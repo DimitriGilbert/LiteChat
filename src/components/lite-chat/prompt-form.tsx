@@ -3,8 +3,8 @@ import { PromptInput } from "./prompt-input";
 import { PromptSettings } from "./prompt-settings";
 import { PromptFiles } from "./prompt-files"; // Import
 import { PromptActions } from "./prompt-actions";
-import { useChatContext } from "@/context/chat-context";
-import { Separator } from "@/components/ui/separator";
+import { useChatContext } from "@/hooks/use-chat-context";
+import { cn } from "@/lib/utils";
 
 interface PromptFormProps {
   className?: string;
@@ -14,26 +14,15 @@ export const PromptForm: React.FC<PromptFormProps> = ({ className }) => {
   const { handleSubmit } = useChatContext();
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className={`space-y-0 ${className}`} // Remove space-y here
-    >
-      {/* Display selected files above input */}
+    <form onSubmit={handleSubmit} className={cn("flex flex-col", className)}>
       <PromptFiles />
 
-      {/* Input area */}
-      <div className="flex items-end gap-2 p-3">
-        {" "}
-        {/* Add padding */}
-        <PromptInput />
+      <div className="flex items-end p-3 md:p-4">
+        <PromptInput className="min-h-[60px]" />
         <PromptActions />
       </div>
 
-      {/* Settings below */}
-      <Separator />
-      <div className="px-3 py-2">
-        {" "}
-        {/* Add padding */}
+      <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
         <PromptSettings />
       </div>
     </form>

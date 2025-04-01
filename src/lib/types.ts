@@ -22,6 +22,7 @@ export interface AiProviderConfig {
   id: string; // e.g., 'openai', 'anthropic'
   name: string; // User-friendly name
   models: AiModelConfig[];
+  requiresApiKey?: boolean;
   // apiKey?: string; // REMOVED - We now select a stored key
 }
 
@@ -109,4 +110,14 @@ export interface ChatContextProps {
 
   // UI Config
   streamingThrottleRate: number;
+
+  // Search
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  // searchOccurrences: number; // Optional: count matches
+  // currentSearchIndex: number; // Optional: for next/prev match nav
+
+  //
+  exportConversation: (conversationId: string | null) => Promise<void>;
+  importConversation: (file: File) => Promise<void>;
 }

@@ -18,8 +18,11 @@ import type {
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { throttle } from "@/lib/throttle";
 import { nanoid } from "nanoid";
-
-const ChatContext = createContext<ChatContextProps | undefined>(undefined);
+import { useDebounce } from "@/hooks/use-debounce";
+import { db } from "@/lib/db"; // Import db directly for export query
+import { z } from "zod"; // Import zod for validation
+import { toast } from "sonner";
+import { ChatContext } from "@/hooks/use-chat-context";
 
 interface ChatProviderProps {
   children: React.ReactNode;
@@ -29,6 +32,19 @@ interface ChatProviderProps {
   initialConversationId?: string | null;
   streamingThrottleRate?: number;
 }
+
+// Zod schema for validating imported messages (adjust as needed)
+const messageImportSchema = z.object({
+  id: z.string(), // Keep original ID? Or generate new? Let's keep for now.
+  role: z.enum(["user", "assistant"]),
+  content: z.string(),
+  createdAt: z
+    .string()
+    .datetime()
+    .transform((dateStr) => new Date(dateStr)), // Parse date string
+  // conversationId will be overridden
+});
+const conversationImportSchema = z.array(messageImportSchema);
 
 export const ChatProvider: React.FC<ChatProviderProps> = ({
   children,
@@ -50,7 +66,16 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [isAiStreaming, setIsAiStreaming] = useState(false);
-  const [error, setError] = useState<string | null>(null); // Global error state
+  const [error, setErrorState] = useState<string | null>(null); // Rename internal state
+
+  // Wrap setError to show toast
+  const setError = useCallback((newError: string | null) => {
+    setErrorState(newError);
+    if (newError) {
+      // Only show toast for new errors, not when clearing
+      toast.error(newError);
+    }
+  }, []);
 
   // State for selected API key ID per provider
   const [selectedApiKeyId, setSelectedApiKeyIdState] = useState<
@@ -68,6 +93,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const [maxTokens, setMaxTokens] = useState<number | null>(null); // null means provider default
   const [systemPrompt, setSystemPrompt] = useState(""); // TODO: Load/Save from storage?
   const [theme, setTheme] = useState<"light" | "dark" | "system">("system"); // TODO: Load/Save, apply theme
+
+  // Search State
+  const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   // Storage Hook
   const {
@@ -222,6 +251,118 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     },
     [renameDbConversation],
   );
+
+  const exportConversation = useCallback(
+    async (conversationId: string | null) => {
+      if (!conversationId) {
+        toast.error("No conversation selected to export.");
+        return;
+      }
+      try {
+        const conversation = await db.conversations.get(conversationId);
+        const messagesToExport = await db.messages
+          .where("conversationId")
+          .equals(conversationId)
+          .sortBy("createdAt");
+
+        if (!conversation || messagesToExport.length === 0) {
+          toast.warning("Cannot export empty or non-existent conversation.");
+          return;
+        }
+
+        // Prepare data (strip conversationId from messages for cleaner export?)
+        const exportData = messagesToExport.map(
+          ({ conversationId, ...msg }) => msg,
+        );
+
+        const jsonString = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        // Sanitize title for filename
+        const filename = `${conversation.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_${conversationId.substring(0, 6)}.json`;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast.success(`Conversation "${conversation.title}" exported.`);
+      } catch (err: any) {
+        console.error("Export failed:", err);
+        toast.error(`Export failed: ${err.message}`);
+      }
+    },
+    [],
+  ); // Dependency: none (uses db directly)
+
+  const importConversation = useCallback(
+    async (file: File) => {
+      if (!file || file.type !== "application/json") {
+        toast.error("Please select a valid JSON file.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const jsonString = event.target?.result as string;
+          const parsedData = JSON.parse(jsonString);
+
+          // Validate structure
+          const validationResult =
+            conversationImportSchema.safeParse(parsedData);
+          if (!validationResult.success) {
+            console.error("Import validation error:", validationResult.error);
+            toast.error(
+              `Import failed: Invalid file format. ${validationResult.error.errors[0]?.message || ""}`,
+            );
+            return;
+          }
+
+          const importedMessages = validationResult.data;
+
+          if (importedMessages.length === 0) {
+            toast.warning("Imported file contains no messages.");
+            return;
+          }
+
+          // Create a new conversation for the import
+          const newConversationTitle = `Imported: ${file.name.replace(/\.json$/i, "")}`;
+          const newConversationId =
+            await createDbConversation(newConversationTitle); // Use DB function
+
+          // Add messages to the new conversation
+          // Use Promise.all for potentially better performance on many messages
+          await Promise.all(
+            importedMessages.map((msg) =>
+              addDbMessage({
+                ...msg, // Spread validated message data (includes role, content, createdAt)
+                conversationId: newConversationId, // Assign to the NEW conversation
+                // id: nanoid(), // Optionally generate new IDs on import
+              }),
+            ),
+          );
+
+          // Select the newly imported conversation
+          selectConversation(newConversationId); // Use the context's select function
+          toast.success(
+            `Conversation imported successfully as "${newConversationTitle}"!`,
+          );
+        } catch (err: any) {
+          console.error("Import failed:", err);
+          toast.error(
+            `Import failed: ${err.message || "Could not read or parse file."}`,
+          );
+        }
+      };
+      reader.onerror = () => {
+        toast.error("Failed to read the file.");
+      };
+      reader.readAsText(file);
+    },
+    [createDbConversation, addDbMessage, selectConversation],
+  ); // Dependencies
 
   // --- Message Handling ---
   useEffect(() => {
@@ -589,6 +730,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       theme,
       setTheme,
       streamingThrottleRate,
+      searchTerm,
+      setSearchTerm,
+      exportConversation, // Add export function
+      importConversation, // Add import function
     }),
     [
       // Keep all previous dependencies
@@ -630,6 +775,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       theme,
       setTheme,
       streamingThrottleRate,
+      searchTerm,
+      exportConversation,
+      importConversation,
     ],
   );
 
@@ -652,13 +800,4 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   return (
     <ChatContext.Provider value={contextValue}>{children}</ChatContext.Provider>
   );
-};
-
-export const useChatContext = (): ChatContextProps => {
-  // ... (keep existing implementation)
-  const context = useContext(ChatContext);
-  if (!context) {
-    throw new Error("useChatContext must be used within a ChatProvider");
-  }
-  return context;
 };

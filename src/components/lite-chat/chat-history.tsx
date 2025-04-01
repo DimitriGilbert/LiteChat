@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useChatContext } from "@/context/chat-context";
-import { MessageSquarePlusIcon, Trash2Icon, Edit3Icon } from "lucide-react";
+import { useChatContext } from "@/hooks/use-chat-context";
+import { Trash2Icon, Edit3Icon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input"; // For renaming
 
@@ -48,23 +48,16 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ className }) => {
     }
   };
 
-  const handleCreate = async () => {
-    const newId = await createConversation();
-    selectConversation(newId);
-  };
-
   return (
-    <div className={`flex h-full flex-col p-2 ${className}`}>
-      <Button
-        variant="outline"
-        className="mb-2 w-full justify-start gap-2"
-        onClick={handleCreate}
-      >
-        <MessageSquarePlusIcon className="h-4 w-4" />
-        New Chat
-      </Button>
-      <ScrollArea className="flex-grow h-0">
+    <div className={cn("flex h-full flex-col", className)}>
+      <ScrollArea className="flex-grow px-3 py-2">
         <div className="space-y-1 pr-2">
+          {conversations.length === 0 && (
+            <div className="text-sm text-gray-400 text-center py-4">
+              No conversations yet
+            </div>
+          )}
+
           {conversations.map((convo) =>
             editingId === convo.id ? (
               <form
@@ -75,51 +68,58 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ className }) => {
                 <Input
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
-                  onBlur={handleCancelRename} // Cancel on blur
+                  onBlur={handleCancelRename}
                   autoFocus
-                  className="h-8 flex-grow"
+                  className="h-9 flex-grow text-sm bg-gray-700 border-gray-600 text-gray-200"
                   aria-label="Rename conversation input"
                 />
-                <Button type="submit" size="sm" variant="ghost">
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 px-2 text-gray-300 hover:text-white"
+                >
                   Save
                 </Button>
               </form>
             ) : (
-              <Button
+              <div
                 key={convo.id}
-                variant={
-                  selectedConversationId === convo.id ? "secondary" : "ghost"
-                }
-                className="group w-full justify-between h-8 px-2"
+                className={cn(
+                  "group w-full justify-between h-10 px-3 text-sm font-normal flex",
+                  selectedConversationId === convo.id
+                    ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                    : "hover:bg-gray-700 text-gray-300",
+                )}
                 onClick={() => selectConversation(convo.id)}
               >
-                <span className="truncate flex-grow text-left text-sm">
+                <span className="truncate flex-grow text-left">
                   {convo.title}
                 </span>
                 <div className="flex-shrink-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6"
+                    className="h-7 w-7 text-gray-400 hover:text-white"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleStartRename(convo.id, convo.title);
                     }}
                     aria-label="Rename conversation"
                   >
-                    <Edit3Icon className="h-3 w-3" />
+                    <Edit3Icon className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive"
+                    className="h-7 w-7 hover:bg-red-900/30 hover:text-red-400 text-gray-400"
                     onClick={(e) => handleDelete(convo.id, e)}
                     aria-label="Delete conversation"
                   >
-                    <Trash2Icon className="h-3 w-3" />
+                    <Trash2Icon className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-              </Button>
+              </div>
             ),
           )}
         </div>

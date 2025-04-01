@@ -6,8 +6,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useChatContext } from "@/context/chat-context";
+import { useChatContext } from "@/hooks/use-chat-context";
 import { KeyIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ApiKeySelectorProps {
   className?: string;
@@ -52,13 +53,18 @@ export const ApiKeySelector: React.FC<ApiKeySelectorProps> = ({
       onValueChange={handleValueChange}
       disabled={!selectedProviderId || availableKeys.length === 0}
     >
-      <SelectTrigger className={`w-[180px] ${className}`}>
-        <KeyIcon className="h-3 w-3 mr-1 text-muted-foreground" />
+      <SelectTrigger
+        className={cn(
+          "w-[180px] h-9 text-sm bg-gray-700 border-gray-600 text-gray-200",
+          className,
+        )}
+      >
+        <KeyIcon className="h-3 w-3 mr-1 text-gray-400" />
         <SelectValue placeholder="Select API Key" />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className="bg-gray-700 border-gray-600 text-gray-200">
         <SelectItem value="none">
-          <span className="text-muted-foreground">None (Use Default)</span>
+          <span className="text-gray-400">None (Use Default)</span>
         </SelectItem>
         {availableKeys.map((key) => (
           <SelectItem key={key.id} value={key.id}>

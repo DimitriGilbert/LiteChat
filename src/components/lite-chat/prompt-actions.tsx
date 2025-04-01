@@ -1,13 +1,14 @@
 import React, { useRef } from "react"; // Add useRef
 import { Button } from "@/components/ui/button";
 import { SendHorizonalIcon, PaperclipIcon } from "lucide-react";
-import { useChatContext } from "@/context/chat-context";
+import { useChatContext } from "@/hooks/use-chat-context";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface PromptActionsProps {
   className?: string;
@@ -37,48 +38,49 @@ export const PromptActions: React.FC<PromptActionsProps> = ({ className }) => {
   };
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      {/* Hidden File Input */}
+    <div className={cn("flex items-end ml-2 mb-1", className)}>
       <input
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
         className="hidden"
-        multiple // Allow multiple files?
-        // accept="image/*" // TODO: Specify acceptable file types
+        multiple
       />
 
       <TooltipProvider delayDuration={100}>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
-              onClick={handleAttachClick} // Use handler
+              onClick={handleAttachClick}
               disabled={isStreaming}
-              aria-label="Attach file" // Update label
+              className="h-10 w-10 rounded-full mr-2 border-gray-200 dark:border-gray-700"
+              aria-label="Attach file"
             >
               <PaperclipIcon className="h-5 w-5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            {/* TODO: Update tooltip based on model capabilities */}
-            <p>Attach file (multimodal support varies)</p>
+            <p>Attach file</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
 
-      {/* ... Send Button ... */}
       <TooltipProvider delayDuration={100}>
         <Tooltip>
           <TooltipTrigger asChild>
             <div>
-              {" "}
-              {/* Wrapper for disabled tooltip */}
               <Button
                 type="submit"
                 size="icon"
                 disabled={!canSubmit}
+                className={cn(
+                  "h-10 w-10 rounded-full",
+                  canSubmit
+                    ? "bg-primary hover:bg-primary/90"
+                    : "bg-gray-200 dark:bg-gray-700",
+                )}
                 aria-label="Send message"
               >
                 <SendHorizonalIcon className="h-5 w-5" />

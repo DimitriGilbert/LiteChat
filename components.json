@@ -17,18 +17,5 @@
     "lib": "@/lib",
     "hooks": "@/hooks"
   },
-  "iconLibrary": "lucide",
-  "registryDependencies": [
-    "button",
-    "dialog",
-    "input",
-    "label",
-    "select",
-    "scroll-area",
-    "separator",
-    "skeleton",
-    "textarea",
-    "tooltip",
-    "alert"
-  ]
+  "iconLibrary": "lucide"
 }

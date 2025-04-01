@@ -6,7 +6,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"; // Assuming shadcn/ui
-import { useChatContext } from "@/context/chat-context";
+import { useChatContext } from "@/hooks/use-chat-context";
+import { cn } from "@/lib/utils";
 
 interface ProviderSelectorProps {
   className?: string;
@@ -33,10 +34,15 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       onValueChange={handleValueChange}
       disabled={providers.length <= 1}
     >
-      <SelectTrigger className={`w-[180px] ${className}`}>
+      <SelectTrigger
+        className={cn(
+          "w-[180px] h-9 text-sm bg-gray-700 border-gray-600 text-gray-200",
+          className,
+        )}
+      >
         <SelectValue placeholder="Select Provider" />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className="bg-gray-700 border-gray-600 text-gray-200">
         {providers.map((provider) => (
           <SelectItem key={provider.id} value={provider.id}>
             {provider.name}

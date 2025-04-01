@@ -20,16 +20,41 @@ const CodeBlock: React.FC<any> = React.memo(
   ({ node, inline, className, children, ...props }) => {
     const match = /language-(\w+)/.exec(className || "");
     return !inline && match ? (
-      <SyntaxHighlighter
-        style={vscDarkPlus} // Or your chosen style
-        language={match[1]}
-        PreTag="div"
+      <div className="relative group">
+        <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 bg-gray-800/80 hover:bg-gray-700 text-gray-200"
+            onClick={() => {
+              navigator.clipboard.writeText(
+                String(children).replace(/\n$/, ""),
+              );
+              toast.success("Code copied to clipboard");
+            }}
+            aria-label="Copy code"
+          >
+            <CopyIcon className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        <SyntaxHighlighter
+          style={vscDarkPlus}
+          language={match[1]}
+          PreTag="div"
+          className="rounded-md !mt-3 !mb-3 !bg-gray-800 dark:!bg-gray-900"
+          {...props}
+        >
+          {String(children).replace(/\n$/, "")}
+        </SyntaxHighlighter>
+      </div>
+    ) : (
+      <code
+        className={cn(
+          "font-mono text-sm px-1 py-0.5 rounded-sm bg-gray-100 dark:bg-gray-800",
+          className,
+        )}
         {...props}
       >
-        {String(children).replace(/\n$/, "")}
-      </SyntaxHighlighter>
-    ) : (
-      <code className={cn("font-mono text-sm", className)} {...props}>
         {children}
       </code>
     );
@@ -41,24 +66,24 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
   ({ message, onRegenerate, className }) => {
     const isUser = message.role === "user";
     const displayContent = message.isStreaming
-      ? (message.streamedContent ?? "") + "▍" // Add cursor during streaming
+      ? (message.streamedContent ?? "") + "▍"
       : message.content;
 
     return (
       <div
         className={cn(
-          "group flex gap-3 p-3 rounded-lg", // Slightly larger gap/padding
-          // isUser ? "bg-primary/5" : "bg-muted/50", // Subtle background difference
+          "group flex gap-4 px-4 py-5 transition-colors",
+          isUser ? "bg-gray-900" : "bg-gray-800",
           className,
         )}
       >
         {/* Avatar/Icon */}
         <div
           className={cn(
-            "flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center",
+            "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-1",
             isUser
-              ? "bg-primary/20 text-primary"
-              : "bg-muted text-muted-foreground",
+              ? "bg-blue-900/30 text-blue-400"
+              : "bg-violet-900/30 text-violet-400",
           )}
         >
           {isUser ? (
@@ -69,31 +94,34 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
         </div>
 
         <div className="flex-grow min-w-0">
-          {" "}
-          {/* Ensure content wraps */}
-          {/* Removed role display, icon is enough */}
-          {/* <div className="font-semibold text-sm mb-1 capitalize">{message.role}</div> */}
+          {/* Role label */}
+          <div className="text-xs font-medium text-gray-400 mb-1">
+            {isUser ? "You" : "Assistant"}
+          </div>
+
           <div
             className={cn(
-              "prose prose-sm dark:prose-invert max-w-none",
-              "prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0", // Tighten prose spacing
-              "prose-code:before:content-none prose-code:after:content-none prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded", // Inline code style
-              "prose-pre:bg-muted prose-pre:p-0 prose-pre:rounded-md prose-pre:my-2", // Pre block style reset for highlighter
+              "prose prose-sm prose-invert max-w-none",
+              "prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1",
+              "prose-headings:mt-4 prose-headings:mb-2",
+              "prose-code:before:content-none prose-code:after:content-none prose-code:bg-gray-700 prose-code:px-1 prose-code:py-0.5 prose-code:rounded-sm",
+              "prose-pre:bg-gray-700 prose-pre:p-0 prose-pre:rounded-md prose-pre:my-2",
             )}
           >
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                code: CodeBlock, // Use custom component for code blocks
+                code: CodeBlock,
               }}
             >
               {displayContent}
             </ReactMarkdown>
           </div>
         </div>
+
         <div className="flex-shrink-0 self-start pt-1">
           <MessageActions
-            messageContent={message.content} // Always copy final content
+            messageContent={message.content}
             onRegenerate={
               !isUser && onRegenerate && !message.isStreaming && !message.error
                 ? () => onRegenerate(message.id)

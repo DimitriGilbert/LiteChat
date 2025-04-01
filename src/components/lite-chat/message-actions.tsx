@@ -1,6 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button"; // Assuming shadcn/ui Button
 import { CopyIcon, RefreshCwIcon } from "lucide-react"; // Example icons
+import { toast } from "sonner";
 
 interface MessageActionsProps {
   messageContent: string;
@@ -11,7 +12,15 @@ interface MessageActionsProps {
 export const MessageActions: React.FC<MessageActionsProps> = React.memo(
   ({ messageContent, onRegenerate, className }) => {
     const handleCopy = () => {
-      navigator.clipboard.writeText(messageContent);
+      navigator.clipboard
+        .writeText(messageContent)
+        .then(() => {
+          toast.success("Copied to clipboard!"); // Use toast
+        })
+        .catch((err) => {
+          toast.error("Failed to copy text.");
+          console.error("Copy failed:", err);
+        });
       // Add toast notification here if desired
     };
 
