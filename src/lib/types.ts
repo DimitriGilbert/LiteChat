@@ -98,13 +98,23 @@ export interface ChatContextProps {
   removeAttachedFile: (fileName: string) => void;
   clearAttachedFiles: () => void;
 
-  // Advanced Settings (Placeholders)
+  // Advanced Settings
   temperature: number;
   setTemperature: (value: number) => void;
   maxTokens: number | null;
   setMaxTokens: (value: number | null) => void;
   systemPrompt: string;
   setSystemPrompt: (value: string) => void;
+  // Add new settings
+  topP: number | null;
+  setTopP: (value: number | null) => void;
+  topK: number | null;
+  setTopK: (value: number | null) => void;
+  presencePenalty: number | null;
+  setPresencePenalty: (value: number | null) => void;
+  frequencyPenalty: number | null;
+  setFrequencyPenalty: (value: number | null) => void;
+
   theme: "light" | "dark" | "system";
   setTheme: (value: "light" | "dark" | "system") => void;
 
@@ -120,4 +130,5 @@ export interface ChatContextProps {
   //
   exportConversation: (conversationId: string | null) => Promise<void>;
   importConversation: (file: File) => Promise<void>;
+  exportAllConversations: () => Promise<void>;
 }

@@ -1,6 +1,21 @@
 @import "tailwindcss";
 @tailwind utilities;
 
+@layer components {
+    /* Ensure the Dialog Overlay has a semi-transparent background */
+    [data-radix-dialog-overlay][data-state="open"] {
+        /* Use the CSS variable defined in @layer base */
+        /* Adjust alpha (0.8 = 80% opaque) */
+        background-color: hsla(var(--background) / 0.8);
+    }
+
+    /* Ensure Dialog Content definitely has a solid background */
+    [data-radix-dialog-content][data-state="open"] {
+        /* Use the CSS variable defined in @layer base */
+        background-color: hsl(var(--background));
+    }
+}
+
 @layer base {
     :root {
         --background: 0 0% 100%;

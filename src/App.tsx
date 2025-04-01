@@ -6,7 +6,7 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 const lmstudio = createOpenAICompatible({
   name: "lmstudio",
-  baseURL: "http://192.168.1.70:1234",
+  baseURL: "http://192.168.1.70:1234/v1",
 });
 
 const chatProviders: AiProviderConfig[] = [
