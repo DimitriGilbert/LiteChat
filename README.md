@@ -12,6 +12,8 @@ It operates purely within the user's browser, leveraging the power of the **Verc
 
 The core philosophy revolves around a **"Bring Your Own API Key" (BYOK)** model, giving end-users control over their AI provider credentials while simplifying deployment for developers. LiteChat is structured as a composable component system, making it easy to customize and integrate seamlessly, especially within ecosystems like **shadcn/ui**.
 
+It is built on Typescript, React 19, Tailwind V4 and uses Shadcn components.
+
 ## Core Goals & Philosophy
 
 *   **🚀 Simplicity & Lightweight:** Minimal footprint, easy integration, and no server-side dependencies. Get a chat interface running in minutes.

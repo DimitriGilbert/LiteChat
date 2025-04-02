@@ -6,15 +6,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SettingsGeneral } from "./settings-general";
 import { SettingsApiKeys } from "./settings-api-keys";
 import { SettingsDataManagement } from "./settings-data-management";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils"; // Import cn
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -28,12 +25,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       {/* Add bg-background here */}
-      <DialogContent
-        className={cn(
-          "sm:max-w-[650px] flex flex-col max-h-[80vh]",
-          "bg-background", // Explicitly set background color
-        )}
-      >
+      <DialogContent className="sm:max-w-[650px] flex flex-col max-h-[80vh] bg-cyan-950">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>

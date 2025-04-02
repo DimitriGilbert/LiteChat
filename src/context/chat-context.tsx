@@ -1,3 +1,5 @@
+// src/context/chat-context.tsx
+
 import React, {
   useState,
   useCallback,
@@ -5,14 +7,14 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { streamText, type CoreMessage } from "ai"; // Import CoreMessage
+import { streamText, type CoreMessage } from "ai";
 import type { AiProviderConfig, ChatContextProps, Message } from "@/lib/types";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { throttle } from "@/lib/throttle";
 import { nanoid } from "nanoid";
 import { useDebounce } from "@/hooks/use-debounce";
-import { db } from "@/lib/db"; // Import db directly for export query
-import { z } from "zod"; // Import zod for validation
+import { db } from "@/lib/db"; // Import db directly
+import { z } from "zod";
 import { toast } from "sonner";
 import { ChatContext } from "@/hooks/use-chat-context";
 
@@ -25,16 +27,14 @@ interface ChatProviderProps {
   streamingThrottleRate?: number;
 }
 
-// Zod schema for validating imported messages (adjust as needed)
 const messageImportSchema = z.object({
-  id: z.string(), // Keep original ID? Or generate new? Let's keep for now.
+  id: z.string(),
   role: z.enum(["user", "assistant"]),
   content: z.string(),
   createdAt: z
     .string()
     .datetime()
-    .transform((dateStr) => new Date(dateStr)), // Parse date string
-  // conversationId will be overridden
+    .transform((dateStr) => new Date(dateStr)),
 });
 const conversationImportSchema = z.array(messageImportSchema);
 
@@ -55,82 +55,72 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | null
   >(initialConversationId);
+
+  // --- State Management Change ---
+  // localMessages is the primary source for the UI rendering.
+  // It's updated manually on submit/stream and loaded initially from DB on convo switch.
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
-  const [isAiStreaming, setIsAiStreaming] = useState(false);
-  const [error, setErrorState] = useState<string | null>(null); // Rename internal state
+  // --- End State Management Change ---
 
-  // Wrap setError to show toast
+  const [isAiStreaming, setIsAiStreaming] = useState(false);
+  const [error, setErrorState] = useState<string | null>(null);
+
   const setError = useCallback((newError: string | null) => {
     setErrorState(newError);
     if (newError) {
-      // Only show toast for new errors, not when clearing
       toast.error(newError);
     }
   }, []);
 
-  // State for selected API key ID per provider
   const [selectedApiKeyId, setSelectedApiKeyIdState] = useState<
     Record<string, string | null>
   >({});
-
-  // Input State
   const [prompt, setPrompt] = useState("");
-
-  // File State (Placeholder)
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-
-  // Advanced Settings State (Placeholders with defaults)
   const [temperature, setTemperature] = useState(0.7);
-  const [maxTokens, setMaxTokens] = useState<number | null>(null); // null means provider default
+  const [maxTokens, setMaxTokens] = useState<number | null>(null);
   const [systemPrompt, setSystemPrompt] = useState(
     "You are a helpful AI assitant that respond precisely and concisely to user requests",
-  ); // TODO: Load/Save from storage?
+  );
   const [topP, setTopP] = useState<number | null>(null);
   const [topK, setTopK] = useState<number | null>(null);
   const [presencePenalty, setPresencePenalty] = useState<number | null>(null);
   const [frequencyPenalty, setFrequencyPenalty] = useState<number | null>(null);
-
-  const [theme, setTheme] = useState<"light" | "dark" | "system">("system"); // TODO: Load/Save, apply theme
-
-  // Search State
+  const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  // Storage Hook
+  // Storage Hook (useLiveQuery for conversations/keys still active)
   const {
     conversations,
     createConversation: createDbConversation,
     deleteConversation: deleteDbConversation,
     renameConversation: renameDbConversation,
-    messages: dbMessages,
+    // messages: dbMessages, // We won't directly use the live query result for localMessages anymore
     addDbMessage,
     deleteDbMessage,
     getDbMessagesUpTo,
-    apiKeys, // Get keys from storage hook
+    apiKeys,
     addApiKey: addDbApiKey,
     deleteApiKey: deleteDbApiKey,
-  } = useChatStorage(selectedConversationId);
+  } = useChatStorage(selectedConversationId); // Pass ID for filtering other live queries
 
-  // Streaming Control
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // --- API Key Management ---
   const setSelectedApiKeyId = useCallback(
     (providerId: string, keyId: string | null) => {
       setSelectedApiKeyIdState((prev) => ({ ...prev, [providerId]: keyId }));
-      // TODO: Persist selection in localStorage?
     },
     [],
   );
 
   const addApiKey = useCallback(
     async (name: string, providerId: string, value: string) => {
-      // Clear sensitive value quickly
       const keyToAdd = value;
-      value = ""; // Clear from memory scope if possible
+      value = "";
       const newId = await addDbApiKey(name, providerId, keyToAdd);
-      // Auto-select the newly added key for its provider
       setSelectedApiKeyId(providerId, newId);
       return newId;
     },
@@ -141,7 +131,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     async (id: string) => {
       const keyToDelete = apiKeys.find((k) => k.id === id);
       await deleteDbApiKey(id);
-      // If the deleted key was selected, deselect it
       if (keyToDelete && selectedApiKeyId[keyToDelete.providerId] === id) {
         setSelectedApiKeyId(keyToDelete.providerId, null);
       }
@@ -149,7 +138,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     [apiKeys, deleteDbApiKey, selectedApiKeyId, setSelectedApiKeyId],
   );
 
-  // Get the *value* of the currently selected API key for a given provider
   const getApiKeyForProvider = useCallback(
     (providerId: string): string | undefined => {
       const selectedId = selectedApiKeyId[providerId];
@@ -160,7 +148,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   );
 
   // --- Provider/Model Selection ---
-  // ... (keep existing auto-selection logic) ...
   const selectedProvider = useMemo(
     () => providers.find((p) => p.id === selectedProviderId),
     [providers, selectedProviderId],
@@ -198,29 +185,40 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     }
   }, [providers, selectedProviderId, selectedModelId, selectedProvider]);
 
+  // --- File Handling ---
+  const addAttachedFile = useCallback((file: File) => {
+    setAttachedFiles((prev) => [...prev, file]);
+  }, []);
+
+  const removeAttachedFile = useCallback((fileName: string) => {
+    setAttachedFiles((prev) => prev.filter((f) => f.name !== fileName));
+  }, []);
+
+  const clearAttachedFiles = useCallback(() => {
+    setAttachedFiles([]);
+  }, []);
+
   // --- Conversation Management ---
   const selectConversation = useCallback(
     (id: string | null) => {
-      // ... (keep existing implementation)
       if (isAiStreaming) {
         abortControllerRef.current?.abort();
         setIsAiStreaming(false);
       }
-      setSelectedConversationId(id);
-      setLocalMessages([]);
-      setIsLoadingMessages(true);
+      // Don't clear localMessages here, the useEffect below will handle loading
+      setIsLoadingMessages(true); // Show loading indicator
       setPrompt("");
-      setError(null); // Clear error on conversation change
-      clearAttachedFiles(); // Clear files
+      setError(null);
+      clearAttachedFiles();
+      setSelectedConversationId(id); // This triggers the useEffect below
     },
-    [isAiStreaming], // Add clearAttachedFiles when implemented
+    [isAiStreaming, clearAttachedFiles, setError],
   );
 
   const createConversation = useCallback(
     async (title?: string): Promise<string> => {
-      // ... (keep existing implementation)
       const newId = await createDbConversation(title);
-      selectConversation(newId);
+      selectConversation(newId); // Select triggers load via useEffect
       return newId;
     },
     [createDbConversation, selectConversation],
@@ -228,31 +226,32 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
   const deleteConversation = useCallback(
     async (id: string): Promise<void> => {
-      // ... (keep existing implementation)
+      const currentSelectedId = selectedConversationId; // Capture before potential change
       await deleteDbConversation(id);
-      if (selectedConversationId === id) {
-        const nextConversation = conversations.find((c) => c.id !== id);
-        selectConversation(nextConversation?.id ?? null);
+      if (currentSelectedId === id) {
+        // Find the next available conversation *after* deletion
+        const remainingConversations = await db.conversations
+          .orderBy("updatedAt")
+          .reverse()
+          .toArray();
+        selectConversation(remainingConversations[0]?.id ?? null);
       }
+      // No need to manually update `conversations` state, useLiveQuery handles it
     },
-    [
-      deleteDbConversation,
-      selectedConversationId,
-      selectConversation,
-      conversations,
-    ],
+    [deleteDbConversation, selectedConversationId, selectConversation],
   );
 
   const renameConversation = useCallback(
     async (id: string, newTitle: string): Promise<void> => {
-      // ... (keep existing implementation)
       await renameDbConversation(id, newTitle);
+      // No need to manually update `conversations` state, useLiveQuery handles it
     },
     [renameDbConversation],
   );
 
   const exportConversation = useCallback(
     async (conversationId: string | null) => {
+      // ... (implementation remains the same)
       if (!conversationId) {
         toast.error("No conversation selected to export.");
         return;
@@ -269,7 +268,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           return;
         }
 
-        // Prepare data (strip conversationId from messages for cleaner export?)
         const exportData = messagesToExport.map(
           ({ conversationId, ...msg }) => msg,
         );
@@ -279,7 +277,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        // Sanitize title for filename
         const filename = `${conversation.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_${conversationId.substring(0, 6)}.json`;
         link.download = filename;
         document.body.appendChild(link);
@@ -293,10 +290,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       }
     },
     [],
-  ); // Dependency: none (uses db directly)
+  );
 
   const importConversation = useCallback(
     async (file: File) => {
+      // ... (implementation remains the same)
       if (!file || file.type !== "application/json") {
         toast.error("Please select a valid JSON file.");
         return;
@@ -308,7 +306,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           const jsonString = event.target?.result as string;
           const parsedData = JSON.parse(jsonString);
 
-          // Validate structure
           const validationResult =
             conversationImportSchema.safeParse(parsedData);
           if (!validationResult.success) {
@@ -326,25 +323,20 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
             return;
           }
 
-          // Create a new conversation for the import
           const newConversationTitle = `Imported: ${file.name.replace(/\.json$/i, "")}`;
           const newConversationId =
-            await createDbConversation(newConversationTitle); // Use DB function
+            await createDbConversation(newConversationTitle);
 
-          // Add messages to the new conversation
-          // Use Promise.all for potentially better performance on many messages
           await Promise.all(
             importedMessages.map((msg) =>
               addDbMessage({
-                ...msg, // Spread validated message data (includes role, content, createdAt)
-                conversationId: newConversationId, // Assign to the NEW conversation
-                // id: nanoid(), // Optionally generate new IDs on import
+                ...msg,
+                conversationId: newConversationId,
               }),
             ),
           );
 
-          // Select the newly imported conversation
-          selectConversation(newConversationId); // Use the context's select function
+          selectConversation(newConversationId);
           toast.success(
             `Conversation imported successfully as "${newConversationTitle}"!`,
           );
@@ -361,34 +353,58 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       reader.readAsText(file);
     },
     [createDbConversation, addDbMessage, selectConversation],
-  ); // Dependencies
+  );
 
-  // --- Message Handling ---
+  // --- Message Loading Effect ---
+  // *** MODIFIED EFFECT ***
+  // This effect now ONLY runs when the selectedConversationId changes.
+  // It fetches the messages for that conversation directly from the DB
+  // and sets the localMessages state, which is used for rendering.
   useEffect(() => {
-    setIsLoadingMessages(true);
-    setLocalMessages(dbMessages.map((m) => ({ ...m }))); // Map DbMessage to Message
-    setIsLoadingMessages(false);
-  }, [dbMessages]);
-
-  // --- File Handling (Placeholders) ---
-  const addAttachedFile = useCallback((file: File) => {
-    setAttachedFiles((prev) => [...prev, file]);
-    // TODO: Add validation (size, type, count)
-  }, []);
-
-  const removeAttachedFile = useCallback((fileName: string) => {
-    setAttachedFiles((prev) => prev.filter((f) => f.name !== fileName));
-  }, []);
-
-  const clearAttachedFiles = useCallback(() => {
-    setAttachedFiles([]);
-  }, []);
+    // Only run if a conversation is selected
+    if (selectedConversationId) {
+      console.log(
+        `Loading messages for ${selectedConversationId} directly from DB`,
+      );
+      setIsLoadingMessages(true);
+      // Fetch messages directly from Dexie for the selected conversation
+      db.messages
+        .where("conversationId")
+        .equals(selectedConversationId)
+        .sortBy("createdAt")
+        .then((messagesFromDb) => {
+          // Populate localMessages with data fetched from DB
+          setLocalMessages(
+            messagesFromDb.map((dbMsg) => ({
+              ...dbMsg,
+              // Ensure runtime properties are reset correctly on load
+              isStreaming: false,
+              streamedContent: undefined,
+              error: null,
+            })),
+          );
+          setIsLoadingMessages(false);
+        })
+        .catch((err) => {
+          // Handle potential errors during fetch
+          console.error("Failed to load messages from DB:", err);
+          setError(`Error loading chat: ${err.message}`);
+          setLocalMessages([]); // Clear messages on error
+          setIsLoadingMessages(false);
+        });
+    } else {
+      // No conversation selected, clear messages and loading state
+      setLocalMessages([]);
+      setIsLoadingMessages(false);
+    }
+    // DEPEND ONLY ON selectedConversationId and setError
+  }, [selectedConversationId, setError]); // <-- REMOVED dbMessages dependency
 
   // --- Stop Streaming Function ---
   const stopStreaming = useCallback(() => {
-    // ... (keep existing implementation)
     abortControllerRef.current?.abort();
     setIsAiStreaming(false);
+    // Update the message in localMessages directly
     setLocalMessages((prev) =>
       prev.map((msg) =>
         msg.isStreaming
@@ -401,14 +417,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           : msg,
       ),
     );
-  }, []);
+  }, []); // No dependency on localMessages needed here
 
   // --- Core AI Call Logic ---
   const performAiStream = useCallback(
     async (
-      // *** MODIFIED: Accept conversationId and the exact messages to send ***
       conversationIdToUse: string,
-      messagesToSend: CoreMessage[], // The final array for the API
+      messagesToSend: CoreMessage[],
       currentTemperature: number,
       currentMaxTokens: number | null,
       currentTopP: number | null,
@@ -416,40 +431,24 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       currentPresencePenalty: number | null,
       currentFrequencyPenalty: number | null,
     ) => {
-      // Use passed conversationIdToUse for checks and DB operations
-      if (!conversationIdToUse) {
-        console.error(
-          "performAiStream called without valid conversationIdToUse",
-        );
-        throw new Error(
-          "Internal Error: No active conversation ID provided for AI stream.",
-        );
-      }
-      // Checks for model/provider still read from state (should be stable enough)
-      if (!selectedModel || !selectedProvider) {
-        console.error("performAiStream called without selectedModel/Provider");
+      if (!conversationIdToUse)
+        throw new Error("Internal Error: No active conversation ID provided.");
+      if (!selectedModel || !selectedProvider)
         throw new Error("AI provider or model not selected.");
-      }
 
       const apiKey = getApiKeyForProvider(selectedProvider.id);
       const needsKey =
         selectedProvider.requiresApiKey ?? selectedProvider.id !== "mock";
-
-      if (needsKey && !apiKey) {
-        console.error(
-          `API Key missing for ${selectedProvider.name} (ID: ${selectedProvider.id})`,
-        );
+      if (needsKey && !apiKey)
         throw new Error(
           `API Key for ${selectedProvider.name} is not set or selected.`,
         );
-      }
 
-      // Add placeholder for AI response
       const assistantMessageId = nanoid();
       const assistantPlaceholderTimestamp = new Date();
       const assistantPlaceholder: Message = {
         id: assistantMessageId,
-        conversationId: conversationIdToUse, // Use passed ID
+        conversationId: conversationIdToUse,
         role: "assistant",
         content: "",
         createdAt: assistantPlaceholderTimestamp,
@@ -457,14 +456,20 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         streamedContent: "",
         error: null,
       };
-      setLocalMessages((prev) => [...prev, assistantPlaceholder]); // Update local state
+
+      // --- Manual State Update ---
+      // Add the placeholder directly to localMessages for immediate UI update
+      setLocalMessages((prev) => [...prev, assistantPlaceholder]);
+      // --- End Manual State Update ---
+
       setIsAiStreaming(true);
       setError(null);
 
       abortControllerRef.current = new AbortController();
 
-      // Throttled UI update logic remains the same
       const throttledStreamUpdate = throttle((streamedContentChunk: string) => {
+        // --- Manual State Update ---
+        // Update the placeholder in localMessages directly
         setLocalMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMessageId
@@ -476,22 +481,21 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
               : msg,
           ),
         );
+        // --- End Manual State Update ---
       }, streamingThrottleRate);
 
       let finalContent = "";
       let streamError: Error | null = null;
 
       try {
-        // *** MODIFIED: Use the passed messagesToSend directly ***
         console.log(
           "Sending messages to AI:",
           JSON.stringify(messagesToSend, null, 2),
-        ); // DEBUG LOG
+        );
 
         const result = streamText({
           model: selectedModel.instance,
-          messages: messagesToSend, // Use the passed array
-          tools: selectedModel.tools,
+          messages: messagesToSend,
           abortSignal: abortControllerRef.current.signal,
           temperature: currentTemperature,
           maxTokens: currentMaxTokens ?? undefined,
@@ -499,30 +503,36 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           topK: currentTopK ?? undefined,
           presencePenalty: currentPresencePenalty ?? undefined,
           frequencyPenalty: currentFrequencyPenalty ?? undefined,
-          // TODO: Pass API key if required
         });
 
         for await (const delta of result.textStream) {
           finalContent += delta;
           throttledStreamUpdate(delta);
         }
+        console.log("Stream finished. Final raw content:", finalContent);
       } catch (err: any) {
+        streamError = err;
         if (err.name === "AbortError") {
-          console.log("Stream aborted.");
-          // Read potentially updated streamedContent from state for abort case
-          finalContent =
-            localMessages.find((m) => m.id === assistantMessageId)
-              ?.streamedContent || "Stopped";
+          console.log("Stream aborted by user.");
+          // Read final content from state *before* the final update below
+          setLocalMessages((prev) => {
+            const abortedMsg = prev.find((m) => m.id === assistantMessageId);
+            finalContent = abortedMsg?.streamedContent || "Stopped";
+            return prev; // No state change here, just reading
+          });
+          streamError = null;
         } else {
           console.error("streamText error:", err);
-          streamError = err;
           finalContent = `Error: ${err.message || "Failed to get response"}`;
         }
       } finally {
         abortControllerRef.current = null;
         setIsAiStreaming(false);
 
-        // Update local state with final/partial/error content
+        console.log("Saving final content:", finalContent);
+
+        // --- Manual State Update ---
+        // Update the final assistant message in localMessages directly
         setLocalMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMessageId
@@ -536,35 +546,45 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
               : msg,
           ),
         );
+        // --- End Manual State Update ---
 
-        // Persist the final assistant message to Dexie
-        await addDbMessage({
-          id: assistantMessageId,
-          conversationId: conversationIdToUse, // Use passed ID
-          role: "assistant",
-          content: finalContent,
-          createdAt: assistantPlaceholderTimestamp,
-        });
-
-        if (streamError && streamError.name !== "AbortError") {
+        // --- Persist Final Assistant Message to DB ---
+        if (!streamError) {
+          await addDbMessage({
+            id: assistantMessageId,
+            conversationId: conversationIdToUse,
+            role: "assistant",
+            content: finalContent,
+            createdAt: assistantPlaceholderTimestamp,
+          }).catch((dbErr) => {
+            console.error(
+              "Failed to save final assistant message to DB:",
+              dbErr,
+            );
+            setError(`Error saving response: ${dbErr.message}`);
+            // Optionally update the message state again to show a save error?
+            setLocalMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, error: `Save failed: ${dbErr.message}` }
+                  : msg,
+              ),
+            );
+          });
+        } else {
           setError(`AI Error: ${streamError.message}`);
-        } else if (streamError?.name === "AbortError") {
-          setError(null);
         }
       }
     },
     [
-      // Dependencies:
       selectedModel,
       selectedProvider,
       getApiKeyForProvider,
       addDbMessage,
-      localMessages, // Still needed for abort case reading streamedContent
       streamingThrottleRate,
       setError,
-      setLocalMessages,
-      setIsAiStreaming,
-      // Removed history construction logic dependencies
+      // setLocalMessages is implicitly used via the state updater functions
+      // No need to list localMessages itself as a dependency here
     ],
   );
 
@@ -573,7 +593,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     async (e?: React.FormEvent<HTMLFormElement>) => {
       e?.preventDefault();
       const currentPrompt = prompt.trim();
-      const canSubmit = currentPrompt.length > 0; // || attachedFiles.length > 0;
+      const canSubmit = currentPrompt.length > 0;
 
       if (!canSubmit || isAiStreaming) {
         return;
@@ -581,15 +601,17 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
       let currentConversationId = selectedConversationId;
 
-      // --- Conversation Handling ---
       if (!currentConversationId) {
         try {
           console.log("No conversation selected, creating new one...");
-          const newConvId = await createConversation("New Chat");
+          const newConvId = await createConversation("New Chat"); // This now selects and triggers load
           if (!newConvId)
             throw new Error("Failed to create a new conversation ID.");
-          currentConversationId = newConvId;
+          currentConversationId = newConvId; // Update ID for this submission
           console.log("New conversation created:", currentConversationId);
+          // Wait a tick for the state update from selectConversation to potentially settle?
+          // Or rely on the fact that addDbMessage below will use the correct ID.
+          // await new Promise(resolve => setTimeout(resolve, 0));
         } catch (err: any) {
           console.error("Error creating conversation during submit:", err);
           setError(`Error: Could not start chat - ${err.message}`);
@@ -597,124 +619,117 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         }
       }
 
-      // --- Provider/Model Check ---
+      // Re-check after potential conversation creation
+      if (!currentConversationId) {
+        setError("Error: Could not determine active conversation.");
+        return;
+      }
+
       if (!selectedProvider || !selectedModel) {
         setError("Error: Please select an AI Provider and Model first.");
         return;
       }
 
-      // --- Prepare User Message ---
       const userPromptContent = currentPrompt;
-      setPrompt(""); // Clear prompt early
+      setPrompt("");
       clearAttachedFiles();
       setError(null);
 
       let userMessageId: string;
       let userMessageForState: Message;
+      const userMessageTimestamp = new Date(); // Consistent timestamp
+
       try {
         const userMessageData = {
           role: "user" as const,
           content: userPromptContent,
           conversationId: currentConversationId,
+          createdAt: userMessageTimestamp, // Use consistent timestamp
         };
+        // Add to DB first
         userMessageId = await addDbMessage(userMessageData);
+        // Prepare the object for state
         userMessageForState = {
           ...userMessageData,
-          id: userMessageId,
-          createdAt: new Date(),
+          id: userMessageId, // Use ID from DB
         };
-
-        // Update local state immediately
-        setLocalMessages((prevMessages) => [
-          ...prevMessages,
-          userMessageForState,
-        ]);
       } catch (dbError: any) {
         console.error("Error adding user message to DB:", dbError);
         setError(`Error: Could not save your message - ${dbError.message}`);
         return;
       }
 
-      // --- Prepare and Send to AI ---
-      // Use a functional state update callback. Inside it, construct the history
-      // and *immediately* call performAiStream.
-      setLocalMessages((currentLocalMessages) => {
-        // Construct the history from the *current* state, which includes the new user message
-        const history = currentLocalMessages
-          .filter((m) => m.conversationId === currentConversationId && !m.error)
-          .map(
-            (m): CoreMessage => ({
-              role: m.role,
-              content: m.content,
-            }),
-          );
+      // --- Prepare Full Message List for AI (using current localMessages + new user message) ---
+      // Use localMessages as it's the source of truth for the UI history at this point
+      const currentHistory = localMessages
+        .filter((m) => !m.error) // Exclude errored messages from history
+        .map((m): CoreMessage => ({ role: m.role, content: m.content }));
 
-        // Prepare the final message list for the AI
-        const messagesToSendForAI: CoreMessage[] = [];
-        if (systemPrompt) {
-          messagesToSendForAI.push({ role: "system", content: systemPrompt });
-        }
-        messagesToSendForAI.push(...history);
+      const messagesToSendForAI: CoreMessage[] = [];
+      if (systemPrompt) {
+        messagesToSendForAI.push({ role: "system", content: systemPrompt });
+      }
+      messagesToSendForAI.push(...currentHistory);
+      messagesToSendForAI.push({
+        role: userMessageForState.role,
+        content: userMessageForState.content,
+      });
 
-        console.log(
-          "Final messagesToSendForAI (inside state reader):",
-          JSON.stringify(messagesToSendForAI, null, 2),
-        );
+      console.log(
+        "Messages prepared for AI:",
+        JSON.stringify(messagesToSendForAI, null, 2),
+      );
 
-        // *** CRITICAL: Check if the list is valid before calling AI ***
-        // Check if there's at least one non-system message
+      // --- Manual State Update ---
+      // Add the user message directly to localMessages for immediate UI update
+      setLocalMessages((prevMessages) => [
+        ...prevMessages,
+        userMessageForState,
+      ]);
+      // --- End Manual State Update ---
+
+      // --- Call AI Stream ---
+      try {
         const hasUserOrAssistantMessage = messagesToSendForAI.some(
           (m) => m.role !== "system",
         );
-
         if (!hasUserOrAssistantMessage) {
           console.error(
             "handleSubmit Error: Attempting to send empty or system-only message list to AI.",
           );
-          // Update error state *outside* the setter if possible, or handle carefully
-          // Using setTimeout to break out of the setter context for the error update
-          setTimeout(
-            () => setError("Internal Error: Cannot send empty message list."),
-            0,
+          setError("Internal Error: Cannot send empty message list.");
+          // Revert the user message state update
+          setLocalMessages((prev) =>
+            prev.filter((m) => m.id !== userMessageId),
           );
-        } else {
-          // *** Call performAiStream from *inside* the state setter callback ***
-          // This ensures it runs *after* history is built based on the latest state.
-          // We don't need to await it here as performAiStream handles its own async logic.
-          performAiStream(
-            currentConversationId, // Pass the definite ID
-            messagesToSendForAI, // Pass the final message list
-            temperature,
-            maxTokens,
-            topP,
-            topK,
-            presencePenalty,
-            frequencyPenalty,
-          ).catch((err) => {
-            // Catch potential errors from performAiStream setup (like missing API key)
-            console.error(
-              "Error during AI stream setup/call (from state setter):",
-              err,
-            );
-            // Update error state *outside* the setter context
-            setTimeout(() => setError(`Error: ${err.message}`), 0);
-          });
+          return;
         }
 
-        // This state update doesn't actually change the state,
-        // it's just used as a reliable point to execute code after the previous update.
-        return currentLocalMessages;
-      });
+        await performAiStream(
+          currentConversationId,
+          messagesToSendForAI,
+          temperature,
+          maxTokens,
+          topP,
+          topK,
+          presencePenalty,
+          frequencyPenalty,
+        );
+      } catch (err: any) {
+        console.error("Error during AI stream setup/call:", err);
+        setError(`Error: ${err.message}`);
+        // Revert the user message state update if AI call setup fails
+        setLocalMessages((prev) => prev.filter((m) => m.id !== userMessageId));
+      }
     },
     [
-      // Dependencies:
       prompt,
       selectedConversationId,
       selectedModel,
       selectedProvider,
       isAiStreaming,
       addDbMessage,
-      performAiStream, // Dependency needed
+      performAiStream,
       clearAttachedFiles,
       setError,
       systemPrompt,
@@ -724,10 +739,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       topK,
       presencePenalty,
       frequencyPenalty,
-      createConversation,
+      createConversation, // Needed for creating new chat on submit
       setPrompt,
-      setLocalMessages, // Dependency needed
-      // attachedFiles
+      localMessages, // Needed for history construction
+      // setLocalMessages is implicitly used via state updater
     ],
   );
 
@@ -744,7 +759,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
       setError(null);
 
-      // 1. Find the message index
+      // 1. Find the message index in localMessages
       const messageIndex = localMessages.findIndex((m) => m.id === messageId);
       if (messageIndex < 0) {
         setError("Cannot regenerate non-existent message.");
@@ -756,39 +771,47 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         return;
       }
 
-      // 2. Get history up to the point *before* the message to regenerate
-      const historyMessages = await getDbMessagesUpTo(
-        conversationIdToUse,
-        messageId,
-      );
+      // 2. Get history from localMessages up to the point *before* the message
+      const historyForRegen = localMessages.slice(0, messageIndex);
 
-      // 3. Construct the message list to send for regeneration
+      // 3. Construct the message list to send
       const messagesToSendForAI: CoreMessage[] = [];
       if (systemPrompt) {
         messagesToSendForAI.push({ role: "system", content: systemPrompt });
       }
       messagesToSendForAI.push(
-        ...historyMessages.map(
-          (m): CoreMessage => ({
-            // Map DB messages to CoreMessage
-            role: m.role,
-            content: m.content,
-            // TODO: Add multimodal content if needed
-          }),
-        ),
+        ...historyForRegen
+          .filter((m) => !m.error) // Exclude errors from regen history
+          .map((m): CoreMessage => ({ role: m.role, content: m.content })),
       );
 
       // 4. Remove the message to regenerate and subsequent messages from DB and state
       const messagesToDelete = localMessages.slice(messageIndex);
       await Promise.all(messagesToDelete.map((m) => deleteDbMessage(m.id)));
-      setLocalMessages((prev) => prev.slice(0, messageIndex)); // Update local state
 
-      // 5. Call the stream function with the truncated history
+      // --- Manual State Update ---
+      // Update local state immediately
+      setLocalMessages((prev) => prev.slice(0, messageIndex));
+      // --- End Manual State Update ---
+
+      // 5. Call the stream function
       try {
-        // *** MODIFIED: Pass conversationIdToUse and the constructed messagesToSendForAI ***
+        // Check history isn't empty (excluding system prompt)
+        const hasUserOrAssistantMessage = messagesToSendForAI.some(
+          (m) => m.role !== "system",
+        );
+        if (!hasUserOrAssistantMessage) {
+          console.error(
+            "Regenerate Error: Attempting to send empty or system-only message list to AI.",
+          );
+          setError("Internal Error: Cannot regenerate with empty history.");
+          // Note: State already updated, maybe show error differently?
+          return;
+        }
+
         await performAiStream(
-          conversationIdToUse, // Pass definite ID
-          messagesToSendForAI, // Pass the history *before* regenerated message
+          conversationIdToUse,
+          messagesToSendForAI,
           temperature,
           maxTokens,
           topP,
@@ -799,30 +822,31 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       } catch (err: any) {
         console.error("Error during regeneration stream setup:", err);
         setError(`Error: ${err.message}`);
+        // If setup fails, the state is already truncated. Maybe try reloading?
+        // Or just display the error.
       }
     },
     [
-      // Dependencies:
       selectedConversationId,
       isAiStreaming,
-      localMessages, // Needed for finding index and slicing
-      getDbMessagesUpTo,
+      localMessages, // Needed for finding index, slicing, and history
       deleteDbMessage,
-      performAiStream, // Expects different args
+      performAiStream,
       setError,
-      systemPrompt, // Needed for constructing messagesToSendForAI
+      systemPrompt,
       temperature,
       maxTokens,
       topP,
       topK,
       presencePenalty,
-      frequencyPenalty, // Settings
-      setLocalMessages, // Needed for state update
+      frequencyPenalty,
+      // setLocalMessages implicitly used
     ],
   );
 
   // --- Export All Conversations ---
   const exportAllConversations = useCallback(async () => {
+    // ... (implementation remains the same)
     try {
       const allConversations = await db.conversations.toArray();
       if (allConversations.length === 0) {
@@ -840,7 +864,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           title: conversation.title,
           createdAt: conversation.createdAt,
           updatedAt: conversation.updatedAt,
-          // Keep original message IDs for potential re-import mapping?
           messages: messages.map(({ conversationId, ...msg }) => msg),
         });
       }
@@ -861,7 +884,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       console.error("Export All failed:", err);
       toast.error(`Export All failed: ${err.message}`);
     }
-  }, []); // No dependencies needed
+  }, []);
 
   // --- Context Value ---
   const contextValue: ChatContextProps = useMemo(
@@ -871,38 +894,46 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       setSelectedProviderId,
       selectedModelId,
       setSelectedModelId,
-      apiKeys, // Pass full list
-      selectedApiKeyId, // Pass selected map
-      setSelectedApiKeyId, // Pass setter
+      apiKeys,
+      selectedApiKeyId,
+      setSelectedApiKeyId,
       addApiKey,
       deleteApiKey,
       getApiKeyForProvider,
-      conversations,
+      conversations: conversations || [], // Use live query result for conversation list
       selectedConversationId,
       selectConversation,
       createConversation,
       deleteConversation,
       renameConversation,
-      messages: localMessages,
+      messages: localMessages, // Use localMessages for rendering
       isLoading: isLoadingMessages,
       isStreaming: isAiStreaming,
-      error, // Pass error state
-      setError, // Pass error setter
+      error,
+      setError,
       prompt,
       setPrompt,
       handleSubmit,
       stopStreaming,
-      regenerateMessage, // Pass regeneration function
-      attachedFiles, // Pass file state
+      regenerateMessage,
+      attachedFiles,
       addAttachedFile,
       removeAttachedFile,
       clearAttachedFiles,
-      temperature, // Pass settings state
+      temperature,
       setTemperature,
       maxTokens,
       setMaxTokens,
       systemPrompt,
       setSystemPrompt,
+      topP, // Pass new settings
+      setTopP,
+      topK,
+      setTopK,
+      presencePenalty,
+      setPresencePenalty,
+      frequencyPenalty,
+      setFrequencyPenalty,
       theme,
       setTheme,
       streamingThrottleRate,
@@ -913,7 +944,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       exportAllConversations,
     }),
     [
-      // Keep all previous dependencies
+      // Ensure all state and functions used in the value are listed
       providers,
       selectedProviderId,
       selectedModelId,
@@ -923,13 +954,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       addApiKey,
       deleteApiKey,
       getApiKeyForProvider,
-      conversations,
+      conversations, // From useLiveQuery
       selectedConversationId,
       selectConversation,
       createConversation,
       deleteConversation,
       renameConversation,
-      localMessages,
+      localMessages, // The UI message state
       isLoadingMessages,
       isAiStreaming,
       error,
@@ -949,17 +980,26 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       setMaxTokens,
       systemPrompt,
       setSystemPrompt,
+      topP,
+      setTopP,
+      topK,
+      setTopK,
+      presencePenalty,
+      setPresencePenalty,
+      frequencyPenalty,
+      setFrequencyPenalty,
       theme,
       setTheme,
       streamingThrottleRate,
       searchTerm,
+      setSearchTerm, // Added setSearchTerm
       exportConversation,
       importConversation,
       exportAllConversations,
     ],
   );
 
-  // Apply theme (Example)
+  // Apply theme
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove("light", "dark");
@@ -972,7 +1012,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     } else {
       root.classList.add(theme);
     }
-    // TODO: Persist theme choice in localStorage
   }, [theme]);
 
   return (

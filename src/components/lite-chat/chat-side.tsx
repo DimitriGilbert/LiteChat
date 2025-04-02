@@ -80,23 +80,6 @@ export const ChatSide: React.FC<ChatSideProps> = ({ className }) => {
         <Button
           variant="outline"
           className="w-full justify-start gap-2 text-sm h-9 border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
-          onClick={handleImportClick}
-        >
-          <UploadIcon className="h-4 w-4" />
-          Import Chat
-        </Button>
-        <Button
-          variant="outline"
-          className="w-full justify-start gap-2 text-sm h-9 border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
-          onClick={handleExportClick}
-          disabled={!selectedConversationId}
-        >
-          <DownloadIcon className="h-4 w-4" />
-          Export Current Chat
-        </Button>
-        <Button
-          variant="outline"
-          className="w-full justify-start gap-2 text-sm h-9 border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
           onClick={() => setIsSettingsOpen(true)}
         >
           <SettingsIcon className="h-4 w-4" />
