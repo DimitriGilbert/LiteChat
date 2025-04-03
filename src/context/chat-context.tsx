@@ -15,7 +15,7 @@ import type {
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { throttle } from "@/lib/throttle";
 import { nanoid } from "nanoid";
-import { useDebounce } from "@/hooks/use-debounce";
+// import { useDebounce } from "@/hooks/use-debounce";
 import { db } from "@/lib/db"; // Import db directly
 import { z } from "zod";
 import { toast } from "sonner";
@@ -105,7 +105,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     updateConversationSystemPrompt: updateDbConversationSystemPrompt,
     addDbMessage,
     deleteDbMessage,
-    getDbMessagesUpTo,
+    // getDbMessagesUpTo,
     apiKeys,
     addApiKey: addDbApiKey,
     deleteApiKey: deleteDbApiKey,
