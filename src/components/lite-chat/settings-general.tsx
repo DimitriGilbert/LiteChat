@@ -47,17 +47,6 @@ export const SettingsGeneral: React.FC = () => {
           </Label>
         </RadioGroup>
       </div>
-
-      {/* Add other general settings here if needed */}
-      {/* Example:
-      <div>
-        <h3 className="text-lg font-medium mb-2">Feature Toggles</h3>
-        <div className="flex items-center space-x-2">
-          <Switch id="some-feature" />
-          <Label htmlFor="some-feature">Enable Experimental Feature X</Label>
-        </div>
-      </div>
-      */}
     </div>
   );
 };

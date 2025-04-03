@@ -13,6 +13,7 @@ export function useChatStorage(conversationId: string | null) {
 
   const createConversation = async (
     title: string = "New Chat",
+    initialSystemPrompt?: string | null,
   ): Promise<string> => {
     // ... (keep existing implementation)
     const newId = nanoid();
@@ -20,6 +21,7 @@ export function useChatStorage(conversationId: string | null) {
     const newConversation: DbConversation = {
       id: newId,
       title,
+      systemPrompt: initialSystemPrompt ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -39,10 +41,19 @@ export function useChatStorage(conversationId: string | null) {
     id: string,
     newTitle: string,
   ): Promise<void> => {
-    // ... (keep existing implementation)
     await db.conversations.update(id, {
       title: newTitle,
       updatedAt: new Date(),
+    });
+  };
+
+  const updateConversationSystemPrompt = async (
+    id: string,
+    systemPrompt: string | null,
+  ): Promise<void> => {
+    await db.conversations.update(id, {
+      systemPrompt: systemPrompt,
+      updatedAt: new Date(), // Also update timestamp
     });
   };
 
@@ -140,11 +151,12 @@ export function useChatStorage(conversationId: string | null) {
     createConversation,
     deleteConversation,
     renameConversation,
+    updateConversationSystemPrompt,
     messages: (messages || []) as DbMessage[],
     addDbMessage,
     updateDbMessageContent,
-    deleteDbMessage, // Export delete message
-    getDbMessagesUpTo, // Export history getter
+    deleteDbMessage,
+    getDbMessagesUpTo,
     apiKeys: apiKeys || [],
     addApiKey,
     deleteApiKey,

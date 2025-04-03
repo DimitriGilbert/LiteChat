@@ -30,6 +30,7 @@ export interface AiProviderConfig {
 export interface DbConversation {
   id: string;
   title: string;
+  systemPrompt?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -77,6 +78,10 @@ export interface ChatContextProps {
   createConversation: (title?: string) => Promise<string>;
   deleteConversation: (id: string) => Promise<void>;
   renameConversation: (id: string, newTitle: string) => Promise<void>;
+  updateConversationSystemPrompt: (
+    id: string,
+    systemPrompt: string | null,
+  ) => Promise<void>;
 
   // Messages
   messages: Message[];
@@ -103,9 +108,9 @@ export interface ChatContextProps {
   setTemperature: (value: number) => void;
   maxTokens: number | null;
   setMaxTokens: (value: number | null) => void;
-  systemPrompt: string;
-  setSystemPrompt: (value: string) => void;
-  // Add new settings
+  globalSystemPrompt: string; // Global default system prompt
+  setGlobalSystemPrompt: (value: string) => void; // Setter for global prompt
+  activeSystemPrompt: string | null;
   topP: number | null;
   setTopP: (value: number | null) => void;
   topK: number | null;

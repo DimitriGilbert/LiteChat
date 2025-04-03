@@ -1,5 +1,3 @@
-// src/context/chat-context.tsx
-
 import React, {
   useState,
   useCallback,
@@ -8,7 +6,12 @@ import React, {
   useRef,
 } from "react";
 import { streamText, type CoreMessage } from "ai";
-import type { AiProviderConfig, ChatContextProps, Message } from "@/lib/types";
+import type {
+  AiProviderConfig,
+  ChatContextProps,
+  Message,
+  DbConversation,
+} from "@/lib/types";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { throttle } from "@/lib/throttle";
 import { nanoid } from "nanoid";
@@ -80,16 +83,18 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState<number | null>(null);
-  const [systemPrompt, setSystemPrompt] = useState(
-    "You are a helpful AI assitant that respond precisely and concisely to user requests",
+
+  const [globalSystemPrompt, setGlobalSystemPrompt] = useState(
+    "You are a helpful AI assistant.", // Default global prompt
   );
+  const [activeConversationData, setActiveConversationData] =
+    useState<DbConversation | null>(null);
   const [topP, setTopP] = useState<number | null>(null);
   const [topK, setTopK] = useState<number | null>(null);
   const [presencePenalty, setPresencePenalty] = useState<number | null>(null);
   const [frequencyPenalty, setFrequencyPenalty] = useState<number | null>(null);
   const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
   const [searchTerm, setSearchTerm] = useState("");
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   // Storage Hook (useLiveQuery for conversations/keys still active)
   const {
@@ -97,7 +102,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     createConversation: createDbConversation,
     deleteConversation: deleteDbConversation,
     renameConversation: renameDbConversation,
-    // messages: dbMessages, // We won't directly use the live query result for localMessages anymore
+    updateConversationSystemPrompt: updateDbConversationSystemPrompt,
     addDbMessage,
     deleteDbMessage,
     getDbMessagesUpTo,
@@ -200,7 +205,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
   // --- Conversation Management ---
   const selectConversation = useCallback(
-    (id: string | null) => {
+    async (id: string | null) => {
       if (isAiStreaming) {
         abortControllerRef.current?.abort();
         setIsAiStreaming(false);
@@ -210,33 +215,58 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       setPrompt("");
       setError(null);
       clearAttachedFiles();
-      setSelectedConversationId(id); // This triggers the useEffect below
+      setSelectedConversationId(id);
+      if (id) {
+        try {
+          const convoData = await db.conversations.get(id);
+          setActiveConversationData(convoData ?? null);
+        } catch (err) {
+          console.error("Failed to load conversation data:", err);
+          setActiveConversationData(null);
+          setError("Failed to load conversation details.");
+        }
+      } else {
+        setActiveConversationData(null); // Clear if no conversation selected
+      }
     },
     [isAiStreaming, clearAttachedFiles, setError],
   );
 
   const createConversation = useCallback(
-    async (title?: string): Promise<string> => {
-      const newId = await createDbConversation(title);
-      selectConversation(newId); // Select triggers load via useEffect
+    async (
+      title?: string,
+      initialSystemPrompt?: string | null,
+    ): Promise<string> => {
+      const newId = await createDbConversation(title, initialSystemPrompt);
+      selectConversation(newId);
       return newId;
     },
     [createDbConversation, selectConversation],
   );
 
+  const updateConversationSystemPrompt = useCallback(
+    async (id: string, systemPrompt: string | null): Promise<void> => {
+      await updateDbConversationSystemPrompt(id, systemPrompt);
+      // Refresh active conversation data if it's the currently selected one
+      if (id === selectedConversationId) {
+        const updatedConvoData = await db.conversations.get(id);
+        setActiveConversationData(updatedConvoData ?? null);
+      }
+    },
+    [updateDbConversationSystemPrompt, selectedConversationId],
+  );
+
   const deleteConversation = useCallback(
     async (id: string): Promise<void> => {
-      const currentSelectedId = selectedConversationId; // Capture before potential change
+      const currentSelectedId = selectedConversationId;
       await deleteDbConversation(id);
       if (currentSelectedId === id) {
-        // Find the next available conversation *after* deletion
         const remainingConversations = await db.conversations
           .orderBy("updatedAt")
           .reverse()
           .toArray();
         selectConversation(remainingConversations[0]?.id ?? null);
       }
-      // No need to manually update `conversations` state, useLiveQuery handles it
     },
     [deleteDbConversation, selectedConversationId, selectConversation],
   );
@@ -244,9 +274,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const renameConversation = useCallback(
     async (id: string, newTitle: string): Promise<void> => {
       await renameDbConversation(id, newTitle);
-      // No need to manually update `conversations` state, useLiveQuery handles it
+      // Refresh active conversation data if it's the currently selected one
+      if (id === selectedConversationId) {
+        const updatedConvoData = await db.conversations.get(id);
+        setActiveConversationData(updatedConvoData ?? null);
+      }
     },
-    [renameDbConversation],
+    [renameDbConversation, selectedConversationId],
   );
 
   const exportConversation = useCallback(
@@ -356,28 +390,20 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   );
 
   // --- Message Loading Effect ---
-  // *** MODIFIED EFFECT ***
-  // This effect now ONLY runs when the selectedConversationId changes.
-  // It fetches the messages for that conversation directly from the DB
-  // and sets the localMessages state, which is used for rendering.
   useEffect(() => {
-    // Only run if a conversation is selected
     if (selectedConversationId) {
       console.log(
         `Loading messages for ${selectedConversationId} directly from DB`,
       );
       setIsLoadingMessages(true);
-      // Fetch messages directly from Dexie for the selected conversation
       db.messages
         .where("conversationId")
         .equals(selectedConversationId)
         .sortBy("createdAt")
         .then((messagesFromDb) => {
-          // Populate localMessages with data fetched from DB
           setLocalMessages(
             messagesFromDb.map((dbMsg) => ({
               ...dbMsg,
-              // Ensure runtime properties are reset correctly on load
               isStreaming: false,
               streamedContent: undefined,
               error: null,
@@ -386,19 +412,23 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           setIsLoadingMessages(false);
         })
         .catch((err) => {
-          // Handle potential errors during fetch
           console.error("Failed to load messages from DB:", err);
           setError(`Error loading chat: ${err.message}`);
           setLocalMessages([]); // Clear messages on error
           setIsLoadingMessages(false);
         });
     } else {
-      // No conversation selected, clear messages and loading state
       setLocalMessages([]);
       setIsLoadingMessages(false);
     }
-    // DEPEND ONLY ON selectedConversationId and setError
-  }, [selectedConversationId, setError]); // <-- REMOVED dbMessages dependency
+  }, [selectedConversationId, setError]);
+
+  const activeSystemPrompt = useMemo(() => {
+    if (activeConversationData && activeConversationData.systemPrompt != null) {
+      return activeConversationData.systemPrompt;
+    }
+    return globalSystemPrompt;
+  }, [activeConversationData, globalSystemPrompt]);
 
   // --- Stop Streaming Function ---
   const stopStreaming = useCallback(() => {
@@ -430,6 +460,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       currentTopK: number | null,
       currentPresencePenalty: number | null,
       currentFrequencyPenalty: number | null,
+      systemPromptToUse: string | null,
     ) => {
       if (!conversationIdToUse)
         throw new Error("Internal Error: No active conversation ID provided.");
@@ -457,10 +488,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         error: null,
       };
 
-      // --- Manual State Update ---
-      // Add the placeholder directly to localMessages for immediate UI update
       setLocalMessages((prev) => [...prev, assistantPlaceholder]);
-      // --- End Manual State Update ---
 
       setIsAiStreaming(true);
       setError(null);
@@ -468,8 +496,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       abortControllerRef.current = new AbortController();
 
       const throttledStreamUpdate = throttle((streamedContentChunk: string) => {
-        // --- Manual State Update ---
-        // Update the placeholder in localMessages directly
         setLocalMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMessageId
@@ -481,21 +507,28 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
               : msg,
           ),
         );
-        // --- End Manual State Update ---
       }, streamingThrottleRate);
 
       let finalContent = "";
       let streamError: Error | null = null;
 
       try {
+        const messagesForApi: CoreMessage[] = [];
+        if (systemPromptToUse) {
+          messagesForApi.push({ role: "system", content: systemPromptToUse });
+        }
+
+        messagesForApi.push(
+          ...messagesToSend.filter((m) => m.role !== "system"),
+        );
         console.log(
           "Sending messages to AI:",
-          JSON.stringify(messagesToSend, null, 2),
+          JSON.stringify(messagesForApi, null, 2),
         );
 
         const result = streamText({
           model: selectedModel.instance,
-          messages: messagesToSend,
+          messages: messagesForApi,
           abortSignal: abortControllerRef.current.signal,
           temperature: currentTemperature,
           maxTokens: currentMaxTokens ?? undefined,
@@ -530,9 +563,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         setIsAiStreaming(false);
 
         console.log("Saving final content:", finalContent);
-
-        // --- Manual State Update ---
-        // Update the final assistant message in localMessages directly
         setLocalMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMessageId
@@ -546,9 +576,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
               : msg,
           ),
         );
-        // --- End Manual State Update ---
 
-        // --- Persist Final Assistant Message to DB ---
         if (!streamError) {
           await addDbMessage({
             id: assistantMessageId,
@@ -562,7 +590,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
               dbErr,
             );
             setError(`Error saving response: ${dbErr.message}`);
-            // Optionally update the message state again to show a save error?
             setLocalMessages((prev) =>
               prev.map((msg) =>
                 msg.id === assistantMessageId
@@ -583,8 +610,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       addDbMessage,
       streamingThrottleRate,
       setError,
-      // setLocalMessages is implicitly used via the state updater functions
-      // No need to list localMessages itself as a dependency here
     ],
   );
 
@@ -604,14 +629,19 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       if (!currentConversationId) {
         try {
           console.log("No conversation selected, creating new one...");
-          const newConvId = await createConversation("New Chat"); // This now selects and triggers load
+          // ## start - Pass activeSystemPrompt if creating new convo implicitly
+          // Note: If user *explicitly* wants a different prompt for a new chat,
+          // they should use the createConversation button/action directly.
+          // This handles the case where submit happens with no convo selected.
+          const newConvId = await createConversation(
+            "New Chat",
+            activeSystemPrompt,
+          );
+          // ## end
           if (!newConvId)
             throw new Error("Failed to create a new conversation ID.");
-          currentConversationId = newConvId; // Update ID for this submission
+          currentConversationId = newConvId;
           console.log("New conversation created:", currentConversationId);
-          // Wait a tick for the state update from selectConversation to potentially settle?
-          // Or rely on the fact that addDbMessage below will use the correct ID.
-          // await new Promise(resolve => setTimeout(resolve, 0));
         } catch (err: any) {
           console.error("Error creating conversation during submit:", err);
           setError(`Error: Could not start chat - ${err.message}`);
@@ -619,12 +649,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         }
       }
 
-      // Re-check after potential conversation creation
       if (!currentConversationId) {
         setError("Error: Could not determine active conversation.");
         return;
       }
-
       if (!selectedProvider || !selectedModel) {
         setError("Error: Please select an AI Provider and Model first.");
         return;
@@ -637,68 +665,56 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
       let userMessageId: string;
       let userMessageForState: Message;
-      const userMessageTimestamp = new Date(); // Consistent timestamp
+      const userMessageTimestamp = new Date();
 
       try {
         const userMessageData = {
           role: "user" as const,
           content: userPromptContent,
           conversationId: currentConversationId,
-          createdAt: userMessageTimestamp, // Use consistent timestamp
+          createdAt: userMessageTimestamp,
         };
-        // Add to DB first
         userMessageId = await addDbMessage(userMessageData);
-        // Prepare the object for state
-        userMessageForState = {
-          ...userMessageData,
-          id: userMessageId, // Use ID from DB
-        };
+        userMessageForState = { ...userMessageData, id: userMessageId };
       } catch (dbError: any) {
         console.error("Error adding user message to DB:", dbError);
         setError(`Error: Could not save your message - ${dbError.message}`);
         return;
       }
 
-      // --- Prepare Full Message List for AI (using current localMessages + new user message) ---
-      // Use localMessages as it's the source of truth for the UI history at this point
+      // --- Prepare Message List for AI (using localMessages + new user message) ---
+      // The system prompt is handled *inside* performAiStream now
       const currentHistory = localMessages
-        .filter((m) => !m.error) // Exclude errored messages from history
+        .filter((m) => !m.error)
         .map((m): CoreMessage => ({ role: m.role, content: m.content }));
 
-      const messagesToSendForAI: CoreMessage[] = [];
-      if (systemPrompt) {
-        messagesToSendForAI.push({ role: "system", content: systemPrompt });
-      }
-      messagesToSendForAI.push(...currentHistory);
-      messagesToSendForAI.push({
-        role: userMessageForState.role,
-        content: userMessageForState.content,
-      });
+      const messagesToSendForAI: CoreMessage[] = [
+        ...currentHistory,
+        {
+          role: userMessageForState.role,
+          content: userMessageForState.content,
+        },
+      ];
 
       console.log(
-        "Messages prepared for AI:",
+        "Messages prepared for AI (excluding system prompt):",
         JSON.stringify(messagesToSendForAI, null, 2),
       );
 
-      // --- Manual State Update ---
-      // Add the user message directly to localMessages for immediate UI update
       setLocalMessages((prevMessages) => [
         ...prevMessages,
         userMessageForState,
       ]);
-      // --- End Manual State Update ---
 
-      // --- Call AI Stream ---
       try {
         const hasUserOrAssistantMessage = messagesToSendForAI.some(
           (m) => m.role !== "system",
         );
         if (!hasUserOrAssistantMessage) {
           console.error(
-            "handleSubmit Error: Attempting to send empty or system-only message list to AI.",
+            "handleSubmit Error: Attempting to send empty message list to AI.",
           );
           setError("Internal Error: Cannot send empty message list.");
-          // Revert the user message state update
           setLocalMessages((prev) =>
             prev.filter((m) => m.id !== userMessageId),
           );
@@ -714,11 +730,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           topK,
           presencePenalty,
           frequencyPenalty,
+          activeSystemPrompt,
         );
       } catch (err: any) {
         console.error("Error during AI stream setup/call:", err);
         setError(`Error: ${err.message}`);
-        // Revert the user message state update if AI call setup fails
         setLocalMessages((prev) => prev.filter((m) => m.id !== userMessageId));
       }
     },
@@ -732,17 +748,16 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       performAiStream,
       clearAttachedFiles,
       setError,
-      systemPrompt,
+      activeSystemPrompt,
       temperature,
       maxTokens,
       topP,
       topK,
       presencePenalty,
       frequencyPenalty,
-      createConversation, // Needed for creating new chat on submit
+      createConversation,
       setPrompt,
-      localMessages, // Needed for history construction
-      // setLocalMessages is implicitly used via state updater
+      localMessages,
     ],
   );
 
@@ -759,7 +774,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
       setError(null);
 
-      // 1. Find the message index in localMessages
       const messageIndex = localMessages.findIndex((m) => m.id === messageId);
       if (messageIndex < 0) {
         setError("Cannot regenerate non-existent message.");
@@ -771,41 +785,26 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         return;
       }
 
-      // 2. Get history from localMessages up to the point *before* the message
       const historyForRegen = localMessages.slice(0, messageIndex);
 
-      // 3. Construct the message list to send
-      const messagesToSendForAI: CoreMessage[] = [];
-      if (systemPrompt) {
-        messagesToSendForAI.push({ role: "system", content: systemPrompt });
-      }
-      messagesToSendForAI.push(
-        ...historyForRegen
-          .filter((m) => !m.error) // Exclude errors from regen history
-          .map((m): CoreMessage => ({ role: m.role, content: m.content })),
-      );
+      const messagesToSendForAI: CoreMessage[] = historyForRegen
+        .filter((m) => !m.error)
+        .map((m): CoreMessage => ({ role: m.role, content: m.content }));
 
-      // 4. Remove the message to regenerate and subsequent messages from DB and state
       const messagesToDelete = localMessages.slice(messageIndex);
       await Promise.all(messagesToDelete.map((m) => deleteDbMessage(m.id)));
 
-      // --- Manual State Update ---
-      // Update local state immediately
       setLocalMessages((prev) => prev.slice(0, messageIndex));
-      // --- End Manual State Update ---
 
-      // 5. Call the stream function
       try {
-        // Check history isn't empty (excluding system prompt)
         const hasUserOrAssistantMessage = messagesToSendForAI.some(
           (m) => m.role !== "system",
         );
         if (!hasUserOrAssistantMessage) {
           console.error(
-            "Regenerate Error: Attempting to send empty or system-only message list to AI.",
+            "Regenerate Error: Attempting to send empty message list to AI.",
           );
           setError("Internal Error: Cannot regenerate with empty history.");
-          // Note: State already updated, maybe show error differently?
           return;
         }
 
@@ -818,29 +817,27 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           topK,
           presencePenalty,
           frequencyPenalty,
+          activeSystemPrompt,
         );
       } catch (err: any) {
         console.error("Error during regeneration stream setup:", err);
         setError(`Error: ${err.message}`);
-        // If setup fails, the state is already truncated. Maybe try reloading?
-        // Or just display the error.
       }
     },
     [
       selectedConversationId,
       isAiStreaming,
-      localMessages, // Needed for finding index, slicing, and history
+      localMessages,
       deleteDbMessage,
       performAiStream,
       setError,
-      systemPrompt,
+      activeSystemPrompt,
       temperature,
       maxTokens,
       topP,
       topK,
       presencePenalty,
       frequencyPenalty,
-      // setLocalMessages implicitly used
     ],
   );
 
@@ -906,6 +903,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       createConversation,
       deleteConversation,
       renameConversation,
+      updateConversationSystemPrompt,
       messages: localMessages, // Use localMessages for rendering
       isLoading: isLoadingMessages,
       isStreaming: isAiStreaming,
@@ -924,8 +922,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       setTemperature,
       maxTokens,
       setMaxTokens,
-      systemPrompt,
-      setSystemPrompt,
+      globalSystemPrompt,
+      setGlobalSystemPrompt,
+      activeSystemPrompt,
       topP, // Pass new settings
       setTopP,
       topK,
@@ -960,6 +959,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       createConversation,
       deleteConversation,
       renameConversation,
+      updateConversationSystemPrompt,
       localMessages, // The UI message state
       isLoadingMessages,
       isAiStreaming,
@@ -977,9 +977,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       temperature,
       setTemperature,
       maxTokens,
+      globalSystemPrompt,
+      setGlobalSystemPrompt,
+      activeSystemPrompt,
       setMaxTokens,
-      systemPrompt,
-      setSystemPrompt,
       topP,
       setTopP,
       topK,

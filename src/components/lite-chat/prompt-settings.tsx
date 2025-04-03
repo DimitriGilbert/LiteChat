@@ -43,13 +43,8 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
   const showKeyProvidedIndicator = needsKey && keyIsSelected && keyHasValue;
 
   return (
-    <div className={cn("bg-gray-800 text-gray-300", className)}>
-      <div
-        className={cn(
-          "flex flex-wrap items-center gap-3 bg-gray-800 text-gray-300",
-          className,
-        )}
-      >
+    <div className={cn("bg-gray-800 text-gray-300 p-3", className)}>
+      <div className="flex flex-wrap items-center gap-3">
         <ProviderSelector />
         <ModelSelector />
         {/* <ApiKeySelector /> */}
@@ -104,8 +99,9 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
           </Tooltip>
         </TooltipProvider>
       </div>
-      {/* Conditionally render Advanced Settings */}
-      {isAdvancedOpen && <PromptSettingsAdvanced />}
+      {isAdvancedOpen && (
+        <PromptSettingsAdvanced className="pt-3 -mx-3 -mb-3" />
+      )}
     </div>
   );
 };

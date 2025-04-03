@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { SettingsGeneral } from "./settings-general";
 import { SettingsApiKeys } from "./settings-api-keys";
 import { SettingsDataManagement } from "./settings-data-management";
+import { SettingsAssistant } from "./settings-assistant";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -38,20 +39,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           className="flex-grow flex flex-col overflow-hidden"
         >
           <TabsList className="flex-shrink-0">
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="assistant">Prompt</TabsTrigger>
+
             <TabsTrigger value="apiKeys">API Keys</TabsTrigger>
             <TabsTrigger value="data">Data Management</TabsTrigger>
-            <TabsTrigger value="general">General</TabsTrigger>
           </TabsList>
 
           <ScrollArea className="flex-grow mt-4 pr-1">
+            <TabsContent value="general" className="mt-0">
+              <SettingsGeneral />
+            </TabsContent>
+            <TabsContent value="assistant">
+              <SettingsAssistant />
+            </TabsContent>
             <TabsContent value="apiKeys" className="mt-0">
               <SettingsApiKeys />
             </TabsContent>
             <TabsContent value="data" className="mt-0">
               <SettingsDataManagement />
-            </TabsContent>
-            <TabsContent value="general" className="mt-0">
-              <SettingsGeneral />
             </TabsContent>
           </ScrollArea>
         </Tabs>
