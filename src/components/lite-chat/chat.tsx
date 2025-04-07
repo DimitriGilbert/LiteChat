@@ -3,12 +3,13 @@ import React, { useState } from "react";
 import { ChatProvider } from "@/context/chat-context";
 import { ChatSide } from "./chat-side";
 import { ChatWrapper } from "./chat-wrapper";
-import type { AiProviderConfig } from "@/lib/types";
+import type { AiProviderConfig, SidebarItemType } from "@/lib/types"; // Import SidebarItemType
 import { cn } from "@/lib/utils";
 import { MenuIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // Export sub-components for composability
+// ... (keep existing exports) ...
 export { ChatContent } from "./chat-content";
 export { ChatHistory } from "./chat-history";
 export { ChatSide } from "./chat-side";
@@ -26,16 +27,24 @@ export { ProviderSelector } from "./provider-selector";
 export { SettingsModal } from "./settings-modal";
 export { useChatContext } from "@/hooks/use-chat-context";
 export { ChatProvider } from "@/context/chat-context";
-export type { AiProviderConfig, AiModelConfig, Message } from "@/lib/types";
+export type {
+  AiProviderConfig,
+  AiModelConfig,
+  Message,
+  DbProject, // Export DbProject if needed by consumers
+  DbConversation, // Export DbConversation if needed by consumers
+  SidebarItem, // Export SidebarItem if needed by consumers
+  SidebarItemType, // Export SidebarItemType if needed by consumers
+} from "@/lib/types";
 
 interface LiteChatProps {
   providers: AiProviderConfig[];
   initialProviderId?: string | null;
   initialModelId?: string | null;
-  initialConversationId?: string | null;
+  initialSelectedItemId?: string | null; // Renamed from initialConversationId
+  initialSelectedItemType?: SidebarItemType | null; // Added
   streamingThrottleRate?: number;
   className?: string;
-  /** Optional: Default state for the sidebar (true = open, false = closed) */
   defaultSidebarOpen?: boolean;
   SideComponent?: React.ComponentType<{ className?: string }>;
   WrapperComponent?: React.ComponentType<{ className?: string }>;
@@ -45,10 +54,11 @@ export const LiteChat: React.FC<LiteChatProps> = ({
   providers,
   initialProviderId,
   initialModelId,
-  initialConversationId,
+  initialSelectedItemId, // Use new prop
+  initialSelectedItemType, // Use new prop
   streamingThrottleRate,
   className,
-  defaultSidebarOpen = true, // Default to open
+  defaultSidebarOpen = true,
   SideComponent = ChatSide,
   WrapperComponent = ChatWrapper,
 }) => {
@@ -59,7 +69,8 @@ export const LiteChat: React.FC<LiteChatProps> = ({
       providers={providers}
       initialProviderId={initialProviderId}
       initialModelId={initialModelId}
-      initialConversationId={initialConversationId}
+      initialSelectedItemId={initialSelectedItemId} // Pass new prop
+      initialSelectedItemType={initialSelectedItemType} // Pass new prop
       streamingThrottleRate={streamingThrottleRate}
     >
       <div
@@ -68,42 +79,44 @@ export const LiteChat: React.FC<LiteChatProps> = ({
           className,
         )}
       >
-        {/* Sidebar: Conditionally render and apply classes */}
+        {/* Sidebar */}
         {sidebarOpen && (
           <SideComponent
             className={cn(
-              "w-72 flex-shrink-0", // Ensure sidebar doesn't shrink
-              "hidden md:flex", // Hide on small screens, flex on medium+
+              "w-72 flex-shrink-0",
+              "hidden md:flex", // Standard responsive behavior
             )}
           />
         )}
 
+        {/* Mobile Sidebar (Drawer - Example, requires extra implementation) */}
+        {/* {sidebarOpen && (
+          <div className="md:hidden fixed inset-0 bg-black/50 z-40">
+             <SideComponent className="w-72 h-full absolute left-0 top-0 z-50" />
+          </div>
+        )} */}
+
         {/* Main Chat Area Wrapper */}
         <div className="flex-grow flex flex-col relative w-full min-w-0">
-          {" "}
-          {/* Added min-w-0 */}
-          {/* Sidebar Toggle Button - Positioned relative to this wrapper */}
+          {/* Sidebar Toggle Button */}
           <Button
             variant="ghost"
             size="icon"
             className={cn(
-              "absolute top-3 left-3 z-10 text-gray-400 hover:text-white hover:bg-gray-700",
-              // Show toggle only on medium screens if sidebar is closed, or always on small screens
-              sidebarOpen ? "md:hidden" : "block",
+              "absolute top-3 left-3 z-10 text-gray-400 hover:text-white hover:bg-gray-700 md:hidden", // Only show on small screens
             )}
             onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
-            {/* Use MenuIcon when sidebar is closed, XIcon when open (on small screens) */}
             {sidebarOpen ? (
-              <XIcon className="h-5 w-5 md:hidden" /> // Show X only on small screens when open
+              <XIcon className="h-5 w-5" />
             ) : (
-              <MenuIcon className="h-5 w-5" /> // Show Menu when closed
+              <MenuIcon className="h-5 w-5" />
             )}
           </Button>
+
           {/* Render the main chat content */}
-          <WrapperComponent className="h-full" />{" "}
-          {/* Ensure Wrapper takes full height */}
+          <WrapperComponent className="h-full" />
         </div>
       </div>
     </ChatProvider>

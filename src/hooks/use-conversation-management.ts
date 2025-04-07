@@ -1,140 +1,298 @@
 // src/hooks/use-conversation-management.ts
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useChatStorage } from "./use-chat-storage";
-import type { DbConversation } from "@/lib/types";
-import { db } from "@/lib/db";
+import type {
+  DbConversation,
+  DbProject,
+  SidebarItem,
+  SidebarItemType,
+  ProjectSidebarItem,
+  ConversationSidebarItem,
+} from "@/lib/types";
+import { db } from "@/lib/db"; // Direct db access for complex queries/transactions
 import { toast } from "sonner";
 import { z } from "zod";
+// Removed Dexie import if not used for minKey anymore
+import { useLiveQuery } from "dexie-react-hooks";
 
-const messageImportSchema = z.object({
-  id: z.string(),
-  role: z.enum(["user", "assistant"]),
-  content: z.string(),
-  createdAt: z
-    .string()
-    .datetime()
-    .transform((dateStr) => new Date(dateStr)),
-});
-const conversationImportSchema = z.array(messageImportSchema);
+// ... (keep existing imports and schemas) ...
 
 interface UseConversationManagementProps {
-  initialConversationId?: string | null;
-  onConversationSelect: (id: string | null) => void; // Callback when selection changes
+  initialSelectedItemId?: string | null;
+  initialSelectedItemType?: SidebarItemType | null;
+  onSelectItem: (id: string | null, type: SidebarItemType | null) => void; // Unified callback
 }
 
 interface UseConversationManagementReturn {
-  conversations: DbConversation[];
-  selectedConversationId: string | null;
-  selectConversation: (id: string | null) => Promise<void>; // Make async for consistency
+  sidebarItems: SidebarItem[]; // The hierarchical list for the UI
+  selectedItemId: string | null;
+  selectedItemType: SidebarItemType | null;
+  selectItem: (
+    id: string | null,
+    type: SidebarItemType | null,
+  ) => Promise<void>;
   createConversation: (
+    parentId: string | null,
     title?: string,
-    initialSystemPrompt?: string | null,
-  ) => Promise<string>;
-  deleteConversation: (id: string) => Promise<void>;
-  renameConversation: (id: string, newTitle: string) => Promise<void>;
+  ) => Promise<string>; // Returns ID
+  createProject: (
+    parentId: string | null,
+    name?: string,
+  ) => Promise<{ id: string; name: string }>; // Returns ID and initial name
+  deleteItem: (id: string, type: SidebarItemType) => Promise<void>;
+  renameItem: (
+    id: string,
+    newName: string,
+    type: SidebarItemType,
+  ) => Promise<void>;
   updateConversationSystemPrompt: (
     id: string,
     systemPrompt: string | null,
   ) => Promise<void>;
   exportConversation: (conversationId: string | null) => Promise<void>;
-  importConversation: (file: File) => Promise<void>;
-  exportAllConversations: () => Promise<void>;
-  activeConversationData: DbConversation | null;
+  importConversation: (file: File, parentId: string | null) => Promise<void>;
+  exportAllConversations: () => Promise<void>; // Needs review for project structure
+  activeConversationData: DbConversation | null; // Only if selected item is a conversation
 }
 
 export function useConversationManagement({
-  initialConversationId = null,
-  onConversationSelect,
+  initialSelectedItemId = null,
+  initialSelectedItemType = null,
+  onSelectItem,
 }: UseConversationManagementProps): UseConversationManagementReturn {
-  const [selectedConversationId, setSelectedConversationId] = useState<
-    string | null
-  >(initialConversationId);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(
+    initialSelectedItemId,
+  );
+  const [selectedItemType, setSelectedItemType] =
+    useState<SidebarItemType | null>(initialSelectedItemType);
   const [activeConversationData, setActiveConversationData] =
     useState<DbConversation | null>(null);
 
-  // Use storage hook primarily for conversation list and DB actions
-  const {
-    conversations,
-    createConversation: createDbConversation,
-    deleteConversation: deleteDbConversation,
-    renameConversation: renameDbConversation,
-    updateConversationSystemPrompt: updateDbConversationSystemPrompt,
-    addDbMessage, // Needed for import
-  } = useChatStorage(selectedConversationId); // Keep ID for potential filtering if needed
+  // Use storage hook for basic DB operations
+  const storage = useChatStorage();
 
-  const selectConversation = useCallback(
-    async (id: string | null) => {
-      setSelectedConversationId(id);
-      onConversationSelect(id); // Notify parent/context
-      if (id) {
+  // --- Fetch and build the sidebar tree ---
+  const sidebarItems = useLiveQuery<SidebarItem[]>(async () => {
+    console.log("useLiveQuery (sidebarItems): Fetching ALL items...");
+    // Fetch ALL projects and conversations
+    const allProjects = await db.projects.toArray();
+    const allConversations = await db.conversations.toArray();
+
+    // Combine and map
+    const combinedItems: SidebarItem[] = [
+      ...allProjects.map(
+        (p): ProjectSidebarItem => ({ ...p, type: "project" }),
+      ),
+      ...allConversations.map(
+        (c): ConversationSidebarItem => ({ ...c, type: "conversation" }),
+      ),
+    ];
+
+    // Sort combined list in memory: most recently updated first
+    combinedItems.sort((a, b) => {
+      // Handle potential undefined dates defensively, though unlikely
+      const dateA = a.updatedAt?.getTime() ?? 0;
+      const dateB = b.updatedAt?.getTime() ?? 0;
+      return dateB - dateA;
+    });
+
+    // TODO: Implement hierarchical structuring here if needed later.
+    // For now, return the flat, sorted list.
+    console.log(
+      `useLiveQuery (sidebarItems): Fetched ${combinedItems.length} total items.`,
+      combinedItems,
+    );
+    return combinedItems;
+  }, []); // Re-run when underlying tables (projects, conversations) change
+
+  // --- Selection Logic ---
+  const selectItem = useCallback(
+    async (id: string | null, type: SidebarItemType | null) => {
+      console.log(`useConversationManagement: Selecting item ${id} (${type})`);
+      // Update state *immediately*
+      setSelectedItemId(id);
+      setSelectedItemType(type);
+      onSelectItem(id, type); // Notify parent/context
+
+      // Fetch conversation data *after* state update
+      if (id && type === "conversation") {
         try {
+          console.log(
+            `useConversationManagement: Fetching data for convo ${id}`,
+          );
+          // Use direct db access which might be slightly faster than storage hook wrapper here
           const convoData = await db.conversations.get(id);
           setActiveConversationData(convoData ?? null);
+          console.log(
+            `useConversationManagement: Set active convo data`,
+            convoData,
+          );
         } catch (err) {
           console.error("Failed to load conversation data:", err);
           setActiveConversationData(null);
           toast.error("Failed to load conversation details.");
         }
       } else {
-        setActiveConversationData(null);
+        setActiveConversationData(null); // Clear if project or null is selected
+        console.log(`useConversationManagement: Cleared active convo data`);
       }
     },
-    [onConversationSelect],
+    [onSelectItem], // Removed storage dependency as we use db directly here
   );
 
+  // --- Creation Logic ---
   const createConversation = useCallback(
     async (
+      parentId: string | null,
       title?: string,
       initialSystemPrompt?: string | null,
     ): Promise<string> => {
-      const newId = await createDbConversation(title, initialSystemPrompt);
-      await selectConversation(newId); // Select the new conversation
+      const newId = await storage.createConversation(
+        parentId,
+        title,
+        initialSystemPrompt,
+      );
+      // Select the new conversation AFTER it's created and the live query potentially updates
+      // Use a slight delay or ensure the live query updates before selecting,
+      // though Dexie LiveQuery should be quite fast.
+      // await new Promise(resolve => setTimeout(resolve, 50)); // Optional small delay
+      await selectItem(newId, "conversation");
       return newId;
     },
-    [createDbConversation, selectConversation],
+    [storage, selectItem],
   );
 
-  const deleteConversation = useCallback(
-    async (id: string): Promise<void> => {
-      const currentSelectedId = selectedConversationId;
-      await deleteDbConversation(id);
-      if (currentSelectedId === id) {
-        // Select the next available conversation or null
-        const remainingConversations = await db.conversations
-          .orderBy("updatedAt")
-          .reverse()
-          .toArray();
-        await selectConversation(remainingConversations[0]?.id ?? null);
-      }
-      // No need to manually refresh 'conversations' due to useLiveQuery
+  const createProject = useCallback(
+    async (
+      parentId: string | null,
+      name: string = "New Project",
+    ): Promise<{ id: string; name: string }> => {
+      const newProject = await storage.createProject(name, parentId);
+      // Don't automatically select the new project, let the UI handle expansion/focus
+      // The live query will update the list, and ChatSide will trigger edit mode.
+      return { id: newProject.id, name: newProject.name };
     },
-    [deleteDbConversation, selectedConversationId, selectConversation],
+    [storage],
   );
 
-  const renameConversation = useCallback(
-    async (id: string, newTitle: string): Promise<void> => {
-      await renameDbConversation(id, newTitle);
-      if (id === selectedConversationId) {
-        // Refresh active data if it's the current one
-        const updatedConvoData = await db.conversations.get(id);
-        setActiveConversationData(updatedConvoData ?? null);
+  // --- Deletion Logic ---
+  const deleteItem = useCallback(
+    async (id: string, type: SidebarItemType): Promise<void> => {
+      const currentSelectedId = selectedItemId; // Capture before potential change
+
+      // Prevent deleting projects with children (simple approach)
+      if (type === "project") {
+        // Fetch children directly - more reliable than relying on potentially stale sidebarItems
+        const childProjects = await db.projects
+          .where("parentId")
+          .equals(id)
+          .count();
+        const childConvos = await db.conversations
+          .where("parentId")
+          .equals(id)
+          .count();
+        if (childProjects > 0 || childConvos > 0) {
+          toast.error("Cannot delete project with items inside.");
+          return;
+        }
       }
-      // No need to manually refresh 'conversations' due to useLiveQuery
+
+      try {
+        if (type === "conversation") {
+          await storage.deleteConversation(id);
+        } else if (type === "project") {
+          await storage.deleteProject(id);
+        }
+
+        toast.success(`${type === "project" ? "Project" : "Chat"} deleted.`);
+
+        // If the deleted item was selected, select the first available item or null
+        if (currentSelectedId === id) {
+          console.log(`Deleted item ${id} was selected. Finding next item...`);
+          // Re-fetch items to find the next one based on current sort order
+          const allProjects = await db.projects.toArray();
+          const allConversations = await db.conversations.toArray();
+          const combinedItems: (DbProject | DbConversation)[] = [
+            ...allProjects,
+            ...allConversations,
+          ];
+          combinedItems.sort(
+            (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+          );
+
+          const nextItem = combinedItems[0]; // Get the most recently updated remaining item
+          console.log("Next item to select:", nextItem);
+          await selectItem(
+            nextItem?.id ?? null,
+            nextItem
+              ? "name" in nextItem // Check if it's a project (has 'name')
+                ? "project"
+                : "conversation"
+              : null,
+          );
+        }
+        // LiveQuery will update the sidebarItems list automatically
+      } catch (err: any) {
+        console.error(`Failed to delete ${type}:`, err);
+        toast.error(`Failed to delete ${type}: ${err.message}`);
+      }
     },
-    [renameDbConversation, selectedConversationId],
+    [storage, selectedItemId, selectItem], // selectedItemId needed for post-delete selection logic
   );
 
+  // --- Renaming Logic ---
+  const renameItem = useCallback(
+    async (
+      id: string,
+      newName: string,
+      type: SidebarItemType,
+    ): Promise<void> => {
+      const trimmedName = newName.trim();
+      if (!trimmedName) {
+        toast.error("Name cannot be empty.");
+        throw new Error("Name cannot be empty."); // Throw to signal failure to HistoryItem
+      }
+      try {
+        console.log(
+          // Add log
+          `useConversationManagement: Calling storage to rename ${type} ${id} to "${trimmedName}"`,
+        );
+        if (type === "conversation") {
+          await storage.renameConversation(id, trimmedName);
+          // If the renamed item is the currently active conversation, refresh its data
+          if (id === selectedItemId && type === selectedItemType) {
+            const updatedConvoData = await db.conversations.get(id);
+            setActiveConversationData(updatedConvoData ?? null);
+          }
+        } else if (type === "project") {
+          await storage.renameProject(id, trimmedName); // This should be called
+        }
+        console.log(`useConversationManagement: Rename successful for ${id}`); // Add log
+        // LiveQuery should update the name in sidebarItems automatically due to updatedAt change
+      } catch (err: any) {
+        console.error(`Failed to rename ${type}:`, err);
+        toast.error(`Failed to rename ${type}: ${err.message}`);
+        throw err; // Re-throw to signal failure
+      }
+    },
+    [storage, selectedItemId, selectedItemType], // Need selectedItemType as well
+  );
+
+  // --- Update System Prompt (Conversation Specific) ---
   const updateConversationSystemPrompt = useCallback(
     async (id: string, systemPrompt: string | null): Promise<void> => {
-      await updateDbConversationSystemPrompt(id, systemPrompt);
-      if (id === selectedConversationId) {
+      await storage.updateConversationSystemPrompt(id, systemPrompt);
+      if (id === selectedItemId && selectedItemType === "conversation") {
         const updatedConvoData = await db.conversations.get(id);
         setActiveConversationData(updatedConvoData ?? null);
       }
     },
-    [updateDbConversationSystemPrompt, selectedConversationId],
+    [storage, selectedItemId, selectedItemType],
   );
 
+  // --- Import/Export ---
+  // (Keep existing exportConversation, importConversation, exportAllConversations)
+  // ... (exportConversation implementation) ...
   const exportConversation = useCallback(
     async (conversationId: string | null) => {
       if (!conversationId) {
@@ -148,22 +306,24 @@ export function useConversationManagement({
           .equals(conversationId)
           .sortBy("createdAt");
 
-        if (!conversation || messagesToExport.length === 0) {
-          toast.warning("Cannot export empty or non-existent conversation.");
+        if (!conversation) {
+          toast.warning("Cannot export non-existent conversation.");
           return;
         }
 
-        // Exclude conversationId from exported messages
-        const exportData = messagesToExport.map(
-          ({ conversationId: _, ...msg }) => msg,
-        );
+        const exportData = messagesToExport.map((msg) => ({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          createdAt: msg.createdAt.toISOString(), // Standard format
+        }));
 
         const jsonString = JSON.stringify(exportData, null, 2);
         const blob = new Blob([jsonString], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        const filename = `${conversation.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_${conversationId.substring(0, 6)}.json`;
+        const filename = `${conversation.title.replace(/[^a-z0-9]/gi, "_").toLowerCase() || "chat"}_${conversationId.substring(0, 6)}.json`;
         link.download = filename;
         document.body.appendChild(link);
         link.click();
@@ -175,11 +335,12 @@ export function useConversationManagement({
         toast.error(`Export failed: ${err.message}`);
       }
     },
-    [],
+    [], // No storage dependency needed if using db directly
   );
 
+  // ... (importConversation implementation) ...
   const importConversation = useCallback(
-    async (file: File) => {
+    async (file: File, parentId: string | null) => {
       if (!file || file.type !== "application/json") {
         toast.error("Please select a valid JSON file.");
         return;
@@ -190,8 +351,6 @@ export function useConversationManagement({
         try {
           const jsonString = event.target?.result as string;
           const parsedData = JSON.parse(jsonString);
-
-          // Validate the structure of the imported data
           const validationResult =
             conversationImportSchema.safeParse(parsedData);
           if (!validationResult.success) {
@@ -201,32 +360,30 @@ export function useConversationManagement({
             );
             return;
           }
-
           const importedMessages = validationResult.data;
 
-          if (importedMessages.length === 0) {
-            toast.warning("Imported file contains no messages.");
-            return;
+          const newConversationTitle = `Imported: ${file.name.replace(/\.json$/i, "").substring(0, 50)}`; // Limit title length
+          const newConversationId = await storage.createConversation(
+            parentId,
+            newConversationTitle,
+          );
+
+          if (importedMessages.length > 0) {
+            await db.messages.bulkAdd(
+              importedMessages.map((msg) => ({
+                ...msg,
+                conversationId: newConversationId,
+              })),
+            );
+            const lastMessageTime =
+              importedMessages[importedMessages.length - 1].createdAt;
+            await db.conversations.update(newConversationId, {
+              updatedAt:
+                lastMessageTime > new Date() ? lastMessageTime : new Date(), // Use later date
+            });
           }
 
-          // Create a new conversation for the imported messages
-          const newConversationTitle = `Imported: ${file.name.replace(/\.json$/i, "")}`;
-          const newConversationId =
-            await createDbConversation(newConversationTitle);
-
-          // Add messages to the new conversation
-          await db.messages.bulkAdd(
-            importedMessages.map((msg) => ({
-              ...msg,
-              conversationId: newConversationId,
-            })),
-          );
-          // Update the new conversation's timestamp
-          await db.conversations.update(newConversationId, {
-            updatedAt: new Date(),
-          });
-
-          await selectConversation(newConversationId); // Select the newly imported chat
+          await selectItem(newConversationId, "conversation");
           toast.success(
             `Conversation imported successfully as "${newConversationTitle}"!`,
           );
@@ -242,9 +399,10 @@ export function useConversationManagement({
       };
       reader.readAsText(file);
     },
-    [createDbConversation, addDbMessage, selectConversation], // addDbMessage might not be strictly needed if bulkAdd works
+    [storage, selectItem],
   );
 
+  // ... (exportAllConversations implementation) ...
   const exportAllConversations = useCallback(async () => {
     try {
       const allConversations = await db.conversations.toArray();
@@ -260,13 +418,20 @@ export function useConversationManagement({
           .equals(conversation.id)
           .sortBy("createdAt");
         exportData.push({
-          // Include conversation metadata in the export
-          id: conversation.id,
-          title: conversation.title,
-          systemPrompt: conversation.systemPrompt,
-          createdAt: conversation.createdAt,
-          updatedAt: conversation.updatedAt,
-          messages: messages.map(({ conversationId: _, ...msg }) => msg), // Exclude redundant convoId
+          _litechat_meta: {
+            id: conversation.id,
+            title: conversation.title,
+            systemPrompt: conversation.systemPrompt,
+            createdAt: conversation.createdAt.toISOString(),
+            updatedAt: conversation.updatedAt.toISOString(),
+            parentId: conversation.parentId,
+          },
+          messages: messages.map((msg) => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            createdAt: msg.createdAt.toISOString(),
+          })),
         });
       }
 
@@ -276,7 +441,7 @@ export function useConversationManagement({
       const link = document.createElement("a");
       link.href = url;
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      link.download = `litechat_all_export_${timestamp}.json`;
+      link.download = `litechat_all_conversations_export_${timestamp}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -288,13 +453,32 @@ export function useConversationManagement({
     }
   }, []);
 
+  // Effect to load initial item if provided
+  useEffect(() => {
+    if (initialSelectedItemId && initialSelectedItemType) {
+      console.log(
+        "useConversationManagement: Selecting initial item",
+        initialSelectedItemId,
+        initialSelectedItemType,
+      );
+      // Use timeout to ensure live query has potentially run once
+      const timer = setTimeout(() => {
+        selectItem(initialSelectedItemId, initialSelectedItemType);
+      }, 50); // Small delay
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
+
   return {
-    conversations: conversations || [], // Ensure it's always an array
-    selectedConversationId,
-    selectConversation,
+    sidebarItems: sidebarItems || [], // Ensure it's always an array
+    selectedItemId,
+    selectedItemType,
+    selectItem,
     createConversation,
-    deleteConversation,
-    renameConversation,
+    createProject,
+    deleteItem,
+    renameItem,
     updateConversationSystemPrompt,
     exportConversation,
     importConversation,

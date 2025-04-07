@@ -10,6 +10,17 @@ export interface DbApiKey {
   createdAt: Date;
 }
 
+// --- Project Structure ---
+export interface DbProject {
+  id: string;
+  name: string;
+  parentId: string | null; // ID of the parent project, or null for root
+  createdAt: Date;
+  updatedAt: Date;
+  // Add other project-specific fields if needed, e.g., description
+  // description?: string;
+}
+
 // Define the structure for AI providers and their models
 export interface AiModelConfig {
   id: string; // e.g., 'gpt-4o', 'claude-3-opus'
@@ -23,12 +34,12 @@ export interface AiProviderConfig {
   name: string; // User-friendly name
   models: AiModelConfig[];
   requiresApiKey?: boolean;
-  // apiKey?: string; // REMOVED - We now select a stored key
 }
 
 // Database Schemas
 export interface DbConversation {
   id: string;
+  parentId: string | null; // ID of the parent project, or null for root
   title: string;
   systemPrompt?: string | null;
   createdAt: Date;
@@ -49,6 +60,25 @@ export interface Message extends DbMessage {
   streamedContent?: string; // Content being actively streamed
   error?: string | null; // Add error field to message type
 }
+
+// Type for items displayed in the sidebar (Projects or Conversations)
+export type SidebarItemType = "project" | "conversation";
+export interface SidebarItemBase {
+  id: string;
+  parentId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+export interface ProjectSidebarItem extends SidebarItemBase {
+  type: "project";
+  name: string;
+  children?: SidebarItem[]; // For hierarchical display
+}
+export interface ConversationSidebarItem extends SidebarItemBase {
+  type: "conversation";
+  title: string;
+}
+export type SidebarItem = ProjectSidebarItem | ConversationSidebarItem;
 
 // Context Type
 export interface ChatContextProps {
@@ -71,19 +101,32 @@ export interface ChatContextProps {
   deleteApiKey: (id: string) => Promise<void>;
   getApiKeyForProvider: (providerId: string) => string | undefined; // Gets the *value* of the selected key
 
-  // Conversations
-  conversations: DbConversation[];
-  selectedConversationId: string | null;
-  selectConversation: (id: string | null) => void;
-  createConversation: (title?: string) => Promise<string>;
-  deleteConversation: (id: string) => Promise<void>;
-  renameConversation: (id: string, newTitle: string) => Promise<void>;
+  // Projects & Conversations (Sidebar Tree)
+  sidebarItems: SidebarItem[]; // Combined list for the tree view
+  selectedItemId: string | null; // ID of the selected project or conversation
+  selectedItemType: SidebarItemType | null; // Type of the selected item
+  selectItem: (id: string | null, type: SidebarItemType | null) => void; // Unified selection
+  createConversation: (
+    parentId: string | null,
+    title?: string,
+  ) => Promise<string>;
+  createProject: (
+    parentId: string | null,
+    name?: string,
+  ) => Promise<{ id: string; name: string }>; // Returns ID and initial name
+  deleteItem: (id: string, type: SidebarItemType) => Promise<void>; // Unified delete
+  renameItem: (
+    id: string,
+    newName: string,
+    type: SidebarItemType,
+  ) => Promise<void>; // Unified rename
   updateConversationSystemPrompt: (
     id: string,
     systemPrompt: string | null,
   ) => Promise<void>;
+  activeConversationData: DbConversation | null; // Data for the *selected* conversation (if any)
 
-  // Messages
+  // Messages (for the selected conversation)
   messages: Message[];
   isLoading: boolean; // Loading messages or initial state
   isStreaming: boolean; // Is AI currently responding?
@@ -129,11 +172,10 @@ export interface ChatContextProps {
   // Search
   searchTerm: string;
   setSearchTerm: (term: string) => void;
-  // searchOccurrences: number; // Optional: count matches
-  // currentSearchIndex: number; // Optional: for next/prev match nav
 
-  //
+  // Import/Export
   exportConversation: (conversationId: string | null) => Promise<void>;
-  importConversation: (file: File) => Promise<void>;
-  exportAllConversations: () => Promise<void>;
+  importConversation: (file: File, parentId: string | null) => Promise<void>; // Add parentId
+  exportAllConversations: () => Promise<void>; // Might need rework for projects
+  // TODO: Add project export/import later if needed
 }
