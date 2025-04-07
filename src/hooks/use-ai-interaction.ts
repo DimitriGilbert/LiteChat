@@ -2,10 +2,11 @@
 import { useCallback, useRef } from "react";
 import { streamText, type CoreMessage } from "ai";
 import type { AiModelConfig, AiProviderConfig, Message } from "@/lib/types";
-import { throttle } from "@/lib/throttle";
+import { throttle } from "@/lib/throttle"; // Your throttle implementation
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 
+// --- Interfaces remain the same ---
 interface UseAiInteractionProps {
   selectedModel: AiModelConfig | undefined;
   selectedProvider: AiProviderConfig | undefined;
@@ -18,6 +19,7 @@ interface UseAiInteractionProps {
     messageData: Omit<import("@/lib/types").DbMessage, "id" | "createdAt"> &
       Partial<Pick<import("@/lib/types").DbMessage, "id" | "createdAt">>,
   ) => Promise<string>;
+  abortControllerRef: React.MutableRefObject<AbortController | null>;
 }
 
 interface PerformAiStreamParams {
@@ -34,7 +36,6 @@ interface PerformAiStreamParams {
 
 interface UseAiInteractionReturn {
   performAiStream: (params: PerformAiStreamParams) => Promise<void>;
-  abortControllerRef: React.MutableRefObject<AbortController | null>;
 }
 
 export function useAiInteraction({
@@ -46,9 +47,8 @@ export function useAiInteraction({
   setIsAiStreaming,
   setError,
   addDbMessage,
+  abortControllerRef,
 }: UseAiInteractionProps): UseAiInteractionReturn {
-  const abortControllerRef = useRef<AbortController | null>(null);
-
   const performAiStream = useCallback(
     async ({
       conversationIdToUse,
@@ -61,6 +61,7 @@ export function useAiInteraction({
       currentFrequencyPenalty,
       systemPromptToUse,
     }: PerformAiStreamParams) => {
+      // --- Boilerplate checks remain the same ---
       if (!conversationIdToUse) {
         const err = new Error(
           "Internal Error: No active conversation ID provided.",
@@ -73,16 +74,15 @@ export function useAiInteraction({
         setError(err.message);
         throw err;
       }
-
       const apiKey = getApiKeyForProvider(selectedProvider.id);
       const needsKey =
-        selectedProvider.requiresApiKey ?? selectedProvider.id !== "mock"; // Assume non-mock needs key unless specified otherwise
+        selectedProvider.requiresApiKey ?? selectedProvider.id !== "mock";
       if (needsKey && !apiKey) {
         const err = new Error(
           `API Key for ${selectedProvider.name} is not set or selected.`,
         );
         setError(err.message);
-        toast.error(err.message); // Also show toast for visibility
+        toast.error(err.message);
         throw err;
       }
 
@@ -92,148 +92,217 @@ export function useAiInteraction({
         id: assistantMessageId,
         conversationId: conversationIdToUse,
         role: "assistant",
-        content: "", // Start with empty content
+        content: "",
         createdAt: assistantPlaceholderTimestamp,
         isStreaming: true,
-        streamedContent: "", // Initialize streamed content
+        streamedContent: "", // Start empty
         error: null,
       };
 
-      // Add placeholder immediately to local state for UI update
+      console.log(
+        `[AI Stream ${assistantMessageId}] Adding placeholder message.`,
+      );
       setLocalMessages((prev) => [...prev, assistantPlaceholder]);
 
       setIsAiStreaming(true);
-      setError(null); // Clear previous errors
+      setError(null);
 
-      abortControllerRef.current = new AbortController();
+      const currentAbortController = new AbortController();
+      abortControllerRef.current = currentAbortController;
+      console.log(`[AI Stream ${assistantMessageId}] Created AbortController.`);
 
-      // Throttle UI updates for streamed content
-      const throttledStreamUpdate = throttle((streamedContentChunk: string) => {
-        setLocalMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantMessageId
-              ? {
-                  ...msg,
-                  // Append chunk to the streamed content
-                  streamedContent:
-                    (msg.streamedContent || "") + streamedContentChunk,
-                }
-              : msg,
-          ),
-        );
+      // This variable holds the *true* accumulated content.
+      let finalContent = "";
+
+      // --- Throttled Update Function (Corrected Logic) ---
+      // It no longer needs the chunk as an argument.
+      const throttledStreamUpdate = throttle(() => {
+        // It reads the *current* value of finalContent from the outer scope.
+        const currentAccumulatedContent = finalContent;
+
+        setLocalMessages((prev) => {
+          const targetMessageIndex = prev.findIndex(
+            (msg) => msg.id === assistantMessageId,
+          );
+          if (targetMessageIndex === -1) {
+            return prev; // Message gone
+          }
+
+          const targetMessage = prev[targetMessageIndex];
+
+          // Check if still streaming (prevents updates after finally block)
+          if (!targetMessage.isStreaming) {
+            console.log(
+              `[AI Stream ${assistantMessageId}] Throttled update skipped: Message no longer streaming.`,
+            );
+            return prev;
+          }
+
+          // *** THE FIX: Set streamedContent directly to the current finalContent ***
+          console.log(
+            `[AI Stream ${assistantMessageId}] Throttled update: Setting streamedContent to current finalContent (length ${currentAccumulatedContent.length}): "${currentAccumulatedContent.substring(0, 100)}..."`,
+          );
+
+          const updatedMessages = [...prev];
+          updatedMessages[targetMessageIndex] = {
+            ...targetMessage,
+            streamedContent: currentAccumulatedContent, // Use the up-to-date accumulated string
+          };
+          return updatedMessages;
+        });
       }, streamingThrottleRate);
 
-      let finalContent = "";
       let streamError: Error | null = null;
+      let deltaCount = 0;
 
       try {
+        // --- Stream preparation remains the same ---
         const messagesForApi: CoreMessage[] = [];
-        // Add system prompt if provided
         if (systemPromptToUse) {
           messagesForApi.push({ role: "system", content: systemPromptToUse });
         }
-        // Add user/assistant messages, filtering out any potential system messages from history
         messagesForApi.push(
           ...messagesToSend.filter((m) => m.role !== "system"),
         );
 
         console.log(
-          "Sending messages to AI:",
-          JSON.stringify(messagesForApi, null, 2),
+          `[AI Stream ${assistantMessageId}] Sending ${messagesForApi.length} messages to AI. Model: ${selectedModel.id}`,
         );
 
-        // Call the Vercel AI SDK
         const result = streamText({
           model: selectedModel.instance,
           messages: messagesForApi,
-          abortSignal: abortControllerRef.current.signal,
-          // Pass through AI parameters
+          abortSignal: currentAbortController.signal,
           temperature: currentTemperature,
-          maxTokens: currentMaxTokens ?? undefined, // Use undefined if null
+          maxTokens: currentMaxTokens ?? undefined,
           topP: currentTopP ?? undefined,
           topK: currentTopK ?? undefined,
           presencePenalty: currentPresencePenalty ?? undefined,
           frequencyPenalty: currentFrequencyPenalty ?? undefined,
-          // Add other parameters like tools if needed:
-          // tools: selectedModel.tools,
         });
 
-        // Process the stream
+        console.log(`[AI Stream ${assistantMessageId}] Starting stream loop.`);
         for await (const delta of result.textStream) {
+          deltaCount++;
+          // *** Accumulate the ground truth here ***
           finalContent += delta;
-          throttledStreamUpdate(delta); // Update UI via throttled function
+          // *** Trigger the throttled UI update (without passing the delta) ***
+          throttledStreamUpdate();
         }
-        console.log("Stream finished. Final raw content:", finalContent);
+        console.log(
+          `[AI Stream ${assistantMessageId}] Stream loop finished normally after ${deltaCount} deltas. Final content length: ${finalContent.length}`,
+        );
       } catch (err: any) {
+        // --- Error handling remains the same ---
         streamError = err;
         if (err.name === "AbortError") {
-          console.log("Stream aborted by user.");
-          // Capture the content streamed so far before finalizing state
-          setLocalMessages((prev) => {
-            const abortedMsg = prev.find((m) => m.id === assistantMessageId);
-            finalContent = abortedMsg?.streamedContent || "Stopped"; // Use streamed content or "Stopped"
-            return prev; // No state change here, just reading
-          });
-          streamError = null; // Clear error as it was intentional
+          console.log(
+            `[AI Stream ${assistantMessageId}] Stream aborted by user after ${deltaCount} deltas.`,
+          );
+          // Use the finalContent accumulated up to the abort point
+          console.log(
+            `[AI Stream ${assistantMessageId}] Abort final content set to (from finalContent): "${finalContent}"`,
+          );
+          streamError = null;
         } else {
-          console.error("streamText error:", err);
+          console.error(
+            `[AI Stream ${assistantMessageId}] streamText error after ${deltaCount} deltas:`,
+            err,
+          );
           finalContent = `Error: ${err.message || "Failed to get response"}`;
-          setError(`AI Error: ${finalContent}`); // Set global error state
+          setError(`AI Error: ${finalContent}`);
           toast.error(`AI Error: ${err.message || "Unknown error"}`);
         }
       } finally {
-        abortControllerRef.current = null; // Clear the abort controller ref
-        setIsAiStreaming(false); // Update streaming status
+        // --- Finally block remains the same ---
+        console.log(
+          `[AI Stream ${assistantMessageId}] Entering finally block. StreamError: ${streamError?.message}`,
+        );
 
-        console.log("Finalizing message state. Content:", finalContent);
+        // Optional: Cancel throttled calls if your throttle function supports it
+        // (throttledStreamUpdate as any).cancel?.();
 
-        // Final update to the message in local state
+        if (abortControllerRef.current === currentAbortController) {
+          abortControllerRef.current = null;
+          console.log(
+            `[AI Stream ${assistantMessageId}] Cleared matching AbortController ref.`,
+          );
+        } else {
+          console.log(
+            `[AI Stream ${assistantMessageId}] AbortController ref did not match or was already null.`,
+          );
+        }
+
+        setIsAiStreaming(false);
+
+        console.log(
+          `[AI Stream ${assistantMessageId}] Finalizing message state. Using finalContent (length ${finalContent.length}): "${finalContent.substring(0, 100)}..."`,
+        );
+
+        // Final UI state update uses the complete finalContent
         setLocalMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMessageId
               ? {
                   ...msg,
-                  content: finalContent, // Set the final content
-                  isStreaming: false, // Mark as not streaming
-                  streamedContent: undefined, // Clear intermediate streamed content
-                  error: streamError ? streamError.message : null, // Set error if one occurred
+                  content: finalContent, // The ground truth
+                  isStreaming: false,
+                  streamedContent: undefined, // Clear the intermediate buffer
+                  error: streamError ? streamError.message : null,
                 }
               : msg,
           ),
         );
+        console.log(
+          `[AI Stream ${assistantMessageId}] Final UI state update dispatched.`,
+        );
 
-        // Save the final message to DB if there was no stream error
+        // --- DB Save Logic remains the same (uses finalContent) ---
         if (!streamError && finalContent.trim() !== "") {
-          // Avoid saving empty/error messages
+          console.log(
+            `[AI Stream ${assistantMessageId}] Attempting to save final message to DB.`,
+          );
           try {
             await addDbMessage({
-              id: assistantMessageId, // Use the same ID
+              id: assistantMessageId,
               conversationId: conversationIdToUse,
               role: "assistant",
-              content: finalContent,
-              createdAt: assistantPlaceholderTimestamp, // Use original timestamp
+              content: finalContent, // Save the ground truth
+              createdAt: assistantPlaceholderTimestamp,
             });
-            console.log("Assistant message saved to DB:", assistantMessageId);
+            console.log(
+              `[AI Stream ${assistantMessageId}] Assistant message saved to DB successfully.`,
+            );
           } catch (dbErr: any) {
+            const dbErrorMessage = `Save failed: ${dbErr.message}`;
             console.error(
-              "Failed to save final assistant message to DB:",
+              `[AI Stream ${assistantMessageId}] Failed to save final assistant message to DB:`,
               dbErr,
             );
             setError(`Error saving response: ${dbErr.message}`);
             toast.error(`Failed to save response: ${dbErr.message}`);
-            // Optionally update the message state again to show save error
             setLocalMessages((prev) =>
               prev.map((msg) =>
                 msg.id === assistantMessageId
-                  ? { ...msg, error: `Save failed: ${dbErr.message}` }
+                  ? { ...msg, error: dbErrorMessage }
                   : msg,
               ),
             );
+            console.log(
+              `[AI Stream ${assistantMessageId}] Updated message in UI state with DB save error.`,
+            );
           }
         } else if (streamError) {
-          // If there was a stream error, ensure the error state is set
           setError(`AI Error: ${streamError.message}`);
+          console.log(
+            `[AI Stream ${assistantMessageId}] DB save skipped due to stream error.`,
+          );
+        } else {
+          console.log(
+            `[AI Stream ${assistantMessageId}] DB save skipped due to empty or whitespace-only final content.`,
+          );
         }
+        console.log(`[AI Stream ${assistantMessageId}] Exiting finally block.`);
       }
     },
     [
@@ -244,12 +313,12 @@ export function useAiInteraction({
       setLocalMessages,
       setIsAiStreaming,
       setError,
-      addDbMessage, // Include addDbMessage dependency
+      addDbMessage,
+      abortControllerRef,
     ],
   );
 
   return {
     performAiStream,
-    abortControllerRef,
   };
 }

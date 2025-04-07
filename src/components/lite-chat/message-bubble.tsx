@@ -1,3 +1,4 @@
+// src/components/lite-chat/message-bubble.tsx
 import React from "react";
 import type { Message } from "@/lib/types";
 import { MessageActions } from "./message-actions";
@@ -5,9 +6,10 @@ import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-// Choose a style. Example: vscDarkPlus or prism
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { BotIcon, UserIcon } from "lucide-react"; // Example icons
+import { BotIcon, UserIcon, CopyIcon } from "lucide-react";
+import { Button } from "@/components/ui/button"; // Import Button
+import { toast } from "sonner"; // Import toast
 
 interface MessageBubbleProps {
   message: Message;
@@ -15,13 +17,17 @@ interface MessageBubbleProps {
   className?: string;
 }
 
-// Custom Code component for Syntax Highlighting
+// Custom Code component for Syntax Highlighting (Keep as is)
 const CodeBlock: React.FC<any> = React.memo(
   ({ node, inline, className, children, ...props }) => {
     const match = /language-(\w+)/.exec(className || "");
     return !inline && match ? (
-      <div className="relative group">
-        <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="relative group/codeblock">
+        {" "}
+        {/* Added group/codeblock */}
+        <div className="absolute right-2 top-2 opacity-0 group-hover/codeblock:opacity-100 transition-opacity">
+          {" "}
+          {/* Use group-hover/codeblock */}
           <Button
             variant="ghost"
             size="icon"
@@ -50,7 +56,7 @@ const CodeBlock: React.FC<any> = React.memo(
     ) : (
       <code
         className={cn(
-          "font-mono text-sm px-1 py-0.5 rounded-sm bg-gray-100 dark:bg-gray-800",
+          "font-mono text-sm px-1 py-0.5 rounded-sm bg-gray-700", // Adjusted inline code style
           className,
         )}
         {...props}
@@ -62,114 +68,128 @@ const CodeBlock: React.FC<any> = React.memo(
 );
 CodeBlock.displayName = "CodeBlock";
 
-export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(
-  ({ message, onRegenerate, className }) => {
-    const isUser = message.role === "user";
-    const displayContent = message.isStreaming
-      ? (message.streamedContent ?? "") + "▍"
-      : message.content;
+// Main Message Bubble Component
+const MessageBubble: React.FC<MessageBubbleProps> = ({
+  message,
+  onRegenerate,
+  className,
+}) => {
+  const isUser = message.role === "user";
+  // Content for streaming state (plain text)
+  const streamingContent = message.streamedContent ?? "";
+  // Final content (potentially markdown)
+  const finalContent = message.content;
 
-    return (
+  return (
+    <div
+      // Add group class here for MessageActions hover effect
+      className={cn(
+        "group/message flex gap-4 px-4 py-5 transition-colors",
+        isUser ? "bg-gray-900" : "bg-gray-800", // Keep distinct backgrounds
+        className,
+      )}
+    >
+      {/* Avatar/Icon */}
       <div
         className={cn(
-          "group flex gap-4 px-4 py-5 transition-colors",
-          isUser ? "bg-gray-900" : "bg-gray-800",
-          className,
+          "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-1",
+          isUser
+            ? "bg-blue-900/30 text-blue-400"
+            : "bg-violet-900/30 text-violet-400",
         )}
       >
-        {/* Avatar/Icon */}
-        <div
-          className={cn(
-            "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-1",
-            isUser
-              ? "bg-blue-900/30 text-blue-400"
-              : "bg-violet-900/30 text-violet-400",
-          )}
-        >
-          {isUser ? (
-            <UserIcon className="w-4 h-4" />
-          ) : (
-            <BotIcon className="w-4 h-4" />
-          )}
+        {isUser ? (
+          <UserIcon className="w-4 h-4" />
+        ) : (
+          <BotIcon className="w-4 h-4" />
+        )}
+      </div>
+
+      {/* Message Content Area */}
+      <div className="flex-grow min-w-0">
+        {/* Role label */}
+        <div className="text-xs font-medium text-gray-400 mb-1">
+          {isUser ? "You" : "Assistant"}
         </div>
 
-        <div className="flex-grow min-w-0">
-          {/* Role label */}
-          <div className="text-xs font-medium text-gray-400 mb-1">
-            {isUser ? "You" : "Assistant"}
+        {/* Conditional Rendering: Plain text during stream, Markdown after */}
+        {message.isStreaming ? (
+          // Render plain text during streaming, preserving whitespace/newlines
+          <div className="text-gray-200 text-sm whitespace-pre-wrap break-words">
+            {streamingContent}
+            <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"></span>{" "}
+            {/* Streaming indicator */}
           </div>
-
+        ) : (
+          // Render final content with Markdown processing
           <div
             className={cn(
               "prose prose-sm prose-invert max-w-none",
+              // Add styling for prose elements if needed
               "prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1",
               "prose-headings:mt-4 prose-headings:mb-2",
               "prose-code:before:content-none prose-code:after:content-none prose-code:bg-gray-700 prose-code:px-1 prose-code:py-0.5 prose-code:rounded-sm",
-              "prose-pre:bg-gray-700 prose-pre:p-0 prose-pre:rounded-md prose-pre:my-2",
+              "prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-2", // Make pre background transparent so CodeBlock controls it
             )}
           >
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                code: CodeBlock,
+                code: CodeBlock, // Use custom CodeBlock for highlighting
               }}
             >
-              {displayContent}
+              {finalContent}
             </ReactMarkdown>
           </div>
-        </div>
-
-        <div className="flex-shrink-0 self-start pt-1">
-          <MessageActions
-            messageContent={message.content}
-            onRegenerate={
-              !isUser && onRegenerate && !message.isStreaming && !message.error
-                ? () => onRegenerate(message.id)
-                : undefined
-            }
-          />
-        </div>
+        )}
+        {/* Display error if present */}
+        {message.error && (
+          <p className="text-xs text-red-400 mt-1">Error: {message.error}</p>
+        )}
       </div>
-    );
-  },
-);
 
-MessageBubble.displayName = "MessageBubble";
+      {/* Actions Area */}
+      <div className="flex-shrink-0 self-start pt-1 opacity-0 group-hover/message:opacity-100 transition-opacity">
+        {" "}
+        {/* Use group-hover/message */}
+        <MessageActions
+          messageContent={message.content} // Pass final content for copy
+          onRegenerate={
+            !isUser && onRegenerate && !message.isStreaming && !message.error
+              ? () => onRegenerate(message.id)
+              : undefined
+          }
+        />
+      </div>
+    </div>
+  );
+};
 
 // Keep the custom comparison function for React.memo
 const messagesAreEqual = (
   prevProps: MessageBubbleProps,
   nextProps: MessageBubbleProps,
 ): boolean => {
-  // If error state changes, rerender
-  if (prevProps.message.error !== nextProps.message.error) return false;
+  const prevMsg = prevProps.message;
+  const nextMsg = nextProps.message;
 
-  // If it's not streaming, compare normally (id, content, role, error)
-  if (!nextProps.message.isStreaming && !prevProps.message.isStreaming) {
-    return (
-      prevProps.message.id === nextProps.message.id &&
-      prevProps.message.content === nextProps.message.content &&
-      prevProps.message.role === nextProps.message.role &&
-      prevProps.message.error === nextProps.message.error // Include error check
-    );
-  }
-
-  // If streaming state changes, rerender
-  if (prevProps.message.isStreaming !== nextProps.message.isStreaming) {
+  // Basic checks for changes that always warrant a rerender
+  if (
+    prevMsg.id !== nextMsg.id ||
+    prevMsg.role !== nextMsg.role ||
+    prevMsg.error !== nextMsg.error ||
+    prevMsg.isStreaming !== nextMsg.isStreaming // Crucial: rerender when streaming starts/stops
+  ) {
     return false;
   }
 
-  // If it *is* streaming, only compare streamedContent, ID and error
-  if (nextProps.message.isStreaming) {
-    return (
-      prevProps.message.id === nextProps.message.id &&
-      prevProps.message.streamedContent === nextProps.message.streamedContent &&
-      prevProps.message.error === nextProps.message.error // Include error check
-    );
+  // If streaming, compare streamedContent
+  if (nextMsg.isStreaming) {
+    return prevMsg.streamedContent === nextMsg.streamedContent;
   }
 
-  // Fallback (shouldn't be reached often)
-  return false; // Rerender if unsure
+  // If not streaming, compare final content
+  return prevMsg.content === nextMsg.content;
 };
 
 export const MemoizedMessageBubble = React.memo(
