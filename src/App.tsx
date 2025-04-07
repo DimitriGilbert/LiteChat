@@ -16,14 +16,14 @@ const chatProviders: AiProviderConfig[] = [
     requiresApiKey: false,
     models: [
       {
-        id: "gemma-3-12b-it",
-        name: "gemma3 12b",
-        instance: lmstudio("gemma-3-12b-it"),
-      },
-      {
         id: "gemma-3-1b-it",
         name: "gemma3 1b",
         instance: lmstudio("gemma-3-1b-it"),
+      },
+      {
+        id: "gemma-3-12b-it",
+        name: "gemma3 12b",
+        instance: lmstudio("gemma-3-12b-it"),
       },
     ],
   },
