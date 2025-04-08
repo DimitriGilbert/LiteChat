@@ -116,7 +116,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         {message.isStreaming ? (
           // Render plain text during streaming, preserving whitespace/newlines
           <div className="text-gray-200 text-sm whitespace-pre-wrap break-words">
+            {/* <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                code: CodeBlock, // Use custom CodeBlock for highlighting
+              }}
+            > */}
             {streamingContent}
+            {/* </ReactMarkdown> */}
             <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"></span>{" "}
             {/* Streaming indicator */}
           </div>
