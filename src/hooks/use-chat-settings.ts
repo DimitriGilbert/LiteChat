@@ -28,6 +28,36 @@ interface UseChatSettingsReturn {
   setSearchTerm: React.Dispatch<React.SetStateAction<string>>;
 }
 
+// Separate custom hook for the theme effect to satisfy Rules of Hooks
+function useThemeEffect(theme: "light" | "dark" | "system") {
+  useEffect(() => {
+    // Skip DOM manipulation entirely during Vitest runs
+    if (import.meta.env.VITEST) {
+      return;
+    }
+
+    // Guard against SSR or environments where document might not be fully ready
+    if (typeof window === "undefined" || !window.document?.documentElement) {
+      return;
+    }
+
+    const root = window.document.documentElement;
+    root.classList.remove("light", "dark");
+
+    let effectiveTheme = theme;
+    if (theme === "system") {
+      // Ensure matchMedia is available before calling it
+      effectiveTheme =
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+    }
+
+    root.classList.add(effectiveTheme);
+  }, [theme]); // Dependency remains the same
+}
+
 export function useChatSettings({
   activeConversationData,
 }: UseChatSettingsProps): UseChatSettingsReturn {
@@ -43,30 +73,15 @@ export function useChatSettings({
   const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Derived: Determine the active system prompt
   const activeSystemPrompt = useMemo(() => {
-    // Use conversation-specific prompt if it exists (and is not explicitly null/empty string?)
     if (activeConversationData?.systemPrompt) {
       return activeConversationData.systemPrompt;
     }
-    // Otherwise, fall back to the global prompt
     return globalSystemPrompt;
   }, [activeConversationData, globalSystemPrompt]);
 
-  // Apply theme to HTML element
-  useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove("light", "dark");
-    if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
-        ? "dark"
-        : "light";
-      root.classList.add(systemTheme);
-    } else {
-      root.classList.add(theme);
-    }
-  }, [theme]);
+  // Call the custom hook that contains the effect
+  useThemeEffect(theme);
 
   return {
     temperature,

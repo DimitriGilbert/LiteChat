@@ -21,11 +21,9 @@ import {
 } from "@/components/ui/table";
 import { Trash2Icon, EyeIcon, EyeOffIcon } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 export const SettingsApiKeys: React.FC = () => {
-  const { apiKeys, addApiKey, deleteApiKey, providers, setSelectedApiKeyId } =
-    useChatContext();
+  const { apiKeys, addApiKey, deleteApiKey, providers } = useChatContext();
   const [newKeyName, setNewKeyName] = useState("");
   const [newKeyValue, setNewKeyValue] = useState("");
   const [newKeyProviderId, setNewKeyProviderId] = useState<string>("");
@@ -40,7 +38,8 @@ export const SettingsApiKeys: React.FC = () => {
     }
     setIsAdding(true);
     try {
-      const addedKeyId = await addApiKey(
+      // const addedKeyId = await addApiKey(
+      await addApiKey(
         newKeyName.trim(),
         newKeyProviderId,
         newKeyValue.trim(), // Pass the value
@@ -51,9 +50,13 @@ export const SettingsApiKeys: React.FC = () => {
       setNewKeyProviderId("");
       // Optionally auto-select the new key (addApiKey already does this)
       // setSelectedApiKeyId(newKeyProviderId, addedKeyId);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to add API key:", error);
-      toast.error(`Failed to add API key: ${error.message}`);
+      if (error instanceof Error) {
+        toast.error(`Failed to add API key: ${error.message}`);
+      } else {
+        toast.error(`Failed to add API key: ${String(error)}`);
+      }
     } finally {
       setIsAdding(false);
     }
@@ -69,9 +72,13 @@ export const SettingsApiKeys: React.FC = () => {
           delete next[id]; // Remove visibility state for deleted key
           return next;
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Failed to delete API key:", error);
-        toast.error(`Failed to delete API key: ${error.message}`);
+        if (error instanceof Error) {
+          toast.error(`Failed to delete API key: ${error.message}`);
+        } else {
+          toast.error(`Failed to delete API key: ${String(error)}`);
+        }
       }
     }
   };

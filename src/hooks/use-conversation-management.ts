@@ -8,14 +8,11 @@ import type {
   SidebarItemType,
   ProjectSidebarItem,
   ConversationSidebarItem,
+  Message,
 } from "@/lib/types";
-import { db } from "@/lib/db"; // Direct db access for complex queries/transactions
+import { db } from "@/lib/db";
 import { toast } from "sonner";
-import { z } from "zod";
-// Removed Dexie import if not used for minKey anymore
 import { useLiveQuery } from "dexie-react-hooks";
-
-// ... (keep existing imports and schemas) ...
 
 interface UseConversationManagementProps {
   initialSelectedItemId?: string | null;
@@ -232,9 +229,13 @@ export function useConversationManagement({
           );
         }
         // LiveQuery will update the sidebarItems list automatically
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(`Failed to delete ${type}:`, err);
-        toast.error(`Failed to delete ${type}: ${err.message}`);
+        if (err instanceof Error) {
+          toast.error(`Failed to delete ${type}: ${err.message}`);
+        } else {
+          toast.error(`Failed to delete ${type}: Unknown error`);
+        }
       }
     },
     [storage, selectedItemId, selectItem], // selectedItemId needed for post-delete selection logic
@@ -269,9 +270,13 @@ export function useConversationManagement({
         }
         console.log(`useConversationManagement: Rename successful for ${id}`); // Add log
         // LiveQuery should update the name in sidebarItems automatically due to updatedAt change
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(`Failed to rename ${type}:`, err);
-        toast.error(`Failed to rename ${type}: ${err.message}`);
+        if (err instanceof Error) {
+          toast.error(`Failed to rename ${type}: ${err.message}`);
+        } else {
+          toast.error(`Failed to rename ${type}: Unknown error`);
+        }
         throw err; // Re-throw to signal failure
       }
     },
@@ -330,9 +335,13 @@ export function useConversationManagement({
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         toast.success(`Conversation "${conversation.title}" exported.`);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Export failed:", err);
-        toast.error(`Export failed: ${err.message}`);
+        if (err instanceof Error) {
+          toast.error(`Export failed: ${err.message}`);
+        } else {
+          toast.error(`Export failed: Unknown error`);
+        }
       }
     },
     [], // No storage dependency needed if using db directly
@@ -370,7 +379,7 @@ export function useConversationManagement({
 
           if (importedMessages.length > 0) {
             await db.messages.bulkAdd(
-              importedMessages.map((msg) => ({
+              importedMessages.map((msg: Message) => ({
                 ...msg,
                 conversationId: newConversationId,
               })),
@@ -387,11 +396,13 @@ export function useConversationManagement({
           toast.success(
             `Conversation imported successfully as "${newConversationTitle}"!`,
           );
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error("Import failed:", err);
-          toast.error(
-            `Import failed: ${err.message || "Could not read or parse file."}`,
-          );
+          if (err instanceof Error) {
+            toast.error(`Import failed: ${err.message}`);
+          } else {
+            toast.error("Import failed: Unknown error");
+          }
         }
       };
       reader.onerror = () => {
@@ -447,9 +458,13 @@ export function useConversationManagement({
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       toast.success(`All ${allConversations.length} conversations exported.`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Export All failed:", err);
-      toast.error(`Export All failed: ${err.message}`);
+      if (err instanceof Error) {
+        toast.error(`Export All failed: ${err.message}`);
+      } else {
+        toast.error("Export All failed: Unknown error");
+      }
     }
   }, []);
 

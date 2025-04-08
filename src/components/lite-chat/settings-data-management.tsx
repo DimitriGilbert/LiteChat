@@ -2,8 +2,6 @@
 import React, { useRef } from "react";
 import { useChatContext } from "@/hooks/use-chat-context";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input"; // For file input styling
 import { UploadIcon, DownloadIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { db } from "@/lib/db"; // Import db for clearing data
@@ -22,7 +20,7 @@ export const SettingsDataManagement: React.FC = () => {
     const file = event.target.files?.[0];
     if (file) {
       try {
-        await importConversation(file);
+        await importConversation(file, null);
         // Reset file input to allow importing the same file again
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
@@ -59,9 +57,13 @@ export const SettingsDataManagement: React.FC = () => {
           toast.success("All local data cleared. Reloading the application...");
           // Force reload to re-initialize the database and context
           setTimeout(() => window.location.reload(), 1500);
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("Failed to clear all data:", error);
-          toast.error(`Failed to clear data: ${error.message}`);
+          if (error instanceof Error) {
+            toast.error(`Failed to clear data: ${error.message}`);
+          } else {
+            toast.error("Failed to clear data");
+          }
         }
       }
     }

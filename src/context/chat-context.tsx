@@ -1,15 +1,8 @@
 // src/context/chat-context.tsx
-import React, {
-  useMemo,
-  useCallback,
-  useState,
-  useEffect,
-  useRef, // Import useRef
-} from "react";
+import React, { useMemo, useCallback, useState, useRef } from "react";
 import type {
   AiProviderConfig,
   ChatContextProps,
-  DbMessage,
   SidebarItemType,
   Message,
 } from "@/lib/types";
@@ -83,7 +76,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     getApiKeyForProvider,
   } = useApiKeysManagement();
 
-  const { addDbMessage, deleteDbMessage, getDbMessagesUpTo } = useChatStorage();
+  const { addDbMessage, deleteDbMessage } = useChatStorage();
 
   const handleSelectItem = useCallback(
     (id: string | null, type: SidebarItemType | null) => {
@@ -242,16 +235,21 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           const newConvId = await createConversation(
             parentProjectId,
             currentPrompt.substring(0, 50) || "New Chat",
-            activeConversationData?.systemPrompt ?? globalSystemPrompt,
+            // activeConversationData?.systemPrompt ?? globalSystemPrompt,
           );
           if (!newConvId)
             throw new Error("Failed to get ID for new conversation.");
           conversationIdToSubmit = newConvId;
           // Selection happens within createConversation's flow
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error("Error creating conversation during submit:", err);
-          setError(`Error: Could not start chat - ${err.message}`);
-          toast.error(`Failed to start chat: ${err.message}`);
+          if (err instanceof Error) {
+            setError(`Error: Could not start chat - ${err.message}`);
+            toast.error(`Failed to start chat: ${err.message}`);
+          } else {
+            toast.error("Failed to start chat");
+            setError(`Error: Could not start chat - ${err}`);
+          }
           return;
         }
       }
@@ -277,7 +275,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       selectedModel,
       createConversation,
       activeConversationData,
-      globalSystemPrompt,
+      // globalSystemPrompt,
       setPrompt,
       clearAttachedFiles,
       handleMessageSubmit,

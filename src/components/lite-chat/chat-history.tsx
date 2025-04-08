@@ -20,12 +20,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type {
-  SidebarItem,
-  SidebarItemType,
-  ProjectSidebarItem,
-  ConversationSidebarItem,
-} from "@/lib/types";
+import type { SidebarItem } from "@/lib/types";
 import { toast } from "sonner";
 
 // --- History Item Component ---
@@ -64,7 +59,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
       setEditedName(newName);
       nameBeforeEdit.current = newName; // Keep ref updated too
     }
-  }, [item.name, item.title, item.type, isEditing]);
+  }, [item, isEditing]);
 
   // Effect to trigger edit mode based on prop
   useEffect(() => {
@@ -74,7 +69,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
       nameBeforeEdit.current = item.type === "project" ? item.name : item.title;
       setEditedName(nameBeforeEdit.current); // Ensure input starts with correct value
     }
-  }, [startInEditMode, item.id]); // Depend only on startInEditMode and item.id
+  }, [startInEditMode, item]);
 
   // Effect to focus input when editing starts
   useEffect(() => {
@@ -143,7 +138,6 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const typeName = item.type === "project" ? "project" : "chat";
     const name = item.type === "project" ? item.name : item.title;
     const confirmationMessage =
       item.type === "project"

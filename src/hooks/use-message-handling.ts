@@ -1,6 +1,6 @@
 // src/hooks/use-message-handling.ts
 import React, { useCallback, useEffect } from "react"; // Removed useState
-import type { Message, CoreMessage, DbMessage } from "@/lib/types";
+import type { Message, DbMessage } from "@/lib/types";
 // Removed useChatStorage import here, DB functions are passed as props
 import { db } from "@/lib/db";
 import { toast } from "sonner";
@@ -8,7 +8,7 @@ import { toast } from "sonner";
 // Interface for AI stream parameters (ensure consistency)
 export interface PerformAiStreamParams {
   conversationIdToUse: string;
-  messagesToSend: CoreMessage[];
+  messagesToSend: Message[];
   currentTemperature: number;
   currentMaxTokens: number | null;
   currentTopP: number | null;
@@ -202,13 +202,18 @@ export function useMessageHandling({
           "useMessageHandling: User message saved to DB",
           userMessageId,
         );
-      } catch (dbError: any) {
+      } catch (dbError: unknown) {
         console.error(
           "useMessageHandling: Error adding user message:",
           dbError,
         );
-        setError(`Error: Could not save your message - ${dbError.message}`);
-        toast.error(`Error saving message: ${dbError.message}`);
+        if (dbError instanceof Error) {
+          setError(`Error: Could not save your message - ${dbError.message}`);
+          toast.error(`Error saving message: ${dbError.message}`);
+        } else {
+          setError("Error: Could not save your message");
+          toast.error("Error saving message");
+        }
         return;
       }
 
@@ -221,11 +226,11 @@ export function useMessageHandling({
 
       // 3. Prepare message history for AI (using the state *after* adding the user message)
       // Read state functionally to ensure it's the latest after the update above
-      const messagesForAi = await new Promise<CoreMessage[]>((resolve) => {
+      const messagesForAi = await new Promise<Message[]>((resolve) => {
         setLocalMessages((currentMessages) => {
           const history = currentMessages
             .filter((m) => !m.error)
-            .map((m): CoreMessage => ({ role: m.role, content: m.content }));
+            .map((m): Message => ({ role: m.role, content: m.content }));
           resolve(history);
           return currentMessages; // No change here, just reading
         });
@@ -260,7 +265,7 @@ export function useMessageHandling({
           systemPromptToUse: activeSystemPrompt,
         });
         console.log("useMessageHandling: performAiStream finished");
-      } catch (err: any) {
+      } catch (err: unknown) {
         // Errors during the stream are handled within performAiStream
         console.error(
           "useMessageHandling: Error during performAiStream call:",
@@ -320,7 +325,7 @@ export function useMessageHandling({
       const historyForRegen = localMessages
         .slice(0, messageIndex)
         .filter((m) => !m.error)
-        .map((m): CoreMessage => ({ role: m.role, content: m.content }));
+        .map((m): Message => ({ role: m.role, content: m.content }));
 
       const hasUserOrAssistantMessage = historyForRegen.some(
         (m) => m.role === "user" || m.role === "assistant",
@@ -341,10 +346,15 @@ export function useMessageHandling({
         console.log(
           `useMessageHandling: Deleted ${messagesToDelete.length} messages for regen`,
         );
-      } catch (dbErr: any) {
+      } catch (dbErr: unknown) {
         console.error("useMessageHandling: Error deleting for regen:", dbErr);
-        setError(`Error preparing regeneration: ${dbErr.message}`);
-        toast.error("Failed to prepare for regeneration.");
+        if (dbErr instanceof Error) {
+          setError(`Error preparing regeneration: ${dbErr.message}`);
+          toast.error("Failed to prepare for regeneration : " + dbErr.message);
+        } else {
+          setError("Unknown error preparing regeneration");
+          toast.error("Failed to prepare for regeneration.");
+        }
         return;
       }
 
@@ -367,7 +377,7 @@ export function useMessageHandling({
           systemPromptToUse: activeSystemPrompt,
         });
         console.log("useMessageHandling: performAiStream finished for regen");
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("useMessageHandling: Error during regen stream:", err);
       }
     },

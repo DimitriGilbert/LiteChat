@@ -15,8 +15,7 @@ interface PromptActionsProps {
 }
 
 export const PromptActions: React.FC<PromptActionsProps> = ({ className }) => {
-  const { prompt, handleSubmit, isStreaming, addAttachedFile } =
-    useChatContext();
+  const { prompt, isStreaming, addAttachedFile } = useChatContext();
   const fileInputRef = useRef<HTMLInputElement>(null); // Ref for file input
 
   const canSubmit =

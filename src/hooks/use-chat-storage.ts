@@ -8,7 +8,6 @@ import type {
   DbProject,
 } from "@/lib/types";
 import { nanoid } from "nanoid";
-import Dexie from "dexie"; // Import Dexie for minKey
 
 // Note: This hook now provides low-level DB access.
 // Higher-level logic (like fetching tree structures) will be in use-conversation-management.

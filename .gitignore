@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 plop
 prompt_4_*
+src/test/**/*.notest.*

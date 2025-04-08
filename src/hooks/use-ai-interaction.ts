@@ -1,5 +1,5 @@
 // src/hooks/use-ai-interaction.ts
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { streamText, type CoreMessage } from "ai";
 import type { AiModelConfig, AiProviderConfig, Message } from "@/lib/types";
 import { throttle } from "@/lib/throttle"; // Your throttle implementation
@@ -187,35 +187,32 @@ export function useAiInteraction({
         // console.log(
         //   `[AI Stream ${assistantMessageId}] Stream loop finished normally after ${deltaCount} deltas. Final content length: ${finalContent.length}`,
         // );
-      } catch (err: any) {
-        // --- Error handling remains the same ---
-        streamError = err;
-        if (err.name === "AbortError") {
-          // console.log(
-          //   `[AI Stream ${assistantMessageId}] Stream aborted by user after ${deltaCount} deltas.`,
-          // );
-          // Use the finalContent accumulated up to the abort point
-          // console.log(
-          //   `[AI Stream ${assistantMessageId}] Abort final content set to (from finalContent): "${finalContent}"`,
-          // );
-          streamError = null;
-        } else {
-          console.error(
-            `[AI Stream ${assistantMessageId}] streamText error after ${deltaCount} deltas:`,
-            err,
-          );
-          finalContent = `Error: ${err.message || "Failed to get response"}`;
-          setError(`AI Error: ${finalContent}`);
-          toast.error(`AI Error: ${err.message || "Unknown error"}`);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          streamError = err;
+          if (err.name === "AbortError") {
+            // console.log(
+            //   `[AI Stream ${assistantMessageId}] Stream aborted by user after ${deltaCount} deltas.`,
+            // );
+            // Use the finalContent accumulated up to the abort point
+            // console.log(
+            //   `[AI Stream ${assistantMessageId}] Abort final content set to (from finalContent): "${finalContent}"`,
+            // );
+            streamError = null;
+          } else {
+            console.error(
+              `[AI Stream ${assistantMessageId}] streamText error after ${deltaCount} deltas:`,
+              err,
+            );
+            finalContent = `Error: ${err.message || "Failed to get response"}`;
+            setError(`AI Error: ${finalContent}`);
+            toast.error(`AI Error: ${err.message || "Unknown error"}`);
+          }
         }
       } finally {
-        // --- Finally block remains the same ---
         // console.log(
         //   `[AI Stream ${assistantMessageId}] Entering finally block. StreamError: ${streamError?.message}`,
         // );
-
-        // Optional: Cancel throttled calls if your throttle function supports it
-        // (throttledStreamUpdate as any).cancel?.();
 
         if (abortControllerRef.current === currentAbortController) {
           abortControllerRef.current = null;
@@ -268,24 +265,33 @@ export function useAiInteraction({
             // console.log(
             //   `[AI Stream ${assistantMessageId}] Assistant message saved to DB successfully.`,
             // );
-          } catch (dbErr: any) {
-            const dbErrorMessage = `Save failed: ${dbErr.message}`;
-            console.error(
-              `[AI Stream ${assistantMessageId}] Failed to save final assistant message to DB:`,
-              dbErr,
-            );
-            setError(`Error saving response: ${dbErr.message}`);
-            toast.error(`Failed to save response: ${dbErr.message}`);
-            setLocalMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === assistantMessageId
-                  ? { ...msg, error: dbErrorMessage }
-                  : msg,
-              ),
-            );
-            // console.log(
-            //   `[AI Stream ${assistantMessageId}] Updated message in UI state with DB save error.`,
-            // );
+          } catch (dbErr: unknown) {
+            if (dbErr instanceof Error) {
+              const dbErrorMessage = `Save failed: ${dbErr.message}`;
+              console.error(
+                `[AI Stream ${assistantMessageId}] Failed to save final assistant message to DB:`,
+                dbErr,
+              );
+              setError(`Error saving response: ${dbErr.message}`);
+              toast.error(`Failed to save response: ${dbErr.message}`);
+              setLocalMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, error: dbErrorMessage }
+                    : msg,
+                ),
+              );
+              // console.log(
+              //   `[AI Stream ${assistantMessageId}] Updated message in UI state with DB save error.`,
+              // );
+            } else {
+              console.error(
+                `[AI Stream ${assistantMessageId}] Failed to save final assistant message to DB:`,
+                dbErr,
+              );
+              setError(`Error saving response: ${dbErr}`);
+              toast.error(`Failed to save response: ${dbErr}`);
+            }
           }
         } else if (streamError) {
           setError(`AI Error: ${streamError.message}`);

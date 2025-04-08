@@ -18,54 +18,54 @@ interface MessageBubbleProps {
 }
 
 // Custom Code component for Syntax Highlighting (Keep as is)
-const CodeBlock: React.FC<any> = React.memo(
-  ({ node, inline, className, children, ...props }) => {
-    const match = /language-(\w+)/.exec(className || "");
-    return !inline && match ? (
-      <div className="relative group/codeblock">
+const CodeBlock: React.FC<{
+  inline?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+}> = React.memo(({ inline, className, children, ...props }) => {
+  const match = /language-(\w+)/.exec(className || "");
+  return !inline && match ? (
+    <div className="relative group/codeblock">
+      {" "}
+      {/* Added group/codeblock */}
+      <div className="absolute right-2 top-2 opacity-0 group-hover/codeblock:opacity-100 transition-opacity">
         {" "}
-        {/* Added group/codeblock */}
-        <div className="absolute right-2 top-2 opacity-0 group-hover/codeblock:opacity-100 transition-opacity">
-          {" "}
-          {/* Use group-hover/codeblock */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 bg-gray-800/80 hover:bg-gray-700 text-gray-200"
-            onClick={() => {
-              navigator.clipboard.writeText(
-                String(children).replace(/\n$/, ""),
-              );
-              toast.success("Code copied to clipboard");
-            }}
-            aria-label="Copy code"
-          >
-            <CopyIcon className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        <SyntaxHighlighter
-          style={vscDarkPlus}
-          language={match[1]}
-          PreTag="div"
-          className="rounded-md !mt-3 !mb-3 !bg-gray-800 dark:!bg-gray-900"
-          {...props}
+        {/* Use group-hover/codeblock */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 bg-gray-800/80 hover:bg-gray-700 text-gray-200"
+          onClick={() => {
+            navigator.clipboard.writeText(String(children).replace(/\n$/, ""));
+            toast.success("Code copied to clipboard");
+          }}
+          aria-label="Copy code"
         >
-          {String(children).replace(/\n$/, "")}
-        </SyntaxHighlighter>
+          <CopyIcon className="h-3.5 w-3.5" />
+        </Button>
       </div>
-    ) : (
-      <code
-        className={cn(
-          "font-mono text-sm px-1 py-0.5 rounded-sm bg-gray-700", // Adjusted inline code style
-          className,
-        )}
+      <SyntaxHighlighter
+        style={vscDarkPlus}
+        language={match[1]}
+        PreTag="div"
+        className="rounded-md !mt-3 !mb-3 !bg-gray-800 dark:!bg-gray-900"
         {...props}
       >
-        {children}
-      </code>
-    );
-  },
-);
+        {String(children).replace(/\n$/, "")}
+      </SyntaxHighlighter>
+    </div>
+  ) : (
+    <code
+      className={cn(
+        "font-mono text-sm px-1 py-0.5 rounded-sm bg-gray-700", // Adjusted inline code style
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </code>
+  );
+});
 CodeBlock.displayName = "CodeBlock";
 
 // Main Message Bubble Component

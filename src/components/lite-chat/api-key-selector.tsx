@@ -27,7 +27,11 @@ export const ApiKeySelector: React.FC<ApiKeySelectorProps> = ({
 
   const currentProvider = providers.find((p) => p.id === selectedProviderId);
   // Simple check if provider might need a key (improve if needed)
-  const requiresKey = selectedProviderId && selectedProviderId !== "mock"; // Example: mock provider doesn't need a key
+  const requiresKey =
+    selectedProviderId &&
+    currentProvider &&
+    selectedProviderId !== "mock" &&
+    currentProvider.requiresApiKey;
 
   const availableKeys = selectedProviderId
     ? apiKeys.filter((key) => key.providerId === selectedProviderId)

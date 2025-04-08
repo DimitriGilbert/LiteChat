@@ -13,9 +13,16 @@ export default defineConfig({
     },
   },
   test: {
-    globals: true,
-    environment: "jsdom",
-    setupFiles: "./src/test/setup.ts", // Create this file
-    css: true,
+    globals: true, // Use Vitest global APIs (describe, it, expect, etc.)
+    environment: "jsdom", // Simulate DOM environment
+    setupFiles: "./src/test/setup.ts", // Path to your setup file
+    css: true, // Enable CSS processing if needed for tests (e.g., snapshot testing with styles)
+    // Optional: Configure coverage
+    // coverage: {
+    //   provider: 'v8', // or 'istanbul'
+    //   reporter: ['text', 'json', 'html'],
+    //   include: ['src/**/*.{ts,tsx}'],
+    //   exclude: ['src/main.tsx', 'src/vite-env.d.ts', 'src/test/setup.ts', 'src/lib/db.ts', 'src/**/*.d.ts', 'src/components/ui/**'], // Exclude UI primitives, setup, etc.
+    // },
   },
 });
