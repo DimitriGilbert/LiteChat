@@ -1,7 +1,9 @@
+// src/components/lite-chat/prompt-form.tsx
 import React from "react";
 import { PromptInput } from "./prompt-input";
 import { PromptSettings } from "./prompt-settings";
-import { PromptFiles } from "./prompt-files"; // Import
+import { PromptFiles } from "./prompt-files"; // For direct uploads
+import { SelectedVfsFilesDisplay } from "./selected-vfs-files-display"; // Import VFS selection display
 import { PromptActions } from "./prompt-actions";
 import { useChatContext } from "@/hooks/use-chat-context";
 import { cn } from "@/lib/utils";
@@ -15,7 +17,11 @@ export const PromptForm: React.FC<PromptFormProps> = ({ className }) => {
 
   return (
     <form onSubmit={handleSubmit} className={cn("flex flex-col", className)}>
+      {/* Display for temporary file uploads */}
       <PromptFiles />
+
+      {/* Display for selected VFS files for context */}
+      <SelectedVfsFilesDisplay />
 
       <div className="flex items-end p-3 md:p-4">
         <PromptInput className="min-h-[60px]" />

@@ -1,3 +1,4 @@
+// src/components/lite-chat/prompt-actions.tsx
 import React, { useRef } from "react"; // Add useRef
 import { Button } from "@/components/ui/button";
 import { SendHorizonalIcon, PaperclipIcon } from "lucide-react";
@@ -49,7 +50,9 @@ export const PromptActions: React.FC<PromptActionsProps> = ({ className }) => {
       <TooltipProvider delayDuration={100}>
         <Tooltip>
           <TooltipTrigger asChild>
+            {/* Add type="button" here */}
             <Button
+              type="button" // <--- ADD THIS LINE
               variant="outline"
               size="icon"
               onClick={handleAttachClick}
@@ -66,6 +69,7 @@ export const PromptActions: React.FC<PromptActionsProps> = ({ className }) => {
         </Tooltip>
       </TooltipProvider>
 
+      {/* Submit button remains type="submit" (implicitly via form) */}
       <TooltipProvider delayDuration={100}>
         <Tooltip>
           <TooltipTrigger asChild>

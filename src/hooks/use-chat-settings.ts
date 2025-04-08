@@ -1,9 +1,10 @@
 // src/hooks/use-chat-settings.ts
 import { useState, useMemo, useEffect } from "react";
-import type { DbConversation } from "@/lib/types";
+import type { DbConversation, DbProject } from "@/lib/types";
 
 interface UseChatSettingsProps {
   activeConversationData: DbConversation | null;
+  activeProjectData: DbProject | null; // Accept active project data
 }
 
 interface UseChatSettingsReturn {
@@ -13,7 +14,7 @@ interface UseChatSettingsReturn {
   setMaxTokens: React.Dispatch<React.SetStateAction<number | null>>;
   globalSystemPrompt: string;
   setGlobalSystemPrompt: React.Dispatch<React.SetStateAction<string>>;
-  activeSystemPrompt: string | null; // Derived
+  activeSystemPrompt: string | null; // Derived: convo-specific or global
   topP: number | null;
   setTopP: React.Dispatch<React.SetStateAction<number | null>>;
   topK: number | null;
@@ -28,25 +29,24 @@ interface UseChatSettingsReturn {
   setSearchTerm: React.Dispatch<React.SetStateAction<string>>;
 }
 
-// Separate custom hook for the theme effect to satisfy Rules of Hooks
+// Custom hook to apply theme changes to the DOM
 function useThemeEffect(theme: "light" | "dark" | "system") {
   useEffect(() => {
-    // Skip DOM manipulation entirely during Vitest runs
+    // Skip DOM manipulation during server-side rendering or tests
+    if (typeof window === "undefined" || !window.document?.documentElement) {
+      return;
+    }
+    // Skip during Vitest runs if needed
     if (import.meta.env.VITEST) {
       return;
     }
 
-    // Guard against SSR or environments where document might not be fully ready
-    if (typeof window === "undefined" || !window.document?.documentElement) {
-      return;
-    }
-
     const root = window.document.documentElement;
-    root.classList.remove("light", "dark");
+    root.classList.remove("light", "dark"); // Remove previous theme classes
 
     let effectiveTheme = theme;
+    // Determine effective theme if 'system' is selected
     if (theme === "system") {
-      // Ensure matchMedia is available before calling it
       effectiveTheme =
         window.matchMedia &&
         window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -54,35 +54,42 @@ function useThemeEffect(theme: "light" | "dark" | "system") {
           : "light";
     }
 
+    // Add the calculated theme class to the root element
     root.classList.add(effectiveTheme);
-  }, [theme]); // Dependency remains the same
+  }, [theme]); // Re-run effect only when the theme state changes
 }
 
 export function useChatSettings({
   activeConversationData,
+  // activeProjectData, // Currently unused, but available if needed for project-specific settings
 }: UseChatSettingsProps): UseChatSettingsReturn {
+  // State for various chat settings
   const [temperature, setTemperature] = useState(0.7);
-  const [maxTokens, setMaxTokens] = useState<number | null>(null);
+  const [maxTokens, setMaxTokens] = useState<number | null>(null); // Default to null (provider default)
   const [globalSystemPrompt, setGlobalSystemPrompt] = useState(
-    "You are a helpful AI assistant.",
+    "You are a helpful AI assistant.", // Default global prompt
   );
-  const [topP, setTopP] = useState<number | null>(null);
-  const [topK, setTopK] = useState<number | null>(null);
-  const [presencePenalty, setPresencePenalty] = useState<number | null>(null);
-  const [frequencyPenalty, setFrequencyPenalty] = useState<number | null>(null);
-  const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [topP, setTopP] = useState<number | null>(null); // Default to null (provider default)
+  const [topK, setTopK] = useState<number | null>(null); // Default to null (provider default)
+  const [presencePenalty, setPresencePenalty] = useState<number | null>(null); // Default to null (provider default)
+  const [frequencyPenalty, setFrequencyPenalty] = useState<number | null>(null); // Default to null (provider default)
+  const [theme, setTheme] = useState<"light" | "dark" | "system">("system"); // Default theme
+  const [searchTerm, setSearchTerm] = useState(""); // State for message search term
 
+  // Determine the active system prompt: use conversation-specific if available, else global
   const activeSystemPrompt = useMemo(() => {
+    // Projects don't have system prompts, only conversations do
     if (activeConversationData?.systemPrompt) {
       return activeConversationData.systemPrompt;
     }
+    // Fallback to the global system prompt
     return globalSystemPrompt;
-  }, [activeConversationData, globalSystemPrompt]);
+  }, [activeConversationData, globalSystemPrompt]); // Recalculate when conversation data or global prompt changes
 
-  // Call the custom hook that contains the effect
+  // Apply the theme effect using the custom hook
   useThemeEffect(theme);
 
+  // Return all settings states and setters
   return {
     temperature,
     setTemperature,

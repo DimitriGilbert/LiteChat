@@ -1,18 +1,24 @@
-import React, { useState } from "react"; // Add useState
+// src/components/lite-chat/prompt-settings.tsx
+import React, { useState } from "react";
 import { ProviderSelector } from "./provider-selector";
 import { ModelSelector } from "./model-selector";
-// import { ApiKeySelector } from "./api-key-selector"; // REMOVED from here
-import { PromptSettingsAdvanced } from "./prompt-settings-advanced"; // Import advanced
+import { PromptSettingsAdvanced } from "./prompt-settings-advanced";
 import { useChatContext } from "@/hooks/use-chat-context";
-import { KeyIcon, AlertTriangleIcon, Settings2Icon } from "lucide-react"; // Add Settings2Icon
-import { Button } from "@/components/ui/button"; // Import Button
+import {
+  KeyIcon,
+  AlertTriangleIcon,
+  Settings2Icon,
+  FolderSyncIcon,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
 import { cn } from "@/lib/utils";
 
 interface PromptSettingsProps {
@@ -27,8 +33,11 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
     providers,
     getApiKeyForProvider,
     selectedApiKeyId,
+    selectedItemId,
+    vfsEnabled,
+    toggleVfsEnabled,
   } = useChatContext();
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false); // State for toggle
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
   const providerConfig = providers.find((p) => p.id === selectedProviderId);
   const needsKey =
@@ -42,24 +51,32 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
   const showKeyRequiredWarning = needsKey && (!keyIsSelected || !keyHasValue);
   const showKeyProvidedIndicator = needsKey && keyIsSelected && keyHasValue;
 
+  const isItemSelected = !!selectedItemId;
+
   return (
-    <div className={cn("bg-gray-800 text-gray-300 p-3", className)}>
-      <div className="flex flex-wrap items-center gap-3">
+    <div className={cn("bg-gray-800 text-gray-300", className)}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
         <ProviderSelector />
         <ModelSelector />
-        {/* <ApiKeySelector /> */}
 
+        {/* API Key Indicator */}
         <TooltipProvider delayDuration={100}>
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center h-9">
                 {showKeyRequiredWarning && (
-                  <AlertTriangleIcon className="h-4 w-4 text-amber-500 ml-1" />
+                  <AlertTriangleIcon
+                    className="h-4 w-4 text-amber-500"
+                    aria-label="API Key Required"
+                  />
                 )}
                 {showKeyProvidedIndicator && (
-                  <KeyIcon className="h-4 w-4 text-green-500 ml-1" />
+                  <KeyIcon
+                    className="h-4 w-4 text-green-500"
+                    aria-label="API Key Provided"
+                  />
                 )}
-                {!needsKey && <div className="w-4 h-4 ml-1" />}
+                {!needsKey && <div className="w-4 h-4" />}
               </div>
             </TooltipTrigger>
             <TooltipContent side="top">
@@ -69,18 +86,60 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
                 </p>
               )}
               {showKeyProvidedIndicator && (
-                <p>API Key is selected for this provider.</p>
+                <p>API Key is selected and available for this provider.</p>
               )}
               {!needsKey && <p>API Key not required for this provider.</p>}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
+
+        {/* VFS Toggle */}
+        <TooltipProvider delayDuration={100}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center space-x-2 h-9">
+                <Switch
+                  id="vfs-toggle"
+                  checked={vfsEnabled}
+                  onCheckedChange={toggleVfsEnabled}
+                  disabled={!isItemSelected}
+                  aria-label="Toggle Virtual Filesystem"
+                />
+                <Label
+                  htmlFor="vfs-toggle"
+                  className={cn(
+                    "text-xs cursor-pointer flex items-center gap-1 transition-colors",
+                    !isItemSelected && "text-gray-500 cursor-not-allowed",
+                    isItemSelected && vfsEnabled && "text-blue-400",
+                    isItemSelected && !vfsEnabled && "text-gray-400",
+                  )}
+                >
+                  <FolderSyncIcon className="h-3.5 w-3.5" />
+                  <span>Files</span>
+                </Label>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {isItemSelected ? (
+                <p>
+                  {vfsEnabled ? "Disable" : "Enable"} Virtual Filesystem for
+                  this item
+                </p>
+              ) : (
+                <p>Select a chat or project to manage its filesystem</p>
+              )}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
         <div className="flex-grow" />
-        {/* Advanced Settings Toggle Button */}
+
+        {/* Advanced Settings Toggle Button - CORRECTED */}
         <TooltipProvider delayDuration={100}>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
@@ -99,8 +158,9 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
           </Tooltip>
         </TooltipProvider>
       </div>
+
       {isAdvancedOpen && (
-        <PromptSettingsAdvanced className="pt-3 -mx-3 -mb-3" />
+        <PromptSettingsAdvanced className="border-t border-gray-700" />
       )}
     </div>
   );

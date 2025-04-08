@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// src/components/lite-chat/prompt-settings-advanced.tsx
+import React, { useState, useEffect, useMemo } from "react"; // Added useMemo
 import { useChatContext } from "@/hooks/use-chat-context";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -7,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiKeySelector } from "./api-key-selector";
+import { FileManager } from "./file-manager";
 import { cn } from "@/lib/utils";
 import { db } from "@/lib/db";
 import { SaveIcon, InfoIcon } from "lucide-react";
@@ -25,6 +27,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
   className,
 }) => {
   const {
+    // Parameters
     temperature,
     setTemperature,
     maxTokens,
@@ -37,31 +40,46 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setPresencePenalty,
     frequencyPenalty,
     setFrequencyPenalty,
+    // System Prompt related
     activeSystemPrompt,
-    selectedConversationId,
+    // selectedConversationId, // REMOVED - Use selectedItemId and selectedItemType instead
+    selectedItemId, // Use generic selectedItemId
+    selectedItemType, // Use selectedItemType to check if it's a conversation
     updateConversationSystemPrompt,
+    // VFS related
+    vfsEnabled,
   } = useChatContext();
+
+  // Derive conversationId only if the selected item is a conversation
+  const conversationId = useMemo(() => {
+    return selectedItemType === "conversation" ? selectedItemId : null;
+  }, [selectedItemId, selectedItemType]);
+
+  // Local state for conversation-specific system prompt editing
   const [localConvoSystemPrompt, setLocalConvoSystemPrompt] = useState<
     string | null
   >(null);
   const [isConvoPromptDirty, setIsConvoPromptDirty] = useState(false);
 
-  // Update local state when the active prompt changes (e.g., switching convos)
+  // Effect to load conversation system prompt when the derived conversationId changes
   useEffect(() => {
-    if (selectedConversationId) {
+    // Only load if conversationId is not null (i.e., a conversation is selected)
+    if (conversationId) {
       db.conversations
-        .get(selectedConversationId)
+        .get(conversationId)
         .then((convo) => {
           setLocalConvoSystemPrompt(convo?.systemPrompt ?? null);
           setIsConvoPromptDirty(false);
         })
         .catch(() => setLocalConvoSystemPrompt(null));
     } else {
+      // Clear local prompt state if no conversation is selected
       setLocalConvoSystemPrompt(null);
       setIsConvoPromptDirty(false);
     }
-  }, [selectedConversationId]);
+  }, [conversationId]); // Depend on the derived conversationId
 
+  // Handle changes to the local system prompt textarea
   const handleConvoSystemPromptChange = (
     e: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
@@ -69,16 +87,19 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setIsConvoPromptDirty(true);
   };
 
+  // Save the conversation-specific system prompt
   const saveConvoSystemPrompt = () => {
-    if (selectedConversationId && isConvoPromptDirty) {
+    // Use the derived conversationId
+    if (conversationId && isConvoPromptDirty) {
       const promptToSave =
         localConvoSystemPrompt?.trim() === "" ? null : localConvoSystemPrompt;
-      updateConversationSystemPrompt(selectedConversationId, promptToSave)
+      updateConversationSystemPrompt(conversationId, promptToSave)
         .then(() => setIsConvoPromptDirty(false))
         .catch((err) => console.error("Failed to save system prompt", err));
     }
   };
 
+  // Helper for number input changes
   const handleNumberInputChange = (
     setter: (value: number | null) => void,
     e: React.ChangeEvent<HTMLInputElement>,
@@ -87,6 +108,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setter(value === "" ? null : parseInt(value, 10) || null);
   };
 
+  // Helper for slider changes
   const handleSliderChange = (
     setter: (value: number | null) => void,
     value: number[],
@@ -94,18 +116,15 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setter(value[0]);
   };
 
-  const isConversationSelected = !!selectedConversationId;
-  const isConversationPromptSet = localConvoSystemPrompt !== null;
+  // Use the derived conversationId for conditional rendering/logic
+  const isConversationSelected = !!conversationId;
+  const isConversationPromptSet =
+    localConvoSystemPrompt !== null && localConvoSystemPrompt.trim() !== "";
 
   return (
-    <div
-      className={cn(
-        "p-3 border-t border-gray-200 dark:border-gray-700",
-        className,
-      )}
-    >
+    <div className={cn("p-3", className)}>
       <Tabs defaultValue="parameters" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 h-9 mb-3">
+        <TabsList className="grid w-full grid-cols-4 h-9 mb-3">
           <TabsTrigger value="parameters" className="text-xs px-2 h-7">
             Parameters
           </TabsTrigger>
@@ -115,9 +134,16 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           <TabsTrigger value="api_keys" className="text-xs px-2 h-7">
             API Keys
           </TabsTrigger>
+          <TabsTrigger
+            value="files"
+            className="text-xs px-2 h-7"
+            disabled={!vfsEnabled}
+          >
+            Files
+          </TabsTrigger>
         </TabsList>
 
-        {/* Parameters Tab */}
+        {/* Parameters Tab Content */}
         <TabsContent value="parameters" className="space-y-4 mt-0">
           <div className="grid grid-cols-2 gap-4 items-end">
             <div className="space-y-1.5">
@@ -147,7 +173,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
               />
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-4 items-end">
             <div className="space-y-1.5">
               <Label htmlFor="max-tokens" className="text-xs">
@@ -178,7 +203,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
               />
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-4 items-end">
             <div className="space-y-1.5">
               <Label htmlFor="presence-penalty" className="text-xs">
@@ -213,7 +237,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           </div>
         </TabsContent>
 
-        {/* System Prompt Tab – Conversation-specific only */}
+        {/* System Prompt Tab Content */}
         <TabsContent value="system_prompt" className="space-y-3 mt-0">
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
@@ -226,6 +250,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
               >
                 Current Conversation Prompt
               </Label>
+              {/* Use isConversationSelected for conditional rendering */}
               {isConversationSelected && (
                 <TooltipProvider delayDuration={100}>
                   <Tooltip>
@@ -263,14 +288,15 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
               placeholder={
                 isConversationSelected
                   ? "Override global prompt for this chat (leave blank to use global)"
-                  : "Select a conversation to set its prompt"
+                  : "Select a conversation to set its specific system prompt"
               }
               value={localConvoSystemPrompt ?? activeSystemPrompt ?? ""}
               onChange={handleConvoSystemPromptChange}
               className="text-xs min-h-[80px] max-h-[150px]"
               rows={4}
-              disabled={!isConversationSelected}
+              disabled={!isConversationSelected} // Use derived boolean
             />
+            {/* Use isConversationSelected for conditional rendering */}
             {isConversationSelected && !isConversationPromptSet && (
               <p className="text-xs text-gray-400 flex items-center gap-1">
                 <InfoIcon className="h-3 w-3" />
@@ -286,9 +312,22 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           </div>
         </TabsContent>
 
-        {/* API Keys Tab */}
+        {/* API Keys Tab Content */}
         <TabsContent value="api_keys" className="mt-0">
           <ApiKeySelector />
+        </TabsContent>
+
+        {/* Files Tab Content */}
+        <TabsContent value="files" className="mt-0">
+          {vfsEnabled && selectedItemId ? (
+            <FileManager key={selectedItemId} />
+          ) : (
+            <div className="text-center text-sm text-gray-500 py-8">
+              Virtual Filesystem is not enabled for the selected item.
+              <br />
+              Enable it using the toggle in the basic prompt settings area.
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

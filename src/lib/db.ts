@@ -11,30 +11,28 @@ export class ChatDatabase extends Dexie {
   constructor() {
     super("LiteChatDatabase");
     // Bump version number when schema changes
-    this.version(3).stores({
+    this.version(4).stores({
       // Added projects table with index on parentId
       projects: "++id, name, parentId, createdAt, updatedAt",
       // Added parentId index to conversations
       conversations: "id, parentId, createdAt, updatedAt",
-      messages: "id, conversationId, createdAt",
+      // Added vfsContextPaths to messages (Dexie handles optional fields)
+      messages: "id, conversationId, createdAt, vfsContextPaths",
       apiKeys: "id, name, providerId, createdAt",
     });
     // Define previous versions for migration
+    this.version(3).stores({
+      projects: "++id, name, parentId, createdAt, updatedAt",
+      conversations: "id, parentId, createdAt, updatedAt",
+      messages: "id, conversationId, createdAt", // Old messages schema
+      apiKeys: "id, name, providerId, createdAt",
+    });
     this.version(2).stores({
-      conversations: "id, createdAt, updatedAt", // Old schema
+      conversations: "id, createdAt, updatedAt", // Older schema
       messages: "id, conversationId, createdAt",
       apiKeys: "id, name, providerId, createdAt",
     });
-    // Add upgrade logic if needed for complex changes,
-    // Dexie handles simple additions like adding 'parentId' automatically if default value is acceptable (null/undefined)
-    // this.version(3).upgrade(tx => {
-    // Add default parentId to existing conversations if necessary
-    // return tx.table('conversations').toCollection().modify(convo => {
-    //   if (convo.parentId === undefined) {
-    //     convo.parentId = null;
-    //   }
-    // });
-    // });
+    // No upgrade function needed for adding an optional field like vfsContextPaths
   }
 }
 

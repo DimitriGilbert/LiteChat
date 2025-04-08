@@ -1,14 +1,14 @@
 // src/hooks/use-message-handling.ts
-import React, { useCallback, useEffect } from "react"; // Removed useState
+import React, { useCallback, useEffect } from "react";
 import type { Message, DbMessage } from "@/lib/types";
-// Removed useChatStorage import here, DB functions are passed as props
 import { db } from "@/lib/db";
 import { toast } from "sonner";
+import type { CoreMessage } from "ai";
 
-// Interface for AI stream parameters (ensure consistency)
+// Interface for AI stream parameters
 export interface PerformAiStreamParams {
   conversationIdToUse: string;
-  messagesToSend: Message[];
+  messagesToSend: CoreMessage[];
   currentTemperature: number;
   currentMaxTokens: number | null;
   currentTopP: number | null;
@@ -32,14 +32,12 @@ interface UseMessageHandlingProps {
   frequencyPenalty: number | null;
   isAiStreaming: boolean;
   setIsAiStreaming: React.Dispatch<React.SetStateAction<boolean>>;
-  // State and setters passed down from ChatProvider
   localMessages: Message[];
   setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  isLoadingMessages: boolean; // Receive loading state
-  setIsLoadingMessages: React.Dispatch<React.SetStateAction<boolean>>; // Receive loading setter
-  error: string | null; // Receive error state
-  setError: (error: string | null) => void; // Receive error setter
-  // DB functions passed down
+  isLoadingMessages: boolean;
+  setIsLoadingMessages: React.Dispatch<React.SetStateAction<boolean>>;
+  error: string | null;
+  setError: (error: string | null) => void;
   addDbMessage: (
     messageData: Omit<DbMessage, "id" | "createdAt"> &
       Partial<Pick<DbMessage, "id" | "createdAt">>,
@@ -49,10 +47,11 @@ interface UseMessageHandlingProps {
 
 // Return type of the hook
 interface UseMessageHandlingReturn {
-  // No need to return state/setters managed by the provider
   handleSubmit: (
-    userPromptContent: string,
+    originalUserPrompt: string,
     currentConversationId: string,
+    promptToSendToAI: string,
+    vfsContextPaths?: string[],
   ) => Promise<void>;
   regenerateMessage: (messageId: string) => Promise<void>;
   stopStreaming: () => void;
@@ -71,34 +70,19 @@ export function useMessageHandling({
   presencePenalty,
   frequencyPenalty,
   isAiStreaming,
-  // No need for setIsAiStreaming here if only used in stopStreaming via callback
-  // State and setters received as props:
   localMessages,
   setLocalMessages,
-  // isLoadingMessages, // Not directly used inside, only setIsLoadingMessages
   setIsLoadingMessages,
-  // error, // Not directly used inside, only setError
   setError,
-  // DB functions received as props:
   addDbMessage,
   deleteDbMessage,
 }: UseMessageHandlingProps): UseMessageHandlingReturn {
-  // --- Remove internal state declarations ---
-  // const [localMessages, setLocalMessages] = useState<Message[]>([]); // REMOVED
-  // const [isLoadingMessages, setIsLoadingMessages] = useState(true); // REMOVED
-  // const [error, setErrorState] = useState<string | null>(null); // REMOVED
-  // const setError = useCallback(...) // REMOVED (using prop directly)
-
   // --- Message Loading Effect ---
   useEffect(() => {
     let isMounted = true;
     if (selectedConversationId) {
-      console.log(
-        `useMessageHandling: Loading messages for ${selectedConversationId}`,
-      );
-      // Use the setter passed via props
       setIsLoadingMessages(true);
-      setError(null); // Clear previous errors on load
+      setError(null);
 
       db.messages
         .where("conversationId")
@@ -106,44 +90,33 @@ export function useMessageHandling({
         .sortBy("createdAt")
         .then((messagesFromDb) => {
           if (isMounted) {
-            console.log(
-              `useMessageHandling: Loaded ${messagesFromDb.length} messages from DB`,
-            );
-            // Use the setter passed via props
             setLocalMessages(
               messagesFromDb.map((dbMsg) => ({
                 ...dbMsg,
                 isStreaming: false,
                 streamedContent: undefined,
                 error: null,
+                vfsContextPaths: dbMsg.vfsContextPaths ?? undefined,
               })),
             );
-            // Use the setter passed via props
             setIsLoadingMessages(false);
-            console.log("useMessageHandling: Set loading false");
           }
         })
         .catch((err) => {
           if (isMounted) {
             console.error("useMessageHandling: Failed to load messages:", err);
-            // Use the setter passed via props
             setError(`Error loading chat: ${err.message}`);
             toast.error(`Error loading chat: ${err.message}`);
-            setLocalMessages([]); // Clear messages on error
-            setIsLoadingMessages(false); // Still set loading false on error
+            setLocalMessages([]);
+            setIsLoadingMessages(false);
           }
         });
     } else {
-      // No conversation selected, clear messages and set loading false
-      console.log(
-        "useMessageHandling: No conversation selected, clearing state.",
-      );
       setLocalMessages([]);
       setIsLoadingMessages(false);
       setError(null);
     }
     return () => {
-      console.log("useMessageHandling: Unmounting effect");
       isMounted = false;
     };
   }, [
@@ -151,14 +124,11 @@ export function useMessageHandling({
     setIsLoadingMessages,
     setLocalMessages,
     setError,
-  ]); // Dependencies are the setters and the ID
+  ]);
 
   // --- Stop Streaming ---
   const stopStreaming = useCallback(() => {
-    console.log("useMessageHandling: stopStreaming called");
-    stopStreamingCallback(); // Call the function passed from context/parent
-    // Update the local message state immediately to reflect stoppage
-    // Use the setter passed via props
+    stopStreamingCallback();
     setLocalMessages((prev) =>
       prev.map((msg) =>
         msg.isStreaming
@@ -175,33 +145,59 @@ export function useMessageHandling({
 
   // --- Handle Submission ---
   const handleSubmit = useCallback(
-    async (userPromptContent: string, currentConversationId: string) => {
-      console.log("useMessageHandling: handleSubmit called");
+    async (
+      originalUserPrompt: string,
+      currentConversationId: string,
+      promptToSendToAI: string,
+      vfsContextPaths?: string[],
+    ) => {
       if (!currentConversationId) {
         setError("Error: Could not determine active conversation.");
         return;
       }
 
-      setError(null); // Clear previous errors
+      setError(null);
 
       let userMessageId: string;
       let userMessageForState: Message;
       const userMessageTimestamp = new Date();
 
-      // 1. Save user message to DB (using function prop)
+      // Prepare message history for AI *before* saving the new user message
+      const messagesForAi = await new Promise<CoreMessage[]>((resolve) => {
+        setLocalMessages((currentMessages) => {
+          const history = currentMessages
+            .filter((m) => !m.error)
+            .map((m): CoreMessage => ({ role: m.role, content: m.content }));
+          history.push({ role: "user", content: promptToSendToAI });
+          resolve(history);
+          return currentMessages;
+        });
+      });
+
+      const hasUserOrAssistantMessage = messagesForAi.some(
+        (m) => m.role === "user" || m.role === "assistant",
+      );
+      if (!hasUserOrAssistantMessage) {
+        console.error("useMessageHandling: Attempting to send empty history.");
+        setError("Internal Error: Cannot send empty message list.");
+        return;
+      }
+
+      // Save user message to DB (using original prompt)
       try {
         const userMessageData = {
           role: "user" as const,
-          content: userPromptContent,
+          content: originalUserPrompt,
           conversationId: currentConversationId,
           createdAt: userMessageTimestamp,
+          vfsContextPaths: vfsContextPaths,
         };
         userMessageId = await addDbMessage(userMessageData);
-        userMessageForState = { ...userMessageData, id: userMessageId };
-        console.log(
-          "useMessageHandling: User message saved to DB",
-          userMessageId,
-        );
+        userMessageForState = {
+          ...userMessageData,
+          id: userMessageId,
+          vfsContextPaths: vfsContextPaths ?? undefined,
+        };
       } catch (dbError: unknown) {
         console.error(
           "useMessageHandling: Error adding user message:",
@@ -217,42 +213,14 @@ export function useMessageHandling({
         return;
       }
 
-      // 2. Update local state with user message (using setter prop)
+      // Update local state with user message (using original prompt)
       setLocalMessages((prevMessages) => [
         ...prevMessages,
         userMessageForState,
       ]);
-      console.log("useMessageHandling: User message added to local state");
 
-      // 3. Prepare message history for AI (using the state *after* adding the user message)
-      // Read state functionally to ensure it's the latest after the update above
-      const messagesForAi = await new Promise<Message[]>((resolve) => {
-        setLocalMessages((currentMessages) => {
-          const history = currentMessages
-            .filter((m) => !m.error)
-            .map((m): Message => ({ role: m.role, content: m.content }));
-          resolve(history);
-          return currentMessages; // No change here, just reading
-        });
-      });
-
-      console.log(
-        `useMessageHandling: Prepared ${messagesForAi.length} messages for AI`,
-      );
-
-      const hasUserOrAssistantMessage = messagesForAi.some(
-        (m) => m.role === "user" || m.role === "assistant",
-      );
-      if (!hasUserOrAssistantMessage) {
-        console.error("useMessageHandling: Attempting to send empty history.");
-        setError("Internal Error: Cannot send empty message list.");
-        setLocalMessages((prev) => prev.filter((m) => m.id !== userMessageId)); // Rollback
-        return;
-      }
-
-      // 4. Call AI stream function (passed as prop)
+      // Call AI stream function
       try {
-        console.log("useMessageHandling: Calling performAiStream");
         await performAiStream({
           conversationIdToUse: currentConversationId,
           messagesToSend: messagesForAi,
@@ -264,14 +232,11 @@ export function useMessageHandling({
           currentFrequencyPenalty: frequencyPenalty,
           systemPromptToUse: activeSystemPrompt,
         });
-        console.log("useMessageHandling: performAiStream finished");
       } catch (err: unknown) {
-        // Errors during the stream are handled within performAiStream
         console.error(
           "useMessageHandling: Error during performAiStream call:",
           err,
         );
-        // setError might be set within performAiStream already
       }
     },
     [
@@ -285,20 +250,15 @@ export function useMessageHandling({
       topK,
       presencePenalty,
       frequencyPenalty,
-      setLocalMessages, // Need setter prop as dependency
+      setLocalMessages,
     ],
   );
 
   // --- Regeneration ---
   const regenerateMessage = useCallback(
     async (messageId: string) => {
-      console.log(
-        "useMessageHandling: regenerateMessage called for",
-        messageId,
-      );
       const conversationIdToUse = selectedConversationId;
       if (!conversationIdToUse || isAiStreaming) {
-        console.warn("Regeneration prevented: No convo or already streaming.");
         if (isAiStreaming)
           toast.warning("Please wait for the current response.");
         return;
@@ -306,7 +266,6 @@ export function useMessageHandling({
 
       setError(null);
 
-      // Use localMessages prop directly
       const messageIndex = localMessages.findIndex((m) => m.id === messageId);
       if (messageIndex < 0) {
         setError("Cannot regenerate non-existent message.");
@@ -321,11 +280,11 @@ export function useMessageHandling({
         return;
       }
 
-      // 1. Get history (using localMessages prop)
+      // Get history
       const historyForRegen = localMessages
         .slice(0, messageIndex)
         .filter((m) => !m.error)
-        .map((m): Message => ({ role: m.role, content: m.content }));
+        .map((m): CoreMessage => ({ role: m.role, content: m.content }));
 
       const hasUserOrAssistantMessage = historyForRegen.some(
         (m) => m.role === "user" || m.role === "assistant",
@@ -339,13 +298,10 @@ export function useMessageHandling({
         return;
       }
 
-      // 2. Delete messages from DB (using function prop)
+      // Delete messages from DB
       const messagesToDelete = localMessages.slice(messageIndex);
       try {
         await Promise.all(messagesToDelete.map((m) => deleteDbMessage(m.id)));
-        console.log(
-          `useMessageHandling: Deleted ${messagesToDelete.length} messages for regen`,
-        );
       } catch (dbErr: unknown) {
         console.error("useMessageHandling: Error deleting for regen:", dbErr);
         if (dbErr instanceof Error) {
@@ -358,13 +314,11 @@ export function useMessageHandling({
         return;
       }
 
-      // 3. Update local state (using setter prop)
+      // Update local state
       setLocalMessages((prev) => prev.slice(0, messageIndex));
-      console.log("useMessageHandling: Sliced local messages for regen");
 
-      // 4. Call AI stream function (passed as prop)
+      // Call AI stream function
       try {
-        console.log("useMessageHandling: Calling performAiStream for regen");
         await performAiStream({
           conversationIdToUse: conversationIdToUse,
           messagesToSend: historyForRegen,
@@ -376,7 +330,6 @@ export function useMessageHandling({
           currentFrequencyPenalty: frequencyPenalty,
           systemPromptToUse: activeSystemPrompt,
         });
-        console.log("useMessageHandling: performAiStream finished for regen");
       } catch (err: unknown) {
         console.error("useMessageHandling: Error during regen stream:", err);
       }
@@ -384,10 +337,10 @@ export function useMessageHandling({
     [
       selectedConversationId,
       isAiStreaming,
-      localMessages, // Need localMessages prop
-      deleteDbMessage, // Need function prop
-      performAiStream, // Need function prop
-      setError, // Need setter prop
+      localMessages,
+      deleteDbMessage,
+      performAiStream,
+      setError,
       activeSystemPrompt,
       temperature,
       maxTokens,
@@ -395,11 +348,10 @@ export function useMessageHandling({
       topK,
       presencePenalty,
       frequencyPenalty,
-      setLocalMessages, // Need setter prop
+      setLocalMessages,
     ],
   );
 
-  // Return only the functions, as state is managed by the provider
   return {
     handleSubmit,
     regenerateMessage,

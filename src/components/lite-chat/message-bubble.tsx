@@ -7,7 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { BotIcon, UserIcon, CopyIcon } from "lucide-react";
+import { BotIcon, UserIcon, CopyIcon, FileTextIcon } from "lucide-react"; // Added FileTextIcon
 import { Button } from "@/components/ui/button"; // Import Button
 import { toast } from "sonner"; // Import toast
 
@@ -79,6 +79,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const streamingContent = message.streamedContent ?? "";
   // Final content (potentially markdown)
   const finalContent = message.content;
+  // VFS context paths for user messages
+  const vfsPaths = message.vfsContextPaths;
 
   return (
     <div
@@ -116,14 +118,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         {message.isStreaming ? (
           // Render plain text during streaming, preserving whitespace/newlines
           <div className="text-gray-200 text-sm whitespace-pre-wrap break-words">
-            {/* <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                code: CodeBlock, // Use custom CodeBlock for highlighting
-              }}
-            > */}
             {streamingContent}
-            {/* </ReactMarkdown> */}
             <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"></span>{" "}
             {/* Streaming indicator */}
           </div>
@@ -149,6 +144,28 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </ReactMarkdown>
           </div>
         )}
+
+        {/* Display VFS Context Paths for User Messages */}
+        {isUser && vfsPaths && vfsPaths.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-gray-700/50 flex flex-wrap gap-x-3 gap-y-1">
+            <span className="text-xs text-gray-500 font-medium w-full mb-0.5">
+              Included context:
+            </span>
+            {vfsPaths.map((path) => (
+              <div
+                key={path}
+                className="flex items-center gap-1 text-xs text-gray-400 bg-gray-800/50 px-1.5 py-0.5 rounded"
+                title={path}
+              >
+                <FileTextIcon className="h-3 w-3 flex-shrink-0" />
+                <span className="font-mono truncate max-w-[200px]">
+                  {path.startsWith("/") ? path.substring(1) : path}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Display error if present */}
         {message.error && (
           <p className="text-xs text-red-400 mt-1">Error: {message.error}</p>
@@ -185,7 +202,16 @@ const messagesAreEqual = (
     prevMsg.id !== nextMsg.id ||
     prevMsg.role !== nextMsg.role ||
     prevMsg.error !== nextMsg.error ||
-    prevMsg.isStreaming !== nextMsg.isStreaming // Crucial: rerender when streaming starts/stops
+    prevMsg.isStreaming !== nextMsg.isStreaming || // Crucial: rerender when streaming starts/stops
+    // Check if vfsContextPaths array has changed (simple reference check first)
+    prevMsg.vfsContextPaths !== nextMsg.vfsContextPaths ||
+    // Deeper check if references are different but content might be the same
+    (prevMsg.vfsContextPaths &&
+      nextMsg.vfsContextPaths &&
+      (prevMsg.vfsContextPaths.length !== nextMsg.vfsContextPaths.length ||
+        !prevMsg.vfsContextPaths.every(
+          (val, index) => val === nextMsg.vfsContextPaths?.[index],
+        )))
   ) {
     return false;
   }

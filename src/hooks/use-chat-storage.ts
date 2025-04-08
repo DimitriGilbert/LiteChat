@@ -6,11 +6,12 @@ import type {
   DbMessage,
   DbApiKey,
   DbProject,
+  SidebarItemType, // Ensure SidebarItemType is imported
 } from "@/lib/types";
 import { nanoid } from "nanoid";
 
-// Note: This hook now provides low-level DB access.
-// Higher-level logic (like fetching tree structures) will be in use-conversation-management.
+// Note: This hook provides low-level DB access.
+// Higher-level logic (like fetching tree structures) is in use-conversation-management.
 export function useChatStorage() {
   // === Projects ===
   const projects = useLiveQuery(
@@ -31,6 +32,7 @@ export function useChatStorage() {
       parentId,
       createdAt: now,
       updatedAt: now,
+      vfsEnabled: false, // Initialize vfsEnabled
     };
     await db.projects.add(newProject);
     // If nested, update parent project's timestamp
@@ -44,38 +46,25 @@ export function useChatStorage() {
     try {
       console.log(
         `useChatStorage: Updating project ${id} name to "${newName}"`,
-      ); // Add log
+      );
       await db.projects.update(id, { name: newName, updatedAt: new Date() });
-      console.log(`useChatStorage: Project ${id} updated successfully.`); // Add log
+      console.log(`useChatStorage: Project ${id} updated successfully.`);
     } catch (error) {
-      console.error(`useChatStorage: Failed to update project ${id}`, error); // Add error log
+      console.error(`useChatStorage: Failed to update project ${id}`, error);
       throw error; // Re-throw the error
     }
   };
 
   const deleteProject = async (id: string): Promise<void> => {
     // Simple delete: Assumes children are handled elsewhere or deletion is prevented if children exist.
-    // For cascading delete, you'd need a transaction:
-    // await db.transaction('rw', db.projects, db.conversations, db.messages, async () => {
-    //   const childrenProjects = await db.projects.where('parentId').equals(id).toArray();
-    //   for (const child of childrenProjects) {
-    //     await deleteProject(child.id); // Recursive delete
-    //   }
-    //   const childrenConvos = await db.conversations.where('parentId').equals(id).toArray();
-    //   for (const convo of childrenConvos) {
-    //     await deleteConversation(convo.id); // Assumes deleteConversation handles messages
-    //   }
-    //   await db.projects.delete(id);
-    // });
+    // For cascading delete, a transaction would be needed.
     await db.projects.delete(id); // Simple delete for now
+    // TODO: Consider deleting associated VFS data if vfsEnabled was true
   };
 
   const getProject = async (id: string): Promise<DbProject | undefined> => {
     return db.projects.get(id);
   };
-
-  // Removed getProjectsByParentId using useLiveQuery here, as it's better handled
-  // in the component/hook that needs the specific filtered list, or via the main sidebarItems query.
 
   // === Conversations ===
   const conversations = useLiveQuery(
@@ -98,6 +87,7 @@ export function useChatStorage() {
       systemPrompt: initialSystemPrompt ?? null,
       createdAt: now,
       updatedAt: now,
+      vfsEnabled: false, // Initialize vfsEnabled
     };
     await db.conversations.add(newConversation);
     // Optionally update parent project's updatedAt timestamp
@@ -112,6 +102,7 @@ export function useChatStorage() {
       await db.messages.where("conversationId").equals(id).delete();
       await db.conversations.delete(id);
     });
+    // TODO: Consider deleting associated VFS data if vfsEnabled was true
   };
 
   const renameConversation = async (
@@ -146,12 +137,39 @@ export function useChatStorage() {
     return db.conversations.get(id);
   };
 
-  // Removed getConversationsByParentId using useLiveQuery here.
+  // === VFS Toggle ===
+  // Function to update the vfsEnabled flag in the database for a given item
+  const toggleVfsEnabled = async (
+    id: string,
+    type: SidebarItemType,
+  ): Promise<void> => {
+    const now = new Date();
+    // Determine the correct Dexie table based on the item type
+    const table = type === "conversation" ? db.conversations : db.projects;
+    // Get the current state of the item
+    const current = await table.get(id);
+
+    if (current) {
+      // Update the item with the toggled vfsEnabled state and new timestamp
+      await table.update(id, {
+        vfsEnabled: !current.vfsEnabled,
+        updatedAt: now,
+      });
+      // If the item has a parent project, update its timestamp as well
+      if (current.parentId) {
+        await db.projects.update(current.parentId, { updatedAt: now });
+      }
+    } else {
+      // Log a warning and throw an error if the item wasn't found
+      console.warn(`[DB] Item ${id} (${type}) not found for VFS toggle.`);
+      throw new Error("Item not found");
+    }
+  };
 
   // === Messages ===
-  // REMOVED the problematic useLiveQuery export for messages.
   // useMessageHandling fetches messages directly when the conversation ID changes.
 
+  // MODIFIED: Accept vfsContextPaths
   const addDbMessage = async (
     messageData: Omit<DbMessage, "id" | "createdAt"> &
       Partial<Pick<DbMessage, "id" | "createdAt">>,
@@ -165,6 +183,7 @@ export function useChatStorage() {
       role: messageData.role,
       content: messageData.content,
       conversationId: messageData.conversationId,
+      vfsContextPaths: messageData.vfsContextPaths ?? undefined, // Save paths if provided
     };
     const conversation = await db.conversations.get(messageData.conversationId);
     await db.messages.add(newMessage);
@@ -221,7 +240,7 @@ export function useChatStorage() {
       id: newId,
       name,
       providerId,
-      value,
+      value, // Storing value directly; consider obfuscation/encryption if needed
       createdAt: new Date(),
     };
     await db.apiKeys.add(newKey);
@@ -246,9 +265,10 @@ export function useChatStorage() {
     renameConversation,
     updateConversationSystemPrompt,
     getConversation,
+    // VFS Toggle
+    toggleVfsEnabled, // Expose the DB toggle function
     // Messages
-    // getMessagesForConversation: messages, // REMOVED
-    addDbMessage,
+    addDbMessage, // Keep existing functions
     updateDbMessageContent,
     deleteDbMessage,
     getDbMessagesUpTo,

@@ -5,6 +5,8 @@ import type {
   ChatContextProps,
   SidebarItemType,
   Message,
+  DbConversation,
+  DbProject,
 } from "@/lib/types";
 import { ChatContext } from "@/hooks/use-chat-context";
 import { useProviderModelSelection } from "@/hooks/use-provider-model-selection";
@@ -15,8 +17,11 @@ import { useAiInteraction } from "@/hooks/use-ai-interaction";
 import { useChatInput } from "@/hooks/use-chat-input";
 import { useMessageHandling } from "@/hooks/use-message-handling";
 import { useChatStorage } from "@/hooks/use-chat-storage";
+import { useVirtualFileSystem } from "@/hooks/use-virtual-file-system";
 import { toast } from "sonner";
+import { nanoid } from "nanoid";
 
+// Props expected by the ChatProvider component
 interface ChatProviderProps {
   children: React.ReactNode;
   providers: AiProviderConfig[];
@@ -27,6 +32,17 @@ interface ChatProviderProps {
   streamingThrottleRate?: number;
 }
 
+// Helper to decode Uint8Array to string, handling potential errors
+const decodeUint8Array = (arr: Uint8Array): string => {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(arr);
+  } catch (e) {
+    console.warn("Failed to decode Uint8Array as UTF-8, trying lossy:", e);
+    // Fallback to lossy decoding if strict UTF-8 fails
+    return new TextDecoder("utf-8", { fatal: false }).decode(arr);
+  }
+};
+
 export const ChatProvider: React.FC<ChatProviderProps> = ({
   children,
   providers,
@@ -36,13 +52,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   initialSelectedItemType = null,
   streamingThrottleRate = 42,
 }) => {
-  // --- State for AI Streaming and Messages ---
+  // --- Core State ---
   const [isAiStreaming, setIsAiStreaming] = useState(false);
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [error, setErrorState] = useState<string | null>(null);
-
-  // Ref for AI abort controller - owned by the provider
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const setError = useCallback((newError: string | null) => {
@@ -53,168 +67,113 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   }, []);
 
   // --- Hook Instantiation ---
-
-  const {
-    selectedProviderId,
-    setSelectedProviderId,
-    selectedModelId,
-    setSelectedModelId,
-    selectedProvider,
-    selectedModel,
-  } = useProviderModelSelection({
+  const providerModel = useProviderModelSelection({
     providers,
     initialProviderId,
     initialModelId,
   });
-
-  const {
-    apiKeys,
-    selectedApiKeyId,
-    setSelectedApiKeyId,
-    addApiKey,
-    deleteApiKey,
-    getApiKeyForProvider,
-  } = useApiKeysManagement();
-
-  const { addDbMessage, deleteDbMessage } = useChatStorage();
-
+  const apiKeysMgmt = useApiKeysManagement();
+  const storage = useChatStorage();
   const handleSelectItem = useCallback(
     (id: string | null, type: SidebarItemType | null) => {
-      console.log(
-        `ChatProvider: handleSelectItem called with id=${id}, type=${type}`,
-      );
       if (abortControllerRef.current) {
-        console.log(
-          "ChatProvider: Aborting stream via ref due to selection change.",
-        );
         abortControllerRef.current.abort();
-        // No need to nullify the ref here, the finally block in useAiInteraction
-        // or the stopStreamingCallback will handle it based on the signal.
         toast.info("AI response stopped due to selection change.");
       }
     },
-    [], // abortControllerRef is stable, no need to list as dependency
+    [],
   );
-
-  const {
-    sidebarItems,
-    selectedItemId,
-    selectedItemType,
-    selectItem,
-    createConversation,
-    createProject,
-    deleteItem,
-    renameItem,
-    updateConversationSystemPrompt,
-    exportConversation,
-    importConversation,
-    exportAllConversations,
-    activeConversationData,
-  } = useConversationManagement({
+  const conversationMgmt = useConversationManagement({
     initialSelectedItemId,
     initialSelectedItemType,
     onSelectItem: handleSelectItem,
+    toggleDbVfs: storage.toggleVfsEnabled,
+  });
+  const chatSettings = useChatSettings({
+    activeConversationData: conversationMgmt.activeConversationData,
+    activeProjectData: conversationMgmt.activeProjectData,
+  });
+  const chatInput = useChatInput();
+
+  const vfsEnabled = useMemo(() => {
+    if (conversationMgmt.selectedItemType === "conversation") {
+      return conversationMgmt.activeConversationData?.vfsEnabled ?? false;
+    }
+    if (conversationMgmt.selectedItemType === "project") {
+      return conversationMgmt.activeProjectData?.vfsEnabled ?? false;
+    }
+    return false;
+  }, [
+    conversationMgmt.selectedItemType,
+    conversationMgmt.activeConversationData,
+    conversationMgmt.activeProjectData,
+  ]);
+
+  const vfs = useVirtualFileSystem({
+    itemId: conversationMgmt.selectedItemId,
+    itemType: conversationMgmt.selectedItemType,
+    isEnabled: vfsEnabled,
   });
 
-  const {
-    temperature,
-    setTemperature,
-    maxTokens,
-    setMaxTokens,
-    globalSystemPrompt,
-    setGlobalSystemPrompt,
-    activeSystemPrompt,
-    topP,
-    setTopP,
-    topK,
-    setTopK,
-    presencePenalty,
-    setPresencePenalty,
-    frequencyPenalty,
-    setFrequencyPenalty,
-    theme,
-    setTheme,
-    searchTerm,
-    setSearchTerm,
-  } = useChatSettings({ activeConversationData });
-
-  const {
-    prompt,
-    setPrompt,
-    attachedFiles,
-    addAttachedFile,
-    removeAttachedFile,
-    clearAttachedFiles,
-  } = useChatInput();
-
-  // AI Interaction Hook - Pass the abortControllerRef
-  const { performAiStream } = useAiInteraction({
-    selectedModel,
-    selectedProvider,
-    getApiKeyForProvider,
+  const aiInteraction = useAiInteraction({
+    selectedModel: providerModel.selectedModel,
+    selectedProvider: providerModel.selectedProvider,
+    getApiKeyForProvider: apiKeysMgmt.getApiKeyForProvider,
     streamingThrottleRate,
     setLocalMessages,
     setIsAiStreaming,
     setError,
-    addDbMessage,
-    abortControllerRef, // Pass the ref here
+    addDbMessage: storage.addDbMessage,
+    abortControllerRef,
   });
 
-  // Message Handling Hook
-  const {
-    handleSubmit: handleMessageSubmit,
-    regenerateMessage: handleMessageRegenerate,
-    stopStreaming: stopMessageStreaming,
-  } = useMessageHandling({
+  const messageHandling = useMessageHandling({
     selectedConversationId:
-      selectedItemType === "conversation" ? selectedItemId : null,
-    performAiStream,
+      conversationMgmt.selectedItemType === "conversation"
+        ? conversationMgmt.selectedItemId
+        : null,
+    performAiStream: aiInteraction.performAiStream,
     stopStreamingCallback: () => {
-      // Callback to actually abort the stream using the provider's ref
       if (abortControllerRef.current) {
-        console.log("ChatProvider: stopStreamingCallback aborting via ref.");
         abortControllerRef.current.abort();
-        // No need to nullify ref here, finally block handles it.
-      } else {
-        console.log(
-          "ChatProvider: stopStreamingCallback called but no active abortController.",
-        );
       }
     },
-    activeSystemPrompt,
-    temperature,
-    maxTokens,
-    topP,
-    topK,
-    presencePenalty,
-    frequencyPenalty,
+    activeSystemPrompt: chatSettings.activeSystemPrompt,
+    temperature: chatSettings.temperature,
+    maxTokens: chatSettings.maxTokens,
+    topP: chatSettings.topP,
+    topK: chatSettings.topK,
+    presencePenalty: chatSettings.presencePenalty,
+    frequencyPenalty: chatSettings.frequencyPenalty,
     isAiStreaming,
-    setIsAiStreaming, // Pass setter needed by stopStreaming logic within useMessageHandling
+    setIsAiStreaming,
     localMessages,
     setLocalMessages,
     isLoadingMessages,
     setIsLoadingMessages,
     error,
     setError,
-    addDbMessage,
-    deleteDbMessage,
-    // getDbMessagesUpTo, // Pass if needed by useMessageHandling (currently not)
+    addDbMessage: storage.addDbMessage,
+    deleteDbMessage: storage.deleteDbMessage,
   });
 
-  // --- Final Submit Handler (Top Level) ---
+  // --- Top-Level Handlers ---
+
   const handleSubmit = useCallback(
     async (e?: React.FormEvent<HTMLFormElement>) => {
       e?.preventDefault();
-      // ... (rest of handleSubmit remains the same) ...
-      const currentPrompt = prompt.trim();
-      const canSubmit = currentPrompt.length > 0;
+      const currentPrompt = chatInput.prompt.trim();
+      const canSubmit =
+        currentPrompt.length > 0 ||
+        chatInput.attachedFiles.length > 0 ||
+        chatInput.selectedVfsPaths.length > 0;
 
       if (!canSubmit) return;
       if (isAiStreaming) {
         toast.info("Please wait for the current response to finish.");
         return;
       }
-      if (!selectedProvider || !selectedModel) {
+      if (!providerModel.selectedProvider || !providerModel.selectedModel) {
         setError("Error: Please select an AI Provider and Model first.");
         toast.error("Please select an AI Provider and Model.");
         return;
@@ -223,33 +182,34 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       let conversationIdToSubmit: string | null = null;
       let parentProjectId: string | null = null;
 
-      if (selectedItemType === "project" && selectedItemId) {
-        parentProjectId = selectedItemId;
-      } else if (selectedItemType === "conversation" && selectedItemId) {
-        parentProjectId = activeConversationData?.parentId ?? null;
-        conversationIdToSubmit = selectedItemId;
+      if (
+        conversationMgmt.selectedItemType === "project" &&
+        conversationMgmt.selectedItemId
+      ) {
+        parentProjectId = conversationMgmt.selectedItemId;
+      } else if (
+        conversationMgmt.selectedItemType === "conversation" &&
+        conversationMgmt.selectedItemId
+      ) {
+        parentProjectId =
+          conversationMgmt.activeConversationData?.parentId ?? null;
+        conversationIdToSubmit = conversationMgmt.selectedItemId;
       }
 
       if (!conversationIdToSubmit) {
         try {
-          const newConvId = await createConversation(
+          const title = currentPrompt.substring(0, 50) || "New Chat";
+          const newConvId = await conversationMgmt.createConversation(
             parentProjectId,
-            currentPrompt.substring(0, 50) || "New Chat",
-            // activeConversationData?.systemPrompt ?? globalSystemPrompt,
+            title,
           );
           if (!newConvId)
             throw new Error("Failed to get ID for new conversation.");
           conversationIdToSubmit = newConvId;
-          // Selection happens within createConversation's flow
         } catch (err: unknown) {
-          console.error("Error creating conversation during submit:", err);
-          if (err instanceof Error) {
-            setError(`Error: Could not start chat - ${err.message}`);
-            toast.error(`Failed to start chat: ${err.message}`);
-          } else {
-            toast.error("Failed to start chat");
-            setError(`Error: Could not start chat - ${err}`);
-          }
+          const message = err instanceof Error ? err.message : "Unknown error";
+          setError(`Error: Could not start chat - ${message}`);
+          toast.error(`Failed to start chat: ${message}`);
           return;
         }
       }
@@ -260,34 +220,135 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         return;
       }
 
-      const promptToSend = currentPrompt;
-      setPrompt("");
-      clearAttachedFiles();
+      // --- VFS Interaction: Upload attached files ---
+      let uploadInfo = "";
+      if (
+        chatInput.attachedFiles.length > 0 &&
+        vfsEnabled &&
+        vfs.isReady &&
+        vfs.configuredItemId === conversationMgmt.selectedItemId &&
+        !vfs.isOperationLoading
+      ) {
+        try {
+          await vfs.uploadFiles(chatInput.attachedFiles, "/");
+          uploadInfo = `
 
-      await handleMessageSubmit(promptToSend, conversationIdToSubmit);
+[User uploaded: ${chatInput.attachedFiles.map((f) => f.name).join(", ")}]`;
+          chatInput.clearAttachedFiles();
+        } catch (uploadErr) {
+          console.error("Failed to upload attached files:", uploadErr);
+          toast.error(
+            `Failed to upload attached file(s): ${uploadErr instanceof Error ? uploadErr.message : "Unknown error"}`,
+          );
+          uploadInfo = `
+
+[File upload failed: ${uploadErr instanceof Error ? uploadErr.message : "Unknown error"}]`;
+        }
+      } else if (chatInput.attachedFiles.length > 0) {
+        toast.warning(
+          "Files attached, but Virtual Filesystem is not enabled or ready. Files were not uploaded.",
+        );
+        uploadInfo = `
+
+[Files were attached but not uploaded (VFS inactive)]`;
+        chatInput.clearAttachedFiles();
+      }
+
+      // --- VFS Interaction: Include selected file content ---
+      let vfsContextString = "";
+      const pathsIncludedInContext: string[] = [];
+      if (
+        chatInput.selectedVfsPaths.length > 0 &&
+        vfsEnabled &&
+        vfs.isReady &&
+        vfs.configuredItemId === conversationMgmt.selectedItemId &&
+        !vfs.isOperationLoading
+      ) {
+        const contentPromises = chatInput.selectedVfsPaths.map(async (path) => {
+          try {
+            const fileData = await vfs.readFile(path);
+            const fileContent = decodeUint8Array(fileData);
+            let formattedContent = "";
+            if (fileContent.length > 1 * 1024 * 1024) {
+              toast.warning(
+                `File "${path}" is large and only the beginning will be included.`,
+              );
+              formattedContent = `<vfs_file path="${path}" truncated="true">
+${fileContent.substring(0, 10000)}...
+</vfs_file>`;
+            } else {
+              formattedContent = `<vfs_file path="${path}">
+${fileContent}
+</vfs_file>`;
+            }
+            pathsIncludedInContext.push(path);
+            return formattedContent;
+          } catch (readErr) {
+            console.error(`Failed to read VFS file ${path}:`, readErr);
+            toast.error(
+              `Failed to read file "${path}" for context: ${readErr instanceof Error ? readErr.message : "Unknown error"}`,
+            );
+            return `<vfs_file path="${path}" error="Failed to read" />`;
+          }
+        });
+
+        const resolvedContents = await Promise.all(contentPromises);
+        vfsContextString = `
+
+${resolvedContents.join("\n\n")}`;
+      } else if (chatInput.selectedVfsPaths.length > 0) {
+        toast.warning(
+          "VFS files selected, but Virtual Filesystem is not enabled or ready. Content not included.",
+        );
+        chatInput.clearSelectedVfsPaths();
+      }
+
+      // --- Prepare and Send ---
+      const originalUserPrompt = currentPrompt;
+      const promptToSendToAI =
+        (vfsContextString ? vfsContextString + "\n\n" : "") +
+        originalUserPrompt +
+        (uploadInfo ? "\n\n" + uploadInfo : ""); // Append upload info for AI context too
+      chatInput.setPrompt("");
+
+      if (promptToSendToAI.trim().length > 0) {
+        await messageHandling.handleSubmit(
+          originalUserPrompt,
+          conversationIdToSubmit,
+          promptToSendToAI,
+          pathsIncludedInContext,
+        );
+        chatInput.clearSelectedVfsPaths();
+      } else {
+        console.log("Submission skipped: empty prompt after processing.");
+        if (
+          uploadInfo.includes("failed") ||
+          vfsContextString.includes("error=")
+        ) {
+          toast.error("Failed to process attached/selected files.");
+        }
+        chatInput.clearSelectedVfsPaths();
+      }
     },
     [
-      prompt,
+      chatInput,
       isAiStreaming,
-      selectedItemId,
-      selectedItemType,
-      selectedProvider,
-      selectedModel,
-      createConversation,
-      activeConversationData,
-      // globalSystemPrompt,
-      setPrompt,
-      clearAttachedFiles,
-      handleMessageSubmit,
+      providerModel.selectedProvider,
+      providerModel.selectedModel,
+      conversationMgmt,
+      vfsEnabled,
+      vfs,
       setError,
+      messageHandling,
     ],
   );
 
-  // --- Final Regenerate Handler (Top Level) ---
   const regenerateMessage = useCallback(
     async (messageId: string) => {
-      // ... (rest of regenerateMessage remains the same) ...
-      if (selectedItemType !== "conversation" || !selectedItemId) {
+      if (
+        conversationMgmt.selectedItemType !== "conversation" ||
+        !conversationMgmt.selectedItemId
+      ) {
         toast.error("Please select the conversation containing the message.");
         return;
       }
@@ -295,154 +356,141 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         toast.info("Please wait for the current response to finish.");
         return;
       }
-      await handleMessageRegenerate(messageId);
-    },
-    [handleMessageRegenerate, selectedItemType, selectedItemId, isAiStreaming],
-  );
-
-  // --- Modified Import Handler (Top Level) ---
-  const handleImportConversation = useCallback(
-    async (file: File) => {
-      // ... (rest of handleImportConversation remains the same) ...
-      let parentId: string | null = null;
-      if (selectedItemType === "project" && selectedItemId) {
-        parentId = selectedItemId;
-      } else if (selectedItemType === "conversation" && selectedItemId) {
-        parentId = activeConversationData?.parentId ?? null;
-      }
-      await importConversation(file, parentId);
+      await messageHandling.regenerateMessage(messageId);
     },
     [
-      importConversation,
-      selectedItemId,
-      selectedItemType,
-      activeConversationData,
+      messageHandling,
+      conversationMgmt.selectedItemType,
+      conversationMgmt.selectedItemId,
+      isAiStreaming,
     ],
+  );
+
+  const handleImportConversation = useCallback(
+    async (file: File) => {
+      let parentId: string | null = null;
+      if (
+        conversationMgmt.selectedItemType === "project" &&
+        conversationMgmt.selectedItemId
+      ) {
+        parentId = conversationMgmt.selectedItemId;
+      } else if (
+        conversationMgmt.selectedItemType === "conversation" &&
+        conversationMgmt.selectedItemId
+      ) {
+        parentId = conversationMgmt.activeConversationData?.parentId ?? null;
+      }
+      await conversationMgmt.importConversation(file, parentId);
+    },
+    [conversationMgmt],
   );
 
   // --- Context Value Construction ---
   const contextValue: ChatContextProps = useMemo(
     () => ({
-      // ... (Include all necessary values, ensure they are stable or memoized) ...
       providers,
-      selectedProviderId,
-      setSelectedProviderId,
-      selectedModelId,
-      setSelectedModelId,
-      apiKeys,
-      selectedApiKeyId,
-      setSelectedApiKeyId,
-      addApiKey,
-      deleteApiKey,
-      getApiKeyForProvider,
-      sidebarItems,
-      selectedItemId,
-      selectedItemType,
-      selectItem,
-      createConversation,
-      createProject,
-      deleteItem,
-      renameItem,
-      updateConversationSystemPrompt,
-      activeConversationData,
+      selectedProviderId: providerModel.selectedProviderId,
+      setSelectedProviderId: providerModel.setSelectedProviderId,
+      selectedModelId: providerModel.selectedModelId,
+      setSelectedModelId: providerModel.setSelectedModelId,
+      apiKeys: apiKeysMgmt.apiKeys,
+      selectedApiKeyId: apiKeysMgmt.selectedApiKeyId,
+      setSelectedApiKeyId: apiKeysMgmt.setSelectedApiKeyId,
+      addApiKey: apiKeysMgmt.addApiKey,
+      deleteApiKey: apiKeysMgmt.deleteApiKey,
+      getApiKeyForProvider: apiKeysMgmt.getApiKeyForProvider,
+      sidebarItems: conversationMgmt.sidebarItems,
+      selectedItemId: conversationMgmt.selectedItemId,
+      selectedItemType: conversationMgmt.selectedItemType,
+      selectItem: conversationMgmt.selectItem,
+      createConversation: conversationMgmt.createConversation,
+      createProject: conversationMgmt.createProject,
+      deleteItem: conversationMgmt.deleteItem,
+      renameItem: conversationMgmt.renameItem,
+      updateConversationSystemPrompt:
+        conversationMgmt.updateConversationSystemPrompt,
+      activeConversationData: conversationMgmt.activeConversationData,
+      activeProjectData: conversationMgmt.activeProjectData,
       messages: localMessages,
       isLoading: isLoadingMessages,
       isStreaming: isAiStreaming,
       error,
       setError,
-      prompt,
-      setPrompt,
+      prompt: chatInput.prompt,
+      setPrompt: chatInput.setPrompt,
+      attachedFiles: chatInput.attachedFiles,
+      addAttachedFile: chatInput.addAttachedFile,
+      removeAttachedFile: chatInput.removeAttachedFile,
+      clearAttachedFiles: chatInput.clearAttachedFiles,
+      selectedVfsPaths: chatInput.selectedVfsPaths,
+      addSelectedVfsPath: chatInput.addSelectedVfsPath,
+      removeSelectedVfsPath: chatInput.removeSelectedVfsPath,
+      clearSelectedVfsPaths: chatInput.clearSelectedVfsPaths,
       handleSubmit,
-      stopStreaming: stopMessageStreaming,
+      stopStreaming: messageHandling.stopStreaming,
       regenerateMessage,
-      attachedFiles,
-      addAttachedFile,
-      removeAttachedFile,
-      clearAttachedFiles,
-      temperature,
-      setTemperature,
-      maxTokens,
-      setMaxTokens,
-      globalSystemPrompt,
-      setGlobalSystemPrompt,
-      activeSystemPrompt,
-      topP,
-      setTopP,
-      topK,
-      setTopK,
-      presencePenalty,
-      setPresencePenalty,
-      frequencyPenalty,
-      setFrequencyPenalty,
-      theme,
-      setTheme,
+      temperature: chatSettings.temperature,
+      setTemperature: chatSettings.setTemperature,
+      maxTokens: chatSettings.maxTokens,
+      setMaxTokens: chatSettings.setMaxTokens,
+      globalSystemPrompt: chatSettings.globalSystemPrompt,
+      setGlobalSystemPrompt: chatSettings.setGlobalSystemPrompt,
+      activeSystemPrompt: chatSettings.activeSystemPrompt,
+      topP: chatSettings.topP,
+      setTopP: chatSettings.setTopP,
+      topK: chatSettings.topK,
+      setTopK: chatSettings.setTopK,
+      presencePenalty: chatSettings.presencePenalty,
+      setPresencePenalty: chatSettings.setPresencePenalty,
+      frequencyPenalty: chatSettings.frequencyPenalty,
+      setFrequencyPenalty: chatSettings.setFrequencyPenalty,
+      theme: chatSettings.theme,
+      setTheme: chatSettings.setTheme,
       streamingThrottleRate,
-      searchTerm,
-      setSearchTerm,
-      exportConversation,
+      searchTerm: chatSettings.searchTerm,
+      setSearchTerm: chatSettings.setSearchTerm,
+      exportConversation: conversationMgmt.exportConversation,
       importConversation: handleImportConversation,
-      exportAllConversations,
+      exportAllConversations: conversationMgmt.exportAllConversations,
+      vfsEnabled,
+      toggleVfsEnabled: conversationMgmt.toggleVfsEnabled,
+      vfs: {
+        isReady: vfs.isReady,
+        configuredItemId: vfs.configuredItemId,
+        isLoading: vfs.isLoading,
+        isOperationLoading: vfs.isOperationLoading,
+        error: vfs.error,
+        listFiles: vfs.listFiles,
+        readFile: vfs.readFile,
+        writeFile: vfs.writeFile,
+        deleteItem: vfs.deleteItem,
+        createDirectory: vfs.createDirectory,
+        downloadFile: vfs.downloadFile,
+        uploadFiles: vfs.uploadFiles,
+        uploadAndExtractZip: vfs.uploadAndExtractZip,
+        downloadAllAsZip: vfs.downloadAllAsZip,
+        rename: vfs.rename,
+      },
     }),
     [
-      // Add ALL dependencies...
       providers,
-      selectedProviderId,
-      setSelectedProviderId,
-      selectedModelId,
-      setSelectedModelId,
-      apiKeys,
-      selectedApiKeyId,
-      setSelectedApiKeyId,
-      addApiKey,
-      deleteApiKey,
-      getApiKeyForProvider,
-      sidebarItems,
-      selectedItemId,
-      selectedItemType,
-      selectItem,
-      createConversation,
-      createProject,
-      deleteItem,
-      renameItem,
-      updateConversationSystemPrompt,
-      activeConversationData,
+      providerModel,
+      apiKeysMgmt,
+      conversationMgmt,
       localMessages,
       isLoadingMessages,
       isAiStreaming,
       error,
       setError,
-      prompt,
-      setPrompt,
+      chatInput,
       handleSubmit,
-      stopMessageStreaming,
+      messageHandling,
       regenerateMessage,
-      attachedFiles,
-      addAttachedFile,
-      removeAttachedFile,
-      clearAttachedFiles,
-      temperature,
-      setTemperature,
-      maxTokens,
-      setMaxTokens,
-      globalSystemPrompt,
-      setGlobalSystemPrompt,
-      activeSystemPrompt,
-      topP,
-      setTopP,
-      topK,
-      setTopK,
-      presencePenalty,
-      setPresencePenalty,
-      frequencyPenalty,
-      setFrequencyPenalty,
-      theme,
-      setTheme,
+      chatSettings,
       streamingThrottleRate,
-      searchTerm,
-      setSearchTerm,
-      exportConversation,
       handleImportConversation,
-      exportAllConversations,
+      vfsEnabled,
+      vfs,
     ],
   );
 

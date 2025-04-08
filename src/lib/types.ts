@@ -1,97 +1,125 @@
 // src/lib/types.ts
-import type { LanguageModel, Tool } from "ai";
 
-// --- API Key Storage ---
-export interface DbApiKey {
-  id: string; // Unique ID for the key entry
-  name: string; // User-defined name for the key (e.g., "My Personal OpenAI Key")
-  providerId: string; // Links to AiProviderConfig.id (e.g., 'openai')
-  value: string; // The actual API key (store securely)
+import type { CoreMessage } from "ai";
+import type { FileSystem } from "@zenfs/core"; // Keep if needed elsewhere, but not directly in context type
+
+// --- Basic Types ---
+export type Role = "user" | "assistant" | "system";
+export type SidebarItemType = "conversation" | "project";
+
+// --- Database Schemas ---
+export interface DbBase {
+  id: string;
   createdAt: Date;
+  updatedAt: Date;
 }
 
-// --- Project Structure ---
-export interface DbProject {
-  id: string;
+export interface DbProject extends DbBase {
   name: string;
-  parentId: string | null; // ID of the parent project, or null for root
-  createdAt: Date;
-  updatedAt: Date;
-  // Add other project-specific fields if needed, e.g., description
-  // description?: string;
+  parentId: string | null; // ID of the parent project, null for root
+  vfsEnabled: boolean; // Flag for Virtual File System
 }
 
-// Define the structure for AI providers and their models
-export interface AiModelConfig {
-  id: string; // e.g., 'gpt-4o', 'claude-3-opus'
-  name: string; // User-friendly name
-  instance: LanguageModel; // The actual instantiated model from Vercel AI SDK
-  tools?: Record<string, Tool>;
-}
-
-export interface AiProviderConfig {
-  id: string; // e.g., 'openai', 'anthropic'
-  name: string; // User-friendly name
-  models: AiModelConfig[];
-  requiresApiKey?: boolean;
-}
-
-// Database Schemas
-export interface DbConversation {
-  id: string;
-  parentId: string | null; // ID of the parent project, or null for root
+export interface DbConversation extends DbBase {
   title: string;
-  systemPrompt?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  systemPrompt: string | null;
+  parentId: string | null; // ID of the parent project, null for root
+  vfsEnabled: boolean; // Flag for Virtual File System
 }
 
-export interface DbMessage {
-  id: string;
+export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {
   conversationId: string;
-  role: "user" | "assistant";
+  role: Role;
   content: string;
-  createdAt: Date;
+  vfsContextPaths?: string[]; // ADDED: Paths of VFS files included in context
 }
 
-// Runtime Message Type (includes potential streaming state)
-export interface Message extends DbMessage {
-  isStreaming?: boolean;
-  streamedContent?: string; // Content being actively streamed
-  error?: string | null; // Add error field to message type
-}
-
-// Type for items displayed in the sidebar (Projects or Conversations)
-export type SidebarItemType = "project" | "conversation";
-export interface SidebarItemBase {
-  id: string;
-  parentId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-export interface ProjectSidebarItem extends SidebarItemBase {
-  type: "project";
+export interface DbApiKey extends Pick<DbBase, "id" | "createdAt"> {
   name: string;
-  children?: SidebarItem[]; // For hierarchical display
+  providerId: string;
+  value: string; // Store the actual key value (consider security implications)
 }
-export interface ConversationSidebarItem extends SidebarItemBase {
+
+// --- UI & State Types ---
+export interface Message extends CoreMessage {
+  id?: string; // Optional ID for UI state before DB save
+  conversationId?: string; // Optional for UI state
+  createdAt?: Date; // Optional for UI state
+  isStreaming?: boolean; // Flag for streaming state
+  streamedContent?: string; // Intermediate streamed content
+  error?: string | null; // Error associated with the message
+  vfsContextPaths?: string[]; // ADDED: Paths of VFS files included in context
+}
+
+export interface SidebarItemBase extends DbBase {
+  type: SidebarItemType;
+}
+export interface ProjectSidebarItem extends DbProject, SidebarItemBase {
+  type: "project";
+}
+export interface ConversationSidebarItem
+  extends DbConversation,
+    SidebarItemBase {
   type: "conversation";
-  title: string;
 }
 export type SidebarItem = ProjectSidebarItem | ConversationSidebarItem;
 
-// Context Type
+// --- AI Configuration ---
+export interface AiModelConfig {
+  id: string; // e.g., 'gpt-4o', 'claude-3-opus'
+  name: string; // User-friendly name, e.g., "GPT-4o"
+  instance: any; // The actual AI SDK model instance
+  contextWindow?: number; // Optional: Token limit
+}
+
+export interface AiProviderConfig {
+  id: string; // e.g., 'openai', 'anthropic', 'google'
+  name: string; // User-friendly name, e.g., "OpenAI"
+  models: AiModelConfig[];
+  requiresApiKey?: boolean; // Does this provider need an API key client-side? (default: true)
+}
+
+// --- Virtual File System ---
+export interface FileSystemEntry {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+  size: number;
+  lastModified: Date;
+}
+
+// --- Chat Context ---
+// Define the shape of the VFS object within the context
+interface VfsContextObject {
+  isReady: boolean; // ADDED: Is the FS configured and ready?
+  configuredItemId: string | null; // ADDED: Which item ID is it configured for?
+  isLoading: boolean; // Is the VFS hook currently loading/configuring?
+  isOperationLoading: boolean; // ADDED: Is a VFS operation (write, delete, etc.) in progress?
+  error: string | null; // Any configuration error?
+  // Include all the functions returned by the useVirtualFileSystem hook
+  listFiles: (path: string) => Promise<FileSystemEntry[]>;
+  readFile: (path: string) => Promise<Uint8Array>;
+  writeFile: (path: string, data: Uint8Array | string) => Promise<void>;
+  deleteItem: (path: string, recursive?: boolean) => Promise<void>;
+  createDirectory: (path: string) => Promise<void>;
+  downloadFile: (path: string, filename?: string) => Promise<void>;
+  uploadFiles: (files: FileList | File[], targetPath: string) => Promise<void>;
+  uploadAndExtractZip: (file: File, targetPath: string) => Promise<void>;
+  downloadAllAsZip: (filename?: string) => Promise<void>;
+  rename: (oldPath: string, newPath: string) => Promise<void>;
+}
+
 export interface ChatContextProps {
-  // Config
+  // Provider/Model Selection
   providers: AiProviderConfig[];
   selectedProviderId: string | null;
-  setSelectedProviderId: (id: string | null) => void;
+  setSelectedProviderId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedModelId: string | null;
-  setSelectedModelId: (id: string | null) => void;
+  setSelectedModelId: React.Dispatch<React.SetStateAction<string | null>>;
 
-  // API Keys
-  apiKeys: DbApiKey[]; // List of all stored keys
-  selectedApiKeyId: Record<string, string | null>; // { [providerId]: selectedKeyId | null }
+  // API Key Management
+  apiKeys: DbApiKey[];
+  selectedApiKeyId: Record<string, string | null>; // Map: providerId -> selectedKeyId
   setSelectedApiKeyId: (providerId: string, keyId: string | null) => void;
   addApiKey: (
     name: string,
@@ -99,13 +127,16 @@ export interface ChatContextProps {
     value: string,
   ) => Promise<string>;
   deleteApiKey: (id: string) => Promise<void>;
-  getApiKeyForProvider: (providerId: string) => string | undefined; // Gets the *value* of the selected key
+  getApiKeyForProvider: (providerId: string) => string | undefined;
 
-  // Projects & Conversations (Sidebar Tree)
-  sidebarItems: SidebarItem[]; // Combined list for the tree view
-  selectedItemId: string | null; // ID of the selected project or conversation
-  selectedItemType: SidebarItemType | null; // Type of the selected item
-  selectItem: (id: string | null, type: SidebarItemType | null) => void; // Unified selection
+  // Sidebar / Item Management
+  sidebarItems: SidebarItem[];
+  selectedItemId: string | null;
+  selectedItemType: SidebarItemType | null;
+  selectItem: (
+    id: string | null,
+    type: SidebarItemType | null,
+  ) => Promise<void>;
   createConversation: (
     parentId: string | null,
     title?: string,
@@ -113,69 +144,71 @@ export interface ChatContextProps {
   createProject: (
     parentId: string | null,
     name?: string,
-  ) => Promise<{ id: string; name: string }>; // Returns ID and initial name
-  deleteItem: (id: string, type: SidebarItemType) => Promise<void>; // Unified delete
+  ) => Promise<{ id: string; name: string }>;
+  deleteItem: (id: string, type: SidebarItemType) => Promise<void>;
   renameItem: (
     id: string,
     newName: string,
     type: SidebarItemType,
-  ) => Promise<void>; // Unified rename
+  ) => Promise<void>;
   updateConversationSystemPrompt: (
     id: string,
     systemPrompt: string | null,
   ) => Promise<void>;
-  activeConversationData: DbConversation | null; // Data for the *selected* conversation (if any)
+  activeConversationData: DbConversation | null;
+  activeProjectData: DbProject | null;
 
-  // Messages (for the selected conversation)
+  // Messages & Streaming
   messages: Message[];
-  isLoading: boolean; // Loading messages or initial state
-  isStreaming: boolean; // Is AI currently responding?
-  error: string | null; // Global error state
-  setError: (error: string | null) => void; // Setter for global error
+  isLoading: boolean; // Loading messages state
+  isStreaming: boolean; // AI response streaming state
+  error: string | null; // General chat error
+  setError: (error: string | null) => void;
 
-  // Input & Submission
+  // Input Handling
   prompt: string;
-  setPrompt: (prompt: string) => void;
+  setPrompt: React.Dispatch<React.SetStateAction<string>>;
   handleSubmit: (e?: React.FormEvent<HTMLFormElement>) => Promise<void>;
   stopStreaming: () => void;
-  regenerateMessage: (messageId: string) => Promise<void>; // Regeneration function
-
-  // File Handling (Placeholders)
+  regenerateMessage: (messageId: string) => Promise<void>;
   attachedFiles: File[];
   addAttachedFile: (file: File) => void;
   removeAttachedFile: (fileName: string) => void;
   clearAttachedFiles: () => void;
+  selectedVfsPaths: string[]; // ADDED: Paths selected for context
+  addSelectedVfsPath: (path: string) => void; // ADDED
+  removeSelectedVfsPath: (path: string) => void; // ADDED
+  clearSelectedVfsPaths: () => void; // ADDED
 
-  // Advanced Settings
+  // Settings
   temperature: number;
-  setTemperature: (value: number) => void;
+  setTemperature: React.Dispatch<React.SetStateAction<number>>;
   maxTokens: number | null;
-  setMaxTokens: (value: number | null) => void;
-  globalSystemPrompt: string; // Global default system prompt
-  setGlobalSystemPrompt: (value: string) => void; // Setter for global prompt
-  activeSystemPrompt: string | null;
+  setMaxTokens: React.Dispatch<React.SetStateAction<number | null>>;
+  globalSystemPrompt: string;
+  setGlobalSystemPrompt: React.Dispatch<React.SetStateAction<string>>;
+  activeSystemPrompt: string | null; // Derived system prompt
   topP: number | null;
-  setTopP: (value: number | null) => void;
+  setTopP: React.Dispatch<React.SetStateAction<number | null>>;
   topK: number | null;
-  setTopK: (value: number | null) => void;
+  setTopK: React.Dispatch<React.SetStateAction<number | null>>;
   presencePenalty: number | null;
-  setPresencePenalty: (value: number | null) => void;
+  setPresencePenalty: React.Dispatch<React.SetStateAction<number | null>>;
   frequencyPenalty: number | null;
-  setFrequencyPenalty: (value: number | null) => void;
-
+  setFrequencyPenalty: React.Dispatch<React.SetStateAction<number | null>>;
   theme: "light" | "dark" | "system";
-  setTheme: (value: "light" | "dark" | "system") => void;
-
-  // UI Config
+  setTheme: React.Dispatch<React.SetStateAction<"light" | "dark" | "system">>;
   streamingThrottleRate: number;
-
-  // Search
   searchTerm: string;
-  setSearchTerm: (term: string) => void;
+  setSearchTerm: React.Dispatch<React.SetStateAction<string>>;
 
   // Import/Export
   exportConversation: (conversationId: string | null) => Promise<void>;
-  importConversation: (file: File, parentId: string | null) => Promise<void>; // Add parentId
-  exportAllConversations: () => Promise<void>; // Might need rework for projects
-  // TODO: Add project export/import later if needed
+  importConversation: (file: File) => Promise<void>; // Simplified signature for context
+  exportAllConversations: () => Promise<void>;
+
+  // Virtual File System
+  vfsEnabled: boolean; // Is VFS enabled for the *currently selected* item?
+  toggleVfsEnabled: () => Promise<void>; // Function to toggle the DB flag and refresh state
+  vfs: VfsContextObject; // Use the defined interface here
 }
