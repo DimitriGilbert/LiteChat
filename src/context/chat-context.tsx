@@ -3,12 +3,12 @@ import React, { useMemo, useCallback, useState, useRef } from "react";
 import type {
   AiProviderConfig,
   ChatContextProps,
+  CoreChatContextProps, // Import Core type
   SidebarItemType,
   Message,
-  DbConversation,
-  DbProject,
 } from "@/lib/types";
 import { ChatContext } from "@/hooks/use-chat-context";
+import { CoreChatContext } from "@/context/core-chat-context"; // Import Core context
 import { useProviderModelSelection } from "@/hooks/use-provider-model-selection";
 import { useApiKeysManagement } from "@/hooks/use-api-keys-management";
 import { useConversationManagement } from "@/hooks/use-conversation-management";
@@ -19,9 +19,8 @@ import { useMessageHandling } from "@/hooks/use-message-handling";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useVirtualFileSystem } from "@/hooks/use-virtual-file-system";
 import { toast } from "sonner";
-import { nanoid } from "nanoid";
 
-// Props expected by the ChatProvider component
+// Props expected by the ChatProvider component (remain the same)
 interface ChatProviderProps {
   children: React.ReactNode;
   providers: AiProviderConfig[];
@@ -32,13 +31,12 @@ interface ChatProviderProps {
   streamingThrottleRate?: number;
 }
 
-// Helper to decode Uint8Array to string, handling potential errors
+// Helper (remains the same)
 const decodeUint8Array = (arr: Uint8Array): string => {
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(arr);
   } catch (e) {
     console.warn("Failed to decode Uint8Array as UTF-8, trying lossy:", e);
-    // Fallback to lossy decoding if strict UTF-8 fails
     return new TextDecoder("utf-8", { fatal: false }).decode(arr);
   }
 };
@@ -52,49 +50,67 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   initialSelectedItemType = null,
   streamingThrottleRate = 42,
 }) => {
-  // --- Core State ---
-  const [isAiStreaming, setIsAiStreaming] = useState(false);
-  const [localMessages, setLocalMessages] = useState<Message[]>([]);
+  // --- Core State Management (Managed directly in ChatProvider) ---
+  const [isStreaming, setIsStreaming] = useState(false); // Renamed from isAiStreaming
+  const [messages, setMessages] = useState<Message[]>([]); // Renamed from localMessages
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [error, setErrorState] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const chatInput = useChatInput(); // Manages prompt, attachedFiles, selectedVfsPaths
 
   const setError = useCallback((newError: string | null) => {
     setErrorState(newError);
     if (newError) {
       console.error("Chat Error Context:", newError);
+      // Consider adding toast here if desired for all errors
     }
   }, []);
 
-  // --- Hook Instantiation ---
+  // --- Hook Instantiation (Optional Modules & Persistence) ---
   const providerModel = useProviderModelSelection({
     providers,
     initialProviderId,
     initialModelId,
   });
   const apiKeysMgmt = useApiKeysManagement();
-  const storage = useChatStorage();
+  const storage = useChatStorage(); // Provides DB functions
+
+  // Callback for stopping AI stream (used by conversationMgmt and messageHandling)
+  const stopStreamingCallback = useCallback(() => {
+    if (abortControllerRef.current) {
+      // console.log("ChatProvider: Aborting stream via abortControllerRef");
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null; // Clear ref after aborting
+      // toast.info("AI response stopped."); // Toast moved to stopStreamingCore if needed
+    } else {
+      // console.log("ChatProvider: Stop requested but no active abortControllerRef");
+    }
+    // Update streaming state immediately
+    setIsStreaming(false);
+  }, []); // No dependencies needed
+
   const handleSelectItem = useCallback(
     (id: string | null, type: SidebarItemType | null) => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        toast.info("AI response stopped due to selection change.");
-      }
+      // Stop any ongoing stream when selection changes
+      stopStreamingCallback();
+      // Reset messages and loading state handled by useMessageHandling effect
     },
-    [],
+    [stopStreamingCallback],
   );
+
   const conversationMgmt = useConversationManagement({
     initialSelectedItemId,
     initialSelectedItemType,
     onSelectItem: handleSelectItem,
-    toggleDbVfs: storage.toggleVfsEnabled,
+    toggleDbVfs: storage.toggleVfsEnabled, // Pass DB function
   });
+
   const chatSettings = useChatSettings({
     activeConversationData: conversationMgmt.activeConversationData,
     activeProjectData: conversationMgmt.activeProjectData,
   });
-  const chatInput = useChatInput();
 
+  // --- VFS Module ---
   const vfsEnabled = useMemo(() => {
     if (conversationMgmt.selectedItemType === "conversation") {
       return conversationMgmt.activeConversationData?.vfsEnabled ?? false;
@@ -115,29 +131,27 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     isEnabled: vfsEnabled,
   });
 
+  // --- AI Interaction Hook (Receives core setters/DB functions) ---
   const aiInteraction = useAiInteraction({
     selectedModel: providerModel.selectedModel,
     selectedProvider: providerModel.selectedProvider,
     getApiKeyForProvider: apiKeysMgmt.getApiKeyForProvider,
     streamingThrottleRate,
-    setLocalMessages,
-    setIsAiStreaming,
-    setError,
-    addDbMessage: storage.addDbMessage,
-    abortControllerRef,
+    setLocalMessages: setMessages, // Pass core state setter
+    setIsAiStreaming: setIsStreaming, // Pass core state setter
+    setError, // Pass core error setter
+    addDbMessage: storage.addDbMessage, // Pass DB function
+    abortControllerRef, // Pass ref
   });
 
+  // --- Message Handling Hook (Receives core state/setters/DB functions/AI func) ---
   const messageHandling = useMessageHandling({
     selectedConversationId:
       conversationMgmt.selectedItemType === "conversation"
         ? conversationMgmt.selectedItemId
         : null,
-    performAiStream: aiInteraction.performAiStream,
-    stopStreamingCallback: () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    },
+    performAiStream: aiInteraction.performAiStream, // Pass AI function
+    stopStreamingCallback, // Pass stop callback
     activeSystemPrompt: chatSettings.activeSystemPrompt,
     temperature: chatSettings.temperature,
     maxTokens: chatSettings.maxTokens,
@@ -145,20 +159,22 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     topK: chatSettings.topK,
     presencePenalty: chatSettings.presencePenalty,
     frequencyPenalty: chatSettings.frequencyPenalty,
-    isAiStreaming,
-    setIsAiStreaming,
-    localMessages,
-    setLocalMessages,
-    isLoadingMessages,
-    setIsLoadingMessages,
-    error,
-    setError,
-    addDbMessage: storage.addDbMessage,
-    deleteDbMessage: storage.deleteDbMessage,
+    isAiStreaming: isStreaming, // Pass core state
+    setIsAiStreaming: setIsStreaming, // Pass core setter (for checks within hook)
+    localMessages: messages, // Pass core state
+    setLocalMessages: setMessages, // Pass core setter
+    isLoadingMessages: isLoadingMessages, // Pass core state
+    setIsLoadingMessages: setIsLoadingMessages, // Pass core setter
+    error: error, // Pass core state
+    setError, // Pass core setter
+    addDbMessage: storage.addDbMessage, // Pass DB function
+    deleteDbMessage: storage.deleteDbMessage, // Pass DB function
   });
 
-  // --- Top-Level Handlers ---
+  // --- Top-Level Handlers (Orchestration Layer) ---
 
+  // This handleSubmit orchestrates optional features (like VFS)
+  // before calling the core message submission logic.
   const handleSubmit = useCallback(
     async (e?: React.FormEvent<HTMLFormElement>) => {
       e?.preventDefault();
@@ -169,7 +185,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         chatInput.selectedVfsPaths.length > 0;
 
       if (!canSubmit) return;
-      if (isAiStreaming) {
+      if (isStreaming) {
         toast.info("Please wait for the current response to finish.");
         return;
       }
@@ -182,6 +198,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       let conversationIdToSubmit: string | null = null;
       let parentProjectId: string | null = null;
 
+      // Determine target conversation/project
       if (
         conversationMgmt.selectedItemType === "project" &&
         conversationMgmt.selectedItemId
@@ -196,6 +213,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         conversationIdToSubmit = conversationMgmt.selectedItemId;
       }
 
+      // Create new conversation if needed
       if (!conversationIdToSubmit) {
         try {
           const title = currentPrompt.substring(0, 50) || "New Chat";
@@ -206,6 +224,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           if (!newConvId)
             throw new Error("Failed to get ID for new conversation.");
           conversationIdToSubmit = newConvId;
+          // No need to select it here, createConversation handles selection
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : "Unknown error";
           setError(`Error: Could not start chat - ${message}`);
@@ -226,31 +245,27 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         chatInput.attachedFiles.length > 0 &&
         vfsEnabled &&
         vfs.isReady &&
-        vfs.configuredItemId === conversationMgmt.selectedItemId &&
+        vfs.configuredItemId === conversationMgmt.selectedItemId && // Ensure VFS is for the *current* item
         !vfs.isOperationLoading
       ) {
         try {
           await vfs.uploadFiles(chatInput.attachedFiles, "/");
-          uploadInfo = `
-
-[User uploaded: ${chatInput.attachedFiles.map((f) => f.name).join(", ")}]`;
-          chatInput.clearAttachedFiles();
+          uploadInfo = `\n\n[User uploaded: ${chatInput.attachedFiles.map((f) => f.name).join(", ")}]`;
+          chatInput.clearAttachedFiles(); // Clear only on success
         } catch (uploadErr) {
           console.error("Failed to upload attached files:", uploadErr);
-          toast.error(
-            `Failed to upload attached file(s): ${uploadErr instanceof Error ? uploadErr.message : "Unknown error"}`,
-          );
-          uploadInfo = `
-
-[File upload failed: ${uploadErr instanceof Error ? uploadErr.message : "Unknown error"}]`;
+          const message =
+            uploadErr instanceof Error ? uploadErr.message : "Unknown error";
+          toast.error(`Failed to upload attached file(s): ${message}`);
+          uploadInfo = `\n\n[File upload failed: ${message}]`;
+          // Do not clear attached files on failure
         }
       } else if (chatInput.attachedFiles.length > 0) {
         toast.warning(
-          "Files attached, but Virtual Filesystem is not enabled or ready. Files were not uploaded.",
+          "Files attached, but Virtual Filesystem is not enabled or ready for this item. Files were not uploaded.",
         );
-        uploadInfo = `
-
-[Files were attached but not uploaded (VFS inactive)]`;
+        uploadInfo = `\n\n[Files were attached but not uploaded (VFS inactive/misconfigured)]`;
+        // Clear attached files even if upload didn't happen, as user intended submission
         chatInput.clearAttachedFiles();
       }
 
@@ -261,88 +276,104 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         chatInput.selectedVfsPaths.length > 0 &&
         vfsEnabled &&
         vfs.isReady &&
-        vfs.configuredItemId === conversationMgmt.selectedItemId &&
+        vfs.configuredItemId === conversationMgmt.selectedItemId && // Ensure VFS is for the *current* item
         !vfs.isOperationLoading
       ) {
         const contentPromises = chatInput.selectedVfsPaths.map(async (path) => {
           try {
             const fileData = await vfs.readFile(path);
             const fileContent = decodeUint8Array(fileData);
+            // Simple truncation example (adjust as needed)
+            const maxSize = 5000; // Example max size
             let formattedContent = "";
-            if (fileContent.length > 1 * 1024 * 1024) {
+            if (fileContent.length > maxSize) {
               toast.warning(
-                `File "${path}" is large and only the beginning will be included.`,
+                `File "${path}" is large (${fileContent.length} bytes) and will be truncated in context.`,
               );
-              formattedContent = `<vfs_file path="${path}" truncated="true">
-${fileContent.substring(0, 10000)}...
-</vfs_file>`;
+              formattedContent = `<vfs_file path="${path}" truncated="true">\n${fileContent.substring(0, maxSize)}...\n</vfs_file>`;
             } else {
-              formattedContent = `<vfs_file path="${path}">
-${fileContent}
-</vfs_file>`;
+              formattedContent = `<vfs_file path="${path}">\n${fileContent}\n</vfs_file>`;
             }
-            pathsIncludedInContext.push(path);
+            pathsIncludedInContext.push(path); // Track successful inclusions
             return formattedContent;
           } catch (readErr) {
             console.error(`Failed to read VFS file ${path}:`, readErr);
+            const message =
+              readErr instanceof Error ? readErr.message : "Unknown error";
             toast.error(
-              `Failed to read file "${path}" for context: ${readErr instanceof Error ? readErr.message : "Unknown error"}`,
+              `Failed to read file "${path}" for context: ${message}`,
             );
             return `<vfs_file path="${path}" error="Failed to read" />`;
           }
         });
 
         const resolvedContents = await Promise.all(contentPromises);
-        vfsContextString = `
-
-${resolvedContents.join("\n\n")}`;
+        if (resolvedContents.length > 0) {
+          vfsContextString = `\n\n${resolvedContents.join("\n\n")}`;
+        }
+        // Clear selected paths after attempting to read them
+        chatInput.clearSelectedVfsPaths();
       } else if (chatInput.selectedVfsPaths.length > 0) {
         toast.warning(
-          "VFS files selected, but Virtual Filesystem is not enabled or ready. Content not included.",
+          "VFS files selected, but Virtual Filesystem is not enabled or ready for this item. Content not included.",
         );
+        // Clear selected paths even if VFS wasn't ready
         chatInput.clearSelectedVfsPaths();
       }
 
       // --- Prepare and Send ---
-      const originalUserPrompt = currentPrompt;
+      const originalUserPrompt = currentPrompt; // Keep original for display/DB
+      // Construct the prompt that includes VFS info for the AI
       const promptToSendToAI =
         (vfsContextString ? vfsContextString + "\n\n" : "") +
         originalUserPrompt +
-        (uploadInfo ? "\n\n" + uploadInfo : ""); // Append upload info for AI context too
+        (uploadInfo ? "\n\n" + uploadInfo : "");
+
+      // Clear the input field visually
       chatInput.setPrompt("");
 
+      // Call the core message handling logic if there's content to send
       if (promptToSendToAI.trim().length > 0) {
-        await messageHandling.handleSubmit(
-          originalUserPrompt,
+        await messageHandling.handleSubmitCore(
+          originalUserPrompt, // Pass original prompt for DB/UI state
           conversationIdToSubmit,
-          promptToSendToAI,
-          pathsIncludedInContext,
+          promptToSendToAI, // Pass potentially augmented prompt for AI
+          pathsIncludedInContext, // Pass paths actually included
         );
-        chatInput.clearSelectedVfsPaths();
       } else {
-        console.log("Submission skipped: empty prompt after processing.");
+        // Handle cases where only file operations happened without a text prompt
+        console.log(
+          "Submission skipped: empty prompt after processing VFS/uploads.",
+        );
         if (
           uploadInfo.includes("failed") ||
           vfsContextString.includes("error=")
         ) {
-          toast.error("Failed to process attached/selected files.");
+          // Error already toasted, maybe set general error state?
+          // setError("Failed to process attached/selected files.");
+        } else if (uploadInfo || vfsContextString) {
+          // If only successful file ops happened, maybe add a system message?
+          // For now, just log it.
+          console.log(
+            "VFS/Upload operations completed without user text prompt.",
+          );
         }
-        chatInput.clearSelectedVfsPaths();
       }
     },
     [
       chatInput,
-      isAiStreaming,
+      isStreaming,
       providerModel.selectedProvider,
       providerModel.selectedModel,
-      conversationMgmt,
+      conversationMgmt, // For selected item, createConversation
       vfsEnabled,
-      vfs,
+      vfs, // For VFS operations
       setError,
-      messageHandling,
+      messageHandling.handleSubmitCore, // Use the core handler
     ],
   );
 
+  // This regenerateMessage ensures the correct context before calling core logic
   const regenerateMessage = useCallback(
     async (messageId: string) => {
       if (
@@ -352,19 +383,26 @@ ${resolvedContents.join("\n\n")}`;
         toast.error("Please select the conversation containing the message.");
         return;
       }
-      if (isAiStreaming) {
+      if (isStreaming) {
         toast.info("Please wait for the current response to finish.");
         return;
       }
-      await messageHandling.regenerateMessage(messageId);
+      // Call the core regeneration logic
+      await messageHandling.regenerateMessageCore(messageId);
     },
     [
-      messageHandling,
+      messageHandling.regenerateMessageCore, // Use the core handler
       conversationMgmt.selectedItemType,
       conversationMgmt.selectedItemId,
-      isAiStreaming,
+      isStreaming,
     ],
   );
+
+  // This stopStreaming calls the core logic
+  const stopStreaming = useCallback(() => {
+    messageHandling.stopStreamingCore(); // Call the core handler
+    toast.info("AI response stopped."); // Provide user feedback
+  }, [messageHandling.stopStreamingCore]);
 
   const handleImportConversation = useCallback(
     async (file: File) => {
@@ -378,27 +416,67 @@ ${resolvedContents.join("\n\n")}`;
         conversationMgmt.selectedItemType === "conversation" &&
         conversationMgmt.selectedItemId
       ) {
+        // Import into the same project as the currently selected conversation
         parentId = conversationMgmt.activeConversationData?.parentId ?? null;
       }
+      // Use the conversationMgmt hook's import function
       await conversationMgmt.importConversation(file, parentId);
     },
-    [conversationMgmt],
+    [conversationMgmt], // Depends on conversationMgmt hook
   );
 
   // --- Context Value Construction ---
-  const contextValue: ChatContextProps = useMemo(
+
+  // Core Context Value
+  const coreContextValue: CoreChatContextProps = useMemo(
     () => ({
+      messages,
+      setMessages,
+      isLoadingMessages,
+      setIsLoadingMessages,
+      isStreaming,
+      setIsStreaming,
+      error,
+      setError,
+      prompt: chatInput.prompt,
+      setPrompt: chatInput.setPrompt,
+      handleSubmitCore: messageHandling.handleSubmitCore,
+      stopStreamingCore: messageHandling.stopStreamingCore,
+      regenerateMessageCore: messageHandling.regenerateMessageCore,
+      abortControllerRef,
+    }),
+    [
+      messages,
+      isLoadingMessages,
+      isStreaming,
+      error,
+      setError,
+      chatInput.prompt,
+      chatInput.setPrompt,
+      messageHandling.handleSubmitCore,
+      messageHandling.stopStreamingCore,
+      messageHandling.regenerateMessageCore,
+      // abortControllerRef is stable
+    ],
+  );
+
+  // Full Context Value (Superset)
+  const fullContextValue: ChatContextProps = useMemo(
+    () => ({
+      // Provider/Model Selection
       providers,
       selectedProviderId: providerModel.selectedProviderId,
       setSelectedProviderId: providerModel.setSelectedProviderId,
       selectedModelId: providerModel.selectedModelId,
       setSelectedModelId: providerModel.setSelectedModelId,
+      // API Key Management
       apiKeys: apiKeysMgmt.apiKeys,
       selectedApiKeyId: apiKeysMgmt.selectedApiKeyId,
       setSelectedApiKeyId: apiKeysMgmt.setSelectedApiKeyId,
       addApiKey: apiKeysMgmt.addApiKey,
       deleteApiKey: apiKeysMgmt.deleteApiKey,
       getApiKeyForProvider: apiKeysMgmt.getApiKeyForProvider,
+      // Sidebar / Item Management
       sidebarItems: conversationMgmt.sidebarItems,
       selectedItemId: conversationMgmt.selectedItemId,
       selectedItemType: conversationMgmt.selectedItemType,
@@ -411,13 +489,18 @@ ${resolvedContents.join("\n\n")}`;
         conversationMgmt.updateConversationSystemPrompt,
       activeConversationData: conversationMgmt.activeConversationData,
       activeProjectData: conversationMgmt.activeProjectData,
-      messages: localMessages,
-      isLoading: isLoadingMessages,
-      isStreaming: isAiStreaming,
-      error,
-      setError,
-      prompt: chatInput.prompt,
-      setPrompt: chatInput.setPrompt,
+      // Core State (mirrored from coreContextValue)
+      messages: coreContextValue.messages,
+      isLoading: coreContextValue.isLoadingMessages, // Renamed field in full context
+      isStreaming: coreContextValue.isStreaming,
+      error: coreContextValue.error,
+      setError: coreContextValue.setError,
+      // Input Handling (Core + Optional)
+      prompt: coreContextValue.prompt,
+      setPrompt: coreContextValue.setPrompt,
+      handleSubmit, // Top-level handler
+      stopStreaming, // Top-level handler
+      regenerateMessage, // Top-level handler
       attachedFiles: chatInput.attachedFiles,
       addAttachedFile: chatInput.addAttachedFile,
       removeAttachedFile: chatInput.removeAttachedFile,
@@ -426,9 +509,7 @@ ${resolvedContents.join("\n\n")}`;
       addSelectedVfsPath: chatInput.addSelectedVfsPath,
       removeSelectedVfsPath: chatInput.removeSelectedVfsPath,
       clearSelectedVfsPaths: chatInput.clearSelectedVfsPaths,
-      handleSubmit,
-      stopStreaming: messageHandling.stopStreaming,
-      regenerateMessage,
+      // Settings
       temperature: chatSettings.temperature,
       setTemperature: chatSettings.setTemperature,
       maxTokens: chatSettings.maxTokens,
@@ -449,9 +530,11 @@ ${resolvedContents.join("\n\n")}`;
       streamingThrottleRate,
       searchTerm: chatSettings.searchTerm,
       setSearchTerm: chatSettings.setSearchTerm,
+      // Import/Export
       exportConversation: conversationMgmt.exportConversation,
-      importConversation: handleImportConversation,
+      importConversation: handleImportConversation, // Use the wrapped handler
       exportAllConversations: conversationMgmt.exportAllConversations,
+      // Virtual File System
       vfsEnabled,
       toggleVfsEnabled: conversationMgmt.toggleVfsEnabled,
       vfs: {
@@ -473,28 +556,30 @@ ${resolvedContents.join("\n\n")}`;
       },
     }),
     [
+      // Dependencies for Full Context
       providers,
       providerModel,
       apiKeysMgmt,
       conversationMgmt,
-      localMessages,
-      isLoadingMessages,
-      isAiStreaming,
-      error,
-      setError,
-      chatInput,
+      coreContextValue, // Include core context value as dependency
       handleSubmit,
-      messageHandling,
+      stopStreaming,
       regenerateMessage,
+      chatInput, // For file/vfs path state
       chatSettings,
       streamingThrottleRate,
       handleImportConversation,
       vfsEnabled,
-      vfs,
+      vfs, // Include VFS object
     ],
   );
 
   return (
-    <ChatContext.Provider value={contextValue}>{children}</ChatContext.Provider>
+    // Provide both contexts. Core context is internal, Full context is for consumers.
+    <CoreChatContext.Provider value={coreContextValue}>
+      <ChatContext.Provider value={fullContextValue}>
+        {children}
+      </ChatContext.Provider>
+    </CoreChatContext.Provider>
   );
 };

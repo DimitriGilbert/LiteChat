@@ -1,4 +1,5 @@
 // src/lib/types.ts
+// Add the new CoreChatContextProps interface
 
 import type { CoreMessage } from "ai";
 import type { FileSystem } from "@zenfs/core"; // Keep if needed elsewhere, but not directly in context type
@@ -89,6 +90,30 @@ export interface FileSystemEntry {
 }
 
 // --- Chat Context ---
+
+// NEW: Core Context Definition
+export interface CoreChatContextProps {
+  messages: Message[];
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  isLoadingMessages: boolean;
+  setIsLoadingMessages: React.Dispatch<React.SetStateAction<boolean>>;
+  isStreaming: boolean;
+  setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>;
+  error: string | null;
+  setError: (error: string | null) => void;
+  prompt: string;
+  setPrompt: React.Dispatch<React.SetStateAction<string>>;
+  handleSubmitCore: (
+    originalUserPrompt: string,
+    currentConversationId: string,
+    promptToSendToAI: string,
+    vfsContextPaths?: string[],
+  ) => Promise<void>;
+  stopStreamingCore: () => void;
+  regenerateMessageCore: (messageId: string) => Promise<void>;
+  abortControllerRef: React.MutableRefObject<AbortController | null>;
+}
+
 // Define the shape of the VFS object within the context
 interface VfsContextObject {
   isReady: boolean; // ADDED: Is the FS configured and ready?
@@ -109,6 +134,7 @@ interface VfsContextObject {
   rename: (oldPath: string, newPath: string) => Promise<void>;
 }
 
+// Full Context (Superset including Core + Optional Modules)
 export interface ChatContextProps {
   // Provider/Model Selection
   providers: AiProviderConfig[];
@@ -158,19 +184,19 @@ export interface ChatContextProps {
   activeConversationData: DbConversation | null;
   activeProjectData: DbProject | null;
 
-  // Messages & Streaming
+  // Messages & Streaming (Core - exposed via full context too)
   messages: Message[];
   isLoading: boolean; // Loading messages state
   isStreaming: boolean; // AI response streaming state
   error: string | null; // General chat error
   setError: (error: string | null) => void;
 
-  // Input Handling
+  // Input Handling (Core + Optional Module parts)
   prompt: string;
   setPrompt: React.Dispatch<React.SetStateAction<string>>;
-  handleSubmit: (e?: React.FormEvent<HTMLFormElement>) => Promise<void>;
-  stopStreaming: () => void;
-  regenerateMessage: (messageId: string) => Promise<void>;
+  handleSubmit: (e?: React.FormEvent<HTMLFormElement>) => Promise<void>; // The top-level submit
+  stopStreaming: () => void; // The top-level stop
+  regenerateMessage: (messageId: string) => Promise<void>; // The top-level regenerate
   attachedFiles: File[];
   addAttachedFile: (file: File) => void;
   removeAttachedFile: (fileName: string) => void;
