@@ -3,13 +3,12 @@ import React, { useState } from "react";
 import { ChatProvider } from "@/context/chat-context";
 import { ChatSide } from "./chat-side";
 import { ChatWrapper } from "./chat-wrapper";
-import type { AiProviderConfig, SidebarItemType } from "@/lib/types"; // Import SidebarItemType
+import type { AiProviderConfig, SidebarItemType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { MenuIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // Export sub-components for composability
-// ... (keep existing exports) ...
 export { ChatContent } from "./chat-content";
 export { ChatHistory } from "./chat-history";
 export { ChatSide } from "./chat-side";
@@ -31,18 +30,19 @@ export type {
   AiProviderConfig,
   AiModelConfig,
   Message,
-  DbProject, // Export DbProject if needed by consumers
-  DbConversation, // Export DbConversation if needed by consumers
-  SidebarItem, // Export SidebarItem if needed by consumers
-  SidebarItemType, // Export SidebarItemType if needed by consumers
+  DbProject,
+  DbConversation,
+  SidebarItem,
+  SidebarItemType,
 } from "@/lib/types";
+export { useSidebarManagement } from "@/hooks/use-sidebar-management";
 
 interface LiteChatProps {
   providers: AiProviderConfig[];
   initialProviderId?: string | null;
   initialModelId?: string | null;
-  initialSelectedItemId?: string | null; // Renamed from initialConversationId
-  initialSelectedItemType?: SidebarItemType | null; // Added
+  initialSelectedItemId?: string | null;
+  initialSelectedItemType?: SidebarItemType | null;
   streamingThrottleRate?: number;
   className?: string;
   defaultSidebarOpen?: boolean;
@@ -54,8 +54,8 @@ export const LiteChat: React.FC<LiteChatProps> = ({
   providers,
   initialProviderId,
   initialModelId,
-  initialSelectedItemId, // Use new prop
-  initialSelectedItemType, // Use new prop
+  initialSelectedItemId,
+  initialSelectedItemType,
   streamingThrottleRate,
   className,
   defaultSidebarOpen = true,
@@ -69,8 +69,8 @@ export const LiteChat: React.FC<LiteChatProps> = ({
       providers={providers}
       initialProviderId={initialProviderId}
       initialModelId={initialModelId}
-      initialSelectedItemId={initialSelectedItemId} // Pass new prop
-      initialSelectedItemType={initialSelectedItemType} // Pass new prop
+      initialSelectedItemId={initialSelectedItemId}
+      initialSelectedItemType={initialSelectedItemType}
       streamingThrottleRate={streamingThrottleRate}
     >
       <div
@@ -90,11 +90,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
         )}
 
         {/* Mobile Sidebar (Drawer - Example, requires extra implementation) */}
-        {/* {sidebarOpen && (
-          <div className="md:hidden fixed inset-0 bg-black/50 z-40">
-             <SideComponent className="w-72 h-full absolute left-0 top-0 z-50" />
-          </div>
-        )} */}
+        {/* Consider adding a proper drawer implementation later */}
 
         {/* Main Chat Area Wrapper */}
         <div className="flex-grow flex flex-col relative w-full min-w-0">

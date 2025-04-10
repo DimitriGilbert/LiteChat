@@ -179,12 +179,12 @@ export interface ChatContextProps {
     id: string,
     systemPrompt: string | null,
   ) => Promise<void>;
-  // activeConversationData: DbConversation | null;
-  // activeProjectData: DbProject | null;
+  // REMOVED: activeConversationData: DbConversation | null;
+  // REMOVED: activeProjectData: DbProject | null;
 
   // Messages & Streaming (Core)
   messages: Message[];
-  isLoading: boolean;
+  isLoading: boolean; // Alias for isLoadingMessages
   isStreaming: boolean;
   error: string | null;
   setError: (error: string | null) => void;
@@ -228,16 +228,16 @@ export interface ChatContextProps {
 
   // Import/Export & Data Management
   exportConversation: (conversationId: string | null) => Promise<void>;
-  importConversation: (file: File) => Promise<void>;
+  importConversation: (file: File) => Promise<void>; // Simplified signature
   exportAllConversations: () => Promise<void>;
   clearAllData: () => Promise<void>;
 
   // Virtual File System
   vfsEnabled: boolean;
-  toggleVfsEnabled: () => Promise<void>;
+  toggleVfsEnabled: () => Promise<void>; // Simplified signature
   vfs: VfsContextObject;
 
-  // Pass required DB functions
+  // Pass required DB functions (Consider removing if not needed directly)
   getConversation: (id: string) => Promise<DbConversation | undefined>;
   getProject: (id: string) => Promise<DbProject | undefined>;
 }

@@ -14,14 +14,17 @@ import type {
   Message,
   DbConversation,
   DbProject,
-  DbApiKey, // Keep DbApiKey
-  SidebarItem, // Keep SidebarItem
+  DbApiKey,
+  SidebarItem,
+  ProjectSidebarItem, // Import specific types
+  ConversationSidebarItem, // Import specific types
 } from "@/lib/types";
 import { ChatContext } from "@/hooks/use-chat-context";
 import { CoreChatContext } from "@/context/core-chat-context";
 import { useProviderModelSelection } from "@/hooks/use-provider-model-selection";
 import { useApiKeysManagement } from "@/hooks/use-api-keys-management";
-import { useConversationManagement } from "@/hooks/use-conversation-management";
+// Import the renamed hook
+import { useSidebarManagement } from "@/hooks/use-sidebar-management";
 import { useChatSettings } from "@/hooks/use-chat-settings";
 import { useAiInteraction } from "@/hooks/use-ai-interaction";
 import { useChatInput } from "@/hooks/use-chat-input";
@@ -30,7 +33,7 @@ import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useVirtualFileSystem } from "@/hooks/use-virtual-file-system";
 import { toast } from "sonner";
 
-// ... (interfaces and decodeUint8Array remain the same) ...
+// Interface for ChatProviderProps remains the same
 interface ChatProviderProps {
   children: React.ReactNode;
   providers: AiProviderConfig[];
@@ -50,7 +53,6 @@ const decodeUint8Array = (arr: Uint8Array): string => {
   }
 };
 
-// Keep EMPTY constants for default values if needed, but don't pass them directly if live data exists
 const EMPTY_API_KEYS: DbApiKey[] = [];
 const EMPTY_SIDEBAR_ITEMS: SidebarItem[] = [];
 
@@ -63,7 +65,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   initialSelectedItemType = null,
   streamingThrottleRate = 42,
 }) => {
-  // --- Core State Management ---
+  // --- Core State Management (remains the same) ---
   const [isStreaming, setIsStreaming] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
@@ -84,97 +86,137 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     initialProviderId,
     initialModelId,
   });
-  const storage = useChatStorage(); // Contains live query results
+  const storage = useChatStorage(); // Contains live query results and DB functions
 
+  // --- Combine Projects and Conversations into SidebarItems ---
+  const sidebarItems = useMemo<SidebarItem[]>(() => {
+    const allProjects = storage.projects || [];
+    const allConversations = storage.conversations || [];
+    const combinedItems: SidebarItem[] = [
+      ...allProjects.map(
+        (p): ProjectSidebarItem => ({ ...p, type: "project" }),
+      ),
+      ...allConversations.map(
+        (c): ConversationSidebarItem => ({ ...c, type: "conversation" }),
+      ),
+    ];
+    // Sort by updatedAt descending
+    combinedItems.sort(
+      (a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
+    );
+    return combinedItems;
+  }, [storage.projects, storage.conversations]);
+
+  // --- State for derived active data ---
+  const [activeItemId, setActiveItemId] = useState<string | null>(
+    initialSelectedItemId,
+  );
+  const [activeItemType, setActiveItemType] = useState<SidebarItemType | null>(
+    initialSelectedItemType,
+  );
+
+  // --- Callback for Sidebar Management Hook ---
+  // This is called by useSidebarManagement when an item is selected
+  const handleSelectItem = useCallback(
+    (id: string | null, type: SidebarItemType | null) => {
+      // Stop streaming and clear inputs regardless of selection change
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      setIsStreaming(false);
+      chatInput.clearSelectedVfsPaths();
+      chatInput.clearAttachedFiles();
+      setMessages([]); // Clear messages immediately
+      setErrorState(null); // Clear errors
+
+      // Update the state that determines the active data
+      setActiveItemId(id);
+      setActiveItemType(type);
+      setIsLoadingMessages(!!id); // Set loading only if an item is selected
+
+      console.log(
+        `[ChatProvider] handleSelectItem updated state: ID=${id}, Type=${type}`,
+      );
+    },
+    [chatInput], // Removed stopStreamingCallback dependency
+  );
+
+  // --- Instantiate Sidebar Management Hook ---
+  const sidebarMgmt = useSidebarManagement({
+    initialSelectedItemId,
+    initialSelectedItemType,
+    onSelectItem: handleSelectItem, // Pass the callback
+    // Pass DB functions from storage
+    dbCreateConversation: storage.createConversation,
+    dbCreateProject: storage.createProject,
+    dbDeleteConversation: storage.deleteConversation,
+    dbDeleteProject: storage.deleteProject,
+    dbRenameConversation: storage.renameConversation,
+    dbRenameProject: storage.renameProject,
+    dbUpdateConversationSystemPrompt: storage.updateConversationSystemPrompt,
+    dbGetConversation: storage.getConversation,
+    dbGetMessagesForConversation: storage.getMessagesForConversation,
+    dbBulkAddMessages: storage.bulkAddMessages,
+    dbUpdateConversationTimestamp: storage.updateConversationTimestamp,
+    dbCountChildProjects: storage.countChildProjects,
+    dbCountChildConversations: storage.countChildConversations,
+    dbToggleVfsEnabled: storage.toggleVfsEnabled,
+    sidebarItems: sidebarItems, // Pass the live, sorted items array
+  });
+
+  // --- Derive active data based on activeItemId/Type ---
+  const activeItemData = useMemo(() => {
+    console.log(
+      `[ChatProvider] Recalculating activeItemData for ID: ${activeItemId}, Type: ${activeItemType}`,
+    );
+    if (!activeItemId || !activeItemType) return null;
+
+    // Find in the combined sidebarItems list
+    const item = sidebarItems.find((i) => i.id === activeItemId);
+    // Ensure the type matches (should always match if state is consistent)
+    if (item && item.type === activeItemType) {
+      return item;
+    }
+    console.warn(
+      `[ChatProvider] Could not find active item (${activeItemId}, ${activeItemType}) in sidebarItems list.`,
+    );
+    return null;
+  }, [activeItemId, activeItemType, sidebarItems]); // Depend on ID, Type, and the items list
+
+  const activeConversationData = useMemo(() => {
+    return activeItemType === "conversation"
+      ? (activeItemData as DbConversation | null)
+      : null;
+  }, [activeItemType, activeItemData]);
+
+  const activeProjectData = useMemo(() => {
+    return activeItemType === "project"
+      ? (activeItemData as DbProject | null)
+      : null;
+  }, [activeItemType, activeItemData]);
+  // --- End Derive active data ---
+
+  // --- Instantiate other hooks (ApiKeys, Settings, VFS, AI, Messages) ---
   const apiKeysMgmt = useApiKeysManagement({
-    // Pass the LIVE data from storage here
     apiKeys: storage.apiKeys || EMPTY_API_KEYS,
     addDbApiKey: storage.addApiKey,
     deleteDbApiKey: storage.deleteApiKey,
   });
-
-  const stopStreamingCallback = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    setIsStreaming(false);
-  }, []);
-
-  const handleSelectItem = useCallback(
-    (id: string | null, type: SidebarItemType | null) => {
-      stopStreamingCallback();
-      chatInput.clearSelectedVfsPaths();
-      chatInput.clearAttachedFiles();
-      setMessages([]);
-      setIsLoadingMessages(!!id);
-      setErrorState(null);
-      // Log selection change
-      console.log(
-        `[ChatProvider] handleSelectItem called: ID=${id}, Type=${type}`,
-      );
-    },
-    [stopStreamingCallback, chatInput],
-  );
-
-  const conversationMgmt = useConversationManagement({
-    initialSelectedItemId,
-    initialSelectedItemType,
-    onSelectItem: handleSelectItem,
-    toggleDbVfs: storage.toggleVfsEnabled,
-    getProject: storage.getProject,
-    getConversation: storage.getConversation,
-    getMessagesForConversation: storage.getMessagesForConversation,
-    bulkAddMessages: storage.bulkAddMessages,
-    updateConversationTimestamp: storage.updateConversationTimestamp,
-    countChildProjects: storage.countChildProjects,
-    countChildConversations: storage.countChildConversations,
-  });
-
-  // --- Derive active data directly from storage based on selection ---
-  // FIX 1: Correct dependencies and lookup logic for activeItemData
-  const activeItemData = useMemo(() => {
-    const { selectedItemId, selectedItemType } = conversationMgmt;
-    console.log(
-      `[ChatProvider] Recalculating activeItemData for ID: ${selectedItemId}, Type: ${selectedItemType}`,
-    );
-    if (!selectedItemId || !selectedItemType) return null;
-
-    // Perform lookup inside the memo using the latest storage values
-    if (selectedItemType === "conversation") {
-      // Use the live array from storage directly inside the memo
-      return storage.conversations.find((c) => c.id === selectedItemId) || null;
-    } else if (selectedItemType === "project") {
-      // Use the live array from storage directly inside the memo
-      return storage.projects.find((p) => p.id === selectedItemId) || null;
-    }
-    return null;
-    // Depend ONLY on the stable ID and Type from conversationMgmt state
-  }, [conversationMgmt, storage.conversations, storage.projects]); // Keep storage arrays here because the *lookup* needs the latest data
-
-  const activeConversationData = useMemo(() => {
-    return conversationMgmt.selectedItemType === "conversation"
-      ? (activeItemData as DbConversation | null)
-      : null;
-  }, [conversationMgmt.selectedItemType, activeItemData]);
-
-  const activeProjectData = useMemo(() => {
-    return conversationMgmt.selectedItemType === "project"
-      ? (activeItemData as DbProject | null)
-      : null;
-  }, [conversationMgmt.selectedItemType, activeItemData]);
-  // --- End Derive active data ---
 
   const chatSettings = useChatSettings({
     activeConversationData: activeConversationData,
     activeProjectData: activeProjectData,
   });
 
-  // --- VFS (remains disabled) ---
-  const vfsEnabled = useMemo(() => false, []);
+  // VFS remains disabled for now
+  const vfsEnabled = useMemo(
+    () => activeItemData?.vfsEnabled ?? false,
+    [activeItemData],
+  );
   const vfs = useVirtualFileSystem({
-    itemId: conversationMgmt.selectedItemId,
-    itemType: conversationMgmt.selectedItemType,
+    itemId: activeItemId, // Use derived active ID
+    itemType: activeItemType, // Use derived active Type
     isEnabled: vfsEnabled,
   });
   useEffect(() => {
@@ -182,9 +224,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       chatInput.clearSelectedVfsPaths();
     }
   }, [vfsEnabled, chatInput]);
-  // --- End VFS ---
 
-  // --- AI Interaction & Message Handling ---
   const aiInteraction = useAiInteraction({
     selectedModel: providerModel.selectedModel,
     selectedProvider: providerModel.selectedProvider,
@@ -198,12 +238,16 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   });
 
   const messageHandling = useMessageHandling({
-    selectedConversationId:
-      conversationMgmt.selectedItemType === "conversation"
-        ? conversationMgmt.selectedItemId
-        : null,
+    selectedConversationId: activeConversationData?.id ?? null, // Use derived data
     performAiStream: aiInteraction.performAiStream,
-    stopStreamingCallback,
+    stopStreamingCallback: useCallback(() => {
+      // Define stopStreamingCallback inline or memoize separately if needed elsewhere
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      setIsStreaming(false);
+    }, []),
     activeSystemPrompt: chatSettings.activeSystemPrompt,
     temperature: chatSettings.temperature,
     maxTokens: chatSettings.maxTokens,
@@ -246,34 +290,28 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       let conversationIdToSubmit: string | null = null;
       let parentProjectId: string | null = null;
 
-      // Determine parent and target conversation ID based on current selection
-      if (
-        conversationMgmt.selectedItemType === "project" &&
-        conversationMgmt.selectedItemId
-      ) {
-        parentProjectId = conversationMgmt.selectedItemId;
-      } else if (
-        conversationMgmt.selectedItemType === "conversation" &&
-        conversationMgmt.selectedItemId
-      ) {
+      // Determine parent and target conversation ID based on current selection (using activeItem state)
+      if (activeItemType === "project" && activeItemId) {
+        parentProjectId = activeItemId;
+      } else if (activeItemType === "conversation" && activeItemId) {
         // Use the memoized activeConversationData to find parentId
         parentProjectId = activeConversationData?.parentId ?? null;
-        conversationIdToSubmit = conversationMgmt.selectedItemId;
+        conversationIdToSubmit = activeItemId;
       }
 
       // If no conversation is selected (e.g., a project is selected, or nothing is), create one
       if (!conversationIdToSubmit) {
         try {
           const title = currentPrompt.substring(0, 50) || "New Chat";
-          // Create conversation, potentially under the selected project (parentProjectId)
-          const newConvId = await conversationMgmt.createConversation(
+          // Use the sidebarMgmt hook's createConversation function
+          const newConvId = await sidebarMgmt.createConversation(
             parentProjectId,
             title,
           );
           if (!newConvId)
             throw new Error("Failed to get ID for new conversation.");
           conversationIdToSubmit = newConvId;
-          // Note: createConversation already selects the new item, triggering message load
+          // Note: sidebarMgmt.createConversation already selects the new item, triggering message load via handleSelectItem
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : "Unknown error";
           setError(`Error: Could not start chat - ${message}`);
@@ -320,9 +358,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         console.log(
           "Submission skipped: empty prompt after processing VFS/uploads.",
         );
-        // If only files were attached (and uploads worked), we might still want
-        // to add a user message indicating files were sent, even if text prompt is empty.
-        // For now, it skips if the text part is empty.
       }
     },
     [
@@ -330,8 +365,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       isStreaming,
       providerModel.selectedProvider,
       providerModel.selectedModel,
-      conversationMgmt, // Includes selectedItemId/Type and createConversation
+      activeItemId, // Use state for selection
+      activeItemType, // Use state for selection
       activeConversationData, // Memoized derived state for parentId lookup
+      sidebarMgmt, // Use sidebarMgmt.createConversation
       setError,
       messageHandling,
     ],
@@ -339,10 +376,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
   const regenerateMessage = useCallback(
     async (messageId: string) => {
-      if (
-        conversationMgmt.selectedItemType !== "conversation" ||
-        !conversationMgmt.selectedItemId
-      ) {
+      if (activeItemType !== "conversation" || !activeItemId) {
         toast.error("Please select the conversation containing the message.");
         return;
       }
@@ -352,12 +386,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       }
       await messageHandling.regenerateMessageCore(messageId);
     },
-    [
-      messageHandling,
-      conversationMgmt.selectedItemType,
-      conversationMgmt.selectedItemId,
-      isStreaming,
-    ],
+    [messageHandling, activeItemType, activeItemId, isStreaming],
   );
 
   const stopStreaming = useCallback(() => {
@@ -368,21 +397,30 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const handleImportConversation = useCallback(
     async (file: File) => {
       let parentId: string | null = null;
-      if (
-        conversationMgmt.selectedItemType === "project" &&
-        conversationMgmt.selectedItemId
-      ) {
-        parentId = conversationMgmt.selectedItemId;
-      } else if (
-        conversationMgmt.selectedItemType === "conversation" &&
-        conversationMgmt.selectedItemId
-      ) {
+      if (activeItemType === "project" && activeItemId) {
+        parentId = activeItemId;
+      } else if (activeItemType === "conversation" && activeItemId) {
         parentId = activeConversationData?.parentId ?? null;
       }
-      await conversationMgmt.importConversation(file, parentId);
+      // Use the sidebarMgmt hook's import function
+      await sidebarMgmt.importConversation(file, parentId);
     },
-    [conversationMgmt, activeConversationData],
+    [sidebarMgmt, activeItemType, activeItemId, activeConversationData],
   );
+
+  const handleToggleVfs = useCallback(async () => {
+    if (!activeItemId || !activeItemType) {
+      toast.warning("No item selected.");
+      return;
+    }
+    // Use the sidebarMgmt hook's toggle function
+    await sidebarMgmt.toggleVfsEnabled(
+      activeItemId,
+      activeItemType,
+      vfsEnabled, // Pass the current state
+    );
+    // Note: The vfsEnabled state will update via the activeItemData memo
+  }, [sidebarMgmt, activeItemId, activeItemType, vfsEnabled]);
 
   // --- Context Value Construction ---
   const coreContextValue: CoreChatContextProps = useMemo(
@@ -418,38 +456,42 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
   const fullContextValue: ChatContextProps = useMemo(
     () => ({
+      // Provider/Model Selection
       providers,
       selectedProviderId: providerModel.selectedProviderId,
       setSelectedProviderId: providerModel.setSelectedProviderId,
       selectedModelId: providerModel.selectedModelId,
       setSelectedModelId: providerModel.setSelectedModelId,
-      // FIX 2: Provide live data, not static empty arrays
+      // API Key Management
       apiKeys: storage.apiKeys || EMPTY_API_KEYS,
-      sidebarItems: conversationMgmt.sidebarItems || EMPTY_SIDEBAR_ITEMS,
       selectedApiKeyId: apiKeysMgmt.selectedApiKeyId,
       setSelectedApiKeyId: apiKeysMgmt.setSelectedApiKeyId,
       addApiKey: apiKeysMgmt.addApiKey,
       deleteApiKey: apiKeysMgmt.deleteApiKey,
       getApiKeyForProvider: apiKeysMgmt.getApiKeyForProvider,
-      selectedItemId: conversationMgmt.selectedItemId,
-      selectedItemType: conversationMgmt.selectedItemType,
-      selectItem: conversationMgmt.selectItem,
-      createConversation: conversationMgmt.createConversation,
-      createProject: conversationMgmt.createProject,
-      deleteItem: conversationMgmt.deleteItem,
-      renameItem: conversationMgmt.renameItem,
+      // Sidebar / Item Management (from sidebarMgmt and provider state)
+      sidebarItems: sidebarItems || EMPTY_SIDEBAR_ITEMS, // Use combined list
+      selectedItemId: sidebarMgmt.selectedItemId, // Use state from hook
+      selectedItemType: sidebarMgmt.selectedItemType, // Use state from hook
+      selectItem: sidebarMgmt.selectItem,
+      createConversation: sidebarMgmt.createConversation,
+      createProject: sidebarMgmt.createProject,
+      deleteItem: sidebarMgmt.deleteItem,
+      renameItem: sidebarMgmt.renameItem,
       updateConversationSystemPrompt:
-        conversationMgmt.updateConversationSystemPrompt,
+        sidebarMgmt.updateConversationSystemPrompt,
+      // Messages & Streaming (Core)
       messages: coreContextValue.messages,
-      isLoading: coreContextValue.isLoadingMessages, // Use isLoadingMessages alias
+      isLoading: coreContextValue.isLoadingMessages,
       isStreaming: coreContextValue.isStreaming,
       error: coreContextValue.error,
       setError: coreContextValue.setError,
+      // Input Handling (Core + Optional)
       prompt: coreContextValue.prompt,
       setPrompt: coreContextValue.setPrompt,
-      handleSubmit,
-      stopStreaming,
-      regenerateMessage,
+      handleSubmit, // Use top-level handler
+      stopStreaming, // Use top-level handler
+      regenerateMessage, // Use top-level handler
       attachedFiles: chatInput.attachedFiles,
       addAttachedFile: chatInput.addAttachedFile,
       removeAttachedFile: chatInput.removeAttachedFile,
@@ -458,6 +500,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       addSelectedVfsPath: chatInput.addSelectedVfsPath,
       removeSelectedVfsPath: chatInput.removeSelectedVfsPath,
       clearSelectedVfsPaths: chatInput.clearSelectedVfsPaths,
+      // Settings
       temperature: chatSettings.temperature,
       setTemperature: chatSettings.setTemperature,
       maxTokens: chatSettings.maxTokens,
@@ -478,89 +521,67 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       streamingThrottleRate,
       searchTerm: chatSettings.searchTerm,
       setSearchTerm: chatSettings.setSearchTerm,
-      exportConversation: conversationMgmt.exportConversation,
-      importConversation: handleImportConversation,
-      exportAllConversations: conversationMgmt.exportAllConversations,
+      // Import/Export & Data Management
+      exportConversation: sidebarMgmt.exportConversation,
+      importConversation: handleImportConversation, // Use top-level handler
+      exportAllConversations: sidebarMgmt.exportAllConversations,
       clearAllData: storage.clearAllData,
-      vfsEnabled: false, // Keep disabled
-      toggleVfsEnabled: conversationMgmt.toggleVfsEnabled,
-      vfs: {
-        // Dummy VFS object
-        isReady: false,
-        configuredItemId: null,
-        isLoading: false,
-        isOperationLoading: false,
-        error: "VFS Disabled for Debug",
-        listFiles: async () => [],
-        readFile: async () => {
-          throw new Error("VFS Disabled");
-        },
-        writeFile: async () => {
-          throw new Error("VFS Disabled");
-        },
-        deleteItem: async () => {
-          throw new Error("VFS Disabled");
-        },
-        createDirectory: async () => {
-          throw new Error("VFS Disabled");
-        },
-        downloadFile: async () => {
-          throw new Error("VFS Disabled");
-        },
-        uploadFiles: async () => {
-          throw new Error("VFS Disabled");
-        },
-        uploadAndExtractZip: async () => {
-          throw new Error("VFS Disabled");
-        },
-        downloadAllAsZip: async () => {
-          throw new Error("VFS Disabled");
-        },
-        rename: async () => {
-          throw new Error("VFS Disabled");
-        },
-      },
+      // Virtual File System
+      vfsEnabled: vfsEnabled, // Use derived state
+      toggleVfsEnabled: handleToggleVfs, // Use top-level handler
+      vfs: vfs, // Pass the VFS hook result
+      // Pass required DB functions (still needed by some components directly?)
+      // Consider removing these if all consumers use context actions
       getConversation: storage.getConversation,
       getProject: storage.getProject,
     }),
     [
-      // Dependencies (ensure stability where possible)
+      // Dependencies
       providers,
       providerModel.selectedProviderId,
       providerModel.setSelectedProviderId,
       providerModel.selectedModelId,
       providerModel.setSelectedModelId,
-      storage.apiKeys, // Live data
-      conversationMgmt.sidebarItems, // Live data
+      storage.apiKeys,
       apiKeysMgmt.selectedApiKeyId,
       apiKeysMgmt.setSelectedApiKeyId,
       apiKeysMgmt.addApiKey,
       apiKeysMgmt.deleteApiKey,
       apiKeysMgmt.getApiKeyForProvider,
-      conversationMgmt.selectedItemId,
-      conversationMgmt.selectedItemType,
-      conversationMgmt.selectItem,
-      conversationMgmt.createConversation,
-      conversationMgmt.createProject,
-      conversationMgmt.deleteItem,
-      conversationMgmt.renameItem,
-      conversationMgmt.updateConversationSystemPrompt,
-      conversationMgmt.exportConversation,
-      conversationMgmt.exportAllConversations,
-      conversationMgmt.toggleVfsEnabled,
-      coreContextValue, // Memoized core state
-      handleSubmit, // useCallback
-      stopStreaming, // useCallback
-      regenerateMessage, // useCallback
-      handleImportConversation, // useCallback
-      chatInput, // Memoized input state
-      chatSettings, // Memoized settings state
+      sidebarItems, // Combined list
+      sidebarMgmt.selectedItemId,
+      sidebarMgmt.selectedItemType,
+      sidebarMgmt.selectItem,
+      sidebarMgmt.createConversation,
+      sidebarMgmt.createProject,
+      sidebarMgmt.deleteItem,
+      sidebarMgmt.renameItem,
+      sidebarMgmt.updateConversationSystemPrompt,
+      sidebarMgmt.exportConversation,
+      sidebarMgmt.exportAllConversations,
+      coreContextValue,
+      handleSubmit,
+      stopStreaming,
+      regenerateMessage,
+      handleImportConversation,
+      chatInput,
+      chatSettings,
       streamingThrottleRate,
-      storage.clearAllData, // useCallback from storage
-      storage.getConversation, // useCallback from storage
-      storage.getProject, // useCallback from storage
+      storage.clearAllData,
+      vfsEnabled,
+      handleToggleVfs,
+      vfs,
+      storage.getConversation,
+      storage.getProject,
     ],
   );
+
+  // Log when active item changes
+  useEffect(() => {
+    console.log(
+      `[ChatProvider] Active item state updated: ID=${activeItemId}, Type=${activeItemType}`,
+    );
+  }, [activeItemId, activeItemType]);
 
   // Log when messages state changes
   useEffect(() => {

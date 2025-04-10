@@ -1,6 +1,6 @@
 // src/components/lite-chat/chat-side.tsx
-import React, { useState, useRef } from "react";
-import { ChatHistory } from "./chat-history"; // Will be updated next
+import React, { useState, useRef, useEffect } from "react"; // Added useEffect
+import { ChatHistory } from "./chat-history";
 import { SettingsModal } from "./settings-modal";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,11 +8,10 @@ import {
   PlusIcon,
   FolderPlusIcon,
   DownloadIcon,
-} from "lucide-react"; // Add FolderPlusIcon
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-// Removed Upload/Download icons if handled elsewhere (like history items)
 import { useChatContext } from "@/hooks/use-chat-context";
-import { toast } from "sonner"; // Import toast
+import { toast } from "sonner";
 
 interface ChatSideProps {
   className?: string;
@@ -21,66 +20,70 @@ interface ChatSideProps {
 export const ChatSide: React.FC<ChatSideProps> = ({ className }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const {
-    // selectItem, // No longer needed directly here
-    createConversation,
-    createProject, // Use createProject
-    selectedItemId,
-    selectedItemType,
-    importConversation, // Get import function from context
+    createConversation, // From context (provided by sidebarMgmt)
+    createProject, // From context (provided by sidebarMgmt)
+    selectedItemId, // From context (provided by sidebarMgmt)
+    selectedItemType, // From context (provided by sidebarMgmt)
+    importConversation, // From context (top-level handler)
+    getConversation, // Get DB function from context
+    getProject, // Get DB function from context
   } = useChatContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // State to track which new project should start in edit mode
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [parentIdForNewItem, setParentIdForNewItem] = useState<string | null>(
+    null,
+  );
+
+  // Effect to determine the correct parentId based on selection
+  useEffect(() => {
+    let determinedParentId: string | null = null;
+    if (selectedItemType === "project") {
+      determinedParentId = selectedItemId;
+    } else if (selectedItemType === "conversation") {
+      // Need to fetch the conversation to find its parent
+      // This is slightly less ideal, but necessary if we don't store parentId in selection state
+      if (selectedItemId) {
+        getConversation(selectedItemId).then((convo) => {
+          if (convo) {
+            setParentIdForNewItem(convo.parentId);
+          } else {
+            setParentIdForNewItem(null); // Fallback if convo not found
+          }
+        });
+        // Prevent setting state directly here, let the async update handle it
+        return;
+      } else {
+        determinedParentId = null; // No item selected
+      }
+    } else {
+      determinedParentId = null; // No item selected
+    }
+    setParentIdForNewItem(determinedParentId);
+  }, [selectedItemId, selectedItemType, getConversation]);
 
   const handleCreateChat = async () => {
-    // Determine parentId based on current selection
-    let parentId: string | null = null;
-    if (selectedItemType === "project") {
-      parentId = selectedItemId;
-    } else if (selectedItemType === "conversation") {
-      // If a chat is selected, find its parent project ID
-      // This requires access to the full item data, maybe context needs to provide it?
-      // Or, simpler: just create at root if a chat is selected.
-      // Let's go with the simpler approach for now.
-      parentId = null; // Create at root if a chat is selected
-      console.log("Creating chat at root because a conversation was selected.");
-    }
-    // createConversation now selects the new chat automatically
-    await createConversation(parentId);
+    // Use the state updated by the effect
+    await createConversation(parentIdForNewItem);
   };
 
   const handleCreateProject = async () => {
-    // Determine parentId based on current selection
-    let parentId: string | null = null;
-    if (selectedItemType === "project") {
-      parentId = selectedItemId;
-    } else if (selectedItemType === "conversation") {
-      // Create at root if a chat is selected (consistent with handleCreateChat)
-      parentId = null;
-      console.log(
-        "Creating project at root because a conversation was selected.",
-      );
-    }
     try {
-      const { id: newProjectId } = await createProject(parentId);
-      // Set the ID of the project that should start editing
+      // Use the state updated by the effect
+      const { id: newProjectId } = await createProject(parentIdForNewItem);
       setEditingProjectId(newProjectId);
-      // We don't select it here, ChatHistory will handle focus/edit state
     } catch (error) {
       console.error("Failed to create project:", error);
       toast.error("Failed to create project.");
     }
   };
 
-  // Callback for ChatHistory to clear the editing state flag
   const onEditComplete = (id: string) => {
     if (editingProjectId === id) {
       setEditingProjectId(null);
     }
   };
 
-  // --- Import Handling ---
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
@@ -88,10 +91,9 @@ export const ChatSide: React.FC<ChatSideProps> = ({ className }) => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Use the context's importConversation (which handles parentId logic)
+      // importConversation handles parentId logic internally now
       importConversation(file);
     }
-    // Reset file input value so the same file can be selected again
     if (event.target) {
       event.target.value = "";
     }
@@ -128,7 +130,6 @@ export const ChatSide: React.FC<ChatSideProps> = ({ className }) => {
 
       {/* History Area */}
       <div className="flex-grow overflow-hidden flex flex-col">
-        {/* Pass editingProjectId and callback to ChatHistory */}
         <ChatHistory
           className="flex-grow"
           editingItemId={editingProjectId}
@@ -147,15 +148,12 @@ export const ChatSide: React.FC<ChatSideProps> = ({ className }) => {
 
       {/* Settings & Import Buttons */}
       <div className="border-t border-gray-700 p-3 space-y-2 bg-gray-800">
-        {/* Add Import Button Here */}
         <Button
           variant="outline"
           className="w-full justify-start gap-2 text-sm h-9 border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
           onClick={handleImportClick}
         >
-          {/* You might want an UploadIcon here */}
-          <DownloadIcon className="h-4 w-4 transform rotate-180" />{" "}
-          {/* Simple upload visual */}
+          <DownloadIcon className="h-4 w-4 transform rotate-180" />
           Import Chat (.json)
         </Button>
 

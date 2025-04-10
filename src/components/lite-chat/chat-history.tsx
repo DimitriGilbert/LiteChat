@@ -37,18 +37,24 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
   startInEditMode,
   onEditComplete,
 }) => {
-  const {
-    selectItem,
-    deleteItem,
-    renameItem,
-    exportConversation, // Keep for conversations
-  } = useChatContext();
+  const { selectItem, deleteItem, renameItem, exportConversation } =
+    useChatContext();
 
-  const [isEditing, setIsEditing] = useState(startInEditMode); // Initialize directly
+  const [isEditing, setIsEditing] = useState(startInEditMode);
   const currentItemName = item.type === "project" ? item.name : item.title;
   const [editedName, setEditedName] = useState(currentItemName);
   const inputRef = useRef<HTMLInputElement>(null);
   const nameBeforeEdit = useRef(currentItemName);
+
+  // Effects remain the same...
+  useEffect(() => {
+    setIsEditing(startInEditMode);
+    if (startInEditMode) {
+      const currentName = item.type === "project" ? item.name : item.title;
+      setEditedName(currentName);
+      nameBeforeEdit.current = currentName;
+    }
+  }, [startInEditMode, item]);
 
   useEffect(() => {
     if (!isEditing) {
@@ -59,20 +65,13 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
   }, [item, isEditing]);
 
   useEffect(() => {
-    if (startInEditMode) {
-      setIsEditing(true);
-      nameBeforeEdit.current = item.type === "project" ? item.name : item.title;
-      setEditedName(nameBeforeEdit.current);
-    }
-  }, [startInEditMode, item]);
-
-  useEffect(() => {
     if (isEditing) {
       inputRef.current?.focus();
       inputRef.current?.select();
     }
   }, [isEditing]);
 
+  // Callbacks remain the same...
   const handleSave = useCallback(async () => {
     const trimmedName = editedName.trim();
     if (trimmedName && trimmedName !== nameBeforeEdit.current) {
@@ -89,7 +88,6 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
       } catch (error) {
         console.error("HistoryItem: Rename failed", error);
         setEditedName(nameBeforeEdit.current);
-        toast.error(`Failed to rename ${item.type}.`);
         setIsEditing(false);
         onEditComplete(item.id);
       }
@@ -130,7 +128,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
     const name = item.type === "project" ? item.name : item.title;
     const confirmationMessage =
       item.type === "project"
-        ? `Delete project "${name}"? This cannot be undone.` // Simplified message for now
+        ? `Delete project "${name}"? This cannot be undone.`
         : `Delete chat "${name}" and all its messages? This cannot be undone.`;
     if (window.confirm(confirmationMessage)) {
       deleteItem(item.id, item.type);
@@ -139,8 +137,9 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
 
   const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    nameBeforeEdit.current = item.type === "project" ? item.name : item.title;
-    setEditedName(nameBeforeEdit.current);
+    const currentName = item.type === "project" ? item.name : item.title;
+    nameBeforeEdit.current = currentName;
+    setEditedName(currentName);
     setIsEditing(true);
   };
 
@@ -152,44 +151,69 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
 
   const Icon = item.type === "project" ? FolderIcon : MessageSquareIcon;
   const displayName = item.type === "project" ? item.name : item.title;
-  const indentLevel = item.parentId ? 1 : 0; // Basic indent for now
+  const indentLevel = item.parentId ? 1 : 0;
 
   return (
     <div
       className={cn(
-        "flex items-center justify-between p-2 rounded-md cursor-pointer group text-sm",
+        "grid grid-cols-[auto_1fr_auto] items-center gap-x-2", // Grid definition, gap between columns
+        "p-2 rounded-md cursor-pointer group text-sm w-full overflow-hidden", // Keep w-full and overflow-hidden
         "hover:bg-gray-700",
         isSelected && !isEditing && "bg-gray-600 text-white",
         isEditing && "bg-gray-700 ring-1 ring-blue-600",
       )}
-      style={{ paddingLeft: `${0.5 + indentLevel * 1}rem` }}
+      style={{ paddingLeft: `${0.5 + indentLevel * 1}rem` }} // Keep indent
       onClick={handleClick}
       title={displayName}
     >
-      <Icon className="h-4 w-4 mr-2 flex-shrink-0 text-gray-400" />
+      {/* Column 1: Icon */}
+      <Icon className="h-4 w-4 flex-shrink-0 text-gray-400" />
 
-      {isEditing ? (
-        <Input
-          ref={inputRef}
-          value={editedName}
-          onChange={(e) => setEditedName(e.target.value)}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
-          className="flex-grow h-6 px-1 py-0 text-sm bg-gray-800 border-gray-600 focus:ring-1 focus:ring-blue-500"
-          onClick={(e) => e.stopPropagation()}
-        />
-      ) : (
-        <span className="truncate flex-grow pr-2">{displayName}</span>
-      )}
+      {/* Column 2: Text/Input */}
+      {/* Add min-w-0 and overflow-hidden to this container div */}
+      <div className="min-w-0 overflow-hidden">
+        {isEditing ? (
+          <Input
+            ref={inputRef}
+            value={editedName}
+            onChange={(e) => setEditedName(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={handleKeyDown}
+            className="h-6 px-1 py-0 text-sm bg-gray-800 border-gray-600 focus:ring-1 focus:ring-blue-500 w-full"
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="truncate block">{displayName}</span>
+              </TooltipTrigger>
+              <TooltipContent
+                side="bottom"
+                className="max-w-[300px] break-words bg-gray-900 text-gray-100 border border-gray-700 shadow-lg"
+              >
+                {displayName}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
 
+      {/* Column 3: Actions */}
+      {/* Actions Container - Now part of the grid flow */}
       <div
         className={cn(
-          "flex items-center gap-0.5 flex-shrink-0",
+          "flex items-center gap-0.5", // Simple flex container for buttons
+          // Visibility logic remains the same
           isEditing
             ? "opacity-100"
-            : "opacity-0 group-hover:opacity-100 transition-opacity",
+            : "opacity-0 group-hover:opacity-100 focus-within:opacity-100",
+          // isSelected && !isEditing && "opacity-100",
         )}
+        // Prevent click propagation to the item itself
+        onClick={(e) => e.stopPropagation()}
       >
+        {/* Buttons remain the same */}
         {isEditing ? (
           <>
             <TooltipProvider delayDuration={100}>
@@ -303,13 +327,12 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
   onEditComplete,
 }) => {
   const { sidebarItems, selectedItemId } = useChatContext();
-
-  // Display all items flat for now, sorted by the query (updatedAt desc)
   const itemsToDisplay = sidebarItems;
 
   return (
     <ScrollArea className={cn("flex-grow h-0", className)}>
-      <div className="p-2 space-y-1">
+      {/* Keep 'block' here, it shouldn't interfere with grid children */}
+      <div className="block p-2 space-y-1">
         {itemsToDisplay.length === 0 && (
           <p className="text-xs text-gray-500 text-center py-4 px-2">
             No projects or chats yet. Use the buttons above to create one.
