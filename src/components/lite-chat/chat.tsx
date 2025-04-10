@@ -3,12 +3,20 @@ import React, { useState } from "react";
 import { ChatProvider } from "@/context/chat-context";
 import { ChatSide } from "./chat-side";
 import { ChatWrapper } from "./chat-wrapper";
-import type { AiProviderConfig, SidebarItemType } from "@/lib/types";
+import type {
+  AiProviderConfig,
+  SidebarItemType,
+  LiteChatConfig, // Import the new config type
+  Message,
+  DbProject,
+  DbConversation,
+  SidebarItem,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { MenuIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Export sub-components for composability (remains the same)
+// Export sub-components for composability
 export { ChatContent } from "./chat-content";
 export { ChatHistory } from "./chat-history";
 export { ChatSide } from "./chat-side";
@@ -28,50 +36,44 @@ export { useChatContext } from "@/hooks/use-chat-context";
 export { ChatProvider } from "@/context/chat-context";
 export type {
   AiProviderConfig,
-  AiModelConfig,
   Message,
   DbProject,
   DbConversation,
   SidebarItem,
   SidebarItemType,
-} from "@/lib/types";
-export { useSidebarManagement } from "@/hooks/use-sidebar-management";
+  LiteChatConfig, // Export config type as well
+};
+export { useSidebarManagement } from "@/hooks/use-sidebar-management"; // Keep if needed externally
 
 interface LiteChatProps {
   providers: AiProviderConfig[];
-  initialProviderId?: string | null;
-  initialModelId?: string | null;
-  initialSelectedItemId?: string | null;
-  initialSelectedItemType?: SidebarItemType | null;
-  streamingThrottleRate?: number;
+  config?: LiteChatConfig; // Make config optional, defaults handled below
   className?: string;
-  defaultSidebarOpen?: boolean;
   SideComponent?: React.ComponentType<{ className?: string }>;
   WrapperComponent?: React.ComponentType<{ className?: string }>;
-  // --- Feature Flags (Optional Props) ---
-  enableApiKeyManagement?: boolean; // Default: true
-  enableSidebar?: boolean; // Default: true
-  enableVfs?: boolean; // Default: true
-  enableAdvancedSettings?: boolean; // Default: true <-- Add prop
 }
 
 export const LiteChat: React.FC<LiteChatProps> = ({
   providers,
-  initialProviderId,
-  initialModelId,
-  initialSelectedItemId,
-  initialSelectedItemType,
-  streamingThrottleRate,
+  config = {}, // Default to empty object if config is not provided
   className,
-  defaultSidebarOpen = true,
   SideComponent = ChatSide,
   WrapperComponent = ChatWrapper,
-  // --- Feature Flags with Defaults ---
-  enableApiKeyManagement = true,
-  enableSidebar = true,
-  enableVfs = true,
-  enableAdvancedSettings = true, // <-- Use prop
 }) => {
+  // Destructure config with defaults
+  const {
+    enableSidebar = true,
+    enableVfs = true,
+    enableApiKeyManagement = true,
+    enableAdvancedSettings = true,
+    initialProviderId = null,
+    initialModelId = null,
+    initialSelectedItemId = null,
+    initialSelectedItemType = null,
+    streamingThrottleRate, // Let ChatProvider handle its default
+    defaultSidebarOpen = true,
+  } = config;
+
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
 
   return (
@@ -86,7 +88,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
       enableApiKeyManagement={enableApiKeyManagement}
       enableSidebar={enableSidebar}
       enableVfs={enableVfs}
-      enableAdvancedSettings={enableAdvancedSettings} // <-- Pass down
+      enableAdvancedSettings={enableAdvancedSettings}
     >
       <div
         className={cn(

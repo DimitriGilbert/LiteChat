@@ -1,4 +1,5 @@
 // src/lib/types.ts
+import type { CoreMessage } from "ai"; // Ensure CoreMessage is imported
 
 // --- Basic Types ---
 export type Role = "user" | "assistant" | "system";
@@ -85,6 +86,25 @@ export interface FileSystemEntry {
   lastModified: Date;
 }
 
+// --- Chat Configuration (NEW) ---
+export interface LiteChatConfig {
+  // Feature Flags (defaults to true if undefined)
+  enableSidebar?: boolean;
+  enableVfs?: boolean;
+  enableApiKeyManagement?: boolean;
+  enableAdvancedSettings?: boolean;
+
+  // Initial State (defaults to null/undefined if undefined)
+  initialProviderId?: string | null;
+  initialModelId?: string | null;
+  initialSelectedItemId?: string | null;
+  initialSelectedItemType?: SidebarItemType | null;
+
+  // Other Settings
+  streamingThrottleRate?: number; // Default handled in provider
+  defaultSidebarOpen?: boolean; // Default handled in LiteChat component
+}
+
 // --- Chat Context ---
 
 // Core Context Definition
@@ -111,7 +131,7 @@ export interface CoreChatContextProps {
 }
 
 // VFS object within the context
-interface VfsContextObject {
+export interface VfsContextObject {
   isReady: boolean;
   configuredItemId: string | null;
   isLoading: boolean;
@@ -208,8 +228,8 @@ export interface ChatContextProps {
   setTemperature: React.Dispatch<React.SetStateAction<number>>;
   maxTokens: number | null;
   setMaxTokens: React.Dispatch<React.SetStateAction<number | null>>;
-  globalSystemPrompt: string;
-  setGlobalSystemPrompt: React.Dispatch<React.SetStateAction<string>>;
+  globalSystemPrompt: string | null;
+  setGlobalSystemPrompt: React.Dispatch<React.SetStateAction<string | null>>;
   activeSystemPrompt: string | null; // Keep derived prompt
   topP: number | null;
   setTopP: React.Dispatch<React.SetStateAction<number | null>>;
