@@ -14,6 +14,7 @@ import type {
   SidebarItem,
   CustomPromptAction,
   CustomMessageAction,
+  CustomSettingTab, // Import CustomSettingTab
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { MenuIcon, XIcon } from "lucide-react";
@@ -48,12 +49,13 @@ export type {
   LiteChatConfig,
   CustomPromptAction,
   CustomMessageAction,
+  CustomSettingTab, // Export CustomSettingTab
 };
 export { useSidebarManagement } from "@/hooks/use-sidebar-management";
 
 interface LiteChatProps {
   providers: AiProviderConfig[];
-  config?: LiteChatConfig; // Config now includes custom actions
+  config?: LiteChatConfig; // Config now includes custom actions and settings
   className?: string;
   SideComponent?: React.ComponentType<{ className?: string }>;
   WrapperComponent?: React.ComponentType<{ className?: string }>;
@@ -66,7 +68,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
   SideComponent = ChatSide,
   WrapperComponent = ChatWrapper,
 }) => {
-  // Destructure config with defaults, including custom actions
+  // Destructure config with defaults, including custom actions and settings
   const {
     enableSidebar = true,
     enableVfs = true,
@@ -80,6 +82,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
     defaultSidebarOpen = true,
     customPromptActions = [], // Default to empty array
     customMessageActions = [], // Default to empty array
+    customSettingsTabs = [], // Default to empty array
   } = config;
 
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
@@ -96,9 +99,10 @@ export const LiteChat: React.FC<LiteChatProps> = ({
       enableSidebar={enableSidebar}
       enableVfs={enableVfs}
       enableAdvancedSettings={enableAdvancedSettings}
-      // Pass custom actions down to the provider
+      // Pass custom actions and settings down to the provider
       customPromptActions={customPromptActions}
       customMessageActions={customMessageActions}
+      customSettingsTabs={customSettingsTabs} // Pass custom settings tabs
     >
       <div
         className={cn(

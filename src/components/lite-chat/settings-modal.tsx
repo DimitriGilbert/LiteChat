@@ -24,7 +24,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { enableApiKeyManagement } = useChatContext(); // <-- Get flag
+  // Get context, including custom settings tabs
+  const context = useChatContext();
+  const { enableApiKeyManagement, customSettingsTabs = [] } = context;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -49,6 +51,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <TabsTrigger value="apiKeys">API Keys</TabsTrigger>
             )}
             <TabsTrigger value="data">Data Management</TabsTrigger>
+            {/* Render custom tab triggers */}
+            {customSettingsTabs.map((tab) => (
+              <TabsTrigger key={tab.id} value={tab.id}>
+                {tab.title}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           <ScrollArea className="flex-grow mt-4 pr-1">
@@ -67,6 +75,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <TabsContent value="data" className="mt-0">
               <SettingsDataManagement />
             </TabsContent>
+            {/* Render custom tab content */}
+            {customSettingsTabs.map((tab) => (
+              <TabsContent key={tab.id} value={tab.id} className="mt-0">
+                {/* Render the custom component, passing the full context */}
+                <tab.component context={context} />
+              </TabsContent>
+            ))}
           </ScrollArea>
         </Tabs>
       </DialogContent>

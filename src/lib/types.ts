@@ -108,6 +108,7 @@ interface ChatContextPropsForwardDeclare extends CoreChatContextProps {
   // ... add other specific props actions might need from the full context
   customPromptActions?: CustomPromptAction[];
   customMessageActions?: CustomMessageAction[];
+  customSettingsTabs?: CustomSettingTab[];
 }
 
 export interface CustomPromptAction extends CustomActionBase {
@@ -120,6 +121,19 @@ export interface CustomMessageAction extends CustomActionBase {
   onClick: (message: Message, context: ChatContextProps) => void; // Use full type here
   // Optional: Condition to determine if the action should be shown for a specific message
   isVisible?: (message: Message, context: ChatContextProps) => boolean; // Use full type here
+}
+
+// --- Custom Settings Definitions ---
+export interface CustomSettingTabProps {
+  // Define props passed to custom setting components
+  // Pass the full context for maximum flexibility, or specific parts if preferred
+  context: ChatContextProps;
+}
+
+export interface CustomSettingTab {
+  id: string;
+  title: string;
+  component: React.ComponentType<CustomSettingTabProps>;
 }
 
 // --- Chat Configuration ---
@@ -143,6 +157,7 @@ export interface LiteChatConfig {
   // Extensibility
   customPromptActions?: CustomPromptAction[];
   customMessageActions?: CustomMessageAction[];
+  customSettingsTabs?: CustomSettingTab[];
 }
 
 // --- Chat Context ---
@@ -303,4 +318,5 @@ export interface ChatContextProps {
   // Extensibility
   customPromptActions?: CustomPromptAction[];
   customMessageActions?: CustomMessageAction[];
+  customSettingsTabs?: CustomSettingTab[];
 }

@@ -21,6 +21,7 @@ import type {
   VfsContextObject,
   CustomPromptAction,
   CustomMessageAction,
+  CustomSettingTab, // Import CustomSettingTab
 } from "@/lib/types";
 import { ChatContext } from "@/hooks/use-chat-context";
 import { CoreChatContext } from "@/context/core-chat-context";
@@ -50,6 +51,7 @@ const decodeUint8Array = (arr: Uint8Array): string => {
 
 const EMPTY_API_KEYS: DbApiKey[] = [];
 const EMPTY_SIDEBAR_ITEMS: SidebarItem[] = [];
+const EMPTY_CUSTOM_SETTINGS_TABS: CustomSettingTab[] = []; // Default empty array
 
 // --- Dummy VFS Object ---
 const dummyVfs: VfsContextObject = {
@@ -121,7 +123,7 @@ const dummyApiKeysMgmt = {
   },
 };
 
-// Update ChatProviderProps to accept custom actions
+// Update ChatProviderProps to accept custom actions and settings
 interface ChatProviderProps {
   children: React.ReactNode;
   providers: AiProviderConfig[];
@@ -135,9 +137,10 @@ interface ChatProviderProps {
   enableSidebar?: boolean;
   enableVfs?: boolean;
   enableAdvancedSettings?: boolean;
-  // Custom Actions
+  // Custom Extensibility
   customPromptActions?: CustomPromptAction[];
   customMessageActions?: CustomMessageAction[];
+  customSettingsTabs?: CustomSettingTab[]; // Add custom settings tabs
 }
 
 export const ChatProvider: React.FC<ChatProviderProps> = ({
@@ -153,9 +156,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   enableSidebar = true,
   enableVfs = true,
   enableAdvancedSettings = true,
-  // Custom Actions with Defaults
+  // Custom Extensibility with Defaults
   customPromptActions = [],
   customMessageActions = [],
+  customSettingsTabs = EMPTY_CUSTOM_SETTINGS_TABS, // Use default empty array
 }) => {
   // --- Core State ---
   const [isStreaming, setIsStreaming] = useState(false);
@@ -490,7 +494,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
               const contentBytes = await vfs.readFile(path);
               const contentText = decodeUint8Array(contentBytes);
               pathsIncludedInContext.push(path);
-              return `<vfs_file path="${path}">\n${contentText}\n</vfs_file>`;
+              return `<vfs_file path="${path}">
+${contentText}
+</vfs_file>`;
             } catch (readErr) {
               console.error(`Error reading VFS file ${path}:`, readErr);
               toast.error(`Failed to read VFS file: ${path}`);
@@ -517,7 +523,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
             if (file.type.startsWith("text/")) {
               try {
                 const contentText = await file.text();
-                return `<attached_file name="${file.name}" type="${file.type}">\n${contentText}\n</attached_file>`;
+                return `<attached_file name="${file.name}" type="${file.type}">
+${contentText}
+</attached_file>`;
               } catch (readErr) {
                 console.error(
                   `Error reading attached file ${file.name}:`,
@@ -676,7 +684,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     ],
   );
 
-  // Add custom actions to the full context value
+  // Add custom actions and settings to the full context value
   const fullContextValue: ChatContextProps = useMemo(
     () => ({
       // --- Feature Flags ---
@@ -772,11 +780,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       // Extensibility - Pass down the arrays received from props
       customPromptActions: customPromptActions,
       customMessageActions: customMessageActions,
+      customSettingsTabs: customSettingsTabs, // Add custom settings tabs
     }),
     [
-      // Add custom actions to dependency array
+      // Add custom actions and settings to dependency array
       customPromptActions,
       customMessageActions,
+      customSettingsTabs, // Add custom settings tabs
       // Existing dependencies...
       enableApiKeyManagement,
       enableAdvancedSettings,
