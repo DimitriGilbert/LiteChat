@@ -48,30 +48,24 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
   const currentItemName = item.type === "project" ? item.name : item.title;
   const [editedName, setEditedName] = useState(currentItemName);
   const inputRef = useRef<HTMLInputElement>(null);
-  // Use a ref to store the name *when editing started* for cancellation
   const nameBeforeEdit = useRef(currentItemName);
 
-  // Update editedName state if the item prop changes *while not editing*
-  // This handles external updates (like successful rename)
   useEffect(() => {
     if (!isEditing) {
       const newName = item.type === "project" ? item.name : item.title;
       setEditedName(newName);
-      nameBeforeEdit.current = newName; // Keep ref updated too
+      nameBeforeEdit.current = newName;
     }
   }, [item, isEditing]);
 
-  // Effect to trigger edit mode based on prop
   useEffect(() => {
     if (startInEditMode) {
       setIsEditing(true);
-      // Set the nameBeforeEdit ref *only when starting* edit mode via prop
       nameBeforeEdit.current = item.type === "project" ? item.name : item.title;
-      setEditedName(nameBeforeEdit.current); // Ensure input starts with correct value
+      setEditedName(nameBeforeEdit.current);
     }
   }, [startInEditMode, item]);
 
-  // Effect to focus input when editing starts
   useEffect(() => {
     if (isEditing) {
       inputRef.current?.focus();
@@ -81,14 +75,12 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
 
   const handleSave = useCallback(async () => {
     const trimmedName = editedName.trim();
-    // Use nameBeforeEdit for comparison
     if (trimmedName && trimmedName !== nameBeforeEdit.current) {
       console.log(
         `HistoryItem: Attempting rename for ${item.type} ${item.id} from "${nameBeforeEdit.current}" to "${trimmedName}"`,
       );
       try {
         await renameItem(item.id, trimmedName, item.type);
-        // No need to update nameBeforeEdit.current here, useEffect handles it
         toast.success(
           `${item.type === "project" ? "Project" : "Chat"} renamed.`,
         );
@@ -96,17 +88,14 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
         onEditComplete(item.id);
       } catch (error) {
         console.error("HistoryItem: Rename failed", error);
-        // Revert input value on error
         setEditedName(nameBeforeEdit.current);
         toast.error(`Failed to rename ${item.type}.`);
-        setIsEditing(false); // Exit edit mode even on error
+        setIsEditing(false);
         onEditComplete(item.id);
       }
     } else if (!trimmedName) {
       toast.error("Name cannot be empty.");
-      // Don't close edit mode, let user fix it. Keep input value as is.
     } else {
-      // Name didn't change or was just whitespace trimmed, just exit edit mode
       console.log(
         `HistoryItem: Rename skipped for ${item.id} (no change or only whitespace)`,
       );
@@ -116,7 +105,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
   }, [editedName, item.id, item.type, renameItem, onEditComplete]);
 
   const handleCancel = useCallback(() => {
-    setEditedName(nameBeforeEdit.current); // Revert to name before edit started
+    setEditedName(nameBeforeEdit.current);
     setIsEditing(false);
     onEditComplete(item.id);
   }, [onEditComplete, item.id]);
@@ -141,7 +130,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
     const name = item.type === "project" ? item.name : item.title;
     const confirmationMessage =
       item.type === "project"
-        ? `Delete project "${name}" and all items inside it? This cannot be undone.` // Updated message
+        ? `Delete project "${name}"? This cannot be undone.` // Simplified message for now
         : `Delete chat "${name}" and all its messages? This cannot be undone.`;
     if (window.confirm(confirmationMessage)) {
       deleteItem(item.id, item.type);
@@ -150,9 +139,8 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
 
   const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // Store the current name when starting edit manually
     nameBeforeEdit.current = item.type === "project" ? item.name : item.title;
-    setEditedName(nameBeforeEdit.current); // Ensure input starts with correct value
+    setEditedName(nameBeforeEdit.current);
     setIsEditing(true);
   };
 
@@ -163,9 +151,8 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
   };
 
   const Icon = item.type === "project" ? FolderIcon : MessageSquareIcon;
-  // Display name comes directly from the prop when not editing
   const displayName = item.type === "project" ? item.name : item.title;
-  const indentLevel = item.parentId ? 1 : 0;
+  const indentLevel = item.parentId ? 1 : 0; // Basic indent for now
 
   return (
     <div
@@ -173,11 +160,11 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
         "flex items-center justify-between p-2 rounded-md cursor-pointer group text-sm",
         "hover:bg-gray-700",
         isSelected && !isEditing && "bg-gray-600 text-white",
-        isEditing && "bg-gray-700 ring-1 ring-blue-600", // Add ring when editing
+        isEditing && "bg-gray-700 ring-1 ring-blue-600",
       )}
       style={{ paddingLeft: `${0.5 + indentLevel * 1}rem` }}
       onClick={handleClick}
-      title={displayName} // Use prop value for tooltip
+      title={displayName}
     >
       <Icon className="h-4 w-4 mr-2 flex-shrink-0 text-gray-400" />
 
@@ -186,16 +173,15 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
           ref={inputRef}
           value={editedName}
           onChange={(e) => setEditedName(e.target.value)}
-          onBlur={handleSave} // Save on blur
+          onBlur={handleSave}
           onKeyDown={handleKeyDown}
           className="flex-grow h-6 px-1 py-0 text-sm bg-gray-800 border-gray-600 focus:ring-1 focus:ring-blue-500"
           onClick={(e) => e.stopPropagation()}
         />
       ) : (
-        <span className="truncate flex-grow pr-2">{displayName}</span> // Use displayName from prop
+        <span className="truncate flex-grow pr-2">{displayName}</span>
       )}
 
-      {/* Actions */}
       <div
         className={cn(
           "flex items-center gap-0.5 flex-shrink-0",
@@ -206,7 +192,6 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
       >
         {isEditing ? (
           <>
-            {/* Save Button */}
             <TooltipProvider delayDuration={100}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -226,7 +211,6 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
                 <TooltipContent side="top">Save (Enter)</TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            {/* Cancel Button */}
             <TooltipProvider delayDuration={100}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -249,7 +233,6 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
           </>
         ) : (
           <>
-            {/* Edit Button */}
             <TooltipProvider delayDuration={100}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -266,7 +249,6 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
                 <TooltipContent side="top">Rename</TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            {/* Export Button (Conversation only) */}
             {item.type === "conversation" && (
               <TooltipProvider delayDuration={100}>
                 <Tooltip>
@@ -285,7 +267,6 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
                 </Tooltip>
               </TooltipProvider>
             )}
-            {/* Delete Button */}
             <TooltipProvider delayDuration={100}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -310,7 +291,6 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
 };
 
 // --- Main Chat History Component ---
-// No changes needed here if HistoryItem is fixed
 interface ChatHistoryProps {
   className?: string;
   editingItemId: string | null;

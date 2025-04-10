@@ -1,10 +1,21 @@
 // src/hooks/use-api-keys-management.ts
 import { useState, useCallback } from "react";
-import { useChatStorage } from "./use-chat-storage";
+// REMOVED: import { useChatStorage } from "./use-chat-storage";
 import type { DbApiKey } from "@/lib/types";
 
+// --- NEW: Props Interface ---
+interface UseApiKeysManagementProps {
+  apiKeys: DbApiKey[]; // Pass live array in
+  addDbApiKey: (
+    name: string,
+    providerId: string,
+    value: string,
+  ) => Promise<string>;
+  deleteDbApiKey: (id: string) => Promise<void>;
+}
+
 interface UseApiKeysManagementReturn {
-  apiKeys: DbApiKey[];
+  // apiKeys: DbApiKey[]; // No longer returned, passed in
   selectedApiKeyId: Record<string, string | null>;
   setSelectedApiKeyId: (providerId: string, keyId: string | null) => void;
   addApiKey: (
@@ -16,13 +27,13 @@ interface UseApiKeysManagementReturn {
   getApiKeyForProvider: (providerId: string) => string | undefined;
 }
 
-export function useApiKeysManagement(): UseApiKeysManagementReturn {
-  // We only need the API key parts from useChatStorage here
-  const {
-    apiKeys,
-    addApiKey: addDbApiKey,
-    deleteApiKey: deleteDbApiKey,
-  } = useChatStorage(null); // Pass null as we don't need conversation-specific data
+// --- MODIFIED: Accept props ---
+export function useApiKeysManagement({
+  apiKeys, // from props
+  addDbApiKey, // from props
+  deleteDbApiKey, // from props
+}: UseApiKeysManagementProps): UseApiKeysManagementReturn {
+  // REMOVED: const { apiKeys, addApiKey: addDbApiKey, deleteApiKey: deleteDbApiKey } = useChatStorage(null);
 
   const [selectedApiKeyIdState, setSelectedApiKeyIdState] = useState<
     Record<string, string | null>
@@ -41,41 +52,40 @@ export function useApiKeysManagement(): UseApiKeysManagementReturn {
       providerId: string,
       value: string,
     ): Promise<string> => {
-      // Simple obfuscation for safety, not true encryption
       const keyToAdd = value;
       value = ""; // Clear original value immediately
+      // Use passed-in function
       const newId = await addDbApiKey(name, providerId, keyToAdd);
-      // Auto-select the newly added key
       setSelectedApiKeyId(providerId, newId);
       return newId;
     },
-    [addDbApiKey, setSelectedApiKeyId],
+    [addDbApiKey, setSelectedApiKeyId], // Use passed-in function in dependency array
   );
 
   const deleteApiKey = useCallback(
     async (id: string): Promise<void> => {
       const keyToDelete = apiKeys.find((k) => k.id === id);
+      // Use passed-in function
       await deleteDbApiKey(id);
-      // If the deleted key was selected, deselect it
       if (keyToDelete && selectedApiKeyIdState[keyToDelete.providerId] === id) {
         setSelectedApiKeyId(keyToDelete.providerId, null);
       }
     },
-    [apiKeys, deleteDbApiKey, selectedApiKeyIdState, setSelectedApiKeyId],
+    [apiKeys, deleteDbApiKey, selectedApiKeyIdState, setSelectedApiKeyId], // Use passed-in function and apiKeys prop in dependency array
   );
 
   const getApiKeyForProvider = useCallback(
     (providerId: string): string | undefined => {
       const selectedId = selectedApiKeyIdState[providerId];
       if (!selectedId) return undefined;
-      // Find the key in the live query result
+      // Find the key in the passed-in live query result
       return apiKeys.find((key) => key.id === selectedId)?.value;
     },
-    [apiKeys, selectedApiKeyIdState],
+    [apiKeys, selectedApiKeyIdState], // Use passed-in apiKeys prop in dependency array
   );
 
   return {
-    apiKeys,
+    // apiKeys, // No longer returned
     selectedApiKeyId: selectedApiKeyIdState,
     setSelectedApiKeyId,
     addApiKey,

@@ -1,5 +1,5 @@
 // src/components/lite-chat/prompt-settings-advanced.tsx
-import React, { useState, useEffect, useMemo } from "react"; // Added useMemo
+import React, { useState, useEffect, useMemo } from "react";
 import { useChatContext } from "@/hooks/use-chat-context";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiKeySelector } from "./api-key-selector";
 import { FileManager } from "./file-manager";
 import { cn } from "@/lib/utils";
-import { db } from "@/lib/db";
+// REMOVED: import { db } from "@/lib/db";
 import { SaveIcon, InfoIcon } from "lucide-react";
 import {
   Tooltip,
@@ -42,12 +42,13 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setFrequencyPenalty,
     // System Prompt related
     activeSystemPrompt,
-    // selectedConversationId, // REMOVED - Use selectedItemId and selectedItemType instead
-    selectedItemId, // Use generic selectedItemId
-    selectedItemType, // Use selectedItemType to check if it's a conversation
+    selectedItemId,
+    selectedItemType,
     updateConversationSystemPrompt,
     // VFS related
     vfsEnabled,
+    // --- DB Function from Context ---
+    getConversation, // Get DB function from context
   } = useChatContext();
 
   // Derive conversationId only if the selected item is a conversation
@@ -63,21 +64,21 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
 
   // Effect to load conversation system prompt when the derived conversationId changes
   useEffect(() => {
-    // Only load if conversationId is not null (i.e., a conversation is selected)
-    if (conversationId) {
-      db.conversations
-        .get(conversationId)
+    // Only load if conversationId is not null and getConversation is available
+    if (conversationId && getConversation) {
+      // Use getConversation from context
+      getConversation(conversationId)
         .then((convo) => {
           setLocalConvoSystemPrompt(convo?.systemPrompt ?? null);
           setIsConvoPromptDirty(false);
         })
         .catch(() => setLocalConvoSystemPrompt(null));
     } else {
-      // Clear local prompt state if no conversation is selected
+      // Clear local prompt state if no conversation is selected or function not ready
       setLocalConvoSystemPrompt(null);
       setIsConvoPromptDirty(false);
     }
-  }, [conversationId]); // Depend on the derived conversationId
+  }, [conversationId, getConversation]); // Depend on derived ID and context function
 
   // Handle changes to the local system prompt textarea
   const handleConvoSystemPromptChange = (
@@ -145,6 +146,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
 
         {/* Parameters Tab Content */}
         <TabsContent value="parameters" className="space-y-4 mt-0">
+          {/* ... (rest of parameters content remains the same) ... */}
           <div className="grid grid-cols-2 gap-4 items-end">
             <div className="space-y-1.5">
               <Label htmlFor="temperature" className="text-xs">
@@ -250,7 +252,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
               >
                 Current Conversation Prompt
               </Label>
-              {/* Use isConversationSelected for conditional rendering */}
               {isConversationSelected && (
                 <TooltipProvider delayDuration={100}>
                   <Tooltip>
@@ -294,9 +295,8 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
               onChange={handleConvoSystemPromptChange}
               className="text-xs min-h-[80px] max-h-[150px]"
               rows={4}
-              disabled={!isConversationSelected} // Use derived boolean
+              disabled={!isConversationSelected}
             />
-            {/* Use isConversationSelected for conditional rendering */}
             {isConversationSelected && !isConversationPromptSet && (
               <p className="text-xs text-gray-400 flex items-center gap-1">
                 <InfoIcon className="h-3 w-3" />

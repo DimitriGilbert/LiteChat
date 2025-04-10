@@ -1,8 +1,7 @@
 // src/lib/types.ts
-// Add the new CoreChatContextProps interface
 
 import type { CoreMessage } from "ai";
-import type { FileSystem } from "@zenfs/core"; // Keep if needed elsewhere, but not directly in context type
+// Removed FileSystem import as it's not directly used in context types
 
 // --- Basic Types ---
 export type Role = "user" | "assistant" | "system";
@@ -17,39 +16,39 @@ export interface DbBase {
 
 export interface DbProject extends DbBase {
   name: string;
-  parentId: string | null; // ID of the parent project, null for root
-  vfsEnabled: boolean; // Flag for Virtual File System
+  parentId: string | null;
+  vfsEnabled: boolean;
 }
 
 export interface DbConversation extends DbBase {
   title: string;
   systemPrompt: string | null;
-  parentId: string | null; // ID of the parent project, null for root
-  vfsEnabled: boolean; // Flag for Virtual File System
+  parentId: string | null;
+  vfsEnabled: boolean;
 }
 
 export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {
   conversationId: string;
   role: Role;
   content: string;
-  vfsContextPaths?: string[]; // ADDED: Paths of VFS files included in context
+  vfsContextPaths?: string[];
 }
 
 export interface DbApiKey extends Pick<DbBase, "id" | "createdAt"> {
   name: string;
   providerId: string;
-  value: string; // Store the actual key value (consider security implications)
+  value: string;
 }
 
 // --- UI & State Types ---
 export interface Message extends CoreMessage {
-  id?: string; // Optional ID for UI state before DB save
-  conversationId?: string; // Optional for UI state
-  createdAt?: Date; // Optional for UI state
-  isStreaming?: boolean; // Flag for streaming state
-  streamedContent?: string; // Intermediate streamed content
-  error?: string | null; // Error associated with the message
-  vfsContextPaths?: string[]; // ADDED: Paths of VFS files included in context
+  id?: string;
+  conversationId?: string;
+  createdAt?: Date;
+  isStreaming?: boolean;
+  streamedContent?: string;
+  error?: string | null;
+  vfsContextPaths?: string[];
 }
 
 export interface SidebarItemBase extends DbBase {
@@ -67,17 +66,17 @@ export type SidebarItem = ProjectSidebarItem | ConversationSidebarItem;
 
 // --- AI Configuration ---
 export interface AiModelConfig {
-  id: string; // e.g., 'gpt-4o', 'claude-3-opus'
-  name: string; // User-friendly name, e.g., "GPT-4o"
-  instance: any; // The actual AI SDK model instance
-  contextWindow?: number; // Optional: Token limit
+  id: string;
+  name: string;
+  instance: any;
+  contextWindow?: number;
 }
 
 export interface AiProviderConfig {
-  id: string; // e.g., 'openai', 'anthropic', 'google'
-  name: string; // User-friendly name, e.g., "OpenAI"
+  id: string;
+  name: string;
   models: AiModelConfig[];
-  requiresApiKey?: boolean; // Does this provider need an API key client-side? (default: true)
+  requiresApiKey?: boolean;
 }
 
 // --- Virtual File System ---
@@ -91,7 +90,7 @@ export interface FileSystemEntry {
 
 // --- Chat Context ---
 
-// NEW: Core Context Definition
+// Core Context Definition
 export interface CoreChatContextProps {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -114,14 +113,13 @@ export interface CoreChatContextProps {
   abortControllerRef: React.MutableRefObject<AbortController | null>;
 }
 
-// Define the shape of the VFS object within the context
+// VFS object within the context
 interface VfsContextObject {
-  isReady: boolean; // ADDED: Is the FS configured and ready?
-  configuredItemId: string | null; // ADDED: Which item ID is it configured for?
-  isLoading: boolean; // Is the VFS hook currently loading/configuring?
-  isOperationLoading: boolean; // ADDED: Is a VFS operation (write, delete, etc.) in progress?
-  error: string | null; // Any configuration error?
-  // Include all the functions returned by the useVirtualFileSystem hook
+  isReady: boolean;
+  configuredItemId: string | null;
+  isLoading: boolean;
+  isOperationLoading: boolean;
+  error: string | null;
   listFiles: (path: string) => Promise<FileSystemEntry[]>;
   readFile: (path: string) => Promise<Uint8Array>;
   writeFile: (path: string, data: Uint8Array | string) => Promise<void>;
@@ -145,7 +143,7 @@ export interface ChatContextProps {
 
   // API Key Management
   apiKeys: DbApiKey[];
-  selectedApiKeyId: Record<string, string | null>; // Map: providerId -> selectedKeyId
+  selectedApiKeyId: Record<string, string | null>;
   setSelectedApiKeyId: (providerId: string, keyId: string | null) => void;
   addApiKey: (
     name: string,
@@ -181,30 +179,30 @@ export interface ChatContextProps {
     id: string,
     systemPrompt: string | null,
   ) => Promise<void>;
-  activeConversationData: DbConversation | null;
-  activeProjectData: DbProject | null;
+  // activeConversationData: DbConversation | null;
+  // activeProjectData: DbProject | null;
 
-  // Messages & Streaming (Core - exposed via full context too)
+  // Messages & Streaming (Core)
   messages: Message[];
-  isLoading: boolean; // Loading messages state
-  isStreaming: boolean; // AI response streaming state
-  error: string | null; // General chat error
+  isLoading: boolean;
+  isStreaming: boolean;
+  error: string | null;
   setError: (error: string | null) => void;
 
-  // Input Handling (Core + Optional Module parts)
+  // Input Handling (Core + Optional)
   prompt: string;
   setPrompt: React.Dispatch<React.SetStateAction<string>>;
-  handleSubmit: (e?: React.FormEvent<HTMLFormElement>) => Promise<void>; // The top-level submit
-  stopStreaming: () => void; // The top-level stop
-  regenerateMessage: (messageId: string) => Promise<void>; // The top-level regenerate
+  handleSubmit: (e?: React.FormEvent<HTMLFormElement>) => Promise<void>;
+  stopStreaming: () => void;
+  regenerateMessage: (messageId: string) => Promise<void>;
   attachedFiles: File[];
   addAttachedFile: (file: File) => void;
   removeAttachedFile: (fileName: string) => void;
   clearAttachedFiles: () => void;
-  selectedVfsPaths: string[]; // ADDED: Paths selected for context
-  addSelectedVfsPath: (path: string) => void; // ADDED
-  removeSelectedVfsPath: (path: string) => void; // ADDED
-  clearSelectedVfsPaths: () => void; // ADDED
+  selectedVfsPaths: string[];
+  addSelectedVfsPath: (path: string) => void;
+  removeSelectedVfsPath: (path: string) => void;
+  clearSelectedVfsPaths: () => void;
 
   // Settings
   temperature: number;
@@ -213,7 +211,7 @@ export interface ChatContextProps {
   setMaxTokens: React.Dispatch<React.SetStateAction<number | null>>;
   globalSystemPrompt: string;
   setGlobalSystemPrompt: React.Dispatch<React.SetStateAction<string>>;
-  activeSystemPrompt: string | null; // Derived system prompt
+  activeSystemPrompt: string | null; // Keep derived prompt
   topP: number | null;
   setTopP: React.Dispatch<React.SetStateAction<number | null>>;
   topK: number | null;
@@ -228,13 +226,18 @@ export interface ChatContextProps {
   searchTerm: string;
   setSearchTerm: React.Dispatch<React.SetStateAction<string>>;
 
-  // Import/Export
+  // Import/Export & Data Management
   exportConversation: (conversationId: string | null) => Promise<void>;
-  importConversation: (file: File) => Promise<void>; // Simplified signature for context
+  importConversation: (file: File) => Promise<void>;
   exportAllConversations: () => Promise<void>;
+  clearAllData: () => Promise<void>;
 
   // Virtual File System
-  vfsEnabled: boolean; // Is VFS enabled for the *currently selected* item?
-  toggleVfsEnabled: () => Promise<void>; // Function to toggle the DB flag and refresh state
-  vfs: VfsContextObject; // Use the defined interface here
+  vfsEnabled: boolean;
+  toggleVfsEnabled: () => Promise<void>;
+  vfs: VfsContextObject;
+
+  // Pass required DB functions
+  getConversation: (id: string) => Promise<DbConversation | undefined>;
+  getProject: (id: string) => Promise<DbProject | undefined>;
 }

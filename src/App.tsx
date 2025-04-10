@@ -32,16 +32,8 @@ const chatProviders: AiProviderConfig[] = [
 function App() {
   return (
     <div className="h-screen bg-gray-900 flex flex-col">
-      <header className="border-b border-gray-800 bg-gray-800 py-3 px-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-white flex items-center gap-2">
-          LiteChat <span className="text-yellow-400">⚡️</span>
-        </h1>
-      </header>
-
-      <main className="flex-grow overflow-hidden p-0 flex items-stretch">
-        <div className="w-full mx-auto h-full flex">
-          <LiteChat providers={chatProviders} className="h-full w-full" />
-        </div>
+      <main className="flex-grow overflow-hidden p-4">
+        <LiteChat providers={chatProviders} />
       </main>
 
       <Toaster richColors position="top-right" />

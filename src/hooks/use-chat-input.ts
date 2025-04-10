@@ -1,5 +1,5 @@
 // src/hooks/use-chat-input.ts
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 
 interface UseChatInputReturn {
   prompt: string;
@@ -49,16 +49,30 @@ export function useChatInput(): UseChatInputReturn {
     setSelectedVfsPaths([]);
   }, []);
 
-  return {
-    prompt,
-    setPrompt,
-    attachedFiles,
-    addAttachedFile,
-    removeAttachedFile,
-    clearAttachedFiles,
-    selectedVfsPaths,
-    addSelectedVfsPath,
-    removeSelectedVfsPath,
-    clearSelectedVfsPaths,
-  };
+  return useMemo(
+    () => ({
+      prompt,
+      setPrompt,
+      attachedFiles,
+      addAttachedFile,
+      removeAttachedFile,
+      clearAttachedFiles,
+      selectedVfsPaths,
+      addSelectedVfsPath,
+      removeSelectedVfsPath,
+      clearSelectedVfsPaths,
+    }),
+    [
+      prompt,
+      setPrompt,
+      attachedFiles,
+      addAttachedFile,
+      removeAttachedFile,
+      clearAttachedFiles,
+      selectedVfsPaths,
+      addSelectedVfsPath,
+      removeSelectedVfsPath,
+      clearSelectedVfsPaths,
+    ],
+  );
 }

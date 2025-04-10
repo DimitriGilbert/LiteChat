@@ -1,11 +1,10 @@
 // src/hooks/use-message-handling.ts
 import React, { useCallback, useEffect } from "react";
 import type { Message, DbMessage } from "@/lib/types";
-import { db } from "@/lib/db"; // Keep direct import for loading effect for now
 import { toast } from "sonner";
 import type { CoreMessage } from "ai";
 
-// Interface for AI stream parameters (remains the same)
+// ... (interfaces remain the same) ...
 export interface PerformAiStreamParams {
   conversationIdToUse: string;
   messagesToSend: CoreMessage[];
@@ -18,14 +17,10 @@ export interface PerformAiStreamParams {
   systemPromptToUse: string | null;
 }
 
-// --- Updated Props Interface ---
 interface UseMessageHandlingProps {
   selectedConversationId: string | null;
-  // AI interaction function passed directly
   performAiStream: (params: PerformAiStreamParams) => Promise<void>;
-  // Stop callback passed directly
   stopStreamingCallback: () => void;
-  // Settings passed directly
   activeSystemPrompt: string | null;
   temperature: number;
   maxTokens: number | null;
@@ -33,24 +28,22 @@ interface UseMessageHandlingProps {
   topK: number | null;
   presencePenalty: number | null;
   frequencyPenalty: number | null;
-  // Core state/setters passed directly
   isAiStreaming: boolean;
-  setIsAiStreaming: React.Dispatch<React.SetStateAction<boolean>>; // Needed for checks
+  setIsAiStreaming: React.Dispatch<React.SetStateAction<boolean>>;
   localMessages: Message[];
   setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   isLoadingMessages: boolean;
   setIsLoadingMessages: React.Dispatch<React.SetStateAction<boolean>>;
-  error: string | null; // Needed for checks/display
+  error: string | null;
   setError: (error: string | null) => void;
-  // DB functions passed directly
   addDbMessage: (
     messageData: Omit<DbMessage, "id" | "createdAt"> &
       Partial<Pick<DbMessage, "id" | "createdAt">>,
   ) => Promise<string>;
   deleteDbMessage: (messageId: string) => Promise<void>;
+  getMessagesForConversation: (conversationId: string) => Promise<DbMessage[]>;
 }
 
-// Return type of the hook (renamed functions for clarity)
 interface UseMessageHandlingReturn {
   handleSubmitCore: (
     originalUserPrompt: string,
@@ -61,29 +54,30 @@ interface UseMessageHandlingReturn {
   regenerateMessageCore: (messageId: string) => Promise<void>;
   stopStreamingCore: () => void;
 }
+// --- End interfaces ---
 
-// Hook implementation
 export function useMessageHandling({
   selectedConversationId,
-  performAiStream, // from props
-  stopStreamingCallback, // from props
-  activeSystemPrompt, // from props
-  temperature, // from props
-  maxTokens, // from props
-  topP, // from props
-  topK, // from props
-  presencePenalty, // from props
-  frequencyPenalty, // from props
-  isAiStreaming, // from props
-  // setIsAiStreaming, // Not directly used here, but passed for dependency array clarity
-  localMessages, // from props
-  setLocalMessages, // from props
-  // isLoadingMessages, // Not directly used here
-  setIsLoadingMessages, // from props
-  // error, // Not directly used here
-  setError, // from props
-  addDbMessage, // from props
-  deleteDbMessage, // from props
+  performAiStream,
+  stopStreamingCallback,
+  activeSystemPrompt,
+  temperature,
+  maxTokens,
+  topP,
+  topK,
+  presencePenalty,
+  frequencyPenalty,
+  isAiStreaming,
+  // setIsAiStreaming, // Not directly used in this hook's logic flow
+  localMessages,
+  setLocalMessages, // Setter used below
+  // isLoadingMessages, // Not directly used
+  setIsLoadingMessages, // Setter used below
+  // error, // Not directly used
+  setError, // Setter used below
+  addDbMessage,
+  deleteDbMessage,
+  getMessagesForConversation,
 }: UseMessageHandlingProps): UseMessageHandlingReturn {
   // --- Message Loading Effect ---
   useEffect(() => {
@@ -92,11 +86,7 @@ export function useMessageHandling({
       setIsLoadingMessages(true);
       setError(null);
 
-      // TODO: Refactor this direct DB access in Task 1.2
-      db.messages
-        .where("conversationId")
-        .equals(selectedConversationId)
-        .sortBy("createdAt")
+      getMessagesForConversation(selectedConversationId)
         .then((messagesFromDb) => {
           if (isMounted) {
             setLocalMessages(
@@ -123,6 +113,7 @@ export function useMessageHandling({
           }
         });
     } else {
+      // Clear state when no conversation is selected
       setLocalMessages([]);
       setIsLoadingMessages(false);
       setError(null);
@@ -131,24 +122,27 @@ export function useMessageHandling({
       isMounted = false;
     };
   }, [
+    // --- MODIFIED DEPENDENCY ARRAY ---
     selectedConversationId,
-    setIsLoadingMessages,
+    getMessagesForConversation, // Assume this is stable
+    // REMOVED: setIsLoadingMessages, setLocalMessages, setError
+    // Add setters back here ONLY if the lint rule complains AND you are sure
+    // they are causing instability from the parent. Usually, they are safe to omit.
     setLocalMessages,
+    setIsLoadingMessages,
     setError,
   ]);
+  // --- End Message Loading Effect ---
 
   // --- Stop Streaming ---
-  // Renamed to stopStreamingCore
   const stopStreamingCore = useCallback(() => {
-    stopStreamingCallback(); // Call the passed callback (which handles abortController)
-    // Update local state to reflect stopped streaming
+    stopStreamingCallback();
     setLocalMessages((prev) =>
       prev.map((msg) =>
         msg.isStreaming
           ? {
               ...msg,
               isStreaming: false,
-              // Use streamed content if available, otherwise mark as stopped
               content: msg.streamedContent || msg.content || "Stopped by user",
               streamedContent: undefined,
             }
@@ -158,7 +152,6 @@ export function useMessageHandling({
   }, [stopStreamingCallback, setLocalMessages]);
 
   // --- Handle Submission ---
-  // Renamed to handleSubmitCore
   const handleSubmitCore = useCallback(
     async (
       originalUserPrompt: string,
@@ -166,27 +159,24 @@ export function useMessageHandling({
       promptToSendToAI: string,
       vfsContextPaths?: string[],
     ) => {
+      // ... (handleSubmitCore logic remains the same)
       if (!currentConversationId) {
         setError("Error: Could not determine active conversation.");
         toast.error("Cannot submit message: No active conversation selected.");
         return;
       }
 
-      setError(null); // Clear previous errors on new submission
+      setError(null);
 
-      // --- Prepare message history for AI ---
-      // Create history *before* adding the new user message to local state
-      // This ensures the AI gets the state *before* the user message was sent
       const messagesForAi: CoreMessage[] = [
         ...localMessages
           .filter(
             (m) => !m.error && (m.role === "user" || m.role === "assistant"),
-          ) // Filter out errors and system messages
+          )
           .map((m): CoreMessage => ({ role: m.role, content: m.content })),
-        { role: "user", content: promptToSendToAI }, // Add the new user prompt (potentially with VFS context)
+        { role: "user", content: promptToSendToAI },
       ];
 
-      // Basic check to prevent sending only system prompts or empty history
       const hasUserOrAssistantMessage = messagesForAi.some(
         (m) => m.role === "user" || m.role === "assistant",
       );
@@ -197,23 +187,22 @@ export function useMessageHandling({
         return;
       }
 
-      // --- Save user message to DB (using original prompt) ---
       let userMessageId: string;
       let userMessageForState: Message;
       const userMessageTimestamp = new Date();
       try {
         const userMessageData = {
           role: "user" as const,
-          content: originalUserPrompt, // Save the original prompt without VFS context
+          content: originalUserPrompt,
           conversationId: currentConversationId,
           createdAt: userMessageTimestamp,
-          vfsContextPaths: vfsContextPaths, // Store VFS paths used
+          vfsContextPaths: vfsContextPaths,
         };
         userMessageId = await addDbMessage(userMessageData);
         userMessageForState = {
           ...userMessageData,
           id: userMessageId,
-          isStreaming: false, // User messages don't stream
+          isStreaming: false,
           streamedContent: undefined,
           error: null,
           vfsContextPaths: vfsContextPaths ?? undefined,
@@ -227,20 +216,18 @@ export function useMessageHandling({
           dbError instanceof Error ? dbError.message : "Unknown DB error";
         setError(`Error: Could not save your message - ${message}`);
         toast.error(`Error saving message: ${message}`);
-        return; // Stop if user message can't be saved
+        return;
       }
 
-      // --- Update local state with user message (using original prompt) ---
       setLocalMessages((prevMessages) => [
         ...prevMessages,
         userMessageForState,
       ]);
 
-      // --- Call AI stream function ---
       try {
         await performAiStream({
           conversationIdToUse: currentConversationId,
-          messagesToSend: messagesForAi, // Send the prepared history
+          messagesToSend: messagesForAi,
           currentTemperature: temperature,
           currentMaxTokens: maxTokens,
           currentTopP: topP,
@@ -250,8 +237,6 @@ export function useMessageHandling({
           systemPromptToUse: activeSystemPrompt,
         });
       } catch (err: unknown) {
-        // Errors during streaming are handled within performAiStream (setting error state, toasting)
-        // Log here for debugging if needed, but avoid redundant error setting/toasting
         console.error(
           "useMessageHandling: Error during performAiStream call:",
           err,
@@ -259,7 +244,7 @@ export function useMessageHandling({
       }
     },
     [
-      localMessages, // Need current messages to build history
+      localMessages,
       addDbMessage,
       performAiStream,
       setError,
@@ -275,9 +260,9 @@ export function useMessageHandling({
   );
 
   // --- Regeneration ---
-  // Renamed to regenerateMessageCore
   const regenerateMessageCore = useCallback(
     async (messageId: string) => {
+      // ... (regenerateMessageCore logic remains the same)
       const conversationIdToUse = selectedConversationId;
       if (!conversationIdToUse) {
         toast.error("Please select the conversation first.");
@@ -288,7 +273,7 @@ export function useMessageHandling({
         return;
       }
 
-      setError(null); // Clear previous errors
+      setError(null);
 
       const messageIndex = localMessages.findIndex((m) => m.id === messageId);
       if (messageIndex < 0) {
@@ -304,15 +289,13 @@ export function useMessageHandling({
         return;
       }
 
-      // --- Get history up to the message *before* the one being regenerated ---
       const historyForRegen = localMessages
-        .slice(0, messageIndex) // Exclude the message being regenerated and subsequent ones
+        .slice(0, messageIndex)
         .filter(
           (m) => !m.error && (m.role === "user" || m.role === "assistant"),
         )
         .map((m): CoreMessage => ({ role: m.role, content: m.content }));
 
-      // Check if history is valid
       const hasUserOrAssistantMessage = historyForRegen.some(
         (m) => m.role === "user" || m.role === "assistant",
       );
@@ -325,10 +308,8 @@ export function useMessageHandling({
         return;
       }
 
-      // --- Delete messages from DB (the one being regenerated + subsequent ones) ---
       const messagesToDelete = localMessages.slice(messageIndex);
       try {
-        // Ensure IDs exist before attempting deletion
         const idsToDelete = messagesToDelete
           .map((m) => m.id)
           .filter((id): id is string => !!id);
@@ -343,13 +324,11 @@ export function useMessageHandling({
           dbErr instanceof Error ? dbErr.message : "Unknown DB error";
         setError(`Error preparing regeneration: ${message}`);
         toast.error(`Failed to prepare for regeneration: ${message}`);
-        return; // Stop if DB cleanup fails
+        return;
       }
 
-      // --- Update local state (remove regenerated and subsequent messages) ---
       setLocalMessages((prev) => prev.slice(0, messageIndex));
 
-      // --- Call AI stream function with the truncated history ---
       try {
         await performAiStream({
           conversationIdToUse: conversationIdToUse,
@@ -363,7 +342,6 @@ export function useMessageHandling({
           systemPromptToUse: activeSystemPrompt,
         });
       } catch (err: unknown) {
-        // Errors handled within performAiStream
         console.error("useMessageHandling: Error during regen stream:", err);
       }
     },

@@ -16,10 +16,8 @@ export const ChatWrapper: React.FC<ChatWrapperProps> = ({ className }) => {
         className,
       )}
     >
-      <ChatHeader /> {/* Add the header here */}
-      <ChatContent className="flex-grow h-0" />{" "}
-      {/* Ensure ChatContent handles scrolling */}
-      <PromptWrapper />
+      <ChatHeader />
+      <ChatContent className="flex-grow h-0" /> <PromptWrapper />
     </main>
   );
 };
