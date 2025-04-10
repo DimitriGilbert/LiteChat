@@ -1,8 +1,7 @@
-// src/components/lite-chat/chat-content.tsx
-import React, { useRef, useEffect, useState, useCallback } from "react"; // Keep useEffect
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { MemoizedMessageBubble } from "./message-bubble";
-import { useChatContext } from "@/hooks/use-chat-context";
+import { useCoreChatContext } from "@/context/core-chat-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,19 +14,15 @@ import { throttle } from "@/lib/throttle";
 
 interface ChatContentProps {
   className?: string;
+  regenerateMessage: (messageId: string) => void;
 }
 
-// Helper function to find the viewport
-const getViewport = (root: HTMLDivElement | null): HTMLDivElement | null => {
-  if (!root) return null;
-  // Radix typically adds this data attribute to the viewport
-  return root.querySelector("[data-radix-scroll-area-viewport]");
-};
+export const ChatContent: React.FC<ChatContentProps> = ({
+  className,
+  regenerateMessage,
+}) => {
+  const { messages, isLoadingMessages, isStreaming } = useCoreChatContext();
 
-export const ChatContent: React.FC<ChatContentProps> = ({ className }) => {
-  // Destructure 'isLoading' directly, which corresponds to 'isLoadingMessages' in the provider
-  const { messages, isLoading, isStreaming, regenerateMessage } =
-    useChatContext();
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -35,14 +30,11 @@ export const ChatContent: React.FC<ChatContentProps> = ({ className }) => {
   const [newMessagesWhileScrolledUp, setNewMessagesWhileScrolledUp] =
     useState(false);
 
-  // --- Add Diagnostic Logging ---
   useEffect(() => {
     console.log("[ChatContent] Received messages:", messages);
-    console.log("[ChatContent] Received isLoading:", isLoading);
-  }, [messages, isLoading]);
-  // --- End Diagnostic Logging ---
+    console.log("[ChatContent] Received isLoadingMessages:", isLoadingMessages);
+  }, [messages, isLoadingMessages]);
 
-  // Effect to check if new messages arrived while scrolled up
   useEffect(() => {
     if (!isAtBottom && messages.length > 0) {
       if (!newMessagesWhileScrolledUp) {
@@ -51,7 +43,11 @@ export const ChatContent: React.FC<ChatContentProps> = ({ className }) => {
     }
   }, [messages, isAtBottom, newMessagesWhileScrolledUp]);
 
-  // Manual scroll function using the viewport found via root ref
+  const getViewport = (root: HTMLDivElement | null): HTMLDivElement | null => {
+    if (!root) return null;
+    return root.querySelector("[data-radix-scroll-area-viewport]");
+  };
+
   const scrollToBottom = useCallback(() => {
     const viewport = getViewport(scrollAreaRootRef.current);
     if (viewport) {
@@ -59,9 +55,8 @@ export const ChatContent: React.FC<ChatContentProps> = ({ className }) => {
       setIsAtBottom(true);
       setNewMessagesWhileScrolledUp(false);
     }
-  }, []); // No dependencies needed
+  }, []);
 
-  // Scroll handler attached to the viewport (found via root ref)
   const handleScroll = useCallback(
     throttle(() => {
       const viewport = getViewport(scrollAreaRootRef.current);
@@ -79,7 +74,6 @@ export const ChatContent: React.FC<ChatContentProps> = ({ className }) => {
     [newMessagesWhileScrolledUp],
   );
 
-  // Effect to scroll down automatically ONLY if already at the bottom when new messages arrive
   useEffect(() => {
     const viewport = getViewport(scrollAreaRootRef.current);
     if (viewport && isAtBottom) {
@@ -88,7 +82,7 @@ export const ChatContent: React.FC<ChatContentProps> = ({ className }) => {
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [messages, isAtBottom]); // Run if messages change or if we reach the bottom
+  }, [messages, isAtBottom]);
 
   const handleRegenerate = (messageId: string) => {
     regenerateMessage(messageId);
@@ -102,17 +96,14 @@ export const ChatContent: React.FC<ChatContentProps> = ({ className }) => {
         ref={scrollAreaRootRef}
       >
         <div className="py-6 px-4 md:px-6 space-y-6 min-h-full">
-          {/* --- Loading / Empty State --- */}
-          {/* Check isLoading FIRST */}
-          {isLoading && (
+          {isLoadingMessages && (
             <div className="space-y-4 mt-4">
               <Skeleton className="h-16 w-3/4 bg-gray-800" />
               <Skeleton className="h-20 w-1/2 ml-auto bg-gray-800" />
               <Skeleton className="h-16 w-2/3 bg-gray-800" />
             </div>
           )}
-          {/* Check for empty messages only AFTER loading is false */}
-          {!isLoading && messages.length === 0 && (
+          {!isLoadingMessages && messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] text-center px-4">
               <div className="rounded-full bg-gray-800 p-5 mb-5">
                 <MessageSquarePlusIcon className="h-12 w-12 text-gray-400" />
@@ -144,10 +135,7 @@ export const ChatContent: React.FC<ChatContentProps> = ({ className }) => {
               </div>
             </div>
           )}
-
-          {/* --- Messages Map --- */}
-          {/* Map only AFTER loading is false and messages exist */}
-          {!isLoading &&
+          {!isLoadingMessages &&
             messages.map((message) => (
               <div key={message.id}>
                 <MemoizedMessageBubble
@@ -166,12 +154,10 @@ export const ChatContent: React.FC<ChatContentProps> = ({ className }) => {
                 )}
               </div>
             ))}
-          {/* Target div for scrolling */}
           <div ref={messagesEndRef} className="h-1" />
         </div>
         <ScrollBar orientation="vertical" />
       </ScrollArea>
-      {/* --- Scroll Button --- */}
       {(!isAtBottom || newMessagesWhileScrolledUp) && (
         <div className="absolute bottom-4 right-4 z-10">
           <Button

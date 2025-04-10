@@ -1,22 +1,21 @@
-// src/components/lite-chat/prompt-input.tsx
 import React, { useRef, useEffect, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
-import { useChatContext } from "@/hooks/use-chat-context";
+import { useCoreChatContext } from "@/context/core-chat-context";
 import { cn } from "@/lib/utils";
 
 interface PromptInputProps {
   className?: string;
+  selectedConversationId: string | null;
+  handleSubmit: () => void;
 }
 
-export const PromptInput: React.FC<PromptInputProps> = ({ className }) => {
-  const {
-    prompt,
-    setPrompt,
-    handleSubmit,
-    isStreaming,
-    messages,
-    selectedConversationId,
-  } = useChatContext();
+export const PromptInput: React.FC<PromptInputProps> = ({
+  className,
+  selectedConversationId,
+  handleSubmit,
+}) => {
+  const { prompt, setPrompt, isStreaming, messages } = useCoreChatContext();
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleKeyDown = useCallback(

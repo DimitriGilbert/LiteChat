@@ -3,9 +3,10 @@ import React, { useState } from "react";
 import { ChatProvider } from "@/context/chat-context";
 import { ChatSide } from "./chat-side";
 import { ChatWrapper } from "./chat-wrapper";
+import { useChatContext } from "@/hooks/use-chat-context";
 import type {
   AiProviderConfig,
-  AiModelConfig, // Added missing import
+  AiModelConfig,
   SidebarItemType,
   LiteChatConfig,
   Message,
@@ -14,7 +15,7 @@ import type {
   SidebarItem,
   CustomPromptAction,
   CustomMessageAction,
-  CustomSettingTab, // Import CustomSettingTab
+  CustomSettingTab,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { MenuIcon, XIcon } from "lucide-react";
@@ -49,16 +50,22 @@ export type {
   LiteChatConfig,
   CustomPromptAction,
   CustomMessageAction,
-  CustomSettingTab, // Export CustomSettingTab
+  CustomSettingTab,
 };
 export { useSidebarManagement } from "@/hooks/use-sidebar-management";
 
 interface LiteChatProps {
   providers: AiProviderConfig[];
-  config?: LiteChatConfig; // Config now includes custom actions and settings
+  config?: LiteChatConfig;
   className?: string;
   SideComponent?: React.ComponentType<{ className?: string }>;
-  WrapperComponent?: React.ComponentType<{ className?: string }>;
+  WrapperComponent?: React.ComponentType<{
+    className?: string;
+    selectedItemId: string | null;
+    selectedItemType: SidebarItemType | null;
+    sidebarItems: SidebarItem[];
+    regenerateMessage: (messageId: string) => void;
+  }>;
 }
 
 export const LiteChat: React.FC<LiteChatProps> = ({
@@ -68,7 +75,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({
   SideComponent = ChatSide,
   WrapperComponent = ChatWrapper,
 }) => {
-  // Destructure config with defaults, including custom actions and settings
   const {
     enableSidebar = true,
     enableVfs = true,
@@ -80,9 +86,9 @@ export const LiteChat: React.FC<LiteChatProps> = ({
     initialSelectedItemType = null,
     streamingThrottleRate,
     defaultSidebarOpen = true,
-    customPromptActions = [], // Default to empty array
-    customMessageActions = [], // Default to empty array
-    customSettingsTabs = [], // Default to empty array
+    customPromptActions = [],
+    customMessageActions = [],
+    customSettingsTabs = [],
   } = config;
 
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
@@ -99,52 +105,86 @@ export const LiteChat: React.FC<LiteChatProps> = ({
       enableSidebar={enableSidebar}
       enableVfs={enableVfs}
       enableAdvancedSettings={enableAdvancedSettings}
-      // Pass custom actions and settings down to the provider
       customPromptActions={customPromptActions}
       customMessageActions={customMessageActions}
-      customSettingsTabs={customSettingsTabs} // Pass custom settings tabs
+      customSettingsTabs={customSettingsTabs}
     >
-      <div
-        className={cn(
-          "flex h-full w-full overflow-hidden bg-gray-900 border border-gray-700 rounded-lg shadow-sm",
-          className,
-        )}
-      >
-        {/* Sidebar */}
-        {enableSidebar && sidebarOpen && (
-          <SideComponent
-            className={cn(
-              "w-72 flex-shrink-0",
-              "hidden md:flex", // Standard responsive behavior
-            )}
-          />
-        )}
-
-        {/* Main Chat Area Wrapper */}
-        <div className="flex-grow flex flex-col relative w-full min-w-0">
-          {/* Sidebar Toggle Button */}
-          {enableSidebar && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "absolute top-3 left-3 z-10 text-gray-400 hover:text-white hover:bg-gray-700 md:hidden", // Only show on small screens
-              )}
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
-            >
-              {sidebarOpen ? (
-                <XIcon className="h-5 w-5" />
-              ) : (
-                <MenuIcon className="h-5 w-5" />
-              )}
-            </Button>
-          )}
-
-          {/* Chat Content */}
-          <WrapperComponent className="h-full" />
-        </div>
-      </div>
+      <LiteChatInner
+        className={className}
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        enableSidebar={enableSidebar}
+        SideComponent={SideComponent}
+        WrapperComponent={WrapperComponent}
+      />
     </ChatProvider>
+  );
+};
+
+interface LiteChatInnerProps {
+  className?: string;
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  enableSidebar: boolean;
+  SideComponent: React.ComponentType<{ className?: string }>;
+  WrapperComponent: React.ComponentType<{
+    className?: string;
+    selectedItemId: string | null;
+    selectedItemType: SidebarItemType | null;
+    sidebarItems: SidebarItem[];
+    regenerateMessage: (messageId: string) => void;
+  }>;
+}
+
+const LiteChatInner: React.FC<LiteChatInnerProps> = ({
+  className,
+  sidebarOpen,
+  setSidebarOpen,
+  enableSidebar,
+  SideComponent,
+  WrapperComponent,
+}) => {
+  const { selectedItemId, selectedItemType, sidebarItems, regenerateMessage } =
+    useChatContext();
+
+  return (
+    <div
+      className={cn(
+        "flex h-full w-full overflow-hidden bg-gray-900 border border-gray-700 rounded-lg shadow-sm",
+        className,
+      )}
+    >
+      {enableSidebar && sidebarOpen && (
+        <SideComponent className={cn("w-72 flex-shrink-0", "hidden md:flex")} />
+      )}
+
+      <div className="flex-grow flex flex-col relative w-full min-w-0">
+        {enableSidebar && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "absolute top-3 left-3 z-10 text-gray-400 hover:text-white hover:bg-gray-700 md:hidden",
+            )}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+          >
+            {sidebarOpen ? (
+              <XIcon className="h-5 w-5" />
+            ) : (
+              <MenuIcon className="h-5 w-5" />
+            )}
+          </Button>
+        )}
+
+        <WrapperComponent
+          className="h-full"
+          selectedItemId={selectedItemId}
+          selectedItemType={selectedItemType}
+          sidebarItems={sidebarItems}
+          regenerateMessage={regenerateMessage}
+        />
+      </div>
+    </div>
   );
 };
