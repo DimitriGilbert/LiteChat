@@ -1,5 +1,4 @@
-// src/components/lite-chat/chat-side.tsx
-import React, { useState, useRef, useEffect } from "react"; // Added useEffect
+import React, { useState, useRef, useEffect } from "react";
 import { ChatHistory } from "./chat-history";
 import { SettingsModal } from "./settings-modal";
 import { Button } from "@/components/ui/button";
@@ -20,13 +19,13 @@ interface ChatSideProps {
 export const ChatSide: React.FC<ChatSideProps> = ({ className }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const {
-    createConversation, // From context (provided by sidebarMgmt)
-    createProject, // From context (provided by sidebarMgmt)
-    selectedItemId, // From context (provided by sidebarMgmt)
-    selectedItemType, // From context (provided by sidebarMgmt)
-    importConversation, // From context (top-level handler)
-    getConversation, // Get DB function from context
-    getProject, // Get DB function from context
+    createConversation,
+    createProject,
+    selectedItemId,
+    selectedItemType,
+    importConversation,
+    getConversation,
+    // getProject, // REMOVE unused
   } = useChatContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,41 +34,35 @@ export const ChatSide: React.FC<ChatSideProps> = ({ className }) => {
     null,
   );
 
-  // Effect to determine the correct parentId based on selection
   useEffect(() => {
     let determinedParentId: string | null = null;
     if (selectedItemType === "project") {
       determinedParentId = selectedItemId;
     } else if (selectedItemType === "conversation") {
-      // Need to fetch the conversation to find its parent
-      // This is slightly less ideal, but necessary if we don't store parentId in selection state
       if (selectedItemId) {
         getConversation(selectedItemId).then((convo) => {
           if (convo) {
             setParentIdForNewItem(convo.parentId);
           } else {
-            setParentIdForNewItem(null); // Fallback if convo not found
+            setParentIdForNewItem(null);
           }
         });
-        // Prevent setting state directly here, let the async update handle it
         return;
       } else {
-        determinedParentId = null; // No item selected
+        determinedParentId = null;
       }
     } else {
-      determinedParentId = null; // No item selected
+      determinedParentId = null;
     }
     setParentIdForNewItem(determinedParentId);
   }, [selectedItemId, selectedItemType, getConversation]);
 
   const handleCreateChat = async () => {
-    // Use the state updated by the effect
     await createConversation(parentIdForNewItem);
   };
 
   const handleCreateProject = async () => {
     try {
-      // Use the state updated by the effect
       const { id: newProjectId } = await createProject(parentIdForNewItem);
       setEditingProjectId(newProjectId);
     } catch (error) {
@@ -91,7 +84,6 @@ export const ChatSide: React.FC<ChatSideProps> = ({ className }) => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // importConversation handles parentId logic internally now
       importConversation(file);
     }
     if (event.target) {

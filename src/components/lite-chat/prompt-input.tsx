@@ -5,16 +5,17 @@ import { cn } from "@/lib/utils";
 
 interface PromptInputProps {
   className?: string;
-  selectedConversationId: string | null;
-  handleSubmit: () => void;
 }
 
-export const PromptInput: React.FC<PromptInputProps> = ({
-  className,
-  selectedConversationId,
-  handleSubmit,
-}) => {
-  const { prompt, setPrompt, isStreaming, messages } = useCoreChatContext();
+export const PromptInput: React.FC<PromptInputProps> = ({ className }) => {
+  const {
+    prompt,
+    setPrompt,
+    isStreaming,
+    // messages,
+    // handleSubmitCore,
+    // selectedConversationId,
+  } = useCoreChatContext();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -22,28 +23,27 @@ export const PromptInput: React.FC<PromptInputProps> = ({
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       const isModKey = e.metaKey || e.ctrlKey;
 
-      if (e.key === "Enter" && (isModKey || !e.shiftKey) && !isStreaming) {
+      if (e.key === "Enter" && (isModKey || !e.shiftKey)) {
         e.preventDefault();
-        if (prompt.trim()) {
-          handleSubmit();
-        }
+        const form = textareaRef.current?.closest("form");
+        form?.requestSubmit();
         return;
       }
 
-      if (
-        e.key === "ArrowUp" &&
-        !prompt &&
-        selectedConversationId &&
-        messages.length > 0
-      ) {
-        const lastUserMessage = [...messages]
-          .reverse()
-          .find((m) => m.role === "user");
-        if (lastUserMessage) {
-          e.preventDefault();
-          setPrompt(lastUserMessage.content);
-        }
-      }
+      // if (
+      //   e.key === "ArrowUp" &&
+      //   !prompt &&
+      //   selectedConversationId &&
+      //   messages.length > 0
+      // ) {
+      //   const lastUserMessage = [...messages]
+      //     .reverse()
+      //     .find((m) => m.role === "user");
+      //   if (lastUserMessage) {
+      //     e.preventDefault();
+      //     setPrompt(lastUserMessage.content);
+      //   }
+      // }
 
       if (
         e.key === "Escape" &&
@@ -54,12 +54,10 @@ export const PromptInput: React.FC<PromptInputProps> = ({
       }
     },
     [
-      prompt,
-      isStreaming,
-      handleSubmit,
-      setPrompt,
-      messages,
-      selectedConversationId,
+      // prompt,
+      // selectedConversationId,
+      // messages,
+      // setPrompt,
     ],
   );
 

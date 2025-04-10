@@ -21,7 +21,7 @@ export const ChatContent: React.FC<ChatContentProps> = ({
   className,
   regenerateMessage,
 }) => {
-  const { messages, isLoadingMessages, isStreaming } = useCoreChatContext();
+  const { messages, isLoadingMessages } = useCoreChatContext();
 
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -57,22 +57,23 @@ export const ChatContent: React.FC<ChatContentProps> = ({
     }
   }, []);
 
-  const handleScroll = useCallback(
-    throttle(() => {
-      const viewport = getViewport(scrollAreaRootRef.current);
-      if (viewport) {
-        const threshold = 50;
-        const atBottom =
-          viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
-          threshold;
-        setIsAtBottom(atBottom);
-        if (atBottom && newMessagesWhileScrolledUp) {
-          setNewMessagesWhileScrolledUp(false);
-        }
+  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    throttledHandleScroll();
+  };
+
+  const throttledHandleScroll = throttle(() => {
+    const viewport = getViewport(scrollAreaRootRef.current);
+    if (viewport) {
+      const threshold = 50;
+      const atBottom =
+        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
+        threshold;
+      setIsAtBottom(atBottom);
+      if (atBottom && newMessagesWhileScrolledUp) {
+        setNewMessagesWhileScrolledUp(false);
       }
-    }, 100),
-    [newMessagesWhileScrolledUp],
-  );
+    }
+  }, 100);
 
   useEffect(() => {
     const viewport = getViewport(scrollAreaRootRef.current);

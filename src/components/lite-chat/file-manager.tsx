@@ -1,11 +1,5 @@
 // src/components/lite-chat/file-manager.tsx
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  useMemo,
-} from "react"; // Added useMemo
+import React, { useState, useEffect, useCallback, useRef } from "react"; // Added useMemo
 import { useChatContext } from "@/hooks/use-chat-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -225,7 +219,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
           removeSelectedVfsPath(entry.path);
         }
         loadEntries(currentPath);
-      } catch (error) {
+      } catch {
         /* Error handled in hook */
       }
     }
@@ -243,7 +237,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
     } else {
       try {
         await vfs.downloadFile(entry.path, entry.name);
-      } catch (error) {
+      } catch {
         /* Error handled in hook */
       }
     }
@@ -264,7 +258,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
       try {
         await vfs.uploadFiles(files, currentPath);
         loadEntries(currentPath);
-      } catch (error) {
+      } catch {
         /* Error handled in hook */
       }
     }
@@ -285,7 +279,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
         try {
           await vfs.uploadAndExtractZip(file, currentPath);
           loadEntries(currentPath);
-        } catch (error) {
+        } catch {
           /* Error handled in hook */
         }
       } else {
@@ -303,7 +297,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
     try {
       const filename = `vfs_${basename(currentPath) || "root"}.zip`;
       await vfs.downloadAllAsZip(filename);
-    } catch (error) {
+    } catch {
       /* Error handled in hook */
     }
   };
@@ -346,7 +340,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
       }
       cancelEditing();
       loadEntries(currentPath);
-    } catch (error) {
+    } catch {
       cancelEditing();
     }
   };
@@ -385,7 +379,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
       toast.success(`Folder "${trimmedName}" created.`);
       cancelCreatingFolder();
       loadEntries(currentPath);
-    } catch (error) {
+    } catch {
       cancelCreatingFolder();
     }
   };

@@ -96,20 +96,20 @@ export interface CustomActionBase {
 }
 
 // Forward declare ChatContextProps for use in action handlers
-interface ChatContextPropsForwardDeclare extends CoreChatContextProps {
-  // Add other essential props needed by actions if CoreChatContextProps is not enough
-  // This avoids circular dependency issues if actions need the full context type.
-  // For now, let's assume CoreChatContextProps + specific needed items are sufficient
-  // or pass the full context object carefully.
-  // We will define the full ChatContextProps later.
-  providers: AiProviderConfig[];
-  selectedProviderId: string | null;
-  selectedModelId: string | null;
-  // ... add other specific props actions might need from the full context
-  customPromptActions?: CustomPromptAction[];
-  customMessageActions?: CustomMessageAction[];
-  customSettingsTabs?: CustomSettingTab[];
-}
+// interface ChatContextPropsForwardDeclare extends CoreChatContextProps {
+//   // Add other essential props needed by actions if CoreChatContextProps is not enough
+//   // This avoids circular dependency issues if actions need the full context type.
+//   // For now, let's assume CoreChatContextProps + specific needed items are sufficient
+//   // or pass the full context object carefully.
+//   // We will define the full ChatContextProps later.
+//   providers: AiProviderConfig[];
+//   selectedProviderId: string | null;
+//   selectedModelId: string | null;
+//   // ... add other specific props actions might need from the full context
+//   customPromptActions?: CustomPromptAction[];
+//   customMessageActions?: CustomMessageAction[];
+//   customSettingsTabs?: CustomSettingTab[];
+// }
 
 export interface CustomPromptAction extends CustomActionBase {
   // onClick receives the full chat context for flexibility

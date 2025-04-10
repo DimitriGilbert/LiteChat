@@ -285,7 +285,7 @@ export function useVirtualFileSystem({
       setIsOperationLoading(true);
       try {
         await createDirectoryInternalImpl(path);
-      } catch (err) {
+      } catch {
         // Error handled in internal impl
       } finally {
         setIsOperationLoading(false);

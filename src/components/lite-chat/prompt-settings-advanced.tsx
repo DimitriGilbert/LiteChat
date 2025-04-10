@@ -40,7 +40,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setFrequencyPenalty,
     activeSystemPrompt, // This will be null if advanced settings are globally disabled
     globalSystemPrompt, // This will be null if advanced settings are globally disabled
-    setGlobalSystemPrompt, // This will be a dummy function if disabled
     selectedItemId,
     selectedItemType,
     updateConversationSystemPrompt,
