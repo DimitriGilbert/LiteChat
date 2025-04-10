@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiKeySelector } from "./api-key-selector";
 import { FileManager } from "./file-manager";
 import { cn } from "@/lib/utils";
-// REMOVED: import { db } from "@/lib/db";
 import { SaveIcon, InfoIcon } from "lucide-react";
 import {
   Tooltip,
@@ -27,7 +26,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
   className,
 }) => {
   const {
-    // Parameters
     temperature,
     setTemperature,
     maxTokens,
@@ -40,33 +38,26 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setPresencePenalty,
     frequencyPenalty,
     setFrequencyPenalty,
-    // System Prompt related
     activeSystemPrompt,
     selectedItemId,
     selectedItemType,
     updateConversationSystemPrompt,
-    // VFS related
-    vfsEnabled,
-    // --- DB Function from Context ---
-    getConversation, // Get DB function from context
+    isVfsEnabledForItem, // Get the boolean flag
+    vfs, // Get the VFS object (real or dummy)
+    getConversation,
   } = useChatContext();
 
-  // Derive conversationId only if the selected item is a conversation
   const conversationId = useMemo(() => {
     return selectedItemType === "conversation" ? selectedItemId : null;
   }, [selectedItemId, selectedItemType]);
 
-  // Local state for conversation-specific system prompt editing
   const [localConvoSystemPrompt, setLocalConvoSystemPrompt] = useState<
     string | null
   >(null);
   const [isConvoPromptDirty, setIsConvoPromptDirty] = useState(false);
 
-  // Effect to load conversation system prompt when the derived conversationId changes
   useEffect(() => {
-    // Only load if conversationId is not null and getConversation is available
     if (conversationId && getConversation) {
-      // Use getConversation from context
       getConversation(conversationId)
         .then((convo) => {
           setLocalConvoSystemPrompt(convo?.systemPrompt ?? null);
@@ -74,13 +65,11 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
         })
         .catch(() => setLocalConvoSystemPrompt(null));
     } else {
-      // Clear local prompt state if no conversation is selected or function not ready
       setLocalConvoSystemPrompt(null);
       setIsConvoPromptDirty(false);
     }
-  }, [conversationId, getConversation]); // Depend on derived ID and context function
+  }, [conversationId, getConversation]);
 
-  // Handle changes to the local system prompt textarea
   const handleConvoSystemPromptChange = (
     e: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
@@ -88,9 +77,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setIsConvoPromptDirty(true);
   };
 
-  // Save the conversation-specific system prompt
   const saveConvoSystemPrompt = () => {
-    // Use the derived conversationId
     if (conversationId && isConvoPromptDirty) {
       const promptToSave =
         localConvoSystemPrompt?.trim() === "" ? null : localConvoSystemPrompt;
@@ -100,7 +87,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     }
   };
 
-  // Helper for number input changes
   const handleNumberInputChange = (
     setter: (value: number | null) => void,
     e: React.ChangeEvent<HTMLInputElement>,
@@ -109,7 +95,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setter(value === "" ? null : parseInt(value, 10) || null);
   };
 
-  // Helper for slider changes
   const handleSliderChange = (
     setter: (value: number | null) => void,
     value: number[],
@@ -117,7 +102,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setter(value[0]);
   };
 
-  // Use the derived conversationId for conditional rendering/logic
   const isConversationSelected = !!conversationId;
   const isConversationPromptSet =
     localConvoSystemPrompt !== null && localConvoSystemPrompt.trim() !== "";
@@ -138,15 +122,13 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           <TabsTrigger
             value="files"
             className="text-xs px-2 h-7"
-            disabled={!vfsEnabled}
+            disabled={!isVfsEnabledForItem} // Disable tab if VFS not enabled for item
           >
             Files
           </TabsTrigger>
         </TabsList>
 
-        {/* Parameters Tab Content */}
         <TabsContent value="parameters" className="space-y-4 mt-0">
-          {/* ... (rest of parameters content remains the same) ... */}
           <div className="grid grid-cols-2 gap-4 items-end">
             <div className="space-y-1.5">
               <Label htmlFor="temperature" className="text-xs">
@@ -239,7 +221,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           </div>
         </TabsContent>
 
-        {/* System Prompt Tab Content */}
         <TabsContent value="system_prompt" className="space-y-3 mt-0">
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
@@ -312,20 +293,30 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           </div>
         </TabsContent>
 
-        {/* API Keys Tab Content */}
         <TabsContent value="api_keys" className="mt-0">
           <ApiKeySelector />
         </TabsContent>
 
         {/* Files Tab Content */}
         <TabsContent value="files" className="mt-0">
-          {vfsEnabled && selectedItemId ? (
+          {/* Check if VFS is enabled for the item AND ready */}
+          {isVfsEnabledForItem && vfs.isReady ? (
+            // Pass selectedItemId to key to force remount if item changes
             <FileManager key={selectedItemId} />
           ) : (
             <div className="text-center text-sm text-gray-500 py-8">
-              Virtual Filesystem is not enabled for the selected item.
+              {isVfsEnabledForItem && vfs.isLoading
+                ? "Initializing filesystem..." // Show loading state
+                : isVfsEnabledForItem && vfs.error
+                  ? `Error: ${vfs.error}` // Show error state
+                  : "Virtual Filesystem is not enabled for the selected item." // Show disabled state
+              }
               <br />
-              Enable it using the toggle in the basic prompt settings area.
+              {!isVfsEnabledForItem && (
+                <span>
+                  Enable it using the toggle in the basic prompt settings area.
+                </span>
+              )}
             </div>
           )}
         </TabsContent>

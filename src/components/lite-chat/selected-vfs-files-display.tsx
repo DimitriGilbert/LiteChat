@@ -2,7 +2,7 @@
 import React from "react";
 import { useChatContext } from "@/hooks/use-chat-context";
 import { Button } from "@/components/ui/button";
-import { XIcon, FileTextIcon } from "lucide-react"; // Icons
+import { XIcon, FileTextIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SelectedVfsFilesDisplayProps {
@@ -12,9 +12,15 @@ interface SelectedVfsFilesDisplayProps {
 export const SelectedVfsFilesDisplay: React.FC<
   SelectedVfsFilesDisplayProps
 > = ({ className }) => {
-  const { selectedVfsPaths, removeSelectedVfsPath } = useChatContext();
+  const {
+    selectedVfsPaths,
+    removeSelectedVfsPath,
+    isVfsEnabledForItem, // Get the flag
+    vfs, // Get the vfs object
+  } = useChatContext();
 
-  if (selectedVfsPaths.length === 0) {
+  // Only render if VFS is enabled for the item, the hook is ready, and paths are selected
+  if (!isVfsEnabledForItem || !vfs.isReady || selectedVfsPaths.length === 0) {
     return null;
   }
 

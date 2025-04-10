@@ -16,14 +16,14 @@ import type {
   DbProject,
   DbApiKey,
   SidebarItem,
-  ProjectSidebarItem, // Import specific types
-  ConversationSidebarItem, // Import specific types
+  ProjectSidebarItem,
+  ConversationSidebarItem,
+  VfsContextObject, // Import VfsContextObject
 } from "@/lib/types";
 import { ChatContext } from "@/hooks/use-chat-context";
 import { CoreChatContext } from "@/context/core-chat-context";
 import { useProviderModelSelection } from "@/hooks/use-provider-model-selection";
 import { useApiKeysManagement } from "@/hooks/use-api-keys-management";
-// Import the renamed hook
 import { useSidebarManagement } from "@/hooks/use-sidebar-management";
 import { useChatSettings } from "@/hooks/use-chat-settings";
 import { useAiInteraction } from "@/hooks/use-ai-interaction";
@@ -33,7 +33,72 @@ import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useVirtualFileSystem } from "@/hooks/use-virtual-file-system";
 import { toast } from "sonner";
 
-// Interface for ChatProviderProps remains the same
+// Helper to decode Uint8Array safely
+const decodeUint8Array = (arr: Uint8Array): string => {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(arr);
+  } catch (e) {
+    console.warn(
+      "Failed to decode Uint8Array as strict UTF-8, trying lossy:",
+      e,
+    );
+    return new TextDecoder("utf-8", { fatal: false }).decode(arr);
+  }
+};
+
+const EMPTY_API_KEYS: DbApiKey[] = [];
+const EMPTY_SIDEBAR_ITEMS: SidebarItem[] = [];
+
+// --- Dummy VFS Object ---
+const dummyVfs: VfsContextObject = {
+  isReady: false,
+  isLoading: false,
+  isOperationLoading: false,
+  error: null,
+  configuredItemId: null,
+  listFiles: async () => {
+    console.warn("VFS not enabled/ready");
+    return [];
+  },
+  readFile: async () => {
+    console.warn("VFS not enabled/ready");
+    throw new Error("VFS not enabled/ready");
+  },
+  writeFile: async () => {
+    console.warn("VFS not enabled/ready");
+    throw new Error("VFS not enabled/ready");
+  },
+  deleteItem: async () => {
+    console.warn("VFS not enabled/ready");
+    throw new Error("VFS not enabled/ready");
+  },
+  createDirectory: async () => {
+    console.warn("VFS not enabled/ready");
+    throw new Error("VFS not enabled/ready");
+  },
+  downloadFile: async () => {
+    console.warn("VFS not enabled/ready");
+    throw new Error("VFS not enabled/ready");
+  },
+  uploadFiles: async () => {
+    console.warn("VFS not enabled/ready");
+    throw new Error("VFS not enabled/ready");
+  },
+  uploadAndExtractZip: async () => {
+    console.warn("VFS not enabled/ready");
+    throw new Error("VFS not enabled/ready");
+  },
+  downloadAllAsZip: async () => {
+    console.warn("VFS not enabled/ready");
+    throw new Error("VFS not enabled/ready");
+  },
+  rename: async () => {
+    console.warn("VFS not enabled/ready");
+    throw new Error("VFS not enabled/ready");
+  },
+};
+// --- End Dummy VFS Object ---
+
 interface ChatProviderProps {
   children: React.ReactNode;
   providers: AiProviderConfig[];
@@ -44,24 +109,6 @@ interface ChatProviderProps {
   streamingThrottleRate?: number;
 }
 
-// Helper to decode Uint8Array safely
-const decodeUint8Array = (arr: Uint8Array): string => {
-  try {
-    // Try strict UTF-8 decoding first
-    return new TextDecoder("utf-8", { fatal: true }).decode(arr);
-  } catch (e) {
-    console.warn(
-      "Failed to decode Uint8Array as strict UTF-8, trying lossy:",
-      e,
-    );
-    // Fallback to lossy decoding if strict fails
-    return new TextDecoder("utf-8", { fatal: false }).decode(arr);
-  }
-};
-
-const EMPTY_API_KEYS: DbApiKey[] = [];
-const EMPTY_SIDEBAR_ITEMS: SidebarItem[] = [];
-
 export const ChatProvider: React.FC<ChatProviderProps> = ({
   children,
   providers,
@@ -71,7 +118,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   initialSelectedItemType = null,
   streamingThrottleRate = 42,
 }) => {
-  // --- Core State Management (remains the same) ---
   const [isStreaming, setIsStreaming] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
@@ -86,15 +132,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     }
   }, []);
 
-  // --- Hook Instantiation ---
   const providerModel = useProviderModelSelection({
     providers,
     initialProviderId,
     initialModelId,
   });
-  const storage = useChatStorage(); // Contains live query results and DB functions
+  const storage = useChatStorage();
 
-  // --- Combine Projects and Conversations into SidebarItems ---
   const sidebarItems = useMemo<SidebarItem[]>(() => {
     const allProjects = storage.projects || [];
     const allConversations = storage.conversations || [];
@@ -106,14 +150,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         (c): ConversationSidebarItem => ({ ...c, type: "conversation" }),
       ),
     ];
-    // Sort by updatedAt descending
     combinedItems.sort(
       (a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
     );
     return combinedItems;
   }, [storage.projects, storage.conversations]);
 
-  // --- State for derived active data ---
   const [activeItemId, setActiveItemId] = useState<string | null>(
     initialSelectedItemId,
   );
@@ -121,11 +163,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     initialSelectedItemType,
   );
 
-  // --- Callback for Sidebar Management Hook ---
-  // This is called by useSidebarManagement when an item is selected
   const handleSelectItem = useCallback(
     (id: string | null, type: SidebarItemType | null) => {
-      // Stop streaming and clear inputs regardless of selection change
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
@@ -133,27 +172,24 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       setIsStreaming(false);
       chatInput.clearSelectedVfsPaths();
       chatInput.clearAttachedFiles();
-      setMessages([]); // Clear messages immediately
-      setErrorState(null); // Clear errors
+      setMessages([]);
+      setErrorState(null);
 
-      // Update the state that determines the active data
       setActiveItemId(id);
       setActiveItemType(type);
-      setIsLoadingMessages(!!id); // Set loading only if an item is selected
+      setIsLoadingMessages(!!id);
 
       console.log(
         `[ChatProvider] handleSelectItem updated state: ID=${id}, Type=${type}`,
       );
     },
-    [chatInput], // Removed stopStreamingCallback dependency
+    [chatInput],
   );
 
-  // --- Instantiate Sidebar Management Hook ---
   const sidebarMgmt = useSidebarManagement({
     initialSelectedItemId,
     initialSelectedItemType,
-    onSelectItem: handleSelectItem, // Pass the callback
-    // Pass DB functions from storage
+    onSelectItem: handleSelectItem,
     dbCreateConversation: storage.createConversation,
     dbCreateProject: storage.createProject,
     dbDeleteConversation: storage.deleteConversation,
@@ -168,19 +204,15 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     dbCountChildProjects: storage.countChildProjects,
     dbCountChildConversations: storage.countChildConversations,
     dbToggleVfsEnabled: storage.toggleVfsEnabled,
-    sidebarItems: sidebarItems, // Pass the live, sorted items array
+    sidebarItems: sidebarItems,
   });
 
-  // --- Derive active data based on activeItemId/Type ---
   const activeItemData = useMemo(() => {
     console.log(
       `[ChatProvider] Recalculating activeItemData for ID: ${activeItemId}, Type: ${activeItemType}`,
     );
     if (!activeItemId || !activeItemType) return null;
-
-    // Find in the combined sidebarItems list
     const item = sidebarItems.find((i) => i.id === activeItemId);
-    // Ensure the type matches (should always match if state is consistent)
     if (item && item.type === activeItemType) {
       return item;
     }
@@ -188,7 +220,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       `[ChatProvider] Could not find active item (${activeItemId}, ${activeItemType}) in sidebarItems list.`,
     );
     return null;
-  }, [activeItemId, activeItemType, sidebarItems]); // Depend on ID, Type, and the items list
+  }, [activeItemId, activeItemType, sidebarItems]);
 
   const activeConversationData = useMemo(() => {
     return activeItemType === "conversation"
@@ -201,9 +233,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       ? (activeItemData as DbProject | null)
       : null;
   }, [activeItemType, activeItemData]);
-  // --- End Derive active data ---
 
-  // --- Instantiate other hooks (ApiKeys, Settings, VFS, AI, Messages) ---
   const apiKeysMgmt = useApiKeysManagement({
     apiKeys: storage.apiKeys || EMPTY_API_KEYS,
     addDbApiKey: storage.addApiKey,
@@ -215,21 +245,31 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     activeProjectData: activeProjectData,
   });
 
-  // VFS Hook Instantiation
-  const vfsEnabled = useMemo(
+  // --- VFS Instantiation Logic ---
+  const isVfsEnabledForItem = useMemo(
     () => activeItemData?.vfsEnabled ?? false,
     [activeItemData],
   );
-  const vfs = useVirtualFileSystem({
-    itemId: activeItemId, // Use derived active ID
-    itemType: activeItemType, // Use derived active Type
-    isEnabled: vfsEnabled,
+
+  const realVfs = useVirtualFileSystem({
+    itemId: activeItemId,
+    itemType: activeItemType,
+    isEnabled: isVfsEnabledForItem && !!activeItemId,
   });
+
+  const vfs = useMemo(() => {
+    if (isVfsEnabledForItem && activeItemId) {
+      return realVfs;
+    }
+    return dummyVfs;
+  }, [isVfsEnabledForItem, activeItemId, realVfs]);
+
   useEffect(() => {
-    if (!vfsEnabled && chatInput.selectedVfsPaths.length > 0) {
+    if (!isVfsEnabledForItem && chatInput.selectedVfsPaths.length > 0) {
       chatInput.clearSelectedVfsPaths();
     }
-  }, [vfsEnabled, chatInput]);
+  }, [isVfsEnabledForItem, chatInput]);
+  // --- End VFS Instantiation Logic ---
 
   const aiInteraction = useAiInteraction({
     selectedModel: providerModel.selectedModel,
@@ -244,10 +284,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   });
 
   const messageHandling = useMessageHandling({
-    selectedConversationId: activeConversationData?.id ?? null, // Use derived data
+    selectedConversationId: activeConversationData?.id ?? null,
     performAiStream: aiInteraction.performAiStream,
     stopStreamingCallback: useCallback(() => {
-      // Define stopStreamingCallback inline or memoize separately if needed elsewhere
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
@@ -274,7 +313,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     getMessagesForConversation: storage.getMessagesForConversation,
   });
 
-  // --- Top-Level Handlers ---
   const handleSubmit = useCallback(
     async (e?: React.FormEvent<HTMLFormElement>) => {
       e?.preventDefault();
@@ -282,7 +320,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       const canSubmit =
         currentPrompt.length > 0 ||
         chatInput.attachedFiles.length > 0 ||
-        chatInput.selectedVfsPaths.length > 0; // Allow submit if VFS files selected
+        chatInput.selectedVfsPaths.length > 0;
 
       if (!canSubmit) return;
       if (isStreaming) {
@@ -298,20 +336,16 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       let conversationIdToSubmit: string | null = null;
       let parentProjectId: string | null = null;
 
-      // Determine parent and target conversation ID based on current selection (using activeItem state)
       if (activeItemType === "project" && activeItemId) {
         parentProjectId = activeItemId;
       } else if (activeItemType === "conversation" && activeItemId) {
-        // Use the memoized activeConversationData to find parentId
         parentProjectId = activeConversationData?.parentId ?? null;
         conversationIdToSubmit = activeItemId;
       }
 
-      // If no conversation is selected (e.g., a project is selected, or nothing is), create one
       if (!conversationIdToSubmit) {
         try {
           const title = currentPrompt.substring(0, 50) || "New Chat";
-          // Use the sidebarMgmt hook's createConversation function
           const newConvId = await sidebarMgmt.createConversation(
             parentProjectId,
             title,
@@ -319,7 +353,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           if (!newConvId)
             throw new Error("Failed to get ID for new conversation.");
           conversationIdToSubmit = newConvId;
-          // Note: sidebarMgmt.createConversation already selects the new item, triggering message load via handleSelectItem
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : "Unknown error";
           setError(`Error: Could not start chat - ${message}`);
@@ -334,18 +367,22 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         return;
       }
 
-      // --- VFS/Upload Handling ---
       let contextPrefix = "";
-      const pathsIncludedInContext: string[] = []; // Store paths for the message object
+      const pathsIncludedInContext: string[] = [];
 
       // 1. Process VFS Files
-      if (vfsEnabled && vfs.isReady && chatInput.selectedVfsPaths.length > 0) {
+      if (
+        isVfsEnabledForItem &&
+        vfs.isReady &&
+        vfs.configuredItemId === conversationIdToSubmit && // Ensure VFS is ready for the *target* conversation
+        chatInput.selectedVfsPaths.length > 0
+      ) {
         const vfsContentPromises = chatInput.selectedVfsPaths.map(
           async (path) => {
             try {
               const contentBytes = await vfs.readFile(path);
-              const contentText = decodeUint8Array(contentBytes); // Use safe decoder
-              pathsIncludedInContext.push(path); // Add path to list for message object
+              const contentText = decodeUint8Array(contentBytes);
+              pathsIncludedInContext.push(path);
               return `<vfs_file path="${path}">\n${contentText}\n</vfs_file>`;
             } catch (readErr) {
               console.error(`Error reading VFS file ${path}:`, readErr);
@@ -356,20 +393,24 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         );
         const vfsContents = await Promise.all(vfsContentPromises);
         if (vfsContents.length > 0) {
-          contextPrefix += vfsContents.join("\n") + "\n\n";
+          contextPrefix += vfsContents.join("\n\n") + "\n\n";
         }
-        chatInput.clearSelectedVfsPaths(); // Clear after processing
+        chatInput.clearSelectedVfsPaths();
+      } else if (chatInput.selectedVfsPaths.length > 0) {
+        console.warn(
+          "VFS paths selected but VFS not enabled/ready for this item. Clearing selection.",
+        );
+        toast.warning("VFS not enabled for this chat. Selected files ignored.");
+        chatInput.clearSelectedVfsPaths();
       }
 
-      // 2. Process Attached Files (Basic Text Handling)
+      // 2. Process Attached Files
       if (chatInput.attachedFiles.length > 0) {
         const attachedContentPromises = chatInput.attachedFiles.map(
           async (file) => {
-            // Basic check for text-based files
             if (file.type.startsWith("text/")) {
               try {
                 const contentText = await file.text();
-                // Note: We don't add attached files to vfsContextPaths
                 return `<attached_file name="${file.name}" type="${file.type}">\n${contentText}\n</attached_file>`;
               } catch (readErr) {
                 console.error(
@@ -380,8 +421,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
                 return `<attached_file name="${file.name}" type="${file.type}" error="Failed to read"/>`;
               }
             } else {
-              // Placeholder for non-text files (e.g., images)
-              // TODO: Implement proper handling (e.g., multimodal models, data URIs)
               console.warn(
                 `Skipping non-text attached file: ${file.name} (${file.type})`,
               );
@@ -392,30 +431,27 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         );
         const attachedContents = await Promise.all(attachedContentPromises);
         if (attachedContents.length > 0) {
-          contextPrefix += attachedContents.join("\n") + "\n\n";
+          contextPrefix += attachedContents.join("\n\n") + "\n\n";
         }
-        chatInput.clearAttachedFiles(); // Clear after processing
+        chatInput.clearAttachedFiles();
       }
-      // --- End VFS/Upload Handling ---
 
-      const originalUserPrompt = currentPrompt; // The text the user actually typed
-      const promptToSendToAI = contextPrefix + originalUserPrompt; // Prepend context
+      const originalUserPrompt = currentPrompt;
+      const promptToSendToAI = contextPrefix + originalUserPrompt;
 
-      chatInput.setPrompt(""); // Clear input immediately
+      chatInput.setPrompt("");
 
-      // Only proceed if there's actual text content OR context was added
       if (promptToSendToAI.trim().length > 0) {
         await messageHandling.handleSubmitCore(
-          originalUserPrompt, // Pass the original typed prompt
+          originalUserPrompt,
           conversationIdToSubmit,
-          promptToSendToAI, // Pass the combined prompt
-          pathsIncludedInContext, // Pass the list of VFS paths used
+          promptToSendToAI,
+          pathsIncludedInContext,
         );
       } else {
         console.log(
           "Submission skipped: empty prompt after processing VFS/uploads.",
         );
-        // Optionally provide feedback if only files were attached but couldn't be read
         if (contextPrefix.includes("error=")) {
           toast.warning(
             "Submitted with file context, but some files failed to read.",
@@ -432,14 +468,14 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       isStreaming,
       providerModel.selectedProvider,
       providerModel.selectedModel,
-      activeItemId, // Use state for selection
-      activeItemType, // Use state for selection
-      activeConversationData, // Memoized derived state for parentId lookup
-      sidebarMgmt, // Use sidebarMgmt.createConversation
+      activeItemId,
+      activeItemType,
+      activeConversationData,
+      sidebarMgmt,
       setError,
       messageHandling,
-      vfsEnabled, // Dependency for VFS logic
-      vfs, // Dependency for VFS logic
+      isVfsEnabledForItem, // Add dependency
+      vfs, // Add dependency
     ],
   );
 
@@ -471,7 +507,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       } else if (activeItemType === "conversation" && activeItemId) {
         parentId = activeConversationData?.parentId ?? null;
       }
-      // Use the sidebarMgmt hook's import function
       await sidebarMgmt.importConversation(file, parentId);
     },
     [sidebarMgmt, activeItemType, activeItemId, activeConversationData],
@@ -482,16 +517,18 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       toast.warning("No item selected.");
       return;
     }
-    // Use the sidebarMgmt hook's toggle function
     await sidebarMgmt.toggleVfsEnabled(
       activeItemId,
       activeItemType,
-      vfsEnabled, // Pass the current state
+      isVfsEnabledForItem, // Pass the current derived state
     );
-    // Note: The vfsEnabled state will update via the activeItemData memo
-  }, [sidebarMgmt, activeItemId, activeItemType, vfsEnabled]);
+  }, [
+    sidebarMgmt,
+    activeItemId,
+    activeItemType,
+    isVfsEnabledForItem, // Add dependency
+  ]);
 
-  // --- Context Value Construction ---
   const coreContextValue: CoreChatContextProps = useMemo(
     () => ({
       messages,
@@ -538,10 +575,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       addApiKey: apiKeysMgmt.addApiKey,
       deleteApiKey: apiKeysMgmt.deleteApiKey,
       getApiKeyForProvider: apiKeysMgmt.getApiKeyForProvider,
-      // Sidebar / Item Management (from sidebarMgmt and provider state)
-      sidebarItems: sidebarItems || EMPTY_SIDEBAR_ITEMS, // Use combined list
-      selectedItemId: sidebarMgmt.selectedItemId, // Use state from hook
-      selectedItemType: sidebarMgmt.selectedItemType, // Use state from hook
+      // Sidebar / Item Management
+      sidebarItems: sidebarItems || EMPTY_SIDEBAR_ITEMS,
+      selectedItemId: sidebarMgmt.selectedItemId,
+      selectedItemType: sidebarMgmt.selectedItemType,
       selectItem: sidebarMgmt.selectItem,
       createConversation: sidebarMgmt.createConversation,
       createProject: sidebarMgmt.createProject,
@@ -558,9 +595,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       // Input Handling (Core + Optional)
       prompt: coreContextValue.prompt,
       setPrompt: coreContextValue.setPrompt,
-      handleSubmit, // Use top-level handler
-      stopStreaming, // Use top-level handler
-      regenerateMessage, // Use top-level handler
+      handleSubmit,
+      stopStreaming,
+      regenerateMessage,
       attachedFiles: chatInput.attachedFiles,
       addAttachedFile: chatInput.addAttachedFile,
       removeAttachedFile: chatInput.removeAttachedFile,
@@ -592,20 +629,18 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       setSearchTerm: chatSettings.setSearchTerm,
       // Import/Export & Data Management
       exportConversation: sidebarMgmt.exportConversation,
-      importConversation: handleImportConversation, // Use top-level handler
+      importConversation: handleImportConversation,
       exportAllConversations: sidebarMgmt.exportAllConversations,
       clearAllData: storage.clearAllData,
       // Virtual File System
-      vfsEnabled: vfsEnabled, // Use derived state
-      toggleVfsEnabled: handleToggleVfs, // Use top-level handler
-      vfs: vfs, // Pass the VFS hook result
-      // Pass required DB functions (still needed by some components directly?)
-      // Consider removing these if all consumers use context actions
+      isVfsEnabledForItem: isVfsEnabledForItem, // Pass the derived boolean
+      toggleVfsEnabled: handleToggleVfs, // Pass the handler
+      vfs: vfs, // Pass the conditionally real or dummy VFS object
+      // Pass required DB functions
       getConversation: storage.getConversation,
       getProject: storage.getProject,
     }),
     [
-      // Dependencies
       providers,
       providerModel.selectedProviderId,
       providerModel.setSelectedProviderId,
@@ -617,7 +652,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       apiKeysMgmt.addApiKey,
       apiKeysMgmt.deleteApiKey,
       apiKeysMgmt.getApiKeyForProvider,
-      sidebarItems, // Combined list
+      sidebarItems,
       sidebarMgmt.selectedItemId,
       sidebarMgmt.selectedItemType,
       sidebarMgmt.selectItem,
@@ -637,27 +672,24 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       chatSettings,
       streamingThrottleRate,
       storage.clearAllData,
-      vfsEnabled,
-      handleToggleVfs,
-      vfs,
+      isVfsEnabledForItem, // Add dependency
+      handleToggleVfs, // Add dependency
+      vfs, // Add dependency
       storage.getConversation,
       storage.getProject,
     ],
   );
 
-  // Log when active item changes
   useEffect(() => {
     console.log(
       `[ChatProvider] Active item state updated: ID=${activeItemId}, Type=${activeItemType}`,
     );
   }, [activeItemId, activeItemType]);
 
-  // Log when messages state changes
   useEffect(() => {
     console.log("[ChatProvider] Messages state updated:", messages);
   }, [messages]);
 
-  // Log when loading state changes
   useEffect(() => {
     console.log(
       "[ChatProvider] isLoadingMessages state updated:",

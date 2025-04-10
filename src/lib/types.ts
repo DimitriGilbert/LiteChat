@@ -233,7 +233,7 @@ export interface ChatContextProps {
   clearAllData: () => Promise<void>;
 
   // Virtual File System
-  vfsEnabled: boolean;
+  isVfsEnabledForItem: boolean;
   toggleVfsEnabled: () => Promise<void>; // Simplified signature
   vfs: VfsContextObject;
 

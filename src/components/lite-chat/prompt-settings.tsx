@@ -34,8 +34,8 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
     getApiKeyForProvider,
     selectedApiKeyId,
     selectedItemId,
-    vfsEnabled,
-    toggleVfsEnabled,
+    isVfsEnabledForItem, // Use the flag from context
+    toggleVfsEnabled, // Use the action from context
   } = useChatContext();
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
@@ -100,8 +100,8 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
               <div className="flex items-center space-x-2 h-9">
                 <Switch
                   id="vfs-toggle"
-                  checked={vfsEnabled}
-                  onCheckedChange={toggleVfsEnabled}
+                  checked={isVfsEnabledForItem} // Use context flag for checked state
+                  onCheckedChange={toggleVfsEnabled} // Use context action for change
                   disabled={!isItemSelected}
                   aria-label="Toggle Virtual Filesystem"
                 />
@@ -110,8 +110,8 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
                   className={cn(
                     "text-xs cursor-pointer flex items-center gap-1 transition-colors",
                     !isItemSelected && "text-gray-500 cursor-not-allowed",
-                    isItemSelected && vfsEnabled && "text-blue-400",
-                    isItemSelected && !vfsEnabled && "text-gray-400",
+                    isItemSelected && isVfsEnabledForItem && "text-blue-400", // Use context flag
+                    isItemSelected && !isVfsEnabledForItem && "text-gray-400", // Use context flag
                   )}
                 >
                   <FolderSyncIcon className="h-3.5 w-3.5" />
@@ -122,8 +122,8 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
             <TooltipContent side="top">
               {isItemSelected ? (
                 <p>
-                  {vfsEnabled ? "Disable" : "Enable"} Virtual Filesystem for
-                  this item
+                  {isVfsEnabledForItem ? "Disable" : "Enable"} Virtual
+                  Filesystem for this item
                 </p>
               ) : (
                 <p>Select a chat or project to manage its filesystem</p>
@@ -134,7 +134,7 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
 
         <div className="flex-grow" />
 
-        {/* Advanced Settings Toggle Button - CORRECTED */}
+        {/* Advanced Settings Toggle Button */}
         <TooltipProvider delayDuration={100}>
           <Tooltip>
             <TooltipTrigger asChild>
