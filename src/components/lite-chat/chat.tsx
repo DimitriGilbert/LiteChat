@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { MenuIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Export sub-components for composability
+// Export sub-components for composability (remains the same)
 export { ChatContent } from "./chat-content";
 export { ChatHistory } from "./chat-history";
 export { ChatSide } from "./chat-side";
@@ -52,7 +52,7 @@ interface LiteChatProps {
   enableApiKeyManagement?: boolean; // Default: true
   enableSidebar?: boolean; // Default: true
   enableVfs?: boolean; // Default: true
-  enableAdvancedSettings?: boolean; // Default: true
+  enableAdvancedSettings?: boolean; // Default: true <-- Add prop
 }
 
 export const LiteChat: React.FC<LiteChatProps> = ({
@@ -70,7 +70,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
   enableApiKeyManagement = true,
   enableSidebar = true,
   enableVfs = true,
-  enableAdvancedSettings = true,
+  enableAdvancedSettings = true, // <-- Use prop
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
 
@@ -86,7 +86,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
       enableApiKeyManagement={enableApiKeyManagement}
       enableSidebar={enableSidebar}
       enableVfs={enableVfs}
-      enableAdvancedSettings={enableAdvancedSettings}
+      enableAdvancedSettings={enableAdvancedSettings} // <-- Pass down
     >
       <div
         className={cn(

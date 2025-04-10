@@ -38,17 +38,19 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setPresencePenalty,
     frequencyPenalty,
     setFrequencyPenalty,
-    activeSystemPrompt,
+    activeSystemPrompt, // This will be null if advanced settings are globally disabled
+    globalSystemPrompt, // This will be null if advanced settings are globally disabled
+    setGlobalSystemPrompt, // This will be a dummy function if disabled
     selectedItemId,
     selectedItemType,
     updateConversationSystemPrompt,
     isVfsEnabledForItem,
     vfs,
     getConversation,
-    enableApiKeyManagement, // <-- Get flag
+    enableApiKeyManagement,
+    enableAdvancedSettings, // <-- Get flag (though not used for rendering logic here)
   } = useChatContext();
 
-  // ... (state and effects for localConvoSystemPrompt remain the same) ...
   const conversationId = useMemo(() => {
     return selectedItemType === "conversation" ? selectedItemId : null;
   }, [selectedItemId, selectedItemType]);
@@ -58,31 +60,39 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
   >(null);
   const [isConvoPromptDirty, setIsConvoPromptDirty] = useState(false);
 
+  // Effect to load conversation-specific prompt
   useEffect(() => {
-    if (conversationId && getConversation) {
+    // Only try to load if advanced settings are enabled and a convo is selected
+    if (enableAdvancedSettings && conversationId && getConversation) {
       getConversation(conversationId)
         .then((convo) => {
           setLocalConvoSystemPrompt(convo?.systemPrompt ?? null);
           setIsConvoPromptDirty(false);
         })
-        .catch(() => setLocalConvoSystemPrompt(null));
+        .catch(() => {
+          setLocalConvoSystemPrompt(null);
+          setIsConvoPromptDirty(false);
+        });
     } else {
+      // Reset if advanced settings disabled or no convo selected
       setLocalConvoSystemPrompt(null);
       setIsConvoPromptDirty(false);
     }
-  }, [conversationId, getConversation]);
+  }, [conversationId, getConversation, enableAdvancedSettings]); // Add enableAdvancedSettings dependency
 
   const handleConvoSystemPromptChange = (
     e: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
-    // ... (logic remains the same)
     setLocalConvoSystemPrompt(e.target.value);
     setIsConvoPromptDirty(true);
   };
 
   const saveConvoSystemPrompt = () => {
-    // ... (logic remains the same)
-    if (conversationId && isConvoPromptDirty) {
+    if (
+      enableAdvancedSettings && // Check flag before saving
+      conversationId &&
+      isConvoPromptDirty
+    ) {
       const promptToSave =
         localConvoSystemPrompt?.trim() === "" ? null : localConvoSystemPrompt;
       updateConversationSystemPrompt(conversationId, promptToSave)
@@ -95,7 +105,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setter: (value: number | null) => void,
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    // ... (logic remains the same)
     const value = e.target.value;
     setter(value === "" ? null : parseInt(value, 10) || null);
   };
@@ -104,13 +113,21 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setter: (value: number | null) => void,
     value: number[],
   ) => {
-    // ... (logic remains the same)
     setter(value[0]);
   };
 
   const isConversationSelected = !!conversationId;
+  // Check local state for whether a convo prompt is *set* (not just active)
   const isConversationPromptSet =
     localConvoSystemPrompt !== null && localConvoSystemPrompt.trim() !== "";
+  // Check if the *active* prompt is the global one (or if no convo prompt is set)
+  const isUsingGlobalOrDefault =
+    activeSystemPrompt === globalSystemPrompt || !isConversationPromptSet;
+
+  // This component should only render if enableAdvancedSettings is true,
+  // so we don't need to hide elements based on the flag *within* this component.
+  // The setters passed down from context will be dummy functions if disabled,
+  // preventing state updates, but the UI elements will still render if this component is mounted.
 
   return (
     <div className={cn("p-3", className)}>
@@ -122,7 +139,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           <TabsTrigger value="system_prompt" className="text-xs px-2 h-7">
             System Prompt
           </TabsTrigger>
-          {/* Conditionally render API Keys tab */}
+          {/* Conditionally render API Keys tab based on its own flag */}
           {enableApiKeyManagement && (
             <TabsTrigger value="api_keys" className="text-xs px-2 h-7">
               API Keys
@@ -139,7 +156,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
 
         {/* Parameters Tab */}
         <TabsContent value="parameters" className="space-y-4 mt-0">
-          {/* ... (Parameter sliders/inputs remain the same) ... */}
+          {/* Parameter sliders/inputs */}
           <div className="grid grid-cols-2 gap-4 items-end">
             <div className="space-y-1.5">
               <Label htmlFor="temperature" className="text-xs">
@@ -234,7 +251,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
 
         {/* System Prompt Tab */}
         <TabsContent value="system_prompt" className="space-y-3 mt-0">
-          {/* ... (System prompt textarea and logic remain the same) ... */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
               <Label
@@ -285,24 +301,46 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
                   ? "Override global prompt for this chat (leave blank to use global)"
                   : "Select a conversation to set its specific system prompt"
               }
-              value={localConvoSystemPrompt ?? activeSystemPrompt ?? ""}
+              // Display local state if convo selected, otherwise show the active prompt (which might be global or null)
+              value={
+                isConversationSelected
+                  ? (localConvoSystemPrompt ?? "")
+                  : (activeSystemPrompt ?? "")
+              }
               onChange={handleConvoSystemPromptChange}
               className="text-xs min-h-[80px] max-h-[150px]"
               rows={4}
               disabled={!isConversationSelected}
             />
-            {isConversationSelected && !isConversationPromptSet && (
+            {isConversationSelected && isUsingGlobalOrDefault && (
               <p className="text-xs text-gray-400 flex items-center gap-1">
                 <InfoIcon className="h-3 w-3" />
-                Currently using the global system prompt.
+                Currently using the global system prompt (or default).
               </p>
             )}
-            {isConversationSelected && isConversationPromptSet && (
+            {isConversationSelected && !isUsingGlobalOrDefault && (
               <p className="text-xs text-green-400 flex items-center gap-1">
                 <InfoIcon className="h-3 w-3" />
                 Using this conversation-specific prompt.
               </p>
             )}
+          </div>
+          {/* Optionally show Global System Prompt for reference */}
+          <div className="space-y-1.5 pt-2 border-t border-gray-700/50">
+            <Label htmlFor="global-system-prompt-ref" className="text-xs">
+              Global System Prompt (Reference)
+            </Label>
+            <Textarea
+              id="global-system-prompt-ref"
+              readOnly
+              value={globalSystemPrompt ?? "Not set or disabled"}
+              className="text-xs min-h-[60px] max-h-[100px] bg-gray-800/50 border-gray-700/50"
+              rows={3}
+            />
+            <p className="text-xs text-gray-500">
+              Managed in main Settings dialog. Used when conversation prompt is
+              blank.
+            </p>
           </div>
         </TabsContent>
 
@@ -310,7 +348,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
         {enableApiKeyManagement && (
           <TabsContent value="api_keys" className="mt-0">
             <ApiKeySelector />
-            {/* You might add a link/button here to go to the full API Key settings */}
             <p className="text-xs text-gray-400 mt-2">
               Select the API key to use for the current provider. Manage all
               keys in the main Settings dialog.
@@ -320,7 +357,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
 
         {/* Files Tab */}
         <TabsContent value="files" className="mt-0">
-          {/* ... (File manager rendering logic remains the same) ... */}
           {isVfsEnabledForItem && vfs.isReady ? (
             <FileManager key={selectedItemId} />
           ) : (

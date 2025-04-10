@@ -34,8 +34,9 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
     getApiKeyForProvider,
     selectedApiKeyId,
     selectedItemId,
-    isVfsEnabledForItem, // Use the flag from context
-    toggleVfsEnabled, // Use the action from context
+    isVfsEnabledForItem,
+    toggleVfsEnabled,
+    enableAdvancedSettings, // <-- Get the flag from context
   } = useChatContext();
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
@@ -100,8 +101,8 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
               <div className="flex items-center space-x-2 h-9">
                 <Switch
                   id="vfs-toggle"
-                  checked={isVfsEnabledForItem} // Use context flag for checked state
-                  onCheckedChange={toggleVfsEnabled} // Use context action for change
+                  checked={isVfsEnabledForItem}
+                  onCheckedChange={toggleVfsEnabled}
                   disabled={!isItemSelected}
                   aria-label="Toggle Virtual Filesystem"
                 />
@@ -110,8 +111,8 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
                   className={cn(
                     "text-xs cursor-pointer flex items-center gap-1 transition-colors",
                     !isItemSelected && "text-gray-500 cursor-not-allowed",
-                    isItemSelected && isVfsEnabledForItem && "text-blue-400", // Use context flag
-                    isItemSelected && !isVfsEnabledForItem && "text-gray-400", // Use context flag
+                    isItemSelected && isVfsEnabledForItem && "text-blue-400",
+                    isItemSelected && !isVfsEnabledForItem && "text-gray-400",
                   )}
                 >
                   <FolderSyncIcon className="h-3.5 w-3.5" />
@@ -134,32 +135,35 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
 
         <div className="flex-grow" />
 
-        {/* Advanced Settings Toggle Button */}
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-                className={cn(
-                  "h-8 w-8 text-gray-400 hover:text-gray-200",
-                  isAdvancedOpen && "bg-gray-700 text-gray-200",
-                )}
-                aria-label="Toggle advanced settings"
-              >
-                <Settings2Icon className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              <p>{isAdvancedOpen ? "Hide" : "Show"} Advanced Settings</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        {/* Advanced Settings Toggle Button - Conditionally render */}
+        {enableAdvancedSettings && (
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+                  className={cn(
+                    "h-8 w-8 text-gray-400 hover:text-gray-200",
+                    isAdvancedOpen && "bg-gray-700 text-gray-200",
+                  )}
+                  aria-label="Toggle advanced settings"
+                >
+                  <Settings2Icon className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>{isAdvancedOpen ? "Hide" : "Show"} Advanced Settings</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
 
-      {isAdvancedOpen && (
+      {/* Advanced Settings Panel - Conditionally render */}
+      {enableAdvancedSettings && isAdvancedOpen && (
         <PromptSettingsAdvanced className="border-t border-gray-700" />
       )}
     </div>

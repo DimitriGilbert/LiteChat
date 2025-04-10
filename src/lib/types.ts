@@ -133,6 +133,7 @@ interface VfsContextObject {
 export interface ChatContextProps {
   // --- Feature Flags ---
   enableApiKeyManagement: boolean; // Flag indicating if the module is active
+  enableAdvancedSettings: boolean;
 
   // Provider/Model Selection
   providers: AiProviderConfig[];

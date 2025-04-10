@@ -33,7 +33,7 @@ import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useVirtualFileSystem } from "@/hooks/use-virtual-file-system";
 import { toast } from "sonner";
 
-// Helper to decode Uint8Array safely
+// Helper to decode Uint8Array safely (remains the same)
 const decodeUint8Array = (arr: Uint8Array): string => {
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(arr);
@@ -49,7 +49,7 @@ const decodeUint8Array = (arr: Uint8Array): string => {
 const EMPTY_API_KEYS: DbApiKey[] = [];
 const EMPTY_SIDEBAR_ITEMS: SidebarItem[] = [];
 
-// --- Dummy VFS Object ---
+// --- Dummy VFS Object --- (remains the same)
 const dummyVfs: VfsContextObject = {
   isReady: false,
   isLoading: false,
@@ -98,7 +98,7 @@ const dummyVfs: VfsContextObject = {
   },
 };
 
-// --- Dummy API Key Management ---
+// --- Dummy API Key Management --- (remains the same)
 const dummyApiKeysMgmt = {
   selectedApiKeyId: {},
   setSelectedApiKeyId: () => {
@@ -131,7 +131,7 @@ interface ChatProviderProps {
   enableApiKeyManagement?: boolean;
   enableSidebar?: boolean;
   enableVfs?: boolean;
-  enableAdvancedSettings?: boolean;
+  enableAdvancedSettings?: boolean; // <-- Accept the new flag
 }
 
 export const ChatProvider: React.FC<ChatProviderProps> = ({
@@ -146,9 +146,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   enableApiKeyManagement = true,
   enableSidebar = true,
   enableVfs = true,
-  enableAdvancedSettings = true,
+  enableAdvancedSettings = true, // <-- Use the prop
 }) => {
-  // --- Core State ---
+  // --- Core State --- (remains the same)
   const [isStreaming, setIsStreaming] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
@@ -163,7 +163,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     }
   }, []);
 
-  // --- Hooks ---
+  // --- Hooks --- (Provider/Model, Storage, API Keys remain the same)
   const providerModel = useProviderModelSelection({
     providers,
     initialProviderId,
@@ -171,7 +171,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   });
   const storage = useChatStorage();
 
-  // --- Conditional API Key Management ---
   const realApiKeysMgmt = useApiKeysManagement({
     apiKeys: storage.apiKeys || EMPTY_API_KEYS,
     addDbApiKey: storage.addApiKey,
@@ -182,7 +181,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     return enableApiKeyManagement ? realApiKeysMgmt : dummyApiKeysMgmt;
   }, [enableApiKeyManagement, realApiKeysMgmt]);
 
-  // --- Sidebar Management (Conditional based on enableSidebar) ---
+  // --- Sidebar Management --- (remains the same)
   const [activeItemId, setActiveItemId] = useState<string | null>(
     initialSelectedItemId,
   );
@@ -230,7 +229,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     return combinedItems;
   }, [storage.projects, storage.conversations]);
 
-  // Instantiate sidebar management hook conditionally
   const realSidebarMgmt = useSidebarManagement({
     initialSelectedItemId,
     initialSelectedItemType,
@@ -252,7 +250,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     sidebarItems: sidebarItems,
   });
 
-  // Dummy sidebar management object
   const dummySidebarMgmt = useMemo(
     () => ({
       selectedItemId: null,
@@ -297,7 +294,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     return enableSidebar ? realSidebarMgmt : dummySidebarMgmt;
   }, [enableSidebar, realSidebarMgmt, dummySidebarMgmt]);
 
-  // --- Active Item Data ---
+  // --- Active Item Data --- (remains the same)
   const activeItemData = useMemo(() => {
     console.log(
       `[ChatProvider] Recalculating activeItemData for ID: ${activeItemId}, Type: ${activeItemType}`,
@@ -326,12 +323,14 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   }, [activeItemType, activeItemData]);
 
   // --- Settings ---
+  // Pass enableAdvancedSettings flag to the hook
   const chatSettings = useChatSettings({
     activeConversationData: activeConversationData,
     activeProjectData: activeProjectData,
+    enableAdvancedSettings: enableAdvancedSettings, // <-- Pass flag
   });
 
-  // --- VFS Instantiation Logic (Conditional based on enableVfs) ---
+  // --- VFS Instantiation Logic --- (remains the same)
   const isVfsEnabledForItem = useMemo(
     () => (enableVfs ? (activeItemData?.vfsEnabled ?? false) : false),
     [enableVfs, activeItemData],
@@ -357,6 +356,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   }, [isVfsEnabledForItem, chatInput]);
 
   // --- AI Interaction ---
+  // Pass settings values (potentially defaults/nulls) from chatSettings
   const aiInteraction = useAiInteraction({
     selectedModel: providerModel.selectedModel,
     selectedProvider: providerModel.selectedProvider,
@@ -370,6 +370,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   });
 
   // --- Message Handling ---
+  // Pass settings values (potentially defaults/nulls) from chatSettings
   const messageHandling = useMessageHandling({
     selectedConversationId: activeConversationData?.id ?? null,
     performAiStream: aiInteraction.performAiStream,
@@ -380,6 +381,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       }
       setIsStreaming(false);
     }, []),
+    // Pass potentially null/default values from chatSettings
     activeSystemPrompt: chatSettings.activeSystemPrompt,
     temperature: chatSettings.temperature,
     maxTokens: chatSettings.maxTokens,
@@ -387,6 +389,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     topK: chatSettings.topK,
     presencePenalty: chatSettings.presencePenalty,
     frequencyPenalty: chatSettings.frequencyPenalty,
+    // Core state/setters
     isAiStreaming: isStreaming,
     setIsAiStreaming: setIsStreaming,
     localMessages: messages,
@@ -395,12 +398,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     setIsLoadingMessages: setIsLoadingMessages,
     error: error,
     setError,
+    // DB functions
     addDbMessage: storage.addDbMessage,
     deleteDbMessage: storage.deleteDbMessage,
     getMessagesForConversation: storage.getMessagesForConversation,
   });
 
-  // --- Submit Handler ---
+  // --- Submit Handler --- (remains the same)
   const handleSubmit = useCallback(
     async (e?: React.FormEvent<HTMLFormElement>) => {
       e?.preventDefault();
@@ -482,7 +486,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         enableVfs &&
         isVfsEnabledForItem &&
         vfs.isReady &&
-        vfs.configuredItemId === conversationIdToSubmit &&
+        vfs.configuredItemId === conversationIdToSubmit && // Check if VFS is configured for the *correct* item
         chatInput.selectedVfsPaths.length > 0
       ) {
         const vfsContentPromises = chatInput.selectedVfsPaths.map(
@@ -594,7 +598,7 @@ ${contentText}
     ],
   );
 
-  // --- Other Handlers ---
+  // --- Other Handlers --- (regenerate, stop, import, toggleVFS remain the same)
   const regenerateMessage = useCallback(
     async (messageId: string) => {
       if (activeItemType !== "conversation" || !activeItemId) {
@@ -637,6 +641,7 @@ ${contentText}
       toast.error("Virtual Filesystem is disabled in configuration.");
       return;
     }
+    // Pass current state for optimistic update/toast message
     await sidebarMgmt.toggleVfsEnabled(
       activeItemId,
       activeItemType,
@@ -685,7 +690,8 @@ ${contentText}
   const fullContextValue: ChatContextProps = useMemo(
     () => ({
       // --- Feature Flags ---
-      enableApiKeyManagement, // Pass down the flag
+      enableApiKeyManagement,
+      enableAdvancedSettings, // <-- Pass down the flag
 
       // Provider/Model Selection
       providers,
@@ -736,7 +742,7 @@ ${contentText}
       removeSelectedVfsPath: chatInput.removeSelectedVfsPath,
       clearSelectedVfsPaths: chatInput.clearSelectedVfsPaths,
 
-      // Settings
+      // Settings (Values from chatSettings hook)
       temperature: chatSettings.temperature,
       setTemperature: chatSettings.setTemperature,
       maxTokens: chatSettings.maxTokens,
@@ -774,23 +780,24 @@ ${contentText}
       getProject: storage.getProject,
     }),
     [
-      enableApiKeyManagement, // Add flag dependency
+      enableApiKeyManagement,
+      enableAdvancedSettings, // <-- Add flag dependency
       providers,
       providerModel.selectedProviderId,
       providerModel.setSelectedProviderId,
       providerModel.selectedModelId,
       providerModel.setSelectedModelId,
       storage.apiKeys,
-      apiKeysMgmt, // Use the potentially dummy object
+      apiKeysMgmt,
       sidebarItems,
-      sidebarMgmt, // Use the potentially dummy object
+      sidebarMgmt,
       coreContextValue,
       handleSubmit,
       stopStreaming,
       regenerateMessage,
       handleImportConversation,
       chatInput,
-      chatSettings,
+      chatSettings, // <-- Use the settings object
       streamingThrottleRate,
       storage.clearAllData,
       isVfsEnabledForItem,
@@ -801,7 +808,7 @@ ${contentText}
     ],
   );
 
-  // --- Logging Effects ---
+  // --- Logging Effects --- (remain the same)
   useEffect(() => {
     console.log(
       `[ChatProvider] Active item state updated: ID=${activeItemId}, Type=${activeItemType}`,
