@@ -1,5 +1,6 @@
 // src/lib/types.ts
-import type { CoreMessage } from "ai"; // Ensure CoreMessage is imported
+import type { CoreMessage } from "ai";
+import React from "react"; // Import React for ReactNode
 
 // --- Basic Types ---
 export type Role = "user" | "assistant" | "system";
@@ -66,7 +67,7 @@ export type SidebarItem = ProjectSidebarItem | ConversationSidebarItem;
 export interface AiModelConfig {
   id: string;
   name: string;
-  instance: any;
+  instance: any; // Consider a more specific type if possible
   contextWindow?: number;
 }
 
@@ -86,7 +87,42 @@ export interface FileSystemEntry {
   lastModified: Date;
 }
 
-// --- Chat Configuration (NEW) ---
+// --- Custom Action Definitions ---
+export interface CustomActionBase {
+  id: string; // Unique identifier for the action
+  icon: React.ReactNode; // The icon component to display
+  tooltip: string; // Tooltip text for the button
+  className?: string; // Optional class names for the button
+}
+
+// Forward declare ChatContextProps for use in action handlers
+interface ChatContextPropsForwardDeclare extends CoreChatContextProps {
+  // Add other essential props needed by actions if CoreChatContextProps is not enough
+  // This avoids circular dependency issues if actions need the full context type.
+  // For now, let's assume CoreChatContextProps + specific needed items are sufficient
+  // or pass the full context object carefully.
+  // We will define the full ChatContextProps later.
+  providers: AiProviderConfig[];
+  selectedProviderId: string | null;
+  selectedModelId: string | null;
+  // ... add other specific props actions might need from the full context
+  customPromptActions?: CustomPromptAction[];
+  customMessageActions?: CustomMessageAction[];
+}
+
+export interface CustomPromptAction extends CustomActionBase {
+  // onClick receives the full chat context for flexibility
+  onClick: (context: ChatContextProps) => void; // Use full type here
+}
+
+export interface CustomMessageAction extends CustomActionBase {
+  // onClick receives the specific message and the full chat context
+  onClick: (message: Message, context: ChatContextProps) => void; // Use full type here
+  // Optional: Condition to determine if the action should be shown for a specific message
+  isVisible?: (message: Message, context: ChatContextProps) => boolean; // Use full type here
+}
+
+// --- Chat Configuration ---
 export interface LiteChatConfig {
   // Feature Flags (defaults to true if undefined)
   enableSidebar?: boolean;
@@ -103,6 +139,10 @@ export interface LiteChatConfig {
   // Other Settings
   streamingThrottleRate?: number; // Default handled in provider
   defaultSidebarOpen?: boolean; // Default handled in LiteChat component
+
+  // Extensibility
+  customPromptActions?: CustomPromptAction[];
+  customMessageActions?: CustomMessageAction[];
 }
 
 // --- Chat Context ---
@@ -152,7 +192,7 @@ export interface VfsContextObject {
 // Full Context (Superset including Core + Optional Modules)
 export interface ChatContextProps {
   // --- Feature Flags ---
-  enableApiKeyManagement: boolean; // Flag indicating if the module is active
+  enableApiKeyManagement: boolean;
   enableAdvancedSettings: boolean;
 
   // Provider/Model Selection
@@ -230,7 +270,7 @@ export interface ChatContextProps {
   setMaxTokens: React.Dispatch<React.SetStateAction<number | null>>;
   globalSystemPrompt: string | null;
   setGlobalSystemPrompt: React.Dispatch<React.SetStateAction<string | null>>;
-  activeSystemPrompt: string | null; // Keep derived prompt
+  activeSystemPrompt: string | null;
   topP: number | null;
   setTopP: React.Dispatch<React.SetStateAction<number | null>>;
   topK: number | null;
@@ -247,16 +287,20 @@ export interface ChatContextProps {
 
   // Import/Export & Data Management
   exportConversation: (conversationId: string | null) => Promise<void>;
-  importConversation: (file: File) => Promise<void>; // Simplified signature
+  importConversation: (file: File) => Promise<void>;
   exportAllConversations: () => Promise<void>;
   clearAllData: () => Promise<void>;
 
   // Virtual File System (Object might be dummy if disabled)
   isVfsEnabledForItem: boolean;
-  toggleVfsEnabled: () => Promise<void>; // Simplified signature
+  toggleVfsEnabled: () => Promise<void>;
   vfs: VfsContextObject;
 
-  // Pass required DB functions (Consider removing if not needed directly)
+  // Pass required DB functions
   getConversation: (id: string) => Promise<DbConversation | undefined>;
   getProject: (id: string) => Promise<DbProject | undefined>;
+
+  // Extensibility
+  customPromptActions?: CustomPromptAction[];
+  customMessageActions?: CustomMessageAction[];
 }

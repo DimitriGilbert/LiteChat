@@ -1,54 +1,120 @@
+// src/components/lite-chat/message-actions.tsx
 import React from "react";
-import { Button } from "@/components/ui/button"; // Assuming shadcn/ui Button
-import { CopyIcon, RefreshCwIcon } from "lucide-react"; // Example icons
+import { Button } from "@/components/ui/button";
+import { CopyIcon, RefreshCwIcon } from "lucide-react";
 import { toast } from "sonner";
+import { useChatContext } from "@/hooks/use-chat-context";
+import type { Message } from "@/lib/types";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface MessageActionsProps {
-  messageContent: string;
-  onRegenerate?: () => void; // Optional: For AI messages
+  message: Message; // Accept the full message object
+  onRegenerate?: () => void;
   className?: string;
 }
 
 export const MessageActions: React.FC<MessageActionsProps> = React.memo(
-  ({ messageContent, onRegenerate, className }) => {
+  ({ message, onRegenerate, className }) => {
+    // Get custom actions and the full context
+    const context = useChatContext();
+    const { customMessageActions = [] } = context;
+
     const handleCopy = () => {
       navigator.clipboard
-        .writeText(messageContent)
+        .writeText(message.content) // Use message.content
         .then(() => {
-          toast.success("Copied to clipboard!"); // Use toast
+          toast.success("Copied to clipboard!");
         })
         .catch((err) => {
           toast.error("Failed to copy text.");
           console.error("Copy failed:", err);
         });
-      // Add toast notification here if desired
     };
 
     return (
       <div
-        className={`flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ${className}`}
-      >
-        {onRegenerate && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={onRegenerate}
-            aria-label="Regenerate response"
-          >
-            <RefreshCwIcon className="h-4 w-4" />
-          </Button>
+        className={cn(
+          "flex items-center gap-0.5 opacity-0 group-hover/message:opacity-100 transition-opacity", // Use group-hover/message
+          className,
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={handleCopy}
-          aria-label="Copy message"
-        >
-          <CopyIcon className="h-4 w-4" />
-        </Button>
-        {/* Add other actions like Edit (for user), Delete, etc. */}
+      >
+        {/* Custom Message Actions */}
+        {customMessageActions.map((action) => {
+          // Check visibility condition if provided
+          const isVisible = action.isVisible
+            ? action.isVisible(message, context)
+            : true;
+          if (!isVisible) return null;
+
+          return (
+            <TooltipProvider key={action.id} delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn("h-6 w-6", action.className)} // Apply custom classes
+                    onClick={() => action.onClick(message, context)} // Pass message and context
+                    aria-label={action.tooltip}
+                  >
+                    {action.icon}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p>{action.tooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
+        })}
+
+        {/* Default Regenerate Action */}
+        {onRegenerate && (
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={onRegenerate}
+                  aria-label="Regenerate response"
+                >
+                  <RefreshCwIcon className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>Regenerate</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
+        {/* Default Copy Action */}
+        <TooltipProvider delayDuration={100}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={handleCopy}
+                aria-label="Copy message"
+              >
+                <CopyIcon className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>Copy</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     );
   },

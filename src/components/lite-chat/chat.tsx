@@ -5,12 +5,15 @@ import { ChatSide } from "./chat-side";
 import { ChatWrapper } from "./chat-wrapper";
 import type {
   AiProviderConfig,
+  AiModelConfig, // Added missing import
   SidebarItemType,
-  LiteChatConfig, // Import the new config type
+  LiteChatConfig,
   Message,
   DbProject,
   DbConversation,
   SidebarItem,
+  CustomPromptAction,
+  CustomMessageAction,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { MenuIcon, XIcon } from "lucide-react";
@@ -36,18 +39,21 @@ export { useChatContext } from "@/hooks/use-chat-context";
 export { ChatProvider } from "@/context/chat-context";
 export type {
   AiProviderConfig,
+  AiModelConfig,
   Message,
   DbProject,
   DbConversation,
   SidebarItem,
   SidebarItemType,
-  LiteChatConfig, // Export config type as well
+  LiteChatConfig,
+  CustomPromptAction,
+  CustomMessageAction,
 };
-export { useSidebarManagement } from "@/hooks/use-sidebar-management"; // Keep if needed externally
+export { useSidebarManagement } from "@/hooks/use-sidebar-management";
 
 interface LiteChatProps {
   providers: AiProviderConfig[];
-  config?: LiteChatConfig; // Make config optional, defaults handled below
+  config?: LiteChatConfig; // Config now includes custom actions
   className?: string;
   SideComponent?: React.ComponentType<{ className?: string }>;
   WrapperComponent?: React.ComponentType<{ className?: string }>;
@@ -55,12 +61,12 @@ interface LiteChatProps {
 
 export const LiteChat: React.FC<LiteChatProps> = ({
   providers,
-  config = {}, // Default to empty object if config is not provided
+  config = {},
   className,
   SideComponent = ChatSide,
   WrapperComponent = ChatWrapper,
 }) => {
-  // Destructure config with defaults
+  // Destructure config with defaults, including custom actions
   const {
     enableSidebar = true,
     enableVfs = true,
@@ -70,8 +76,10 @@ export const LiteChat: React.FC<LiteChatProps> = ({
     initialModelId = null,
     initialSelectedItemId = null,
     initialSelectedItemType = null,
-    streamingThrottleRate, // Let ChatProvider handle its default
+    streamingThrottleRate,
     defaultSidebarOpen = true,
+    customPromptActions = [], // Default to empty array
+    customMessageActions = [], // Default to empty array
   } = config;
 
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
@@ -84,11 +92,13 @@ export const LiteChat: React.FC<LiteChatProps> = ({
       initialSelectedItemId={initialSelectedItemId}
       initialSelectedItemType={initialSelectedItemType}
       streamingThrottleRate={streamingThrottleRate}
-      // Pass down the resolved feature flags
       enableApiKeyManagement={enableApiKeyManagement}
       enableSidebar={enableSidebar}
       enableVfs={enableVfs}
       enableAdvancedSettings={enableAdvancedSettings}
+      // Pass custom actions down to the provider
+      customPromptActions={customPromptActions}
+      customMessageActions={customMessageActions}
     >
       <div
         className={cn(
@@ -96,7 +106,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
           className,
         )}
       >
-        {/* Sidebar - Conditionally render based on flag AND state */}
+        {/* Sidebar */}
         {enableSidebar && sidebarOpen && (
           <SideComponent
             className={cn(
@@ -108,7 +118,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
 
         {/* Main Chat Area Wrapper */}
         <div className="flex-grow flex flex-col relative w-full min-w-0">
-          {/* Sidebar Toggle Button - Only show if sidebar is enabled */}
+          {/* Sidebar Toggle Button */}
           {enableSidebar && (
             <Button
               variant="ghost"
@@ -127,7 +137,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
             </Button>
           )}
 
-          {/* Render the main chat content */}
+          {/* Chat Content */}
           <WrapperComponent className="h-full" />
         </div>
       </div>

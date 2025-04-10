@@ -7,9 +7,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { BotIcon, UserIcon, CopyIcon, FileTextIcon } from "lucide-react"; // Added FileTextIcon
-import { Button } from "@/components/ui/button"; // Import Button
-import { toast } from "sonner"; // Import toast
+import { BotIcon, UserIcon, CopyIcon, FileTextIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface MessageBubbleProps {
   message: Message;
@@ -17,7 +17,7 @@ interface MessageBubbleProps {
   className?: string;
 }
 
-// Custom Code component for Syntax Highlighting (Keep as is)
+// Custom Code component for Syntax Highlighting
 const CodeBlock: React.FC<{
   inline?: boolean;
   className?: string;
@@ -26,11 +26,7 @@ const CodeBlock: React.FC<{
   const match = /language-(\w+)/.exec(className || "");
   return !inline && match ? (
     <div className="relative group/codeblock">
-      {" "}
-      {/* Added group/codeblock */}
       <div className="absolute right-2 top-2 opacity-0 group-hover/codeblock:opacity-100 transition-opacity">
-        {" "}
-        {/* Use group-hover/codeblock */}
         <Button
           variant="ghost"
           size="icon"
@@ -57,7 +53,7 @@ const CodeBlock: React.FC<{
   ) : (
     <code
       className={cn(
-        "font-mono text-sm px-1 py-0.5 rounded-sm bg-gray-700", // Adjusted inline code style
+        "font-mono text-sm px-1 py-0.5 rounded-sm bg-gray-700",
         className,
       )}
       {...props}
@@ -75,19 +71,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   className,
 }) => {
   const isUser = message.role === "user";
-  // Content for streaming state (plain text)
   const streamingContent = message.streamedContent ?? "";
-  // Final content (potentially markdown)
   const finalContent = message.content;
-  // VFS context paths for user messages
   const vfsPaths = message.vfsContextPaths;
 
   return (
     <div
-      // Add group class here for MessageActions hover effect
       className={cn(
-        "group/message flex gap-4 px-4 py-5 transition-colors",
-        isUser ? "bg-gray-900" : "bg-gray-800", // Keep distinct backgrounds
+        "group/message flex gap-4 px-4 py-5 transition-colors", // Added group/message
+        isUser ? "bg-gray-900" : "bg-gray-800",
         className,
       )}
     >
@@ -114,30 +106,26 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           {isUser ? "You" : "Assistant"}
         </div>
 
-        {/* Conditional Rendering: Plain text during stream, Markdown after */}
+        {/* Content */}
         {message.isStreaming ? (
-          // Render plain text during streaming, preserving whitespace/newlines
           <div className="text-gray-200 text-sm whitespace-pre-wrap break-words">
             {streamingContent}
-            <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"></span>{" "}
-            {/* Streaming indicator */}
+            <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"></span>
           </div>
         ) : (
-          // Render final content with Markdown processing
           <div
             className={cn(
               "prose prose-sm prose-invert max-w-none",
-              // Add styling for prose elements if needed
               "prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1",
               "prose-headings:mt-4 prose-headings:mb-2",
               "prose-code:before:content-none prose-code:after:content-none prose-code:bg-gray-700 prose-code:px-1 prose-code:py-0.5 prose-code:rounded-sm",
-              "prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-2", // Make pre background transparent so CodeBlock controls it
+              "prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-2",
             )}
           >
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                code: CodeBlock, // Use custom CodeBlock for highlighting
+                code: CodeBlock,
               }}
             >
               {finalContent}
@@ -145,7 +133,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
         )}
 
-        {/* Display VFS Context Paths for User Messages */}
+        {/* VFS Context Paths */}
         {isUser && vfsPaths && vfsPaths.length > 0 && (
           <div className="mt-2 pt-2 border-t border-gray-700/50 flex flex-wrap gap-x-3 gap-y-1">
             <span className="text-xs text-gray-500 font-medium w-full mb-0.5">
@@ -166,18 +154,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
         )}
 
-        {/* Display error if present */}
+        {/* Error */}
         {message.error && (
           <p className="text-xs text-red-400 mt-1">Error: {message.error}</p>
         )}
       </div>
 
       {/* Actions Area */}
-      <div className="flex-shrink-0 self-start pt-1 opacity-0 group-hover/message:opacity-100 transition-opacity">
-        {" "}
-        {/* Use group-hover/message */}
+      <div className="flex-shrink-0 self-start pt-1">
         <MessageActions
-          messageContent={message.content} // Pass final content for copy
+          message={message} // Pass the full message object
           onRegenerate={
             !isUser && onRegenerate && !message.isStreaming && !message.error
               ? () => onRegenerate(message.id)
@@ -189,7 +175,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   );
 };
 
-// Keep the custom comparison function for React.memo
+// Custom comparison function for React.memo
 const messagesAreEqual = (
   prevProps: MessageBubbleProps,
   nextProps: MessageBubbleProps,

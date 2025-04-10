@@ -1,5 +1,5 @@
 // src/components/lite-chat/prompt-actions.tsx
-import React, { useRef } from "react"; // Add useRef
+import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { SendHorizonalIcon, PaperclipIcon } from "lucide-react";
 import { useChatContext } from "@/hooks/use-chat-context";
@@ -16,29 +16,34 @@ interface PromptActionsProps {
 }
 
 export const PromptActions: React.FC<PromptActionsProps> = ({ className }) => {
-  const { prompt, isStreaming, addAttachedFile } = useChatContext();
-  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for file input
+  // Get custom actions and the full context
+  const context = useChatContext();
+  const {
+    prompt,
+    isStreaming,
+    addAttachedFile,
+    customPromptActions = [], // Default to empty array
+  } = context;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const canSubmit =
-    prompt.trim().length > 0 /* || attachedFiles.length > 0 */ && !isStreaming; // TODO: Allow submit with only files
+  const canSubmit = prompt.trim().length > 0 && !isStreaming;
 
   const handleAttachClick = () => {
-    fileInputRef.current?.click(); // Trigger hidden input
+    fileInputRef.current?.click();
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
       for (let i = 0; i < files.length; i++) {
-        addAttachedFile(files[i]); // Add selected files to context
+        addAttachedFile(files[i]);
       }
-      // Reset input value so selecting the same file again triggers onChange
       event.target.value = "";
     }
   };
 
   return (
-    <div className={cn("flex items-end ml-2 mb-1", className)}>
+    <div className={cn("flex items-end ml-2 mb-1 gap-1", className)}>
       <input
         type="file"
         ref={fileInputRef}
@@ -46,18 +51,17 @@ export const PromptActions: React.FC<PromptActionsProps> = ({ className }) => {
         className="hidden"
         multiple
       />
-
+      {/* Attach Button */}
       <TooltipProvider delayDuration={100}>
         <Tooltip>
           <TooltipTrigger asChild>
-            {/* Add type="button" here */}
             <Button
-              type="button" // <--- ADD THIS LINE
+              type="button"
               variant="outline"
               size="icon"
               onClick={handleAttachClick}
               disabled={isStreaming}
-              className="h-10 w-10 rounded-full mr-2 border-gray-200 dark:border-gray-700"
+              className="h-10 w-10 rounded-full border-gray-200 dark:border-gray-700"
               aria-label="Attach file"
             >
               <PaperclipIcon className="h-5 w-5" />
@@ -68,8 +72,33 @@ export const PromptActions: React.FC<PromptActionsProps> = ({ className }) => {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-
-      {/* Submit button remains type="submit" (implicitly via form) */}
+      {/* Custom Prompt Actions */}
+      {customPromptActions.map((action) => (
+        <TooltipProvider key={action.id} delayDuration={100}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => action.onClick(context)} // Pass full context
+                disabled={isStreaming} // Disable custom actions during streaming too
+                className={cn(
+                  "h-10 w-10 rounded-full border-gray-200 dark:border-gray-700",
+                  action.className, // Apply custom classes
+                )}
+                aria-label={action.tooltip}
+              >
+                {action.icon}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{action.tooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ))}
+      {/* Send Button */}
       <TooltipProvider delayDuration={100}>
         <Tooltip>
           <TooltipTrigger asChild>
