@@ -1,8 +1,5 @@
 // src/lib/types.ts
 
-import type { CoreMessage } from "ai";
-// Removed FileSystem import as it's not directly used in context types
-
 // --- Basic Types ---
 export type Role = "user" | "assistant" | "system";
 export type SidebarItemType = "conversation" | "project";
@@ -134,6 +131,9 @@ interface VfsContextObject {
 
 // Full Context (Superset including Core + Optional Modules)
 export interface ChatContextProps {
+  // --- Feature Flags ---
+  enableApiKeyManagement: boolean; // Flag indicating if the module is active
+
   // Provider/Model Selection
   providers: AiProviderConfig[];
   selectedProviderId: string | null;
@@ -141,7 +141,7 @@ export interface ChatContextProps {
   selectedModelId: string | null;
   setSelectedModelId: React.Dispatch<React.SetStateAction<string | null>>;
 
-  // API Key Management
+  // API Key Management (Functions might be dummies if disabled)
   apiKeys: DbApiKey[];
   selectedApiKeyId: Record<string, string | null>;
   setSelectedApiKeyId: (providerId: string, keyId: string | null) => void;
@@ -153,7 +153,7 @@ export interface ChatContextProps {
   deleteApiKey: (id: string) => Promise<void>;
   getApiKeyForProvider: (providerId: string) => string | undefined;
 
-  // Sidebar / Item Management
+  // Sidebar / Item Management (Functions might be dummies if disabled)
   sidebarItems: SidebarItem[];
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
@@ -179,8 +179,6 @@ export interface ChatContextProps {
     id: string,
     systemPrompt: string | null,
   ) => Promise<void>;
-  // REMOVED: activeConversationData: DbConversation | null;
-  // REMOVED: activeProjectData: DbProject | null;
 
   // Messages & Streaming (Core)
   messages: Message[];
@@ -204,7 +202,7 @@ export interface ChatContextProps {
   removeSelectedVfsPath: (path: string) => void;
   clearSelectedVfsPaths: () => void;
 
-  // Settings
+  // Settings (Functions might be dummies if disabled)
   temperature: number;
   setTemperature: React.Dispatch<React.SetStateAction<number>>;
   maxTokens: number | null;
@@ -232,7 +230,7 @@ export interface ChatContextProps {
   exportAllConversations: () => Promise<void>;
   clearAllData: () => Promise<void>;
 
-  // Virtual File System
+  // Virtual File System (Object might be dummy if disabled)
   isVfsEnabledForItem: boolean;
   toggleVfsEnabled: () => Promise<void>; // Simplified signature
   vfs: VfsContextObject;

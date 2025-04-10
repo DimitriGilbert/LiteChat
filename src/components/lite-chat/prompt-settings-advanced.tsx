@@ -42,11 +42,13 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     selectedItemId,
     selectedItemType,
     updateConversationSystemPrompt,
-    isVfsEnabledForItem, // Get the boolean flag
-    vfs, // Get the VFS object (real or dummy)
+    isVfsEnabledForItem,
+    vfs,
     getConversation,
+    enableApiKeyManagement, // <-- Get flag
   } = useChatContext();
 
+  // ... (state and effects for localConvoSystemPrompt remain the same) ...
   const conversationId = useMemo(() => {
     return selectedItemType === "conversation" ? selectedItemId : null;
   }, [selectedItemId, selectedItemType]);
@@ -73,11 +75,13 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
   const handleConvoSystemPromptChange = (
     e: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
+    // ... (logic remains the same)
     setLocalConvoSystemPrompt(e.target.value);
     setIsConvoPromptDirty(true);
   };
 
   const saveConvoSystemPrompt = () => {
+    // ... (logic remains the same)
     if (conversationId && isConvoPromptDirty) {
       const promptToSave =
         localConvoSystemPrompt?.trim() === "" ? null : localConvoSystemPrompt;
@@ -91,6 +95,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setter: (value: number | null) => void,
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
+    // ... (logic remains the same)
     const value = e.target.value;
     setter(value === "" ? null : parseInt(value, 10) || null);
   };
@@ -99,6 +104,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setter: (value: number | null) => void,
     value: number[],
   ) => {
+    // ... (logic remains the same)
     setter(value[0]);
   };
 
@@ -116,19 +122,24 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           <TabsTrigger value="system_prompt" className="text-xs px-2 h-7">
             System Prompt
           </TabsTrigger>
-          <TabsTrigger value="api_keys" className="text-xs px-2 h-7">
-            API Keys
-          </TabsTrigger>
+          {/* Conditionally render API Keys tab */}
+          {enableApiKeyManagement && (
+            <TabsTrigger value="api_keys" className="text-xs px-2 h-7">
+              API Keys
+            </TabsTrigger>
+          )}
           <TabsTrigger
             value="files"
             className="text-xs px-2 h-7"
-            disabled={!isVfsEnabledForItem} // Disable tab if VFS not enabled for item
+            disabled={!isVfsEnabledForItem}
           >
             Files
           </TabsTrigger>
         </TabsList>
 
+        {/* Parameters Tab */}
         <TabsContent value="parameters" className="space-y-4 mt-0">
+          {/* ... (Parameter sliders/inputs remain the same) ... */}
           <div className="grid grid-cols-2 gap-4 items-end">
             <div className="space-y-1.5">
               <Label htmlFor="temperature" className="text-xs">
@@ -221,7 +232,9 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           </div>
         </TabsContent>
 
+        {/* System Prompt Tab */}
         <TabsContent value="system_prompt" className="space-y-3 mt-0">
+          {/* ... (System prompt textarea and logic remain the same) ... */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
               <Label
@@ -293,24 +306,30 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           </div>
         </TabsContent>
 
-        <TabsContent value="api_keys" className="mt-0">
-          <ApiKeySelector />
-        </TabsContent>
+        {/* API Keys Tab - Conditionally render content */}
+        {enableApiKeyManagement && (
+          <TabsContent value="api_keys" className="mt-0">
+            <ApiKeySelector />
+            {/* You might add a link/button here to go to the full API Key settings */}
+            <p className="text-xs text-gray-400 mt-2">
+              Select the API key to use for the current provider. Manage all
+              keys in the main Settings dialog.
+            </p>
+          </TabsContent>
+        )}
 
-        {/* Files Tab Content */}
+        {/* Files Tab */}
         <TabsContent value="files" className="mt-0">
-          {/* Check if VFS is enabled for the item AND ready */}
+          {/* ... (File manager rendering logic remains the same) ... */}
           {isVfsEnabledForItem && vfs.isReady ? (
-            // Pass selectedItemId to key to force remount if item changes
             <FileManager key={selectedItemId} />
           ) : (
             <div className="text-center text-sm text-gray-500 py-8">
               {isVfsEnabledForItem && vfs.isLoading
-                ? "Initializing filesystem..." // Show loading state
+                ? "Initializing filesystem..."
                 : isVfsEnabledForItem && vfs.error
-                  ? `Error: ${vfs.error}` // Show error state
-                  : "Virtual Filesystem is not enabled for the selected item." // Show disabled state
-              }
+                  ? `Error: ${vfs.error}`
+                  : "Virtual Filesystem is not enabled for the selected item."}
               <br />
               {!isVfsEnabledForItem && (
                 <span>

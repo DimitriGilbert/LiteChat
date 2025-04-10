@@ -48,6 +48,11 @@ interface LiteChatProps {
   defaultSidebarOpen?: boolean;
   SideComponent?: React.ComponentType<{ className?: string }>;
   WrapperComponent?: React.ComponentType<{ className?: string }>;
+  // --- Feature Flags (Optional Props) ---
+  enableApiKeyManagement?: boolean; // Default: true
+  enableSidebar?: boolean; // Default: true
+  enableVfs?: boolean; // Default: true
+  enableAdvancedSettings?: boolean; // Default: true
 }
 
 export const LiteChat: React.FC<LiteChatProps> = ({
@@ -61,6 +66,11 @@ export const LiteChat: React.FC<LiteChatProps> = ({
   defaultSidebarOpen = true,
   SideComponent = ChatSide,
   WrapperComponent = ChatWrapper,
+  // --- Feature Flags with Defaults ---
+  enableApiKeyManagement = true,
+  enableSidebar = true,
+  enableVfs = true,
+  enableAdvancedSettings = true,
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
 
@@ -72,6 +82,11 @@ export const LiteChat: React.FC<LiteChatProps> = ({
       initialSelectedItemId={initialSelectedItemId}
       initialSelectedItemType={initialSelectedItemType}
       streamingThrottleRate={streamingThrottleRate}
+      // Pass down the resolved feature flags
+      enableApiKeyManagement={enableApiKeyManagement}
+      enableSidebar={enableSidebar}
+      enableVfs={enableVfs}
+      enableAdvancedSettings={enableAdvancedSettings}
     >
       <div
         className={cn(
@@ -79,8 +94,8 @@ export const LiteChat: React.FC<LiteChatProps> = ({
           className,
         )}
       >
-        {/* Sidebar */}
-        {sidebarOpen && (
+        {/* Sidebar - Conditionally render based on flag AND state */}
+        {enableSidebar && sidebarOpen && (
           <SideComponent
             className={cn(
               "w-72 flex-shrink-0",
@@ -89,27 +104,26 @@ export const LiteChat: React.FC<LiteChatProps> = ({
           />
         )}
 
-        {/* Mobile Sidebar (Drawer - Example, requires extra implementation) */}
-        {/* Consider adding a proper drawer implementation later */}
-
         {/* Main Chat Area Wrapper */}
         <div className="flex-grow flex flex-col relative w-full min-w-0">
-          {/* Sidebar Toggle Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "absolute top-3 left-3 z-10 text-gray-400 hover:text-white hover:bg-gray-700 md:hidden", // Only show on small screens
-            )}
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
-          >
-            {sidebarOpen ? (
-              <XIcon className="h-5 w-5" />
-            ) : (
-              <MenuIcon className="h-5 w-5" />
-            )}
-          </Button>
+          {/* Sidebar Toggle Button - Only show if sidebar is enabled */}
+          {enableSidebar && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "absolute top-3 left-3 z-10 text-gray-400 hover:text-white hover:bg-gray-700 md:hidden", // Only show on small screens
+              )}
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+            >
+              {sidebarOpen ? (
+                <XIcon className="h-5 w-5" />
+              ) : (
+                <MenuIcon className="h-5 w-5" />
+              )}
+            </Button>
+          )}
 
           {/* Render the main chat content */}
           <WrapperComponent className="h-full" />

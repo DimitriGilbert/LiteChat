@@ -13,6 +13,7 @@ import { SettingsGeneral } from "./settings-general";
 import { SettingsApiKeys } from "./settings-api-keys";
 import { SettingsDataManagement } from "./settings-data-management";
 import { SettingsAssistant } from "./settings-assistant";
+import { useChatContext } from "@/hooks/use-chat-context"; // <-- Import context hook
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -23,9 +24,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { enableApiKeyManagement } = useChatContext(); // <-- Get flag
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      {/* Add bg-background here */}
       <DialogContent className="sm:max-w-[650px] flex flex-col max-h-[80vh] bg-cyan-950">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
@@ -35,14 +37,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </DialogHeader>
 
         <Tabs
-          defaultValue="apiKeys"
+          // Default to 'general' if API keys are disabled, otherwise 'apiKeys'
+          defaultValue={enableApiKeyManagement ? "apiKeys" : "general"}
           className="flex-grow flex flex-col overflow-hidden"
         >
           <TabsList className="flex-shrink-0">
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="assistant">Prompt</TabsTrigger>
-
-            <TabsTrigger value="apiKeys">API Keys</TabsTrigger>
+            {/* Conditionally render API Keys trigger */}
+            {enableApiKeyManagement && (
+              <TabsTrigger value="apiKeys">API Keys</TabsTrigger>
+            )}
             <TabsTrigger value="data">Data Management</TabsTrigger>
           </TabsList>
 
@@ -53,18 +58,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <TabsContent value="assistant">
               <SettingsAssistant />
             </TabsContent>
-            <TabsContent value="apiKeys" className="mt-0">
-              <SettingsApiKeys />
-            </TabsContent>
+            {/* Conditionally render API Keys content */}
+            {enableApiKeyManagement && (
+              <TabsContent value="apiKeys" className="mt-0">
+                <SettingsApiKeys />
+              </TabsContent>
+            )}
             <TabsContent value="data" className="mt-0">
               <SettingsDataManagement />
             </TabsContent>
           </ScrollArea>
         </Tabs>
-        {/* Optional Footer */}
-        {/* <DialogFooter className="mt-4 flex-shrink-0">
-          <Button onClick={onClose} variant="outline">Close</Button>
-        </DialogFooter> */}
       </DialogContent>
     </Dialog>
   );

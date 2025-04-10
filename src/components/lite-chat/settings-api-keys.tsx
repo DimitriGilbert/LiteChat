@@ -19,18 +19,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2Icon, EyeIcon, EyeOffIcon } from "lucide-react";
+import { Trash2Icon, EyeIcon, EyeOffIcon, InfoIcon } from "lucide-react"; // Added InfoIcon
 import { toast } from "sonner";
 
 export const SettingsApiKeys: React.FC = () => {
-  const { apiKeys, addApiKey, deleteApiKey, providers } = useChatContext();
+  const {
+    apiKeys,
+    addApiKey,
+    deleteApiKey,
+    providers,
+    enableApiKeyManagement, // <-- Get flag from context
+  } = useChatContext();
   const [newKeyName, setNewKeyName] = useState("");
   const [newKeyValue, setNewKeyValue] = useState("");
   const [newKeyProviderId, setNewKeyProviderId] = useState<string>("");
   const [isAdding, setIsAdding] = useState(false);
-  const [showValues, setShowValues] = useState<Record<string, boolean>>({}); // Track visibility per key
+  const [showValues, setShowValues] = useState<Record<string, boolean>>({});
+
+  // --- Conditional Rendering ---
+  if (!enableApiKeyManagement) {
+    return (
+      <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2 bg-gray-800/30 rounded-md border border-dashed border-gray-700 min-h-[200px]">
+        <InfoIcon className="h-5 w-5" />
+        API Key Management is disabled in the configuration.
+      </div>
+    );
+  }
+  // --- End Conditional Rendering ---
 
   const handleAddKey = async (e: React.FormEvent) => {
+    // ... (handleAddKey logic remains the same)
     e.preventDefault();
     if (!newKeyName.trim() || !newKeyValue.trim() || !newKeyProviderId) {
       toast.error("Please fill in all fields for the API key.");
@@ -38,18 +56,11 @@ export const SettingsApiKeys: React.FC = () => {
     }
     setIsAdding(true);
     try {
-      // const addedKeyId = await addApiKey(
-      await addApiKey(
-        newKeyName.trim(),
-        newKeyProviderId,
-        newKeyValue.trim(), // Pass the value
-      );
+      await addApiKey(newKeyName.trim(), newKeyProviderId, newKeyValue.trim());
       toast.success(`API Key "${newKeyName.trim()}" added.`);
       setNewKeyName("");
-      setNewKeyValue(""); // Clear the value after submission
+      setNewKeyValue("");
       setNewKeyProviderId("");
-      // Optionally auto-select the new key (addApiKey already does this)
-      // setSelectedApiKeyId(newKeyProviderId, addedKeyId);
     } catch (error: unknown) {
       console.error("Failed to add API key:", error);
       if (error instanceof Error) {
@@ -63,13 +74,14 @@ export const SettingsApiKeys: React.FC = () => {
   };
 
   const handleDeleteKey = async (id: string, name: string) => {
+    // ... (handleDeleteKey logic remains the same)
     if (window.confirm(`Are you sure you want to delete the key "${name}"?`)) {
       try {
         await deleteApiKey(id);
         toast.success(`API Key "${name}" deleted.`);
         setShowValues((prev) => {
           const next = { ...prev };
-          delete next[id]; // Remove visibility state for deleted key
+          delete next[id];
           return next;
         });
       } catch (error: unknown) {
@@ -84,10 +96,12 @@ export const SettingsApiKeys: React.FC = () => {
   };
 
   const toggleShowValue = (id: string) => {
+    // ... (toggleShowValue logic remains the same)
     setShowValues((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const getProviderName = (providerId: string) => {
+    // ... (getProviderName logic remains the same)
     return providers.find((p) => p.id === providerId)?.name ?? providerId;
   };
 
@@ -120,7 +134,7 @@ export const SettingsApiKeys: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 {providers
-                  .filter((p) => p.requiresApiKey !== false && p.id !== "mock") // Only show providers needing keys
+                  .filter((p) => p.requiresApiKey !== false && p.id !== "mock")
                   .map((provider) => (
                     <SelectItem key={provider.id} value={provider.id}>
                       {provider.name}
@@ -133,7 +147,7 @@ export const SettingsApiKeys: React.FC = () => {
             <Label htmlFor="new-key-value">API Key Value</Label>
             <Input
               id="new-key-value"
-              type="password" // Use password type initially
+              type="password"
               value={newKeyValue}
               onChange={(e) => setNewKeyValue(e.target.value)}
               placeholder="Paste your API key here"
