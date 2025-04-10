@@ -44,11 +44,17 @@ interface ChatProviderProps {
   streamingThrottleRate?: number;
 }
 
+// Helper to decode Uint8Array safely
 const decodeUint8Array = (arr: Uint8Array): string => {
   try {
+    // Try strict UTF-8 decoding first
     return new TextDecoder("utf-8", { fatal: true }).decode(arr);
   } catch (e) {
-    console.warn("Failed to decode Uint8Array as UTF-8, trying lossy:", e);
+    console.warn(
+      "Failed to decode Uint8Array as strict UTF-8, trying lossy:",
+      e,
+    );
+    // Fallback to lossy decoding if strict fails
     return new TextDecoder("utf-8", { fatal: false }).decode(arr);
   }
 };
@@ -209,7 +215,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     activeProjectData: activeProjectData,
   });
 
-  // VFS remains disabled for now
+  // VFS Hook Instantiation
   const vfsEnabled = useMemo(
     () => activeItemData?.vfsEnabled ?? false,
     [activeItemData],
@@ -274,7 +280,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       e?.preventDefault();
       const currentPrompt = chatInput.prompt.trim();
       const canSubmit =
-        currentPrompt.length > 0 || chatInput.attachedFiles.length > 0;
+        currentPrompt.length > 0 ||
+        chatInput.attachedFiles.length > 0 ||
+        chatInput.selectedVfsPaths.length > 0; // Allow submit if VFS files selected
 
       if (!canSubmit) return;
       if (isStreaming) {
@@ -326,38 +334,97 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         return;
       }
 
-      // --- VFS/Upload Handling (remains disabled for now) ---
-      let uploadInfo = "";
-      if (chatInput.attachedFiles.length > 0) {
-        toast.warning("File attaching is temporarily disabled for debugging.");
-        uploadInfo = `
-          [File attaching disabled]`;
-        chatInput.clearAttachedFiles();
+      // --- VFS/Upload Handling ---
+      let contextPrefix = "";
+      const pathsIncludedInContext: string[] = []; // Store paths for the message object
+
+      // 1. Process VFS Files
+      if (vfsEnabled && vfs.isReady && chatInput.selectedVfsPaths.length > 0) {
+        const vfsContentPromises = chatInput.selectedVfsPaths.map(
+          async (path) => {
+            try {
+              const contentBytes = await vfs.readFile(path);
+              const contentText = decodeUint8Array(contentBytes); // Use safe decoder
+              pathsIncludedInContext.push(path); // Add path to list for message object
+              return `<vfs_file path="${path}">\n${contentText}\n</vfs_file>`;
+            } catch (readErr) {
+              console.error(`Error reading VFS file ${path}:`, readErr);
+              toast.error(`Failed to read VFS file: ${path}`);
+              return `<vfs_file path="${path}" error="Failed to read"/>`;
+            }
+          },
+        );
+        const vfsContents = await Promise.all(vfsContentPromises);
+        if (vfsContents.length > 0) {
+          contextPrefix += vfsContents.join("\n") + "\n\n";
+        }
+        chatInput.clearSelectedVfsPaths(); // Clear after processing
       }
-      const pathsIncludedInContext: string[] = [];
-      if (chatInput.selectedVfsPaths.length > 0) {
-        toast.warning("VFS context is temporarily disabled for debugging.");
-        chatInput.clearSelectedVfsPaths();
+
+      // 2. Process Attached Files (Basic Text Handling)
+      if (chatInput.attachedFiles.length > 0) {
+        const attachedContentPromises = chatInput.attachedFiles.map(
+          async (file) => {
+            // Basic check for text-based files
+            if (file.type.startsWith("text/")) {
+              try {
+                const contentText = await file.text();
+                // Note: We don't add attached files to vfsContextPaths
+                return `<attached_file name="${file.name}" type="${file.type}">\n${contentText}\n</attached_file>`;
+              } catch (readErr) {
+                console.error(
+                  `Error reading attached file ${file.name}:`,
+                  readErr,
+                );
+                toast.error(`Failed to read attached file: ${file.name}`);
+                return `<attached_file name="${file.name}" type="${file.type}" error="Failed to read"/>`;
+              }
+            } else {
+              // Placeholder for non-text files (e.g., images)
+              // TODO: Implement proper handling (e.g., multimodal models, data URIs)
+              console.warn(
+                `Skipping non-text attached file: ${file.name} (${file.type})`,
+              );
+              toast.info(`Skipping non-text file: ${file.name}`);
+              return `<attached_file name="${file.name}" type="${file.type}" status="skipped_non_text"/>`;
+            }
+          },
+        );
+        const attachedContents = await Promise.all(attachedContentPromises);
+        if (attachedContents.length > 0) {
+          contextPrefix += attachedContents.join("\n") + "\n\n";
+        }
+        chatInput.clearAttachedFiles(); // Clear after processing
       }
       // --- End VFS/Upload Handling ---
 
-      const originalUserPrompt = currentPrompt;
-      const promptToSendToAI = originalUserPrompt + uploadInfo;
+      const originalUserPrompt = currentPrompt; // The text the user actually typed
+      const promptToSendToAI = contextPrefix + originalUserPrompt; // Prepend context
 
       chatInput.setPrompt(""); // Clear input immediately
 
-      // Only proceed if there's actual text content to send
+      // Only proceed if there's actual text content OR context was added
       if (promptToSendToAI.trim().length > 0) {
         await messageHandling.handleSubmitCore(
-          originalUserPrompt,
+          originalUserPrompt, // Pass the original typed prompt
           conversationIdToSubmit,
-          promptToSendToAI,
-          pathsIncludedInContext,
+          promptToSendToAI, // Pass the combined prompt
+          pathsIncludedInContext, // Pass the list of VFS paths used
         );
       } else {
         console.log(
           "Submission skipped: empty prompt after processing VFS/uploads.",
         );
+        // Optionally provide feedback if only files were attached but couldn't be read
+        if (contextPrefix.includes("error=")) {
+          toast.warning(
+            "Submitted with file context, but some files failed to read.",
+          );
+        } else if (contextPrefix.includes("skipped_non_text")) {
+          toast.info(
+            "Submitted with file context, but non-text files were skipped.",
+          );
+        }
       }
     },
     [
@@ -371,6 +438,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       sidebarMgmt, // Use sidebarMgmt.createConversation
       setError,
       messageHandling,
+      vfsEnabled, // Dependency for VFS logic
+      vfs, // Dependency for VFS logic
     ],
   );
 
