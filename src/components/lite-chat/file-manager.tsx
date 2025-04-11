@@ -1,10 +1,9 @@
 // src/components/lite-chat/file-manager.tsx
-import React, { useState, useEffect, useCallback, useRef } from "react"; // Added useMemo
-import { useChatContext } from "@/hooks/use-chat-context";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useChatContext } from "@/hooks/use-chat-context"; // Use full context again
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
-// ... other imports ...
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { FileSystemEntry } from "@/lib/types";
@@ -36,7 +35,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// --- Helper Functions (remain the same) ---
 const formatBytes = (bytes: number, decimals = 2): string => {
   if (bytes === 0) return "0 Bytes";
   const k = 1024;
@@ -74,12 +72,13 @@ const basename = (path: string): string => {
 export const FileManager: React.FC<{ className?: string }> = ({
   className,
 }) => {
+  // Get VFS selection state/actions from the full context again
   const {
     vfs,
     selectedItemId,
     selectedVfsPaths, // Get selected paths from context
     addSelectedVfsPath, // Get actions from context
-    removeSelectedVfsPath,
+    removeSelectedVfsPath, // Get actions from context
   } = useChatContext();
   const [currentPath, setCurrentPath] = useState("/");
   const [entries, setEntries] = useState<FileSystemEntry[]>([]);
@@ -90,7 +89,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
 
   // Local state for checked paths within this component instance
   const [checkedPaths, setCheckedPaths] = useState<Set<string>>(
-    () => new Set(selectedVfsPaths), // Initialize from context
+    () => new Set(selectedVfsPaths),
   );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -174,7 +173,6 @@ export const FileManager: React.FC<{ className?: string }> = ({
   const handleRefresh = () => {
     loadEntries(currentPath);
   };
-  // --- End Navigation Handlers ---
 
   // --- Checkbox Handler ---
   const handleCheckboxChange = useCallback(
@@ -194,7 +192,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
     [addSelectedVfsPath, removeSelectedVfsPath],
   );
 
-  // --- Action Handlers (remain the same, use vfs from context) ---
+  // --- Action Handlers (use context actions where needed) ---
   const handleDelete = async (entry: FileSystemEntry) => {
     if (!vfs.isReady || vfs.configuredItemId !== selectedItemId) {
       toast.error("Filesystem not ready.");
@@ -301,9 +299,8 @@ export const FileManager: React.FC<{ className?: string }> = ({
       /* Error handled in hook */
     }
   };
-  // --- End Action Handlers ---
 
-  // --- Rename Logic (remain the same, use vfs from context) ---
+  // --- Rename Logic (use context actions) ---
   const startEditing = (entry: FileSystemEntry) => {
     setEditingPath(entry.path);
     setNewName(entry.name);
@@ -333,7 +330,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
     try {
       await vfs.rename(editingPath, newPath);
       toast.success(`Renamed "${oldName}" to "${trimmedNewName}"`);
-      // If renamed file was selected, update the selection path
+      // If renamed file was selected, update the selection path via context
       if (checkedPaths.has(editingPath)) {
         removeSelectedVfsPath(editingPath);
         addSelectedVfsPath(newPath);
@@ -350,9 +347,8 @@ export const FileManager: React.FC<{ className?: string }> = ({
       renameInputRef.current?.select();
     }
   }, [editingPath]);
-  // --- End Rename Logic ---
 
-  // --- Create Folder Logic (remain the same, use vfs from context) ---
+  // ... (Create Folder Logic, Render Logic remain the same) ...
   const startCreatingFolder = () => {
     setCreatingFolder(true);
     setNewFolderName("");
@@ -388,7 +384,6 @@ export const FileManager: React.FC<{ className?: string }> = ({
       newFolderInputRef.current?.focus();
     }
   }, [creatingFolder]);
-  // --- End Create Folder Logic ---
 
   // --- Render Logic ---
   if (isConfigLoading) {

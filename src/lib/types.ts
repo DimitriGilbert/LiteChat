@@ -285,7 +285,10 @@ export interface ChatContextProps {
   ) => Promise<void>;
   stopStreaming: () => void;
   regenerateMessage: (messageId: string) => Promise<void>;
-  // REMOVED file/vfs state and actions from context props
+  selectedVfsPaths: string[];
+  addSelectedVfsPath: (path: string) => void;
+  removeSelectedVfsPath: (path: string) => void;
+  clearSelectedVfsPaths: () => void;
 
   // Settings (Functions might be dummies if disabled)
   temperature: number;

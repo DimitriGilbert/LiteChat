@@ -1,27 +1,27 @@
 // src/components/lite-chat/selected-vfs-files-display.tsx
 import React from "react";
-import { useChatContext } from "@/hooks/use-chat-context"; // Still need context for flags
+import { useChatContext } from "@/hooks/use-chat-context"; // Use full context again
 import { Button } from "@/components/ui/button";
 import { XIcon, FileTextIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SelectedVfsFilesDisplayProps {
   className?: string;
-  selectedVfsPaths: string[]; // Add prop
-  removeSelectedVfsPath: (path: string) => void; // Add prop
+  // REMOVED props - get state from context
 }
 
 export const SelectedVfsFilesDisplay: React.FC<
   SelectedVfsFilesDisplayProps
 > = ({
   className,
-  selectedVfsPaths, // Use prop
-  removeSelectedVfsPath, // Use prop
+  // REMOVED props
 }) => {
+  // Get VFS selection state/actions from context again
   const {
-    // REMOVED: selectedVfsPaths, removeSelectedVfsPath,
-    isVfsEnabledForItem, // Get the flag
-    vfs, // Get the vfs object
+    selectedVfsPaths, // Use context
+    removeSelectedVfsPath, // Use context
+    isVfsEnabledForItem,
+    vfs,
   } = useChatContext();
 
   // Only render if VFS is enabled for the item, the hook is ready, and paths are selected
@@ -54,7 +54,7 @@ export const SelectedVfsFilesDisplay: React.FC<
             variant="ghost"
             size="icon"
             className="h-5 w-5 text-gray-500 hover:text-red-600 dark:hover:text-red-400 ml-1 flex-shrink-0"
-            onClick={() => removeSelectedVfsPath(path)} // Use prop
+            onClick={() => removeSelectedVfsPath(path)} // Use context action
             aria-label={`Remove file ${path} from context`}
           >
             <XIcon className="h-3 w-3" />
