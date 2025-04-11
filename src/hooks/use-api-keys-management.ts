@@ -14,7 +14,7 @@ interface UseApiKeysManagementProps {
   deleteDbApiKey: (id: string) => Promise<void>;
 }
 
-interface UseApiKeysManagementReturn {
+export interface UseApiKeysManagementReturn {
   // apiKeys: DbApiKey[]; // No longer returned, passed in
   selectedApiKeyId: Record<string, string | null>;
   setSelectedApiKeyId: (providerId: string, keyId: string | null) => void;
@@ -29,12 +29,10 @@ interface UseApiKeysManagementReturn {
 
 // --- MODIFIED: Accept props ---
 export function useApiKeysManagement({
-  apiKeys, // from props
-  addDbApiKey, // from props
-  deleteDbApiKey, // from props
+  apiKeys,
+  addDbApiKey,
+  deleteDbApiKey,
 }: UseApiKeysManagementProps): UseApiKeysManagementReturn {
-  // REMOVED: const { apiKeys, addApiKey: addDbApiKey, deleteApiKey: deleteDbApiKey } = useChatStorage(null);
-
   const [selectedApiKeyIdState, setSelectedApiKeyIdState] = useState<
     Record<string, string | null>
   >({});

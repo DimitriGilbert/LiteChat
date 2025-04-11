@@ -26,7 +26,10 @@ import type {
 import { ChatContext } from "@/hooks/use-chat-context";
 import { CoreChatContext } from "@/context/core-chat-context";
 import { useProviderModelSelection } from "@/hooks/use-provider-model-selection";
-import { useApiKeysManagement } from "@/hooks/use-api-keys-management";
+import {
+  useApiKeysManagement,
+  type UseApiKeysManagementReturn,
+} from "@/hooks/use-api-keys-management";
 import { useSidebarManagement } from "@/hooks/use-sidebar-management";
 import { useChatSettings } from "@/hooks/use-chat-settings";
 import { useAiInteraction } from "@/hooks/use-ai-interaction";
@@ -159,8 +162,8 @@ const dummyVfs: VfsContextObject = {
 };
 
 // --- Dummy API Key Management ---
-const dummyApiKeysMgmt = {
-  selectedApiKeyId: {},
+const dummyApiKeysMgmt: UseApiKeysManagementReturn = {
+  selectedApiKeyId: {} as Record<string, string | null>,
   setSelectedApiKeyId: () => {
     console.warn("API Key Management is disabled.");
   },
@@ -239,7 +242,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     addDbApiKey: storage.addApiKey,
     deleteDbApiKey: storage.deleteApiKey,
   });
-  const apiKeysMgmt = useMemo(() => {
+  const apiKeysMgmt: UseApiKeysManagementReturn = useMemo(() => {
     return enableApiKeyManagement ? realApiKeysMgmt : dummyApiKeysMgmt;
   }, [enableApiKeyManagement, realApiKeysMgmt]);
 
@@ -272,7 +275,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     [chatInput],
   );
 
-  // ... (sidebarItems, realSidebarMgmt, dummySidebarMgmt, sidebarMgmt remain same) ...
   const sidebarItems = useMemo<SidebarItem[]>(() => {
     const allProjects = storage.projects || [];
     const allConversations = storage.conversations || [];
@@ -355,7 +357,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     return enableSidebar ? realSidebarMgmt : dummySidebarMgmt;
   }, [enableSidebar, realSidebarMgmt, dummySidebarMgmt]);
 
-  // --- Active Item Data (remains the same) ---
+  // --- Active Item Data ---
   const activeItemData = useMemo(() => {
     if (!activeItemId || !activeItemType) return null;
     const item = sidebarItems.find((i) => i.id === activeItemId);
@@ -377,7 +379,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       : null;
   }, [activeItemType, activeItemData]);
 
-  // --- Settings (remains the same) ---
+  // --- Settings ---
   const chatSettings = useChatSettings({
     activeConversationData: activeConversationData,
     activeProjectData: activeProjectData,
@@ -409,7 +411,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     }
   }, [isVfsEnabledForItem, chatInput]); // Add chatInput dependency back
 
-  // --- AI Interaction (remains the same) ---
+  // --- AI Interaction ---
   const aiInteraction = useAiInteraction({
     selectedModel: providerModel.selectedModel,
     selectedProvider: providerModel.selectedProvider,
@@ -422,7 +424,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     abortControllerRef,
   });
 
-  // --- Message Handling (remains the same) ---
+  // --- Message Handling ---
   const messageHandling = useMessageHandling({
     selectedConversationId: activeConversationData?.id ?? null,
     performAiStream: aiInteraction.performAiStream,
@@ -452,6 +454,49 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     deleteDbMessage: storage.deleteDbMessage,
     getMessagesForConversation: storage.getMessagesForConversation,
   });
+  // --- Effect for Default API Key Selection ---
+  useEffect(() => {
+    // Only run if API key management is enabled and a provider is selected
+    if (!enableApiKeyManagement || !providerModel.selectedProviderId) {
+      return;
+    }
+
+    const currentProviderId = providerModel.selectedProviderId;
+
+    if (apiKeysMgmt.selectedApiKeyId[currentProviderId]) {
+      return; // Don't override user's explicit selection
+    }
+
+    // Check if the provider requires a key
+    const providerConfig = providers.find((p) => p.id === currentProviderId);
+    const needsKey =
+      providerConfig?.requiresApiKey ?? currentProviderId !== "mock";
+
+    if (!needsKey) {
+      return; // No key needed, nothing to select
+    }
+
+    // Find available keys for this provider from the storage hook's live data
+    const availableKeysForProvider = (storage.apiKeys || []).filter(
+      (key) => key.providerId === currentProviderId,
+    );
+
+    // If keys are available, select the first one
+    if (availableKeysForProvider.length > 0) {
+      const firstKey = availableKeysForProvider[0];
+      console.log(
+        `[ChatProvider] Auto-selecting API key "${firstKey.name}" (${firstKey.id.substring(0, 4)}...) for provider ${currentProviderId}`,
+      );
+      // Use the setter from the API key management hook
+      apiKeysMgmt.setSelectedApiKeyId(currentProviderId, firstKey.id);
+    }
+  }, [
+    providerModel.selectedProviderId,
+    storage.apiKeys,
+    providers,
+    apiKeysMgmt,
+    enableApiKeyManagement,
+  ]);
 
   // --- Submit Handler (Use chatInput from closure for VFS/files) ---
   const handleSubmit = useCallback(
