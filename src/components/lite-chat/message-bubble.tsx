@@ -200,8 +200,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           <MessageActions
             message={message}
             onRegenerate={
-              !isUser && onRegenerate && !message.isStreaming && !message.error
-                ? () => onRegenerate(message.id)
+              !isUser &&
+              onRegenerate &&
+              message.id && // Check if message.id exists
+              !message.isStreaming &&
+              !message.error
+                ? () => onRegenerate(message.id!) // Use non-null assertion as we checked
                 : undefined
             }
           />

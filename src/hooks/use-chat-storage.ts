@@ -161,20 +161,40 @@ export function useChatStorage() {
   const toggleVfsEnabled = useCallback(
     async (id: string, type: SidebarItemType): Promise<void> => {
       const now = new Date();
-      const table = type === "conversation" ? db.conversations : db.projects;
-      const current = await table.get(id);
-
-      if (current) {
-        await table.update(id, {
-          vfsEnabled: !current.vfsEnabled,
-          updatedAt: now,
-        });
-        if (current.parentId) {
-          await db.projects.update(current.parentId, { updatedAt: now });
+      // Use separate if blocks to satisfy TypeScript's type checking for update
+      if (type === "conversation") {
+        const current = await db.conversations.get(id);
+        if (current) {
+          await db.conversations.update(id, {
+            vfsEnabled: !current.vfsEnabled,
+            updatedAt: now,
+          });
+          if (current.parentId) {
+            await db.projects.update(current.parentId, { updatedAt: now });
+          }
+        } else {
+          console.warn(
+            `[DB] Item ${id} (conversation) not found for VFS toggle.`,
+          );
+          throw new Error("Item not found");
+        }
+      } else if (type === "project") {
+        const current = await db.projects.get(id);
+        if (current) {
+          await db.projects.update(id, {
+            vfsEnabled: !current.vfsEnabled,
+            updatedAt: now,
+          });
+          if (current.parentId) {
+            await db.projects.update(current.parentId, { updatedAt: now });
+          }
+        } else {
+          console.warn(`[DB] Item ${id} (project) not found for VFS toggle.`);
+          throw new Error("Item not found");
         }
       } else {
-        console.warn(`[DB] Item ${id} (${type}) not found for VFS toggle.`);
-        throw new Error("Item not found");
+        console.warn(`[DB] Unknown item type ${type} for VFS toggle.`);
+        throw new Error("Unknown item type");
       }
     },
     [], // No dependencies needed

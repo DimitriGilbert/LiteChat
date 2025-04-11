@@ -1,6 +1,6 @@
 // src/App.tsx
-import React from "react";
-import { LiteChat, type AiProviderConfig } from "./components/lite-chat/chat";
+import { LiteChat } from "./components/lite-chat/chat";
+import type { AiProviderConfig } from "@/lib/types";
 import { Toaster } from "@/components/ui/sonner";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 

@@ -1,5 +1,5 @@
 // src/lib/types.ts
-import type { CoreMessage } from "ai";
+// import type { CoreMessage } from "ai";
 import React from "react"; // Import React for ReactNode
 
 // --- Basic Types ---
@@ -40,7 +40,12 @@ export interface DbApiKey extends Pick<DbBase, "id" | "createdAt"> {
 }
 
 // --- UI & State Types ---
-export interface Message extends CoreMessage {
+// Define Message properties directly instead of extending CoreMessage
+export interface Message {
+  // Core properties matching CoreMessage
+  role: Role;
+  content: string;
+  // Additional properties
   id?: string;
   conversationId?: string;
   createdAt?: Date;
@@ -53,6 +58,9 @@ export interface Message extends CoreMessage {
   tokensInput?: number;
   tokensOutput?: number;
   tokensPerSecond?: number;
+  // Add other properties from CoreMessage if needed, e.g., tool_calls, tool_call_id
+  // tool_calls?: ToolCall[];
+  // tool_call_id?: string;
 }
 
 export interface SidebarItemBase extends DbBase {

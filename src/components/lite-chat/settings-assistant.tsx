@@ -1,3 +1,4 @@
+// src/components/lite-chat/settings-assistant.tsx
 import React from "react";
 import { useChatContext } from "@/hooks/use-chat-context";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,7 @@ export const SettingsAssistant: React.FC = () => {
         <Textarea
           id="assistant-global-system-prompt"
           placeholder="Enter default system instructions for the assistant..."
-          value={globalSystemPrompt}
+          value={globalSystemPrompt ?? ""}
           onChange={(e) => setGlobalSystemPrompt(e.target.value)}
           rows={4}
         />

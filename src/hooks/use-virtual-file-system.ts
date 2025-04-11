@@ -391,7 +391,7 @@ export function useVirtualFileSystem({
         const zip = await JSZip.loadAsync(file);
         const fileWritePromises: Promise<void>[] = [];
 
-        zip.forEach((relativePath, zipEntry) => {
+        zip.forEach((_, zipEntry) => {
           const fullTargetPath = joinPath(normalizedTargetPath, zipEntry.name);
           if (zipEntry.dir) {
             fileWritePromises.push(createDirectoryInternalImpl(fullTargetPath));
