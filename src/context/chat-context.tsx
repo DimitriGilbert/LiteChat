@@ -622,7 +622,15 @@ ${contentText}
 \`\`\`
 </attached_file>`;
             } catch (readErr) {
-              toast.error(`Failed to read attached file: ${file.name}`);
+              let errmsg = "";
+              if (readErr instanceof Error) {
+                errmsg = readErr.message;
+              } else {
+                errmsg = String(readErr);
+              }
+              toast.error(
+                `Failed to read attached file: ${file.name}\n${errmsg}`,
+              );
               return `<attached_file name="${file.name}" type="${file.type}" error="Failed to read"/>`;
             }
           } else {

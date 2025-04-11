@@ -3,6 +3,7 @@ import { LiteChat } from "./components/lite-chat/chat";
 import type { AiProviderConfig } from "@/lib/types";
 import { Toaster } from "@/components/ui/sonner";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import ErrorBoundary from "./components/error-boundary"; // Import the ErrorBoundary
 
 const lmstudio = createOpenAICompatible({
   name: "lmstudio",
@@ -62,13 +63,16 @@ const chatProviders: AiProviderConfig[] = [
 
 function App() {
   return (
-    <div className="h-screen bg-gray-900 flex flex-col">
-      <main className="flex-grow overflow-hidden p-4">
-        <LiteChat providers={chatProviders} />
-      </main>
+    // Wrap the main content with ErrorBoundary
+    <ErrorBoundary>
+      <div className="h-screen bg-gray-900 flex flex-col">
+        <main className="flex-grow overflow-hidden p-4">
+          <LiteChat providers={chatProviders} />
+        </main>
 
-      <Toaster richColors position="top-right" />
-    </div>
+        <Toaster richColors position="top-right" />
+      </div>
+    </ErrorBoundary>
   );
 }
 
