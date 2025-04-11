@@ -141,6 +141,7 @@ export function useAiInteraction({
 
       let streamError: Error | null = null;
 
+      const startTime = Date.now();
       try {
         const messagesForApi: CoreMessage[] = [];
         if (systemPromptToUse) {
@@ -149,6 +150,8 @@ export function useAiInteraction({
         messagesForApi.push(
           ...messagesToSend.filter((m) => m.role !== "system"),
         );
+
+        const apiKeyForHeader = getApiKeyForProvider(selectedProvider.id);
 
         const result = streamText({
           model: selectedModel.instance,
@@ -160,6 +163,11 @@ export function useAiInteraction({
           topK: currentTopK ?? undefined,
           presencePenalty: currentPresencePenalty ?? undefined,
           frequencyPenalty: currentFrequencyPenalty ?? undefined,
+          headers: apiKeyForHeader
+            ? {
+                Authorization: `Bearer ${apiKeyForHeader}`,
+              }
+            : undefined,
         });
 
         for await (const delta of result.textStream) {
@@ -200,6 +208,18 @@ export function useAiInteraction({
                   isStreaming: false,
                   streamedContent: undefined,
                   error: streamError ? streamError.message : null,
+                  providerId: selectedProvider?.id,
+                  modelId: selectedModel?.id,
+                  tokensInput: messagesToSend.reduce(
+                    (sum, m) => sum + (m.content.length || 0),
+                    0,
+                  ),
+                  tokensOutput: finalContent.length,
+                  tokensPerSecond:
+                    streamError || !startTime
+                      ? undefined
+                      : finalContent.length /
+                        ((Date.now() - startTime) / 1000 || 1),
                 }
               : msg,
           ),

@@ -49,6 +49,62 @@ const decodeUint8Array = (arr: Uint8Array): string => {
   }
 };
 
+const CODE_FILE_EXTENSIONS = new Set([
+  // Web Development
+  "js",
+  "jsx",
+  "ts",
+  "tsx",
+  "html",
+  "css",
+  "scss",
+  "less",
+  // Backend Development
+  "php",
+  "py",
+  "rb",
+  "java",
+  "cpp",
+  "c",
+  "cs",
+  "go",
+  "rs",
+  // Data & Config
+  "json",
+  "yaml",
+  "yml",
+  "xml",
+  "csv",
+  "sql",
+  // Documentation & Markup
+  "md",
+  "markdown",
+  "txt",
+  "rst",
+  // Shell Scripts
+  "sh",
+  "bash",
+  "zsh",
+  "fish",
+  "bat",
+  "ps1",
+  // Configuration
+  "env",
+  "ini",
+  "conf",
+  "config",
+  "toml",
+  // Other
+  "gradle",
+  "dockerfile",
+  "gitignore",
+]);
+
+const isCodeFile = (filename: string): boolean => {
+  const extension = filename.split(".").pop()?.toLowerCase() || "";
+  return CODE_FILE_EXTENSIONS.has(extension);
+};
+
 const EMPTY_API_KEYS: DbApiKey[] = [];
 const EMPTY_SIDEBAR_ITEMS: SidebarItem[] = [];
 const EMPTY_CUSTOM_SETTINGS_TABS: CustomSettingTab[] = []; // Default empty array
@@ -494,9 +550,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
               const contentBytes = await vfs.readFile(path);
               const contentText = decodeUint8Array(contentBytes);
               pathsIncludedInContext.push(path);
-              return `<vfs_file path="${path}">
-${contentText}
-</vfs_file>`;
+              const fileExtension = path.split(".").pop()?.toLowerCase() || "";
+
+              return `<vfs_file path="${path}" extension="${fileExtension}">
+      \`\`\`${fileExtension}
+      ${contentText}
+      \`\`\`
+      </vfs_file>`;
             } catch (readErr) {
               console.error(`Error reading VFS file ${path}:`, readErr);
               toast.error(`Failed to read VFS file: ${path}`);
@@ -504,6 +564,7 @@ ${contentText}
             }
           },
         );
+
         const vfsContents = await Promise.all(vfsContentPromises);
         if (vfsContents.length > 0) {
           contextPrefix += vfsContents.join("\n\n") + "\n\n";
@@ -520,12 +581,18 @@ ${contentText}
       if (chatInput.attachedFiles.length > 0) {
         const attachedContentPromises = chatInput.attachedFiles.map(
           async (file) => {
-            if (file.type.startsWith("text/")) {
+            // Handle both text and code files
+            if (file.type.startsWith("text/") || isCodeFile(file.name)) {
               try {
                 const contentText = await file.text();
-                return `<attached_file name="${file.name}" type="${file.type}">
-${contentText}
-</attached_file>`;
+                const fileExtension =
+                  file.name.split(".").pop()?.toLowerCase() || "";
+
+                return `<attached_file name="${file.name}" type="${file.type}" extension="${fileExtension}">
+      \`\`\`${fileExtension}
+      ${contentText}
+      \`\`\`
+      </attached_file>`;
               } catch (readErr) {
                 console.error(
                   `Error reading attached file ${file.name}:`,
@@ -536,13 +603,14 @@ ${contentText}
               }
             } else {
               console.warn(
-                `Skipping non-text attached file: ${file.name} (${file.type})`,
+                `Skipping non-text/code file: ${file.name} (${file.type})`,
               );
-              toast.info(`Skipping non-text file: ${file.name}`);
-              return `<attached_file name="${file.name}" type="${file.type}" status="skipped_non_text"/>`;
+              toast.info(`Skipping unsupported file: ${file.name}`);
+              return `<attached_file name="${file.name}" type="${file.type}" status="skipped_unsupported"/>`;
             }
           },
         );
+
         const attachedContents = await Promise.all(attachedContentPromises);
         if (attachedContents.length > 0) {
           contextPrefix += attachedContents.join("\n\n") + "\n\n";

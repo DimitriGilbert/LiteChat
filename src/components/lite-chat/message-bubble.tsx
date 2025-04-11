@@ -78,7 +78,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   return (
     <div
       className={cn(
-        "group/message flex gap-4 px-4 py-5 transition-colors", // Added group/message
+        "group/message flex gap-4 px-4 py-5 transition-colors relative", // Added group/message
         isUser ? "bg-gray-900" : "bg-gray-800",
         className,
       )}
@@ -100,7 +100,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       </div>
 
       {/* Message Content Area */}
-      <div className="flex-grow min-w-0">
+      <div className="flex-grow min-w-0 pr-12">
         {/* Role label */}
         <div className="text-xs font-medium text-gray-400 mb-1">
           {isUser ? "You" : "Assistant"}
@@ -153,6 +153,38 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             ))}
           </div>
         )}
+        {!isUser && (
+          <div className="mt-2 opacity-0 group-hover/message:opacity-100 transition-opacity text-xs text-gray-400 flex flex-wrap gap-x-4 gap-y-1">
+            {message.providerId && message.modelId && (
+              <span>
+                <strong>{message.providerId}</strong>:
+                <span className="ml-1">{message.modelId}</span>
+              </span>
+            )}
+            {(message.tokensInput !== undefined ||
+              message.tokensOutput !== undefined) && (
+              <span>
+                tokens:
+                {message.tokensInput !== undefined && (
+                  <>
+                    in <strong>{message.tokensInput}</strong>
+                  </>
+                )}
+                {message.tokensOutput !== undefined && (
+                  <>
+                    , out <strong>{message.tokensOutput}</strong>
+                  </>
+                )}
+              </span>
+            )}
+            {message.tokensPerSecond !== undefined && (
+              <span>
+                speed: <strong>{message.tokensPerSecond.toFixed(1)}</strong>{" "}
+                tok/s
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Error */}
         {message.error && (
@@ -161,15 +193,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       </div>
 
       {/* Actions Area */}
-      <div className="flex-shrink-0 self-start pt-1">
-        <MessageActions
-          message={message} // Pass the full message object
-          onRegenerate={
-            !isUser && onRegenerate && !message.isStreaming && !message.error
-              ? () => onRegenerate(message.id)
-              : undefined
-          }
-        />
+      <div className="absolute right-4 h-full top-0">
+        <div className="sticky top-5">
+          {" "}
+          {/* This makes it stick within its container */}
+          <MessageActions
+            message={message}
+            onRegenerate={
+              !isUser && onRegenerate && !message.isStreaming && !message.error
+                ? () => onRegenerate(message.id)
+                : undefined
+            }
+          />
+        </div>
       </div>
     </div>
   );

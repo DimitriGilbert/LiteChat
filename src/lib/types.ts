@@ -48,6 +48,11 @@ export interface Message extends CoreMessage {
   streamedContent?: string;
   error?: string | null;
   vfsContextPaths?: string[];
+  providerId?: string;
+  modelId?: string;
+  tokensInput?: number;
+  tokensOutput?: number;
+  tokensPerSecond?: number;
 }
 
 export interface SidebarItemBase extends DbBase {

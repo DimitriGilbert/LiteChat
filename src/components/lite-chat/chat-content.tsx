@@ -57,7 +57,8 @@ export const ChatContent: React.FC<ChatContentProps> = ({
     }
   }, []);
 
-  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+  // const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+  const handleScroll = () => {
     throttledHandleScroll();
   };
 
