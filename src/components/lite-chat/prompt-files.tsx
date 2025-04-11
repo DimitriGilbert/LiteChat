@@ -1,14 +1,21 @@
+// src/components/lite-chat/prompt-files.tsx
 import React from "react";
-import { useChatContext } from "@/hooks/use-chat-context";
+// REMOVED: import { useChatContext } from "@/hooks/use-chat-context";
 import { Button } from "@/components/ui/button";
 import { XIcon, FileIcon } from "lucide-react"; // Icons
 import { cn } from "@/lib/utils";
 
 interface PromptFilesProps {
   className?: string;
+  attachedFiles: File[]; // Add prop
+  removeAttachedFile: (fileName: string) => void; // Add prop
 }
-export const PromptFiles: React.FC<PromptFilesProps> = ({ className }) => {
-  const { attachedFiles, removeAttachedFile } = useChatContext();
+export const PromptFiles: React.FC<PromptFilesProps> = ({
+  className,
+  attachedFiles, // Use prop
+  removeAttachedFile, // Use prop
+}) => {
+  // REMOVED: const { attachedFiles, removeAttachedFile } = useChatContext();
 
   if (attachedFiles.length === 0) {
     return null;
@@ -53,7 +60,7 @@ export const PromptFiles: React.FC<PromptFilesProps> = ({ className }) => {
               variant="ghost"
               size="icon"
               className="h-6 w-6 text-gray-500 hover:text-red-600 dark:hover:text-red-400 ml-1"
-              onClick={() => removeAttachedFile(file.name)}
+              onClick={() => removeAttachedFile(file.name)} // Use prop
               aria-label={`Remove file ${file.name}`}
             >
               <XIcon className="h-3.5 w-3.5" />

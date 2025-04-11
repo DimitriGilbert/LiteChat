@@ -21,7 +21,7 @@ import type {
   VfsContextObject,
   CustomPromptAction,
   CustomMessageAction,
-  CustomSettingTab, // Import CustomSettingTab
+  CustomSettingTab,
 } from "@/lib/types";
 import { ChatContext } from "@/hooks/use-chat-context";
 import { CoreChatContext } from "@/context/core-chat-context";
@@ -30,7 +30,7 @@ import { useApiKeysManagement } from "@/hooks/use-api-keys-management";
 import { useSidebarManagement } from "@/hooks/use-sidebar-management";
 import { useChatSettings } from "@/hooks/use-chat-settings";
 import { useAiInteraction } from "@/hooks/use-ai-interaction";
-import { useChatInput } from "@/hooks/use-chat-input";
+// REMOVED: import { useChatInput } from "@/hooks/use-chat-input";
 import { useMessageHandling } from "@/hooks/use-message-handling";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useVirtualFileSystem } from "@/hooks/use-virtual-file-system";
@@ -179,7 +179,6 @@ const dummyApiKeysMgmt = {
   },
 };
 
-// Update ChatProviderProps to accept custom actions and settings
 interface ChatProviderProps {
   children: React.ReactNode;
   providers: AiProviderConfig[];
@@ -188,15 +187,13 @@ interface ChatProviderProps {
   initialSelectedItemId?: string | null;
   initialSelectedItemType?: SidebarItemType | null;
   streamingThrottleRate?: number;
-  // Feature Flags
   enableApiKeyManagement?: boolean;
   enableSidebar?: boolean;
   enableVfs?: boolean;
   enableAdvancedSettings?: boolean;
-  // Custom Extensibility
   customPromptActions?: CustomPromptAction[];
   customMessageActions?: CustomMessageAction[];
-  customSettingsTabs?: CustomSettingTab[]; // Add custom settings tabs
+  customSettingsTabs?: CustomSettingTab[];
 }
 
 export const ChatProvider: React.FC<ChatProviderProps> = ({
@@ -207,15 +204,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   initialSelectedItemId = null,
   initialSelectedItemType = null,
   streamingThrottleRate = 42,
-  // Feature Flags with Defaults
   enableApiKeyManagement = true,
   enableSidebar = true,
   enableVfs = true,
   enableAdvancedSettings = true,
-  // Custom Extensibility with Defaults
   customPromptActions = [],
   customMessageActions = [],
-  customSettingsTabs = EMPTY_CUSTOM_SETTINGS_TABS, // Use default empty array
+  customSettingsTabs = EMPTY_CUSTOM_SETTINGS_TABS,
 }) => {
   // --- Core State ---
   const [isStreaming, setIsStreaming] = useState(false);
@@ -223,7 +218,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [error, setErrorState] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const chatInput = useChatInput();
+  // REMOVED: const chatInput = useChatInput();
 
   const setError = useCallback((newError: string | null) => {
     setErrorState(newError);
@@ -232,20 +227,18 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     }
   }, []);
 
-  // --- Hooks ---
+  // --- Hooks (remain largely the same) ---
   const providerModel = useProviderModelSelection({
     providers,
     initialProviderId,
     initialModelId,
   });
   const storage = useChatStorage();
-
   const realApiKeysMgmt = useApiKeysManagement({
     apiKeys: storage.apiKeys || EMPTY_API_KEYS,
     addDbApiKey: storage.addApiKey,
     deleteDbApiKey: storage.deleteApiKey,
   });
-
   const apiKeysMgmt = useMemo(() => {
     return enableApiKeyManagement ? realApiKeysMgmt : dummyApiKeysMgmt;
   }, [enableApiKeyManagement, realApiKeysMgmt]);
@@ -265,22 +258,20 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         abortControllerRef.current = null;
       }
       setIsStreaming(false);
-      chatInput.clearSelectedVfsPaths();
-      chatInput.clearAttachedFiles();
+      // No longer need to clear chatInput state here
       setMessages([]);
       setErrorState(null);
-
       setActiveItemId(id);
       setActiveItemType(type);
       setIsLoadingMessages(!!id);
-
       console.log(
         `[ChatProvider] handleSelectItem updated state: ID=${id}, Type=${type}`,
       );
     },
-    [chatInput],
+    [], // Removed chatInput dependency
   );
 
+  // ... (sidebarItems, realSidebarMgmt, dummySidebarMgmt, sidebarMgmt remain same) ...
   const sidebarItems = useMemo<SidebarItem[]>(() => {
     const allProjects = storage.projects || [];
     const allConversations = storage.conversations || [];
@@ -363,7 +354,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     return enableSidebar ? realSidebarMgmt : dummySidebarMgmt;
   }, [enableSidebar, realSidebarMgmt, dummySidebarMgmt]);
 
-  // --- Active Item Data ---
+  // --- Active Item Data (remains the same) ---
   const activeItemData = useMemo(() => {
     if (!activeItemId || !activeItemType) return null;
     const item = sidebarItems.find((i) => i.id === activeItemId);
@@ -385,7 +376,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       : null;
   }, [activeItemType, activeItemData]);
 
-  // --- Settings ---
+  // --- Settings (remains the same) ---
   const chatSettings = useChatSettings({
     activeConversationData: activeConversationData,
     activeProjectData: activeProjectData,
@@ -411,13 +402,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     return dummyVfs;
   }, [enableVfs, isVfsEnabledForItem, activeItemId, realVfs]);
 
-  useEffect(() => {
-    if (!isVfsEnabledForItem && chatInput.selectedVfsPaths.length > 0) {
-      chatInput.clearSelectedVfsPaths();
-    }
-  }, [isVfsEnabledForItem, chatInput]);
+  // REMOVED: useEffect for clearing VFS paths (now handled locally in PromptForm)
 
-  // --- AI Interaction ---
+  // --- AI Interaction (remains the same) ---
   const aiInteraction = useAiInteraction({
     selectedModel: providerModel.selectedModel,
     selectedProvider: providerModel.selectedProvider,
@@ -430,7 +417,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     abortControllerRef,
   });
 
-  // --- Message Handling ---
+  // --- Message Handling (remains the same) ---
   const messageHandling = useMessageHandling({
     selectedConversationId: activeConversationData?.id ?? null,
     performAiStream: aiInteraction.performAiStream,
@@ -461,15 +448,19 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     getMessagesForConversation: storage.getMessagesForConversation,
   });
 
-  // --- Submit Handler ---
+  // --- Submit Handler (Modified to accept arguments) ---
   const handleSubmit = useCallback(
-    async (e?: React.FormEvent<HTMLFormElement>) => {
-      e?.preventDefault();
-      const currentPrompt = chatInput.prompt.trim();
+    async (
+      promptValue: string,
+      attachedFilesValue: File[],
+      selectedVfsPathsValue: string[],
+    ) => {
+      // No e.preventDefault() needed here, called in PromptForm
+      const currentPrompt = promptValue.trim();
       const canSubmit =
         currentPrompt.length > 0 ||
-        chatInput.attachedFiles.length > 0 ||
-        chatInput.selectedVfsPaths.length > 0;
+        attachedFilesValue.length > 0 ||
+        selectedVfsPathsValue.length > 0;
 
       if (!canSubmit) return;
       if (isStreaming) {
@@ -520,6 +511,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           if (!newConvId)
             throw new Error("Failed to get ID for new conversation.");
           conversationIdToSubmit = newConvId;
+          // Note: handleSelectItem will be called implicitly by sidebarMgmt
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : "Unknown error";
           setError(`Error: Could not start chat - ${message}`);
@@ -537,91 +529,76 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       let contextPrefix = "";
       const pathsIncludedInContext: string[] = [];
 
+      // Process VFS files (using argument selectedVfsPathsValue)
       if (
         enableVfs &&
         isVfsEnabledForItem &&
         vfs.isReady &&
         vfs.configuredItemId === conversationIdToSubmit &&
-        chatInput.selectedVfsPaths.length > 0
+        selectedVfsPathsValue.length > 0
       ) {
-        const vfsContentPromises = chatInput.selectedVfsPaths.map(
-          async (path) => {
-            try {
-              const contentBytes = await vfs.readFile(path);
-              const contentText = decodeUint8Array(contentBytes);
-              pathsIncludedInContext.push(path);
-              const fileExtension = path.split(".").pop()?.toLowerCase() || "";
-
-              return `<vfs_file path="${path}" extension="${fileExtension}">
-      \`\`\`${fileExtension}
-      ${contentText}
-      \`\`\`
-      </vfs_file>`;
-            } catch (readErr) {
-              console.error(`Error reading VFS file ${path}:`, readErr);
-              toast.error(`Failed to read VFS file: ${path}`);
-              return `<vfs_file path="${path}" error="Failed to read"/>`;
-            }
-          },
-        );
-
+        const vfsContentPromises = selectedVfsPathsValue.map(async (path) => {
+          try {
+            const contentBytes = await vfs.readFile(path);
+            const contentText = decodeUint8Array(contentBytes);
+            pathsIncludedInContext.push(path);
+            const fileExtension = path.split(".").pop()?.toLowerCase() || "";
+            return `<vfs_file path="${path}" extension="${fileExtension}">\n\`\`\`${fileExtension}\n${contentText}\n\`\`\`\n</vfs_file>`;
+          } catch (readErr) {
+            console.error(`Error reading VFS file ${path}:`, readErr);
+            toast.error(`Failed to read VFS file: ${path}`);
+            return `<vfs_file path="${path}" error="Failed to read"/>`;
+          }
+        });
         const vfsContents = await Promise.all(vfsContentPromises);
         if (vfsContents.length > 0) {
           contextPrefix += vfsContents.join("\n\n") + "\n\n";
         }
-        chatInput.clearSelectedVfsPaths();
-      } else if (chatInput.selectedVfsPaths.length > 0) {
+        // Clearing selectedVfsPaths is now handled locally in PromptForm
+      } else if (selectedVfsPathsValue.length > 0) {
         console.warn(
           "VFS paths selected but VFS not enabled/ready for this item. Clearing selection.",
         );
         toast.warning("VFS not enabled for this chat. Selected files ignored.");
-        chatInput.clearSelectedVfsPaths();
+        // Clearing selectedVfsPaths is now handled locally in PromptForm
       }
 
-      if (chatInput.attachedFiles.length > 0) {
-        const attachedContentPromises = chatInput.attachedFiles.map(
-          async (file) => {
-            // Handle both text and code files
-            if (file.type.startsWith("text/") || isCodeFile(file.name)) {
-              try {
-                const contentText = await file.text();
-                const fileExtension =
-                  file.name.split(".").pop()?.toLowerCase() || "";
-
-                return `<attached_file name="${file.name}" type="${file.type}" extension="${fileExtension}">
-      \`\`\`${fileExtension}
-      ${contentText}
-      \`\`\`
-      </attached_file>`;
-              } catch (readErr) {
-                console.error(
-                  `Error reading attached file ${file.name}:`,
-                  readErr,
-                );
-                toast.error(`Failed to read attached file: ${file.name}`);
-                return `<attached_file name="${file.name}" type="${file.type}" error="Failed to read"/>`;
-              }
-            } else {
-              console.warn(
-                `Skipping non-text/code file: ${file.name} (${file.type})`,
+      // Process attached files (using argument attachedFilesValue)
+      if (attachedFilesValue.length > 0) {
+        const attachedContentPromises = attachedFilesValue.map(async (file) => {
+          if (file.type.startsWith("text/") || isCodeFile(file.name)) {
+            try {
+              const contentText = await file.text();
+              const fileExtension =
+                file.name.split(".").pop()?.toLowerCase() || "";
+              return `<attached_file name="${file.name}" type="${file.type}" extension="${fileExtension}">\n\`\`\`${fileExtension}\n${contentText}\n\`\`\`\n</attached_file>`;
+            } catch (readErr) {
+              console.error(
+                `Error reading attached file ${file.name}:`,
+                readErr,
               );
-              toast.info(`Skipping unsupported file: ${file.name}`);
-              return `<attached_file name="${file.name}" type="${file.type}" status="skipped_unsupported"/>`;
+              toast.error(`Failed to read attached file: ${file.name}`);
+              return `<attached_file name="${file.name}" type="${file.type}" error="Failed to read"/>`;
             }
-          },
-        );
-
+          } else {
+            console.warn(
+              `Skipping non-text/code file: ${file.name} (${file.type})`,
+            );
+            toast.info(`Skipping unsupported file: ${file.name}`);
+            return `<attached_file name="${file.name}" type="${file.type}" status="skipped_unsupported"/>`;
+          }
+        });
         const attachedContents = await Promise.all(attachedContentPromises);
         if (attachedContents.length > 0) {
           contextPrefix += attachedContents.join("\n\n") + "\n\n";
         }
-        chatInput.clearAttachedFiles();
+        // Clearing attachedFiles is now handled locally in PromptForm
       }
 
       const originalUserPrompt = currentPrompt;
       const promptToSendToAI = contextPrefix + originalUserPrompt;
 
-      chatInput.setPrompt("");
+      // Clearing the prompt is now handled locally in PromptForm
 
       if (promptToSendToAI.trim().length > 0) {
         await messageHandling.handleSubmitCore(
@@ -646,7 +623,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       }
     },
     [
-      chatInput,
+      // Dependencies for handleSubmit
       isStreaming,
       providerModel.selectedProvider,
       providerModel.selectedModel,
@@ -661,10 +638,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       enableVfs,
       apiKeysMgmt,
       enableApiKeyManagement,
+      // No dependency on chatInput needed here anymore
     ],
   );
 
-  // --- Other Handlers ---
+  // --- Other Handlers (remain the same) ---
   const regenerateMessage = useCallback(
     async (messageId: string) => {
       if (activeItemType !== "conversation" || !activeItemId) {
@@ -731,8 +709,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       setIsStreaming,
       error,
       setError,
-      prompt: chatInput.prompt,
-      setPrompt: chatInput.setPrompt,
       handleSubmitCore: messageHandling.handleSubmitCore,
       stopStreamingCore: messageHandling.stopStreamingCore,
       regenerateMessageCore: messageHandling.regenerateMessageCore,
@@ -744,15 +720,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       isStreaming,
       error,
       setError,
-      chatInput.prompt,
-      chatInput.setPrompt,
       messageHandling.handleSubmitCore,
       messageHandling.stopStreamingCore,
       messageHandling.regenerateMessageCore,
     ],
   );
 
-  // Add custom actions and settings to the full context value
+  // Create the full context value *without* prompt/setPrompt/file/vfs state/actions
   const fullContextValue: ChatContextProps = useMemo(
     () => ({
       // --- Feature Flags ---
@@ -786,27 +760,18 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       updateConversationSystemPrompt:
         sidebarMgmt.updateConversationSystemPrompt,
 
-      // Messages & Streaming (Core)
+      // Messages & Streaming (Core - from coreContextValue)
       messages: coreContextValue.messages,
       isLoading: coreContextValue.isLoadingMessages,
       isStreaming: coreContextValue.isStreaming,
       error: coreContextValue.error,
       setError: coreContextValue.setError,
 
-      // Input Handling (Core + Optional)
-      prompt: coreContextValue.prompt,
-      setPrompt: coreContextValue.setPrompt,
-      handleSubmit,
-      stopStreaming,
-      regenerateMessage,
-      attachedFiles: chatInput.attachedFiles,
-      addAttachedFile: chatInput.addAttachedFile,
-      removeAttachedFile: chatInput.removeAttachedFile,
-      clearAttachedFiles: chatInput.clearAttachedFiles,
-      selectedVfsPaths: chatInput.selectedVfsPaths,
-      addSelectedVfsPath: chatInput.addSelectedVfsPath,
-      removeSelectedVfsPath: chatInput.removeSelectedVfsPath,
-      clearSelectedVfsPaths: chatInput.clearSelectedVfsPaths,
+      // Input Handling (Only expose stable handlers)
+      handleSubmit, // Use the memoized handleSubmit from above
+      stopStreaming, // Use the memoized stopStreaming from above
+      regenerateMessage, // Use the memoized regenerateMessage from above
+      // REMOVED file/vfs state and actions from context
 
       // Settings (Values from chatSettings hook)
       temperature: chatSettings.temperature,
@@ -848,39 +813,52 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       // Extensibility - Pass down the arrays received from props
       customPromptActions: customPromptActions,
       customMessageActions: customMessageActions,
-      customSettingsTabs: customSettingsTabs, // Add custom settings tabs
+      customSettingsTabs: customSettingsTabs,
     }),
     [
-      // Add custom actions and settings to dependency array
-      customPromptActions,
-      customMessageActions,
-      customSettingsTabs, // Add custom settings tabs
-      // Existing dependencies...
+      // --- Dependencies for fullContextValue ---
+      // Feature Flags
       enableApiKeyManagement,
       enableAdvancedSettings,
+      // Provider/Model
       providers,
       providerModel.selectedProviderId,
       providerModel.setSelectedProviderId,
       providerModel.selectedModelId,
       providerModel.setSelectedModelId,
+      // API Keys
       storage.apiKeys,
       apiKeysMgmt,
+      // Sidebar
       sidebarItems,
       sidebarMgmt,
-      coreContextValue,
+      // Core State
+      coreContextValue.messages,
+      coreContextValue.isLoadingMessages,
+      coreContextValue.isStreaming,
+      coreContextValue.error,
+      coreContextValue.setError,
+      // Memoized Handlers
       handleSubmit,
       stopStreaming,
       regenerateMessage,
       handleImportConversation,
-      chatInput,
+      handleToggleVfs,
+      // Settings
       chatSettings,
       streamingThrottleRate,
+      // Data Management
       storage.clearAllData,
+      // VFS
       isVfsEnabledForItem,
-      handleToggleVfs,
       vfs,
+      // DB Getters
       storage.getConversation,
       storage.getProject,
+      // Extensibility
+      customPromptActions,
+      customMessageActions,
+      customSettingsTabs,
     ],
   );
 
@@ -891,17 +869,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     );
   }, [activeItemId, activeItemType]);
 
-  useEffect(() => {
-    console.log("[ChatProvider] Messages state updated:", messages);
-  }, [messages]);
-
-  useEffect(() => {
-    console.log(
-      "[ChatProvider] isLoadingMessages state updated:",
-      isLoadingMessages,
-    );
-  }, [isLoadingMessages]);
-
+  // Provide the stable core context and the less frequently changing full context
   return (
     <CoreChatContext.Provider value={coreContextValue}>
       <ChatContext.Provider value={fullContextValue}>

@@ -4,6 +4,7 @@ import { ChatProvider } from "@/context/chat-context";
 import { ChatSide } from "./chat-side";
 import { ChatWrapper } from "./chat-wrapper";
 import { useChatContext } from "@/hooks/use-chat-context";
+// REMOVED: import { useChatInput } from "@/hooks/use-chat-input";
 import type {
   AiProviderConfig,
   SidebarItemType,
@@ -25,6 +26,7 @@ interface LiteChatProps {
     selectedItemType: SidebarItemType | null;
     sidebarItems: SidebarItem[];
     regenerateMessage: (messageId: string) => void;
+    // REMOVED props for prompt state
   }>;
 }
 
@@ -69,6 +71,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
       customMessageActions={customMessageActions}
       customSettingsTabs={customSettingsTabs}
     >
+      {/* Render LiteChatInner directly */}
       <LiteChatInner
         className={className}
         sidebarOpen={sidebarOpen}
@@ -80,6 +83,8 @@ export const LiteChat: React.FC<LiteChatProps> = ({
     </ChatProvider>
   );
 };
+
+// REMOVED: LiteChatInnerWithInputState component
 
 interface LiteChatInnerProps {
   className?: string;
@@ -93,7 +98,9 @@ interface LiteChatInnerProps {
     selectedItemType: SidebarItemType | null;
     sidebarItems: SidebarItem[];
     regenerateMessage: (messageId: string) => void;
+    // REMOVED props for prompt state
   }>;
+  // REMOVED props for prompt state
 }
 
 const LiteChatInner: React.FC<LiteChatInnerProps> = ({
@@ -103,7 +110,9 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
   enableSidebar,
   SideComponent,
   WrapperComponent,
+  // REMOVED prompt state props
 }) => {
+  // Get non-prompt related state from context
   const { selectedItemId, selectedItemType, sidebarItems, regenerateMessage } =
     useChatContext();
 
@@ -143,6 +152,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
           selectedItemType={selectedItemType}
           sidebarItems={sidebarItems}
           regenerateMessage={regenerateMessage}
+          // REMOVED passing prompt state props down
         />
       </div>
     </div>

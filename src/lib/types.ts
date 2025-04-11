@@ -185,8 +185,8 @@ export interface CoreChatContextProps {
   setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>;
   error: string | null;
   setError: (error: string | null) => void;
-  prompt: string;
-  setPrompt: React.Dispatch<React.SetStateAction<string>>;
+  // prompt: string;
+  // setPrompt: React.Dispatch<React.SetStateAction<string>>;
   handleSubmitCore: (
     originalUserPrompt: string,
     currentConversationId: string,
@@ -276,20 +276,16 @@ export interface ChatContextProps {
   error: string | null;
   setError: (error: string | null) => void;
 
-  // Input Handling (Core + Optional)
-  prompt: string;
-  setPrompt: React.Dispatch<React.SetStateAction<string>>;
-  handleSubmit: (e?: React.FormEvent<HTMLFormElement>) => Promise<void>;
+  // Input Handling (Only expose stable handlers)
+  handleSubmit: (
+    // Modified signature
+    promptValue: string,
+    attachedFilesValue: File[],
+    selectedVfsPathsValue: string[],
+  ) => Promise<void>;
   stopStreaming: () => void;
   regenerateMessage: (messageId: string) => Promise<void>;
-  attachedFiles: File[];
-  addAttachedFile: (file: File) => void;
-  removeAttachedFile: (fileName: string) => void;
-  clearAttachedFiles: () => void;
-  selectedVfsPaths: string[];
-  addSelectedVfsPath: (path: string) => void;
-  removeSelectedVfsPath: (path: string) => void;
-  clearSelectedVfsPaths: () => void;
+  // REMOVED file/vfs state and actions from context props
 
   // Settings (Functions might be dummies if disabled)
   temperature: number;

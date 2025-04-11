@@ -1,21 +1,23 @@
+// src/components/lite-chat/prompt-input.tsx
 import React, { useRef, useEffect, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
-import { useCoreChatContext } from "@/context/core-chat-context";
+// REMOVED: import { useCoreChatContext } from "@/context/core-chat-context";
 import { cn } from "@/lib/utils";
 
 interface PromptInputProps {
   className?: string;
+  prompt: string; // Add prop
+  setPrompt: React.Dispatch<React.SetStateAction<string>>; // Add prop
+  isStreaming: boolean; // Add prop
 }
 
-export const PromptInput: React.FC<PromptInputProps> = ({ className }) => {
-  const {
-    prompt,
-    setPrompt,
-    isStreaming,
-    // messages,
-    // handleSubmitCore,
-    // selectedConversationId,
-  } = useCoreChatContext();
+export const PromptInput: React.FC<PromptInputProps> = ({
+  className,
+  prompt, // Use prop
+  setPrompt, // Use prop
+  isStreaming, // Use prop
+}) => {
+  // REMOVED: const { prompt, setPrompt, isStreaming } = useCoreChatContext();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -30,20 +32,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({ className }) => {
         return;
       }
 
-      // if (
-      //   e.key === "ArrowUp" &&
-      //   !prompt &&
-      //   selectedConversationId &&
-      //   messages.length > 0
-      // ) {
-      //   const lastUserMessage = [...messages]
-      //     .reverse()
-      //     .find((m) => m.role === "user");
-      //   if (lastUserMessage) {
-      //     e.preventDefault();
-      //     setPrompt(lastUserMessage.content);
-      //   }
-      // }
+      // History navigation logic removed for simplicity, can be added back if needed
 
       if (
         e.key === "Escape" &&
@@ -53,12 +42,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({ className }) => {
         textareaRef.current?.focus();
       }
     },
-    [
-      // prompt,
-      // selectedConversationId,
-      // messages,
-      // setPrompt,
-    ],
+    [], // No dependencies needed here now
   );
 
   useEffect(() => {
@@ -69,13 +53,13 @@ export const PromptInput: React.FC<PromptInputProps> = ({ className }) => {
       const maxHeight = 200;
       textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
     }
-  }, [prompt]);
+  }, [prompt]); // Keep prompt dependency for height adjustment
 
   return (
     <Textarea
       ref={textareaRef}
-      value={prompt}
-      onChange={(e) => setPrompt(e.target.value)}
+      value={prompt} // Use prop
+      onChange={(e) => setPrompt(e.target.value)} // Use prop
       onKeyDown={handleKeyDown}
       placeholder="Type a message... (Shift+Enter for new line)"
       className={cn(
@@ -84,7 +68,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({ className }) => {
         className,
       )}
       rows={3}
-      disabled={isStreaming}
+      disabled={isStreaming} // Use prop
       aria-label="Chat input"
     />
   );

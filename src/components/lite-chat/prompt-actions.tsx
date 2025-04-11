@@ -2,7 +2,7 @@
 import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { SendHorizonalIcon, PaperclipIcon } from "lucide-react";
-import { useChatContext } from "@/hooks/use-chat-context";
+import { useChatContext } from "@/hooks/use-chat-context"; // Still need context for custom actions
 import {
   Tooltip,
   TooltipContent,
@@ -13,19 +13,26 @@ import { cn } from "@/lib/utils";
 
 interface PromptActionsProps {
   className?: string;
+  prompt: string; // Add prop for prompt value
+  isStreaming: boolean; // Add prop
+  addAttachedFile: (file: File) => void; // Add prop
 }
 
-export const PromptActions: React.FC<PromptActionsProps> = ({ className }) => {
-  // Get custom actions and the full context
+export const PromptActions: React.FC<PromptActionsProps> = ({
+  className,
+  prompt, // Use prop
+  isStreaming, // Use prop
+  addAttachedFile, // Use prop
+}) => {
+  // Get context only for custom actions
   const context = useChatContext();
   const {
-    prompt,
-    isStreaming,
-    addAttachedFile,
+    // REMOVED: prompt, isStreaming, addAttachedFile
     customPromptActions = [], // Default to empty array
   } = context;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Use the passed-in prompt prop to determine if submit is possible
   const canSubmit = prompt.trim().length > 0 && !isStreaming;
 
   const handleAttachClick = () => {
@@ -36,7 +43,7 @@ export const PromptActions: React.FC<PromptActionsProps> = ({ className }) => {
     const files = event.target.files;
     if (files) {
       for (let i = 0; i < files.length; i++) {
-        addAttachedFile(files[i]);
+        addAttachedFile(files[i]); // Use prop
       }
       event.target.value = "";
     }
@@ -60,7 +67,7 @@ export const PromptActions: React.FC<PromptActionsProps> = ({ className }) => {
               variant="outline"
               size="icon"
               onClick={handleAttachClick}
-              disabled={isStreaming}
+              disabled={isStreaming} // Use prop
               className="h-10 w-10 rounded-full border-gray-200 dark:border-gray-700"
               aria-label="Attach file"
             >
@@ -82,7 +89,7 @@ export const PromptActions: React.FC<PromptActionsProps> = ({ className }) => {
                 variant="outline"
                 size="icon"
                 onClick={() => action.onClick(context)} // Pass full context
-                disabled={isStreaming} // Disable custom actions during streaming too
+                disabled={isStreaming} // Use prop
                 className={cn(
                   "h-10 w-10 rounded-full border-gray-200 dark:border-gray-700",
                   action.className, // Apply custom classes
@@ -106,10 +113,10 @@ export const PromptActions: React.FC<PromptActionsProps> = ({ className }) => {
               <Button
                 type="submit"
                 size="icon"
-                disabled={!canSubmit}
+                disabled={!canSubmit} // Use derived state based on prop
                 className={cn(
                   "h-10 w-10 rounded-full",
-                  canSubmit
+                  canSubmit // Use derived state based on prop
                     ? "bg-primary hover:bg-primary/90"
                     : "bg-gray-200 dark:bg-gray-700",
                 )}
@@ -119,7 +126,7 @@ export const PromptActions: React.FC<PromptActionsProps> = ({ className }) => {
               </Button>
             </div>
           </TooltipTrigger>
-          {!canSubmit && (
+          {!canSubmit && ( // Use derived state based on prop
             <TooltipContent>
               <p>
                 {isStreaming ? "Waiting for response..." : "Enter a message"}

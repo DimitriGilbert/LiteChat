@@ -1,20 +1,25 @@
 // src/components/lite-chat/selected-vfs-files-display.tsx
 import React from "react";
-import { useChatContext } from "@/hooks/use-chat-context";
+import { useChatContext } from "@/hooks/use-chat-context"; // Still need context for flags
 import { Button } from "@/components/ui/button";
 import { XIcon, FileTextIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SelectedVfsFilesDisplayProps {
   className?: string;
+  selectedVfsPaths: string[]; // Add prop
+  removeSelectedVfsPath: (path: string) => void; // Add prop
 }
 
 export const SelectedVfsFilesDisplay: React.FC<
   SelectedVfsFilesDisplayProps
-> = ({ className }) => {
+> = ({
+  className,
+  selectedVfsPaths, // Use prop
+  removeSelectedVfsPath, // Use prop
+}) => {
   const {
-    selectedVfsPaths,
-    removeSelectedVfsPath,
+    // REMOVED: selectedVfsPaths, removeSelectedVfsPath,
     isVfsEnabledForItem, // Get the flag
     vfs, // Get the vfs object
   } = useChatContext();
@@ -49,7 +54,7 @@ export const SelectedVfsFilesDisplay: React.FC<
             variant="ghost"
             size="icon"
             className="h-5 w-5 text-gray-500 hover:text-red-600 dark:hover:text-red-400 ml-1 flex-shrink-0"
-            onClick={() => removeSelectedVfsPath(path)}
+            onClick={() => removeSelectedVfsPath(path)} // Use prop
             aria-label={`Remove file ${path} from context`}
           >
             <XIcon className="h-3 w-3" />
