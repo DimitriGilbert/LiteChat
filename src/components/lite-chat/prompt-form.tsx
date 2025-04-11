@@ -14,7 +14,6 @@ interface PromptFormProps {
 }
 
 export const PromptForm: React.FC<PromptFormProps> = ({ className }) => {
-  // Manage prompt/attached file state locally
   const {
     prompt,
     setPrompt,
@@ -24,18 +23,15 @@ export const PromptForm: React.FC<PromptFormProps> = ({ className }) => {
     clearAttachedFiles,
   } = useChatInput();
 
-  // Get VFS selection state/actions and other needed items from context
   const {
     handleSubmit: contextHandleSubmit,
     isStreaming,
     isVfsEnabledForItem,
-    selectedVfsPaths, // Get VFS state from context
-    clearSelectedVfsPaths, // Get VFS action from context
+    selectedVfsPaths,
+    clearSelectedVfsPaths,
   } = useChatContext();
 
-  // Clear local VFS selection if VFS becomes disabled for the item
   useEffect(() => {
-    // Safeguard against selectedVfsPaths being undefined during render cycles
     if (
       !isVfsEnabledForItem &&
       selectedVfsPaths &&
@@ -45,15 +41,12 @@ export const PromptForm: React.FC<PromptFormProps> = ({ className }) => {
     }
   }, [isVfsEnabledForItem, selectedVfsPaths, clearSelectedVfsPaths]);
 
-  // Handle form submission by calling the context function with local state
   const handleLocalSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Pass local prompt/files and context VFS paths to the context handler
     contextHandleSubmit(prompt, attachedFiles, selectedVfsPaths).then(() => {
-      // Clear local state after successful submission attempt
       setPrompt("");
       clearAttachedFiles();
-      clearSelectedVfsPaths(); // Use context action
+      clearSelectedVfsPaths();
     });
   };
 
@@ -62,14 +55,10 @@ export const PromptForm: React.FC<PromptFormProps> = ({ className }) => {
       onSubmit={handleLocalSubmit}
       className={cn("flex flex-col", className)}
     >
-      {/* Pass local file state down */}
       <PromptFiles
         attachedFiles={attachedFiles}
         removeAttachedFile={removeAttachedFile}
       />
-
-      {/* Render SelectedVfsFilesDisplay WITHOUT passing props */}
-      {/* It will get its state directly from context */}
       <SelectedVfsFilesDisplay />
 
       <div className="flex items-end p-3 md:p-4">
@@ -82,7 +71,7 @@ export const PromptForm: React.FC<PromptFormProps> = ({ className }) => {
         <PromptActions
           prompt={prompt}
           isStreaming={isStreaming}
-          addAttachedFile={addAttachedFile} // Pass local file action
+          addAttachedFile={addAttachedFile}
         />
       </div>
 

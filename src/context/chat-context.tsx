@@ -33,10 +33,13 @@ import {
 import { useSidebarManagement } from "@/hooks/use-sidebar-management";
 import { useChatSettings } from "@/hooks/use-chat-settings";
 import { useAiInteraction } from "@/hooks/use-ai-interaction";
-import { useChatInput } from "@/hooks/use-chat-input";
+// import { useChatInput } from "@/hooks/use-chat-input";
 import { useMessageHandling } from "@/hooks/use-message-handling";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useVirtualFileSystem } from "@/hooks/use-virtual-file-system";
+
+import { useState as useVfsState, useCallback as useVfsCallback } from "react";
+
 import { toast } from "sonner";
 
 // Helper to decode Uint8Array safely
@@ -221,7 +224,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [error, setErrorState] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const chatInput = useChatInput();
+  // const chatInput = useChatInput();
 
   const setError = useCallback((newError: string | null) => {
     setErrorState(newError);
@@ -245,7 +248,19 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const apiKeysMgmt: UseApiKeysManagementReturn = useMemo(() => {
     return enableApiKeyManagement ? realApiKeysMgmt : dummyApiKeysMgmt;
   }, [enableApiKeyManagement, realApiKeysMgmt]);
-
+  // --- VFS Selection State (Managed here, previously part of useChatInput) ---
+  const [selectedVfsPaths, setSelectedVfsPaths] = useVfsState<string[]>([]);
+  const addSelectedVfsPath = useVfsCallback((path: string) => {
+    setSelectedVfsPaths((prev) =>
+      prev.includes(path) ? prev : [...prev, path].sort(),
+    );
+  }, []);
+  const removeSelectedVfsPath = useVfsCallback((path: string) => {
+    setSelectedVfsPaths((prev) => prev.filter((p) => p !== path));
+  }, []);
+  const clearSelectedVfsPaths = useVfsCallback(() => {
+    setSelectedVfsPaths([]);
+  }, []);
   // --- Sidebar Management ---
   const [activeItemId, setActiveItemId] = useState<string | null>(
     initialSelectedItemId,
@@ -261,18 +276,18 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         abortControllerRef.current = null;
       }
       setIsStreaming(false);
-      chatInput.clearSelectedVfsPaths();
-      chatInput.clearAttachedFiles();
+      clearSelectedVfsPaths();
       setMessages([]);
       setErrorState(null);
       setActiveItemId(id);
       setActiveItemType(type);
       setIsLoadingMessages(!!id);
+
       console.log(
         `[ChatProvider] handleSelectItem updated state: ID=${id}, Type=${type}`,
       );
     },
-    [chatInput],
+    [clearSelectedVfsPaths],
   );
 
   const sidebarItems = useMemo<SidebarItem[]>(() => {
@@ -406,10 +421,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   }, [enableVfs, isVfsEnabledForItem, activeItemId, realVfs]);
 
   useEffect(() => {
-    if (!isVfsEnabledForItem && chatInput.selectedVfsPaths.length > 0) {
-      chatInput.clearSelectedVfsPaths();
+    if (!isVfsEnabledForItem && selectedVfsPaths.length > 0) {
+      clearSelectedVfsPaths();
     }
-  }, [isVfsEnabledForItem, chatInput]); // Add chatInput dependency back
+  }, [isVfsEnabledForItem, selectedVfsPaths, clearSelectedVfsPaths]);
 
   // --- AI Interaction ---
   const aiInteraction = useAiInteraction({
@@ -500,12 +515,16 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
   // --- Submit Handler (Use chatInput from closure for VFS/files) ---
   const handleSubmit = useCallback(
-    async (promptValue: string, attachedFilesValue: File[]) => {
+    async (
+      promptValue: string, // Receive prompt from PromptForm
+      attachedFilesValue: File[], // Receive attached files from PromptForm
+      vfsPathsToSubmit: string[], // Receive VFS paths from PromptForm (which got them from context)
+    ) => {
       const currentPrompt = promptValue.trim();
       const canSubmit =
         currentPrompt.length > 0 ||
         attachedFilesValue.length > 0 ||
-        chatInput.selectedVfsPaths.length > 0; // Use chatInput here
+        vfsPathsToSubmit.length > 0; // Use argument
 
       if (!canSubmit) return;
       if (isStreaming) {
@@ -556,6 +575,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           if (!newConvId)
             throw new Error("Failed to get ID for new conversation.");
           conversationIdToSubmit = newConvId;
+          // Note: The new conversation might not immediately appear in activeConversationData
+          // We proceed with the ID, assuming subsequent operations will use it correctly.
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : "Unknown error";
           setError(`Error: Could not start chat - ${message}`);
@@ -573,40 +594,38 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       let contextPrefix = "";
       const pathsIncludedInContext: string[] = [];
 
-      // Process VFS files (using chatInput.selectedVfsPaths from closure)
+      // Process VFS files (using vfsPathsToSubmit argument)
       if (
         enableVfs &&
         isVfsEnabledForItem &&
         vfs.isReady &&
-        vfs.configuredItemId === conversationIdToSubmit &&
-        chatInput.selectedVfsPaths.length > 0 // Use chatInput here
+        vfs.configuredItemId === conversationIdToSubmit && // Ensure VFS is configured for the *target* conversation
+        vfsPathsToSubmit.length > 0 // Use argument
       ) {
-        const vfsContentPromises = chatInput.selectedVfsPaths.map(
-          async (path) => {
-            try {
-              const contentBytes = await vfs.readFile(path);
-              const contentText = decodeUint8Array(contentBytes);
-              pathsIncludedInContext.push(path);
-              const fileExtension = path.split(".").pop()?.toLowerCase() || "";
-              return `<vfs_file path="${path}" extension="${fileExtension}">\n\`\`\`${fileExtension}\n${contentText}\n\`\`\`\n</vfs_file>`;
-            } catch (readErr) {
-              console.error(`Error reading VFS file ${path}:`, readErr);
-              toast.error(`Failed to read VFS file: ${path}`);
-              return `<vfs_file path="${path}" error="Failed to read"/>`;
-            }
-          },
-        );
+        const vfsContentPromises = vfsPathsToSubmit.map(async (path) => {
+          try {
+            const contentBytes = await vfs.readFile(path);
+            const contentText = decodeUint8Array(contentBytes);
+            pathsIncludedInContext.push(path);
+            const fileExtension = path.split(".").pop()?.toLowerCase() || "";
+            return `<vfs_file path="${path}" extension="${fileExtension}">\n\`\`\`${fileExtension}\n${contentText}\n\`\`\`\n</vfs_file>`;
+          } catch (readErr) {
+            console.error(`Error reading VFS file ${path}:`, readErr);
+            toast.error(`Failed to read VFS file: ${path}`);
+            return `<vfs_file path="${path}" error="Failed to read"/>`;
+          }
+        });
         const vfsContents = await Promise.all(vfsContentPromises);
         if (vfsContents.length > 0) {
           contextPrefix += vfsContents.join("\n\n") + "\n\n";
         }
-        chatInput.clearSelectedVfsPaths(); // Clear state via chatInput
-      } else if (chatInput.selectedVfsPaths.length > 0) {
+        // Clearing VFS selection is now handled in PromptForm's submit handler
+      } else if (vfsPathsToSubmit.length > 0) {
         console.warn(
           "VFS paths selected but VFS not enabled/ready for this item. Clearing selection.",
         );
         toast.warning("VFS not enabled for this chat. Selected files ignored.");
-        chatInput.clearSelectedVfsPaths(); // Clear state via chatInput
+        // Clearing VFS selection is now handled in PromptForm's submit handler
       }
 
       // Process attached files (using argument attachedFilesValue)
@@ -641,7 +660,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         // Clearing attachedFiles is now handled locally in PromptForm
       }
 
-      const originalUserPrompt = currentPrompt;
+      const originalUserPrompt = currentPrompt; // Use argument
       const promptToSendToAI = contextPrefix + originalUserPrompt;
 
       // Clearing the prompt is now handled locally in PromptForm
@@ -670,7 +689,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     },
     [
       // Dependencies for handleSubmit
-      chatInput, // Add chatInput back for selectedVfsPaths access
       isStreaming,
       providerModel.selectedProvider,
       providerModel.selectedModel,
@@ -685,6 +703,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       enableVfs,
       apiKeysMgmt,
       enableApiKeyManagement,
+      // No dependency on local prompt/files state here anymore
+      // No dependency on selectedVfsPaths state here, it's passed as argument
     ],
   );
 
@@ -813,15 +833,16 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       error: coreContextValue.error,
       setError: coreContextValue.setError,
 
-      // Input Handling (Only expose stable handlers + VFS selection)
-      handleSubmit, // Use the memoized handleSubmit from above
+      // Input Handling (Expose stable handlers + VFS selection state/actions)
+      handleSubmit, // Use the memoized handleSubmit from above (updated signature)
       stopStreaming, // Use the memoized stopStreaming from above
       regenerateMessage, // Use the memoized regenerateMessage from above
-      // RESTORE VFS selection state/actions from chatInput
-      selectedVfsPaths: chatInput.selectedVfsPaths,
-      addSelectedVfsPath: chatInput.addSelectedVfsPath,
-      removeSelectedVfsPath: chatInput.removeSelectedVfsPath,
-      clearSelectedVfsPaths: chatInput.clearSelectedVfsPaths,
+      // ADD VFS selection state/actions (now managed directly in provider)
+      selectedVfsPaths: selectedVfsPaths,
+      addSelectedVfsPath: addSelectedVfsPath,
+      removeSelectedVfsPath: removeSelectedVfsPath,
+      clearSelectedVfsPaths: clearSelectedVfsPaths,
+      // REMOVED prompt/attached file state/actions
 
       // Settings (Values from chatSettings hook)
       temperature: chatSettings.temperature,
@@ -878,21 +899,21 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       providerModel.setSelectedModelId,
       // API Keys
       storage.apiKeys,
-      apiKeysMgmt,
+      apiKeysMgmt, // Note: This is the memoized object containing stable functions
       // Sidebar
       sidebarItems,
-      sidebarMgmt,
+      sidebarMgmt, // Note: This is the memoized object containing stable functions
       // Core State
       coreContextValue.messages,
       coreContextValue.isLoadingMessages,
       coreContextValue.isStreaming,
       coreContextValue.error,
       coreContextValue.setError,
-      // Input State (Only include VFS selection parts from chatInput)
-      chatInput.selectedVfsPaths, // RESTORED
-      chatInput.addSelectedVfsPath, // RESTORED
-      chatInput.removeSelectedVfsPath, // RESTORED
-      chatInput.clearSelectedVfsPaths, // RESTORED
+      // Input State (Only include VFS selection parts)
+      selectedVfsPaths, // State value
+      addSelectedVfsPath, // Stable callback
+      removeSelectedVfsPath, // Stable callback
+      clearSelectedVfsPaths, // Stable callback
       // Memoized Handlers
       handleSubmit,
       stopStreaming,
@@ -900,16 +921,16 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       handleImportConversation,
       handleToggleVfs,
       // Settings
-      chatSettings,
+      chatSettings, // Note: This is the memoized object containing state and setters
       streamingThrottleRate,
       // Data Management
-      storage.clearAllData,
+      storage.clearAllData, // Stable function from storage hook
       // VFS
-      isVfsEnabledForItem,
-      vfs,
+      isVfsEnabledForItem, // Derived state value
+      vfs, // Memoized VFS object (potentially dummy)
       // DB Getters
-      storage.getConversation,
-      storage.getProject,
+      storage.getConversation, // Stable function from storage hook
+      storage.getProject, // Stable function from storage hook
       // Extensibility
       customPromptActions,
       customMessageActions,

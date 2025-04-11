@@ -1,7 +1,6 @@
 // src/components/lite-chat/prompt-input.tsx
 import React, { useRef, useEffect, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
-// REMOVED: import { useCoreChatContext } from "@/context/core-chat-context";
 import { cn } from "@/lib/utils";
 
 interface PromptInputProps {
@@ -17,8 +16,6 @@ export const PromptInput: React.FC<PromptInputProps> = ({
   setPrompt, // Use prop
   isStreaming, // Use prop
 }) => {
-  // REMOVED: const { prompt, setPrompt, isStreaming } = useCoreChatContext();
-
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleKeyDown = useCallback(
@@ -31,9 +28,6 @@ export const PromptInput: React.FC<PromptInputProps> = ({
         form?.requestSubmit();
         return;
       }
-
-      // History navigation logic removed for simplicity, can be added back if needed
-
       if (
         e.key === "Escape" &&
         document.activeElement !== textareaRef.current
@@ -42,7 +36,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
         textareaRef.current?.focus();
       }
     },
-    [], // No dependencies needed here now
+    [],
   );
 
   useEffect(() => {
@@ -53,13 +47,13 @@ export const PromptInput: React.FC<PromptInputProps> = ({
       const maxHeight = 200;
       textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
     }
-  }, [prompt]); // Keep prompt dependency for height adjustment
+  }, [prompt]);
 
   return (
     <Textarea
       ref={textareaRef}
-      value={prompt} // Use prop
-      onChange={(e) => setPrompt(e.target.value)} // Use prop
+      value={prompt}
+      onChange={(e) => setPrompt(e.target.value)}
       onKeyDown={handleKeyDown}
       placeholder="Type a message... (Shift+Enter for new line)"
       className={cn(
@@ -68,7 +62,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
         className,
       )}
       rows={3}
-      disabled={isStreaming} // Use prop
+      disabled={isStreaming}
       aria-label="Chat input"
     />
   );
