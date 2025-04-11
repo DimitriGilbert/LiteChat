@@ -20,10 +20,12 @@ import {
 
 interface PromptSettingsAdvancedProps {
   className?: string;
+  initialTab?: string; // <-- Add prop for initial tab
 }
 
 export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
   className,
+  initialTab = "parameters", // <-- Use the prop, default to 'parameters'
 }) => {
   const {
     temperature,
@@ -38,8 +40,8 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setPresencePenalty,
     frequencyPenalty,
     setFrequencyPenalty,
-    activeSystemPrompt, // This will be null if advanced settings are globally disabled
-    globalSystemPrompt, // This will be null if advanced settings are globally disabled
+    activeSystemPrompt,
+    globalSystemPrompt,
     selectedItemId,
     selectedItemType,
     updateConversationSystemPrompt,
@@ -47,7 +49,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     vfs,
     getConversation,
     enableApiKeyManagement,
-    enableAdvancedSettings, // <-- Get flag (though not used for rendering logic here)
+    enableAdvancedSettings,
   } = useChatContext();
 
   const conversationId = useMemo(() => {
@@ -61,7 +63,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
 
   // Effect to load conversation-specific prompt
   useEffect(() => {
-    // Only try to load if advanced settings are enabled and a convo is selected
     if (enableAdvancedSettings && conversationId && getConversation) {
       getConversation(conversationId)
         .then((convo) => {
@@ -73,11 +74,10 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           setIsConvoPromptDirty(false);
         });
     } else {
-      // Reset if advanced settings disabled or no convo selected
       setLocalConvoSystemPrompt(null);
       setIsConvoPromptDirty(false);
     }
-  }, [conversationId, getConversation, enableAdvancedSettings]); // Add enableAdvancedSettings dependency
+  }, [conversationId, getConversation, enableAdvancedSettings]);
 
   const handleConvoSystemPromptChange = (
     e: React.ChangeEvent<HTMLTextAreaElement>,
@@ -87,11 +87,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
   };
 
   const saveConvoSystemPrompt = () => {
-    if (
-      enableAdvancedSettings && // Check flag before saving
-      conversationId &&
-      isConvoPromptDirty
-    ) {
+    if (enableAdvancedSettings && conversationId && isConvoPromptDirty) {
       const promptToSave =
         localConvoSystemPrompt?.trim() === "" ? null : localConvoSystemPrompt;
       updateConversationSystemPrompt(conversationId, promptToSave)
@@ -116,21 +112,20 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
   };
 
   const isConversationSelected = !!conversationId;
-  // Check local state for whether a convo prompt is *set* (not just active)
   const isConversationPromptSet =
     localConvoSystemPrompt !== null && localConvoSystemPrompt.trim() !== "";
-  // Check if the *active* prompt is the global one (or if no convo prompt is set)
   const isUsingGlobalOrDefault =
     activeSystemPrompt === globalSystemPrompt || !isConversationPromptSet;
 
-  // This component should only render if enableAdvancedSettings is true,
-  // so we don't need to hide elements based on the flag *within* this component.
-  // The setters passed down from context will be dummy functions if disabled,
-  // preventing state updates, but the UI elements will still render if this component is mounted.
-
   return (
     <div className={cn("p-3", className)}>
-      <Tabs defaultValue="parameters" className="w-full">
+      <Tabs
+        // Use the initialTab prop for defaultValue
+        defaultValue={initialTab}
+        // Add key to ensure Tabs component re-initializes with new default
+        key={initialTab}
+        className="w-full"
+      >
         <TabsList className="grid w-full grid-cols-4 h-9 mb-3">
           <TabsTrigger value="parameters" className="text-xs px-2 h-7">
             Parameters
@@ -138,7 +133,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           <TabsTrigger value="system_prompt" className="text-xs px-2 h-7">
             System Prompt
           </TabsTrigger>
-          {/* Conditionally render API Keys tab based on its own flag */}
           {enableApiKeyManagement && (
             <TabsTrigger value="api_keys" className="text-xs px-2 h-7">
               API Keys
@@ -155,7 +149,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
 
         {/* Parameters Tab */}
         <TabsContent value="parameters" className="space-y-4 mt-0">
-          {/* Parameter sliders/inputs */}
+          {/* ... content ... */}
           <div className="grid grid-cols-2 gap-4 items-end">
             <div className="space-y-1.5">
               <Label htmlFor="temperature" className="text-xs">
@@ -250,6 +244,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
 
         {/* System Prompt Tab */}
         <TabsContent value="system_prompt" className="space-y-3 mt-0">
+          {/* ... content ... */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
               <Label
@@ -300,7 +295,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
                   ? "Override global prompt for this chat (leave blank to use global)"
                   : "Select a conversation to set its specific system prompt"
               }
-              // Display local state if convo selected, otherwise show the active prompt (which might be global or null)
               value={
                 isConversationSelected
                   ? (localConvoSystemPrompt ?? "")
@@ -324,7 +318,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
               </p>
             )}
           </div>
-          {/* Optionally show Global System Prompt for reference */}
           <div className="space-y-1.5 pt-2 border-t border-gray-700/50">
             <Label htmlFor="global-system-prompt-ref" className="text-xs">
               Global System Prompt (Reference)
@@ -343,7 +336,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           </div>
         </TabsContent>
 
-        {/* API Keys Tab - Conditionally render content */}
+        {/* API Keys Tab */}
         {enableApiKeyManagement && (
           <TabsContent value="api_keys" className="mt-0">
             <ApiKeySelector />
@@ -356,6 +349,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
 
         {/* Files Tab */}
         <TabsContent value="files" className="mt-0">
+          {/* ... content ... */}
           {isVfsEnabledForItem && vfs.isReady ? (
             <FileManager key={selectedItemId} />
           ) : (

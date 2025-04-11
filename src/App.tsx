@@ -15,27 +15,10 @@ const openrouter = createOpenAICompatible({
 
 const chatProviders: AiProviderConfig[] = [
   {
-    id: "local",
-    name: "local",
-    requiresApiKey: false,
-    models: [
-      {
-        id: "gemma-3-4b-it",
-        name: "gemma3 4b",
-        instance: lmstudio("gemma-3-4b-it"),
-      },
-    ],
-  },
-  {
     id: "openrouter",
     name: "openrouter",
     requiresApiKey: true,
     models: [
-      {
-        id: "openrouter/quasar-alpha",
-        name: "quasar alpha",
-        instance: openrouter("openrouter/quasar-alpha"),
-      },
       {
         id: "openrouter/optimus-alpha",
         name: "optimus A",
@@ -60,6 +43,18 @@ const chatProviders: AiProviderConfig[] = [
         id: "moonshotai/kimi-vl-a3b-thinking:free",
         name: "kimi vl",
         instance: openrouter("moonshotai/kimi-vl-a3b-thinking:free"),
+      },
+    ],
+  },
+  {
+    id: "local",
+    name: "local",
+    requiresApiKey: false,
+    models: [
+      {
+        id: "gemma-3-4b-it",
+        name: "gemma3 4b",
+        instance: lmstudio("gemma-3-4b-it"),
       },
     ],
   },

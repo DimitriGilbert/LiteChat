@@ -11,8 +11,8 @@ import {
   FolderSyncIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch"; // Keep Switch import
+// REMOVED: import { Label } from "@/components/ui/label"; // Label no longer needed for VFS
 import {
   Tooltip,
   TooltipContent,
@@ -31,14 +31,17 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
   const {
     selectedProviderId,
     providers,
-    getApiKeyForProvider,
     selectedApiKeyId,
     selectedItemId,
     isVfsEnabledForItem,
     toggleVfsEnabled,
-    enableAdvancedSettings, // <-- Get the flag from context
+    enableAdvancedSettings,
+    enableApiKeyManagement,
   } = useChatContext();
+
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [advancedInitialTab, setAdvancedInitialTab] =
+    useState<string>("parameters");
 
   const providerConfig = providers.find((p) => p.id === selectedProviderId);
   const needsKey =
@@ -46,13 +49,52 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
   const keyIsSelected = !!(
     selectedProviderId && selectedApiKeyId[selectedProviderId]
   );
-  const keyHasValue = !!(
-    selectedProviderId && getApiKeyForProvider(selectedProviderId)
-  );
-  const showKeyRequiredWarning = needsKey && (!keyIsSelected || !keyHasValue);
-  const showKeyProvidedIndicator = needsKey && keyIsSelected && keyHasValue;
+
+  const showKeyRequiredWarning = needsKey && !keyIsSelected;
+  const showKeyProvidedIndicator = needsKey && keyIsSelected;
 
   const isItemSelected = !!selectedItemId;
+
+  const openAdvancedSettings = (tabId: string = "parameters") => {
+    setAdvancedInitialTab(tabId);
+    setIsAdvancedOpen(true);
+  };
+
+  const handleToggleAdvancedClick = () => {
+    if (isAdvancedOpen) {
+      setIsAdvancedOpen(false);
+    } else {
+      openAdvancedSettings("parameters");
+    }
+  };
+
+  const handleApiKeyIconClick = () => {
+    if (enableApiKeyManagement) {
+      openAdvancedSettings("api_keys");
+    } else {
+      openAdvancedSettings("parameters");
+    }
+  };
+
+  // Handler for clicking the VFS switch container
+  const handleVfsContainerClick = (
+    e: React.MouseEvent<HTMLDivElement, MouseEvent>,
+  ) => {
+    // Prevent click from propagating if clicking directly on the switch thumb/track
+    if ((e.target as HTMLElement).closest('[role="switch"]')) {
+      return;
+    }
+    // Only navigate if VFS is currently enabled and advanced settings are available
+    if (isVfsEnabledForItem && enableAdvancedSettings) {
+      openAdvancedSettings("files");
+    }
+  };
+
+  // Handler for the Switch's checked change event
+  const handleVfsSwitchChange = () => {
+    // We still need to call the toggle function regardless of click location
+    toggleVfsEnabled();
+  };
 
   return (
     <div className={cn("bg-gray-800 text-gray-300", className)}>
@@ -64,70 +106,95 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
         <TooltipProvider delayDuration={100}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex items-center h-9">
+              <button
+                type="button"
+                onClick={handleApiKeyIconClick}
+                className={cn(
+                  "flex items-center h-9 px-1 rounded focus:outline-none focus:ring-1 focus:ring-blue-500",
+                  needsKey ? "cursor-pointer" : "cursor-default",
+                )}
+                disabled={!needsKey}
+                aria-label="Open API Key settings"
+              >
                 {showKeyRequiredWarning && (
-                  <AlertTriangleIcon
-                    className="h-4 w-4 text-amber-500"
-                    aria-label="API Key Required"
-                  />
+                  <AlertTriangleIcon className="h-4 w-4 text-amber-500" />
                 )}
                 {showKeyProvidedIndicator && (
-                  <KeyIcon
-                    className="h-4 w-4 text-green-500"
-                    aria-label="API Key Provided"
-                  />
+                  <KeyIcon className="h-4 w-4 text-green-500" />
                 )}
                 {!needsKey && <div className="w-4 h-4" />}
-              </div>
+              </button>
             </TooltipTrigger>
             <TooltipContent side="top">
               {showKeyRequiredWarning && (
-                <p>
-                  API Key required for this provider is missing or not selected.
-                </p>
+                <p>API Key required, none selected. Click to manage keys.</p>
               )}
               {showKeyProvidedIndicator && (
-                <p>API Key is selected and available for this provider.</p>
+                <p>API Key selected. Click to manage keys.</p>
               )}
               {!needsKey && <p>API Key not required for this provider.</p>}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
 
-        {/* VFS Toggle */}
+        {/* VFS Toggle and Navigation Trigger */}
         <TooltipProvider delayDuration={100}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex items-center space-x-2 h-9">
+              {/* Clickable container */}
+              <div
+                onClick={handleVfsContainerClick}
+                className={cn(
+                  "flex items-center space-x-2 h-9 px-2 rounded",
+                  isItemSelected && isVfsEnabledForItem
+                    ? "cursor-pointer hover:bg-gray-700" // Clickable style when enabled
+                    : "cursor-default", // Default style when disabled or no item
+                  !isItemSelected && "opacity-50", // Dim if no item selected
+                )}
+                role="button" // Indicate it's clickable
+                aria-label={
+                  isVfsEnabledForItem
+                    ? "Virtual Filesystem enabled. Click to manage files."
+                    : "Virtual Filesystem disabled."
+                }
+                tabIndex={isItemSelected && isVfsEnabledForItem ? 0 : -1} // Make focusable only when clickable
+                onKeyDown={(e) => {
+                  if (
+                    (e.key === "Enter" || e.key === " ") &&
+                    isVfsEnabledForItem &&
+                    enableAdvancedSettings
+                  ) {
+                    openAdvancedSettings("files");
+                  }
+                }}
+              >
+                <FolderSyncIcon
+                  className={cn(
+                    "h-4 w-4 transition-colors",
+                    isItemSelected && isVfsEnabledForItem
+                      ? "text-blue-400"
+                      : "text-gray-500",
+                  )}
+                />
                 <Switch
-                  id="vfs-toggle"
+                  id="vfs-toggle-combined"
                   checked={isVfsEnabledForItem}
-                  onCheckedChange={toggleVfsEnabled}
+                  onCheckedChange={handleVfsSwitchChange} // Use separate handler for state change
                   disabled={!isItemSelected}
                   aria-label="Toggle Virtual Filesystem"
+                  // Prevent the container click when clicking the switch itself
+                  onClick={(e) => e.stopPropagation()}
+                  className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-gray-600"
                 />
-                <Label
-                  htmlFor="vfs-toggle"
-                  className={cn(
-                    "text-xs cursor-pointer flex items-center gap-1 transition-colors",
-                    !isItemSelected && "text-gray-500 cursor-not-allowed",
-                    isItemSelected && isVfsEnabledForItem && "text-blue-400",
-                    isItemSelected && !isVfsEnabledForItem && "text-gray-400",
-                  )}
-                >
-                  <FolderSyncIcon className="h-3.5 w-3.5" />
-                  <span>Files</span>
-                </Label>
               </div>
             </TooltipTrigger>
             <TooltipContent side="top">
-              {isItemSelected ? (
-                <p>
-                  {isVfsEnabledForItem ? "Disable" : "Enable"} Virtual
-                  Filesystem for this item
-                </p>
+              {!isItemSelected ? (
+                <p>Select a chat or project first</p>
+              ) : isVfsEnabledForItem ? (
+                <p>Filesystem Enabled. Click to manage files.</p>
               ) : (
-                <p>Select a chat or project to manage its filesystem</p>
+                <p>Filesystem Disabled. Toggle to enable.</p>
               )}
             </TooltipContent>
           </Tooltip>
@@ -135,7 +202,7 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
 
         <div className="flex-grow" />
 
-        {/* Advanced Settings Toggle Button - Conditionally render */}
+        {/* Advanced Settings Toggle Button */}
         {enableAdvancedSettings && (
           <TooltipProvider delayDuration={100}>
             <Tooltip>
@@ -144,7 +211,7 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+                  onClick={handleToggleAdvancedClick}
                   className={cn(
                     "h-8 w-8 text-gray-400 hover:text-gray-200",
                     isAdvancedOpen && "bg-gray-700 text-gray-200",
@@ -162,9 +229,12 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
         )}
       </div>
 
-      {/* Advanced Settings Panel - Conditionally render */}
+      {/* Advanced Settings Panel */}
       {enableAdvancedSettings && isAdvancedOpen && (
-        <PromptSettingsAdvanced className="border-t border-gray-700" />
+        <PromptSettingsAdvanced
+          className="border-t border-gray-700"
+          initialTab={advancedInitialTab}
+        />
       )}
     </div>
   );
