@@ -10,6 +10,7 @@ interface UseVirtualFileSystemProps {
   itemId: string | null;
   itemType: SidebarItemType | null;
   isEnabled: boolean;
+  vfsKey: string | null;
 }
 
 interface UseVirtualFileSystemReturn {
@@ -17,7 +18,7 @@ interface UseVirtualFileSystemReturn {
   isLoading: boolean;
   isOperationLoading: boolean;
   error: string | null;
-  configuredItemId: string | null;
+  configuredVfsKey: string | null;
   listFiles: (path: string) => Promise<FileSystemEntry[]>;
   readFile: (path: string) => Promise<Uint8Array>;
   writeFile: (path: string, data: Uint8Array | string) => Promise<void>;
@@ -28,9 +29,9 @@ interface UseVirtualFileSystemReturn {
   uploadAndExtractZip: (file: File, targetPath: string) => Promise<void>;
   downloadAllAsZip: (filename?: string) => Promise<void>;
   rename: (oldPath: string, newPath: string) => Promise<void>;
+  vfsKey: string | null;
 }
 
-// --- Path Helpers ---
 const normalizePath = (path: string): string => {
   return path.replace(/\\/g, "/").replace(/\/+/g, "/");
 };
@@ -50,30 +51,29 @@ const dirname = (path: string): string => {
   if (lastSlash === 0) return "/";
   return normalized.substring(0, lastSlash);
 };
-// --- End Path Helpers ---
 
 export function useVirtualFileSystem({
-  itemId,
   isEnabled,
+  vfsKey,
 }: UseVirtualFileSystemProps): UseVirtualFileSystemReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [isOperationLoading, setIsOperationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const isMountedRef = useRef(false);
-  const configuredFsIdRef = useRef<string | null>(null);
-  const configuringForIdRef = useRef<string | null>(null);
+  const configuredVfsKeyRef = useRef<string | null>(null);
+  const configuringForVfsKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
 
-    const configureNewFs = async (id: string) => {
+    const configureNewFs = async (key: string) => {
       if (!isMountedRef.current) return;
 
       console.log(
-        `[VFS] Configuring global fs for item ID: ${id} using configureSingle`,
+        `[VFS] Configuring global fs for VFS key: ${key} using configureSingle`,
       );
-      configuringForIdRef.current = id;
+      configuringForVfsKeyRef.current = key;
 
       setIsLoading((prev) => (prev ? prev : true));
       setIsOperationLoading(false);
@@ -81,59 +81,64 @@ export function useVirtualFileSystem({
       setIsReady(false);
 
       try {
-        await configureSingle({ backend: IndexedDB });
+        // Use a unique name for each VFS key (project, orphan)
+        const vfsConf = {
+          backend: IndexedDB,
+          name: `litechat_vfs_${key}`,
+        };
+        await configureSingle(vfsConf);
 
         if (
           isMountedRef.current &&
-          configuringForIdRef.current === id &&
-          itemId === id
+          configuringForVfsKeyRef.current === key &&
+          vfsKey === key
         ) {
-          configuredFsIdRef.current = id;
+          configuredVfsKeyRef.current = key;
           setIsReady(true);
           setError(null);
           console.log(
-            `[VFS] Global fs configured successfully for ${id}. Hook is ready.`,
+            `[VFS] Global fs configured successfully for ${key}. Hook is ready.`,
           );
         } else {
           console.log(
-            `[VFS] Configuration for ${id} finished, but hook state changed (mounted: ${isMountedRef.current}, target: ${itemId}, configuredFor: ${configuringForIdRef.current}). State not updated for ready.`,
+            `[VFS] Configuration for ${key} finished, but hook state changed (mounted: ${isMountedRef.current}, target: ${vfsKey}, configuredFor: ${configuringForVfsKeyRef.current}). State not updated for ready.`,
           );
-          if (itemId !== id) {
+          if (vfsKey !== key) {
             setIsReady(false);
-            configuredFsIdRef.current = null;
+            configuredVfsKeyRef.current = null;
           }
         }
       } catch (err) {
-        console.error(`[VFS] Configuration failed for ${id}:`, err);
-        if (isMountedRef.current && itemId === id) {
+        console.error(`[VFS] Configuration failed for ${key}:`, err);
+        if (isMountedRef.current && vfsKey === key) {
           const errorMsg = `Failed to configure filesystem: ${err instanceof Error ? err.message : String(err)}`;
           setError((prev) => (prev === errorMsg ? prev : errorMsg));
           setIsReady(false);
-          configuredFsIdRef.current = null;
+          configuredVfsKeyRef.current = null;
         }
       } finally {
-        if (configuringForIdRef.current === id) {
+        if (configuringForVfsKeyRef.current === key) {
           setIsLoading(false);
-          configuringForIdRef.current = null;
+          configuringForVfsKeyRef.current = null;
         }
       }
     };
 
-    if (itemId && isEnabled) {
-      if (itemId !== configuredFsIdRef.current) {
-        configureNewFs(itemId);
+    if (vfsKey && isEnabled) {
+      if (vfsKey !== configuredVfsKeyRef.current) {
+        configureNewFs(vfsKey);
       } else {
         if (!isReady) setIsReady(true);
         if (isLoading) setIsLoading(false);
         if (error !== null) setError(null);
-        console.log(`[VFS] Already configured for ${itemId}. State ensured.`);
+        console.log(`[VFS] Already configured for ${vfsKey}. State ensured.`);
       }
     } else {
       if (isReady) setIsReady(false);
-      if (configuredFsIdRef.current !== null) {
-        configuredFsIdRef.current = null;
+      if (configuredVfsKeyRef.current !== null) {
+        configuredVfsKeyRef.current = null;
         console.log(
-          "[VFS] Cleared configured FS ID and readiness due to disable/unselect.",
+          "[VFS] Cleared configured FS key and readiness due to disable/unselect.",
         );
       }
       if (isLoading) setIsLoading(false);
@@ -145,21 +150,21 @@ export function useVirtualFileSystem({
       isMountedRef.current = false;
       console.log("[VFS] Cleanup effect triggered.");
     };
-  }, [itemId, isEnabled, isReady, isLoading, isOperationLoading, error]); // Added state dependencies to ensure consistency check runs
+  }, [vfsKey, isEnabled, isReady, isLoading, isOperationLoading, error]);
 
-  // --- Internal implementations (original functions renamed) ---
   const checkReadyInternal = useCallback(() => {
-    if (!isReady || configuredFsIdRef.current !== itemId) {
+    if (!isReady || configuredVfsKeyRef.current !== vfsKey) {
       const message =
-        "Filesystem is not ready or not configured for the current item.";
-      // toast.error(message); // Avoid toast in check, let caller handle
+        "Filesystem is not ready or not configured for the current VFS key.";
       console.error(
-        `[VFS] Operation prevented: ${message} (isReady: ${isReady}, configuredId: ${configuredFsIdRef.current}, expectedId: ${itemId})`,
+        `[VFS] Operation prevented: ${message} (isReady: ${isReady}, configuredVfsKey: ${configuredVfsKeyRef.current}, expectedVfsKey: ${vfsKey})`,
       );
       throw new Error(message);
     }
     return zenfs_fs;
-  }, [isReady, itemId]);
+  }, [isReady, vfsKey]);
+
+  // All other methods remain unchanged, but use checkReadyInternal and configuredVfsKeyRef
 
   const listFilesInternal = useCallback(
     async (path: string): Promise<FileSystemEntry[]> => {
@@ -181,7 +186,7 @@ export function useVirtualFileSystem({
               };
             } catch (statErr) {
               console.error(`[VFS] Failed to stat ${fullPath}:`, statErr);
-              return null; // Skip files that fail to stat
+              return null;
             }
           }),
         );
@@ -189,13 +194,13 @@ export function useVirtualFileSystem({
       } catch (err) {
         if (err instanceof Error && (err as any).code === "ENOENT") {
           console.warn(`[VFS] Directory not found for listing: ${normalized}`);
-          return []; // Return empty array if dir doesn't exist
+          return [];
         }
         console.error(`[VFS] Failed to list directory ${normalized}:`, err);
         toast.error(
           `Error listing files: ${err instanceof Error ? err.message : String(err)}`,
         );
-        throw err; // Re-throw other errors
+        throw err;
       }
     },
     [checkReadyInternal],
@@ -217,7 +222,7 @@ export function useVirtualFileSystem({
         await fs.promises.mkdir(normalized, { recursive: true });
       } catch (err) {
         if (err instanceof Error && (err as any).code === "EEXIST") {
-          return; // Directory already exists, not an error
+          return;
         }
         console.error(`[VFS] Failed to create directory ${normalized}:`, err);
         toast.error(
@@ -286,7 +291,6 @@ export function useVirtualFileSystem({
       try {
         await createDirectoryInternalImpl(path);
       } catch {
-        // Error handled in internal impl
       } finally {
         setIsOperationLoading(false);
       }
@@ -458,7 +462,7 @@ export function useVirtualFileSystem({
         const url = URL.createObjectURL(zipBlob);
         const link = document.createElement("a");
         link.href = url;
-        const defaultFilename = `vfs_export_${configuredFsIdRef.current || "current"}.zip`;
+        const defaultFilename = `vfs_export_${configuredVfsKeyRef.current || "current"}.zip`;
         link.download = filename || defaultFilename;
         document.body.appendChild(link);
         link.click();
@@ -521,13 +525,12 @@ export function useVirtualFileSystem({
     [checkReadyInternal, createDirectoryInternalImpl],
   );
 
-  // --- Return original interface, conditionally calling dummy or internal funcs ---
   return {
     isReady: isReady,
     isLoading: isLoading,
     isOperationLoading: isOperationLoading,
     error: error,
-    configuredItemId: configuredFsIdRef.current,
+    configuredVfsKey: configuredVfsKeyRef.current,
     listFiles: listFilesInternal,
     readFile: readFileInternal,
     writeFile: writeFileInternal,
@@ -538,5 +541,6 @@ export function useVirtualFileSystem({
     uploadAndExtractZip: uploadAndExtractZipInternal,
     downloadAllAsZip: downloadAllAsZipInternal,
     rename: renameInternal,
+    vfsKey: vfsKey,
   };
 }

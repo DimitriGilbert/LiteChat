@@ -1,6 +1,6 @@
 // src/components/lite-chat/file-manager.tsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useChatContext } from "@/hooks/use-chat-context"; // Use full context again
+import { useChatContext } from "@/hooks/use-chat-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,6 +24,7 @@ import {
   XIcon,
   FolderPlusIcon,
   Loader2Icon,
+  UsersIcon,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -67,18 +68,17 @@ const basename = (path: string): string => {
   if (normalized === "/") return "/";
   return normalized.substring(normalized.lastIndexOf("/") + 1);
 };
-// --- End Helper Functions ---
 
 export const FileManager: React.FC<{ className?: string }> = ({
   className,
 }) => {
-  // Get VFS selection state/actions from the full context again
   const {
     vfs,
-    selectedItemId,
-    selectedVfsPaths, // Get selected paths from context
-    addSelectedVfsPath, // Get actions from context
-    removeSelectedVfsPath, // Get actions from context
+    // selectedItemId,
+    selectedItemType,
+    selectedVfsPaths,
+    addSelectedVfsPath,
+    removeSelectedVfsPath,
   } = useChatContext();
   const [currentPath, setCurrentPath] = useState("/");
   const [entries, setEntries] = useState<FileSystemEntry[]>([]);
@@ -87,7 +87,6 @@ export const FileManager: React.FC<{ className?: string }> = ({
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
 
-  // Local state for checked paths within this component instance
   const [checkedPaths, setCheckedPaths] = useState<Set<string>>(
     () => new Set(selectedVfsPaths),
   );
@@ -109,11 +108,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
 
   const loadEntries = useCallback(
     async (path: string) => {
-      if (
-        !vfs.isReady ||
-        vfs.configuredItemId !== selectedItemId ||
-        isAnyLoading
-      ) {
+      if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey || isAnyLoading) {
         return;
       }
       try {
@@ -131,35 +126,25 @@ export const FileManager: React.FC<{ className?: string }> = ({
         console.error("FileManager List Error:", error);
       }
     },
-    [vfs, selectedItemId, isAnyLoading],
+    [vfs, isAnyLoading],
   );
 
   useEffect(() => {
-    if (vfs.isReady && vfs.configuredItemId === selectedItemId) {
-      console.log(
-        `[FileManager] Effect: VFS ready for ${selectedItemId}, loading path: ${currentPath}`,
-      );
+    if (vfs.isReady && vfs.configuredVfsKey === vfs.vfsKey) {
       loadEntries(currentPath);
     } else {
-      console.log(
-        `[FileManager] Effect: VFS not ready or ID mismatch. isReady=${vfs.isReady}, configuredId=${vfs.configuredItemId}, selectedId=${selectedItemId}. Clearing state.`,
-      );
       setEntries([]);
       setCurrentPath("/");
       setEditingPath(null);
       setCreatingFolder(false);
-      // No need to clear checkedPaths here, it syncs via useEffect on selectedVfsPaths
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vfs.isReady, vfs.configuredItemId, selectedItemId]);
+  }, [vfs.isReady, vfs.configuredVfsKey, vfs.vfsKey]);
 
-  // --- Navigation Handlers (remain the same) ---
+  // --- Navigation Handlers ---
   const handleNavigate = (entry: FileSystemEntry) => {
     if (entry.isDirectory) {
       loadEntries(entry.path);
-    } else {
-      // Maybe download on single click? Or show preview? For now, do nothing.
-      // toast.info(`File: ${entry.name}`);
     }
   };
   const handleNavigateUp = () => {
@@ -181,10 +166,10 @@ export const FileManager: React.FC<{ className?: string }> = ({
         const next = new Set(prev);
         if (checked) {
           next.add(path);
-          addSelectedVfsPath(path); // Update context
+          addSelectedVfsPath(path);
         } else {
           next.delete(path);
-          removeSelectedVfsPath(path); // Update context
+          removeSelectedVfsPath(path);
         }
         return next;
       });
@@ -192,9 +177,9 @@ export const FileManager: React.FC<{ className?: string }> = ({
     [addSelectedVfsPath, removeSelectedVfsPath],
   );
 
-  // --- Action Handlers (use context actions where needed) ---
+  // --- Action Handlers ---
   const handleDelete = async (entry: FileSystemEntry) => {
-    if (!vfs.isReady || vfs.configuredItemId !== selectedItemId) {
+    if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready.");
       return;
     }
@@ -212,19 +197,16 @@ export const FileManager: React.FC<{ className?: string }> = ({
       try {
         await vfs.deleteItem(entry.path, entry.isDirectory);
         toast.success(`"${entry.name}" deleted.`);
-        // If deleted file was selected, remove it from context
         if (!entry.isDirectory && checkedPaths.has(entry.path)) {
           removeSelectedVfsPath(entry.path);
         }
         loadEntries(currentPath);
-      } catch {
-        /* Error handled in hook */
-      }
+      } catch {}
     }
   };
 
   const handleDownload = async (entry: FileSystemEntry) => {
-    if (!vfs.isReady || vfs.configuredItemId !== selectedItemId) {
+    if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready.");
       return;
     }
@@ -235,9 +217,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
     } else {
       try {
         await vfs.downloadFile(entry.path, entry.name);
-      } catch {
-        /* Error handled in hook */
-      }
+      } catch {}
     }
   };
 
@@ -246,7 +226,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
   const handleArchiveUploadClick = () => archiveInputRef.current?.click();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!vfs.isReady || vfs.configuredItemId !== selectedItemId) {
+    if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready for upload.");
       e.target.value = "";
       return;
@@ -256,9 +236,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
       try {
         await vfs.uploadFiles(files, currentPath);
         loadEntries(currentPath);
-      } catch {
-        /* Error handled in hook */
-      }
+      } catch {}
     }
     e.target.value = "";
   };
@@ -266,7 +244,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
   const handleArchiveChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    if (!vfs.isReady || vfs.configuredItemId !== selectedItemId) {
+    if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready for archive extraction.");
       e.target.value = "";
       return;
@@ -277,9 +255,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
         try {
           await vfs.uploadAndExtractZip(file, currentPath);
           loadEntries(currentPath);
-        } catch {
-          /* Error handled in hook */
-        }
+        } catch {}
       } else {
         toast.error("Only ZIP archive extraction is currently supported.");
       }
@@ -288,19 +264,17 @@ export const FileManager: React.FC<{ className?: string }> = ({
   };
 
   const handleDownloadAll = async () => {
-    if (!vfs.isReady || vfs.configuredItemId !== selectedItemId) {
+    if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready for export.");
       return;
     }
     try {
       const filename = `vfs_${basename(currentPath) || "root"}.zip`;
       await vfs.downloadAllAsZip(filename);
-    } catch {
-      /* Error handled in hook */
-    }
+    } catch {}
   };
 
-  // --- Rename Logic (use context actions) ---
+  // --- Rename Logic ---
   const startEditing = (entry: FileSystemEntry) => {
     setEditingPath(entry.path);
     setNewName(entry.name);
@@ -311,7 +285,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
     setNewName("");
   };
   const handleRename = async () => {
-    if (!vfs.isReady || vfs.configuredItemId !== selectedItemId) {
+    if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready for rename.");
       cancelEditing();
       return;
@@ -330,7 +304,6 @@ export const FileManager: React.FC<{ className?: string }> = ({
     try {
       await vfs.rename(editingPath, newPath);
       toast.success(`Renamed "${oldName}" to "${trimmedNewName}"`);
-      // If renamed file was selected, update the selection path via context
       if (checkedPaths.has(editingPath)) {
         removeSelectedVfsPath(editingPath);
         addSelectedVfsPath(newPath);
@@ -348,7 +321,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
     }
   }, [editingPath]);
 
-  // ... (Create Folder Logic, Render Logic remain the same) ...
+  // --- Create Folder Logic ---
   const startCreatingFolder = () => {
     setCreatingFolder(true);
     setNewFolderName("");
@@ -359,7 +332,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
     setNewFolderName("");
   };
   const handleCreateFolder = async () => {
-    if (!vfs.isReady || vfs.configuredItemId !== selectedItemId) {
+    if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready to create folder.");
       cancelCreatingFolder();
       return;
@@ -385,6 +358,39 @@ export const FileManager: React.FC<{ className?: string }> = ({
     }
   }, [creatingFolder]);
 
+  // --- VFS Sharing Banner ---
+  let vfsBanner: React.ReactNode = null;
+  if (vfs.vfsKey === "orphan") {
+    vfsBanner = (
+      <div className="flex items-center gap-2 text-xs text-blue-300 bg-blue-900/40 px-2 py-1 rounded mb-1">
+        <UsersIcon className="h-4 w-4" />
+        <span>
+          <b>Shared VFS:</b> All chats <i>not</i> in a project share this
+          filesystem.
+        </span>
+      </div>
+    );
+  } else if (vfs.vfsKey && selectedItemType === "conversation") {
+    vfsBanner = (
+      <div className="flex items-center gap-2 text-xs text-blue-300 bg-blue-900/40 px-2 py-1 rounded mb-1">
+        <UsersIcon className="h-4 w-4" />
+        <span>
+          <b>Project-shared VFS:</b> All chats in this project share this
+          filesystem.
+        </span>
+      </div>
+    );
+  } else if (vfs.vfsKey && selectedItemType === "project") {
+    vfsBanner = (
+      <div className="flex items-center gap-2 text-xs text-blue-300 bg-blue-900/40 px-2 py-1 rounded mb-1">
+        <FolderIcon className="h-4 w-4" />
+        <span>
+          <b>Project VFS:</b> Filesystem for this project and all its chats.
+        </span>
+      </div>
+    );
+  }
+
   // --- Render Logic ---
   if (isConfigLoading) {
     return (
@@ -403,7 +409,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
       </div>
     );
   }
-  if (!vfs.isReady || vfs.configuredItemId !== selectedItemId) {
+  if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
     return (
       <div className="p-4 text-center text-sm text-gray-500">
         Virtual Filesystem not available or not enabled for this item.
@@ -413,6 +419,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
 
   return (
     <div className={cn("flex flex-col h-[400px]", className)}>
+      {vfsBanner}
       {/* Hidden Inputs */}
       <input
         type="file"
@@ -625,7 +632,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
                       }
                       disabled={isOperationLoading}
                       aria-label={`Select file ${entry.name}`}
-                      className="mt-0.5" // Adjust alignment if needed
+                      className="mt-0.5"
                     />
                   )}
                 </TableCell>
@@ -748,7 +755,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
             {entries.length === 0 && !creatingFolder && (
               <TableRow>
                 <TableCell
-                  colSpan={6} // Adjusted colspan
+                  colSpan={6}
                   className="text-center text-gray-500 py-6"
                 >
                   Folder is empty

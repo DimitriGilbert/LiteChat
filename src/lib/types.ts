@@ -185,8 +185,6 @@ export interface CoreChatContextProps {
   setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>;
   error: string | null;
   setError: (error: string | null) => void;
-  // prompt: string;
-  // setPrompt: React.Dispatch<React.SetStateAction<string>>;
   handleSubmitCore: (
     originalUserPrompt: string,
     currentConversationId: string,
@@ -201,7 +199,7 @@ export interface CoreChatContextProps {
 // VFS object within the context
 export interface VfsContextObject {
   isReady: boolean;
-  configuredItemId: string | null;
+  configuredVfsKey: string | null;
   isLoading: boolean;
   isOperationLoading: boolean;
   error: string | null;
@@ -215,6 +213,7 @@ export interface VfsContextObject {
   uploadAndExtractZip: (file: File, targetPath: string) => Promise<void>;
   downloadAllAsZip: (filename?: string) => Promise<void>;
   rename: (oldPath: string, newPath: string) => Promise<void>;
+  vfsKey?: string | null;
 }
 
 // Full Context (Superset including Core + Optional Modules)
