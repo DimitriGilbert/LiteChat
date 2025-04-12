@@ -1,6 +1,14 @@
 // src/lib/types.ts
 // import type { CoreMessage } from "ai";
 import React from "react"; // Import React for ReactNode
+// Import Mod types - ensure these are defined in mods/types.ts
+import type {
+  DbMod,
+  ModInstance,
+  ModEventPayloadMap,
+  ModMiddlewarePayloadMap,
+  ModMiddlewareReturnMap,
+} from "@/mods/types";
 
 // --- Basic Types ---
 export type Role = "user" | "assistant" | "system";
@@ -326,8 +334,27 @@ export interface ChatContextProps {
   getConversation: (id: string) => Promise<DbConversation | undefined>;
   getProject: (id: string) => Promise<DbProject | undefined>;
 
-  // Extensibility
-  customPromptActions?: CustomPromptAction[];
-  customMessageActions?: CustomMessageAction[];
-  customSettingsTabs?: CustomSettingTab[];
+  // Extensibility (Combined - these now include mod contributions)
+  customPromptActions: CustomPromptAction[];
+  customMessageActions: CustomMessageAction[];
+  customSettingsTabs: CustomSettingTab[];
+
+  // --- Mod System ---
+  /** Raw mod data from the database (for settings UI). */
+  dbMods: DbMod[];
+  /** Instances of currently loaded and enabled mods. */
+  loadedMods: ModInstance[];
+  /** Function to add a new mod entry to the database. */
+  addDbMod: (modData: Omit<DbMod, "id" | "createdAt">) => Promise<string>;
+  /** Function to update an existing mod entry in the database. */
+  updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>;
+  /** Function to delete a mod entry from the database. */
+  deleteDbMod: (id: string) => Promise<void>;
+  // Note: Registration functions (registerModPromptAction etc.) and event emitter
+  // are handled internally by the provider/loader and exposed via the LiteChatModApi,
+  // not directly on the React context consumed by standard components.
+
+  // --- Settings Modal Control ---
+  isSettingsModalOpen: boolean;
+  onSettingsModalOpenChange: (open: boolean) => void; // ADDED this line
 }

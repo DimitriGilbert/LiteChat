@@ -6,14 +6,17 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 import { SettingsGeneral } from "./settings-general";
+import { SettingsAssistant } from "./settings-assistant";
 import { SettingsApiKeys } from "./settings-api-keys";
 import { SettingsDataManagement } from "./settings-data-management";
-import { SettingsAssistant } from "./settings-assistant";
-import { useChatContext } from "@/hooks/use-chat-context"; // <-- Import context hook
+import { SettingsMods } from "./settings-mods"; // Import Mods settings tab
+import { useChatContext } from "@/hooks/use-chat-context";
+import type { CustomSettingTab } from "@/lib/types";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -24,66 +27,81 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  // Get context, including custom settings tabs
   const context = useChatContext();
-  const { enableApiKeyManagement, customSettingsTabs = [] } = context;
+
+  // Use the callback from context to handle open/close changes
+  const handleOpenChange = (open: boolean) => {
+    context.onSettingsModalOpenChange(open); // Notify context for event emission
+    if (!open) {
+      onClose(); // Call the original onClose passed via props
+    }
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[650px] flex flex-col max-h-[80vh] bg-cyan-950">
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[650px] max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
-            Manage API keys, application settings, and chat data.
+            Manage application settings, AI behavior, API keys, and data.
           </DialogDescription>
         </DialogHeader>
-
-        <Tabs
-          // Default to 'general' if API keys are disabled, otherwise 'apiKeys'
-          defaultValue={enableApiKeyManagement ? "apiKeys" : "general"}
-          className="flex-grow flex flex-col overflow-hidden"
-        >
-          <TabsList className="flex-shrink-0">
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="assistant">Prompt</TabsTrigger>
-            {/* Conditionally render API Keys trigger */}
-            {enableApiKeyManagement && (
-              <TabsTrigger value="apiKeys">API Keys</TabsTrigger>
-            )}
-            <TabsTrigger value="data">Data Management</TabsTrigger>
-            {/* Render custom tab triggers */}
-            {customSettingsTabs.map((tab) => (
-              <TabsTrigger key={tab.id} value={tab.id}>
-                {tab.title}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          <ScrollArea className="flex-grow mt-4 pr-1">
-            <TabsContent value="general" className="mt-0">
-              <SettingsGeneral />
-            </TabsContent>
-            <TabsContent value="assistant">
-              <SettingsAssistant />
-            </TabsContent>
-            {/* Conditionally render API Keys content */}
-            {enableApiKeyManagement && (
-              <TabsContent value="apiKeys" className="mt-0">
-                <SettingsApiKeys />
+        <div className="flex-grow overflow-hidden">
+          <Tabs defaultValue="general" className="h-full flex flex-col">
+            <TabsList className="flex-shrink-0">
+              <TabsTrigger value="general">General</TabsTrigger>
+              {context.enableAdvancedSettings && (
+                <TabsTrigger value="assistant">Assistant</TabsTrigger>
+              )}
+              {context.enableApiKeyManagement && (
+                <TabsTrigger value="apiKeys">API Keys</TabsTrigger>
+              )}
+              <TabsTrigger value="data">Data</TabsTrigger>
+              {/* Add Mods Tab Trigger */}
+              <TabsTrigger value="mods">Mods</TabsTrigger>
+              {/* Add Custom Tab Triggers */}
+              {context.customSettingsTabs.map((tab: CustomSettingTab) => (
+                <TabsTrigger key={tab.id} value={tab.id}>
+                  {tab.title}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            <div className="flex-grow overflow-y-auto py-4 pr-2">
+              <TabsContent value="general">
+                <SettingsGeneral />
               </TabsContent>
-            )}
-            <TabsContent value="data" className="mt-0">
-              <SettingsDataManagement />
-            </TabsContent>
-            {/* Render custom tab content */}
-            {customSettingsTabs.map((tab) => (
-              <TabsContent key={tab.id} value={tab.id} className="mt-0">
-                {/* Render the custom component, passing the full context */}
-                <tab.component context={context} />
+              {context.enableAdvancedSettings && (
+                <TabsContent value="assistant">
+                  <SettingsAssistant />
+                </TabsContent>
+              )}
+              {context.enableApiKeyManagement && (
+                <TabsContent value="apiKeys">
+                  <SettingsApiKeys />
+                </TabsContent>
+              )}
+              <TabsContent value="data">
+                <SettingsDataManagement />
               </TabsContent>
-            ))}
-          </ScrollArea>
-        </Tabs>
+              {/* Add Mods Tab Content */}
+              <TabsContent value="mods">
+                <SettingsMods />
+              </TabsContent>
+              {/* Add Custom Tab Content */}
+              {context.customSettingsTabs.map((tab: CustomSettingTab) => (
+                <TabsContent key={tab.id} value={tab.id}>
+                  {/* Render the custom component, passing context */}
+                  <tab.component context={context} />
+                </TabsContent>
+              ))}
+            </div>
+          </Tabs>
+        </div>
+        <DialogFooter className="flex-shrink-0">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

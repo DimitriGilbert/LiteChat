@@ -8,11 +8,23 @@ import type {
   DbProject,
   SidebarItemType,
 } from "@/lib/types";
+import type { DbMod } from "@/mods/types"; // Import DbMod type
 import { nanoid } from "nanoid";
-import { useCallback } from "react"; // Import useCallback
+import { useCallback } from "react";
+
+// Define a placeholder type if DbMod is not yet defined in types.ts
+// type DbMod = {
+//   id: string;
+//   name: string;
+//   sourceUrl?: string | null;
+//   scriptContent?: string | null;
+//   enabled: boolean;
+//   createdAt: Date;
+//   loadOrder: number;
+// };
 
 export function useChatStorage() {
-  // === Live Queries (remain the same) ===
+  // === Live Queries ===
   const projects = useLiveQuery(
     () => db.projects.orderBy("updatedAt").reverse().toArray(),
     [],
@@ -25,6 +37,12 @@ export function useChatStorage() {
   );
   const apiKeys = useLiveQuery(
     () => db.apiKeys.orderBy("createdAt").toArray(),
+    [],
+    [],
+  );
+  // Add mods live query
+  const mods = useLiveQuery(
+    () => db.mods.orderBy("loadOrder").toArray(),
     [],
     [],
   );
@@ -51,7 +69,7 @@ export function useChatStorage() {
       }
       return newProject;
     },
-    [], // No dependencies needed for this DB operation
+    [],
   );
 
   const renameProject = useCallback(
@@ -63,25 +81,25 @@ export function useChatStorage() {
         throw error;
       }
     },
-    [], // No dependencies needed
+    [],
   );
 
   const deleteProject = useCallback(async (id: string): Promise<void> => {
     await db.projects.delete(id);
-  }, []); // No dependencies needed
+  }, []);
 
   const getProject = useCallback(
     async (id: string): Promise<DbProject | undefined> => {
       return db.projects.get(id);
     },
-    [], // No dependencies needed
+    [],
   );
 
   const countChildProjects = useCallback(
     async (parentId: string): Promise<number> => {
       return db.projects.where("parentId").equals(parentId).count();
     },
-    [], // No dependencies needed
+    [],
   );
 
   // === Conversations (Wrap functions in useCallback) ===
@@ -108,7 +126,7 @@ export function useChatStorage() {
       }
       return newId;
     },
-    [], // No dependencies needed
+    [],
   );
 
   const deleteConversation = useCallback(async (id: string): Promise<void> => {
@@ -116,7 +134,7 @@ export function useChatStorage() {
       await db.messages.where("conversationId").equals(id).delete();
       await db.conversations.delete(id);
     });
-  }, []); // No dependencies needed
+  }, []);
 
   const renameConversation = useCallback(
     async (id: string, newTitle: string): Promise<void> => {
@@ -130,7 +148,7 @@ export function useChatStorage() {
         await db.projects.update(conversation.parentId, { updatedAt: now });
       }
     },
-    [], // No dependencies needed
+    [],
   );
 
   const updateConversationSystemPrompt = useCallback(
@@ -140,28 +158,27 @@ export function useChatStorage() {
         updatedAt: new Date(),
       });
     },
-    [], // No dependencies needed
+    [],
   );
 
   const getConversation = useCallback(
     async (id: string): Promise<DbConversation | undefined> => {
       return db.conversations.get(id);
     },
-    [], // No dependencies needed
+    [],
   );
 
   const countChildConversations = useCallback(
     async (parentId: string): Promise<number> => {
       return db.conversations.where("parentId").equals(parentId).count();
     },
-    [], // No dependencies needed
+    [],
   );
 
   // === VFS Toggle (Wrap in useCallback) ===
   const toggleVfsEnabled = useCallback(
     async (id: string, type: SidebarItemType): Promise<void> => {
       const now = new Date();
-      // Use separate if blocks to satisfy TypeScript's type checking for update
       if (type === "conversation") {
         const current = await db.conversations.get(id);
         if (current) {
@@ -197,7 +214,7 @@ export function useChatStorage() {
         throw new Error("Unknown item type");
       }
     },
-    [], // No dependencies needed
+    [],
   );
 
   // === Messages (Wrap functions in useCallback) ===
@@ -208,7 +225,7 @@ export function useChatStorage() {
         .equals(conversationId)
         .sortBy("createdAt");
     },
-    [], // No dependencies needed
+    [],
   );
 
   const addDbMessage = useCallback(
@@ -240,14 +257,14 @@ export function useChatStorage() {
       }
       return newMessage.id;
     },
-    [], // No dependencies needed
+    [],
   );
 
   const updateDbMessageContent = useCallback(
     async (messageId: string, newContent: string): Promise<void> => {
       await db.messages.update(messageId, { content: newContent });
     },
-    [], // No dependencies needed
+    [],
   );
 
   const deleteDbMessage = useCallback(
@@ -255,7 +272,7 @@ export function useChatStorage() {
       await db.messages.delete(messageId);
     },
     [],
-  ); // No dependencies needed
+  );
 
   const getDbMessagesUpTo = useCallback(
     async (convId: string, messageId: string): Promise<DbMessage[]> => {
@@ -267,14 +284,14 @@ export function useChatStorage() {
         .and((msg) => msg.createdAt.getTime() < targetMsg.createdAt.getTime())
         .sortBy("createdAt");
     },
-    [], // No dependencies needed
+    [],
   );
 
   const bulkAddMessages = useCallback(
     async (messages: DbMessage[]): Promise<unknown> => {
       return db.messages.bulkAdd(messages);
     },
-    [], // No dependencies needed
+    [],
   );
 
   const updateConversationTimestamp = useCallback(
@@ -285,7 +302,7 @@ export function useChatStorage() {
         await db.projects.update(conversation.parentId, { updatedAt: date });
       }
     },
-    [], // No dependencies needed
+    [],
   );
 
   // === API Keys (Wrap functions in useCallback) ===
@@ -306,17 +323,47 @@ export function useChatStorage() {
       await db.apiKeys.add(newKey);
       return newId;
     },
-    [], // No dependencies needed
+    [],
   );
 
   const deleteApiKey = useCallback(async (id: string): Promise<void> => {
     await db.apiKeys.delete(id);
-  }, []); // No dependencies needed
+  }, []);
+
+  // === Mods (Wrap functions in useCallback) ===
+  const addMod = useCallback(
+    async (modData: Omit<DbMod, "id" | "createdAt">): Promise<string> => {
+      const newId = nanoid();
+      const newMod: DbMod = {
+        id: newId,
+        createdAt: new Date(),
+        ...modData,
+      };
+      await db.mods.add(newMod);
+      return newId;
+    },
+    [],
+  );
+
+  const updateMod = useCallback(
+    async (id: string, changes: Partial<DbMod>): Promise<void> => {
+      await db.mods.update(id, changes);
+    },
+    [],
+  );
+
+  const deleteMod = useCallback(async (id: string): Promise<void> => {
+    await db.mods.delete(id);
+  }, []);
+
+  const getMods = useCallback(async (): Promise<DbMod[]> => {
+    return db.mods.orderBy("loadOrder").toArray();
+  }, []);
 
   // === Data Management (Wrap in useCallback) ===
   const clearAllData = useCallback(async (): Promise<void> => {
     await db.delete();
-  }, []); // No dependencies needed
+  }, []);
 
   // Return memoized functions and live query results
   return {
@@ -349,6 +396,12 @@ export function useChatStorage() {
     apiKeys: apiKeys || [],
     addApiKey,
     deleteApiKey,
+    // Mods
+    mods: mods || [], // Add mods live query result
+    addMod, // Add mod CRUD functions
+    updateMod,
+    deleteMod,
+    getMods,
     // Data Management
     clearAllData,
   };

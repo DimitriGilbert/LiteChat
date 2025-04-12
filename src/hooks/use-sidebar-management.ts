@@ -9,6 +9,7 @@ import type {
 import { toast } from "sonner";
 import { z } from "zod";
 import { nanoid } from "nanoid";
+import { modEvents, ModEvent } from "@/mods/events"; // Import mod events and ModEvent constants
 
 // Schemas remain the same
 const messageImportSchema = z.object({
@@ -129,6 +130,7 @@ export function useSidebarManagement({
       setSelectedItemId(id);
       setSelectedItemType(type);
       onSelectItem(id, type); // Notify parent (ChatProvider)
+      // Event emission moved to ChatProvider's handleSelectItem
     },
     [onSelectItem],
   );
@@ -172,6 +174,7 @@ export function useSidebarManagement({
         initialSystemPrompt,
       );
       await selectItem(newId, "conversation"); // Select the new item
+      // Event emission moved to ChatProvider's handleSubmit
       return newId;
     },
     [dbCreateConversation, selectItem],
@@ -185,6 +188,13 @@ export function useSidebarManagement({
       // Use passed-in DB function
       const newProject = await dbCreateProject(name, parentId);
       // Don't select project automatically, just return info
+      // Phase 5: Emit 'chat:created' event for projects
+      modEvents.emit(ModEvent.CHAT_CREATED, {
+        // Use ModEvent constant
+        id: newProject.id,
+        type: "project",
+        parentId,
+      });
       return { id: newProject.id, name: newProject.name };
     },
     [dbCreateProject],
@@ -222,6 +232,8 @@ export function useSidebarManagement({
         }
 
         toast.success(`${type === "project" ? "Project" : "Chat"} deleted.`);
+        // Phase 5: Emit 'chat:deleted' event
+        modEvents.emit(ModEvent.CHAT_DELETED, { id, type }); // Use ModEvent constant
 
         // If the deleted item was selected, select the next most recent item
         if (currentSelectedId === id) {
@@ -275,6 +287,7 @@ export function useSidebarManagement({
           await dbRenameProject(id, trimmedName);
         }
         // No need to refresh active data here
+        // TODO: Phase 5 - Emit 'chat:renamed' event if needed
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Unknown error";
         console.error(`Failed to rename ${type}:`, err);
@@ -292,6 +305,7 @@ export function useSidebarManagement({
       // Use passed-in DB function
       await dbUpdateConversationSystemPrompt(id, systemPrompt);
       // No need to refresh active data here
+      // TODO: Phase 5 - Emit 'chat:systemPromptUpdated' event if needed
     },
     [dbUpdateConversationSystemPrompt], // Only depends on DB function now
   );
@@ -368,6 +382,14 @@ export function useSidebarManagement({
             parentId,
             newConversationTitle,
           );
+          // Event emission moved to ChatProvider's handleSubmit/createConversation
+          // Phase 5: Emit 'chat:created' event for imported conversations
+          modEvents.emit(ModEvent.CHAT_CREATED, {
+            // Use ModEvent constant
+            id: newConversationId,
+            type: "conversation",
+            parentId,
+          });
 
           if (importedMessages.length > 0) {
             // Use passed-in DB function

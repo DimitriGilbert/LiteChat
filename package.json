@@ -41,6 +41,7 @@
     "lodash-es": "^4.17.21",
     "lucide-react": "^0.485.0",
     "mark.js": "^8.11.1",
+    "mitt": "^3.0.1",
     "nanoid": "^5.1.5",
     "next-themes": "^0.4.6",
     "react": "^19.0.0",

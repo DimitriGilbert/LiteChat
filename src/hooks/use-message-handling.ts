@@ -3,6 +3,7 @@ import React, { useCallback, useEffect } from "react";
 import type { Message, DbMessage } from "@/lib/types";
 import { toast } from "sonner";
 import type { CoreMessage } from "ai";
+import { modEvents, ModEvent } from "@/mods/events"; // Import mod events and ModEvent constants
 
 // ... (interfaces remain the same) ...
 export interface PerformAiStreamParams {
@@ -149,6 +150,7 @@ export function useMessageHandling({
           : msg,
       ),
     );
+    // TODO: Phase 5 - Emit 'response:stopped' event if needed
   }, [stopStreamingCallback, setLocalMessages]);
 
   // --- Handle Submission ---
@@ -159,7 +161,6 @@ export function useMessageHandling({
       promptToSendToAI: string,
       vfsContextPaths?: string[],
     ) => {
-      // ... (handleSubmitCore logic remains the same)
       if (!currentConversationId) {
         setError("Error: Could not determine active conversation.");
         toast.error("Cannot submit message: No active conversation selected.");
@@ -224,6 +225,12 @@ export function useMessageHandling({
         userMessageForState,
       ]);
 
+      // Phase 5: Emit 'message:submitted' event AFTER adding to local state
+      modEvents.emit(ModEvent.MESSAGE_SUBMITTED, {
+        // Use ModEvent constant
+        message: userMessageForState,
+      });
+
       try {
         await performAiStream({
           conversationIdToUse: currentConversationId,
@@ -241,6 +248,7 @@ export function useMessageHandling({
           "useMessageHandling: Error during performAiStream call:",
           err,
         );
+        // Error handling/setting state is done within performAiStream
       }
     },
     [
@@ -262,7 +270,6 @@ export function useMessageHandling({
   // --- Regeneration ---
   const regenerateMessageCore = useCallback(
     async (messageId: string) => {
-      // ... (regenerateMessageCore logic remains the same)
       const conversationIdToUse = selectedConversationId;
       if (!conversationIdToUse) {
         toast.error("Please select the conversation first.");
@@ -328,6 +335,7 @@ export function useMessageHandling({
       }
 
       setLocalMessages((prev) => prev.slice(0, messageIndex));
+      // TODO: Phase 5 - Emit 'message:regenerating' event if needed
 
       try {
         await performAiStream({
@@ -343,6 +351,7 @@ export function useMessageHandling({
         });
       } catch (err: unknown) {
         console.error("useMessageHandling: Error during regen stream:", err);
+        // Error handling/setting state is done within performAiStream
       }
     },
     [

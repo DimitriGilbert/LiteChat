@@ -5,6 +5,7 @@ import { IndexedDB } from "@zenfs/dom";
 import JSZip from "jszip";
 import type { FileSystemEntry, SidebarItemType } from "@/lib/types";
 import { toast } from "sonner";
+import { modEvents, ModEvent } from "@/mods/events"; // Import mod events and ModEvent constants
 
 interface UseVirtualFileSystemProps {
   itemId: string | null;
@@ -209,7 +210,19 @@ export function useVirtualFileSystem({
   const readFileInternal = useCallback(
     async (path: string): Promise<Uint8Array> => {
       const fs = checkReadyInternal();
-      return fs.promises.readFile(normalizePath(path));
+      const normalizedPath = normalizePath(path);
+      try {
+        const data = await fs.promises.readFile(normalizedPath);
+        // Phase 5: Emit 'vfs:fileRead' event
+        modEvents.emit(ModEvent.VFS_FILE_READ, { path: normalizedPath }); // Use ModEvent constant
+        return data;
+      } catch (err) {
+        console.error(`[VFS] Failed to read file ${normalizedPath}:`, err);
+        toast.error(
+          `Error reading file: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        throw err;
+      }
     },
     [checkReadyInternal],
   );
@@ -220,6 +233,7 @@ export function useVirtualFileSystem({
       const normalized = normalizePath(path);
       try {
         await fs.promises.mkdir(normalized, { recursive: true });
+        // TODO: Phase 5 - Emit 'vfs:directoryCreated' event if needed
       } catch (err) {
         if (err instanceof Error && (err as any).code === "EEXIST") {
           return;
@@ -245,6 +259,8 @@ export function useVirtualFileSystem({
           await createDirectoryInternalImpl(parentDir);
         }
         await fs.promises.writeFile(normalized, data);
+        // Phase 5: Emit 'vfs:fileWritten' event
+        modEvents.emit(ModEvent.VFS_FILE_WRITTEN, { path: normalized }); // Use ModEvent constant
       } catch (err) {
         console.error(`[VFS] Failed to write file ${normalized}:`, err);
         if (!(err instanceof Error && (err as any).code === "EEXIST")) {
@@ -269,8 +285,11 @@ export function useVirtualFileSystem({
         const stat = await fs.promises.stat(normalized);
         if (stat.isDirectory()) {
           await fs.promises.rm(normalized, { recursive });
+          // TODO: Phase 5 - Emit 'vfs:directoryDeleted' event if needed
         } else {
           await fs.promises.unlink(normalized);
+          // Phase 5: Emit 'vfs:fileDeleted' event
+          modEvents.emit(ModEvent.VFS_FILE_DELETED, { path: normalized }); // Use ModEvent constant
         }
       } catch (err) {
         console.error(`[VFS] Failed to delete ${normalized}:`, err);
@@ -301,7 +320,7 @@ export function useVirtualFileSystem({
   const downloadFileInternal = useCallback(
     async (path: string, filename?: string): Promise<void> => {
       try {
-        const data = await readFileInternal(normalizePath(path));
+        const data = await readFileInternal(normalizePath(path)); // readFileInternal now emits read event
         const blob = new Blob([data]);
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -344,7 +363,7 @@ export function useVirtualFileSystem({
           const filePath = joinPath(normalizedTargetPath, file.name);
           try {
             const buffer = await file.arrayBuffer();
-            await writeFileInternal(filePath, new Uint8Array(buffer));
+            await writeFileInternal(filePath, new Uint8Array(buffer)); // writeFileInternal emits write event
             successCount++;
           } catch (err) {
             errorCount++;
@@ -403,6 +422,7 @@ export function useVirtualFileSystem({
             const writePromise = zipEntry
               .async("uint8array")
               .then((content) => {
+                // writeFileInternal emits write event
                 return writeFileInternal(fullTargetPath, content);
               });
             fileWritePromises.push(writePromise);
@@ -450,6 +470,7 @@ export function useVirtualFileSystem({
                 await addFolderToZip(entry.path, subFolder);
               }
             } else {
+              // readFileInternal emits read event
               const content = await readFileInternal(entry.path);
               zipFolder.file(entry.name, content);
             }
@@ -501,6 +522,7 @@ export function useVirtualFileSystem({
           await createDirectoryInternalImpl(parentDir);
         }
         await fs.promises.rename(normalizedOld, normalizedNew);
+        // TODO: Phase 5 - Emit 'vfs:renamed' event if needed
       } catch (err) {
         console.error(
           `[VFS] Failed to rename ${normalizedOld} to ${normalizedNew}:`,

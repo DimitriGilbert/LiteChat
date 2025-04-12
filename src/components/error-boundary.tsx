@@ -1,21 +1,19 @@
 // src/components/error-boundary.tsx
-import React, { Component, ErrorInfo, ReactNode } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+// REMOVED: import React from "react"; // No longer needed
+import { Component, ErrorInfo, ReactNode } from "react";
 
 interface Props {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 interface State {
   hasError: boolean;
-  error: Error | null;
+  error?: Error;
 }
 
 class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
-    error: null,
   };
 
   public static getDerivedStateFromError(error: Error): State {
@@ -24,32 +22,32 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // You can also log the error to an error reporting service
     console.error("Uncaught error:", error, errorInfo);
+    // You can also log the error to an error reporting service here
   }
 
   public render() {
     if (this.state.hasError) {
-      // You can render any custom fallback UI
       return (
-        <div className="flex items-center justify-center h-screen bg-gray-900 text-white p-4">
-          <Alert variant="destructive" className="max-w-lg">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Something went wrong</AlertTitle>
-            <AlertDescription>
-              <p>
-                An unexpected error occurred. Please try refreshing the page.
-              </p>
-              {this.state.error && (
-                <details className="mt-2 text-sm text-gray-400">
-                  <summary>Error Details</summary>
-                  <pre className="mt-1 text-xs whitespace-pre-wrap">
-                    {this.state.error.toString()}
-                  </pre>
-                </details>
-              )}
-            </AlertDescription>
-          </Alert>
+        <div className="flex flex-col items-center justify-center h-screen bg-red-100 text-red-800 p-4">
+          <h1 className="text-2xl font-bold mb-2">
+            Oops! Something went wrong.
+          </h1>
+          <p className="mb-4">
+            An unexpected error occurred. Please try refreshing the page.
+          </p>
+          {this.state.error && (
+            <details className="bg-red-50 p-2 rounded border border-red-200 text-sm w-full max-w-lg text-left">
+              <summary className="cursor-pointer font-medium">
+                Error Details
+              </summary>
+              <pre className="mt-2 whitespace-pre-wrap break-words">
+                {this.state.error.toString()}
+                {"\n"}
+                {this.state.error.stack}
+              </pre>
+            </details>
+          )}
         </div>
       );
     }

@@ -10,6 +10,7 @@ import type {
 import { throttle } from "@/lib/throttle";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
+import { modEvents, ModEvent } from "@/mods/events"; // Import mod events
 
 // --- Updated Interface ---
 interface UseAiInteractionProps {
@@ -117,6 +118,7 @@ export function useAiInteraction({
       abortControllerRef.current = currentAbortController;
 
       let finalContent = "";
+      let finalMessageObject: Message | null = null; // Store the final message object
 
       const throttledStreamUpdate = throttle(() => {
         const currentAccumulatedContent = finalContent;
@@ -143,6 +145,11 @@ export function useAiInteraction({
 
       const startTime = Date.now();
       try {
+        // Phase 5: Emit 'response:start' event
+        modEvents.emit(ModEvent.RESPONSE_START, {
+          conversationId: conversationIdToUse,
+        });
+
         const messagesForApi: CoreMessage[] = [];
         if (systemPromptToUse) {
           messagesForApi.push({ role: "system", content: systemPromptToUse });
@@ -172,6 +179,11 @@ export function useAiInteraction({
 
         for await (const delta of result.textStream) {
           finalContent += delta;
+          // Phase 5: Emit 'response:chunk' event
+          modEvents.emit(ModEvent.RESPONSE_CHUNK, {
+            chunk: delta,
+            conversationId: conversationIdToUse,
+          });
           throttledStreamUpdate();
         }
       } catch (err: unknown) {
@@ -199,32 +211,37 @@ export function useAiInteraction({
         }
         setIsAiStreaming(false);
 
+        // Update local state with final message details
         setLocalMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantMessageId
-              ? {
-                  ...msg,
-                  content: finalContent,
-                  isStreaming: false,
-                  streamedContent: undefined,
-                  error: streamError ? streamError.message : null,
-                  providerId: selectedProvider?.id,
-                  modelId: selectedModel?.id,
-                  tokensInput: messagesToSend.reduce(
-                    (sum, m) => sum + (m.content.length || 0),
-                    0,
-                  ),
-                  tokensOutput: finalContent.length,
-                  tokensPerSecond:
-                    streamError || !startTime
-                      ? undefined
-                      : finalContent.length /
-                        ((Date.now() - startTime) / 1000 || 1),
-                }
-              : msg,
-          ),
+          prev.map((msg) => {
+            if (msg.id === assistantMessageId) {
+              finalMessageObject = {
+                // Capture the final object
+                ...msg,
+                content: finalContent,
+                isStreaming: false,
+                streamedContent: undefined,
+                error: streamError ? streamError.message : null,
+                providerId: selectedProvider?.id,
+                modelId: selectedModel?.id,
+                tokensInput: messagesToSend.reduce(
+                  (sum, m) => sum + (m.content.length || 0),
+                  0,
+                ),
+                tokensOutput: finalContent.length,
+                tokensPerSecond:
+                  streamError || !startTime
+                    ? undefined
+                    : finalContent.length /
+                      ((Date.now() - startTime) / 1000 || 1),
+              };
+              return finalMessageObject;
+            }
+            return msg;
+          }),
         );
 
+        // Save to DB if successful
         if (!streamError && finalContent.trim() !== "") {
           try {
             await addDbMessage({
@@ -233,7 +250,14 @@ export function useAiInteraction({
               role: "assistant",
               content: finalContent,
               createdAt: assistantPlaceholderTimestamp,
+              // TODO: Add provider/model/token info to DbMessage schema if needed
             });
+            // Phase 5: Emit 'response:done' event AFTER successful save
+            if (finalMessageObject) {
+              modEvents.emit(ModEvent.RESPONSE_DONE, {
+                message: finalMessageObject,
+              });
+            }
           } catch (dbErr: unknown) {
             const dbErrorMessage = `Save failed: ${dbErr instanceof Error ? dbErr.message : "Unknown DB error"}`;
             console.error("Failed to save final assistant message:", dbErr);
@@ -246,12 +270,24 @@ export function useAiInteraction({
                   : msg,
               ),
             );
+            // Optionally emit response:done even on save failure, but include error?
+            // if (finalMessageObject) {
+            //   modEvents.emit(ModEvent.RESPONSE_DONE, { message: { ...finalMessageObject, error: dbErrorMessage } });
+            // }
           }
         } else if (streamError) {
           // Error already set and toasted inside catch block
+          // Optionally emit response:done with error here?
+          // if (finalMessageObject) {
+          //    modEvents.emit(ModEvent.RESPONSE_DONE, { message: finalMessageObject }); // finalMessageObject already has error set
+          // }
         } else {
           // Empty content, no need to save or show error
           console.log("DB save skipped due to empty final content.");
+          // Optionally emit response:done for empty messages?
+          // if (finalMessageObject) {
+          //    modEvents.emit(ModEvent.RESPONSE_DONE, { message: finalMessageObject });
+          // }
         }
       }
     },
