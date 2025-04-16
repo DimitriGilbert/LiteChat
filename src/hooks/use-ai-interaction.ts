@@ -3,7 +3,7 @@ import { useCallback } from "react";
 import { streamText, type CoreMessage } from "ai";
 import type {
   AiModelConfig,
-  AiProviderConfig,
+  AiProviderConfig, // This is now the runtime config
   Message,
   DbMessage,
 } from "@/lib/types"; // Added DbMessage
@@ -15,8 +15,8 @@ import { modEvents, ModEvent } from "@/mods/events"; // Import mod events
 // --- Updated Interface ---
 interface UseAiInteractionProps {
   selectedModel: AiModelConfig | undefined;
-  selectedProvider: AiProviderConfig | undefined;
-  getApiKeyForProvider: (providerId: string) => string | undefined;
+  selectedProvider: AiProviderConfig | undefined; // Runtime provider config
+  getApiKeyForProvider: () => string | undefined; // Modified signature: gets key for *selected* provider
   streamingThrottleRate: number;
   // Core state/setters passed directly
   setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -51,7 +51,7 @@ interface UseAiInteractionReturn {
 export function useAiInteraction({
   selectedModel,
   selectedProvider,
-  getApiKeyForProvider,
+  getApiKeyForProvider, // Use modified getter
   streamingThrottleRate,
   setLocalMessages, // from props
   setIsAiStreaming, // from props
@@ -71,7 +71,6 @@ export function useAiInteraction({
       currentFrequencyPenalty,
       systemPromptToUse,
     }: PerformAiStreamParams) => {
-      // --- Boilerplate checks remain the same ---
       if (!conversationIdToUse) {
         const err = new Error(
           "Internal Error: No active conversation ID provided.",
@@ -84,12 +83,17 @@ export function useAiInteraction({
         setError(err.message);
         throw err;
       }
-      const apiKey = getApiKeyForProvider(selectedProvider.id);
-      const needsKey =
-        selectedProvider.requiresApiKey ?? selectedProvider.id !== "mock";
+
+      // Use the passed-in getter which already knows the selected provider
+      const apiKey = getApiKeyForProvider();
+      // Determine if a key is *needed* based on type (more robust check done in ChatProvider)
+      const needsKey = ["openai", "google", "openrouter"].includes(
+        selectedProvider.type,
+      );
+
       if (needsKey && !apiKey) {
         const err = new Error(
-          `API Key for ${selectedProvider.name} is not set or selected.`,
+          `API Key for ${selectedProvider.name} is not available or configured.`,
         );
         setError(err.message);
         toast.error(err.message);
@@ -107,6 +111,8 @@ export function useAiInteraction({
         isStreaming: true,
         streamedContent: "", // Start empty
         error: null,
+        providerId: selectedProvider.id, // Store provider config ID
+        modelId: selectedModel.id, // Store model ID
       };
 
       setLocalMessages((prev) => [...prev, assistantPlaceholder]);
@@ -145,7 +151,6 @@ export function useAiInteraction({
 
       const startTime = Date.now();
       try {
-        // Phase 5: Emit 'response:start' event
         modEvents.emit(ModEvent.RESPONSE_START, {
           conversationId: conversationIdToUse,
         });
@@ -158,10 +163,11 @@ export function useAiInteraction({
           ...messagesToSend.filter((m) => m.role !== "system"),
         );
 
-        const apiKeyForHeader = getApiKeyForProvider(selectedProvider.id);
+        // Use the retrieved API key for the header if it exists
+        const apiKeyForHeader = apiKey;
 
         const result = streamText({
-          model: selectedModel.instance,
+          model: selectedModel.instance, // Use the instance from AiModelConfig
           messages: messagesForApi,
           abortSignal: currentAbortController.signal,
           temperature: currentTemperature,
@@ -173,13 +179,23 @@ export function useAiInteraction({
           headers: apiKeyForHeader
             ? {
                 Authorization: `Bearer ${apiKeyForHeader}`,
+                // Add OpenRouter headers if needed (check provider type)
+                ...(selectedProvider.type === "openrouter" && {
+                  "HTTP-Referer": "http://localhost:5173", // Replace with your actual app URL
+                  "X-Title": "LiteChat", // Replace with your app name
+                }),
               }
-            : undefined,
+            : // Add OpenRouter headers even without key if needed
+              selectedProvider.type === "openrouter"
+              ? {
+                  "HTTP-Referer": "http://localhost:5173",
+                  "X-Title": "LiteChat",
+                }
+              : undefined,
         });
 
         for await (const delta of result.textStream) {
           finalContent += delta;
-          // Phase 5: Emit 'response:chunk' event
           modEvents.emit(ModEvent.RESPONSE_CHUNK, {
             chunk: delta,
             conversationId: conversationIdToUse,
@@ -198,7 +214,6 @@ export function useAiInteraction({
             toast.error(`AI Error: ${err.message || "Unknown error"}`);
           }
         } else {
-          // Handle non-Error throws if necessary
           console.error("Unknown stream error:", err);
           streamError = new Error("Unknown streaming error");
           finalContent = `Error: ${streamError.message}`;
@@ -211,19 +226,16 @@ export function useAiInteraction({
         }
         setIsAiStreaming(false);
 
-        // Update local state with final message details
         setLocalMessages((prev) =>
           prev.map((msg) => {
             if (msg.id === assistantMessageId) {
               finalMessageObject = {
-                // Capture the final object
                 ...msg,
                 content: finalContent,
                 isStreaming: false,
                 streamedContent: undefined,
                 error: streamError ? streamError.message : null,
-                providerId: selectedProvider?.id,
-                modelId: selectedModel?.id,
+                // providerId and modelId already set in placeholder
                 tokensInput: messagesToSend.reduce(
                   (sum, m) => sum + (m.content.length || 0),
                   0,
@@ -241,7 +253,6 @@ export function useAiInteraction({
           }),
         );
 
-        // Save to DB if successful
         if (!streamError && finalContent.trim() !== "") {
           try {
             await addDbMessage({
@@ -250,9 +261,8 @@ export function useAiInteraction({
               role: "assistant",
               content: finalContent,
               createdAt: assistantPlaceholderTimestamp,
-              // TODO: Add provider/model/token info to DbMessage schema if needed
+              // TODO: Add provider/model info to DbMessage schema if needed
             });
-            // Phase 5: Emit 'response:done' event AFTER successful save
             if (finalMessageObject) {
               modEvents.emit(ModEvent.RESPONSE_DONE, {
                 message: finalMessageObject,
@@ -270,37 +280,24 @@ export function useAiInteraction({
                   : msg,
               ),
             );
-            // Optionally emit response:done even on save failure, but include error?
-            // if (finalMessageObject) {
-            //   modEvents.emit(ModEvent.RESPONSE_DONE, { message: { ...finalMessageObject, error: dbErrorMessage } });
-            // }
           }
         } else if (streamError) {
-          // Error already set and toasted inside catch block
-          // Optionally emit response:done with error here?
-          // if (finalMessageObject) {
-          //    modEvents.emit(ModEvent.RESPONSE_DONE, { message: finalMessageObject }); // finalMessageObject already has error set
-          // }
+          // Error handled in catch
         } else {
-          // Empty content, no need to save or show error
           console.log("DB save skipped due to empty final content.");
-          // Optionally emit response:done for empty messages?
-          // if (finalMessageObject) {
-          //    modEvents.emit(ModEvent.RESPONSE_DONE, { message: finalMessageObject });
-          // }
         }
       }
     },
     [
       selectedModel,
       selectedProvider,
-      getApiKeyForProvider,
+      getApiKeyForProvider, // Use modified getter
       streamingThrottleRate,
-      setLocalMessages, // dependency
-      setIsAiStreaming, // dependency
-      setError, // dependency
-      addDbMessage, // dependency
-      abortControllerRef, // dependency
+      setLocalMessages,
+      setIsAiStreaming,
+      setError,
+      addDbMessage,
+      abortControllerRef,
     ],
   );
 

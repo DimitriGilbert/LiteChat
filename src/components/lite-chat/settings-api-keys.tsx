@@ -19,24 +19,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2Icon, EyeIcon, EyeOffIcon, InfoIcon } from "lucide-react"; // Added InfoIcon
+import { Trash2Icon, EyeIcon, EyeOffIcon, InfoIcon } from "lucide-react";
 import { toast } from "sonner";
+// import type { DbProviderConfig } from "@/lib/types";
 
 export const SettingsApiKeys: React.FC = () => {
   const {
     apiKeys,
     addApiKey,
     deleteApiKey,
-    providers,
-    enableApiKeyManagement, // <-- Get flag from context
+    dbProviderConfigs, // Use dbProviderConfigs to list potential link targets
+    enableApiKeyManagement,
   } = useChatContext();
   const [newKeyName, setNewKeyName] = useState("");
   const [newKeyValue, setNewKeyValue] = useState("");
-  const [newKeyProviderId, setNewKeyProviderId] = useState<string>("");
+  // Keep track of the *type* for display, linking happens in Providers tab
+  const [newKeyProviderType, setNewKeyProviderType] = useState<string>("");
   const [isAdding, setIsAdding] = useState(false);
   const [showValues, setShowValues] = useState<Record<string, boolean>>({});
 
-  // --- Conditional Rendering ---
   if (!enableApiKeyManagement) {
     return (
       <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2 bg-gray-800/30 rounded-md border border-dashed border-gray-700 min-h-[200px]">
@@ -45,39 +46,43 @@ export const SettingsApiKeys: React.FC = () => {
       </div>
     );
   }
-  // --- End Conditional Rendering ---
 
   const handleAddKey = async (e: React.FormEvent) => {
-    // ... (handleAddKey logic remains the same)
     e.preventDefault();
-    if (!newKeyName.trim() || !newKeyValue.trim() || !newKeyProviderId) {
+    if (!newKeyName.trim() || !newKeyValue.trim() || !newKeyProviderType) {
       toast.error("Please fill in all fields for the API key.");
       return;
     }
     setIsAdding(true);
     try {
-      await addApiKey(newKeyName.trim(), newKeyProviderId, newKeyValue.trim());
+      // Pass the selected type as the 'providerId' for now, for display grouping
+      await addApiKey(
+        newKeyName.trim(),
+        newKeyProviderType,
+        newKeyValue.trim(),
+      );
       toast.success(`API Key "${newKeyName.trim()}" added.`);
       setNewKeyName("");
       setNewKeyValue("");
-      setNewKeyProviderId("");
+      setNewKeyProviderType("");
     } catch (error: unknown) {
       console.error("Failed to add API key:", error);
-      if (error instanceof Error) {
-        toast.error(`Failed to add API key: ${error.message}`);
-      } else {
-        toast.error(`Failed to add API key: ${String(error)}`);
-      }
+      toast.error(
+        `Failed to add API key: ${error instanceof Error ? error.message : String(error)}`,
+      );
     } finally {
       setIsAdding(false);
     }
   };
 
   const handleDeleteKey = async (id: string, name: string) => {
-    // ... (handleDeleteKey logic remains the same)
-    if (window.confirm(`Are you sure you want to delete the key "${name}"?`)) {
+    if (
+      window.confirm(
+        `Are you sure you want to delete the key "${name}"? This will also unlink it from any providers using it.`,
+      )
+    ) {
       try {
-        await deleteApiKey(id);
+        await deleteApiKey(id); // This now handles unlinking in storage hook
         toast.success(`API Key "${name}" deleted.`);
         setShowValues((prev) => {
           const next = { ...prev };
@@ -86,23 +91,39 @@ export const SettingsApiKeys: React.FC = () => {
         });
       } catch (error: unknown) {
         console.error("Failed to delete API key:", error);
-        if (error instanceof Error) {
-          toast.error(`Failed to delete API key: ${error.message}`);
-        } else {
-          toast.error(`Failed to delete API key: ${String(error)}`);
-        }
+        toast.error(
+          `Failed to delete API key: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
   };
 
   const toggleShowValue = (id: string) => {
-    // ... (toggleShowValue logic remains the same)
     setShowValues((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const getProviderName = (providerId: string) => {
-    // ... (getProviderName logic remains the same)
-    return providers.find((p) => p.id === providerId)?.name ?? providerId;
+  // Get the *configured* provider name if a key is linked
+  const getLinkedProviderNames = (keyId: string): string => {
+    const linkedConfigs = dbProviderConfigs.filter(
+      (config) => config.apiKeyId === keyId,
+    );
+    if (linkedConfigs.length === 0) return "Not linked";
+    return linkedConfigs.map((c) => c.name).join(", ");
+  };
+
+  // Get the type stored with the key (for display)
+  const getKeyTypeLabel = (providerIdOrType: string): string => {
+    // Simple check for known types, otherwise return the stored string
+    const knownTypes = [
+      "openai",
+      "google",
+      "openrouter",
+      "ollama",
+      "openai-compatible",
+    ];
+    return knownTypes.includes(providerIdOrType)
+      ? providerIdOrType
+      : "Unknown/Custom";
   };
 
   return (
@@ -123,23 +144,27 @@ export const SettingsApiKeys: React.FC = () => {
             />
           </div>
           <div>
-            <Label htmlFor="new-key-provider">Provider</Label>
+            {/* Change this to select the *type* it's intended for */}
+            <Label htmlFor="new-key-provider-type">
+              Intended Provider Type
+            </Label>
             <Select
-              value={newKeyProviderId}
-              onValueChange={setNewKeyProviderId}
+              value={newKeyProviderType}
+              onValueChange={setNewKeyProviderType}
               required
             >
-              <SelectTrigger id="new-key-provider" className="mt-1">
-                <SelectValue placeholder="Select Provider" />
+              <SelectTrigger id="new-key-provider-type" className="mt-1">
+                <SelectValue placeholder="Select Type..." />
               </SelectTrigger>
               <SelectContent>
-                {providers
-                  .filter((p) => p.requiresApiKey !== false && p.id !== "mock")
-                  .map((provider) => (
-                    <SelectItem key={provider.id} value={provider.id}>
-                      {provider.name}
-                    </SelectItem>
-                  ))}
+                {/* List common types requiring keys */}
+                <SelectItem value="openai">OpenAI</SelectItem>
+                <SelectItem value="google">Google</SelectItem>
+                <SelectItem value="openrouter">OpenRouter</SelectItem>
+                <SelectItem value="openai-compatible">
+                  OpenAI-Compatible
+                </SelectItem>
+                {/* Add others if needed */}
               </SelectContent>
             </Select>
           </div>
@@ -166,7 +191,8 @@ export const SettingsApiKeys: React.FC = () => {
         <h3 className="text-lg font-medium mb-2">Stored API Keys</h3>
         {apiKeys.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            No API keys stored yet. Add one above.
+            No API keys stored yet. Add one above. Link keys to providers in the
+            'Providers' tab.
           </p>
         ) : (
           <div className="border rounded-md overflow-hidden">
@@ -174,7 +200,8 @@ export const SettingsApiKeys: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Provider</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Linked To</TableHead>
                   <TableHead>Key Value</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -183,7 +210,12 @@ export const SettingsApiKeys: React.FC = () => {
                 {apiKeys.map((key) => (
                   <TableRow key={key.id}>
                     <TableCell className="font-medium">{key.name}</TableCell>
-                    <TableCell>{getProviderName(key.providerId)}</TableCell>
+                    {/* Display the stored type */}
+                    <TableCell>{getKeyTypeLabel(key.providerId)}</TableCell>
+                    {/* Display linked provider names */}
+                    <TableCell className="text-xs text-muted-foreground">
+                      {getLinkedProviderNames(key.id)}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs">

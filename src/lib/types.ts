@@ -5,6 +5,13 @@ import type { DbMod, ModInstance } from "@/mods/types";
 // --- Basic Types ---
 export type Role = "user" | "assistant" | "system";
 export type SidebarItemType = "conversation" | "project";
+// --- NEW: Provider Type Enum ---
+export type DbProviderType =
+  | "openai"
+  | "google"
+  | "openrouter"
+  | "ollama"
+  | "openai-compatible"; // For LMStudio, etc.
 
 // --- Database Schemas ---
 export interface DbBase {
@@ -35,8 +42,19 @@ export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {
 
 export interface DbApiKey extends Pick<DbBase, "id" | "createdAt"> {
   name: string;
-  providerId: string;
+  providerId: string; // NOTE: This might become less relevant if keys are linked to DbProviderConfig
   value: string;
+}
+
+// --- NEW: Database Schema for Provider Configuration ---
+export interface DbProviderConfig extends DbBase {
+  name: string; // User-defined name (e.g., "My LMStudio", "Work OpenAI")
+  type: DbProviderType;
+  isEnabled: boolean;
+  apiKeyId: string | null; // Link to DbApiKey.id if required
+  baseURL: string | null; // For openai-compatible, ollama
+  // Optional: Specify models explicitly, otherwise use defaults/all known
+  enabledModels: string[] | null; // Array of model IDs (e.g., ["gpt-4", "gpt-3.5-turbo"])
 }
 
 // --- UI & State Types ---
@@ -53,7 +71,7 @@ export interface Message {
   streamedContent?: string;
   error?: string | null;
   vfsContextPaths?: string[];
-  providerId?: string;
+  providerId?: string; // This will now refer to DbProviderConfig.id
   modelId?: string;
   tokensInput?: number;
   tokensOutput?: number;
@@ -77,18 +95,20 @@ export interface ConversationSidebarItem
 export type SidebarItem = ProjectSidebarItem | ConversationSidebarItem;
 
 // --- AI Configuration ---
+// This now represents the *runtime* configuration generated from DbProviderConfig
 export interface AiModelConfig {
-  id: string;
-  name: string;
-  instance: any; // Consider a more specific type if possible
+  id: string; // e.g., "gpt-4", "gemini-pro"
+  name: string; // Display name (e.g., "GPT-4", "Gemini Pro")
+  instance: any; // The actual AI SDK model instance
   contextWindow?: number;
 }
 
 export interface AiProviderConfig {
-  id: string;
-  name: string;
+  id: string; // Corresponds to DbProviderConfig.id
+  name: string; // Corresponds to DbProviderConfig.name
+  type: DbProviderType; // Added type for reference
   models: AiModelConfig[];
-  requiresApiKey?: boolean;
+  // requiresApiKey is now determined by DbProviderConfig.apiKeyId != null
 }
 
 // --- Virtual File System ---
@@ -115,7 +135,7 @@ export interface CustomActionBase {
 //   // For now, let's assume CoreChatContextProps + specific needed items are sufficient
 //   // or pass the full context object carefully.
 //   // We will define the full ChatContextProps later.
-//   providers: AiProviderConfig[];
+//   providers: AiProviderConfig[]; // This will be the *active* providers
 //   selectedProviderId: string | null;
 //   selectedModelId: string | null;
 //   // ... add other specific props actions might need from the full context
@@ -150,14 +170,16 @@ export interface CustomSettingTab {
 }
 
 // --- Chat Configuration ---
+// LiteChatConfig no longer takes providers directly
 export interface LiteChatConfig {
   // Feature Flags (defaults to true if undefined)
   enableSidebar?: boolean;
   enableVfs?: boolean;
-  enableApiKeyManagement?: boolean;
+  enableApiKeyManagement?: boolean; // Keep this, as keys are still managed separately
   enableAdvancedSettings?: boolean;
 
   // Initial State (defaults to null/undefined if undefined)
+  // initialProviderId might refer to DbProviderConfig.id now
   initialProviderId?: string | null;
   initialModelId?: string | null;
   initialSelectedItemId?: string | null;
@@ -222,24 +244,33 @@ export interface ChatContextProps {
   enableApiKeyManagement: boolean;
   enableAdvancedSettings: boolean;
 
-  // Provider/Model Selection
-  providers: AiProviderConfig[];
-  selectedProviderId: string | null;
+  // Provider/Model Selection (Now uses dynamically generated providers)
+  activeProviders: AiProviderConfig[]; // Renamed from 'providers'
+  selectedProviderId: string | null; // Refers to DbProviderConfig.id
   setSelectedProviderId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedModelId: string | null;
   setSelectedModelId: React.Dispatch<React.SetStateAction<string | null>>;
 
   // API Key Management (Functions might be dummies if disabled)
   apiKeys: DbApiKey[];
-  selectedApiKeyId: Record<string, string | null>;
-  setSelectedApiKeyId: (providerId: string, keyId: string | null) => void;
   addApiKey: (
     name: string,
-    providerId: string,
+    providerId: string, // This might be less useful now
     value: string,
   ) => Promise<string>;
   deleteApiKey: (id: string) => Promise<void>;
-  getApiKeyForProvider: (providerId: string) => string | undefined;
+  getApiKeyForProvider: (providerId: string) => string | undefined; // Needs adjustment
+
+  // --- NEW: Provider Configuration Management ---
+  dbProviderConfigs: DbProviderConfig[];
+  addDbProviderConfig: (
+    config: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
+  ) => Promise<string>;
+  updateDbProviderConfig: (
+    id: string,
+    changes: Partial<DbProviderConfig>,
+  ) => Promise<void>;
+  deleteDbProviderConfig: (id: string) => Promise<void>;
 
   // Sidebar / Item Management (Functions might be dummies if disabled)
   sidebarItems: SidebarItem[];

@@ -14,7 +14,8 @@ import { SettingsGeneral } from "./settings-general";
 import { SettingsAssistant } from "./settings-assistant";
 import { SettingsApiKeys } from "./settings-api-keys";
 import { SettingsDataManagement } from "./settings-data-management";
-import { SettingsMods } from "./settings-mods"; // Import Mods settings tab
+import { SettingsMods } from "./settings-mods";
+import { SettingsProviders } from "./settings-providers"; // Import Providers settings tab
 import { useChatContext } from "@/hooks/use-chat-context";
 import type { CustomSettingTab } from "@/lib/types";
 
@@ -43,13 +44,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
-            Manage application settings, AI behavior, API keys, and data.
+            Manage application settings, AI behavior, API keys, providers, and
+            data.
           </DialogDescription>
         </DialogHeader>
         <div className="flex-grow overflow-hidden">
           <Tabs defaultValue="general" className="h-full flex flex-col">
             <TabsList className="flex-shrink-0">
               <TabsTrigger value="general">General</TabsTrigger>
+              {/* Add Providers Tab Trigger */}
+              <TabsTrigger value="providers">Providers</TabsTrigger>
               {context.enableAdvancedSettings && (
                 <TabsTrigger value="assistant">Assistant</TabsTrigger>
               )}
@@ -57,7 +61,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <TabsTrigger value="apiKeys">API Keys</TabsTrigger>
               )}
               <TabsTrigger value="data">Data</TabsTrigger>
-              {/* Add Mods Tab Trigger */}
               <TabsTrigger value="mods">Mods</TabsTrigger>
               {/* Add Custom Tab Triggers */}
               {context.customSettingsTabs.map((tab: CustomSettingTab) => (
@@ -69,6 +72,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="flex-grow overflow-y-auto py-4 pr-2">
               <TabsContent value="general">
                 <SettingsGeneral />
+              </TabsContent>
+              {/* Add Providers Tab Content */}
+              <TabsContent value="providers">
+                <SettingsProviders />
               </TabsContent>
               {context.enableAdvancedSettings && (
                 <TabsContent value="assistant">
@@ -83,7 +90,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <TabsContent value="data">
                 <SettingsDataManagement />
               </TabsContent>
-              {/* Add Mods Tab Content */}
               <TabsContent value="mods">
                 <SettingsMods />
               </TabsContent>

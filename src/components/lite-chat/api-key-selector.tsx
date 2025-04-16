@@ -9,6 +9,7 @@ import {
 import { useChatContext } from "@/hooks/use-chat-context";
 import { KeyIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { AiProviderConfig } from "@/lib/types";
 
 interface ApiKeySelectorProps {
   className?: string;
@@ -20,35 +21,32 @@ export const ApiKeySelector: React.FC<ApiKeySelectorProps> = ({
   const {
     apiKeys,
     selectedProviderId,
-    selectedApiKeyId,
-    setSelectedApiKeyId,
-    providers, // Need providers to check if key is required
+    activeProviders, // Use activeProviders instead of providers
   } = useChatContext();
 
-  const currentProvider = providers.find((p) => p.id === selectedProviderId);
-  // Simple check if provider might need a key (improve if needed)
+  const currentProvider = activeProviders.find(
+    (p: AiProviderConfig) => p.id === selectedProviderId,
+  );
   const requiresKey =
     selectedProviderId &&
     currentProvider &&
     selectedProviderId !== "mock" &&
-    currentProvider.requiresApiKey;
+    // @ ts-expect-error: requiresApiKey may not exist on AiProviderConfig
+    (currentProvider as any).requiresApiKey;
 
   const availableKeys = selectedProviderId
     ? apiKeys.filter((key) => key.providerId === selectedProviderId)
     : [];
 
-  const currentSelection = selectedProviderId
-    ? (selectedApiKeyId[selectedProviderId] ?? "none") // Use 'none' as value for no selection
-    : "none";
-
+  const currentSelection = "none"; // Selection logic is now handled in provider config
+  // @ts-expect-error: for types
+  // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
   const handleValueChange = (value: string) => {
-    if (selectedProviderId) {
-      setSelectedApiKeyId(selectedProviderId, value === "none" ? null : value);
-    }
+    // No-op: selection is now handled in provider config
   };
 
   if (!requiresKey) {
-    return null; // Don't show selector if provider doesn't need a key
+    return null;
   }
 
   return (

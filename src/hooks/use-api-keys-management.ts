@@ -1,92 +1,86 @@
 // src/hooks/use-api-keys-management.ts
-import { useState, useCallback } from "react";
-import type { DbApiKey } from "@/lib/types";
+import { useCallback } from "react";
+// import type { DbApiKey } from "@/lib/types";
 
 // --- NEW: Props Interface ---
 interface UseApiKeysManagementProps {
-  apiKeys: DbApiKey[]; // Pass live array in
+  // apiKeys: DbApiKey[]; // Pass live array in
   addDbApiKey: (
     name: string,
-    providerId: string,
+    providerId: string, // Keep for display/grouping? Or remove? Let's keep for now.
     value: string,
   ) => Promise<string>;
   deleteDbApiKey: (id: string) => Promise<void>;
 }
 
 export interface UseApiKeysManagementReturn {
-  // apiKeys: DbApiKey[]; // No longer returned, passed in
-  selectedApiKeyId: Record<string, string | null>;
-  setSelectedApiKeyId: (providerId: string, keyId: string | null) => void;
+  // selectedApiKeyId: Record<string, string | null>; // Keyed by DbProviderConfig.id
+  // setSelectedApiKeyId: (providerConfigId: string, keyId: string | null) => void;
   addApiKey: (
     name: string,
-    providerId: string,
+    providerId: string, // Keep for now
     value: string,
   ) => Promise<string>;
   deleteApiKey: (id: string) => Promise<void>;
-  getApiKeyForProvider: (providerId: string) => string | undefined;
+  // getApiKeyForProvider: (providerConfigId: string) => string | undefined; // REMOVED - Logic moved
 }
 
 // --- MODIFIED: Accept props ---
 export function useApiKeysManagement({
-  apiKeys,
+  // apiKeys,
   addDbApiKey,
   deleteDbApiKey,
 }: UseApiKeysManagementProps): UseApiKeysManagementReturn {
-  const [selectedApiKeyIdState, setSelectedApiKeyIdState] = useState<
-    Record<string, string | null>
-  >({});
+  // Selection state is now managed implicitly by DbProviderConfig.apiKeyId
+  // const [selectedApiKeyIdState, setSelectedApiKeyIdState] = useState<
+  //   Record<string, string | null>
+  // >({});
 
-  const setSelectedApiKeyId = useCallback(
-    (providerId: string, keyId: string | null) => {
-      setSelectedApiKeyIdState((prev) => ({ ...prev, [providerId]: keyId }));
-    },
-    [],
-  );
+  // const setSelectedApiKeyId = useCallback(
+  //   (providerConfigId: string, keyId: string | null) => {
+  //     setSelectedApiKeyIdState((prev) => ({ ...prev, [providerConfigId]: keyId }));
+  //   },
+  //   [],
+  // );
 
   const addApiKey = useCallback(
     async (
       name: string,
-      providerId: string,
+      providerId: string, // Keep for now
       value: string,
     ): Promise<string> => {
       const keyToAdd = value;
       value = ""; // Clear original value immediately
-      // Use passed-in function
       const newId = await addDbApiKey(name, providerId, keyToAdd);
-      setSelectedApiKeyId(providerId, newId);
+      // No automatic selection needed here anymore
       return newId;
     },
-    [addDbApiKey, setSelectedApiKeyId], // Use passed-in function in dependency array
+    [addDbApiKey],
   );
 
   const deleteApiKey = useCallback(
     async (id: string): Promise<void> => {
-      const keyToDelete = apiKeys.find((k) => k.id === id);
-      // Use passed-in function
+      // Deletion logic in useChatStorage now handles unlinking from providerConfigs
       await deleteDbApiKey(id);
-      if (keyToDelete && selectedApiKeyIdState[keyToDelete.providerId] === id) {
-        setSelectedApiKeyId(keyToDelete.providerId, null);
-      }
+      // No need to update selection state here
     },
-    [apiKeys, deleteDbApiKey, selectedApiKeyIdState, setSelectedApiKeyId], // Use passed-in function and apiKeys prop in dependency array
+    [deleteDbApiKey],
   );
 
-  const getApiKeyForProvider = useCallback(
-    (providerId: string): string | undefined => {
-      const selectedId = selectedApiKeyIdState[providerId];
-      if (!selectedId) return undefined;
-      // Find the key in the passed-in live query result
-      return apiKeys.find((key) => key.id === selectedId)?.value;
-    },
-    [apiKeys, selectedApiKeyIdState], // Use passed-in apiKeys prop in dependency array
-  );
+  // const getApiKeyForProvider = useCallback(
+  //   (providerConfigId: string): string | undefined => {
+  //     // This logic is now handled within ChatProvider using DbProviderConfig.apiKeyId
+  //     console.warn("getApiKeyForProvider in useApiKeysManagement is deprecated.");
+  //     return undefined;
+  //   },
+  //   [],
+  // );
 
   return {
-    // apiKeys, // No longer returned
-    selectedApiKeyId: selectedApiKeyIdState,
-    setSelectedApiKeyId,
+    // selectedApiKeyId: selectedApiKeyIdState,
+    // setSelectedApiKeyId,
     addApiKey,
     deleteApiKey,
-    getApiKeyForProvider,
+    // getApiKeyForProvider, // REMOVED
   };
 }

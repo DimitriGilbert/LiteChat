@@ -5,9 +5,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"; // Assuming shadcn/ui
+} from "@/components/ui/select";
 import { useChatContext } from "@/hooks/use-chat-context";
 import { cn } from "@/lib/utils";
+import type { AiProviderConfig } from "@/lib/types";
 
 interface ProviderSelectorProps {
   className?: string;
@@ -17,22 +18,22 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   className,
 }) => {
   const {
-    providers,
+    activeProviders,
     selectedProviderId,
     setSelectedProviderId,
-    setSelectedModelId, // Reset model when provider changes
+    setSelectedModelId,
   } = useChatContext();
 
   const handleValueChange = (value: string) => {
     setSelectedProviderId(value);
-    setSelectedModelId(null); // Reset model selection
+    setSelectedModelId(null);
   };
 
   return (
     <Select
       value={selectedProviderId ?? ""}
       onValueChange={handleValueChange}
-      disabled={providers.length <= 1}
+      disabled={activeProviders.length <= 1}
     >
       <SelectTrigger
         className={cn(
@@ -43,7 +44,7 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         <SelectValue placeholder="Select Provider" />
       </SelectTrigger>
       <SelectContent className="bg-gray-700 border-gray-600 text-gray-200">
-        {providers.map((provider) => (
+        {activeProviders.map((provider: AiProviderConfig) => (
           <SelectItem key={provider.id} value={provider.id}>
             {provider.name}
           </SelectItem>

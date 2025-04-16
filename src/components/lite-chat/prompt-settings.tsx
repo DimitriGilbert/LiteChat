@@ -1,4 +1,3 @@
-// src/components/lite-chat/prompt-settings.tsx
 import React, { useState } from "react";
 import { ProviderSelector } from "./provider-selector";
 import { ModelSelector } from "./model-selector";
@@ -11,7 +10,7 @@ import {
   FolderSyncIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch"; // Keep Switch import
+import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
@@ -19,6 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import type { AiProviderConfig } from "@/lib/types";
 
 interface PromptSettingsProps {
   className?: string;
@@ -29,7 +29,7 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
 }) => {
   const {
     selectedProviderId,
-    providers,
+    activeProviders,
     selectedApiKeyId,
     selectedItemId,
     isVfsEnabledForItem,
@@ -42,11 +42,16 @@ export const PromptSettings: React.FC<PromptSettingsProps> = ({
   const [advancedInitialTab, setAdvancedInitialTab] =
     useState<string>("parameters");
 
-  const providerConfig = providers.find((p) => p.id === selectedProviderId);
+  const providerConfig = activeProviders.find(
+    (p: AiProviderConfig) => p.id === selectedProviderId,
+  );
   const needsKey =
+    // @ts-expect-error: requiresApiKey may not exist on AiProviderConfig
     providerConfig?.requiresApiKey ?? selectedProviderId !== "mock";
   const keyIsSelected = !!(
-    selectedProviderId && selectedApiKeyId[selectedProviderId]
+    selectedProviderId &&
+    selectedApiKeyId &&
+    selectedApiKeyId[selectedProviderId]
   );
 
   const showKeyRequiredWarning = needsKey && !keyIsSelected;

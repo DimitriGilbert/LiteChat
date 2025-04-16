@@ -1,75 +1,27 @@
 // src/App.tsx
 import { LiteChat } from "./components/lite-chat/chat";
-import type { AiProviderConfig } from "@/lib/types";
+// import type { AiProviderConfig } from "@/lib/types"; // No longer needed here
 import { Toaster } from "@/components/ui/sonner";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+// import { createOpenAICompatible } from "@ai-sdk/openai-compatible"; // No longer needed here
 import ErrorBoundary from "./components/error-boundary"; // Import the ErrorBoundary
 
-const lmstudio = createOpenAICompatible({
-  name: "lmstudio",
-  baseURL: "http://192.168.1.70:1234/v1",
-});
-const openrouter = createOpenAICompatible({
-  name: "openrouter",
-  baseURL: "https://openrouter.ai/api/v1",
-});
-
-const chatProviders: AiProviderConfig[] = [
-  {
-    id: "openrouter",
-    name: "openrouter",
-    requiresApiKey: true,
-    models: [
-      {
-        id: "openrouter/optimus-alpha",
-        name: "optimus A",
-        instance: openrouter("openrouter/optimus-alpha"),
-      },
-      {
-        id: "google/gemini-2.5-pro-exp-03-25",
-        name: "gemini 2.5 pro FREE",
-        instance: openrouter("google/gemini-2.5-pro-exp-03-25"),
-      },
-      {
-        id: "google/gemini-2.5-pro-preview-03-25",
-        name: "gemini 2.5 pro",
-        instance: openrouter("google/gemini-2.5-pro-preview-03-25"),
-      },
-      {
-        id: "google/gemini-2.0-flash-001",
-        name: "gemini 2.0 flash",
-        instance: openrouter("google/gemini-2.0-flash-001"),
-      },
-      {
-        id: "moonshotai/kimi-vl-a3b-thinking:free",
-        name: "kimi vl",
-        instance: openrouter("moonshotai/kimi-vl-a3b-thinking:free"),
-      },
-    ],
-  },
-  {
-    id: "local",
-    name: "local",
-    requiresApiKey: false,
-    models: [
-      {
-        id: "gemma-3-4b-it",
-        name: "gemma3 4b",
-        instance: lmstudio("gemma-3-4b-it"),
-      },
-    ],
-  },
-];
-
+// const lmstudio = createOpenAICompatible({
+//   name: "lmstudio",
+//   baseURL: "http://192.168.1.70:1234/v1",
+// });
+// const openrouter = createOpenAICompatible({
+//   name: "openrouter",
+//   baseURL: "https://openrouter.ai/api/v1",
+// });
+// const chatProviders: AiProviderConfig[] = [ ... ];
 function App() {
   return (
-    // Wrap the main content with ErrorBoundary
     <ErrorBoundary>
       <div className="h-screen bg-gray-900 flex flex-col">
         <main className="flex-grow overflow-hidden p-4">
-          <LiteChat providers={chatProviders} />
+          {/* No providers prop needed */}
+          <LiteChat />
         </main>
-
         <Toaster richColors position="top-right" />
       </div>
     </ErrorBoundary>

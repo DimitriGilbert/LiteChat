@@ -22,8 +22,10 @@ import type {
   CustomPromptAction,
   CustomMessageAction,
   CustomSettingTab,
+  DbProviderConfig,
+  DbProviderType,
+  AiModelConfig,
 } from "@/lib/types";
-// Import Mod types
 import type {
   DbMod,
   ModInstance,
@@ -45,21 +47,24 @@ import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useVirtualFileSystem } from "@/hooks/use-virtual-file-system";
 import { useState as useVfsState, useCallback as useVfsCallback } from "react";
 import { toast } from "sonner";
-// Import Mod Loader and related items
 import { loadMods } from "@/mods/loader";
-import { modEvents, ModEvent, ModEventName } from "@/mods/events"; // Import ModEvent constants and ModEventName type
+import { modEvents, ModEvent, ModEventName } from "@/mods/events";
 import {
-  ModMiddlewareHook, // Import middleware hook names
+  ModMiddlewareHook,
   type ReadonlyChatContextSnapshot,
   type ModMiddlewareHookName,
 } from "@/mods/api";
-// Import payload/return maps directly where needed (or keep in types.ts if preferred)
 import type {
   ModEventPayloadMap,
   ModMiddlewarePayloadMap,
   ModMiddlewareReturnMap,
 } from "@/mods/types";
-import { nanoid } from "nanoid"; // Import nanoid for unique IDs
+import { nanoid } from "nanoid";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createOllama } from "ollama-ai-provider";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 // Helper to decode Uint8Array safely
 const decodeUint8Array = (arr: Uint8Array): string => {
@@ -129,7 +134,44 @@ const EMPTY_CUSTOM_SETTINGS_TABS: CustomSettingTab[] = [];
 const EMPTY_CUSTOM_PROMPT_ACTIONS: CustomPromptAction[] = [];
 const EMPTY_CUSTOM_MESSAGE_ACTIONS: CustomMessageAction[] = [];
 const EMPTY_MOD_INSTANCES: ModInstance[] = [];
-const EMPTY_DB_MODS: DbMod[] = []; // Added for initial state
+const EMPTY_DB_MODS: DbMod[] = [];
+const EMPTY_DB_PROVIDER_CONFIGS: DbProviderConfig[] = [];
+const EMPTY_ACTIVE_PROVIDERS: AiProviderConfig[] = [];
+
+const DEFAULT_MODELS: Record<DbProviderType, { id: string; name: string }[]> = {
+  openai: [
+    { id: "gpt-4o", name: "GPT-4o" },
+    { id: "gpt-4-turbo", name: "GPT-4 Turbo" },
+    { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo" },
+  ],
+  google: [
+    { id: "gemini-1.5-pro-latest", name: "Gemini 1.5 Pro" },
+    { id: "gemini-1.5-flash-latest", name: "Gemini 1.5 Flash" },
+    { id: "gemini-1.0-pro", name: "Gemini 1.0 Pro" },
+  ],
+  openrouter: [
+    { id: "google/gemini-flash-1.5", name: "Gemini 1.5 Flash (OR)" },
+    { id: "google/gemini-pro-1.5", name: "Gemini 1.5 Pro (OR)" },
+    { id: "anthropic/claude-3-haiku", name: "Claude 3 Haiku (OR)" },
+    { id: "anthropic/claude-3-sonnet", name: "Claude 3 Sonnet (OR)" },
+    { id: "anthropic/claude-3-opus", name: "Claude 3 Opus (OR)" },
+    { id: "mistralai/mistral-7b-instruct", name: "Mistral 7B Instruct (OR)" },
+    { id: "mistralai/mixtral-8x7b-instruct", name: "Mixtral 8x7B (OR)" },
+  ],
+  ollama: [
+    { id: "llama3", name: "Llama 3 (Ollama)" },
+    { id: "mistral", name: "Mistral (Ollama)" },
+    { id: "gemma", name: "Gemma (Ollama)" },
+  ],
+  "openai-compatible": [
+    { id: "loaded-model-1", name: "Loaded Model 1" },
+    { id: "loaded-model-2", name: "Loaded Model 2" },
+  ],
+};
+
+const requiresApiKey = (type: DbProviderType | null): boolean => {
+  return type === "openai" || type === "openrouter" || type === "google";
+};
 
 const dummyVfs: VfsContextObject = {
   isReady: false,
@@ -181,10 +223,6 @@ const dummyVfs: VfsContextObject = {
 };
 
 const dummyApiKeysMgmt: UseApiKeysManagementReturn = {
-  selectedApiKeyId: {} as Record<string, string | null>,
-  setSelectedApiKeyId: () => {
-    console.warn("API Key Management is disabled.");
-  },
   addApiKey: async () => {
     console.warn("API Key Management is disabled.");
     toast.error("API Key Management is disabled in configuration.");
@@ -195,14 +233,10 @@ const dummyApiKeysMgmt: UseApiKeysManagementReturn = {
     toast.error("API Key Management is disabled in configuration.");
     throw new Error("API Key Management is disabled.");
   },
-  getApiKeyForProvider: () => {
-    return undefined;
-  },
 };
 
 interface ChatProviderProps {
   children: React.ReactNode;
-  providers: AiProviderConfig[];
   initialProviderId?: string | null;
   initialModelId?: string | null;
   initialSelectedItemId?: string | null;
@@ -219,7 +253,6 @@ interface ChatProviderProps {
 
 export const ChatProvider: React.FC<ChatProviderProps> = ({
   children,
-  providers,
   initialProviderId = null,
   initialModelId = null,
   initialSelectedItemId = null,
@@ -239,12 +272,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [error, setErrorState] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false); // State for settings modal
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   // --- Mod State ---
   const [loadedMods, setLoadedMods] =
     useState<ModInstance[]>(EMPTY_MOD_INSTANCES);
-  // State for items registered by mods
   const [modPromptActions, setModPromptActions] = useState<
     CustomPromptAction[]
   >([]);
@@ -254,32 +286,119 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const [modSettingsTabs, setModSettingsTabs] = useState<CustomSettingTab[]>(
     [],
   );
-  // Use refs for listeners/middleware to avoid context re-renders on registration
   const modEventListenersRef = useRef<Map<string, Map<string, Function>>>(
     new Map(),
-  ); // eventName -> listenerId -> listenerFn
+  );
   const modMiddlewareCallbacksRef = useRef<Map<string, Map<string, Function>>>(
     new Map(),
-  ); // hookName -> middlewareId -> middlewareFn
+  );
 
   const setError = useCallback((newError: string | null) => {
     setErrorState(newError);
     if (newError) {
       console.error("Chat Error Context:", newError);
-      // Phase 5: Emit 'error:app' event via modEvents
-      modEvents.emit(ModEvent.APP_ERROR, { message: newError }); // Use ModEvent constant
+      modEvents.emit(ModEvent.APP_ERROR, { message: newError });
     }
   }, []);
 
   // --- Hooks ---
+  const storage = useChatStorage();
+
+  // --- Dynamic Provider Instantiation ---
+  const activeProviders = useMemo<AiProviderConfig[]>(() => {
+    const enabledConfigs = (
+      storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS
+    ).filter((c) => c.isEnabled);
+    const availableApiKeys = storage.apiKeys || EMPTY_API_KEYS;
+
+    if (enabledConfigs.length === 0) {
+      return EMPTY_ACTIVE_PROVIDERS;
+    }
+
+    const generatedProviders: AiProviderConfig[] = [];
+
+    for (const config of enabledConfigs) {
+      try {
+        let providerInstance: any;
+        let apiKey: string | undefined;
+
+        if (config.apiKeyId) {
+          apiKey = availableApiKeys.find(
+            (k) => k.id === config.apiKeyId,
+          )?.value;
+          if (!apiKey && requiresApiKey(config.type)) {
+            throw new Error(
+              `API Key ID ${config.apiKeyId} configured but key not found or value missing.`,
+            );
+          }
+        }
+
+        switch (config.type) {
+          case "openai":
+            if (!apiKey) throw new Error("API Key required for OpenAI.");
+            providerInstance = createOpenAI({ apiKey });
+            break;
+          case "google":
+            if (!apiKey) throw new Error("API Key required for Google.");
+            providerInstance = createGoogleGenerativeAI({ apiKey });
+            break;
+          case "openrouter":
+            if (!apiKey) throw new Error("API Key required for OpenRouter.");
+            providerInstance = createOpenRouter({ apiKey });
+            break;
+          case "ollama":
+            providerInstance = createOllama({
+              baseURL: config.baseURL ?? undefined,
+            });
+            break;
+          case "openai-compatible":
+            if (!config.baseURL)
+              throw new Error("Base URL required for OpenAI-Compatible.");
+            providerInstance = createOpenAICompatible({
+              name: config.name ?? "OpenAI-Compatible",
+              baseURL: config.baseURL,
+              apiKey: apiKey,
+            });
+            break;
+          default:
+            throw new Error(`Unsupported provider type: ${config.type}`);
+        }
+
+        const availableModelDefs = DEFAULT_MODELS[config.type] || [];
+        const models: AiModelConfig[] = availableModelDefs.map((modelDef) => ({
+          id: modelDef.id,
+          name: modelDef.name,
+          instance: providerInstance(modelDef.id),
+        }));
+
+        if (models.length > 0) {
+          generatedProviders.push({
+            id: config.id,
+            name: config.name,
+            type: config.type,
+            models: models,
+          });
+        }
+      } catch (err) {
+        console.error(
+          `[ChatProvider] Failed to instantiate provider ${config.name} (ID: ${config.id}, Type: ${config.type}):`,
+          err,
+        );
+        toast.error(
+          `Failed to load provider "${config.name}": ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+    return generatedProviders;
+  }, [storage.providerConfigs, storage.apiKeys]);
+
   const providerModel = useProviderModelSelection({
-    providers,
+    providers: activeProviders,
     initialProviderId,
     initialModelId,
   });
-  const storage = useChatStorage(); // Includes mod storage functions now
+
   const realApiKeysMgmt = useApiKeysManagement({
-    apiKeys: storage.apiKeys || EMPTY_API_KEYS,
     addDbApiKey: storage.addApiKey,
     deleteDbApiKey: storage.deleteApiKey,
   });
@@ -322,8 +441,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       setActiveItemId(id);
       setActiveItemType(type);
       setIsLoadingMessages(!!id);
-      // Phase 5: Emit 'chat:selected' event
-      modEvents.emit(ModEvent.CHAT_SELECTED, { id, type }); // Use ModEvent constant
+      modEvents.emit(ModEvent.CHAT_SELECTED, { id, type });
     },
     [clearSelectedVfsPaths],
   );
@@ -475,10 +593,27 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   });
 
   // --- AI Interaction ---
+  // This function now gets the API key for the selected provider config
+  const getApiKeyForSelectedProvider = useCallback((): string | undefined => {
+    if (!providerModel.selectedProviderId) return undefined;
+    const selectedDbConfig = (
+      storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS
+    ).find((p) => p.id === providerModel.selectedProviderId);
+    if (!selectedDbConfig) return undefined;
+    if (!selectedDbConfig.apiKeyId) return undefined;
+    return (storage.apiKeys || EMPTY_API_KEYS).find(
+      (k) => k.id === selectedDbConfig.apiKeyId,
+    )?.value;
+  }, [
+    providerModel.selectedProviderId,
+    storage.providerConfigs,
+    storage.apiKeys,
+  ]);
+
   const aiInteraction = useAiInteraction({
     selectedModel: providerModel.selectedModel,
     selectedProvider: providerModel.selectedProvider,
-    getApiKeyForProvider: apiKeysMgmt.getApiKeyForProvider,
+    getApiKeyForProvider: getApiKeyForSelectedProvider,
     streamingThrottleRate,
     setLocalMessages: setMessages,
     setIsAiStreaming: setIsStreaming,
@@ -518,36 +653,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     getMessagesForConversation: storage.getMessagesForConversation,
   });
 
-  // --- Effect for Default API Key Selection ---
-  useEffect(() => {
-    if (!enableApiKeyManagement || !providerModel.selectedProviderId) {
-      return;
-    }
-    const currentProviderId = providerModel.selectedProviderId;
-    if (apiKeysMgmt.selectedApiKeyId[currentProviderId]) {
-      return;
-    }
-    const providerConfig = providers.find((p) => p.id === currentProviderId);
-    const needsKey =
-      providerConfig?.requiresApiKey ?? currentProviderId !== "mock";
-    if (!needsKey) {
-      return;
-    }
-    const availableKeysForProvider = (storage.apiKeys || []).filter(
-      (key) => key.providerId === currentProviderId,
-    );
-    if (availableKeysForProvider.length > 0) {
-      const firstKey = availableKeysForProvider[0];
-      apiKeysMgmt.setSelectedApiKeyId(currentProviderId, firstKey.id);
-    }
-  }, [
-    providerModel.selectedProviderId,
-    storage.apiKeys,
-    providers,
-    apiKeysMgmt,
-    enableApiKeyManagement,
-  ]);
-
   // --- Phase 5: Middleware Runner ---
   const runMiddleware = useCallback(
     async <H extends ModMiddlewareHookName>(
@@ -561,23 +666,15 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         const hook: ModMiddlewareHookName = hookName;
         switch (hook) {
           case ModMiddlewareHook.PROCESS_RESPONSE_CHUNK:
-            // Explicitly return the correct part, cast via unknown
             return (initialPayload as ProcessResponseChunkPayload)
               .chunk as unknown as ModMiddlewareReturnMap[H];
           case ModMiddlewareHook.RENDER_MESSAGE:
-            // Explicitly return the correct part, cast via unknown
             return (initialPayload as RenderMessagePayload)
               .message as unknown as ModMiddlewareReturnMap[H];
-          // For hooks where Payload structure matches Return structure (ignoring 'false')
-          // cast via unknown to bypass TS2352
           case ModMiddlewareHook.SUBMIT_PROMPT:
           case ModMiddlewareHook.VFS_WRITE:
-            // FIX: Cast via unknown
             return initialPayload as unknown as ModMiddlewareReturnMap[H];
           default:
-            // Should not happen if all hooks are handled, but provide a fallback
-            console.warn(`Unhandled hook in runMiddleware bypass: ${hookName}`);
-            // FIX: Cast via unknown
             return initialPayload as unknown as ModMiddlewareReturnMap[H];
         }
       }
@@ -591,10 +688,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
       for (const callback of callbacks) {
         if (currentData === false) {
-          break; // Stop if middleware returned false
+          break;
         }
         try {
-          // Cast input to 'any' as its type might shift during the loop
           currentData = await callback(currentData as any);
         } catch (err) {
           console.error(
@@ -602,36 +698,27 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
             err,
           );
           toast.error(`Middleware error during ${hookName}. Action cancelled.`);
-          currentData = false; // Set to false on error
-          break; // Stop processing on error
+          currentData = false;
+          break;
         }
       }
 
-      // Handle the case where the loop finished but currentData is still the initial payload
-      // (e.g., middleware existed but didn't modify the data or returned the original object)
       if (currentData !== false && currentData === initialPayload) {
         const hook: ModMiddlewareHookName = hookName;
         switch (hook) {
           case ModMiddlewareHook.PROCESS_RESPONSE_CHUNK:
-            // FIX: Cast via unknown
             return (initialPayload as ProcessResponseChunkPayload)
               .chunk as unknown as ModMiddlewareReturnMap[H];
           case ModMiddlewareHook.RENDER_MESSAGE:
-            // FIX: Cast via unknown
             return (initialPayload as RenderMessagePayload)
               .message as unknown as ModMiddlewareReturnMap[H];
           default:
-            // For SUBMIT_PROMPT, VFS_WRITE, etc.
-            // FIX: Cast via unknown
             return initialPayload as unknown as ModMiddlewareReturnMap[H];
         }
       }
-
-      // Final return: currentData is either false or the result of the last middleware (ReturnMap[H])
-      // This final cast should be safe because if it's not false, it holds the ReturnMap[H] type.
       return currentData as ModMiddlewareReturnMap[H] | false;
     },
-    [], // No dependencies needed as it uses the ref
+    [],
   );
 
   // --- Submit Handler ---
@@ -653,19 +740,21 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         return;
       }
       if (!providerModel.selectedProvider || !providerModel.selectedModel) {
-        setError("Error: Please select an AI Provider and Model first.");
+        setError("Error: Please select an active AI Provider and Model first.");
         toast.error("Please select an AI Provider and Model.");
         return;
       }
 
+      // Check for API key using the *adjusted* logic
+      const selectedDbConfig = (
+        storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS
+      ).find((p) => p.id === providerModel.selectedProviderId);
       const needsKey =
-        providerModel.selectedProvider.requiresApiKey ??
-        providerModel.selectedProvider.id !== "mock";
-      if (
-        needsKey &&
-        !apiKeysMgmt.getApiKeyForProvider(providerModel.selectedProvider.id)
-      ) {
-        const errorMsg = `API Key for ${providerModel.selectedProvider.name} is not set or selected.`;
+        selectedDbConfig?.apiKeyId ||
+        requiresApiKey(selectedDbConfig?.type ?? null);
+
+      if (needsKey && !getApiKeyForSelectedProvider()) {
+        const errorMsg = `API Key for ${providerModel.selectedProvider.name} is not set, selected, or linked. Check Settings -> Providers.`;
         setError(errorMsg);
         toast.error(errorMsg);
         if (!enableApiKeyManagement) {
@@ -686,7 +775,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         conversationIdToSubmit = activeItemId;
       }
 
-      // Create conversation if needed
       let newConvCreated = false;
       if (!conversationIdToSubmit) {
         try {
@@ -698,10 +786,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           if (!newConvId)
             throw new Error("Failed to get ID for new conversation.");
           conversationIdToSubmit = newConvId;
-          newConvCreated = true; // Mark that a new conversation was created
-          // Phase 5: Emit 'chat:created' event
+          newConvCreated = true;
           modEvents.emit(ModEvent.CHAT_CREATED, {
-            // Use ModEvent constant
             id: newConvId,
             type: "conversation",
             parentId: parentProjectId,
@@ -724,7 +810,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       let contextPrefix = "";
       const pathsIncludedInContext: string[] = [];
 
-      // VFS context
       if (
         enableVfs &&
         isVfsEnabledForItem &&
@@ -732,14 +817,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         vfs.configuredVfsKey === vfs.vfsKey &&
         vfsPathsToSubmit.length > 0
       ) {
-        // Phase 5: Emit 'vfs:contextAdded' event
         modEvents.emit(ModEvent.VFS_CONTEXT_ADDED, {
-          // Use ModEvent constant
           paths: vfsPathsToSubmit,
         });
         const vfsContentPromises = vfsPathsToSubmit.map(async (path) => {
           try {
-            const contentBytes = await vfs.readFile(path); // readFile emits read event
+            const contentBytes = await vfs.readFile(path);
             const contentText = decodeUint8Array(contentBytes);
             pathsIncludedInContext.push(path);
             const fileExtension = path.split(".").pop()?.toLowerCase() || "";
@@ -762,7 +845,6 @@ ${contentText}
         toast.warning("VFS not enabled for this chat. Selected files ignored.");
       }
 
-      // Attached files context
       if (attachedFilesValue.length > 0) {
         const attachedContentPromises = attachedFilesValue.map(async (file) => {
           if (file.type.startsWith("text/") || isCodeFile(file.name)) {
@@ -802,19 +884,16 @@ ${contentText}
       const promptToSendToAI = contextPrefix + originalUserPrompt;
 
       if (promptToSendToAI.trim().length > 0) {
-        // Phase 5: Integrate 'middleware:submitPrompt'
         let submitPayload: ModMiddlewarePayloadMap[typeof ModMiddlewareHook.SUBMIT_PROMPT] =
           {
             prompt: promptToSendToAI,
             originalUserPrompt,
-            attachedFiles: attachedFilesValue, // Pass reference, mods should treat as read-only
+            attachedFiles: attachedFilesValue,
             vfsPaths: pathsIncludedInContext,
             conversationId: conversationIdToSubmit,
           };
 
-        // Phase 5: Emit 'message:beforeSubmit' event (before middleware)
         modEvents.emit(ModEvent.MESSAGE_BEFORE_SUBMIT, {
-          // Use ModEvent constant
           prompt: originalUserPrompt,
           attachedFiles: attachedFilesValue,
           vfsPaths: pathsIncludedInContext,
@@ -826,13 +905,8 @@ ${contentText}
         );
 
         if (middlewareResult === false) {
-          console.log("[Middleware] Submission cancelled by mod.");
           toast.info("Submission cancelled by a mod.");
-          // If a new conversation was created but submission is cancelled, delete it?
           if (newConvCreated && conversationIdToSubmit) {
-            console.log(
-              "[Middleware] Deleting newly created conversation due to cancelled submission.",
-            );
             await sidebarMgmt.deleteItem(
               conversationIdToSubmit,
               "conversation",
@@ -840,17 +914,14 @@ ${contentText}
           }
           return;
         }
-        // Use potentially modified payload from middleware
         submitPayload = middlewareResult;
 
-        // Call the core message handler with the final (potentially modified) data
         await messageHandling.handleSubmitCore(
-          submitPayload.originalUserPrompt, // Use original prompt for user message display
-          submitPayload.conversationId, // Use potentially modified ID (though unlikely for this hook)
-          submitPayload.prompt, // Use potentially modified prompt for AI
-          submitPayload.vfsPaths, // Use potentially modified VFS paths
+          submitPayload.originalUserPrompt,
+          submitPayload.conversationId,
+          submitPayload.prompt,
+          submitPayload.vfsPaths,
         );
-        // 'message:submitted' event is now emitted inside handleSubmitCore
       }
     },
     [
@@ -866,10 +937,11 @@ ${contentText}
       isVfsEnabledForItem,
       vfs,
       enableVfs,
-      apiKeysMgmt,
       enableApiKeyManagement,
-      runMiddleware, // Add middleware runner as dependency
-      // No dependency on messages here to avoid re-creating handler on message change
+      // runMiddleware,
+      getApiKeyForSelectedProvider,
+      storage.providerConfigs,
+      providerModel.selectedProviderId,
     ],
   );
 
@@ -884,7 +956,6 @@ ${contentText}
         toast.info("Please wait for the current response to finish.");
         return;
       }
-      // TODO: Phase 5 - Add 'middleware:regenerateMessage' hook if needed
       await messageHandling.regenerateMessageCore(messageId);
     },
     [messageHandling, activeItemType, activeItemId, isStreaming],
@@ -933,10 +1004,9 @@ ${contentText}
   // --- Mod Registration Callbacks ---
   const registerModPromptAction = useCallback(
     (action: CustomPromptAction): (() => void) => {
-      const actionId = action.id || nanoid(); // Ensure an ID exists
+      const actionId = action.id || nanoid();
       const actionWithId = { ...action, id: actionId };
       setModPromptActions((prev) => [...prev, actionWithId]);
-      // Return unsubscribe function
       return () => {
         setModPromptActions((prev) => prev.filter((a) => a.id !== actionId));
       };
@@ -974,7 +1044,6 @@ ${contentText}
       callback: (payload: ModEventPayloadMap[E]) => void,
     ): (() => void) => {
       modEvents.on(eventName, callback);
-
       const unsubscribe = () => {
         modEvents.off(eventName, callback);
       };
@@ -988,17 +1057,14 @@ ${contentText}
       hookName: H,
       callback: (
         payload: ModMiddlewarePayloadMap[H],
-      ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>, // Allow async
+      ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>,
     ): (() => void) => {
       const middlewareId = nanoid();
       const currentMap = modMiddlewareCallbacksRef.current;
-
       if (!currentMap.has(hookName)) {
         currentMap.set(hookName, new Map());
       }
       currentMap.get(hookName)?.set(middlewareId, callback);
-
-      // Return unsubscribe function
       return () => {
         const hookCallbacks = currentMap.get(hookName);
         if (hookCallbacks) {
@@ -1013,15 +1079,12 @@ ${contentText}
   );
 
   // --- Function to get Context Snapshot for Mods ---
-  // Defined within the provider to capture current state/refs
   const getContextSnapshotForMod =
     useCallback((): ReadonlyChatContextSnapshot => {
-      // Selectively pick properties from the latest state/refs
-      // Avoid passing the entire context object directly
       return Object.freeze({
         selectedItemId: activeItemId,
         selectedItemType: activeItemType,
-        messages: messages, // Note: This is a snapshot
+        messages: messages,
         isStreaming: isStreaming,
         selectedProviderId: providerModel.selectedProviderId,
         selectedModelId: providerModel.selectedModelId,
@@ -1030,13 +1093,12 @@ ${contentText}
         maxTokens: chatSettings.maxTokens,
         theme: chatSettings.theme,
         isVfsEnabledForItem: isVfsEnabledForItem,
-        getApiKeyForProvider: apiKeysMgmt.getApiKeyForProvider,
-        // Add other safe, read-only properties or functions as needed
+        getApiKeyForProvider: getApiKeyForSelectedProvider,
       });
     }, [
       activeItemId,
       activeItemType,
-      messages, // Dependency needed, but be aware it's a snapshot
+      messages,
       isStreaming,
       providerModel.selectedProviderId,
       providerModel.selectedModelId,
@@ -1045,23 +1107,17 @@ ${contentText}
       chatSettings.maxTokens,
       chatSettings.theme,
       isVfsEnabledForItem,
-      apiKeysMgmt.getApiKeyForProvider,
+      getApiKeyForSelectedProvider,
     ]);
 
   // --- Mod Loader Initialization ---
   useEffect(() => {
     const dbMods = storage.mods || EMPTY_DB_MODS;
-    console.log(`[ChatProvider] Found ${dbMods.length} mods in DB.`);
-
-    // Clear previous mod state before loading new ones
     setModPromptActions([]);
     setModMessageActions([]);
     setModSettingsTabs([]);
-    modEventListenersRef.current.clear(); // Clear listeners managed by provider
+    modEventListenersRef.current.clear();
     modMiddlewareCallbacksRef.current.clear();
-    // Note: We don't call modEvents.removeAllListeners() here,
-    // as mods might register listeners directly via the exported `modEvents`.
-    // The registration callbacks handle unsubscribing specific listeners added via API.
 
     if (dbMods.length > 0) {
       const registrationCallbacks = {
@@ -1071,51 +1127,41 @@ ${contentText}
         registerEventListener: registerModEventListener,
         registerMiddleware: registerModMiddleware,
       };
-
-      console.log("[ChatProvider] Loading mods...");
       loadMods(dbMods, registrationCallbacks, getContextSnapshotForMod)
         .then((instances) => {
           setLoadedMods(instances);
-          console.log(
-            `[ChatProvider] Finished loading ${instances.length} mod instances.`,
-          );
-          // Phase 5: Emit 'app:loaded' event after mods are processed
-          modEvents.emit(ModEvent.APP_LOADED); // Use ModEvent constant
+          modEvents.emit(ModEvent.APP_LOADED);
         })
-        .catch((err) => {
-          console.error("[ChatProvider] Error during mod loading:", err);
-          setError("Failed to load one or more mods.");
-          // Phase 5: Emit 'app:loaded' even if mods failed, app might still work
-          modEvents.emit(ModEvent.APP_LOADED); // Use ModEvent constant
+        .catch((err: unknown) => {
+          if (err instanceof Error) {
+            setError("Failed to load one or more mods." + err.message);
+          } else {
+            setError("Failed to load one or more mods.");
+          }
+          modEvents.emit(ModEvent.APP_LOADED);
         });
     } else {
       setLoadedMods(EMPTY_MOD_INSTANCES);
-      // Phase 5: Emit 'app:loaded' event even if no mods
-      modEvents.emit(ModEvent.APP_LOADED); // Use ModEvent constant
+      modEvents.emit(ModEvent.APP_LOADED);
     }
-
-    // Cleanup function (optional, if dynamic mod unloading is needed)
-    // return () => {
-    //   loadedMods.forEach(unloadMod); // Assuming unloadMod exists
-    // };
   }, [
-    storage.mods, // Re-run when mods change in the DB
-    registerModPromptAction, // Include registration callbacks
+    storage.mods,
+    registerModPromptAction,
     registerModMessageAction,
     registerModSettingsTab,
     registerModEventListener,
     registerModMiddleware,
     getContextSnapshotForMod,
-    setError, // Include setError
+    setError,
   ]);
 
   // --- Settings Modal Event Emission ---
   const handleSettingsModalOpenChange = useCallback((open: boolean) => {
     setIsSettingsModalOpen(open);
     if (open) {
-      modEvents.emit(ModEvent.SETTINGS_OPENED); // Use ModEvent constant
+      modEvents.emit(ModEvent.SETTINGS_OPENED);
     } else {
-      modEvents.emit(ModEvent.SETTINGS_CLOSED); // Use ModEvent constant
+      modEvents.emit(ModEvent.SETTINGS_CLOSED);
     }
   }, []);
 
@@ -1147,7 +1193,6 @@ ${contentText}
     ],
   );
 
-  // Combine built-in custom actions/tabs with mod-provided ones
   const combinedPromptActions = useMemo(
     () => [...customPromptActions, ...modPromptActions],
     [customPromptActions, modPromptActions],
@@ -1163,23 +1208,24 @@ ${contentText}
 
   const fullContextValue: ChatContextProps = useMemo(
     () => ({
-      // Config flags
       enableApiKeyManagement,
       enableAdvancedSettings,
-      // Providers & Models
-      providers,
+      activeProviders: activeProviders,
       selectedProviderId: providerModel.selectedProviderId,
       setSelectedProviderId: providerModel.setSelectedProviderId,
       selectedModelId: providerModel.selectedModelId,
       setSelectedModelId: providerModel.setSelectedModelId,
-      // API Keys
       apiKeys: storage.apiKeys || EMPTY_API_KEYS,
-      selectedApiKeyId: apiKeysMgmt.selectedApiKeyId,
-      setSelectedApiKeyId: apiKeysMgmt.setSelectedApiKeyId,
+      // API key selection is now handled in provider config, not in context
+      // selectedApiKeyId: undefined,
+      // setSelectedApiKeyId: undefined,
       addApiKey: apiKeysMgmt.addApiKey,
       deleteApiKey: apiKeysMgmt.deleteApiKey,
-      getApiKeyForProvider: apiKeysMgmt.getApiKeyForProvider,
-      // Sidebar
+      getApiKeyForProvider: getApiKeyForSelectedProvider,
+      dbProviderConfigs: storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS,
+      addDbProviderConfig: storage.addProviderConfig,
+      updateDbProviderConfig: storage.updateProviderConfig,
+      deleteDbProviderConfig: storage.deleteProviderConfig,
       sidebarItems: sidebarItems || EMPTY_SIDEBAR_ITEMS,
       selectedItemId: sidebarMgmt.selectedItemId,
       selectedItemType: sidebarMgmt.selectedItemType,
@@ -1190,22 +1236,18 @@ ${contentText}
       renameItem: sidebarMgmt.renameItem,
       updateConversationSystemPrompt:
         sidebarMgmt.updateConversationSystemPrompt,
-      // Core Chat State
       messages: coreContextValue.messages,
       isLoading: coreContextValue.isLoadingMessages,
       isStreaming: coreContextValue.isStreaming,
       error: coreContextValue.error,
       setError: coreContextValue.setError,
-      // Core Actions
       handleSubmit,
       stopStreaming,
       regenerateMessage,
-      // VFS Selection
       selectedVfsPaths: selectedVfsPaths,
       addSelectedVfsPath: addSelectedVfsPath,
       removeSelectedVfsPath: removeSelectedVfsPath,
       clearSelectedVfsPaths: clearSelectedVfsPaths,
-      // Settings
       temperature: chatSettings.temperature,
       setTemperature: chatSettings.setTemperature,
       maxTokens: chatSettings.maxTokens,
@@ -1226,92 +1268,73 @@ ${contentText}
       streamingThrottleRate,
       searchTerm: chatSettings.searchTerm,
       setSearchTerm: chatSettings.setSearchTerm,
-      // Data Management
       exportConversation: sidebarMgmt.exportConversation,
       importConversation: handleImportConversation,
       exportAllConversations: sidebarMgmt.exportAllConversations,
       clearAllData: storage.clearAllData,
-      // VFS Management
       isVfsEnabledForItem: isVfsEnabledForItem,
       toggleVfsEnabled: handleToggleVfs,
       vfs: vfs,
-      // DB Accessors
       getConversation: storage.getConversation,
       getProject: storage.getProject,
-      // Extensibility (Combined)
       customPromptActions: combinedPromptActions,
       customMessageActions: combinedMessageActions,
       customSettingsTabs: combinedSettingsTabs,
-      // Mod System State & Storage (Exposed for Settings UI)
-      dbMods: storage.mods || EMPTY_DB_MODS, // Use EMPTY_DB_MODS default
+      dbMods: storage.mods || EMPTY_DB_MODS,
       loadedMods: loadedMods,
       addDbMod: storage.addMod,
       updateDbMod: storage.updateMod,
       deleteDbMod: storage.deleteMod,
-      // Settings Modal Control (for event emission)
       isSettingsModalOpen: isSettingsModalOpen,
       onSettingsModalOpenChange: handleSettingsModalOpenChange,
-      // Note: Mod registration functions and event emitter are not directly exposed here.
-      // Mods interact via the LiteChatModApi provided during loading.
-      // Middleware callbacks are stored in modMiddlewareCallbacksRef for internal use (Phase 5).
     }),
     [
-      // Config flags
       enableApiKeyManagement,
       enableAdvancedSettings,
-      // Providers & Models
-      providers,
+      activeProviders,
       providerModel.selectedProviderId,
       providerModel.setSelectedProviderId,
       providerModel.selectedModelId,
       providerModel.setSelectedModelId,
-      // API Keys
       storage.apiKeys,
       apiKeysMgmt,
-      // Sidebar
+      getApiKeyForSelectedProvider,
+      storage.providerConfigs,
+      storage.addProviderConfig,
+      storage.updateProviderConfig,
+      storage.deleteProviderConfig,
       sidebarItems,
       sidebarMgmt,
-      // Core Chat State
       coreContextValue.messages,
       coreContextValue.isLoadingMessages,
       coreContextValue.isStreaming,
       coreContextValue.error,
       coreContextValue.setError,
-      // Core Actions
       handleSubmit,
       stopStreaming,
       regenerateMessage,
-      // VFS Selection
       selectedVfsPaths,
       addSelectedVfsPath,
       removeSelectedVfsPath,
       clearSelectedVfsPaths,
-      // Settings
       chatSettings,
-      // Data Management
       handleImportConversation,
       storage.clearAllData,
-      // VFS Management
       handleToggleVfs,
       isVfsEnabledForItem,
       vfs,
-      // DB Accessors
       storage.getConversation,
       storage.getProject,
-      // Extensibility (Combined)
-      combinedPromptActions, // Now includes mod actions
-      combinedMessageActions, // Now includes mod actions
-      combinedSettingsTabs, // Now includes mod tabs
-      // Mod System State & Storage
-      storage.mods, // Use live query result
-      loadedMods, // State holding loaded instances
+      combinedPromptActions,
+      combinedMessageActions,
+      combinedSettingsTabs,
+      storage.mods,
+      loadedMods,
       storage.addMod,
       storage.updateMod,
       storage.deleteMod,
-      // Settings Modal Control
       isSettingsModalOpen,
       handleSettingsModalOpenChange,
-      // Other
       streamingThrottleRate,
     ],
   );

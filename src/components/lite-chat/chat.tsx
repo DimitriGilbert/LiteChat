@@ -4,18 +4,12 @@ import { ChatProvider } from "@/context/chat-context";
 import { ChatSide } from "./chat-side";
 import { ChatWrapper } from "./chat-wrapper";
 import { useChatContext } from "@/hooks/use-chat-context";
-import type {
-  AiProviderConfig,
-  SidebarItemType,
-  LiteChatConfig,
-  SidebarItem,
-} from "@/lib/types";
+import type { SidebarItemType, LiteChatConfig, SidebarItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { MenuIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface LiteChatProps {
-  providers: AiProviderConfig[];
   config?: LiteChatConfig;
   className?: string;
   SideComponent?: React.ComponentType<{ className?: string }>;
@@ -29,7 +23,6 @@ interface LiteChatProps {
 }
 
 export const LiteChat: React.FC<LiteChatProps> = ({
-  providers,
   config = {},
   className,
   SideComponent = ChatSide,
@@ -55,7 +48,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({
 
   return (
     <ChatProvider
-      providers={providers}
       initialProviderId={initialProviderId}
       initialModelId={initialModelId}
       initialSelectedItemId={initialSelectedItemId}
@@ -104,6 +96,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
   SideComponent,
   WrapperComponent,
 }) => {
+  // Use the context to get sidebar state and actions
   const { selectedItemId, selectedItemType, sidebarItems, regenerateMessage } =
     useChatContext();
 

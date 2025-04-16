@@ -7,21 +7,11 @@ import type {
   DbApiKey,
   DbProject,
   SidebarItemType,
+  DbProviderConfig, // Import new type
 } from "@/lib/types";
 import type { DbMod } from "@/mods/types"; // Import DbMod type
 import { nanoid } from "nanoid";
 import { useCallback } from "react";
-
-// Define a placeholder type if DbMod is not yet defined in types.ts
-// type DbMod = {
-//   id: string;
-//   name: string;
-//   sourceUrl?: string | null;
-//   scriptContent?: string | null;
-//   enabled: boolean;
-//   createdAt: Date;
-//   loadOrder: number;
-// };
 
 export function useChatStorage() {
   // === Live Queries ===
@@ -40,9 +30,14 @@ export function useChatStorage() {
     [],
     [],
   );
-  // Add mods live query
   const mods = useLiveQuery(
     () => db.mods.orderBy("loadOrder").toArray(),
+    [],
+    [],
+  );
+  // Add providerConfigs live query
+  const providerConfigs = useLiveQuery(
+    () => db.providerConfigs.orderBy("createdAt").toArray(),
     [],
     [],
   );
@@ -309,14 +304,14 @@ export function useChatStorage() {
   const addApiKey = useCallback(
     async (
       name: string,
-      providerId: string,
+      providerId: string, // Less useful now
       value: string,
     ): Promise<string> => {
       const newId = nanoid();
       const newKey: DbApiKey = {
         id: newId,
         name,
-        providerId,
+        providerId, // Keep for now, maybe for display?
         value,
         createdAt: new Date(),
       };
@@ -327,7 +322,21 @@ export function useChatStorage() {
   );
 
   const deleteApiKey = useCallback(async (id: string): Promise<void> => {
-    await db.apiKeys.delete(id);
+    // Also need to potentially update providerConfigs that reference this key
+    await db.transaction("rw", db.apiKeys, db.providerConfigs, async () => {
+      await db.apiKeys.delete(id);
+      // Find configs using this key and set their apiKeyId to null
+      const configsToUpdate = await db.providerConfigs
+        .where("apiKeyId")
+        .equals(id)
+        .toArray();
+      if (configsToUpdate.length > 0) {
+        const updates = configsToUpdate.map((config) =>
+          db.providerConfigs.update(config.id, { apiKeyId: null }),
+        );
+        await Promise.all(updates);
+      }
+    });
   }, []);
 
   // === Mods (Wrap functions in useCallback) ===
@@ -360,9 +369,56 @@ export function useChatStorage() {
     return db.mods.orderBy("loadOrder").toArray();
   }, []);
 
+  // === Provider Configs (NEW - Wrap functions in useCallback) ===
+  const addProviderConfig = useCallback(
+    async (
+      configData: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
+    ): Promise<string> => {
+      const newId = nanoid();
+      const now = new Date();
+      const newConfig: DbProviderConfig = {
+        id: newId,
+        createdAt: now,
+        updatedAt: now,
+        ...configData,
+      };
+      await db.providerConfigs.add(newConfig);
+      return newId;
+    },
+    [],
+  );
+
+  const updateProviderConfig = useCallback(
+    async (id: string, changes: Partial<DbProviderConfig>): Promise<void> => {
+      await db.providerConfigs.update(id, {
+        ...changes,
+        updatedAt: new Date(),
+      });
+    },
+    [],
+  );
+
+  const deleteProviderConfig = useCallback(
+    async (id: string): Promise<void> => {
+      await db.providerConfigs.delete(id);
+    },
+    [],
+  );
+
   // === Data Management (Wrap in useCallback) ===
   const clearAllData = useCallback(async (): Promise<void> => {
-    await db.delete();
+    // Ensure all tables are cleared
+    await Promise.all([
+      db.projects.clear(),
+      db.conversations.clear(),
+      db.messages.clear(),
+      db.apiKeys.clear(),
+      db.mods.clear(),
+      db.providerConfigs.clear(), // Clear new table too
+    ]);
+    // Optionally, fully delete and recreate the DB if simpler
+    // await db.delete();
+    // window.location.reload(); // Reload might be needed after delete
   }, []);
 
   // Return memoized functions and live query results
@@ -397,11 +453,16 @@ export function useChatStorage() {
     addApiKey,
     deleteApiKey,
     // Mods
-    mods: mods || [], // Add mods live query result
-    addMod, // Add mod CRUD functions
+    mods: mods || [],
+    addMod,
     updateMod,
     deleteMod,
     getMods,
+    // Provider Configs (NEW)
+    providerConfigs: providerConfigs || [],
+    addProviderConfig,
+    updateProviderConfig,
+    deleteProviderConfig,
     // Data Management
     clearAllData,
   };
