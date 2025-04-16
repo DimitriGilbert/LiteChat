@@ -25,7 +25,7 @@ export const SettingsDataManagement: React.FC = () => {
     if (file) {
       try {
         // Pass null for parentId to import at root level from settings
-        await importConversation(file);
+        await importConversation(file, null);
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }

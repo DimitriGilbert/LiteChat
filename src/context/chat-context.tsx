@@ -7,45 +7,33 @@ import React, {
   useEffect,
 } from "react";
 import type {
-  AiProviderConfig,
   ChatContextProps,
   CoreChatContextProps,
   SidebarItemType,
   Message,
   DbConversation,
   DbProject,
-  DbApiKey,
-  SidebarItem,
-  ProjectSidebarItem,
-  ConversationSidebarItem,
-  VfsContextObject,
   CustomPromptAction,
   CustomMessageAction,
   CustomSettingTab,
   DbProviderConfig,
   DbProviderType,
-  AiModelConfig,
+  SidebarItem,
+  ProjectSidebarItem,
+  ConversationSidebarItem,
 } from "@/lib/types";
 import type {
-  DbMod,
-  ModInstance,
   ProcessResponseChunkPayload,
   RenderMessagePayload,
 } from "@/mods/types";
 import { ChatContext } from "@/hooks/use-chat-context";
-import { CoreChatContext } from "@/context/core-chat-context";
-import { useProviderModelSelection } from "@/hooks/use-provider-model-selection";
 import {
-  useApiKeysManagement,
-  type UseApiKeysManagementReturn,
-} from "@/hooks/use-api-keys-management";
-import { useSidebarManagement } from "@/hooks/use-sidebar-management";
-import { useChatSettings } from "@/hooks/use-chat-settings";
+  CoreChatContext,
+  useCoreChatContext,
+} from "@/context/core-chat-context";
 import { useAiInteraction } from "@/hooks/use-ai-interaction";
 import { useMessageHandling } from "@/hooks/use-message-handling";
 import { useChatStorage } from "@/hooks/use-chat-storage";
-import { useVirtualFileSystem } from "@/hooks/use-virtual-file-system";
-import { useState as useVfsState, useCallback as useVfsCallback } from "react";
 import { toast } from "sonner";
 import { loadMods } from "@/mods/loader";
 import { modEvents, ModEvent, ModEventName } from "@/mods/events";
@@ -60,13 +48,17 @@ import type {
   ModMiddlewareReturnMap,
 } from "@/mods/types";
 import { nanoid } from "nanoid";
-import { createOpenAI } from "@ai-sdk/openai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { createOllama } from "ollama-ai-provider";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
-// Helper to decode Uint8Array safely
+import {
+  ProviderManagementProvider,
+  useProviderManagementContext,
+} from "./provider-management-context";
+import { SidebarProvider, useSidebarContext } from "./sidebar-context";
+import { SettingsProvider, useSettingsContext } from "./settings-context";
+import { VfsProvider, useVfsContext } from "./vfs-context";
+import { ModProvider, useModContext } from "./mod-context";
+
+// Helper functions
 const decodeUint8Array = (arr: Uint8Array): string => {
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(arr);
@@ -128,112 +120,14 @@ const isCodeFile = (filename: string): boolean => {
   return CODE_FILE_EXTENSIONS.has(extension);
 };
 
-const EMPTY_API_KEYS: DbApiKey[] = [];
-const EMPTY_SIDEBAR_ITEMS: SidebarItem[] = [];
-const EMPTY_CUSTOM_SETTINGS_TABS: CustomSettingTab[] = [];
-const EMPTY_CUSTOM_PROMPT_ACTIONS: CustomPromptAction[] = [];
-const EMPTY_CUSTOM_MESSAGE_ACTIONS: CustomMessageAction[] = [];
-const EMPTY_MOD_INSTANCES: ModInstance[] = [];
-const EMPTY_DB_MODS: DbMod[] = [];
-const EMPTY_DB_PROVIDER_CONFIGS: DbProviderConfig[] = [];
-const EMPTY_ACTIVE_PROVIDERS: AiProviderConfig[] = [];
-
-const DEFAULT_MODELS: Record<DbProviderType, { id: string; name: string }[]> = {
-  openai: [
-    { id: "gpt-4o", name: "GPT-4o" },
-    { id: "gpt-4-turbo", name: "GPT-4 Turbo" },
-    { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo" },
-  ],
-  google: [
-    { id: "gemini-1.5-pro-latest", name: "Gemini 1.5 Pro" },
-    { id: "gemini-1.5-flash-latest", name: "Gemini 1.5 Flash" },
-    { id: "gemini-1.0-pro", name: "Gemini 1.0 Pro" },
-  ],
-  openrouter: [
-    { id: "google/gemini-flash-1.5", name: "Gemini 1.5 Flash (OR)" },
-    { id: "google/gemini-pro-1.5", name: "Gemini 1.5 Pro (OR)" },
-    { id: "anthropic/claude-3-haiku", name: "Claude 3 Haiku (OR)" },
-    { id: "anthropic/claude-3-sonnet", name: "Claude 3 Sonnet (OR)" },
-    { id: "anthropic/claude-3-opus", name: "Claude 3 Opus (OR)" },
-    { id: "mistralai/mistral-7b-instruct", name: "Mistral 7B Instruct (OR)" },
-    { id: "mistralai/mixtral-8x7b-instruct", name: "Mixtral 8x7B (OR)" },
-  ],
-  ollama: [
-    { id: "llama3", name: "Llama 3 (Ollama)" },
-    { id: "mistral", name: "Mistral (Ollama)" },
-    { id: "gemma", name: "Gemma (Ollama)" },
-  ],
-  "openai-compatible": [
-    { id: "loaded-model-1", name: "Loaded Model 1" },
-    { id: "loaded-model-2", name: "Loaded Model 2" },
-  ],
-};
-
 const requiresApiKey = (type: DbProviderType | null): boolean => {
   return type === "openai" || type === "openrouter" || type === "google";
 };
 
-const dummyVfs: VfsContextObject = {
-  isReady: false,
-  isLoading: false,
-  isOperationLoading: false,
-  error: null,
-  configuredVfsKey: null,
-  listFiles: async () => {
-    console.warn("VFS not enabled/ready");
-    return [];
-  },
-  readFile: async () => {
-    console.warn("VFS not enabled/ready");
-    throw new Error("VFS not enabled/ready");
-  },
-  writeFile: async () => {
-    console.warn("VFS not enabled/ready");
-    throw new Error("VFS not enabled/ready");
-  },
-  deleteItem: async () => {
-    console.warn("VFS not enabled/ready");
-    throw new Error("VFS not enabled/ready");
-  },
-  createDirectory: async () => {
-    console.warn("VFS not enabled/ready");
-    throw new Error("VFS not enabled/ready");
-  },
-  downloadFile: async () => {
-    console.warn("VFS not enabled/ready");
-    throw new Error("VFS not enabled/ready");
-  },
-  uploadFiles: async () => {
-    console.warn("VFS not enabled/ready");
-    throw new Error("VFS not enabled/ready");
-  },
-  uploadAndExtractZip: async () => {
-    console.warn("VFS not enabled/ready");
-    throw new Error("VFS not enabled/ready");
-  },
-  downloadAllAsZip: async () => {
-    console.warn("VFS not enabled/ready");
-    throw new Error("VFS not enabled/ready");
-  },
-  rename: async () => {
-    console.warn("VFS not enabled/ready");
-    throw new Error("VFS not enabled/ready");
-  },
-  vfsKey: null,
-};
-
-const dummyApiKeysMgmt: UseApiKeysManagementReturn = {
-  addApiKey: async () => {
-    console.warn("API Key Management is disabled.");
-    toast.error("API Key Management is disabled in configuration.");
-    throw new Error("API Key Management is disabled.");
-  },
-  deleteApiKey: async () => {
-    console.warn("API Key Management is disabled.");
-    toast.error("API Key Management is disabled in configuration.");
-    throw new Error("API Key Management is disabled.");
-  },
-};
+const EMPTY_CUSTOM_SETTINGS_TABS: CustomSettingTab[] = [];
+const EMPTY_CUSTOM_PROMPT_ACTIONS: CustomPromptAction[] = [];
+const EMPTY_CUSTOM_MESSAGE_ACTIONS: CustomMessageAction[] = [];
+const EMPTY_DB_PROVIDER_CONFIGS: DbProviderConfig[] = [];
 
 interface ChatProviderProps {
   children: React.ReactNode;
@@ -251,41 +145,37 @@ interface ChatProviderProps {
   customSettingsTabs?: CustomSettingTab[];
 }
 
-export const ChatProvider: React.FC<ChatProviderProps> = ({
-  children,
-  initialProviderId = null,
-  initialModelId = null,
-  initialSelectedItemId = null,
-  initialSelectedItemType = null,
-  streamingThrottleRate = 42,
-  enableApiKeyManagement = true,
-  enableSidebar = true,
-  enableVfs = true,
-  enableAdvancedSettings = true,
-  customPromptActions = EMPTY_CUSTOM_PROMPT_ACTIONS,
-  customMessageActions = EMPTY_CUSTOM_MESSAGE_ACTIONS,
-  customSettingsTabs = EMPTY_CUSTOM_SETTINGS_TABS,
-}) => {
-  // --- Core State ---
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoadingMessages, setIsLoadingMessages] = useState(true);
-  const [error, setErrorState] = useState<string | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+interface ChatProviderInnerProps extends Omit<ChatProviderProps, "children"> {
+  children: React.ReactNode;
+  userCustomPromptActions: CustomPromptAction[];
+  userCustomMessageActions: CustomMessageAction[];
+  userCustomSettingsTabs: CustomSettingTab[];
+}
 
-  // --- Mod State ---
-  const [loadedMods, setLoadedMods] =
-    useState<ModInstance[]>(EMPTY_MOD_INSTANCES);
-  const [modPromptActions, setModPromptActions] = useState<
-    CustomPromptAction[]
-  >([]);
-  const [modMessageActions, setModMessageActions] = useState<
-    CustomMessageAction[]
-  >([]);
-  const [modSettingsTabs, setModSettingsTabs] = useState<CustomSettingTab[]>(
-    [],
-  );
+const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
+  children,
+  streamingThrottleRate = 42,
+  userCustomPromptActions,
+  userCustomMessageActions,
+  userCustomSettingsTabs,
+}) => {
+  const {
+    messages,
+    setMessages,
+    isLoadingMessages,
+    setIsLoadingMessages,
+    isStreaming,
+    setIsStreaming,
+    error,
+    setError,
+    abortControllerRef,
+  } = useCoreChatContext();
+  const providerMgmt = useProviderManagementContext();
+  const sidebar = useSidebarContext();
+  const settings = useSettingsContext();
+  const vfs = useVfsContext();
+  const modCtx = useModContext();
+  const storage = useChatStorage();
   const modEventListenersRef = useRef<Map<string, Map<string, Function>>>(
     new Map(),
   );
@@ -293,326 +183,14 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     new Map(),
   );
 
-  const setError = useCallback((newError: string | null) => {
-    setErrorState(newError);
-    if (newError) {
-      console.error("Chat Error Context:", newError);
-      modEvents.emit(ModEvent.APP_ERROR, { message: newError });
-    }
-  }, []);
-
-  // --- Hooks ---
-  const storage = useChatStorage();
-
-  // --- Dynamic Provider Instantiation ---
-  const activeProviders = useMemo<AiProviderConfig[]>(() => {
-    const enabledConfigs = (
-      storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS
-    ).filter((c) => c.isEnabled);
-    const availableApiKeys = storage.apiKeys || EMPTY_API_KEYS;
-
-    if (enabledConfigs.length === 0) {
-      return EMPTY_ACTIVE_PROVIDERS;
-    }
-
-    const generatedProviders: AiProviderConfig[] = [];
-
-    for (const config of enabledConfigs) {
-      try {
-        let providerInstance: any;
-        let apiKey: string | undefined;
-
-        if (config.apiKeyId) {
-          apiKey = availableApiKeys.find(
-            (k) => k.id === config.apiKeyId,
-          )?.value;
-          if (!apiKey && requiresApiKey(config.type)) {
-            throw new Error(
-              `API Key ID ${config.apiKeyId} configured but key not found or value missing.`,
-            );
-          }
-        }
-
-        switch (config.type) {
-          case "openai":
-            if (!apiKey) throw new Error("API Key required for OpenAI.");
-            providerInstance = createOpenAI({ apiKey });
-            break;
-          case "google":
-            if (!apiKey) throw new Error("API Key required for Google.");
-            providerInstance = createGoogleGenerativeAI({ apiKey });
-            break;
-          case "openrouter":
-            if (!apiKey) throw new Error("API Key required for OpenRouter.");
-            providerInstance = createOpenRouter({ apiKey });
-            break;
-          case "ollama":
-            providerInstance = createOllama({
-              baseURL: config.baseURL ?? undefined,
-            });
-            break;
-          case "openai-compatible":
-            if (!config.baseURL)
-              throw new Error("Base URL required for OpenAI-Compatible.");
-            providerInstance = createOpenAICompatible({
-              name: config.name ?? "OpenAI-Compatible",
-              baseURL: config.baseURL,
-              apiKey: apiKey,
-            });
-            break;
-          default:
-            throw new Error(`Unsupported provider type: ${config.type}`);
-        }
-
-        const availableModelDefs = DEFAULT_MODELS[config.type] || [];
-        const models: AiModelConfig[] = availableModelDefs.map((modelDef) => ({
-          id: modelDef.id,
-          name: modelDef.name,
-          instance: providerInstance(modelDef.id),
-        }));
-
-        if (models.length > 0) {
-          generatedProviders.push({
-            id: config.id,
-            name: config.name,
-            type: config.type,
-            models: models,
-          });
-        }
-      } catch (err) {
-        console.error(
-          `[ChatProvider] Failed to instantiate provider ${config.name} (ID: ${config.id}, Type: ${config.type}):`,
-          err,
-        );
-        toast.error(
-          `Failed to load provider "${config.name}": ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-    }
-    return generatedProviders;
-  }, [storage.providerConfigs, storage.apiKeys]);
-
-  const providerModel = useProviderModelSelection({
-    providers: activeProviders,
-    initialProviderId,
-    initialModelId,
-  });
-
-  const realApiKeysMgmt = useApiKeysManagement({
-    addDbApiKey: storage.addApiKey,
-    deleteDbApiKey: storage.deleteApiKey,
-  });
-  const apiKeysMgmt: UseApiKeysManagementReturn = useMemo(() => {
-    return enableApiKeyManagement ? realApiKeysMgmt : dummyApiKeysMgmt;
-  }, [enableApiKeyManagement, realApiKeysMgmt]);
-
-  // --- VFS Selection State ---
-  const [selectedVfsPaths, setSelectedVfsPaths] = useVfsState<string[]>([]);
-  const addSelectedVfsPath = useVfsCallback((path: string) => {
-    setSelectedVfsPaths((prev) =>
-      prev.includes(path) ? prev : [...prev, path].sort(),
-    );
-  }, []);
-  const removeSelectedVfsPath = useVfsCallback((path: string) => {
-    setSelectedVfsPaths((prev) => prev.filter((p) => p !== path));
-  }, []);
-  const clearSelectedVfsPaths = useVfsCallback(() => {
-    setSelectedVfsPaths([]);
-  }, []);
-
-  // --- Sidebar Management ---
-  const [activeItemId, setActiveItemId] = useState<string | null>(
-    initialSelectedItemId,
-  );
-  const [activeItemType, setActiveItemType] = useState<SidebarItemType | null>(
-    initialSelectedItemType,
-  );
-
-  const handleSelectItem = useCallback(
-    (id: string | null, type: SidebarItemType | null) => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-      setIsStreaming(false);
-      clearSelectedVfsPaths();
-      setMessages([]);
-      setErrorState(null);
-      setActiveItemId(id);
-      setActiveItemType(type);
-      setIsLoadingMessages(!!id);
-      modEvents.emit(ModEvent.CHAT_SELECTED, { id, type });
-    },
-    [clearSelectedVfsPaths],
-  );
-
-  const sidebarItems = useMemo<SidebarItem[]>(() => {
-    const allProjects = storage.projects || [];
-    const allConversations = storage.conversations || [];
-    const combinedItems: SidebarItem[] = [
-      ...allProjects.map(
-        (p): ProjectSidebarItem => ({ ...p, type: "project" }),
-      ),
-      ...allConversations.map(
-        (c): ConversationSidebarItem => ({ ...c, type: "conversation" }),
-      ),
-    ];
-    combinedItems.sort(
-      (a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
-    );
-    return combinedItems;
-  }, [storage.projects, storage.conversations]);
-
-  const realSidebarMgmt = useSidebarManagement({
-    initialSelectedItemId,
-    initialSelectedItemType,
-    onSelectItem: handleSelectItem,
-    dbCreateConversation: storage.createConversation,
-    dbCreateProject: storage.createProject,
-    dbDeleteConversation: storage.deleteConversation,
-    dbDeleteProject: storage.deleteProject,
-    dbRenameConversation: storage.renameConversation,
-    dbRenameProject: storage.renameProject,
-    dbUpdateConversationSystemPrompt: storage.updateConversationSystemPrompt,
-    dbGetConversation: storage.getConversation,
-    dbGetMessagesForConversation: storage.getMessagesForConversation,
-    dbBulkAddMessages: storage.bulkAddMessages,
-    dbUpdateConversationTimestamp: storage.updateConversationTimestamp,
-    dbCountChildProjects: storage.countChildProjects,
-    dbCountChildConversations: storage.countChildConversations,
-    dbToggleVfsEnabled: storage.toggleVfsEnabled,
-    sidebarItems: sidebarItems,
-  });
-
-  const dummySidebarMgmt = useMemo(
-    () => ({
-      selectedItemId: null,
-      selectedItemType: null,
-      selectItem: async () => {
-        console.warn("Sidebar is disabled.");
-      },
-      createConversation: async () => {
-        console.warn("Sidebar is disabled.");
-        throw new Error("Sidebar is disabled.");
-      },
-      createProject: async () => {
-        console.warn("Sidebar is disabled.");
-        throw new Error("Sidebar is disabled.");
-      },
-      deleteItem: async () => {
-        console.warn("Sidebar is disabled.");
-      },
-      renameItem: async () => {
-        console.warn("Sidebar is disabled.");
-      },
-      updateConversationSystemPrompt: async () => {
-        console.warn("Sidebar is disabled.");
-      },
-      exportConversation: async () => {
-        console.warn("Sidebar is disabled.");
-      },
-      importConversation: async () => {
-        console.warn("Sidebar is disabled.");
-      },
-      exportAllConversations: async () => {
-        console.warn("Sidebar is disabled.");
-      },
-      toggleVfsEnabled: async () => {
-        console.warn("Sidebar is disabled.");
-      },
-    }),
-    [],
-  );
-
-  const sidebarMgmt = useMemo(() => {
-    return enableSidebar ? realSidebarMgmt : dummySidebarMgmt;
-  }, [enableSidebar, realSidebarMgmt, dummySidebarMgmt]);
-
-  // --- Active Item Data ---
-  const activeItemData = useMemo(() => {
-    if (!activeItemId || !activeItemType) return null;
-    const item = sidebarItems.find((i) => i.id === activeItemId);
-    if (item && item.type === activeItemType) {
-      return item;
-    }
-    return null;
-  }, [activeItemId, activeItemType, sidebarItems]);
-
-  const activeConversationData = useMemo(() => {
-    return activeItemType === "conversation"
-      ? (activeItemData as DbConversation | null)
-      : null;
-  }, [activeItemType, activeItemData]);
-
-  // --- VFS Keying Logic ---
-  const vfsKey = useMemo(() => {
-    if (!enableVfs) return null;
-    if (activeItemType === "project" && activeItemId) {
-      return activeItemId;
-    }
-    if (activeItemType === "conversation" && activeConversationData) {
-      return activeConversationData.parentId || "orphan";
-    }
-    return null;
-  }, [enableVfs, activeItemType, activeItemId, activeConversationData]);
-
-  // --- VFS Instantiation Logic ---
-  const isVfsEnabledForItem = useMemo(
-    () => (enableVfs ? (activeItemData?.vfsEnabled ?? false) : false),
-    [enableVfs, activeItemData],
-  );
-
-  const realVfs = useVirtualFileSystem({
-    itemId: activeItemId,
-    itemType: activeItemType,
-    isEnabled: isVfsEnabledForItem && !!activeItemId,
-    vfsKey,
-  });
-
-  const vfs = useMemo(() => {
-    if (enableVfs && isVfsEnabledForItem && activeItemId) {
-      return realVfs;
-    }
-    return dummyVfs;
-  }, [enableVfs, isVfsEnabledForItem, activeItemId, realVfs]);
-
-  useEffect(() => {
-    if (!isVfsEnabledForItem && selectedVfsPaths.length > 0) {
-      clearSelectedVfsPaths();
-    }
-  }, [isVfsEnabledForItem, selectedVfsPaths, clearSelectedVfsPaths]);
-
-  // --- Settings ---
-  const chatSettings = useChatSettings({
-    activeConversationData: activeConversationData,
-    activeProjectData:
-      activeItemType === "project"
-        ? (activeItemData as DbProject | null)
-        : null,
-    enableAdvancedSettings: enableAdvancedSettings,
-  });
-
-  // --- AI Interaction ---
-  // This function now gets the API key for the selected provider config
   const getApiKeyForSelectedProvider = useCallback((): string | undefined => {
-    if (!providerModel.selectedProviderId) return undefined;
-    const selectedDbConfig = (
-      storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS
-    ).find((p) => p.id === providerModel.selectedProviderId);
-    if (!selectedDbConfig) return undefined;
-    if (!selectedDbConfig.apiKeyId) return undefined;
-    return (storage.apiKeys || EMPTY_API_KEYS).find(
-      (k) => k.id === selectedDbConfig.apiKeyId,
-    )?.value;
-  }, [
-    providerModel.selectedProviderId,
-    storage.providerConfigs,
-    storage.apiKeys,
-  ]);
+    if (!providerMgmt.selectedProviderId) return undefined;
+    return providerMgmt.getApiKeyForProvider(providerMgmt.selectedProviderId);
+  }, [providerMgmt]);
 
   const aiInteraction = useAiInteraction({
-    selectedModel: providerModel.selectedModel,
-    selectedProvider: providerModel.selectedProvider,
+    selectedModel: providerMgmt.selectedModel,
+    selectedProvider: providerMgmt.selectedProvider,
     getApiKeyForProvider: getApiKeyForSelectedProvider,
     streamingThrottleRate,
     setLocalMessages: setMessages,
@@ -622,9 +200,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     abortControllerRef,
   });
 
-  // --- Message Handling ---
   const messageHandling = useMessageHandling({
-    selectedConversationId: activeConversationData?.id ?? null,
+    selectedConversationId: sidebar.activeConversationData?.id ?? null,
     performAiStream: aiInteraction.performAiStream,
     stopStreamingCallback: useCallback(() => {
       if (abortControllerRef.current) {
@@ -632,14 +209,14 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         abortControllerRef.current = null;
       }
       setIsStreaming(false);
-    }, []),
-    activeSystemPrompt: chatSettings.activeSystemPrompt,
-    temperature: chatSettings.temperature,
-    maxTokens: chatSettings.maxTokens,
-    topP: chatSettings.topP,
-    topK: chatSettings.topK,
-    presencePenalty: chatSettings.presencePenalty,
-    frequencyPenalty: chatSettings.frequencyPenalty,
+    }, [abortControllerRef, setIsStreaming]),
+    activeSystemPrompt: settings.activeSystemPrompt,
+    temperature: settings.temperature,
+    maxTokens: settings.maxTokens,
+    topP: settings.topP,
+    topK: settings.topK,
+    presencePenalty: settings.presencePenalty,
+    frequencyPenalty: settings.frequencyPenalty,
     isAiStreaming: isStreaming,
     setIsAiStreaming: setIsStreaming,
     localMessages: messages,
@@ -653,7 +230,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     getMessagesForConversation: storage.getMessagesForConversation,
   });
 
-  // --- Phase 5: Middleware Runner ---
   const runMiddleware = useCallback(
     async <H extends ModMiddlewareHookName>(
       hookName: H,
@@ -661,7 +237,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     ): Promise<ModMiddlewareReturnMap[H] | false> => {
       const callbacksMap = modMiddlewareCallbacksRef.current.get(hookName);
 
-      // --- Case 1: No middleware registered ---
       if (!callbacksMap || callbacksMap.size === 0) {
         const hook: ModMiddlewareHookName = hookName;
         switch (hook) {
@@ -679,7 +254,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         }
       }
 
-      // --- Case 2: Middleware registered ---
       let currentData:
         | ModMiddlewarePayloadMap[H]
         | ModMiddlewareReturnMap[H]
@@ -721,7 +295,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     [],
   );
 
-  // --- Submit Handler ---
   const handleSubmit = useCallback(
     async (
       promptValue: string,
@@ -739,25 +312,24 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         toast.info("Please wait for the current response to finish.");
         return;
       }
-      if (!providerModel.selectedProvider || !providerModel.selectedModel) {
+      if (!providerMgmt.selectedProvider || !providerMgmt.selectedModel) {
         setError("Error: Please select an active AI Provider and Model first.");
         toast.error("Please select an AI Provider and Model.");
         return;
       }
 
-      // Check for API key using the *adjusted* logic
       const selectedDbConfig = (
-        storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS
-      ).find((p) => p.id === providerModel.selectedProviderId);
-      const needsKey =
+        providerMgmt.dbProviderConfigs || EMPTY_DB_PROVIDER_CONFIGS
+      ).find((p) => p.id === providerMgmt.selectedProviderId);
+      const needsKeyCheck =
         selectedDbConfig?.apiKeyId ||
         requiresApiKey(selectedDbConfig?.type ?? null);
 
-      if (needsKey && !getApiKeyForSelectedProvider()) {
-        const errorMsg = `API Key for ${providerModel.selectedProvider.name} is not set, selected, or linked. Check Settings -> Providers.`;
+      if (needsKeyCheck && !getApiKeyForSelectedProvider()) {
+        const errorMsg = `API Key for ${providerMgmt.selectedProvider.name} is not set, selected, or linked. Check Settings -> Providers.`;
         setError(errorMsg);
         toast.error(errorMsg);
-        if (!enableApiKeyManagement) {
+        if (!providerMgmt.enableApiKeyManagement) {
           toast.info(
             "API Key management is disabled. Ensure keys are configured correctly if needed by the provider.",
           );
@@ -768,18 +340,21 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       let conversationIdToSubmit: string | null = null;
       let parentProjectId: string | null = null;
 
-      if (activeItemType === "project" && activeItemId) {
-        parentProjectId = activeItemId;
-      } else if (activeItemType === "conversation" && activeItemId) {
-        parentProjectId = activeConversationData?.parentId ?? null;
-        conversationIdToSubmit = activeItemId;
+      if (sidebar.selectedItemType === "project" && sidebar.selectedItemId) {
+        parentProjectId = sidebar.selectedItemId;
+      } else if (
+        sidebar.selectedItemType === "conversation" &&
+        sidebar.selectedItemId
+      ) {
+        parentProjectId = sidebar.activeConversationData?.parentId ?? null;
+        conversationIdToSubmit = sidebar.selectedItemId;
       }
 
       let newConvCreated = false;
       if (!conversationIdToSubmit) {
         try {
           const title = currentPrompt.substring(0, 50) || "New Chat";
-          const newConvId = await sidebarMgmt.createConversation(
+          const newConvId = await sidebar.createConversation(
             parentProjectId,
             title,
           );
@@ -806,15 +381,14 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         return;
       }
 
-      // --- Prepare Context Prefix ---
       let contextPrefix = "";
       const pathsIncludedInContext: string[] = [];
 
       if (
-        enableVfs &&
-        isVfsEnabledForItem &&
-        vfs.isReady &&
-        vfs.configuredVfsKey === vfs.vfsKey &&
+        vfs.enableVfs &&
+        vfs.isVfsEnabledForItem &&
+        vfs.vfs.isReady &&
+        vfs.vfs.configuredVfsKey === vfs.vfs.vfsKey &&
         vfsPathsToSubmit.length > 0
       ) {
         modEvents.emit(ModEvent.VFS_CONTEXT_ADDED, {
@@ -822,7 +396,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         });
         const vfsContentPromises = vfsPathsToSubmit.map(async (path) => {
           try {
-            const contentBytes = await vfs.readFile(path);
+            const contentBytes = await vfs.vfs.readFile(path);
             const contentText = decodeUint8Array(contentBytes);
             pathsIncludedInContext.push(path);
             const fileExtension = path.split(".").pop()?.toLowerCase() || "";
@@ -907,10 +481,7 @@ ${contentText}
         if (middlewareResult === false) {
           toast.info("Submission cancelled by a mod.");
           if (newConvCreated && conversationIdToSubmit) {
-            await sidebarMgmt.deleteItem(
-              conversationIdToSubmit,
-              "conversation",
-            );
+            await sidebar.deleteItem(conversationIdToSubmit, "conversation");
           }
           return;
         }
@@ -926,29 +497,32 @@ ${contentText}
     },
     [
       isStreaming,
-      providerModel.selectedProvider,
-      providerModel.selectedModel,
-      activeItemId,
-      activeItemType,
-      activeConversationData,
-      sidebarMgmt,
+      providerMgmt.selectedProvider,
+      providerMgmt.selectedModel,
+      providerMgmt.selectedProviderId,
+      providerMgmt.dbProviderConfigs,
+      getApiKeyForSelectedProvider,
+      providerMgmt.enableApiKeyManagement,
+      sidebar.selectedItemId,
+      sidebar.selectedItemType,
+      sidebar.activeConversationData,
+      sidebar.createConversation,
+      sidebar.deleteItem,
       setError,
       messageHandling,
-      isVfsEnabledForItem,
-      vfs,
-      enableVfs,
-      enableApiKeyManagement,
-      // runMiddleware,
-      getApiKeyForSelectedProvider,
-      storage.providerConfigs,
-      providerModel.selectedProviderId,
+      vfs.isVfsEnabledForItem,
+      vfs.vfs,
+      vfs.enableVfs,
+      runMiddleware,
     ],
   );
 
-  // --- Other Handlers ---
   const regenerateMessage = useCallback(
     async (messageId: string) => {
-      if (activeItemType !== "conversation" || !activeItemId) {
+      if (
+        sidebar.selectedItemType !== "conversation" ||
+        !sidebar.selectedItemId
+      ) {
         toast.error("Please select the conversation containing the message.");
         return;
       }
@@ -958,7 +532,12 @@ ${contentText}
       }
       await messageHandling.regenerateMessageCore(messageId);
     },
-    [messageHandling, activeItemType, activeItemId, isStreaming],
+    [
+      messageHandling,
+      sidebar.selectedItemType,
+      sidebar.selectedItemId,
+      isStreaming,
+    ],
   );
 
   const stopStreaming = useCallback(() => {
@@ -969,74 +548,45 @@ ${contentText}
   const handleImportConversation = useCallback(
     async (file: File) => {
       let parentId: string | null = null;
-      if (activeItemType === "project" && activeItemId) {
-        parentId = activeItemId;
-      } else if (activeItemType === "conversation" && activeItemId) {
-        parentId = activeConversationData?.parentId ?? null;
+      if (sidebar.selectedItemType === "project" && sidebar.selectedItemId) {
+        parentId = sidebar.selectedItemId;
+      } else if (
+        sidebar.selectedItemType === "conversation" &&
+        sidebar.selectedItemId
+      ) {
+        parentId = sidebar.activeConversationData?.parentId ?? null;
       }
-      await sidebarMgmt.importConversation(file, parentId);
+      await sidebar.importConversation(file, parentId);
     },
-    [sidebarMgmt, activeItemType, activeItemId, activeConversationData],
+    [
+      sidebar.importConversation,
+      sidebar.selectedItemType,
+      sidebar.selectedItemId,
+      sidebar.activeConversationData,
+    ],
   );
 
   const handleToggleVfs = useCallback(async () => {
-    if (!activeItemId || !activeItemType) {
+    if (!sidebar.selectedItemId || !sidebar.selectedItemType) {
       toast.warning("No item selected.");
       return;
     }
-    if (!enableVfs) {
+    if (!vfs.enableVfs) {
       toast.error("Virtual Filesystem is disabled in configuration.");
       return;
     }
-    await sidebarMgmt.toggleVfsEnabled(
-      activeItemId,
-      activeItemType,
-      isVfsEnabledForItem,
+    await sidebar.toggleVfsEnabled(
+      sidebar.selectedItemId,
+      sidebar.selectedItemType,
+      vfs.isVfsEnabledForItem,
     );
   }, [
-    sidebarMgmt,
-    activeItemId,
-    activeItemType,
-    isVfsEnabledForItem,
-    enableVfs,
+    sidebar.toggleVfsEnabled,
+    sidebar.selectedItemId,
+    sidebar.selectedItemType,
+    vfs.isVfsEnabledForItem,
+    vfs.enableVfs,
   ]);
-
-  // --- Mod Registration Callbacks ---
-  const registerModPromptAction = useCallback(
-    (action: CustomPromptAction): (() => void) => {
-      const actionId = action.id || nanoid();
-      const actionWithId = { ...action, id: actionId };
-      setModPromptActions((prev) => [...prev, actionWithId]);
-      return () => {
-        setModPromptActions((prev) => prev.filter((a) => a.id !== actionId));
-      };
-    },
-    [],
-  );
-
-  const registerModMessageAction = useCallback(
-    (action: CustomMessageAction): (() => void) => {
-      const actionId = action.id || nanoid();
-      const actionWithId = { ...action, id: actionId };
-      setModMessageActions((prev) => [...prev, actionWithId]);
-      return () => {
-        setModMessageActions((prev) => prev.filter((a) => a.id !== actionId));
-      };
-    },
-    [],
-  );
-
-  const registerModSettingsTab = useCallback(
-    (tab: CustomSettingTab): (() => void) => {
-      const tabId = tab.id || nanoid();
-      const tabWithId = { ...tab, id: tabId };
-      setModSettingsTabs((prev) => [...prev, tabWithId]);
-      return () => {
-        setModSettingsTabs((prev) => prev.filter((t) => t.id !== tabId));
-      };
-    },
-    [],
-  );
 
   const registerModEventListener = useCallback(
     <E extends ModEventName>(
@@ -1078,58 +628,54 @@ ${contentText}
     [],
   );
 
-  // --- Function to get Context Snapshot for Mods ---
   const getContextSnapshotForMod =
     useCallback((): ReadonlyChatContextSnapshot => {
       return Object.freeze({
-        selectedItemId: activeItemId,
-        selectedItemType: activeItemType,
+        selectedItemId: sidebar.selectedItemId,
+        selectedItemType: sidebar.selectedItemType,
         messages: messages,
         isStreaming: isStreaming,
-        selectedProviderId: providerModel.selectedProviderId,
-        selectedModelId: providerModel.selectedModelId,
-        activeSystemPrompt: chatSettings.activeSystemPrompt,
-        temperature: chatSettings.temperature,
-        maxTokens: chatSettings.maxTokens,
-        theme: chatSettings.theme,
-        isVfsEnabledForItem: isVfsEnabledForItem,
+        selectedProviderId: providerMgmt.selectedProviderId,
+        selectedModelId: providerMgmt.selectedModelId,
+        activeSystemPrompt: settings.activeSystemPrompt,
+        temperature: settings.temperature,
+        maxTokens: settings.maxTokens,
+        theme: settings.theme,
+        isVfsEnabledForItem: vfs.isVfsEnabledForItem,
         getApiKeyForProvider: getApiKeyForSelectedProvider,
       });
     }, [
-      activeItemId,
-      activeItemType,
+      sidebar.selectedItemId,
+      sidebar.selectedItemType,
       messages,
       isStreaming,
-      providerModel.selectedProviderId,
-      providerModel.selectedModelId,
-      chatSettings.activeSystemPrompt,
-      chatSettings.temperature,
-      chatSettings.maxTokens,
-      chatSettings.theme,
-      isVfsEnabledForItem,
+      providerMgmt.selectedProviderId,
+      providerMgmt.selectedModelId,
+      settings.activeSystemPrompt,
+      settings.temperature,
+      settings.maxTokens,
+      settings.theme,
+      vfs.isVfsEnabledForItem,
       getApiKeyForSelectedProvider,
     ]);
 
-  // --- Mod Loader Initialization ---
   useEffect(() => {
-    const dbMods = storage.mods || EMPTY_DB_MODS;
-    setModPromptActions([]);
-    setModMessageActions([]);
-    setModSettingsTabs([]);
+    const dbMods = modCtx.dbMods;
+    modCtx._clearRegisteredModItems();
     modEventListenersRef.current.clear();
     modMiddlewareCallbacksRef.current.clear();
 
     if (dbMods.length > 0) {
       const registrationCallbacks = {
-        registerPromptAction: registerModPromptAction,
-        registerMessageAction: registerModMessageAction,
-        registerSettingsTab: registerModSettingsTab,
+        registerPromptAction: modCtx._registerModPromptAction,
+        registerMessageAction: modCtx._registerModMessageAction,
+        registerSettingsTab: modCtx._registerModSettingsTab,
         registerEventListener: registerModEventListener,
         registerMiddleware: registerModMiddleware,
       };
       loadMods(dbMods, registrationCallbacks, getContextSnapshotForMod)
         .then((instances) => {
-          setLoadedMods(instances);
+          modCtx._setLoadedMods(instances);
           modEvents.emit(ModEvent.APP_LOADED);
         })
         .catch((err: unknown) => {
@@ -1141,31 +687,179 @@ ${contentText}
           modEvents.emit(ModEvent.APP_LOADED);
         });
     } else {
-      setLoadedMods(EMPTY_MOD_INSTANCES);
+      modCtx._setLoadedMods([]);
       modEvents.emit(ModEvent.APP_LOADED);
     }
   }, [
-    storage.mods,
-    registerModPromptAction,
-    registerModMessageAction,
-    registerModSettingsTab,
+    modCtx.dbMods,
+    modCtx._clearRegisteredModItems,
+    modCtx._registerModPromptAction,
+    modCtx._registerModMessageAction,
+    modCtx._registerModSettingsTab,
+    modCtx._setLoadedMods,
     registerModEventListener,
     registerModMiddleware,
     getContextSnapshotForMod,
     setError,
   ]);
 
-  // --- Settings Modal Event Emission ---
-  const handleSettingsModalOpenChange = useCallback((open: boolean) => {
-    setIsSettingsModalOpen(open);
-    if (open) {
-      modEvents.emit(ModEvent.SETTINGS_OPENED);
-    } else {
-      modEvents.emit(ModEvent.SETTINGS_CLOSED);
+  const combinedPromptActions = useMemo(
+    () => [...userCustomPromptActions, ...modCtx.modPromptActions],
+    [userCustomPromptActions, modCtx.modPromptActions],
+  );
+  const combinedMessageActions = useMemo(
+    () => [...userCustomMessageActions, ...modCtx.modMessageActions],
+    [userCustomMessageActions, modCtx.modMessageActions],
+  );
+  const combinedSettingsTabs = useMemo(
+    () => [...userCustomSettingsTabs, ...modCtx.modSettingsTabs],
+    [userCustomSettingsTabs, modCtx.modSettingsTabs],
+  );
+
+  const fullContextValue: ChatContextProps = useMemo(
+    () => ({
+      enableApiKeyManagement: providerMgmt.enableApiKeyManagement,
+      enableAdvancedSettings: settings.enableAdvancedSettings,
+      enableSidebar: sidebar.enableSidebar,
+      enableVfs: vfs.enableVfs,
+      activeProviders: providerMgmt.activeProviders,
+      selectedProviderId: providerMgmt.selectedProviderId,
+      setSelectedProviderId: providerMgmt.setSelectedProviderId,
+      selectedModelId: providerMgmt.selectedModelId,
+      setSelectedModelId: providerMgmt.setSelectedModelId,
+      getApiKeyForProvider: getApiKeyForSelectedProvider,
+      apiKeys: providerMgmt.apiKeys,
+      addApiKey: providerMgmt.addApiKey,
+      deleteApiKey: providerMgmt.deleteApiKey,
+      dbProviderConfigs: providerMgmt.dbProviderConfigs,
+      addDbProviderConfig: providerMgmt.addDbProviderConfig,
+      updateDbProviderConfig: providerMgmt.updateDbProviderConfig,
+      deleteDbProviderConfig: providerMgmt.deleteDbProviderConfig,
+      sidebarItems: sidebar.sidebarItems,
+      selectedItemId: sidebar.selectedItemId,
+      selectedItemType: sidebar.selectedItemType,
+      selectItem: sidebar.selectItem,
+      createConversation: sidebar.createConversation,
+      createProject: sidebar.createProject,
+      deleteItem: sidebar.deleteItem,
+      renameItem: sidebar.renameItem,
+      updateConversationSystemPrompt: sidebar.updateConversationSystemPrompt,
+      messages: messages,
+      isLoading: isLoadingMessages,
+      isStreaming: isStreaming,
+      error: error,
+      setError: setError,
+      handleSubmit,
+      stopStreaming,
+      regenerateMessage,
+      selectedVfsPaths: vfs.selectedVfsPaths,
+      addSelectedVfsPath: vfs.addSelectedVfsPath,
+      removeSelectedVfsPath: vfs.removeSelectedVfsPath,
+      clearSelectedVfsPaths: vfs.clearSelectedVfsPaths,
+      temperature: settings.temperature,
+      setTemperature: settings.setTemperature,
+      maxTokens: settings.maxTokens,
+      setMaxTokens: settings.setMaxTokens,
+      globalSystemPrompt: settings.globalSystemPrompt,
+      setGlobalSystemPrompt: settings.setGlobalSystemPrompt,
+      activeSystemPrompt: settings.activeSystemPrompt,
+      topP: settings.topP,
+      setTopP: settings.setTopP,
+      topK: settings.topK,
+      setTopK: settings.setTopK,
+      presencePenalty: settings.presencePenalty,
+      setPresencePenalty: settings.setPresencePenalty,
+      frequencyPenalty: settings.frequencyPenalty,
+      setFrequencyPenalty: settings.setFrequencyPenalty,
+      theme: settings.theme,
+      setTheme: settings.setTheme,
+      streamingThrottleRate,
+      searchTerm: settings.searchTerm,
+      setSearchTerm: settings.setSearchTerm,
+      exportConversation: sidebar.exportConversation,
+      importConversation: handleImportConversation,
+      exportAllConversations: sidebar.exportAllConversations,
+      clearAllData: storage.clearAllData,
+      isVfsEnabledForItem: vfs.isVfsEnabledForItem,
+      toggleVfsEnabled: handleToggleVfs,
+      vfs: vfs.vfs,
+      getConversation: storage.getConversation,
+      getProject: storage.getProject,
+      customPromptActions: combinedPromptActions,
+      customMessageActions: combinedMessageActions,
+      customSettingsTabs: combinedSettingsTabs,
+      dbMods: modCtx.dbMods,
+      loadedMods: modCtx.loadedMods,
+      addDbMod: modCtx.addDbMod,
+      updateDbMod: modCtx.updateDbMod,
+      deleteDbMod: modCtx.deleteDbMod,
+      isSettingsModalOpen: settings.isSettingsModalOpen,
+      onSettingsModalOpenChange: settings.onSettingsModalOpenChange,
+    }),
+    [
+      providerMgmt,
+      settings,
+      sidebar,
+      vfs,
+      modCtx,
+      messages,
+      isLoadingMessages,
+      isStreaming,
+      error,
+      setError,
+      handleSubmit,
+      stopStreaming,
+      regenerateMessage,
+      handleImportConversation,
+      handleToggleVfs,
+      storage.clearAllData,
+      storage.getConversation,
+      storage.getProject,
+      combinedPromptActions,
+      combinedMessageActions,
+      combinedSettingsTabs,
+      streamingThrottleRate,
+      getApiKeyForSelectedProvider,
+    ],
+  );
+
+  return (
+    <ChatContext.Provider value={fullContextValue}>
+      {children}
+    </ChatContext.Provider>
+  );
+};
+
+export const ChatProvider: React.FC<ChatProviderProps> = ({
+  children,
+  initialProviderId = null,
+  initialModelId = null,
+  initialSelectedItemId = null,
+  initialSelectedItemType = null,
+  streamingThrottleRate = 42,
+  enableApiKeyManagement = true,
+  enableSidebar = true,
+  enableVfs = true,
+  enableAdvancedSettings = true,
+  customPromptActions = EMPTY_CUSTOM_PROMPT_ACTIONS,
+  customMessageActions = EMPTY_CUSTOM_MESSAGE_ACTIONS,
+  customSettingsTabs = EMPTY_CUSTOM_SETTINGS_TABS,
+}) => {
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(true);
+  const [error, setErrorState] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+
+  const setError = useCallback((newError: string | null) => {
+    setErrorState(newError);
+    if (newError) {
+      console.error("Chat Error Context:", newError);
+      modEvents.emit(ModEvent.APP_ERROR, { message: newError });
     }
   }, []);
 
-  // --- Context Values ---
   const coreContextValue: CoreChatContextProps = useMemo(
     () => ({
       messages,
@@ -1176,180 +870,157 @@ ${contentText}
       setIsStreaming,
       error,
       setError,
-      handleSubmitCore: messageHandling.handleSubmitCore,
-      stopStreamingCore: messageHandling.stopStreamingCore,
-      regenerateMessageCore: messageHandling.regenerateMessageCore,
+      handleSubmitCore: async () => {
+        console.warn("handleSubmitCore called on CoreChatContext");
+      },
+      stopStreamingCore: () => {
+        console.warn("stopStreamingCore called on CoreChatContext");
+      },
+      regenerateMessageCore: async () => {
+        console.warn("regenerateMessageCore called on CoreChatContext");
+      },
       abortControllerRef,
     }),
-    [
-      messages,
-      isLoadingMessages,
-      isStreaming,
-      error,
-      setError,
-      messageHandling.handleSubmitCore,
-      messageHandling.stopStreamingCore,
-      messageHandling.regenerateMessageCore,
-    ],
+    [messages, isLoadingMessages, isStreaming, error, setError],
   );
 
-  const combinedPromptActions = useMemo(
-    () => [...customPromptActions, ...modPromptActions],
-    [customPromptActions, modPromptActions],
+  const [activeItemId, setActiveItemId] = useState<string | null>(
+    initialSelectedItemId,
   );
-  const combinedMessageActions = useMemo(
-    () => [...customMessageActions, ...modMessageActions],
-    [customMessageActions, modMessageActions],
-  );
-  const combinedSettingsTabs = useMemo(
-    () => [...customSettingsTabs, ...modSettingsTabs],
-    [customSettingsTabs, modSettingsTabs],
+  const [activeItemType, setActiveItemType] = useState<SidebarItemType | null>(
+    initialSelectedItemType,
   );
 
-  const fullContextValue: ChatContextProps = useMemo(
-    () => ({
-      enableApiKeyManagement,
-      enableAdvancedSettings,
-      activeProviders: activeProviders,
-      selectedProviderId: providerModel.selectedProviderId,
-      setSelectedProviderId: providerModel.setSelectedProviderId,
-      selectedModelId: providerModel.selectedModelId,
-      setSelectedModelId: providerModel.setSelectedModelId,
-      apiKeys: storage.apiKeys || EMPTY_API_KEYS,
-      // API key selection is now handled in provider config, not in context
-      // selectedApiKeyId: undefined,
-      // setSelectedApiKeyId: undefined,
-      addApiKey: apiKeysMgmt.addApiKey,
-      deleteApiKey: apiKeysMgmt.deleteApiKey,
-      getApiKeyForProvider: getApiKeyForSelectedProvider,
-      dbProviderConfigs: storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS,
-      addDbProviderConfig: storage.addProviderConfig,
-      updateDbProviderConfig: storage.updateProviderConfig,
-      deleteDbProviderConfig: storage.deleteProviderConfig,
-      sidebarItems: sidebarItems || EMPTY_SIDEBAR_ITEMS,
-      selectedItemId: sidebarMgmt.selectedItemId,
-      selectedItemType: sidebarMgmt.selectedItemType,
-      selectItem: sidebarMgmt.selectItem,
-      createConversation: sidebarMgmt.createConversation,
-      createProject: sidebarMgmt.createProject,
-      deleteItem: sidebarMgmt.deleteItem,
-      renameItem: sidebarMgmt.renameItem,
-      updateConversationSystemPrompt:
-        sidebarMgmt.updateConversationSystemPrompt,
-      messages: coreContextValue.messages,
-      isLoading: coreContextValue.isLoadingMessages,
-      isStreaming: coreContextValue.isStreaming,
-      error: coreContextValue.error,
-      setError: coreContextValue.setError,
-      handleSubmit,
-      stopStreaming,
-      regenerateMessage,
-      selectedVfsPaths: selectedVfsPaths,
-      addSelectedVfsPath: addSelectedVfsPath,
-      removeSelectedVfsPath: removeSelectedVfsPath,
-      clearSelectedVfsPaths: clearSelectedVfsPaths,
-      temperature: chatSettings.temperature,
-      setTemperature: chatSettings.setTemperature,
-      maxTokens: chatSettings.maxTokens,
-      setMaxTokens: chatSettings.setMaxTokens,
-      globalSystemPrompt: chatSettings.globalSystemPrompt,
-      setGlobalSystemPrompt: chatSettings.setGlobalSystemPrompt,
-      activeSystemPrompt: chatSettings.activeSystemPrompt,
-      topP: chatSettings.topP,
-      setTopP: chatSettings.setTopP,
-      topK: chatSettings.topK,
-      setTopK: chatSettings.setTopK,
-      presencePenalty: chatSettings.presencePenalty,
-      setPresencePenalty: chatSettings.setPresencePenalty,
-      frequencyPenalty: chatSettings.frequencyPenalty,
-      setFrequencyPenalty: chatSettings.setFrequencyPenalty,
-      theme: chatSettings.theme,
-      setTheme: chatSettings.setTheme,
-      streamingThrottleRate,
-      searchTerm: chatSettings.searchTerm,
-      setSearchTerm: chatSettings.setSearchTerm,
-      exportConversation: sidebarMgmt.exportConversation,
-      importConversation: handleImportConversation,
-      exportAllConversations: sidebarMgmt.exportAllConversations,
-      clearAllData: storage.clearAllData,
-      isVfsEnabledForItem: isVfsEnabledForItem,
-      toggleVfsEnabled: handleToggleVfs,
-      vfs: vfs,
-      getConversation: storage.getConversation,
-      getProject: storage.getProject,
-      customPromptActions: combinedPromptActions,
-      customMessageActions: combinedMessageActions,
-      customSettingsTabs: combinedSettingsTabs,
-      dbMods: storage.mods || EMPTY_DB_MODS,
-      loadedMods: loadedMods,
-      addDbMod: storage.addMod,
-      updateDbMod: storage.updateMod,
-      deleteDbMod: storage.deleteMod,
-      isSettingsModalOpen: isSettingsModalOpen,
-      onSettingsModalOpenChange: handleSettingsModalOpenChange,
-    }),
-    [
-      enableApiKeyManagement,
-      enableAdvancedSettings,
-      activeProviders,
-      providerModel.selectedProviderId,
-      providerModel.setSelectedProviderId,
-      providerModel.selectedModelId,
-      providerModel.setSelectedModelId,
-      storage.apiKeys,
-      apiKeysMgmt,
-      getApiKeyForSelectedProvider,
-      storage.providerConfigs,
-      storage.addProviderConfig,
-      storage.updateProviderConfig,
-      storage.deleteProviderConfig,
-      sidebarItems,
-      sidebarMgmt,
-      coreContextValue.messages,
-      coreContextValue.isLoadingMessages,
-      coreContextValue.isStreaming,
-      coreContextValue.error,
-      coreContextValue.setError,
-      handleSubmit,
-      stopStreaming,
-      regenerateMessage,
-      selectedVfsPaths,
-      addSelectedVfsPath,
-      removeSelectedVfsPath,
-      clearSelectedVfsPaths,
-      chatSettings,
-      handleImportConversation,
-      storage.clearAllData,
-      handleToggleVfs,
-      isVfsEnabledForItem,
-      vfs,
-      storage.getConversation,
-      storage.getProject,
-      combinedPromptActions,
-      combinedMessageActions,
-      combinedSettingsTabs,
-      storage.mods,
-      loadedMods,
-      storage.addMod,
-      storage.updateMod,
-      storage.deleteMod,
-      isSettingsModalOpen,
-      handleSettingsModalOpenChange,
-      streamingThrottleRate,
-    ],
+  const handleSelectItem = useCallback(
+    (id: string | null, type: SidebarItemType | null) => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      setIsStreaming(false);
+      setMessages([]);
+      setErrorState(null);
+      setActiveItemId(id);
+      setActiveItemType(type);
+      setIsLoadingMessages(!!id);
+      modEvents.emit(ModEvent.CHAT_SELECTED, { id, type });
+    },
+    [],
   );
 
-  useEffect(() => {
-    console.log(
-      `[ChatProvider] Active item state updated: ID=${activeItemId}, Type=${activeItemType}`,
+  const handleSettingsModalOpenChange = useCallback((open: boolean) => {
+    setIsSettingsModalOpen(open);
+    if (open) {
+      modEvents.emit(ModEvent.SETTINGS_OPENED);
+    } else {
+      modEvents.emit(ModEvent.SETTINGS_CLOSED);
+    }
+  }, []);
+
+  const storage = useChatStorage();
+  const sidebarItems = useMemo<SidebarItem[]>(() => {
+    const allProjects = storage.projects || [];
+    const allConversations = storage.conversations || [];
+    const combinedItems: SidebarItem[] = [
+      ...allProjects.map(
+        (p): ProjectSidebarItem => ({ ...p, type: "project" }),
+      ),
+      ...allConversations.map(
+        (c): ConversationSidebarItem => ({ ...c, type: "conversation" }),
+      ),
+    ];
+    combinedItems.sort(
+      (a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
     );
-  }, [activeItemId, activeItemType]);
+    return combinedItems;
+  }, [storage.projects, storage.conversations]);
+
+  const activeItemData = useMemo(() => {
+    if (!activeItemId || !activeItemType) return null;
+    const item = sidebarItems.find((i) => i.id === activeItemId);
+    if (item && item.type === activeItemType) {
+      return item;
+    }
+    return null;
+  }, [activeItemId, activeItemType, sidebarItems]);
+
+  const activeConversationData = useMemo(() => {
+    return activeItemType === "conversation"
+      ? (activeItemData as DbConversation | null)
+      : null;
+  }, [activeItemType, activeItemData]);
+
+  const activeProjectData = useMemo(() => {
+    return activeItemType === "project"
+      ? (activeItemData as DbProject | null)
+      : null;
+  }, [activeItemType, activeItemData]);
+
+  const isVfsEnabledForItem = useMemo(
+    () => (enableVfs ? (activeItemData?.vfsEnabled ?? false) : false),
+    [enableVfs, activeItemData],
+  );
+
+  const vfsKey = useMemo(() => {
+    if (!enableVfs) return null;
+    if (activeItemType === "project" && activeItemId) {
+      return activeItemId;
+    }
+    if (activeItemType === "conversation" && activeConversationData) {
+      return activeConversationData.parentId || "orphan";
+    }
+    return null;
+  }, [enableVfs, activeItemType, activeItemId, activeConversationData]);
 
   return (
     <CoreChatContext.Provider value={coreContextValue}>
-      <ChatContext.Provider value={fullContextValue}>
-        {children}
-      </ChatContext.Provider>
+      <ProviderManagementProvider
+        initialProviderId={initialProviderId}
+        initialModelId={initialModelId}
+        enableApiKeyManagement={enableApiKeyManagement}
+      >
+        <SidebarProvider
+          initialSelectedItemId={initialSelectedItemId}
+          initialSelectedItemType={initialSelectedItemType}
+          enableSidebar={enableSidebar}
+          onSelectItem={handleSelectItem}
+        >
+          <SettingsProvider
+            enableAdvancedSettings={enableAdvancedSettings}
+            activeConversationData={activeConversationData}
+            activeProjectData={activeProjectData}
+            isSettingsModalOpen={isSettingsModalOpen}
+            onSettingsModalOpenChange={handleSettingsModalOpenChange}
+          >
+            <VfsProvider
+              enableVfs={enableVfs}
+              selectedItemId={activeItemId}
+              selectedItemType={activeItemType}
+              isVfsEnabledForItem={isVfsEnabledForItem}
+              vfsKey={vfsKey}
+            >
+              <ModProvider>
+                <ChatProviderInner
+                  initialProviderId={initialProviderId}
+                  initialModelId={initialModelId}
+                  initialSelectedItemId={initialSelectedItemId}
+                  initialSelectedItemType={initialSelectedItemType}
+                  streamingThrottleRate={streamingThrottleRate}
+                  enableApiKeyManagement={enableApiKeyManagement}
+                  enableSidebar={enableSidebar}
+                  enableVfs={enableVfs}
+                  enableAdvancedSettings={enableAdvancedSettings}
+                  userCustomPromptActions={customPromptActions}
+                  userCustomMessageActions={customMessageActions}
+                  userCustomSettingsTabs={customSettingsTabs}
+                >
+                  {children}
+                </ChatProviderInner>
+              </ModProvider>
+            </VfsProvider>
+          </SettingsProvider>
+        </SidebarProvider>
+      </ProviderManagementProvider>
     </CoreChatContext.Provider>
   );
 };

@@ -5,13 +5,12 @@ import type { DbMod, ModInstance } from "@/mods/types";
 // --- Basic Types ---
 export type Role = "user" | "assistant" | "system";
 export type SidebarItemType = "conversation" | "project";
-// --- NEW: Provider Type Enum ---
 export type DbProviderType =
   | "openai"
   | "google"
   | "openrouter"
   | "ollama"
-  | "openai-compatible"; // For LMStudio, etc.
+  | "openai-compatible";
 
 // --- Database Schemas ---
 export interface DbBase {
@@ -42,11 +41,10 @@ export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {
 
 export interface DbApiKey extends Pick<DbBase, "id" | "createdAt"> {
   name: string;
-  providerId: string; // NOTE: This might become less relevant if keys are linked to DbProviderConfig
+  providerId: string;
   value: string;
 }
 
-// --- NEW: Database Schema for Provider Configuration ---
 export interface DbProviderConfig extends DbBase {
   name: string; // User-defined name (e.g., "My LMStudio", "Work OpenAI")
   type: DbProviderType;
@@ -55,15 +53,17 @@ export interface DbProviderConfig extends DbBase {
   baseURL: string | null; // For openai-compatible, ollama
   // Optional: Specify models explicitly, otherwise use defaults/all known
   enabledModels: string[] | null; // Array of model IDs (e.g., ["gpt-4", "gpt-3.5-turbo"])
+  autoFetchModels: boolean; // Default to true for supported types
+  /** Stores the list of models fetched from the /models endpoint. */
+  fetchedModels: { id: string; name: string }[] | null;
+  /** Timestamp of the last successful model fetch. */
+  modelsLastFetchedAt: Date | null;
 }
 
 // --- UI & State Types ---
-// Define Message properties directly instead of extending CoreMessage
 export interface Message {
-  // Core properties matching CoreMessage
   role: Role;
   content: string;
-  // Additional properties
   id?: string;
   conversationId?: string;
   createdAt?: Date;
@@ -71,14 +71,11 @@ export interface Message {
   streamedContent?: string;
   error?: string | null;
   vfsContextPaths?: string[];
-  providerId?: string; // This will now refer to DbProviderConfig.id
+  providerId?: string;
   modelId?: string;
   tokensInput?: number;
   tokensOutput?: number;
   tokensPerSecond?: number;
-  // Add other properties from CoreMessage if needed, e.g., tool_calls, tool_call_id
-  // tool_calls?: ToolCall[];
-  // tool_call_id?: string;
 }
 
 export interface SidebarItemBase extends DbBase {
@@ -95,20 +92,18 @@ export interface ConversationSidebarItem
 export type SidebarItem = ProjectSidebarItem | ConversationSidebarItem;
 
 // --- AI Configuration ---
-// This now represents the *runtime* configuration generated from DbProviderConfig
 export interface AiModelConfig {
-  id: string; // e.g., "gpt-4", "gemini-pro"
-  name: string; // Display name (e.g., "GPT-4", "Gemini Pro")
-  instance: any; // The actual AI SDK model instance
+  id: string;
+  name: string;
+  instance: any;
   contextWindow?: number;
 }
 
 export interface AiProviderConfig {
-  id: string; // Corresponds to DbProviderConfig.id
-  name: string; // Corresponds to DbProviderConfig.name
-  type: DbProviderType; // Added type for reference
+  id: string;
+  name: string;
+  type: DbProviderType;
   models: AiModelConfig[];
-  // requiresApiKey is now determined by DbProviderConfig.apiKeyId != null
 }
 
 // --- Virtual File System ---
@@ -122,44 +117,23 @@ export interface FileSystemEntry {
 
 // --- Custom Action Definitions ---
 export interface CustomActionBase {
-  id: string; // Unique identifier for the action
-  icon: React.ReactNode; // The icon component to display
-  tooltip: string; // Tooltip text for the button
-  className?: string; // Optional class names for the button
+  id: string;
+  icon: React.ReactNode;
+  tooltip: string;
+  className?: string;
 }
 
-// Forward declare ChatContextProps for use in action handlers
-// interface ChatContextPropsForwardDeclare extends CoreChatContextProps {
-//   // Add other essential props needed by actions if CoreChatContextProps is not enough
-//   // This avoids circular dependency issues if actions need the full context type.
-//   // For now, let's assume CoreChatContextProps + specific needed items are sufficient
-//   // or pass the full context object carefully.
-//   // We will define the full ChatContextProps later.
-//   providers: AiProviderConfig[]; // This will be the *active* providers
-//   selectedProviderId: string | null;
-//   selectedModelId: string | null;
-//   // ... add other specific props actions might need from the full context
-//   customPromptActions?: CustomPromptAction[];
-//   customMessageActions?: CustomMessageAction[];
-//   customSettingsTabs?: CustomSettingTab[];
-// }
-
 export interface CustomPromptAction extends CustomActionBase {
-  // onClick receives the full chat context for flexibility
-  onClick: (context: ChatContextProps) => void; // Use full type here
+  onClick: (context: ChatContextProps) => void;
 }
 
 export interface CustomMessageAction extends CustomActionBase {
-  // onClick receives the specific message and the full chat context
-  onClick: (message: Message, context: ChatContextProps) => void; // Use full type here
-  // Optional: Condition to determine if the action should be shown for a specific message
-  isVisible?: (message: Message, context: ChatContextProps) => boolean; // Use full type here
+  onClick: (message: Message, context: ChatContextProps) => void;
+  isVisible?: (message: Message, context: ChatContextProps) => boolean;
 }
 
 // --- Custom Settings Definitions ---
 export interface CustomSettingTabProps {
-  // Define props passed to custom setting components
-  // Pass the full context for maximum flexibility, or specific parts if preferred
   context: ChatContextProps;
 }
 
@@ -170,26 +144,17 @@ export interface CustomSettingTab {
 }
 
 // --- Chat Configuration ---
-// LiteChatConfig no longer takes providers directly
 export interface LiteChatConfig {
-  // Feature Flags (defaults to true if undefined)
   enableSidebar?: boolean;
   enableVfs?: boolean;
-  enableApiKeyManagement?: boolean; // Keep this, as keys are still managed separately
+  enableApiKeyManagement?: boolean;
   enableAdvancedSettings?: boolean;
-
-  // Initial State (defaults to null/undefined if undefined)
-  // initialProviderId might refer to DbProviderConfig.id now
   initialProviderId?: string | null;
   initialModelId?: string | null;
   initialSelectedItemId?: string | null;
   initialSelectedItemType?: SidebarItemType | null;
-
-  // Other Settings
-  streamingThrottleRate?: number; // Default handled in provider
-  defaultSidebarOpen?: boolean; // Default handled in LiteChat component
-
-  // Extensibility
+  streamingThrottleRate?: number;
+  defaultSidebarOpen?: boolean;
   customPromptActions?: CustomPromptAction[];
   customMessageActions?: CustomMessageAction[];
   customSettingsTabs?: CustomSettingTab[];
@@ -238,30 +203,34 @@ export interface VfsContextObject {
   vfsKey?: string | null;
 }
 
-// Full Context (Superset including Core + Optional Modules)
+// Full Context (Aggregated - Consumers should ideally use specific context hooks)
+// This acts as the central hub providing access to everything if needed,
+// but its direct use should be minimized in favor of specific contexts.
 export interface ChatContextProps {
-  // --- Feature Flags ---
+  // --- Feature Flags (from Settings/ProviderMgmt) ---
   enableApiKeyManagement: boolean;
   enableAdvancedSettings: boolean;
+  enableSidebar: boolean; // from SidebarContext
+  enableVfs: boolean; // from VfsContext
 
-  // Provider/Model Selection (Now uses dynamically generated providers)
-  activeProviders: AiProviderConfig[]; // Renamed from 'providers'
-  selectedProviderId: string | null; // Refers to DbProviderConfig.id
+  // --- Provider/Model Selection (from ProviderManagementContext) ---
+  activeProviders: AiProviderConfig[];
+  selectedProviderId: string | null;
   setSelectedProviderId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedModelId: string | null;
   setSelectedModelId: React.Dispatch<React.SetStateAction<string | null>>;
+  getApiKeyForProvider: (providerConfigId: string) => string | undefined;
 
-  // API Key Management (Functions might be dummies if disabled)
+  // --- API Key Management (from ProviderManagementContext) ---
   apiKeys: DbApiKey[];
   addApiKey: (
     name: string,
-    providerId: string, // This might be less useful now
+    providerId: string,
     value: string,
   ) => Promise<string>;
   deleteApiKey: (id: string) => Promise<void>;
-  getApiKeyForProvider: (providerId: string) => string | undefined; // Needs adjustment
 
-  // --- NEW: Provider Configuration Management ---
+  // --- Provider Configuration Management (from ProviderManagementContext) ---
   dbProviderConfigs: DbProviderConfig[];
   addDbProviderConfig: (
     config: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
@@ -272,7 +241,7 @@ export interface ChatContextProps {
   ) => Promise<void>;
   deleteDbProviderConfig: (id: string) => Promise<void>;
 
-  // Sidebar / Item Management (Functions might be dummies if disabled)
+  // --- Sidebar / Item Management (from SidebarContext) ---
   sidebarItems: SidebarItem[];
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
@@ -299,28 +268,29 @@ export interface ChatContextProps {
     systemPrompt: string | null,
   ) => Promise<void>;
 
-  // Messages & Streaming (Core)
+  // --- Messages & Streaming (from CoreChatContext) ---
   messages: Message[];
   isLoading: boolean; // Alias for isLoadingMessages
   isStreaming: boolean;
   error: string | null;
   setError: (error: string | null) => void;
 
-  // Input Handling (Only expose stable handlers)
+  // --- Interaction Handlers (defined in ChatProvider) ---
   handleSubmit: (
-    // Modified signature
     promptValue: string,
     attachedFilesValue: File[],
     selectedVfsPathsValue: string[],
   ) => Promise<void>;
   stopStreaming: () => void;
   regenerateMessage: (messageId: string) => Promise<void>;
+
+  // --- VFS Selection State (from VfsContext) ---
   selectedVfsPaths: string[];
   addSelectedVfsPath: (path: string) => void;
   removeSelectedVfsPath: (path: string) => void;
   clearSelectedVfsPaths: () => void;
 
-  // Settings (Functions might be dummies if disabled)
+  // --- Settings (from SettingsContext) ---
   temperature: number;
   setTemperature: React.Dispatch<React.SetStateAction<number>>;
   maxTokens: number | null;
@@ -338,46 +308,38 @@ export interface ChatContextProps {
   setFrequencyPenalty: React.Dispatch<React.SetStateAction<number | null>>;
   theme: "light" | "dark" | "system";
   setTheme: React.Dispatch<React.SetStateAction<"light" | "dark" | "system">>;
-  streamingThrottleRate: number;
+  streamingThrottleRate: number; // Passed down from config
   searchTerm: string;
   setSearchTerm: React.Dispatch<React.SetStateAction<string>>;
 
-  // Import/Export & Data Management
+  // --- Import/Export & Data Management (from SidebarContext/Storage) ---
   exportConversation: (conversationId: string | null) => Promise<void>;
-  importConversation: (file: File) => Promise<void>;
+  importConversation: (file: File, parentId: string | null) => Promise<void>; // Adjusted signature
   exportAllConversations: () => Promise<void>;
-  clearAllData: () => Promise<void>;
+  clearAllData: () => Promise<void>; // From storage hook
 
-  // Virtual File System (Object might be dummy if disabled)
+  // --- Virtual File System (from VfsContext) ---
   isVfsEnabledForItem: boolean;
-  toggleVfsEnabled: () => Promise<void>;
+  toggleVfsEnabled: () => Promise<void>; // Handler defined in ChatProvider
   vfs: VfsContextObject;
 
-  // Pass required DB functions
+  // --- DB Accessors (from Storage hook) ---
   getConversation: (id: string) => Promise<DbConversation | undefined>;
   getProject: (id: string) => Promise<DbProject | undefined>;
 
-  // Extensibility (Combined - these now include mod contributions)
+  // --- Extensibility (Combined - User Config + Mods from ModContext) ---
   customPromptActions: CustomPromptAction[];
   customMessageActions: CustomMessageAction[];
   customSettingsTabs: CustomSettingTab[];
 
-  // --- Mod System ---
-  /** Raw mod data from the database (for settings UI). */
+  // --- Mod System (from ModContext) ---
   dbMods: DbMod[];
-  /** Instances of currently loaded and enabled mods. */
   loadedMods: ModInstance[];
-  /** Function to add a new mod entry to the database. */
   addDbMod: (modData: Omit<DbMod, "id" | "createdAt">) => Promise<string>;
-  /** Function to update an existing mod entry in the database. */
   updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>;
-  /** Function to delete a mod entry from the database. */
   deleteDbMod: (id: string) => Promise<void>;
-  // Note: Registration functions (registerModPromptAction etc.) and event emitter
-  // are handled internally by the provider/loader and exposed via the LiteChatModApi,
-  // not directly on the React context consumed by standard components.
 
-  // --- Settings Modal Control ---
+  // --- Settings Modal Control (from SettingsContext) ---
   isSettingsModalOpen: boolean;
-  onSettingsModalOpenChange: (open: boolean) => void; // ADDED this line
+  onSettingsModalOpenChange: (open: boolean) => void;
 }

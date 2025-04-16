@@ -84,7 +84,7 @@ export const ChatSide: React.FC<ChatSideProps> = ({ className }) => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      importConversation(file);
+      importConversation(file, null);
     }
     if (event.target) {
       event.target.value = "";

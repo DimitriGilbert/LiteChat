@@ -5,9 +5,9 @@ import type {
   DbMessage,
   DbApiKey,
   DbProject,
-  DbProviderConfig, // Import new type
+  DbProviderConfig,
 } from "./types";
-import type { DbMod } from "@/mods/types"; // Import DbMod type
+import type { DbMod } from "@/mods/types";
 
 export class ChatDatabase extends Dexie {
   projects!: Table<DbProject, string>;
@@ -15,23 +15,55 @@ export class ChatDatabase extends Dexie {
   messages!: Table<DbMessage, string>;
   apiKeys!: Table<DbApiKey, string>;
   mods!: Table<DbMod, string>;
-  providerConfigs!: Table<DbProviderConfig, string>; // Add providerConfigs table
+  providerConfigs!: Table<DbProviderConfig, string>;
 
   constructor() {
     super("LiteChatDatabase");
-    // Bump version number when schema changes
-    this.version(6).stores({
-      // Added providerConfigs table
+    this.version(7).stores({
       providerConfigs:
-        "++id, &name, type, apiKeyId, isEnabled, createdAt, updatedAt",
-      // Previous tables (ensure indexes match previous version)
+        "++id, &name, type, apiKeyId, isEnabled, autoFetchModels, modelsLastFetchedAt, createdAt, updatedAt",
       mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
       projects: "++id, name, parentId, createdAt, updatedAt",
       conversations: "id, parentId, createdAt, updatedAt",
       messages: "id, conversationId, createdAt, vfsContextPaths",
-      apiKeys: "id, name, providerId, createdAt", // providerId might be less useful now
+      apiKeys: "id, name, providerId, createdAt",
     });
-    // Define previous versions for migration
+    this.version(6).stores({
+      providerConfigs:
+        "++id, &name, type, apiKeyId, isEnabled, createdAt, updatedAt",
+      mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
+      projects: "++id, name, parentId, createdAt, updatedAt",
+      conversations: "id, parentId, createdAt, updatedAt",
+      messages: "id, conversationId, createdAt, vfsContextPaths",
+      apiKeys: "id, name, providerId, createdAt",
+    });
+
+    // Add upgrade logic for version 7
+    this.version(7).upgrade(async (tx) => {
+      // Use toCollection().modify()
+      await tx
+        .table("providerConfigs")
+        .toCollection()
+        .modify((config: DbProviderConfig) => {
+          // Check if fields exist before assigning defaults
+          if (typeof config.autoFetchModels === "undefined") {
+            config.autoFetchModels = [
+              "openai",
+              "openrouter",
+              "ollama",
+              "openai-compatible",
+            ].includes(config.type);
+          }
+          if (typeof config.fetchedModels === "undefined") {
+            config.fetchedModels = null;
+          }
+          if (typeof config.modelsLastFetchedAt === "undefined") {
+            config.modelsLastFetchedAt = null;
+          }
+        });
+    });
+
+    // --- Keep previous version definitions ---
     this.version(5).stores({
       mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
       projects: "++id, name, parentId, createdAt, updatedAt",
@@ -56,7 +88,6 @@ export class ChatDatabase extends Dexie {
       messages: "id, conversationId, createdAt",
       apiKeys: "id, name, providerId, createdAt",
     });
-    // No upgrade function needed for adding a new table
   }
 }
 
