@@ -4,7 +4,6 @@ import { useChatContext } from "@/hooks/use-chat-context";
 import { Button } from "@/components/ui/button";
 import { UploadIcon, DownloadIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
-// REMOVED: import { db } from "@/lib/db"; // No longer needed
 
 export const SettingsDataManagement: React.FC = () => {
   const {

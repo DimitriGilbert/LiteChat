@@ -1,5 +1,4 @@
 // src/components/error-boundary.tsx
-// REMOVED: import React from "react"; // No longer needed
 import { Component, ErrorInfo, ReactNode } from "react";
 
 interface Props {

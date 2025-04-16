@@ -27,7 +27,6 @@ export const PromptActions: React.FC<PromptActionsProps> = ({
   // Get context only for custom actions
   const context = useChatContext();
   const {
-    // REMOVED: prompt, isStreaming, addAttachedFile
     customPromptActions = [], // Default to empty array
   } = context;
   const fileInputRef = useRef<HTMLInputElement>(null);

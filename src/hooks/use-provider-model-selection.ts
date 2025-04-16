@@ -109,8 +109,7 @@ export function useProviderModelSelection({
         setSelectedModelId(null);
       }
     }
-    // This effect reacts to the derived selectedProvider changing, or if the model ID changes externally.
-  }, [selectedProvider, selectedModelId]); // Removed 'providers' dependency here, handled by Effect 1
+  }, [selectedProvider, selectedModelId]);
 
   return {
     selectedProviderId,

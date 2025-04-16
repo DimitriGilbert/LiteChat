@@ -1,14 +1,6 @@
 // src/lib/types.ts
-// import type { CoreMessage } from "ai";
-import React from "react"; // Import React for ReactNode
-// Import Mod types - ensure these are defined in mods/types.ts
-import type {
-  DbMod,
-  ModInstance,
-  ModEventPayloadMap,
-  ModMiddlewarePayloadMap,
-  ModMiddlewareReturnMap,
-} from "@/mods/types";
+import React from "react";
+import type { DbMod, ModInstance } from "@/mods/types";
 
 // --- Basic Types ---
 export type Role = "user" | "assistant" | "system";

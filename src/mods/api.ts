@@ -3,9 +3,7 @@ import type {
   CustomPromptAction,
   CustomMessageAction,
   CustomSettingTab,
-  // REMOVED: Message,
-  // REMOVED: SidebarItemType,
-  ChatContextProps, // Keep ChatContextProps for snapshot type
+  ChatContextProps,
 } from "@/lib/types";
 import type {
   ModEventPayloadMap,

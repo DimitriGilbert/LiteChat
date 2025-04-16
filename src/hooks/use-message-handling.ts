@@ -125,10 +125,7 @@ export function useMessageHandling({
   }, [
     // --- MODIFIED DEPENDENCY ARRAY ---
     selectedConversationId,
-    getMessagesForConversation, // Assume this is stable
-    // REMOVED: setIsLoadingMessages, setLocalMessages, setError
-    // Add setters back here ONLY if the lint rule complains AND you are sure
-    // they are causing instability from the parent. Usually, they are safe to omit.
+    getMessagesForConversation,
     setLocalMessages,
     setIsLoadingMessages,
     setError,

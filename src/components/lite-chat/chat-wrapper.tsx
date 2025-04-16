@@ -12,7 +12,6 @@ interface ChatWrapperProps {
   selectedItemType: SidebarItemType | null;
   sidebarItems: SidebarItem[];
   regenerateMessage: (messageId: string) => void;
-  // REMOVED props for prompt state
 }
 
 export const ChatWrapper: React.FC<ChatWrapperProps> = ({
@@ -21,7 +20,6 @@ export const ChatWrapper: React.FC<ChatWrapperProps> = ({
   selectedItemType,
   sidebarItems,
   regenerateMessage,
-  // REMOVED prompt state props
 }) => {
   return (
     <main

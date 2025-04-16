@@ -3,10 +3,7 @@ import type { DbMod, ModInstance } from "./types";
 import type { LiteChatModApi, ReadonlyChatContextSnapshot } from "./api";
 import { toast } from "sonner";
 import { modEvents } from "./events"; // Use modEvents instance
-import { ModEvent } from "./events"; // Import ModEvent constants
-// REMOVED: import type { ModEventPayloadMap } from "./types"; // Not needed directly here
-// REMOVED: import type { ModMiddlewarePayloadMap } from "./types"; // Not needed directly here
-// REMOVED: import type { ModMiddlewareReturnMap } from "./types"; // Not needed directly here
+import { ModEvent } from "./events";
 import type {
   CustomPromptAction,
   CustomMessageAction,
@@ -51,7 +48,8 @@ export async function loadMods(
 
   for (const mod of enabledMods) {
     let scriptContent = mod.scriptContent;
-    let instance: ModInstance | null = null;
+    // FIX: Initialize instance later based on success/error
+    // let instance: ModInstance | null = null;
 
     try {
       // Fetch script if sourceUrl is provided
@@ -94,7 +92,8 @@ export async function loadMods(
         `[ModLoader] Script executed successfully for mod "${mod.name}".`,
       );
 
-      instance = {
+      // FIX: Create instance on success (without error property)
+      const instance: ModInstance = {
         id: mod.id,
         name: mod.name,
         api: modApi, // Store the API instance
@@ -102,26 +101,28 @@ export async function loadMods(
       loadedInstances.push(instance);
       modEvents.emit(ModEvent.MOD_LOADED, { id: mod.id, name: mod.name });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = String(error); // String() handles various types
       console.error(
         `[ModLoader] Error loading mod "${mod.name}" (ID: ${mod.id}):`,
         error,
       );
       toast.error(`Error loading mod "${mod.name}": ${errorMessage}`);
 
-      // Create an instance even on error to report it
-      instance = {
+      // FIX: Create instance on error, assigning the error property
+      const instance: ModInstance = {
         id: mod.id,
         name: mod.name,
-        api: createApiForMod(mod, registrationCallbacks, getContextSnapshot), // Provide a dummy API? Or the partially constructed one?
+        // Provide API even on error for potential cleanup/reporting? Or a dummy?
+        // Using the created API for now.
+        api: createApiForMod(mod, registrationCallbacks, getContextSnapshot),
+        // Assign the error, ensuring it's Error or string
         error: error instanceof Error ? error : errorMessage,
       };
       loadedInstances.push(instance); // Add error instance to the list
       modEvents.emit(ModEvent.MOD_ERROR, {
         id: mod.id,
         name: mod.name,
-        error: instance.error,
+        error: instance.error ?? "",
       });
     }
   }

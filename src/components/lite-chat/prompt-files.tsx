@@ -1,6 +1,5 @@
 // src/components/lite-chat/prompt-files.tsx
 import React from "react";
-// REMOVED: import { useChatContext } from "@/hooks/use-chat-context";
 import { Button } from "@/components/ui/button";
 import { XIcon, FileIcon } from "lucide-react"; // Icons
 import { cn } from "@/lib/utils";
@@ -15,8 +14,6 @@ export const PromptFiles: React.FC<PromptFilesProps> = ({
   attachedFiles, // Use prop
   removeAttachedFile, // Use prop
 }) => {
-  // REMOVED: const { attachedFiles, removeAttachedFile } = useChatContext();
-
   if (attachedFiles.length === 0) {
     return null;
   }

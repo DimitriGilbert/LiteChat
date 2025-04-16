@@ -7,15 +7,11 @@ import { cn } from "@/lib/utils";
 
 interface SelectedVfsFilesDisplayProps {
   className?: string;
-  // REMOVED props - get state from context
 }
 
 export const SelectedVfsFilesDisplay: React.FC<
   SelectedVfsFilesDisplayProps
-> = ({
-  className,
-  // REMOVED props
-}) => {
+> = ({ className }) => {
   // Get VFS selection state/actions from context again
   const {
     selectedVfsPaths, // Use context

@@ -27,9 +27,8 @@ import type {
 import type {
   DbMod,
   ModInstance,
-  // REMOVED: ModEventPayloadMap, // Now imported via ModEventName in events.ts
-  // REMOVED: ModMiddlewarePayloadMap, // Now imported via ModMiddlewareHookName in api.ts
-  // REMOVED: ModMiddlewareReturnMap, // Now imported via ModMiddlewareHookName in api.ts
+  ProcessResponseChunkPayload,
+  RenderMessagePayload,
 } from "@/mods/types";
 import { ChatContext } from "@/hooks/use-chat-context";
 import { CoreChatContext } from "@/context/core-chat-context";
@@ -52,7 +51,6 @@ import { modEvents, ModEvent, ModEventName } from "@/mods/events"; // Import Mod
 import {
   ModMiddlewareHook, // Import middleware hook names
   type ReadonlyChatContextSnapshot,
-  // REMOVED: type ModEventName, // Now imported from events.ts
   type ModMiddlewareHookName,
 } from "@/mods/api";
 // Import payload/return maps directly where needed (or keep in types.ts if preferred)
@@ -557,38 +555,81 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       initialPayload: ModMiddlewarePayloadMap[H],
     ): Promise<ModMiddlewareReturnMap[H] | false> => {
       const callbacksMap = modMiddlewareCallbacksRef.current.get(hookName);
+
+      // --- Case 1: No middleware registered ---
       if (!callbacksMap || callbacksMap.size === 0) {
-        return initialPayload; // No middleware registered for this hook
+        const hook: ModMiddlewareHookName = hookName;
+        switch (hook) {
+          case ModMiddlewareHook.PROCESS_RESPONSE_CHUNK:
+            // Explicitly return the correct part, cast via unknown
+            return (initialPayload as ProcessResponseChunkPayload)
+              .chunk as unknown as ModMiddlewareReturnMap[H];
+          case ModMiddlewareHook.RENDER_MESSAGE:
+            // Explicitly return the correct part, cast via unknown
+            return (initialPayload as RenderMessagePayload)
+              .message as unknown as ModMiddlewareReturnMap[H];
+          // For hooks where Payload structure matches Return structure (ignoring 'false')
+          // cast via unknown to bypass TS2352
+          case ModMiddlewareHook.SUBMIT_PROMPT:
+          case ModMiddlewareHook.VFS_WRITE:
+            // FIX: Cast via unknown
+            return initialPayload as unknown as ModMiddlewareReturnMap[H];
+          default:
+            // Should not happen if all hooks are handled, but provide a fallback
+            console.warn(`Unhandled hook in runMiddleware bypass: ${hookName}`);
+            // FIX: Cast via unknown
+            return initialPayload as unknown as ModMiddlewareReturnMap[H];
+        }
       }
 
-      let currentPayload: ModMiddlewarePayloadMap[H] | false = initialPayload;
-
-      // Execute callbacks sequentially
-      // Convert Map values (functions) to an array to iterate with async/await
+      // --- Case 2: Middleware registered ---
+      let currentData:
+        | ModMiddlewarePayloadMap[H]
+        | ModMiddlewareReturnMap[H]
+        | false = initialPayload;
       const callbacks = Array.from(callbacksMap.values());
 
       for (const callback of callbacks) {
-        if (currentPayload === false) {
-          // If a previous middleware returned false, stop processing
-          break;
+        if (currentData === false) {
+          break; // Stop if middleware returned false
         }
         try {
-          // Await the result in case the middleware is async
-          currentPayload = await callback(currentPayload);
+          // Cast input to 'any' as its type might shift during the loop
+          currentData = await callback(currentData as any);
         } catch (err) {
           console.error(
             `[Middleware] Error executing middleware for hook '${hookName}':`,
             err,
           );
-          // Optionally stop processing on error, or just log and continue
-          // For now, let's stop processing on error
-          currentPayload = false;
           toast.error(`Middleware error during ${hookName}. Action cancelled.`);
-          break;
+          currentData = false; // Set to false on error
+          break; // Stop processing on error
         }
       }
 
-      return currentPayload as ModMiddlewareReturnMap[H] | false; // Type assertion needed here
+      // Handle the case where the loop finished but currentData is still the initial payload
+      // (e.g., middleware existed but didn't modify the data or returned the original object)
+      if (currentData !== false && currentData === initialPayload) {
+        const hook: ModMiddlewareHookName = hookName;
+        switch (hook) {
+          case ModMiddlewareHook.PROCESS_RESPONSE_CHUNK:
+            // FIX: Cast via unknown
+            return (initialPayload as ProcessResponseChunkPayload)
+              .chunk as unknown as ModMiddlewareReturnMap[H];
+          case ModMiddlewareHook.RENDER_MESSAGE:
+            // FIX: Cast via unknown
+            return (initialPayload as RenderMessagePayload)
+              .message as unknown as ModMiddlewareReturnMap[H];
+          default:
+            // For SUBMIT_PROMPT, VFS_WRITE, etc.
+            // FIX: Cast via unknown
+            return initialPayload as unknown as ModMiddlewareReturnMap[H];
+        }
+      }
+
+      // Final return: currentData is either false or the result of the last middleware (ReturnMap[H])
+      // This final cast should be safe because if it's not false, it holds the ReturnMap[H] type.
+      return currentData as ModMiddlewareReturnMap[H] | false;
     },
     [], // No dependencies needed as it uses the ref
   );
@@ -932,9 +973,12 @@ ${contentText}
       eventName: E,
       callback: (payload: ModEventPayloadMap[E]) => void,
     ): (() => void) => {
-      // Use central emitter, store unsubscribe locally if needed for cleanup
-      const unsubscribe = modEvents.on(eventName, callback);
-      return unsubscribe; // Return the emitter's unsubscribe
+      modEvents.on(eventName, callback);
+
+      const unsubscribe = () => {
+        modEvents.off(eventName, callback);
+      };
+      return unsubscribe;
     },
     [],
   );

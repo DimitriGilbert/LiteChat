@@ -121,9 +121,6 @@ export function useSidebarManagement({
   const [selectedItemType, setSelectedItemType] =
     useState<SidebarItemType | null>(initialSelectedItemType);
 
-  // REMOVED: useChatStorage() call
-  // REMOVED: useLiveQuery() call
-
   // --- Selection Logic ---
   const selectItem = useCallback(
     async (id: string | null, type: SidebarItemType | null) => {

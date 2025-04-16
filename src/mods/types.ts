@@ -1,13 +1,6 @@
 // src/mods/types.ts
-import type {
-  // REMOVED: ChatContextProps,
-  Message,
-  SidebarItemType,
-  // REMOVED: CustomPromptAction,
-  // REMOVED: CustomMessageAction,
-  // REMOVED: CustomSettingTab,
-} from "@/lib/types";
-import type { LiteChatModApi } from "./api"; // Import the API type
+import type { Message, SidebarItemType } from "@/lib/types";
+import type { LiteChatModApi } from "./api";
 
 // --- Database Schema for Mods ---
 export interface DbMod {

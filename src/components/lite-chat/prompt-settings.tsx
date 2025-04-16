@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch"; // Keep Switch import
-// REMOVED: import { Label } from "@/components/ui/label"; // Label no longer needed for VFS
 import {
   Tooltip,
   TooltipContent,
