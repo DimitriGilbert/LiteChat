@@ -1,5 +1,5 @@
 // src/components/lite-chat/settings-providers.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // Added useEffect
 import { useProviderManagementContext } from "@/context/provider-management-context";
 import type { DbProviderConfig, DbApiKey, DbProviderType } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-// Removed Checkbox import as it wasn't used
+import { Checkbox } from "@/components/ui/checkbox"; // Added Checkbox import
 import { Label } from "@/components/ui/label";
 import {
   Trash2Icon,
@@ -60,6 +60,10 @@ interface ProviderRowProps {
   onDelete: (id: string) => Promise<void>;
   onFetchModels: (id: string) => Promise<void>;
   fetchStatus: "idle" | "fetching" | "error" | "success";
+  // Need access to this helper from context
+  getAllAvailableModelDefs: (
+    providerConfigId: string,
+  ) => { id: string; name: string }[];
 }
 
 const ProviderRow: React.FC<ProviderRowProps> = ({
@@ -69,9 +73,34 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
   onDelete,
   onFetchModels,
   fetchStatus,
+  getAllAvailableModelDefs, // Receive helper function
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<DbProviderConfig>>({});
+  // State to hold all models available for selection in edit mode
+  const [availableModels, setAvailableModels] = useState<
+    { id: string; name: string }[]
+  >([]);
+
+  // Fetch available models when entering edit mode
+  useEffect(() => {
+    if (isEditing) {
+      const models = getAllAvailableModelDefs(provider.id);
+      setAvailableModels(models);
+      // Ensure enabledModels is an array in editData when editing starts
+      setEditData((prev) => ({
+        ...prev,
+        enabledModels: provider.enabledModels ?? [],
+      }));
+    } else {
+      setAvailableModels([]); // Clear when not editing
+    }
+  }, [
+    isEditing,
+    provider.id,
+    provider.enabledModels,
+    getAllAvailableModelDefs,
+  ]);
 
   const handleEdit = () => {
     setEditData({
@@ -80,7 +109,7 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
       isEnabled: provider.isEnabled,
       apiKeyId: provider.apiKeyId,
       baseURL: provider.baseURL,
-      enabledModels: provider.enabledModels,
+      enabledModels: provider.enabledModels ?? [], // Initialize as array
       autoFetchModels: provider.autoFetchModels,
     });
     setIsEditing(true);
@@ -93,7 +122,15 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
 
   const handleSave = async () => {
     try {
-      await onUpdate(provider.id, editData);
+      // Pass null if the enabledModels array is empty, otherwise pass the array
+      const changesToSave = {
+        ...editData,
+        enabledModels:
+          editData.enabledModels && editData.enabledModels.length > 0
+            ? editData.enabledModels
+            : null,
+      };
+      await onUpdate(provider.id, changesToSave);
       setIsEditing(false);
       setEditData({});
       toast.success(`Provider "${editData.name || provider.name}" updated.`);
@@ -109,6 +146,21 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
     value: string | boolean | string[] | null,
   ) => {
     setEditData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Handler for enabled model checkboxes
+  const handleEnabledModelChange = (modelId: string, checked: boolean) => {
+    setEditData((prev) => {
+      const currentEnabled = (prev.enabledModels as string[]) ?? []; // Ensure it's an array
+      let newEnabled: string[];
+      if (checked) {
+        newEnabled = [...currentEnabled, modelId];
+      } else {
+        newEnabled = currentEnabled.filter((id) => id !== modelId);
+      }
+      // Ensure unique values
+      return { ...prev, enabledModels: [...new Set(newEnabled)] };
+    });
   };
 
   const handleDelete = async () => {
@@ -138,6 +190,7 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
       {isEditing ? (
         // --- Edit Mode ---
         <div className="space-y-3">
+          {/* Name, Type, Enabled Switch */}
           <div className="flex items-center space-x-2">
             <Input
               value={editData.name || ""}
@@ -173,13 +226,14 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
               <Label htmlFor={`edit-enabled-${provider.id}`}>Enabled</Label>
             </div>
           </div>
+          {/* API Key / Base URL */}
           {(needsKey || needsURL) && (
             <div className="flex items-center space-x-2">
               {needsKey && (
                 <ApiKeySelector
                   label="API Key:"
                   selectedKeyId={editData.apiKeyId ?? null}
-                  onKeySelected={(keyId) => handleChange("apiKeyId", keyId)} // Pass correct callback
+                  onKeySelected={(keyId) => handleChange("apiKeyId", keyId)}
                   apiKeys={apiKeys}
                   className="flex-grow"
                 />
@@ -194,6 +248,7 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
               )}
             </div>
           )}
+          {/* Auto-fetch Switch */}
           <div className="flex items-center space-x-2">
             <Switch
               id={`edit-autofetch-${provider.id}`}
@@ -210,6 +265,45 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
               Auto-fetch models {canFetch ? "" : "(Not Supported)"}
             </Label>
           </div>
+
+          {/* Enabled Models Selection */}
+          {availableModels.length > 0 && (
+            <div className="space-y-2 pt-2">
+              <Label>Enabled Models (for default list)</Label>
+              <p className="text-xs text-gray-400">
+                Select models to show in the main dropdown. Search will always
+                show all available models. If none selected, all are shown by
+                default.
+              </p>
+              <ScrollArea className="h-40 w-full rounded-md border border-gray-600 p-2 bg-gray-700">
+                <div className="space-y-2">
+                  {availableModels.map((model) => (
+                    <div key={model.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`edit-model-${provider.id}-${model.id}`}
+                        // Ensure editData.enabledModels is treated as an array
+                        checked={(
+                          (editData.enabledModels as string[]) ?? []
+                        ).includes(model.id)}
+                        onCheckedChange={(checked) =>
+                          handleEnabledModelChange(model.id, !!checked)
+                        }
+                        className="border-gray-500 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white"
+                      />
+                      <Label
+                        htmlFor={`edit-model-${provider.id}-${model.id}`}
+                        className="text-sm font-normal text-white"
+                      >
+                        {model.name || model.id}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {/* Save/Cancel Buttons */}
           <div className="flex justify-end space-x-2">
             <Button variant="ghost" size="sm" onClick={handleCancel}>
               <XIcon className="h-4 w-4 mr-1" /> Cancel
@@ -264,10 +358,28 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
                 <span className="text-gray-500">Disabled</span>
               )}
             </div>
+            {/* Display Enabled Models List */}
+            {provider.enabledModels && provider.enabledModels.length > 0 && (
+              <div className="pt-1">
+                <span className="font-medium text-gray-300">
+                  Enabled Models ({provider.enabledModels.length}):
+                </span>
+                <ScrollArea className="h-16 mt-1 rounded-md border border-gray-600 p-2 bg-gray-900 text-xs">
+                  {provider.enabledModels.map((modelId) => {
+                    // Find the model name from fetchedModels if possible
+                    const model = provider.fetchedModels?.find(
+                      (m) => m.id === modelId,
+                    );
+                    return <div key={modelId}>{model?.name || modelId}</div>;
+                  })}
+                </ScrollArea>
+              </div>
+            )}
+            {/* Display Fetched Models List */}
             {provider.fetchedModels && provider.fetchedModels.length > 0 && (
               <div className="pt-1">
                 <span className="font-medium text-gray-300">
-                  Available Models ({provider.fetchedModels.length}):
+                  All Available Models ({provider.fetchedModels.length}):
                 </span>
                 <ScrollArea className="h-20 mt-1 rounded-md border border-gray-600 p-2 bg-gray-900 text-xs">
                   {provider.fetchedModels.map((m) => (
@@ -282,6 +394,7 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
                 </span>
               </div>
             )}
+            {/* Fetch Models Button */}
             {canFetch && (
               <div className="pt-1">
                 <Button
@@ -325,6 +438,7 @@ export const SettingsProviders: React.FC = () => {
     apiKeys,
     fetchModels,
     providerFetchStatus,
+    getAllAvailableModelDefs, // Get the helper function
   } = useProviderManagementContext();
   const [isAdding, setIsAdding] = useState(false);
   const [newProviderData, setNewProviderData] = useState<
@@ -335,7 +449,7 @@ export const SettingsProviders: React.FC = () => {
     isEnabled: true,
     apiKeyId: null,
     baseURL: null,
-    enabledModels: null,
+    enabledModels: null, // Start as null
     autoFetchModels: true,
     fetchedModels: null,
     modelsLastFetchedAt: null,
@@ -376,7 +490,8 @@ export const SettingsProviders: React.FC = () => {
         isEnabled: newProviderData.isEnabled ?? true,
         apiKeyId: newProviderData.apiKeyId ?? null,
         baseURL: newProviderData.baseURL ?? null,
-        enabledModels: newProviderData.enabledModels ?? null,
+        // Save enabledModels as null initially for new providers
+        enabledModels: null,
         autoFetchModels: autoFetch,
         fetchedModels: null,
         modelsLastFetchedAt: null,
@@ -396,11 +511,13 @@ export const SettingsProviders: React.FC = () => {
   ) => {
     setNewProviderData((prev) => {
       const updated = { ...prev, [field]: value };
+      // Reset dependent fields when type changes
       if (field === "type") {
         const newType = value as DbProviderType;
         updated.apiKeyId = null;
         updated.baseURL = null;
         updated.autoFetchModels = supportsModelFetching(newType);
+        updated.enabledModels = null; // Reset enabled models on type change
       }
       return updated;
     });
@@ -414,8 +531,8 @@ export const SettingsProviders: React.FC = () => {
     <div className="p-4 space-y-4">
       <h3 className="text-lg font-bold text-white">AI Provider Settings</h3>
       <p className="text-sm text-gray-400">
-        Configure connections to different AI model providers. API keys are
-        stored locally in your browser's IndexedDB.
+        Configure connections to different AI model providers. API keys and
+        settings are stored locally in your browser's IndexedDB.
       </p>
 
       <ScrollArea className="h-[calc(100vh-300px)] pr-3">
@@ -429,6 +546,7 @@ export const SettingsProviders: React.FC = () => {
               onDelete={deleteDbProviderConfig}
               onFetchModels={fetchModels}
               fetchStatus={providerFetchStatus[provider.id] || "idle"}
+              getAllAvailableModelDefs={getAllAvailableModelDefs} // Pass down helper
             />
           ))}
         </div>
@@ -437,6 +555,7 @@ export const SettingsProviders: React.FC = () => {
       {isAdding && (
         <div className="border border-blue-500 rounded-md p-4 space-y-3 bg-gray-800 shadow-lg">
           <h4 className="font-semibold text-white">Add New Provider</h4>
+          {/* Name, Type, Enabled Switch */}
           <div className="flex items-center space-x-2">
             <Input
               value={newProviderData.name || ""}
@@ -472,13 +591,14 @@ export const SettingsProviders: React.FC = () => {
               <Label htmlFor="new-enabled">Enabled</Label>
             </div>
           </div>
+          {/* API Key / Base URL */}
           {(needsKey || needsURL) && (
             <div className="flex items-center space-x-2">
               {needsKey && (
                 <ApiKeySelector
                   label="API Key:"
                   selectedKeyId={newProviderData.apiKeyId ?? null}
-                  onKeySelected={(keyId) => handleNewChange("apiKeyId", keyId)} // Pass correct callback
+                  onKeySelected={(keyId) => handleNewChange("apiKeyId", keyId)}
                   apiKeys={apiKeys}
                   className="flex-grow"
                 />
@@ -493,6 +613,7 @@ export const SettingsProviders: React.FC = () => {
               )}
             </div>
           )}
+          {/* Auto-fetch Switch */}
           <div className="flex items-center space-x-2">
             <Switch
               id="new-autofetch"
@@ -509,6 +630,12 @@ export const SettingsProviders: React.FC = () => {
               Auto-fetch models {canFetch ? "" : "(Not Supported)"}
             </Label>
           </div>
+          {/* Note: Cannot select enabled models until provider is created and models fetched */}
+          <p className="text-xs text-gray-400">
+            You can select specific models to enable after adding the provider
+            and fetching its models.
+          </p>
+          {/* Add/Cancel Buttons */}
           <div className="flex justify-end space-x-2">
             <Button variant="ghost" size="sm" onClick={handleCancelNew}>
               <XIcon className="h-4 w-4 mr-1" /> Cancel

@@ -4,8 +4,8 @@ import React, {
   useContext,
   useMemo,
   useCallback,
-  useState, // Import useState
-  useEffect, // Import useEffect
+  useState,
+  useEffect,
 } from "react";
 import type {
   AiProviderConfig,
@@ -26,24 +26,22 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createOllama } from "ollama-ai-provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { fetchModelsForProvider } from "@/services/model-fetcher"; // Import the fetcher
+import { fetchModelsForProvider } from "@/services/model-fetcher";
 
 const EMPTY_API_KEYS: DbApiKey[] = [];
 const EMPTY_DB_PROVIDER_CONFIGS: DbProviderConfig[] = [];
 const EMPTY_ACTIVE_PROVIDERS: AiProviderConfig[] = [];
 
-// Minimize DEFAULT_MODELS - keep only essential fallbacks or for non-fetchable types
 const DEFAULT_MODELS: Record<DbProviderType, { id: string; name: string }[]> = {
-  openai: [{ id: "gpt-4o", name: "GPT-4o" }], // Keep one popular as fallback
+  openai: [{ id: "gpt-4o", name: "GPT-4o" }],
   google: [
-    // Google GenAI SDK uses specific names, keep these
     { id: "gemini-1.5-pro-latest", name: "Gemini 1.5 Pro" },
     { id: "gemini-1.5-flash-latest", name: "Gemini 1.5 Flash" },
     { id: "gemini-1.0-pro", name: "Gemini 1.0 Pro" },
   ],
-  openrouter: [], // Let fetch handle these
-  ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }], // Keep one popular as fallback
-  "openai-compatible": [], // Let fetch handle these
+  openrouter: [],
+  ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }],
+  "openai-compatible": [],
 };
 
 const requiresApiKey = (type: DbProviderType | null): boolean => {
@@ -63,7 +61,6 @@ const dummyApiKeysMgmt: UseApiKeysManagementReturn = {
   },
 };
 
-// --- NEW Fetching Status Type ---
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 
 interface ProviderManagementContextProps {
@@ -92,9 +89,12 @@ interface ProviderManagementContextProps {
     changes: Partial<DbProviderConfig>,
   ) => Promise<void>;
   deleteDbProviderConfig: (id: string) => Promise<void>;
-  // --- NEW ---
   fetchModels: (providerConfigId: string) => Promise<void>;
   providerFetchStatus: Record<string, FetchStatus>;
+  // Helper to get all available models for a config ID (used in settings)
+  getAllAvailableModelDefs: (
+    providerConfigId: string,
+  ) => { id: string; name: string }[];
 }
 
 const ProviderManagementContext = createContext<
@@ -117,15 +117,13 @@ export const ProviderManagementProvider: React.FC<
   enableApiKeyManagement = true,
 }) => {
   const storage = useChatStorage();
-  // --- NEW State for Fetching Status ---
   const [providerFetchStatus, setProviderFetchStatus] = useState<
     Record<string, FetchStatus>
   >({});
 
-  // --- Function to trigger fetch and update DB ---
   const fetchAndUpdateModels = useCallback(
     async (config: DbProviderConfig) => {
-      if (!config.autoFetchModels) return; // Skip if disabled
+      if (!config.autoFetchModels) return;
 
       setProviderFetchStatus((prev) => ({ ...prev, [config.id]: "fetching" }));
       try {
@@ -147,13 +145,11 @@ export const ProviderManagementProvider: React.FC<
       } catch (error) {
         console.error(error);
         setProviderFetchStatus((prev) => ({ ...prev, [config.id]: "error" }));
-        // Error toast is handled within fetchModelsForProvider
       }
     },
     [storage],
   );
 
-  // --- Effect to trigger initial fetches ---
   useEffect(() => {
     const configsToFetch = (
       storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS
@@ -161,9 +157,9 @@ export const ProviderManagementProvider: React.FC<
       (c) =>
         c.isEnabled &&
         c.autoFetchModels &&
-        !c.fetchedModels && // Only fetch if not already fetched
-        providerFetchStatus[c.id] !== "fetching" && // Avoid re-fetching if already in progress
-        providerFetchStatus[c.id] !== "success", // Avoid re-fetching if successful this session
+        !c.fetchedModels &&
+        providerFetchStatus[c.id] !== "fetching" &&
+        providerFetchStatus[c.id] !== "success",
     );
 
     if (configsToFetch.length > 0) {
@@ -174,7 +170,6 @@ export const ProviderManagementProvider: React.FC<
     }
   }, [storage.providerConfigs, fetchAndUpdateModels, providerFetchStatus]);
 
-  // --- Manual Fetch Trigger ---
   const fetchModels = useCallback(
     async (providerConfigId: string) => {
       const config = (
@@ -189,7 +184,24 @@ export const ProviderManagementProvider: React.FC<
     [storage.providerConfigs, fetchAndUpdateModels],
   );
 
-  // --- Active Providers Generation (Modified) ---
+  // Helper function to get all potential model definitions for a config
+  const getAllAvailableModelDefs = useCallback(
+    (providerConfigId: string): { id: string; name: string }[] => {
+      const config = (
+        storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS
+      ).find((p) => p.id === providerConfigId);
+      if (!config) return [];
+
+      // Prioritize fetched models
+      if (config.fetchedModels && config.fetchedModels.length > 0) {
+        return config.fetchedModels;
+      }
+      // Fallback to default models for the type
+      return DEFAULT_MODELS[config.type] || [];
+    },
+    [storage.providerConfigs],
+  );
+
   const activeProviders = useMemo<AiProviderConfig[]>(() => {
     const enabledConfigs = (
       storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS
@@ -224,7 +236,6 @@ export const ProviderManagementProvider: React.FC<
           continue;
         }
 
-        // Instantiate the base provider SDK object
         switch (config.type) {
           case "openai":
             providerInstance = createOpenAI({ apiKey });
@@ -260,40 +271,32 @@ export const ProviderManagementProvider: React.FC<
             continue;
         }
 
-        // --- Determine available models ---
-        let availableModelDefs: { id: string; name: string }[] = [];
-        if (config.fetchedModels && config.fetchedModels.length > 0) {
-          // 1. Prioritize fetched models
-          availableModelDefs = config.fetchedModels;
-        } else {
-          // 2. Fallback to DEFAULT_MODELS for the type
-          availableModelDefs = DEFAULT_MODELS[config.type] || [];
-        }
+        // --- Determine ALL available models for this provider config ---
+        const allAvailableModelDefs = getAllAvailableModelDefs(config.id);
 
-        // --- Filter models based on enabledModels if specified ---
-        const modelIdsToUse =
+        // --- Determine which models are ENABLED for the dropdown/selection ---
+        // Use user's explicit list if available and not empty
+        const enabledModelIds =
           config.enabledModels && config.enabledModels.length > 0
-            ? config.enabledModels // Use user's explicit list
-            : availableModelDefs.map((m) => m.id); // Use all available (fetched or default)
+            ? config.enabledModels
+            : null;
 
-        // --- Instantiate AiModelConfig for active models ---
-        const models: AiModelConfig[] = modelIdsToUse
-          .map((modelId) => {
-            // Find the definition (either fetched or default)
-            const modelDef = availableModelDefs.find((m) => m.id === modelId);
-            if (!modelDef) {
-              // This can happen if enabledModels contains IDs not in fetched/default lists
-              console.warn(
-                `[ProviderMgmt] Model ID "${modelId}" enabled for "${config.name}" but not found in available definitions. Skipping.`,
-              );
-              return null;
-            }
+        // Filter all available models to get the ones explicitly enabled by the user
+        // If no models are explicitly enabled, use ALL available models.
+        const modelsToEnable = enabledModelIds
+          ? allAvailableModelDefs.filter((def) =>
+              enabledModelIds.includes(def.id),
+            )
+          : allAvailableModelDefs;
+
+        // --- Instantiate AiModelConfig for ENABLED models ---
+        const enabledModels: AiModelConfig[] = modelsToEnable
+          .map((modelDef) => {
             try {
-              // Instantiate the specific model using the base provider instance
               return {
                 id: modelDef.id,
-                name: modelDef.name, // Use name from definition
-                instance: providerInstance(modelDef.id), // Call base instance with model ID
+                name: modelDef.name,
+                instance: providerInstance(modelDef.id),
               };
             } catch (modelErr) {
               console.error(
@@ -305,17 +308,34 @@ export const ProviderManagementProvider: React.FC<
           })
           .filter((m): m is AiModelConfig => m !== null);
 
-        if (models.length > 0) {
+        if (enabledModels.length > 0) {
           generatedProviders.push({
             id: config.id,
             name: config.name,
             type: config.type,
-            models: models,
+            models: enabledModels, // Models enabled via config.enabledModels (or all if null)
+            allAvailableModels: allAvailableModelDefs, // All possible models (fetched/default)
           });
         } else {
-          console.warn(
-            `[ProviderMgmt] No valid models could be instantiated for provider "${config.name}" (ID: ${config.id}). Skipping provider.`,
-          );
+          // Still add the provider if there are potentially models available,
+          // even if none are currently enabled via config.enabledModels.
+          // The search in the combobox should still work.
+          if (allAvailableModelDefs.length > 0) {
+            generatedProviders.push({
+              id: config.id,
+              name: config.name,
+              type: config.type,
+              models: [], // No models explicitly enabled for the dropdown
+              allAvailableModels: allAvailableModelDefs, // All possible models for search
+            });
+            console.warn(
+              `[ProviderMgmt] Provider "${config.name}" (ID: ${config.id}) has available models, but none are currently selected in 'enabledModels'. It will appear, but the dropdown list will be initially empty.`,
+            );
+          } else {
+            console.warn(
+              `[ProviderMgmt] No valid models could be instantiated or found (fetched/default) for provider "${config.name}" (ID: ${config.id}). Skipping provider.`,
+            );
+          }
         }
       } catch (err) {
         console.error(
@@ -328,7 +348,11 @@ export const ProviderManagementProvider: React.FC<
       }
     }
     return generatedProviders;
-  }, [storage.providerConfigs, storage.apiKeys]); // Re-run when DB changes
+  }, [
+    storage.providerConfigs,
+    storage.apiKeys,
+    getAllAvailableModelDefs, // Add dependency
+  ]);
 
   const providerModel = useProviderModelSelection({
     providers: activeProviders,
@@ -375,9 +399,9 @@ export const ProviderManagementProvider: React.FC<
       addDbProviderConfig: storage.addProviderConfig,
       updateDbProviderConfig: storage.updateProviderConfig,
       deleteDbProviderConfig: storage.deleteProviderConfig,
-      // --- NEW ---
       fetchModels,
       providerFetchStatus,
+      getAllAvailableModelDefs, // Expose helper
     }),
     [
       enableApiKeyManagement,
@@ -396,8 +420,9 @@ export const ProviderManagementProvider: React.FC<
       storage.addProviderConfig,
       storage.updateProviderConfig,
       storage.deleteProviderConfig,
-      fetchModels, // Add new function
-      providerFetchStatus, // Add new state
+      fetchModels,
+      providerFetchStatus,
+      getAllAvailableModelDefs, // Add helper to value
     ],
   );
 

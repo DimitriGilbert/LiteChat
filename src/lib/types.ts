@@ -51,8 +51,12 @@ export interface DbProviderConfig extends DbBase {
   isEnabled: boolean;
   apiKeyId: string | null; // Link to DbApiKey.id if required
   baseURL: string | null; // For openai-compatible, ollama
-  // Optional: Specify models explicitly, otherwise use defaults/all known
-  enabledModels: string[] | null; // Array of model IDs (e.g., ["gpt-4", "gpt-3.5-turbo"])
+  /**
+   * IDs of models to show in the primary dropdown list.
+   * If null/empty, show all fetched/default models.
+   * Search accesses all available models regardless of this setting.
+   */
+  enabledModels: string[] | null;
   autoFetchModels: boolean; // Default to true for supported types
   /** Stores the list of models fetched from the /models endpoint. */
   fetchedModels: { id: string; name: string }[] | null;
@@ -342,4 +346,21 @@ export interface ChatContextProps {
   // --- Settings Modal Control (from SettingsContext) ---
   isSettingsModalOpen: boolean;
   onSettingsModalOpenChange: (open: boolean) => void;
+}
+// --- AI Configuration ---
+export interface AiModelConfig {
+  id: string;
+  name: string;
+  instance: any;
+  contextWindow?: number;
+}
+
+export interface AiProviderConfig {
+  id: string;
+  name: string;
+  type: DbProviderType;
+  /** Models actively configured/enabled for this provider (subset of allAvailableModels). */
+  models: AiModelConfig[];
+  /** All models potentially available from this provider (fetched or default). */
+  allAvailableModels: { id: string; name: string }[];
 }
