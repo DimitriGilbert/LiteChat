@@ -15,7 +15,7 @@ import { SettingsAssistant } from "./settings-assistant";
 import { SettingsApiKeys } from "./settings-api-keys";
 import { SettingsDataManagement } from "./settings-data-management";
 import { SettingsMods } from "./settings-mods";
-import { SettingsProviders } from "./settings-providers"; // Import Providers settings tab
+import { SettingsProviders } from "./settings-providers";
 import { useChatContext } from "@/hooks/use-chat-context";
 import type { CustomSettingTab } from "@/lib/types";
 
@@ -30,16 +30,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const context = useChatContext();
 
-  // Use the callback from context to handle open/close changes
   const handleOpenChange = (open: boolean) => {
-    context.onSettingsModalOpenChange(open); // Notify context for event emission
+    context.onSettingsModalOpenChange(open);
     if (!open) {
-      onClose(); // Call the original onClose passed via props
+      onClose();
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      {/* Apply max-height and flex layout here */}
       <DialogContent className="sm:max-w-[650px] max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
@@ -48,11 +48,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             data.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-grow overflow-hidden">
-          <Tabs defaultValue="general" className="h-full flex flex-col">
-            <TabsList className="flex-shrink-0">
+
+        {/* This div grows and handles scrolling for the content */}
+        <div className="flex-grow overflow-y-auto py-4 pr-2">
+          {/* Remove height/flex constraints from Tabs */}
+          <Tabs defaultValue="general" className="">
+            <TabsList className="flex-shrink-0 sticky top-0 bg-background z-10">
+              {" "}
+              {/* Added sticky positioning */}
               <TabsTrigger value="general">General</TabsTrigger>
-              {/* Add Providers Tab Trigger */}
               <TabsTrigger value="providers">Providers</TabsTrigger>
               {context.enableAdvancedSettings && (
                 <TabsTrigger value="assistant">Assistant</TabsTrigger>
@@ -62,18 +66,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
               <TabsTrigger value="data">Data</TabsTrigger>
               <TabsTrigger value="mods">Mods</TabsTrigger>
-              {/* Add Custom Tab Triggers */}
               {context.customSettingsTabs.map((tab: CustomSettingTab) => (
                 <TabsTrigger key={tab.id} value={tab.id}>
                   {tab.title}
                 </TabsTrigger>
               ))}
             </TabsList>
-            <div className="flex-grow overflow-y-auto py-4 pr-2">
+
+            {/* Remove height/overflow constraints from this div */}
+            <div className="mt-4">
+              {" "}
+              {/* Add margin-top for spacing below sticky TabsList */}
               <TabsContent value="general">
                 <SettingsGeneral />
               </TabsContent>
-              {/* Add Providers Tab Content */}
               <TabsContent value="providers">
                 <SettingsProviders />
               </TabsContent>
@@ -93,17 +99,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <TabsContent value="mods">
                 <SettingsMods />
               </TabsContent>
-              {/* Add Custom Tab Content */}
               {context.customSettingsTabs.map((tab: CustomSettingTab) => (
                 <TabsContent key={tab.id} value={tab.id}>
-                  {/* Render the custom component, passing context */}
                   <tab.component context={context} />
                 </TabsContent>
               ))}
             </div>
           </Tabs>
         </div>
-        <DialogFooter className="flex-shrink-0">
+
+        <DialogFooter className="flex-shrink-0 border-t pt-4">
+          {" "}
+          {/* Added border and padding */}
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>

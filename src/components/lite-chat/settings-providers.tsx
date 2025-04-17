@@ -1,5 +1,5 @@
 // src/components/lite-chat/settings-providers.tsx
-import React, { useState, useEffect } from "react"; // Added useEffect
+import React, { useState, useEffect } from "react";
 import { useProviderManagementContext } from "@/context/provider-management-context";
 import type { DbProviderConfig, DbApiKey, DbProviderType } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox"; // Added Checkbox import
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
   Trash2Icon,
@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ApiKeySelector } from "./api-key-selector";
 
+// ... (PROVIDER_TYPES, helper functions, ProviderRowProps remain the same) ...
 const PROVIDER_TYPES: { value: DbProviderType; label: string }[] = [
   { value: "openai", label: "OpenAI" },
   { value: "google", label: "Google Gemini" },
@@ -60,7 +61,6 @@ interface ProviderRowProps {
   onDelete: (id: string) => Promise<void>;
   onFetchModels: (id: string) => Promise<void>;
   fetchStatus: "idle" | "fetching" | "error" | "success";
-  // Need access to this helper from context
   getAllAvailableModelDefs: (
     providerConfigId: string,
   ) => { id: string; name: string }[];
@@ -73,27 +73,24 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
   onDelete,
   onFetchModels,
   fetchStatus,
-  getAllAvailableModelDefs, // Receive helper function
+  getAllAvailableModelDefs,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<DbProviderConfig>>({});
-  // State to hold all models available for selection in edit mode
   const [availableModels, setAvailableModels] = useState<
     { id: string; name: string }[]
   >([]);
 
-  // Fetch available models when entering edit mode
   useEffect(() => {
     if (isEditing) {
       const models = getAllAvailableModelDefs(provider.id);
       setAvailableModels(models);
-      // Ensure enabledModels is an array in editData when editing starts
       setEditData((prev) => ({
         ...prev,
         enabledModels: provider.enabledModels ?? [],
       }));
     } else {
-      setAvailableModels([]); // Clear when not editing
+      setAvailableModels([]);
     }
   }, [
     isEditing,
@@ -109,7 +106,7 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
       isEnabled: provider.isEnabled,
       apiKeyId: provider.apiKeyId,
       baseURL: provider.baseURL,
-      enabledModels: provider.enabledModels ?? [], // Initialize as array
+      enabledModels: provider.enabledModels ?? [],
       autoFetchModels: provider.autoFetchModels,
     });
     setIsEditing(true);
@@ -122,7 +119,6 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
 
   const handleSave = async () => {
     try {
-      // Pass null if the enabledModels array is empty, otherwise pass the array
       const changesToSave = {
         ...editData,
         enabledModels:
@@ -148,17 +144,15 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
     setEditData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Handler for enabled model checkboxes
   const handleEnabledModelChange = (modelId: string, checked: boolean) => {
     setEditData((prev) => {
-      const currentEnabled = (prev.enabledModels as string[]) ?? []; // Ensure it's an array
+      const currentEnabled = (prev.enabledModels as string[]) ?? [];
       let newEnabled: string[];
       if (checked) {
         newEnabled = [...currentEnabled, modelId];
       } else {
         newEnabled = currentEnabled.filter((id) => id !== modelId);
       }
-      // Ensure unique values
       return { ...prev, enabledModels: [...new Set(newEnabled)] };
     });
   };
@@ -281,7 +275,6 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
                     <div key={model.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={`edit-model-${provider.id}-${model.id}`}
-                        // Ensure editData.enabledModels is treated as an array
                         checked={(
                           (editData.enabledModels as string[]) ?? []
                         ).includes(model.id)}
@@ -366,7 +359,6 @@ const ProviderRow: React.FC<ProviderRowProps> = ({
                 </span>
                 <ScrollArea className="h-16 mt-1 rounded-md border border-gray-600 p-2 bg-gray-900 text-xs">
                   {provider.enabledModels.map((modelId) => {
-                    // Find the model name from fetchedModels if possible
                     const model = provider.fetchedModels?.find(
                       (m) => m.id === modelId,
                     );
@@ -438,7 +430,7 @@ export const SettingsProviders: React.FC = () => {
     apiKeys,
     fetchModels,
     providerFetchStatus,
-    getAllAvailableModelDefs, // Get the helper function
+    getAllAvailableModelDefs,
   } = useProviderManagementContext();
   const [isAdding, setIsAdding] = useState(false);
   const [newProviderData, setNewProviderData] = useState<
@@ -449,7 +441,7 @@ export const SettingsProviders: React.FC = () => {
     isEnabled: true,
     apiKeyId: null,
     baseURL: null,
-    enabledModels: null, // Start as null
+    enabledModels: null,
     autoFetchModels: true,
     fetchedModels: null,
     modelsLastFetchedAt: null,
@@ -490,7 +482,6 @@ export const SettingsProviders: React.FC = () => {
         isEnabled: newProviderData.isEnabled ?? true,
         apiKeyId: newProviderData.apiKeyId ?? null,
         baseURL: newProviderData.baseURL ?? null,
-        // Save enabledModels as null initially for new providers
         enabledModels: null,
         autoFetchModels: autoFetch,
         fetchedModels: null,
@@ -511,13 +502,12 @@ export const SettingsProviders: React.FC = () => {
   ) => {
     setNewProviderData((prev) => {
       const updated = { ...prev, [field]: value };
-      // Reset dependent fields when type changes
       if (field === "type") {
         const newType = value as DbProviderType;
         updated.apiKeyId = null;
         updated.baseURL = null;
         updated.autoFetchModels = supportsModelFetching(newType);
-        updated.enabledModels = null; // Reset enabled models on type change
+        updated.enabledModels = null;
       }
       return updated;
     });
@@ -528,14 +518,22 @@ export const SettingsProviders: React.FC = () => {
   const canFetch = supportsModelFetching(newProviderData.type ?? null);
 
   return (
-    <div className="p-4 space-y-4">
-      <h3 className="text-lg font-bold text-white">AI Provider Settings</h3>
-      <p className="text-sm text-gray-400">
-        Configure connections to different AI model providers. API keys and
-        settings are stored locally in your browser's IndexedDB.
-      </p>
-
-      <ScrollArea className="h-[calc(100vh-300px)] pr-3">
+    <div className="p-4 space-y-4 flex flex-col h-full">
+      {" "}
+      {/* Added flex flex-col h-full */}
+      <div>
+        {" "}
+        {/* Encapsulate static header content */}
+        <h3 className="text-lg font-bold text-white">AI Provider Settings</h3>
+        <p className="text-sm text-gray-400">
+          Configure connections to different AI model providers. API keys and
+          settings are stored locally in your browser's IndexedDB.
+        </p>
+      </div>
+      {/* Make ScrollArea flexible */}
+      <ScrollArea className="flex-grow pr-3">
+        {" "}
+        {/* Changed height to flex-grow */}
         <div className="space-y-2">
           {dbProviderConfigs.map((provider) => (
             <ProviderRow
@@ -546,112 +544,118 @@ export const SettingsProviders: React.FC = () => {
               onDelete={deleteDbProviderConfig}
               onFetchModels={fetchModels}
               fetchStatus={providerFetchStatus[provider.id] || "idle"}
-              getAllAvailableModelDefs={getAllAvailableModelDefs} // Pass down helper
+              getAllAvailableModelDefs={getAllAvailableModelDefs}
             />
           ))}
         </div>
       </ScrollArea>
-
-      {isAdding && (
-        <div className="border border-blue-500 rounded-md p-4 space-y-3 bg-gray-800 shadow-lg">
-          <h4 className="font-semibold text-white">Add New Provider</h4>
-          {/* Name, Type, Enabled Switch */}
-          <div className="flex items-center space-x-2">
-            <Input
-              value={newProviderData.name || ""}
-              onChange={(e) => handleNewChange("name", e.target.value)}
-              placeholder="Provider Name (e.g., My Ollama)"
-              className="flex-grow bg-gray-700 border-gray-600 text-white"
-            />
-            <Select
-              value={newProviderData.type}
-              onValueChange={(value) =>
-                handleNewChange("type", value as DbProviderType)
-              }
-            >
-              <SelectTrigger className="w-[180px] bg-gray-700 border-gray-600 text-white">
-                <SelectValue placeholder="Select Type" />
-              </SelectTrigger>
-              <SelectContent className="bg-gray-800 text-white border-gray-600">
-                {PROVIDER_TYPES.map((pt) => (
-                  <SelectItem key={pt.value} value={pt.value}>
-                    {pt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {/* Add/New Form Section (remains at the bottom) */}
+      <div className="mt-auto pt-4">
+        {" "}
+        {/* Add padding top */}
+        {isAdding && (
+          <div className="border border-blue-500 rounded-md p-4 space-y-3 bg-gray-800 shadow-lg">
+            <h4 className="font-semibold text-white">Add New Provider</h4>
+            {/* Name, Type, Enabled Switch */}
+            <div className="flex items-center space-x-2">
+              <Input
+                value={newProviderData.name || ""}
+                onChange={(e) => handleNewChange("name", e.target.value)}
+                placeholder="Provider Name (e.g., My Ollama)"
+                className="flex-grow bg-gray-700 border-gray-600 text-white"
+              />
+              <Select
+                value={newProviderData.type}
+                onValueChange={(value) =>
+                  handleNewChange("type", value as DbProviderType)
+                }
+              >
+                <SelectTrigger className="w-[180px] bg-gray-700 border-gray-600 text-white">
+                  <SelectValue placeholder="Select Type" />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 text-white border-gray-600">
+                  {PROVIDER_TYPES.map((pt) => (
+                    <SelectItem key={pt.value} value={pt.value}>
+                      {pt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="new-enabled"
+                  checked={newProviderData.isEnabled}
+                  onCheckedChange={(checked) =>
+                    handleNewChange("isEnabled", checked)
+                  }
+                />
+                <Label htmlFor="new-enabled">Enabled</Label>
+              </div>
+            </div>
+            {/* API Key / Base URL */}
+            {(needsKey || needsURL) && (
+              <div className="flex items-center space-x-2">
+                {needsKey && (
+                  <ApiKeySelector
+                    label="API Key:"
+                    selectedKeyId={newProviderData.apiKeyId ?? null}
+                    onKeySelected={(keyId) =>
+                      handleNewChange("apiKeyId", keyId)
+                    }
+                    apiKeys={apiKeys}
+                    className="flex-grow"
+                  />
+                )}
+                {needsURL && (
+                  <Input
+                    value={newProviderData.baseURL || ""}
+                    onChange={(e) => handleNewChange("baseURL", e.target.value)}
+                    placeholder="Base URL (e.g., http://localhost:11434)"
+                    className="flex-grow bg-gray-700 border-gray-600 text-white"
+                  />
+                )}
+              </div>
+            )}
+            {/* Auto-fetch Switch */}
             <div className="flex items-center space-x-2">
               <Switch
-                id="new-enabled"
-                checked={newProviderData.isEnabled}
+                id="new-autofetch"
+                checked={newProviderData.autoFetchModels}
                 onCheckedChange={(checked) =>
-                  handleNewChange("isEnabled", checked)
+                  handleNewChange("autoFetchModels", checked)
                 }
+                disabled={!canFetch}
               />
-              <Label htmlFor="new-enabled">Enabled</Label>
+              <Label
+                htmlFor="new-autofetch"
+                className={!canFetch ? "text-gray-500" : ""}
+              >
+                Auto-fetch models {canFetch ? "" : "(Not Supported)"}
+              </Label>
+            </div>
+            <p className="text-xs text-gray-400">
+              You can select specific models to enable after adding the provider
+              and fetching its models.
+            </p>
+            {/* Add/Cancel Buttons */}
+            <div className="flex justify-end space-x-2">
+              <Button variant="ghost" size="sm" onClick={handleCancelNew}>
+                <XIcon className="h-4 w-4 mr-1" /> Cancel
+              </Button>
+              <Button variant="secondary" size="sm" onClick={handleSaveNew}>
+                <SaveIcon className="h-4 w-4 mr-1" /> Add Provider
+              </Button>
             </div>
           </div>
-          {/* API Key / Base URL */}
-          {(needsKey || needsURL) && (
-            <div className="flex items-center space-x-2">
-              {needsKey && (
-                <ApiKeySelector
-                  label="API Key:"
-                  selectedKeyId={newProviderData.apiKeyId ?? null}
-                  onKeySelected={(keyId) => handleNewChange("apiKeyId", keyId)}
-                  apiKeys={apiKeys}
-                  className="flex-grow"
-                />
-              )}
-              {needsURL && (
-                <Input
-                  value={newProviderData.baseURL || ""}
-                  onChange={(e) => handleNewChange("baseURL", e.target.value)}
-                  placeholder="Base URL (e.g., http://localhost:11434)"
-                  className="flex-grow bg-gray-700 border-gray-600 text-white"
-                />
-              )}
-            </div>
-          )}
-          {/* Auto-fetch Switch */}
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="new-autofetch"
-              checked={newProviderData.autoFetchModels}
-              onCheckedChange={(checked) =>
-                handleNewChange("autoFetchModels", checked)
-              }
-              disabled={!canFetch}
-            />
-            <Label
-              htmlFor="new-autofetch"
-              className={!canFetch ? "text-gray-500" : ""}
-            >
-              Auto-fetch models {canFetch ? "" : "(Not Supported)"}
-            </Label>
-          </div>
-          {/* Note: Cannot select enabled models until provider is created and models fetched */}
-          <p className="text-xs text-gray-400">
-            You can select specific models to enable after adding the provider
-            and fetching its models.
-          </p>
-          {/* Add/Cancel Buttons */}
-          <div className="flex justify-end space-x-2">
-            <Button variant="ghost" size="sm" onClick={handleCancelNew}>
-              <XIcon className="h-4 w-4 mr-1" /> Cancel
-            </Button>
-            <Button variant="secondary" size="sm" onClick={handleSaveNew}>
-              <SaveIcon className="h-4 w-4 mr-1" /> Add Provider
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {!isAdding && (
-        <Button onClick={handleAddNew} className="mt-4">
-          <PlusIcon className="h-4 w-4 mr-1" /> Add Provider
-        </Button>
-      )}
+        )}
+        {!isAdding && (
+          <Button onClick={handleAddNew} className="w-full">
+            {" "}
+            {/* Make button full width */}
+            <PlusIcon className="h-4 w-4 mr-1" /> Add Provider
+          </Button>
+        )}
+      </div>
     </div>
   );
 };

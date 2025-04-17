@@ -11,7 +11,8 @@
     "test": "DEBUG_PRINT_LIMIT=10000 vitest",
     "test:ui": "DEBUG_PRINT_LIMIT=10000 vitest --ui",
     "coverage": "DEBUG_PRINT_LIMIT=10000 vitest run --coverage",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist --no-history --dotfiles --remove \".proompts/**/*\"",
+    "to2web": "npm run build && npm run deploy"
   },
   "dependencies": {
     "@ai-sdk/google": "^1.2.11",
