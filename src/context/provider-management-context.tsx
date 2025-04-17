@@ -28,10 +28,10 @@ import { createOllama } from "ollama-ai-provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
 
+// --- Constants, Helpers, Interfaces (remain the same) ---
 const EMPTY_API_KEYS: DbApiKey[] = [];
 const EMPTY_DB_PROVIDER_CONFIGS: DbProviderConfig[] = [];
 const EMPTY_ACTIVE_PROVIDERS: AiProviderConfig[] = [];
-
 const DEFAULT_MODELS: Record<DbProviderType, { id: string; name: string }[]> = {
   openai: [{ id: "gpt-4o", name: "GPT-4o" }],
   google: [
@@ -43,11 +43,9 @@ const DEFAULT_MODELS: Record<DbProviderType, { id: string; name: string }[]> = {
   ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }],
   "openai-compatible": [],
 };
-
 const requiresApiKey = (type: DbProviderType | null): boolean => {
   return type === "openai" || type === "openrouter" || type === "google";
 };
-
 const dummyApiKeysMgmt: UseApiKeysManagementReturn = {
   addApiKey: async () => {
     console.warn("API Key Management is disabled.");
@@ -60,9 +58,7 @@ const dummyApiKeysMgmt: UseApiKeysManagementReturn = {
     throw new Error("API Key Management is disabled.");
   },
 };
-
 type FetchStatus = "idle" | "fetching" | "error" | "success";
-
 interface ProviderManagementContextProps {
   enableApiKeyManagement: boolean;
   activeProviders: AiProviderConfig[];
@@ -91,22 +87,20 @@ interface ProviderManagementContextProps {
   deleteDbProviderConfig: (id: string) => Promise<void>;
   fetchModels: (providerConfigId: string) => Promise<void>;
   providerFetchStatus: Record<string, FetchStatus>;
-  // Helper to get all available models for a config ID (used in settings)
   getAllAvailableModelDefs: (
     providerConfigId: string,
   ) => { id: string; name: string }[];
 }
-
 const ProviderManagementContext = createContext<
   ProviderManagementContextProps | undefined
 >(undefined);
-
 interface ProviderManagementProviderProps {
   children: React.ReactNode;
   initialProviderId?: string | null;
   initialModelId?: string | null;
   enableApiKeyManagement?: boolean;
 }
+// --- End Constants, Helpers, Interfaces ---
 
 export const ProviderManagementProvider: React.FC<
   ProviderManagementProviderProps
@@ -117,43 +111,45 @@ export const ProviderManagementProvider: React.FC<
   enableApiKeyManagement = true,
 }) => {
   const storage = useChatStorage();
+  const dbProviderConfigs =
+    storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS;
+  const apiKeys = storage.apiKeys || EMPTY_API_KEYS;
   const [providerFetchStatus, setProviderFetchStatus] = useState<
     Record<string, FetchStatus>
   >({});
 
-  const fetchAndUpdateModels = useCallback(
+  // --- Internal Fetch Logic (Unchanged from previous fix) ---
+  const fetchAndUpdateModelsInternal = useCallback(
     async (config: DbProviderConfig) => {
-      if (!config.autoFetchModels) return;
-
+      if (providerFetchStatus[config.id] === "fetching") {
+        console.log(
+          `[ProviderMgmt] Fetch already in progress for ${config.name}`,
+        );
+        return;
+      }
       setProviderFetchStatus((prev) => ({ ...prev, [config.id]: "fetching" }));
       try {
-        const apiKey = (storage.apiKeys || EMPTY_API_KEYS).find(
-          (k) => k.id === config.apiKeyId,
-        )?.value;
+        const apiKey = apiKeys.find((k) => k.id === config.apiKeyId)?.value;
         const fetched = await fetchModelsForProvider(config, apiKey);
         await storage.updateProviderConfig(config.id, {
           fetchedModels: fetched,
           modelsLastFetchedAt: new Date(),
         });
-        setProviderFetchStatus((prev) => ({
-          ...prev,
-          [config.id]: "success",
-        }));
+        setProviderFetchStatus((prev) => ({ ...prev, [config.id]: "success" }));
         toast.success(
           `Successfully fetched ${fetched.length} models for ${config.name}`,
         );
       } catch (error) {
-        console.error(error);
+        console.error(`Error fetching models for ${config.name}:`, error);
         setProviderFetchStatus((prev) => ({ ...prev, [config.id]: "error" }));
       }
     },
-    [storage],
+    [storage, apiKeys, providerFetchStatus],
   );
 
+  // --- Auto-fetching on Load (Unchanged from previous fix) ---
   useEffect(() => {
-    const configsToFetch = (
-      storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS
-    ).filter(
+    const configsToFetch = dbProviderConfigs.filter(
       (c) =>
         c.isEnabled &&
         c.autoFetchModels &&
@@ -161,90 +157,82 @@ export const ProviderManagementProvider: React.FC<
         providerFetchStatus[c.id] !== "fetching" &&
         providerFetchStatus[c.id] !== "success",
     );
-
     if (configsToFetch.length > 0) {
       console.log(
-        `[ProviderMgmt] Triggering initial fetch for ${configsToFetch.length} providers.`,
+        `[ProviderMgmt] Triggering initial auto-fetch for ${configsToFetch.length} providers.`,
       );
-      configsToFetch.forEach(fetchAndUpdateModels);
+      Promise.allSettled(
+        configsToFetch.map((config) => fetchAndUpdateModelsInternal(config)),
+      );
     }
-  }, [storage.providerConfigs, fetchAndUpdateModels, providerFetchStatus]);
+  }, [dbProviderConfigs, fetchAndUpdateModelsInternal, providerFetchStatus]);
 
+  // --- Manual Fetch Trigger (Unchanged from previous fix) ---
   const fetchModels = useCallback(
     async (providerConfigId: string) => {
-      const config = (
-        storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS
-      ).find((p) => p.id === providerConfigId);
+      const config = dbProviderConfigs.find((p) => p.id === providerConfigId);
       if (config) {
-        await fetchAndUpdateModels(config);
+        await fetchAndUpdateModelsInternal(config);
       } else {
         toast.error("Provider configuration not found.");
       }
     },
-    [storage.providerConfigs, fetchAndUpdateModels],
+    [dbProviderConfigs, fetchAndUpdateModelsInternal],
   );
 
-  // Helper function to get all potential model definitions for a config
+  // --- Helper to get model definitions (Unchanged from previous fix) ---
   const getAllAvailableModelDefs = useCallback(
     (providerConfigId: string): { id: string; name: string }[] => {
-      const config = (
-        storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS
-      ).find((p) => p.id === providerConfigId);
+      const config = dbProviderConfigs.find((p) => p.id === providerConfigId);
       if (!config) return [];
-
-      // Prioritize fetched models
       if (config.fetchedModels && config.fetchedModels.length > 0) {
         return config.fetchedModels;
       }
-      // Fallback to default models for the type
       return DEFAULT_MODELS[config.type] || [];
     },
-    [storage.providerConfigs],
+    [dbProviderConfigs],
   );
 
+  // --- Generate Active Providers (UPDATED LOGIC) ---
   const activeProviders = useMemo<AiProviderConfig[]>(() => {
-    const enabledConfigs = (
-      storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS
-    ).filter((c) => c.isEnabled);
-    const availableApiKeys = storage.apiKeys || EMPTY_API_KEYS;
-
-    if (enabledConfigs.length === 0) {
-      return EMPTY_ACTIVE_PROVIDERS;
-    }
+    console.log("[ProviderMgmt] Recalculating activeProviders...");
+    const enabledConfigs = dbProviderConfigs.filter((c) => c.isEnabled);
+    if (enabledConfigs.length === 0) return EMPTY_ACTIVE_PROVIDERS;
 
     const generatedProviders: AiProviderConfig[] = [];
 
     for (const config of enabledConfigs) {
       try {
         let providerInstance: any;
-        let apiKey: string | undefined;
-
+        let currentApiKey: string | undefined;
+        // (API Key check logic remains the same)
         if (config.apiKeyId) {
-          apiKey = availableApiKeys.find(
-            (k) => k.id === config.apiKeyId,
-          )?.value;
-          if (!apiKey && requiresApiKey(config.type)) {
+          currentApiKey = apiKeys.find((k) => k.id === config.apiKeyId)?.value;
+          if (!currentApiKey && requiresApiKey(config.type)) {
             console.warn(
-              `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): API Key ID ${config.apiKeyId} configured but key not found or value missing.`,
+              `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): API Key ID ${config.apiKeyId} configured but key not found.`,
             );
             continue;
           }
         } else if (requiresApiKey(config.type)) {
           console.warn(
-            `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): API Key is required but none is linked in the provider configuration.`,
+            `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): API Key required but none linked.`,
           );
           continue;
         }
 
+        // (Provider instantiation logic remains the same)
         switch (config.type) {
           case "openai":
-            providerInstance = createOpenAI({ apiKey });
+            providerInstance = createOpenAI({ apiKey: currentApiKey });
             break;
           case "google":
-            providerInstance = createGoogleGenerativeAI({ apiKey });
+            providerInstance = createGoogleGenerativeAI({
+              apiKey: currentApiKey,
+            });
             break;
           case "openrouter":
-            providerInstance = createOpenRouter({ apiKey });
+            providerInstance = createOpenRouter({ apiKey: currentApiKey });
             break;
           case "ollama":
             providerInstance = createOllama({
@@ -254,43 +242,78 @@ export const ProviderManagementProvider: React.FC<
           case "openai-compatible":
             if (!config.baseURL) {
               console.warn(
-                `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): Base URL required for OpenAI-Compatible.`,
+                `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): Base URL required.`,
               );
               continue;
             }
             providerInstance = createOpenAICompatible({
               name: config.name ?? "OpenAI-Compatible",
               baseURL: config.baseURL,
-              apiKey: apiKey,
+              apiKey: currentApiKey,
             });
             break;
           default:
             console.warn(
-              `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): Unsupported provider type: ${config.type}`,
+              `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): Unsupported type.`,
             );
             continue;
         }
 
-        // --- Determine ALL available models for this provider config ---
+        // --- Get ALL available models for search ---
         const allAvailableModelDefs = getAllAvailableModelDefs(config.id);
+        if (allAvailableModelDefs.length === 0) {
+          console.warn(
+            `[ProviderMgmt] No models found (fetched/default) for provider "${config.name}". Skipping.`,
+          );
+          continue; // Skip provider if no models are available at all
+        }
+        // const allAvailableModelMap = new Map(
+        //   allAvailableModelDefs.map((m) => [m.id, m]),
+        // );
 
-        // --- Determine which models are ENABLED for the dropdown/selection ---
-        // Use user's explicit list if available and not empty
-        const enabledModelIds =
-          config.enabledModels && config.enabledModels.length > 0
-            ? config.enabledModels
-            : null;
+        // --- Determine the list for the dropdown ---
+        let modelsForDropdownList: { id: string; name: string }[] = [];
+        const enabledModelIds = config.enabledModels ?? []; // Use enabled list or empty array
 
-        // Filter all available models to get the ones explicitly enabled by the user
-        // If no models are explicitly enabled, use ALL available models.
-        const modelsToEnable = enabledModelIds
-          ? allAvailableModelDefs.filter((def) =>
-              enabledModelIds.includes(def.id),
-            )
-          : allAvailableModelDefs;
+        if (enabledModelIds.length > 0) {
+          // Filter all available models to get only the enabled ones
+          const enabledModelDefs = allAvailableModelDefs.filter((m) =>
+            enabledModelIds.includes(m.id),
+          );
 
-        // --- Instantiate AiModelConfig for ENABLED models ---
-        const enabledModels: AiModelConfig[] = modelsToEnable
+          // Sort this *enabled subset* based on modelSortOrder
+          const sortOrder = config.modelSortOrder ?? [];
+          const orderedEnabledList: { id: string; name: string }[] = [];
+          const addedIds = new Set<string>();
+
+          // Add models based on the sort order
+          for (const modelId of sortOrder) {
+            // Only add if it's actually in the enabled subset
+            const model = enabledModelDefs.find((m) => m.id === modelId);
+            if (model && !addedIds.has(modelId)) {
+              orderedEnabledList.push(model);
+              addedIds.add(modelId);
+            }
+          }
+
+          // Add any remaining *enabled* models that weren't in the sort order (alphabetically)
+          const remainingEnabled = enabledModelDefs
+            .filter((m) => !addedIds.has(m.id))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+          modelsForDropdownList = [...orderedEnabledList, ...remainingEnabled];
+        } else {
+          // If NO models are explicitly enabled, show ALL available models in dropdown (sorted alphabetically)
+          modelsForDropdownList = [...allAvailableModelDefs].sort((a, b) =>
+            a.name.localeCompare(b.name),
+          );
+          console.log(
+            `[ProviderMgmt] No models explicitly enabled for "${config.name}". Displaying all ${modelsForDropdownList.length} available models in dropdown.`,
+          );
+        }
+
+        // --- Instantiate AiModelConfig for the final dropdown list ---
+        const finalModelsForDropdown: AiModelConfig[] = modelsForDropdownList
           .map((modelDef) => {
             try {
               return {
@@ -308,38 +331,17 @@ export const ProviderManagementProvider: React.FC<
           })
           .filter((m): m is AiModelConfig => m !== null);
 
-        if (enabledModels.length > 0) {
-          generatedProviders.push({
-            id: config.id,
-            name: config.name,
-            type: config.type,
-            models: enabledModels, // Models enabled via config.enabledModels (or all if null)
-            allAvailableModels: allAvailableModelDefs, // All possible models (fetched/default)
-          });
-        } else {
-          // Still add the provider if there are potentially models available,
-          // even if none are currently enabled via config.enabledModels.
-          // The search in the combobox should still work.
-          if (allAvailableModelDefs.length > 0) {
-            generatedProviders.push({
-              id: config.id,
-              name: config.name,
-              type: config.type,
-              models: [], // No models explicitly enabled for the dropdown
-              allAvailableModels: allAvailableModelDefs, // All possible models for search
-            });
-            console.warn(
-              `[ProviderMgmt] Provider "${config.name}" (ID: ${config.id}) has available models, but none are currently selected in 'enabledModels'. It will appear, but the dropdown list will be initially empty.`,
-            );
-          } else {
-            console.warn(
-              `[ProviderMgmt] No valid models could be instantiated or found (fetched/default) for provider "${config.name}" (ID: ${config.id}). Skipping provider.`,
-            );
-          }
-        }
+        // Add the provider config
+        generatedProviders.push({
+          id: config.id,
+          name: config.name,
+          type: config.type,
+          models: finalModelsForDropdown, // Correctly ordered/filtered list for dropdown
+          allAvailableModels: allAvailableModelDefs, // Full list for search
+        });
       } catch (err) {
         console.error(
-          `[ProviderMgmt] Failed to instantiate provider ${config.name} (ID: ${config.id}, Type: ${config.type}):`,
+          `[ProviderMgmt] Failed to instantiate provider ${config.name}:`,
           err,
         );
         toast.error(
@@ -348,18 +350,16 @@ export const ProviderManagementProvider: React.FC<
       }
     }
     return generatedProviders;
-  }, [
-    storage.providerConfigs,
-    storage.apiKeys,
-    getAllAvailableModelDefs, // Add dependency
-  ]);
+  }, [dbProviderConfigs, apiKeys, getAllAvailableModelDefs]); // Depend on live data
 
+  // --- Model Selection Hook (Unchanged) ---
   const providerModel = useProviderModelSelection({
     providers: activeProviders,
     initialProviderId,
     initialModelId,
   });
 
+  // --- API Key Management (Unchanged) ---
   const realApiKeysMgmt = useApiKeysManagement({
     addDbApiKey: storage.addApiKey,
     deleteDbApiKey: storage.deleteApiKey,
@@ -368,19 +368,19 @@ export const ProviderManagementProvider: React.FC<
     return enableApiKeyManagement ? realApiKeysMgmt : dummyApiKeysMgmt;
   }, [enableApiKeyManagement, realApiKeysMgmt]);
 
+  // --- Helper to get API Key Value (Unchanged) ---
   const getApiKeyForProvider = useCallback(
     (providerConfigId: string): string | undefined => {
-      const selectedDbConfig = (
-        storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS
-      ).find((p) => p.id === providerConfigId);
+      const selectedDbConfig = dbProviderConfigs.find(
+        (p) => p.id === providerConfigId,
+      );
       if (!selectedDbConfig?.apiKeyId) return undefined;
-      return (storage.apiKeys || EMPTY_API_KEYS).find(
-        (k) => k.id === selectedDbConfig.apiKeyId,
-      )?.value;
+      return apiKeys.find((k) => k.id === selectedDbConfig.apiKeyId)?.value;
     },
-    [storage.providerConfigs, storage.apiKeys],
+    [dbProviderConfigs, apiKeys],
   );
 
+  // --- Context Value (Unchanged) ---
   const value = useMemo(
     () => ({
       enableApiKeyManagement: enableApiKeyManagement ?? true,
@@ -391,17 +391,17 @@ export const ProviderManagementProvider: React.FC<
       setSelectedModelId: providerModel.setSelectedModelId,
       selectedProvider: providerModel.selectedProvider,
       selectedModel: providerModel.selectedModel,
-      apiKeys: storage.apiKeys || EMPTY_API_KEYS,
+      apiKeys,
       addApiKey: apiKeysMgmt.addApiKey,
       deleteApiKey: apiKeysMgmt.deleteApiKey,
       getApiKeyForProvider,
-      dbProviderConfigs: storage.providerConfigs || EMPTY_DB_PROVIDER_CONFIGS,
+      dbProviderConfigs,
       addDbProviderConfig: storage.addProviderConfig,
       updateDbProviderConfig: storage.updateProviderConfig,
       deleteDbProviderConfig: storage.deleteProviderConfig,
       fetchModels,
       providerFetchStatus,
-      getAllAvailableModelDefs, // Expose helper
+      getAllAvailableModelDefs,
     }),
     [
       enableApiKeyManagement,
@@ -412,17 +412,17 @@ export const ProviderManagementProvider: React.FC<
       providerModel.setSelectedModelId,
       providerModel.selectedProvider,
       providerModel.selectedModel,
-      storage.apiKeys,
+      apiKeys,
       apiKeysMgmt.addApiKey,
       apiKeysMgmt.deleteApiKey,
       getApiKeyForProvider,
-      storage.providerConfigs,
+      dbProviderConfigs,
       storage.addProviderConfig,
       storage.updateProviderConfig,
       storage.deleteProviderConfig,
       fetchModels,
       providerFetchStatus,
-      getAllAvailableModelDefs, // Add helper to value
+      getAllAvailableModelDefs,
     ],
   );
 
@@ -433,6 +433,7 @@ export const ProviderManagementProvider: React.FC<
   );
 };
 
+// --- Hook Export (Unchanged) ---
 export const useProviderManagementContext =
   (): ProviderManagementContextProps => {
     const context = useContext(ProviderManagementContext);

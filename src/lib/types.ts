@@ -62,6 +62,7 @@ export interface DbProviderConfig extends DbBase {
   fetchedModels: { id: string; name: string }[] | null;
   /** Timestamp of the last successful model fetch. */
   modelsLastFetchedAt: Date | null;
+  modelSortOrder: string[] | null;
 }
 
 // --- UI & State Types ---

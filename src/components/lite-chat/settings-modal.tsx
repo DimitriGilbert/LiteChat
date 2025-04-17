@@ -39,8 +39,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      {/* Apply max-height and flex layout here */}
-      <DialogContent className="sm:max-w-[650px] max-h-[80vh] flex flex-col">
+      {/* Set height to 2/3 of viewport height with min/max constraints */}
+      <DialogContent className="sm:max-w-[1000px] h-[66vh] min-h-[500px] max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
@@ -52,10 +52,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* This div grows and handles scrolling for the content */}
         <div className="flex-grow overflow-y-auto py-4 pr-2">
           {/* Remove height/flex constraints from Tabs */}
-          <Tabs defaultValue="general" className="">
+          <Tabs defaultValue="general">
             <TabsList className="flex-shrink-0 sticky top-0 bg-background z-10">
-              {" "}
-              {/* Added sticky positioning */}
               <TabsTrigger value="general">General</TabsTrigger>
               <TabsTrigger value="providers">Providers</TabsTrigger>
               {context.enableAdvancedSettings && (
@@ -73,10 +71,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               ))}
             </TabsList>
 
-            {/* Remove height/overflow constraints from this div */}
             <div className="mt-4">
-              {" "}
-              {/* Add margin-top for spacing below sticky TabsList */}
               <TabsContent value="general">
                 <SettingsGeneral />
               </TabsContent>
@@ -109,8 +104,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <DialogFooter className="flex-shrink-0 border-t pt-4">
-          {" "}
-          {/* Added border and padding */}
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
