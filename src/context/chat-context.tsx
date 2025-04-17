@@ -497,23 +497,15 @@ ${contentText}
     },
     [
       isStreaming,
-      providerMgmt.selectedProvider,
-      providerMgmt.selectedModel,
-      providerMgmt.selectedProviderId,
-      providerMgmt.dbProviderConfigs,
+      providerMgmt,
       getApiKeyForSelectedProvider,
-      providerMgmt.enableApiKeyManagement,
-      sidebar.selectedItemId,
-      sidebar.selectedItemType,
-      sidebar.activeConversationData,
-      sidebar.createConversation,
-      sidebar.deleteItem,
       setError,
       messageHandling,
-      vfs.isVfsEnabledForItem,
-      vfs.vfs,
-      vfs.enableVfs,
+      vfs,
       runMiddleware,
+      sidebar,
+      // decodeUint8Array, // Added dependency - already defined globally
+      // isCodeFile, // Added dependency - already defined globally
     ],
   );
 
@@ -752,10 +744,15 @@ ${contentText}
       handleSubmit,
       stopStreaming,
       regenerateMessage,
+      // VFS
       selectedVfsPaths: vfs.selectedVfsPaths,
       addSelectedVfsPath: vfs.addSelectedVfsPath,
       removeSelectedVfsPath: vfs.removeSelectedVfsPath,
       clearSelectedVfsPaths: vfs.clearSelectedVfsPaths,
+      isVfsEnabledForItem: vfs.isVfsEnabledForItem,
+      toggleVfsEnabled: handleToggleVfs, // Pass the correct function
+      vfs: vfs.vfs,
+      // Settings
       temperature: settings.temperature,
       setTemperature: settings.setTemperature,
       maxTokens: settings.maxTokens,
@@ -776,13 +773,11 @@ ${contentText}
       streamingThrottleRate,
       searchTerm: settings.searchTerm,
       setSearchTerm: settings.setSearchTerm,
+      // Data Management
       exportConversation: sidebar.exportConversation,
       importConversation: handleImportConversation,
       exportAllConversations: sidebar.exportAllConversations,
       clearAllData: storage.clearAllData,
-      isVfsEnabledForItem: vfs.isVfsEnabledForItem,
-      toggleVfsEnabled: handleToggleVfs,
-      vfs: vfs.vfs,
       getConversation: storage.getConversation,
       getProject: storage.getProject,
       customPromptActions: combinedPromptActions,

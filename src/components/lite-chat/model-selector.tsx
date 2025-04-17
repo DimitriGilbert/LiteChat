@@ -15,7 +15,6 @@ export function ModelSelector() {
   const isLoading = !activeProviders || activeProviders.length === 0;
 
   const modelOptions = React.useMemo(() => {
-    // *** CHANGE HERE ***
     // Use selectedProvider.models (filtered based on enabledModels config)
     // instead of selectedProvider.allAvailableModels
     if (!selectedProvider?.models) {
@@ -47,7 +46,7 @@ export function ModelSelector() {
   };
 
   if (isLoading) {
-    return <Skeleton className="h-9 w-full" />;
+    return <Skeleton className="h-9" />;
   }
 
   if (!selectedProvider) {
