@@ -108,7 +108,10 @@ export interface AiProviderConfig {
   id: string;
   name: string;
   type: DbProviderType;
+  /** Models actively configured/enabled for this provider (subset of allAvailableModels). */
   models: AiModelConfig[];
+  /** All models potentially available from this provider (fetched or default). */
+  allAvailableModels: { id: string; name: string }[];
 }
 
 // --- Virtual File System ---
@@ -203,7 +206,7 @@ export interface VfsContextObject {
   downloadFile: (path: string, filename?: string) => Promise<void>;
   uploadFiles: (files: FileList | File[], targetPath: string) => Promise<void>;
   uploadAndExtractZip: (file: File, targetPath: string) => Promise<void>;
-  downloadAllAsZip: (filename?: string) => Promise<void>;
+  downloadAllAsZip: (filename?: string, rootPath?: string) => Promise<void>; // Added rootPath
   rename: (oldPath: string, newPath: string) => Promise<void>;
   vfsKey?: string | null;
 }
@@ -347,21 +350,4 @@ export interface ChatContextProps {
   // --- Settings Modal Control (from SettingsContext) ---
   isSettingsModalOpen: boolean;
   onSettingsModalOpenChange: (open: boolean) => void;
-}
-// --- AI Configuration ---
-export interface AiModelConfig {
-  id: string;
-  name: string;
-  instance: any;
-  contextWindow?: number;
-}
-
-export interface AiProviderConfig {
-  id: string;
-  name: string;
-  type: DbProviderType;
-  /** Models actively configured/enabled for this provider (subset of allAvailableModels). */
-  models: AiModelConfig[];
-  /** All models potentially available from this provider (fetched or default). */
-  allAvailableModels: { id: string; name: string }[];
 }

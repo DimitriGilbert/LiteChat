@@ -2,10 +2,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { configureSingle, fs as zenfs_fs } from "@zenfs/core";
 import { IndexedDB } from "@zenfs/dom";
-import JSZip from "jszip";
+// Removed JSZip import as it's now in vfs-operations
 import type { FileSystemEntry, SidebarItemType } from "@/lib/types";
-import { toast } from "sonner";
-import { modEvents, ModEvent } from "@/mods/events"; // Import mod events and ModEvent constants
+import * as VfsOps from "@/lib/vfs-operations"; // Import the operations module
 
 interface UseVirtualFileSystemProps {
   itemId: string | null;
@@ -28,30 +27,12 @@ interface UseVirtualFileSystemReturn {
   downloadFile: (path: string, filename?: string) => Promise<void>;
   uploadFiles: (files: FileList | File[], targetPath: string) => Promise<void>;
   uploadAndExtractZip: (file: File, targetPath: string) => Promise<void>;
-  downloadAllAsZip: (filename?: string) => Promise<void>;
+  downloadAllAsZip: (filename?: string, rootPath?: string) => Promise<void>; // Added rootPath
   rename: (oldPath: string, newPath: string) => Promise<void>;
   vfsKey: string | null;
 }
 
-const normalizePath = (path: string): string => {
-  return path.replace(/\\/g, "/").replace(/\/+/g, "/");
-};
-const joinPath = (...segments: string[]): string => {
-  return normalizePath(
-    segments
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .join("/"),
-  );
-};
-const dirname = (path: string): string => {
-  const normalized = normalizePath(path);
-  if (normalized === "/") return "/";
-  const lastSlash = normalized.lastIndexOf("/");
-  if (lastSlash === -1) return "/";
-  if (lastSlash === 0) return "/";
-  return normalized.substring(0, lastSlash);
-};
+// Path utilities are now in vfs-operations.ts
 
 export function useVirtualFileSystem({
   isEnabled,
@@ -65,6 +46,7 @@ export function useVirtualFileSystem({
   const configuredVfsKeyRef = useRef<string | null>(null);
   const configuringForVfsKeyRef = useRef<string | null>(null);
 
+  // --- Configuration Effect (Remains the same) ---
   useEffect(() => {
     isMountedRef.current = true;
 
@@ -72,17 +54,16 @@ export function useVirtualFileSystem({
       if (!isMountedRef.current) return;
 
       console.log(
-        `[VFS] Configuring global fs for VFS key: ${key} using configureSingle`,
+        `[VFS Hook] Configuring global fs for VFS key: ${key} using configureSingle`,
       );
       configuringForVfsKeyRef.current = key;
 
-      setIsLoading((prev) => (prev ? prev : true));
+      setIsLoading(true);
       setIsOperationLoading(false);
       setError(null);
       setIsReady(false);
 
       try {
-        // Use a unique name for each VFS key (project, orphan)
         const vfsConf = {
           backend: IndexedDB,
           name: `litechat_vfs_${key}`,
@@ -98,11 +79,11 @@ export function useVirtualFileSystem({
           setIsReady(true);
           setError(null);
           console.log(
-            `[VFS] Global fs configured successfully for ${key}. Hook is ready.`,
+            `[VFS Hook] Global fs configured successfully for ${key}. Hook is ready.`,
           );
         } else {
           console.log(
-            `[VFS] Configuration for ${key} finished, but hook state changed (mounted: ${isMountedRef.current}, target: ${vfsKey}, configuredFor: ${configuringForVfsKeyRef.current}). State not updated for ready.`,
+            `[VFS Hook] Configuration for ${key} finished, but hook state changed (mounted: ${isMountedRef.current}, target: ${vfsKey}, configuredFor: ${configuringForVfsKeyRef.current}). State not updated for ready.`,
           );
           if (vfsKey !== key) {
             setIsReady(false);
@@ -110,10 +91,10 @@ export function useVirtualFileSystem({
           }
         }
       } catch (err) {
-        console.error(`[VFS] Configuration failed for ${key}:`, err);
+        console.error(`[VFS Hook] Configuration failed for ${key}:`, err);
         if (isMountedRef.current && vfsKey === key) {
-          const errorMsg = `Failed to configure filesystem: ${err instanceof Error ? err.message : String(err)}`;
-          setError((prev) => (prev === errorMsg ? prev : errorMsg));
+          const errorMsg = `Failed to initialize filesystem: ${err instanceof Error ? err.message : String(err)}`;
+          setError(errorMsg);
           setIsReady(false);
           configuredVfsKeyRef.current = null;
         }
@@ -132,14 +113,13 @@ export function useVirtualFileSystem({
         if (!isReady) setIsReady(true);
         if (isLoading) setIsLoading(false);
         if (error !== null) setError(null);
-        console.log(`[VFS] Already configured for ${vfsKey}. State ensured.`);
       }
     } else {
       if (isReady) setIsReady(false);
       if (configuredVfsKeyRef.current !== null) {
         configuredVfsKeyRef.current = null;
         console.log(
-          "[VFS] Cleared configured FS key and readiness due to disable/unselect.",
+          "[VFS Hook] Cleared configured FS key and readiness due to disable/unselect.",
         );
       }
       if (isLoading) setIsLoading(false);
@@ -149,420 +129,184 @@ export function useVirtualFileSystem({
 
     return () => {
       isMountedRef.current = false;
-      console.log("[VFS] Cleanup effect triggered.");
     };
   }, [vfsKey, isEnabled, isReady, isLoading, isOperationLoading, error]);
 
+  // --- Readiness Check (Remains the same) ---
   const checkReadyInternal = useCallback(() => {
     if (!isReady || configuredVfsKeyRef.current !== vfsKey) {
       const message =
         "Filesystem is not ready or not configured for the current VFS key.";
       console.error(
-        `[VFS] Operation prevented: ${message} (isReady: ${isReady}, configuredVfsKey: ${configuredVfsKeyRef.current}, expectedVfsKey: ${vfsKey})`,
+        `[VFS Hook] Operation prevented: ${message} (isReady: ${isReady}, configuredVfsKey: ${configuredVfsKeyRef.current}, expectedVfsKey: ${vfsKey})`,
       );
       throw new Error(message);
     }
     return zenfs_fs;
   }, [isReady, vfsKey]);
 
-  // All other methods remain unchanged, but use checkReadyInternal and configuredVfsKeyRef
+  // --- API Wrappers ---
+  // These wrappers check readiness and then call the corresponding operation function.
 
-  const listFilesInternal = useCallback(
+  const listFiles = useCallback(
     async (path: string): Promise<FileSystemEntry[]> => {
-      const fs = checkReadyInternal();
-      const normalized = normalizePath(path);
       try {
-        const entries = await fs.promises.readdir(normalized);
-        const stats = await Promise.all(
-          entries.map(async (name) => {
-            const fullPath = joinPath(normalized, name);
-            try {
-              const stat = await fs.promises.stat(fullPath);
-              return {
-                name,
-                path: fullPath,
-                isDirectory: stat.isDirectory(),
-                size: stat.size,
-                lastModified: stat.mtime,
-              };
-            } catch (statErr) {
-              console.error(`[VFS] Failed to stat ${fullPath}:`, statErr);
-              return null;
-            }
-          }),
-        );
-        return stats.filter((s): s is FileSystemEntry => s !== null);
+        const fs = checkReadyInternal();
+        return await VfsOps.listFilesOp(fs, path);
       } catch (err) {
-        if (err instanceof Error && (err as any).code === "ENOENT") {
-          console.warn(`[VFS] Directory not found for listing: ${normalized}`);
-          return [];
-        }
-        console.error(`[VFS] Failed to list directory ${normalized}:`, err);
-        toast.error(
-          `Error listing files: ${err instanceof Error ? err.message : String(err)}`,
-        );
-        throw err;
+        // checkReadyInternal throws and toasts, listFilesOp handles its own errors/toasts
+        // Return empty array as a fallback if readiness check fails or listFilesOp re-throws
+        return [];
       }
     },
     [checkReadyInternal],
   );
 
-  const readFileInternal = useCallback(
+  const readFile = useCallback(
     async (path: string): Promise<Uint8Array> => {
-      const fs = checkReadyInternal();
-      const normalizedPath = normalizePath(path);
       try {
-        const data = await fs.promises.readFile(normalizedPath);
-        // Phase 5: Emit 'vfs:fileRead' event
-        modEvents.emit(ModEvent.VFS_FILE_READ, { path: normalizedPath }); // Use ModEvent constant
-        return data;
+        const fs = checkReadyInternal();
+        return await VfsOps.readFileOp(fs, path);
       } catch (err) {
-        console.error(`[VFS] Failed to read file ${normalizedPath}:`, err);
-        toast.error(
-          `Error reading file: ${err instanceof Error ? err.message : String(err)}`,
-        );
+        // checkReadyInternal throws and toasts, readFileOp handles its own errors/toasts
+        // Re-throw the error to signal failure to the caller
         throw err;
       }
     },
     [checkReadyInternal],
   );
 
-  const createDirectoryInternalImpl = useCallback(
-    async (path: string): Promise<void> => {
-      const fs = checkReadyInternal();
-      const normalized = normalizePath(path);
-      try {
-        await fs.promises.mkdir(normalized, { recursive: true });
-        // TODO: Phase 5 - Emit 'vfs:directoryCreated' event if needed
-      } catch (err) {
-        if (err instanceof Error && (err as any).code === "EEXIST") {
-          return;
-        }
-        console.error(`[VFS] Failed to create directory ${normalized}:`, err);
-        toast.error(
-          `Error creating directory: ${err instanceof Error ? err.message : String(err)}`,
-        );
-        throw err;
-      }
-    },
-    [checkReadyInternal],
-  );
-
-  const writeFileInternal = useCallback(
+  const writeFile = useCallback(
     async (path: string, data: Uint8Array | string): Promise<void> => {
-      const fs = checkReadyInternal();
-      const normalized = normalizePath(path);
-      const parentDir = dirname(normalized);
-      setIsOperationLoading(true);
       try {
-        if (parentDir !== "/") {
-          await createDirectoryInternalImpl(parentDir);
-        }
-        await fs.promises.writeFile(normalized, data);
-        // Phase 5: Emit 'vfs:fileWritten' event
-        modEvents.emit(ModEvent.VFS_FILE_WRITTEN, { path: normalized }); // Use ModEvent constant
+        const fs = checkReadyInternal();
+        // Pass the state setter for loading management
+        await VfsOps.writeFileOp(fs, setIsOperationLoading, path, data);
       } catch (err) {
-        console.error(`[VFS] Failed to write file ${normalized}:`, err);
-        if (!(err instanceof Error && (err as any).code === "EEXIST")) {
-          toast.error(
-            `Error writing file: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-        throw err;
-      } finally {
-        setIsOperationLoading(false);
-      }
-    },
-    [checkReadyInternal, createDirectoryInternalImpl],
-  );
-
-  const deleteItemInternal = useCallback(
-    async (path: string, recursive: boolean = false): Promise<void> => {
-      const fs = checkReadyInternal();
-      const normalized = normalizePath(path);
-      setIsOperationLoading(true);
-      try {
-        const stat = await fs.promises.stat(normalized);
-        if (stat.isDirectory()) {
-          await fs.promises.rm(normalized, { recursive });
-          // TODO: Phase 5 - Emit 'vfs:directoryDeleted' event if needed
-        } else {
-          await fs.promises.unlink(normalized);
-          // Phase 5: Emit 'vfs:fileDeleted' event
-          modEvents.emit(ModEvent.VFS_FILE_DELETED, { path: normalized }); // Use ModEvent constant
-        }
-      } catch (err) {
-        console.error(`[VFS] Failed to delete ${normalized}:`, err);
-        toast.error(
-          `Error deleting item: ${err instanceof Error ? err.message : String(err)}`,
-        );
-        throw err;
-      } finally {
-        setIsOperationLoading(false);
+        // checkReadyInternal throws and toasts, writeFileOp handles its own errors/toasts
+        // No need to re-throw, failure is indicated by toast and loading state change
       }
     },
     [checkReadyInternal],
   );
 
-  const createDirectoryActual = useCallback(
-    async (path: string): Promise<void> => {
-      setIsOperationLoading(true);
+  const deleteItem = useCallback(
+    async (path: string, recursive: boolean = false): Promise<void> => {
       try {
-        await createDirectoryInternalImpl(path);
-      } catch {
-      } finally {
-        setIsOperationLoading(false);
+        const fs = checkReadyInternal();
+        await VfsOps.deleteItemOp(fs, setIsOperationLoading, path, recursive);
+      } catch (err) {
+        // checkReadyInternal throws and toasts, deleteItemOp handles its own errors/toasts
       }
     },
-    [createDirectoryInternalImpl],
+    [checkReadyInternal],
   );
 
-  const downloadFileInternal = useCallback(
+  const createDirectory = useCallback(
+    async (path: string): Promise<void> => {
+      try {
+        const fs = checkReadyInternal();
+        await VfsOps.createDirectoryOp(fs, setIsOperationLoading, path);
+      } catch (err) {
+        // checkReadyInternal throws and toasts, createDirectoryOp handles its own errors/toasts
+      }
+    },
+    [checkReadyInternal],
+  );
+
+  const downloadFile = useCallback(
     async (path: string, filename?: string): Promise<void> => {
       try {
-        const data = await readFileInternal(normalizePath(path)); // readFileInternal now emits read event
-        const blob = new Blob([data]);
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        const normalized = normalizePath(path);
-        link.download =
-          filename || normalized.substring(normalized.lastIndexOf("/") + 1);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        const fs = checkReadyInternal();
+        await VfsOps.downloadFileOp(fs, path, filename);
       } catch (err) {
-        console.error(`[VFS] Failed to download ${path}:`, err);
-        if (
-          !(
-            err instanceof Error &&
-            err.message.startsWith("Filesystem is not ready")
-          )
-        ) {
-          toast.error(
-            `Error downloading file: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
+        // checkReadyInternal throws and toasts, downloadFileOp handles its own errors/toasts
       }
     },
-    [readFileInternal],
+    [checkReadyInternal],
   );
 
-  const uploadFilesInternal = useCallback(
+  const uploadFiles = useCallback(
     async (files: FileList | File[], targetPath: string): Promise<void> => {
-      const normalizedTargetPath = normalizePath(targetPath);
-      setIsOperationLoading(true);
-      let successCount = 0;
-      let errorCount = 0;
       try {
-        await createDirectoryInternalImpl(normalizedTargetPath);
-
-        const fileArray = Array.from(files);
-        for (const file of fileArray) {
-          const filePath = joinPath(normalizedTargetPath, file.name);
-          try {
-            const buffer = await file.arrayBuffer();
-            await writeFileInternal(filePath, new Uint8Array(buffer)); // writeFileInternal emits write event
-            successCount++;
-          } catch (err) {
-            errorCount++;
-            console.error(`[VFS] Failed to upload ${file.name}:`, err);
-          }
-        }
-
-        if (errorCount > 0) {
-          toast.error(
-            `Finished uploading. ${successCount} files succeeded, ${errorCount} failed.`,
-          );
-        } else if (successCount > 0) {
-          toast.success(
-            `Successfully uploaded ${successCount} file(s) to ${normalizedTargetPath}.`,
-          );
-        }
+        const fs = checkReadyInternal();
+        await VfsOps.uploadFilesOp(
+          fs,
+          setIsOperationLoading,
+          files,
+          targetPath,
+        );
       } catch (err) {
-        console.error("[VFS] General upload error:", err);
-        if (
-          !(
-            err instanceof Error &&
-            (err.message.startsWith("Filesystem is not ready") ||
-              (err as any).code === "EEXIST")
-          )
-        ) {
-          toast.error(
-            `Upload failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-      } finally {
-        setIsOperationLoading(false);
+        // checkReadyInternal throws and toasts, uploadFilesOp handles its own errors/toasts
       }
     },
-    [createDirectoryInternalImpl, writeFileInternal],
+    [checkReadyInternal],
   );
 
-  const uploadAndExtractZipInternal = useCallback(
+  const uploadAndExtractZip = useCallback(
     async (file: File, targetPath: string): Promise<void> => {
-      if (!file.name.toLowerCase().endsWith(".zip")) {
-        toast.error("Please select a valid ZIP file.");
-        return;
-      }
-      setIsOperationLoading(true);
-      const normalizedTargetPath = normalizePath(targetPath);
       try {
-        await createDirectoryInternalImpl(normalizedTargetPath);
-
-        const zip = await JSZip.loadAsync(file);
-        const fileWritePromises: Promise<void>[] = [];
-
-        zip.forEach((_, zipEntry) => {
-          const fullTargetPath = joinPath(normalizedTargetPath, zipEntry.name);
-          if (zipEntry.dir) {
-            fileWritePromises.push(createDirectoryInternalImpl(fullTargetPath));
-          } else {
-            const writePromise = zipEntry
-              .async("uint8array")
-              .then((content) => {
-                // writeFileInternal emits write event
-                return writeFileInternal(fullTargetPath, content);
-              });
-            fileWritePromises.push(writePromise);
-          }
-        });
-
-        await Promise.all(fileWritePromises);
-        toast.success(
-          `Successfully extracted "${file.name}" to ${normalizedTargetPath}.`,
+        const fs = checkReadyInternal();
+        await VfsOps.uploadAndExtractZipOp(
+          fs,
+          setIsOperationLoading,
+          file,
+          targetPath,
         );
       } catch (err) {
-        console.error(`[VFS] Failed to extract zip ${file.name}:`, err);
-        if (
-          !(
-            err instanceof Error &&
-            (err.message.startsWith("Filesystem is not ready") ||
-              (err as any).code === "EEXIST")
-          )
-        ) {
-          toast.error(
-            `ZIP extraction failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-        throw err;
-      } finally {
-        setIsOperationLoading(false);
+        // checkReadyInternal throws and toasts, uploadAndExtractZipOp handles its own errors/toasts
       }
     },
-    [createDirectoryInternalImpl, writeFileInternal],
+    [checkReadyInternal],
   );
 
-  const downloadAllAsZipInternal = useCallback(
-    async (filename?: string): Promise<void> => {
-      setIsOperationLoading(true);
-      const zip = new JSZip();
+  const downloadAllAsZip = useCallback(
+    async (filename?: string, rootPath: string = "/"): Promise<void> => {
       try {
-        checkReadyInternal();
-
-        const addFolderToZip = async (folderPath: string, zipFolder: JSZip) => {
-          const entries = await listFilesInternal(folderPath);
-          for (const entry of entries) {
-            if (entry.isDirectory) {
-              const subFolder = zipFolder.folder(entry.name);
-              if (subFolder) {
-                await addFolderToZip(entry.path, subFolder);
-              }
-            } else {
-              // readFileInternal emits read event
-              const content = await readFileInternal(entry.path);
-              zipFolder.file(entry.name, content);
-            }
-          }
-        };
-
-        await addFolderToZip("/", zip);
-
-        const zipBlob = await zip.generateAsync({ type: "blob" });
-        const url = URL.createObjectURL(zipBlob);
-        const link = document.createElement("a");
-        link.href = url;
-        const defaultFilename = `vfs_export_${configuredVfsKeyRef.current || "current"}.zip`;
-        link.download = filename || defaultFilename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        toast.success("Filesystem exported as ZIP.");
+        const fs = checkReadyInternal();
+        await VfsOps.downloadAllAsZipOp(
+          fs,
+          setIsOperationLoading,
+          filename,
+          rootPath,
+        );
       } catch (err) {
-        console.error("[VFS] Failed to download all as zip:", err);
-        if (
-          !(
-            err instanceof Error &&
-            err.message.startsWith("Filesystem is not ready")
-          )
-        ) {
-          toast.error(
-            `ZIP export failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-        throw err;
-      } finally {
-        setIsOperationLoading(false);
+        // checkReadyInternal throws and toasts, downloadAllAsZipOp handles its own errors/toasts
       }
     },
-    [checkReadyInternal, listFilesInternal, readFileInternal],
+    [checkReadyInternal],
   );
 
-  const renameInternal = useCallback(
+  const rename = useCallback(
     async (oldPath: string, newPath: string): Promise<void> => {
-      const fs = checkReadyInternal();
-      const normalizedOld = normalizePath(oldPath);
-      const normalizedNew = normalizePath(newPath);
-      setIsOperationLoading(true);
       try {
-        const parentDir = dirname(normalizedNew);
-        if (parentDir !== "/") {
-          await createDirectoryInternalImpl(parentDir);
-        }
-        await fs.promises.rename(normalizedOld, normalizedNew);
-        // TODO: Phase 5 - Emit 'vfs:renamed' event if needed
+        const fs = checkReadyInternal();
+        await VfsOps.renameOp(fs, setIsOperationLoading, oldPath, newPath);
       } catch (err) {
-        console.error(
-          `[VFS] Failed to rename ${normalizedOld} to ${normalizedNew}:`,
-          err,
-        );
-        if (
-          !(
-            err instanceof Error &&
-            (err.message.startsWith("Filesystem is not ready") ||
-              (err as any).code === "EEXIST")
-          )
-        ) {
-          toast.error(
-            `Rename failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-        throw err;
-      } finally {
-        setIsOperationLoading(false);
+        // checkReadyInternal throws and toasts, renameOp handles its own errors/toasts
       }
     },
-    [checkReadyInternal, createDirectoryInternalImpl],
+    [checkReadyInternal],
   );
 
+  // --- Return Value ---
   return {
     isReady: isReady,
     isLoading: isLoading,
     isOperationLoading: isOperationLoading,
     error: error,
     configuredVfsKey: configuredVfsKeyRef.current,
-    listFiles: listFilesInternal,
-    readFile: readFileInternal,
-    writeFile: writeFileInternal,
-    deleteItem: deleteItemInternal,
-    createDirectory: createDirectoryActual,
-    downloadFile: downloadFileInternal,
-    uploadFiles: uploadFilesInternal,
-    uploadAndExtractZip: uploadAndExtractZipInternal,
-    downloadAllAsZip: downloadAllAsZipInternal,
-    rename: renameInternal,
+    // Expose the wrapper functions
+    listFiles,
+    readFile,
+    writeFile,
+    deleteItem,
+    createDirectory,
+    downloadFile,
+    uploadFiles,
+    uploadAndExtractZip,
+    downloadAllAsZip,
+    rename,
     vfsKey: vfsKey,
   };
 }

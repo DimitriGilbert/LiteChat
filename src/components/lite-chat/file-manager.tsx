@@ -25,6 +25,7 @@ import {
   FolderPlusIcon,
   Loader2Icon,
   UsersIcon,
+  AlertCircleIcon, // Added for error display
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -45,7 +46,15 @@ const formatBytes = (bytes: number, decimals = 2): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
 };
 const normalizePath = (path: string): string => {
-  return path.replace(/\//g, "/").replace(/\/+/g, "/");
+  // Ensure leading slash, remove trailing slash (unless root), collapse multiple slashes
+  let p = path.replace(/\/+/g, "/");
+  if (!p.startsWith("/")) {
+    p = "/" + p;
+  }
+  if (p !== "/" && p.endsWith("/")) {
+    p = p.slice(0, -1);
+  }
+  return p;
 };
 const joinPath = (...segments: string[]): string => {
   return normalizePath(
@@ -59,13 +68,13 @@ const dirname = (path: string): string => {
   const normalized = normalizePath(path);
   if (normalized === "/") return "/";
   const lastSlash = normalized.lastIndexOf("/");
-  if (lastSlash === -1) return "/";
-  if (lastSlash === 0) return "/";
+  if (lastSlash === -1) return "/"; // Should not happen with normalizePath
+  if (lastSlash === 0) return "/"; // Parent of /file is /
   return normalized.substring(0, lastSlash);
 };
 const basename = (path: string): string => {
   const normalized = normalizePath(path);
-  if (normalized === "/") return "/";
+  if (normalized === "/") return ""; // No basename for root
   return normalized.substring(normalized.lastIndexOf("/") + 1);
 };
 
@@ -74,7 +83,6 @@ export const FileManager: React.FC<{ className?: string }> = ({
 }) => {
   const {
     vfs,
-    // selectedItemId,
     selectedItemType,
     selectedVfsPaths,
     addSelectedVfsPath,
@@ -97,9 +105,11 @@ export const FileManager: React.FC<{ className?: string }> = ({
   const renameInputRef = useRef<HTMLInputElement>(null);
   const newFolderInputRef = useRef<HTMLInputElement>(null);
 
-  const isConfigLoading = vfs.isLoading;
-  const isOperationLoading = vfs.isOperationLoading;
-  const isAnyLoading = isConfigLoading || isOperationLoading;
+  // Use VFS hook states directly
+  const isConfigLoading = vfs.isLoading; // Reflects initial configuration loading
+  const isOperationLoading = vfs.isOperationLoading; // Reflects ongoing FS operations
+  const configError = vfs.error; // Reflects configuration/readiness errors
+  const isAnyLoading = isConfigLoading || isOperationLoading; // Combined loading state for disabling UI
 
   // Sync local checked state when context selection changes
   useEffect(() => {
@@ -108,11 +118,13 @@ export const FileManager: React.FC<{ className?: string }> = ({
 
   const loadEntries = useCallback(
     async (path: string) => {
+      // Prevent loading if VFS isn't ready, already loading, or key mismatch
       if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey || isAnyLoading) {
         return;
       }
       try {
         const normalizedPath = normalizePath(path);
+        // No need to set isOperationLoading here, listFiles is read-only
         const fetchedEntries = await vfs.listFiles(normalizedPath);
         fetchedEntries.sort((a, b) => {
           if (a.isDirectory !== b.isDirectory) {
@@ -123,45 +135,57 @@ export const FileManager: React.FC<{ className?: string }> = ({
         setEntries(fetchedEntries);
         setCurrentPath(normalizedPath);
       } catch (error) {
-        console.error("FileManager List Error:", error);
+        // Error is already toasted by the hook, just log here if needed
+        console.error("FileManager List Error (already toasted):", error);
+        // Optionally clear entries or show an error message in the table
+        setEntries([]);
       }
     },
-    [vfs, isAnyLoading],
+    [vfs, isAnyLoading], // Depend on vfs object and loading state
   );
 
   useEffect(() => {
+    // Load entries when VFS becomes ready for the correct key, or when the key changes
     if (vfs.isReady && vfs.configuredVfsKey === vfs.vfsKey) {
       loadEntries(currentPath);
     } else {
+      // Clear state if VFS is not ready or key mismatch
       setEntries([]);
-      setCurrentPath("/");
+      // Don't reset currentPath here, allow it to persist until a ready VFS loads it
+      // setCurrentPath("/");
       setEditingPath(null);
       setCreatingFolder(false);
     }
+    // Re-run when readiness, configured key, or target key changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vfs.isReady, vfs.configuredVfsKey, vfs.vfsKey]);
 
   // --- Navigation Handlers ---
   const handleNavigate = (entry: FileSystemEntry) => {
+    if (isAnyLoading || editingPath) return; // Prevent navigation while loading or editing
     if (entry.isDirectory) {
       loadEntries(entry.path);
     }
   };
   const handleNavigateUp = () => {
+    if (isAnyLoading) return;
     if (currentPath !== "/") {
       loadEntries(dirname(currentPath));
     }
   };
   const handleNavigateHome = () => {
+    if (isAnyLoading) return;
     loadEntries("/");
   };
   const handleRefresh = () => {
+    if (isAnyLoading) return;
     loadEntries(currentPath);
   };
 
   // --- Checkbox Handler ---
   const handleCheckboxChange = useCallback(
     (checked: boolean, path: string) => {
+      if (isOperationLoading) return; // Prevent changes during operations
       setCheckedPaths((prev) => {
         const next = new Set(prev);
         if (checked) {
@@ -174,11 +198,12 @@ export const FileManager: React.FC<{ className?: string }> = ({
         return next;
       });
     },
-    [addSelectedVfsPath, removeSelectedVfsPath],
+    [addSelectedVfsPath, removeSelectedVfsPath, isOperationLoading],
   );
 
   // --- Action Handlers ---
   const handleDelete = async (entry: FileSystemEntry) => {
+    if (isAnyLoading) return; // Prevent action while loading
     if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready.");
       return;
@@ -189,43 +214,70 @@ export const FileManager: React.FC<{ className?: string }> = ({
         entry.isDirectory
           ? `
 
-      WARNING: This will delete all contents inside!`
+WARNING: This will delete all contents inside!`
           : ""
       }`,
     );
     if (confirmation) {
       try {
+        // isOperationLoading set/unset within vfs.deleteItem
         await vfs.deleteItem(entry.path, entry.isDirectory);
-        toast.success(`"${entry.name}" deleted.`);
+        // Success toast handled by the hook if deletion succeeds
+        // toast.success(`"${entry.name}" deleted.`); // Removed: Handled by hook
         if (!entry.isDirectory && checkedPaths.has(entry.path)) {
-          removeSelectedVfsPath(entry.path);
+          removeSelectedVfsPath(entry.path); // Update selection state immediately
         }
-        loadEntries(currentPath);
-      } catch {}
+        loadEntries(currentPath); // Refresh list after successful deletion
+      } catch (error) {
+        // Error already toasted by the hook
+        console.error("FileManager Delete Error (already toasted):", error);
+      }
     }
   };
 
   const handleDownload = async (entry: FileSystemEntry) => {
+    if (isAnyLoading) return; // Prevent action while loading
     if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready.");
       return;
     }
-    if (entry.isDirectory) {
-      toast.warning(
-        `Folder download for "${entry.name}" not yet implemented. Use Export button.`,
-      );
-    } else {
-      try {
+    try {
+      if (entry.isDirectory) {
+        // Use downloadAllAsZip scoped to the directory path
+        const filename = `vfs_${entry.name}.zip`;
+        // isOperationLoading set/unset within vfs.downloadAllAsZip
+        await vfs.downloadAllAsZip(filename, entry.path);
+        // Success toast handled by the hook
+      } else {
+        // Use downloadFile for single files
+        // isOperationLoading NOT set for single file download (usually fast)
         await vfs.downloadFile(entry.path, entry.name);
-      } catch {}
+        // No success toast for single file download by default
+      }
+    } catch (error) {
+      // Error already toasted by the hook
+      console.error("FileManager Download Error (already toasted):", error);
     }
   };
 
-  const handleUploadClick = () => fileInputRef.current?.click();
-  const handleFolderUploadClick = () => folderInputRef.current?.click();
-  const handleArchiveUploadClick = () => archiveInputRef.current?.click();
+  const handleUploadClick = () => {
+    if (isAnyLoading) return;
+    fileInputRef.current?.click();
+  };
+  const handleFolderUploadClick = () => {
+    if (isAnyLoading) return;
+    folderInputRef.current?.click();
+  };
+  const handleArchiveUploadClick = () => {
+    if (isAnyLoading) return;
+    archiveInputRef.current?.click();
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isAnyLoading) {
+      e.target.value = ""; // Clear input if loading
+      return;
+    }
     if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready for upload.");
       e.target.value = "";
@@ -234,16 +286,25 @@ export const FileManager: React.FC<{ className?: string }> = ({
     const files = e.target.files;
     if (files && files.length > 0) {
       try {
+        // isOperationLoading set/unset within vfs.uploadFiles
         await vfs.uploadFiles(files, currentPath);
-        loadEntries(currentPath);
-      } catch {}
+        // Success/summary toast handled by the hook
+        loadEntries(currentPath); // Refresh list after upload attempt
+      } catch (error) {
+        // Error already toasted by the hook
+        console.error("FileManager Upload Error (already toasted):", error);
+      }
     }
-    e.target.value = "";
+    e.target.value = ""; // Clear input after processing
   };
 
   const handleArchiveChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
+    if (isAnyLoading) {
+      e.target.value = ""; // Clear input if loading
+      return;
+    }
     if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready for archive extraction.");
       e.target.value = "";
@@ -253,38 +314,52 @@ export const FileManager: React.FC<{ className?: string }> = ({
     if (file) {
       if (file.name.toLowerCase().endsWith(".zip")) {
         try {
+          // isOperationLoading set/unset within vfs.uploadAndExtractZip
           await vfs.uploadAndExtractZip(file, currentPath);
-          loadEntries(currentPath);
-        } catch {}
+          // Success/summary toast handled by the hook
+          loadEntries(currentPath); // Refresh list after extraction attempt
+        } catch (error) {
+          // Error already toasted by the hook
+          console.error("FileManager Extract Error (already toasted):", error);
+        }
       } else {
         toast.error("Only ZIP archive extraction is currently supported.");
       }
     }
-    e.target.value = "";
+    e.target.value = ""; // Clear input after processing
   };
 
   const handleDownloadAll = async () => {
+    if (isAnyLoading) return; // Prevent action while loading
     if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready for export.");
       return;
     }
     try {
-      const filename = `vfs_${basename(currentPath) || "root"}.zip`;
-      await vfs.downloadAllAsZip(filename);
-    } catch {}
+      // Export current directory (rootPath = currentPath)
+      const filename = `vfs_${basename(currentPath) || "root"}_export.zip`;
+      // isOperationLoading set/unset within vfs.downloadAllAsZip
+      await vfs.downloadAllAsZip(filename, currentPath);
+      // Success toast handled by the hook
+    } catch (error) {
+      // Error already toasted by the hook
+      console.error("FileManager Export Error (already toasted):", error);
+    }
   };
 
   // --- Rename Logic ---
   const startEditing = (entry: FileSystemEntry) => {
+    if (isAnyLoading || creatingFolder) return; // Prevent editing while loading or creating
     setEditingPath(entry.path);
     setNewName(entry.name);
-    setCreatingFolder(false);
+    setCreatingFolder(false); // Ensure not in create mode
   };
   const cancelEditing = () => {
     setEditingPath(null);
     setNewName("");
   };
   const handleRename = async () => {
+    if (isOperationLoading) return; // Prevent rename if another operation is running
     if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready for rename.");
       cancelEditing();
@@ -302,16 +377,21 @@ export const FileManager: React.FC<{ className?: string }> = ({
     }
     const newPath = joinPath(dirname(editingPath), trimmedNewName);
     try {
+      // isOperationLoading set/unset within vfs.rename
       await vfs.rename(editingPath, newPath);
-      toast.success(`Renamed "${oldName}" to "${trimmedNewName}"`);
+      // Success toast handled by the hook
+      // toast.success(`Renamed "${oldName}" to "${trimmedNewName}"`); // Removed: Handled by hook
       if (checkedPaths.has(editingPath)) {
         removeSelectedVfsPath(editingPath);
         addSelectedVfsPath(newPath);
       }
       cancelEditing();
-      loadEntries(currentPath);
-    } catch {
-      cancelEditing();
+      loadEntries(currentPath); // Refresh list after successful rename
+    } catch (error) {
+      // Error already toasted by the hook
+      console.error("FileManager Rename Error (already toasted):", error);
+      // Don't cancel editing on error, let user retry or cancel explicitly
+      // cancelEditing();
     }
   };
   useEffect(() => {
@@ -323,15 +403,17 @@ export const FileManager: React.FC<{ className?: string }> = ({
 
   // --- Create Folder Logic ---
   const startCreatingFolder = () => {
+    if (isAnyLoading || editingPath) return; // Prevent creating while loading or editing
     setCreatingFolder(true);
     setNewFolderName("");
-    setEditingPath(null);
+    setEditingPath(null); // Ensure not in rename mode
   };
   const cancelCreatingFolder = () => {
     setCreatingFolder(false);
     setNewFolderName("");
   };
   const handleCreateFolder = async () => {
+    if (isOperationLoading) return; // Prevent create if another operation is running
     if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready to create folder.");
       cancelCreatingFolder();
@@ -344,12 +426,19 @@ export const FileManager: React.FC<{ className?: string }> = ({
     }
     const newPath = joinPath(currentPath, trimmedName);
     try {
+      // isOperationLoading set/unset within vfs.createDirectory
       await vfs.createDirectory(newPath);
-      toast.success(`Folder "${trimmedName}" created.`);
+      toast.success(`Folder "${trimmedName}" created.`); // Keep specific success toast here
       cancelCreatingFolder();
-      loadEntries(currentPath);
-    } catch {
-      cancelCreatingFolder();
+      loadEntries(currentPath); // Refresh list after successful creation
+    } catch (error) {
+      // Error already toasted by the hook
+      console.error(
+        "FileManager Create Folder Error (already toasted):",
+        error,
+      );
+      // Don't cancel creating on error, let user retry or cancel explicitly
+      // cancelCreatingFolder();
     }
   };
   useEffect(() => {
@@ -359,6 +448,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
   }, [creatingFolder]);
 
   // --- VFS Sharing Banner ---
+  // (No changes needed here based on requirements)
   let vfsBanner: React.ReactNode = null;
   if (vfs.vfsKey === "orphan") {
     vfsBanner = (
@@ -393,6 +483,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
 
   // --- Render Logic ---
   if (isConfigLoading) {
+    // Show skeletons only during initial config loading
     return (
       <div className={cn("p-4 space-y-2", className)}>
         <Skeleton className="h-8 w-1/2 bg-gray-700" />
@@ -402,14 +493,17 @@ export const FileManager: React.FC<{ className?: string }> = ({
       </div>
     );
   }
-  if (vfs.error) {
+  if (configError) {
+    // Show configuration/readiness errors prominently
     return (
-      <div className="p-4 text-center text-red-400">
-        Error initializing filesystem: {vfs.error}
+      <div className="p-4 text-center text-red-400 flex items-center justify-center gap-2">
+        <AlertCircleIcon className="h-5 w-5" />
+        <span>{configError}</span>
       </div>
     );
   }
   if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
+    // Show message if VFS is disabled or not configured for the current item
     return (
       <div className="p-4 text-center text-sm text-gray-500">
         Virtual Filesystem not available or not enabled for this item.
@@ -417,6 +511,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
     );
   }
 
+  // --- Main File Manager UI ---
   return (
     <div className={cn("flex flex-col h-[400px]", className)}>
       {vfsBanner}
@@ -427,6 +522,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
         onChange={handleFileChange}
         className="hidden"
         multiple
+        disabled={isAnyLoading} // Disable hidden input as well
       />
       <input
         type="file"
@@ -438,6 +534,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
           mozdirectory: "true",
           directory: "true",
         }}
+        disabled={isAnyLoading} // Disable hidden input as well
       />
       <input
         type="file"
@@ -445,6 +542,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
         onChange={handleArchiveChange}
         className="hidden"
         accept=".zip"
+        disabled={isAnyLoading} // Disable hidden input as well
       />
 
       {/* Toolbar */}
@@ -480,11 +578,11 @@ export const FileManager: React.FC<{ className?: string }> = ({
           variant="ghost"
           size="icon"
           onClick={handleRefresh}
-          disabled={isAnyLoading}
+          disabled={isAnyLoading} // Disable refresh if config loading OR operation loading
           title="Refresh current directory"
           className="h-8 w-8"
         >
-          {isOperationLoading ? (
+          {isOperationLoading ? ( // Show spinner only for operations, not config loading
             <Loader2Icon className="h-4 w-4 animate-spin" />
           ) : (
             <RefreshCwIcon className="h-4 w-4" />
@@ -498,7 +596,12 @@ export const FileManager: React.FC<{ className?: string }> = ({
           className="h-8"
           title="Create New Folder"
         >
-          <FolderPlusIcon className="h-4 w-4 mr-1" /> Folder
+          {isOperationLoading && creatingFolder ? ( // Spinner if creating
+            <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
+          ) : (
+            <FolderPlusIcon className="h-4 w-4 mr-1" />
+          )}
+          Folder
         </Button>
         <Button
           variant="outline"
@@ -508,7 +611,12 @@ export const FileManager: React.FC<{ className?: string }> = ({
           className="h-8"
           title="Upload Files"
         >
-          <UploadCloudIcon className="h-4 w-4 mr-1" /> Files
+          {isOperationLoading ? ( // Generic spinner if any operation is loading
+            <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
+          ) : (
+            <UploadCloudIcon className="h-4 w-4 mr-1" />
+          )}
+          Files
         </Button>
         <Button
           variant="outline"
@@ -518,7 +626,12 @@ export const FileManager: React.FC<{ className?: string }> = ({
           className="h-8"
           title="Upload Folder"
         >
-          <FolderIcon className="h-4 w-4 mr-1" /> Folder
+          {isOperationLoading ? (
+            <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
+          ) : (
+            <FolderIcon className="h-4 w-4 mr-1" />
+          )}
+          Folder
         </Button>
         <Button
           variant="outline"
@@ -528,7 +641,12 @@ export const FileManager: React.FC<{ className?: string }> = ({
           className="h-8"
           title="Upload & Extract ZIP"
         >
-          <FileArchiveIcon className="h-4 w-4 mr-1" /> ZIP
+          {isOperationLoading ? (
+            <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
+          ) : (
+            <FileArchiveIcon className="h-4 w-4 mr-1" />
+          )}
+          ZIP
         </Button>
         <Button
           variant="outline"
@@ -538,7 +656,12 @@ export const FileManager: React.FC<{ className?: string }> = ({
           className="h-8"
           title="Download Current Directory as ZIP"
         >
-          <ArchiveIcon className="h-4 w-4 mr-1" /> Export
+          {isOperationLoading ? (
+            <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
+          ) : (
+            <ArchiveIcon className="h-4 w-4 mr-1" />
+          )}
+          Export
         </Button>
       </div>
 
@@ -575,10 +698,10 @@ export const FileManager: React.FC<{ className?: string }> = ({
                         if (e.key === "Enter") handleCreateFolder();
                         if (e.key === "Escape") cancelCreatingFolder();
                       }}
-                      onBlur={handleCreateFolder}
+                      // onBlur={handleCreateFolder} // Avoid auto-create on blur if operation is loading
                       placeholder="New folder name..."
                       className="h-6 px-1 text-xs flex-grow bg-gray-800 border-gray-600 focus:ring-blue-500"
-                      disabled={isOperationLoading}
+                      disabled={isOperationLoading} // Disable input during any operation
                     />
                   </div>
                 </TableCell>
@@ -588,17 +711,21 @@ export const FileManager: React.FC<{ className?: string }> = ({
                     size="icon"
                     className="h-6 w-6 text-green-500 hover:bg-green-900/50"
                     onClick={handleCreateFolder}
-                    disabled={isOperationLoading || !newFolderName.trim()}
+                    disabled={isOperationLoading || !newFolderName.trim()} // Disable during op or if name empty
                     title="Create folder"
                   >
-                    <CheckIcon className="h-4 w-4" />
+                    {isOperationLoading ? (
+                      <Loader2Icon className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckIcon className="h-4 w-4" />
+                    )}
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 text-gray-400 hover:bg-gray-600/50"
                     onClick={cancelCreatingFolder}
-                    disabled={isOperationLoading}
+                    disabled={isOperationLoading} // Disable cancel during op
                     title="Cancel"
                   >
                     <XIcon className="h-4 w-4" />
@@ -612,8 +739,11 @@ export const FileManager: React.FC<{ className?: string }> = ({
                 className={cn(
                   "hover:bg-gray-700/50 group",
                   editingPath === entry.path && "bg-gray-700/70",
+                  isOperationLoading && "opacity-70 cursor-not-allowed", // Dim rows during operations
                 )}
-                onDoubleClick={() => !editingPath && handleNavigate(entry)}
+                onDoubleClick={() =>
+                  !isOperationLoading && !editingPath && handleNavigate(entry)
+                } // Prevent double click during op
               >
                 <TableCell className="px-2">
                   {entry.isDirectory ? (
@@ -630,7 +760,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
                       onCheckedChange={(checked) =>
                         handleCheckboxChange(!!checked, entry.path)
                       }
-                      disabled={isOperationLoading}
+                      disabled={isOperationLoading} // Disable checkbox during op
                       aria-label={`Select file ${entry.name}`}
                       className="mt-0.5"
                     />
@@ -651,16 +781,21 @@ export const FileManager: React.FC<{ className?: string }> = ({
                           if (e.key === "Enter") handleRename();
                           if (e.key === "Escape") cancelEditing();
                         }}
-                        onBlur={handleRename}
+                        // onBlur={handleRename} // Avoid auto-rename on blur if operation is loading
                         className="h-6 px-1 text-xs flex-grow bg-gray-800 border-gray-600 focus:ring-blue-500"
-                        onClick={(e) => e.stopPropagation()}
-                        disabled={isOperationLoading}
+                        onClick={(e) => e.stopPropagation()} // Prevent row navigation
+                        disabled={isOperationLoading} // Disable input during op
                       />
                     </div>
                   ) : (
                     <span
-                      className="cursor-pointer"
-                      onClick={() => handleNavigate(entry)}
+                      className={cn(
+                        entry.isDirectory && "cursor-pointer",
+                        !entry.isDirectory && "cursor-default",
+                      )}
+                      onClick={() =>
+                        !isOperationLoading && handleNavigate(entry)
+                      } // Allow click nav only if not loading
                     >
                       {entry.name}
                     </span>
@@ -683,10 +818,14 @@ export const FileManager: React.FC<{ className?: string }> = ({
                           e.stopPropagation();
                           handleRename();
                         }}
-                        disabled={isOperationLoading || !newName.trim()}
+                        disabled={isOperationLoading || !newName.trim()} // Disable during op or if name empty
                         title="Save name"
                       >
-                        <CheckIcon className="h-4 w-4" />
+                        {isOperationLoading ? (
+                          <Loader2Icon className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckIcon className="h-4 w-4" />
+                        )}
                       </Button>
                       <Button
                         variant="ghost"
@@ -696,14 +835,19 @@ export const FileManager: React.FC<{ className?: string }> = ({
                           e.stopPropagation();
                           cancelEditing();
                         }}
-                        disabled={isOperationLoading}
+                        disabled={isOperationLoading} // Disable cancel during op
                         title="Cancel rename"
                       >
                         <XIcon className="h-4 w-4" />
                       </Button>
                     </>
                   ) : (
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex justify-end gap-0.5">
+                    <div
+                      className={cn(
+                        "opacity-0 group-hover:opacity-100 transition-opacity flex justify-end gap-0.5",
+                        isOperationLoading && "opacity-30", // Dim actions during op
+                      )}
+                    >
                       <Button
                         variant="ghost"
                         size="icon"
@@ -713,7 +857,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
                           e.stopPropagation();
                           startEditing(entry);
                         }}
-                        disabled={isOperationLoading || creatingFolder}
+                        disabled={isAnyLoading || creatingFolder} // Disable if any loading or creating folder
                       >
                         <Edit2Icon className="h-3.5 w-3.5" />
                       </Button>
@@ -723,14 +867,14 @@ export const FileManager: React.FC<{ className?: string }> = ({
                         className="h-6 w-6 hover:bg-gray-600/50"
                         title={
                           entry.isDirectory
-                            ? "Download (ZIP - Not Impl.)"
-                            : "Download"
+                            ? "Download Folder (ZIP)"
+                            : "Download File"
                         }
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDownload(entry);
                         }}
-                        disabled={isOperationLoading || entry.isDirectory}
+                        disabled={isAnyLoading} // Disable if any loading
                       >
                         <DownloadIcon className="h-3.5 w-3.5" />
                       </Button>
@@ -743,7 +887,7 @@ export const FileManager: React.FC<{ className?: string }> = ({
                           e.stopPropagation();
                           handleDelete(entry);
                         }}
-                        disabled={isOperationLoading}
+                        disabled={isAnyLoading} // Disable if any loading
                       >
                         <Trash2Icon className="h-3.5 w-3.5" />
                       </Button>
@@ -752,7 +896,8 @@ export const FileManager: React.FC<{ className?: string }> = ({
                 </TableCell>
               </TableRow>
             ))}
-            {entries.length === 0 && !creatingFolder && (
+            {entries.length === 0 && !creatingFolder && !isOperationLoading && (
+              // Show empty message only if not loading and not creating
               <TableRow>
                 <TableCell
                   colSpan={6}
