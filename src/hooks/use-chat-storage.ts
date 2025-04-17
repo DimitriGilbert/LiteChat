@@ -304,14 +304,14 @@ export function useChatStorage() {
   const addApiKey = useCallback(
     async (
       name: string,
-      providerId: string, // Less useful now
+      providerId: string, // Kept for potential future display/grouping, though not used for linking
       value: string,
     ): Promise<string> => {
       const newId = nanoid();
       const newKey: DbApiKey = {
         id: newId,
         name,
-        providerId, // Keep for now, maybe for display?
+        providerId, // Stored but not directly used for provider configuration linking
         value,
         createdAt: new Date(),
       };

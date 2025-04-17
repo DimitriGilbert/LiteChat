@@ -14,23 +14,18 @@ export function ModelSelector() {
 
   const isLoading = !activeProviders || activeProviders.length === 0;
 
+  // modelOptions uses the filtered/sorted list from the context for the dropdown
   const modelOptions = React.useMemo(() => {
-    // Use selectedProvider.models (filtered based on enabledModels config)
-    // instead of selectedProvider.allAvailableModels
     if (!selectedProvider?.models) {
       return [];
     }
-    // Map the ENABLED models for the primary dropdown list
     return selectedProvider.models.map((model) => ({
       value: model.id,
       label: model.name,
     }));
-    // Note: The search within the Combobox will now only search these enabled models.
-    // If searching *all* models (including non-enabled) is required,
-    // the Combobox component or this logic would need further enhancement.
-  }, [selectedProvider?.models]); // Depend on the filtered models list
+  }, [selectedProvider?.models]);
 
-  // Get all models for the search placeholder text if needed (optional enhancement)
+  // allModelOptions uses the complete list from the context for search/placeholders
   const allModelOptions = React.useMemo(() => {
     if (!selectedProvider?.allAvailableModels) {
       return [];
@@ -78,8 +73,7 @@ export function ModelSelector() {
 
   // Check if there are models specifically *enabled* for the dropdown
   if (modelOptions.length === 0) {
-    // If no models are explicitly enabled, but some exist, show all in search
-    // but prompt user to enable some or search.
+    // If no models are explicitly enabled (but some exist), allow searching all.
     return (
       <Combobox
         // Provide ALL models to the combobox ONLY in this specific case
@@ -103,7 +97,7 @@ export function ModelSelector() {
       value={selectedModelId}
       onChange={handleModelChange}
       placeholder="Select model..."
-      // Adjust search placeholder based on whether all models are shown or just enabled ones
+      // Search placeholder reflects the number of models in the dropdown list
       searchPlaceholder={`Search ${modelOptions.length} enabled models...`}
       emptyText="No matching models found."
       triggerClassName="text-xs h-9"
