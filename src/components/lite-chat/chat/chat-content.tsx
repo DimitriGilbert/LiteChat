@@ -149,19 +149,20 @@ export const ChatContent: React.FC<ChatContentProps> = ({
           )}
           {/* --- Empty State --- */}
           {!isLoadingMessages && messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] text-center px-4">
+            <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] text-center pt-36 px-4">
               <div className="rounded-full bg-gray-800 p-5 mb-5">
                 <MessageSquarePlusIcon className="h-12 w-12 text-gray-400" />
               </div>
               <h3 className="text-xl font-medium mb-3 text-gray-200">
                 Welcome to LiteChat ⚡️
               </h3>
-              <p className="text-sm text-gray-400 max-w-md mb-4">
-                Your local, lightweight AI chat experience that lives right in
-                your browser. No servers(ish), no tracking, just conversations.
+              <p className="text-sm text-gray-400 max-w-xl mb-4">
+                Your OpenSource, local, lightweight AI chat experience that
+                lives right in your browser. No servers(ish), no tracking, just
+                conversations.
               </p>
 
-              <div className="bg-gray-800/80 p-5 rounded-lg border border-gray-700 text-left max-w-lg mb-6">
+              <div className="bg-gray-800/80 p-5 rounded-lg border border-gray-700 text-left max-w-[1600px] mb-6">
                 <h4 className="font-medium text-gray-200 mb-2 flex items-center">
                   <span className="text-yellow-400 mr-2">💡</span> A little
                   backstory...
@@ -207,7 +208,7 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                 </p>
               </div>
 
-              <div className="bg-gray-800/80 p-5 rounded-lg border border-gray-700 text-left max-w-lg mb-6">
+              <div className="bg-gray-800/80 p-5 rounded-lg border border-gray-700 text-left max-w-[1600px] mb-6">
                 <h4 className="font-medium text-gray-200 mb-3 flex items-center">
                   <span className="text-blue-400 mr-2">🔑</span> Bring Your Own
                   API Key
@@ -217,16 +218,7 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                   own API keys and chat with your favorite models.
                 </p>
                 <p className="text-xs text-gray-400 mb-3">
-                  While LiteChat was inspired by concepts from{" "}
-                  <a
-                    href="https://t3.chat"
-                    className="text-blue-400 hover:underline"
-                    target="_blank"
-                    rel="noopener"
-                  >
-                    T3.chat
-                  </a>
-                  , it's been lovingly vibed coded with additional features to
+                  LiteChat was lovingly vibe coded with additional features to
                   make your AI conversations feel more... Naaaahhh XD, I wanted
                   my own wheel !
                 </p>
@@ -238,6 +230,15 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                     To get started, add your API key in settings:
                   </p>
                   <div className="grid grid-cols-1 gap-2 text-xs">
+                    <a
+                      href="https://openrouter.ai/keys"
+                      className="text-blue-400 hover:underline flex items-center"
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      <span className="mr-1">→</span> OpenRouter API Keys (Many
+                      models in one place)
+                    </a>
                     <a
                       href="https://platform.openai.com/account/api-keys"
                       className="text-blue-400 hover:underline flex items-center"
@@ -256,24 +257,34 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                       <span className="mr-1">→</span> Anthropic API Keys (Claude
                       models)
                     </a>
-                    <a
-                      href="https://openrouter.ai/keys"
-                      className="text-blue-400 hover:underline flex items-center"
-                      target="_blank"
-                      rel="noopener"
-                    >
-                      <span className="mr-1">→</span> OpenRouter API Keys (Many
-                      models in one place)
-                    </a>
                   </div>
+                  <p className="text-xs text-gray-400 mb-3 italic pt-4">
+                    Don't worry, your keys are stored in your browser and never
+                    sent to any server except the AI provider you choose.
+                  </p>
                 </div>
                 <p className="text-sm text-gray-300 mb-3 italic">
-                  Don't worry, your keys are stored securely in your browser and
-                  never sent to any server except the AI provider you choose.
-                </p>
-                <p className="text-sm text-gray-300 mb-3 italic">
                   Then you need to configure your provider(s) (I remember
-                  someone saying somthing about clunky...)
+                  someone saying something about clunky...)
+                </p>
+                <p className="text-xs text-gray-400 mb-3">
+                  Or maybe run one locally (
+                  <a
+                    href="https://ollama.ai"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Ollama
+                  </a>{" "}
+                  or{" "}
+                  <a
+                    href="https://lmstudio.app"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    LMStudio
+                  </a>
+                  )
                 </p>
                 <p className="text-sm text-gray-300 mb-3 italic">
                   Aaaand then, ..., you are good to go, just chat your brains
@@ -281,7 +292,7 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                 </p>
               </div>
 
-              <div className="bg-gray-800/80 p-5 rounded-lg border border-gray-700 text-left max-w-lg mb-6">
+              <div className="bg-gray-800/80 p-5 rounded-lg border border-gray-700 text-left max-w-[1600px] mb-6">
                 <h4 className="font-medium text-gray-200 mb-2 flex items-center">
                   <span className="text-green-400 mr-2">✨</span> What makes
                   LiteChat special?

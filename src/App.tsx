@@ -8,7 +8,7 @@ function App() {
   return (
     <ErrorBoundary>
       <div className="h-screen bg-gray-900 flex flex-col">
-        <main className="flex-grow overflow-hidden p-4">
+        <main className="flex-grow overflow-hidden">
           <LiteChat />
         </main>
         <Toaster richColors position="top-right" />
