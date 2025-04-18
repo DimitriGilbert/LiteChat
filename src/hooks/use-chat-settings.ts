@@ -74,7 +74,14 @@ export function useChatSettings({
   // --- Advanced Settings (Conditional State) ---
   // Use defaults if advanced settings are disabled
   const defaultTemp = 0.7;
-  const defaultGlobalPrompt = "You are a helpful AI assistant.";
+  const defaultGlobalPrompt = `You are a helpful, concise AI assistant designed to provide accurate, relevant answers.
+Follow all instructions exactly, prioritizing clarity, specificity, and relevance.
+Define your role and limitations in context, and adhere strictly to them.
+Format responses according to specified output format (e.g., JSON, code block, bullet list).
+If unsure, admit uncertainty rather than guessing, and ask a single clarifying question if required.
+When reasoning is needed, provide brief chain‑of‑thought steps to improve transparency.
+Keep responses concise; avoid unnecessary preamble or filler words.
+`;
 
   const [temperature, setTemperature] = useState(
     enableAdvancedSettings ? defaultTemp : defaultTemp, // Keep default even if disabled for consistency
@@ -105,7 +112,7 @@ export function useChatSettings({
       }
     }
     // Only run when enableAdvancedSettings changes
-  }, [enableAdvancedSettings, globalSystemPrompt]); // Added globalSystemPrompt to deps
+  }, [enableAdvancedSettings, globalSystemPrompt, defaultGlobalPrompt]); // Added globalSystemPrompt to deps
 
   // Determine the active system prompt
   const activeSystemPrompt = useMemo(() => {

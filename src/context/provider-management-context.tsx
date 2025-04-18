@@ -35,9 +35,14 @@ const EMPTY_ACTIVE_PROVIDERS: AiProviderConfig[] = [];
 const DEFAULT_MODELS: Record<DbProviderType, { id: string; name: string }[]> = {
   openai: [{ id: "gpt-4o", name: "GPT-4o" }],
   google: [
-    { id: "gemini-1.5-pro-latest", name: "Gemini 1.5 Pro" },
-    { id: "gemini-1.5-flash-latest", name: "Gemini 1.5 Flash" },
-    { id: "gemini-1.0-pro", name: "Gemini 1.0 Pro" },
+    { id: "gemini-2.5-pro-exp-03-25", name: "Gemini 2.5 Pro exp (Free)" },
+    {
+      id: "gemini-2.0-flash-thinking-exp-01-21",
+      name: "Gemini 2.0 Flash exp (Free)",
+    },
+    { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+    { id: "emini-2.5-pro-preview-03-25", name: "Gemini 2.5 Pro Preview" },
+    { id: "gemini-2.5-flash-preview-04-17", name: "Gemini 2.5 Flash Preview" },
   ],
   openrouter: [],
   ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }],
