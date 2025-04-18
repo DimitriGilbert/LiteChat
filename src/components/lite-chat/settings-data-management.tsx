@@ -1,8 +1,8 @@
 // src/components/lite-chat/settings-data-management.tsx
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { useChatContext } from "@/hooks/use-chat-context";
 import { Button } from "@/components/ui/button";
-import { UploadIcon, DownloadIcon, Trash2Icon } from "lucide-react";
+import { UploadIcon, DownloadIcon, Trash2Icon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const SettingsDataManagement: React.FC = () => {
@@ -12,8 +12,10 @@ export const SettingsDataManagement: React.FC = () => {
     clearAllData, // Get clearAllData from context
   } = useChatContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
-  // ... (handleImportClick, handleFileChange, handleExportAllClick remain the same) ...
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
@@ -23,23 +25,33 @@ export const SettingsDataManagement: React.FC = () => {
   ) => {
     const file = event.target.files?.[0];
     if (file) {
+      setIsImporting(true);
       try {
         // Pass null for parentId to import at root level from settings
         await importConversation(file, null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
+        // Success toast is handled within importConversation hook
       } catch (error) {
         console.error("Import failed (from component):", error);
+        // Error toast is handled within importConversation hook
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ""; // Reset file input
+        }
+        setIsImporting(false);
       }
     }
   };
 
   const handleExportAllClick = async () => {
+    setIsExporting(true);
     try {
       await exportAllConversations();
+      // Success toast is handled within exportAllConversations hook
     } catch (error) {
       console.error("Export all failed (from component):", error);
+      // Error toast is handled within exportAllConversations hook
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -55,15 +67,18 @@ export const SettingsDataManagement: React.FC = () => {
           "SECOND CONFIRMATION:\n\nReally delete everything? Consider exporting first.",
         )
       ) {
+        setIsClearing(true);
         try {
           await clearAllData(); // Use function from context
           toast.success("All local data cleared. Reloading the application...");
           setTimeout(() => window.location.reload(), 1500);
+          // No need to setIsClearing(false) as the page reloads
         } catch (error: unknown) {
           console.error("Failed to clear all data:", error);
           const message =
             error instanceof Error ? error.message : "Unknown error";
           toast.error(`Failed to clear data: ${message}`);
+          setIsClearing(false); // Set back to false on error
         }
       }
     }
@@ -85,10 +100,19 @@ export const SettingsDataManagement: React.FC = () => {
           accept=".json"
           className="hidden"
           id="import-file-input"
+          disabled={isImporting}
         />
-        <Button onClick={handleImportClick} variant="outline">
-          <UploadIcon className="mr-2 h-4 w-4" />
-          Select Import File...
+        <Button
+          onClick={handleImportClick}
+          variant="outline"
+          disabled={isImporting}
+        >
+          {isImporting ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <UploadIcon className="mr-2 h-4 w-4" />
+          )}
+          {isImporting ? "Importing..." : "Select Import File..."}
         </Button>
       </div>
 
@@ -98,9 +122,17 @@ export const SettingsDataManagement: React.FC = () => {
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
           Export all your conversations and messages into a single JSON file.
         </p>
-        <Button onClick={handleExportAllClick} variant="outline">
-          <DownloadIcon className="mr-2 h-4 w-4" />
-          Export All Chats
+        <Button
+          onClick={handleExportAllClick}
+          variant="outline"
+          disabled={isExporting}
+        >
+          {isExporting ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <DownloadIcon className="mr-2 h-4 w-4" />
+          )}
+          {isExporting ? "Exporting..." : "Export All Chats"}
         </Button>
       </div>
 
@@ -112,9 +144,19 @@ export const SettingsDataManagement: React.FC = () => {
         <p className="text-sm text-destructive/90 mb-3">
           Be very careful with these actions. Data loss may be permanent.
         </p>
-        <Button onClick={handleClearAllDataClick} variant="destructive">
-          <Trash2Icon className="mr-2 h-4 w-4" />
-          Clear All Local Data (Conversations & Keys)
+        <Button
+          onClick={handleClearAllDataClick}
+          variant="destructive"
+          disabled={isClearing}
+        >
+          {isClearing ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Trash2Icon className="mr-2 h-4 w-4" />
+          )}
+          {isClearing
+            ? "Clearing Data..."
+            : "Clear All Local Data (Conversations & Keys)"}
         </Button>
       </div>
     </div>

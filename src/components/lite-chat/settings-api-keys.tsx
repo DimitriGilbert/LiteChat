@@ -19,7 +19,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2Icon, EyeIcon, EyeOffIcon, InfoIcon } from "lucide-react";
+import {
+  Trash2Icon,
+  EyeIcon,
+  EyeOffIcon,
+  InfoIcon,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 // import type { DbProviderConfig } from "@/lib/types";
 
@@ -36,6 +42,7 @@ export const SettingsApiKeys: React.FC = () => {
   // Keep track of the *type* for display, linking happens in Providers tab
   const [newKeyProviderType, setNewKeyProviderType] = useState<string>("");
   const [isAdding, setIsAdding] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
   const [showValues, setShowValues] = useState<Record<string, boolean>>({});
 
   if (!enableApiKeyManagement) {
@@ -76,11 +83,13 @@ export const SettingsApiKeys: React.FC = () => {
   };
 
   const handleDeleteKey = async (id: string, name: string) => {
+    // Add confirmation dialog
     if (
       window.confirm(
-        `Are you sure you want to delete the key "${name}"? This will also unlink it from any providers using it.`,
+        `Are you sure you want to delete the API key "${name}"? This will also unlink it from any providers using it. This action cannot be undone.`,
       )
     ) {
+      setIsDeleting((prev) => ({ ...prev, [id]: true }));
       try {
         await deleteApiKey(id); // This now handles unlinking in storage hook
         toast.success(`API Key "${name}" deleted.`);
@@ -94,6 +103,8 @@ export const SettingsApiKeys: React.FC = () => {
         toast.error(
           `Failed to delete API key: ${error instanceof Error ? error.message : String(error)}`,
         );
+      } finally {
+        setIsDeleting((prev) => ({ ...prev, [id]: false }));
       }
     }
   };
@@ -141,6 +152,7 @@ export const SettingsApiKeys: React.FC = () => {
               placeholder="e.g., My Personal Key"
               required
               className="mt-1"
+              disabled={isAdding}
             />
           </div>
           <div>
@@ -152,6 +164,7 @@ export const SettingsApiKeys: React.FC = () => {
               value={newKeyProviderType}
               onValueChange={setNewKeyProviderType}
               required
+              disabled={isAdding}
             >
               <SelectTrigger id="new-key-provider-type" className="mt-1">
                 <SelectValue placeholder="Select Type..." />
@@ -178,10 +191,12 @@ export const SettingsApiKeys: React.FC = () => {
               placeholder="Paste your API key here"
               required
               className="mt-1"
+              disabled={isAdding}
             />
           </div>
         </div>
         <Button type="submit" disabled={isAdding}>
+          {isAdding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {isAdding ? "Adding..." : "Add Key"}
         </Button>
       </form>
@@ -207,50 +222,61 @@ export const SettingsApiKeys: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {apiKeys.map((key) => (
-                  <TableRow key={key.id}>
-                    <TableCell className="font-medium">{key.name}</TableCell>
-                    {/* Display the stored type */}
-                    <TableCell>{getKeyTypeLabel(key.providerId)}</TableCell>
-                    {/* Display linked provider names */}
-                    <TableCell className="text-xs text-muted-foreground">
-                      {getLinkedProviderNames(key.id)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs">
-                          {showValues[key.id] ? key.value : "••••••••••••••••"}
-                        </span>
+                {apiKeys.map((key) => {
+                  const isKeyDeleting = isDeleting[key.id];
+                  return (
+                    <TableRow key={key.id}>
+                      <TableCell className="font-medium">{key.name}</TableCell>
+                      {/* Display the stored type */}
+                      <TableCell>{getKeyTypeLabel(key.providerId)}</TableCell>
+                      {/* Display linked provider names */}
+                      <TableCell className="text-xs text-muted-foreground">
+                        {getLinkedProviderNames(key.id)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs">
+                            {showValues[key.id]
+                              ? key.value
+                              : "••••••••••••••••"}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleShowValue(key.id)}
+                            className="h-6 w-6"
+                            aria-label={
+                              showValues[key.id] ? "Hide key" : "Show key"
+                            }
+                            disabled={isKeyDeleting}
+                          >
+                            {showValues[key.id] ? (
+                              <EyeOffIcon className="h-4 w-4" />
+                            ) : (
+                              <EyeIcon className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => toggleShowValue(key.id)}
-                          className="h-6 w-6"
-                          aria-label={
-                            showValues[key.id] ? "Hide key" : "Show key"
-                          }
+                          onClick={() => handleDeleteKey(key.id, key.name)}
+                          className="text-red-600 hover:text-red-700 h-8 w-8"
+                          aria-label={`Delete key ${key.name}`}
+                          disabled={isKeyDeleting}
                         >
-                          {showValues[key.id] ? (
-                            <EyeOffIcon className="h-4 w-4" />
+                          {isKeyDeleting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <EyeIcon className="h-4 w-4" />
+                            <Trash2Icon className="h-4 w-4" />
                           )}
                         </Button>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteKey(key.id, key.name)}
-                        className="text-red-600 hover:text-red-700 h-8 w-8"
-                        aria-label={`Delete key ${key.name}`}
-                      >
-                        <Trash2Icon className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

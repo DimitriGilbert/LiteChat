@@ -49,6 +49,7 @@ const DEFAULT_MODELS: Record<DbProviderType, { id: string; name: string }[]> = {
   "openai-compatible": [],
 };
 const requiresApiKey = (type: DbProviderType | null): boolean => {
+  // OpenAI-Compatible *might* require a key, but it's optional in the SDK call
   return type === "openai" || type === "openrouter" || type === "google";
 };
 const dummyApiKeysMgmt: UseApiKeysManagementReturn = {
@@ -219,12 +220,13 @@ export const ProviderManagementProvider: React.FC<
       try {
         let providerInstance: any;
         let currentApiKey: string | undefined;
-        // API Key check logic
+
         if (config.apiKeyId) {
           currentApiKey = apiKeys.find((k) => k.id === config.apiKeyId)?.value;
+
           if (!currentApiKey && requiresApiKey(config.type)) {
             console.warn(
-              `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): API Key ID ${config.apiKeyId} configured but key not found.`,
+              `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): API Key ID ${config.apiKeyId} configured but key not found or value missing.`,
             );
             continue;
           }
@@ -235,7 +237,6 @@ export const ProviderManagementProvider: React.FC<
           continue;
         }
 
-        // Provider instantiation logic
         switch (config.type) {
           case "openai":
             providerInstance = createOpenAI({ apiKey: currentApiKey });
@@ -256,7 +257,7 @@ export const ProviderManagementProvider: React.FC<
           case "openai-compatible":
             if (!config.baseURL) {
               console.warn(
-                `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): Base URL required.`,
+                `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): Base URL required for openai-compatible.`,
               );
               continue;
             }
@@ -273,34 +274,27 @@ export const ProviderManagementProvider: React.FC<
             continue;
         }
 
-        // --- Get ALL available models for this provider ---
         const allAvailableModelDefs = getAllAvailableModelDefs(config.id);
         if (allAvailableModelDefs.length === 0) {
           console.warn(
             `[ProviderMgmt] No models found (fetched/default) for provider "${config.name}". Skipping.`,
           );
-          continue; // Skip provider if no models are available at all
+          continue;
         }
 
-        // --- Determine the list of models for the dropdown based on config ---
         let modelsForDropdownList: { id: string; name: string }[] = [];
-        const enabledModelIds = config.enabledModels ?? []; // Use enabled list or empty array
-        const sortOrder = config.modelSortOrder ?? []; // Use sort order or empty array
+        const enabledModelIds = config.enabledModels ?? [];
+        const sortOrder = config.modelSortOrder ?? [];
 
-        // Check if specific models are enabled
         if (enabledModelIds.length > 0) {
-          // Filter all available models to get only the enabled ones
           const enabledModelDefs = allAvailableModelDefs.filter((m) =>
             enabledModelIds.includes(m.id),
           );
 
-          // Sort this *enabled subset* based on modelSortOrder
           const orderedEnabledList: { id: string; name: string }[] = [];
           const addedIds = new Set<string>();
 
-          // Add models based on the sort order
           for (const modelId of sortOrder) {
-            // Only add if it's actually in the enabled subset
             const model = enabledModelDefs.find((m) => m.id === modelId);
             if (model && !addedIds.has(modelId)) {
               orderedEnabledList.push(model);
@@ -308,7 +302,6 @@ export const ProviderManagementProvider: React.FC<
             }
           }
 
-          // Add any remaining *enabled* models that weren't in the sort order (alphabetically)
           const remainingEnabled = enabledModelDefs
             .filter((m) => !addedIds.has(m.id))
             .sort((a, b) => a.name.localeCompare(b.name));
@@ -316,7 +309,6 @@ export const ProviderManagementProvider: React.FC<
           modelsForDropdownList = [...orderedEnabledList, ...remainingEnabled];
 
           if (modelsForDropdownList.length === 0) {
-            // This case might happen if enabledModels has IDs that don't exist in allAvailableModelDefs
             console.warn(
               `[ProviderMgmt] Enabled models configured for "${config.name}", but none matched available models. Falling back to all available models.`,
             );
@@ -325,7 +317,6 @@ export const ProviderManagementProvider: React.FC<
             );
           }
         } else {
-          // If NO models are explicitly enabled, show ALL available models in dropdown (sorted alphabetically)
           modelsForDropdownList = [...allAvailableModelDefs].sort((a, b) =>
             a.name.localeCompare(b.name),
           );
@@ -334,7 +325,6 @@ export const ProviderManagementProvider: React.FC<
           );
         }
 
-        // --- Instantiate AiModelConfig for the final dropdown list ---
         const finalModelsForDropdown: AiModelConfig[] = modelsForDropdownList
           .map((modelDef) => {
             try {
@@ -359,8 +349,8 @@ export const ProviderManagementProvider: React.FC<
             id: config.id,
             name: config.name,
             type: config.type,
-            models: finalModelsForDropdown, // Correctly filtered/sorted list for dropdown
-            allAvailableModels: allAvailableModelDefs, // Full list for search/settings
+            models: finalModelsForDropdown,
+            allAvailableModels: allAvailableModelDefs,
           });
         } else {
           console.warn(

@@ -39,8 +39,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      {/* Set height to 2/3 of viewport height with min/max constraints */}
-      <DialogContent className="sm:max-w-[1000px] h-[66vh] min-h-[500px] max-h-[85vh] flex flex-col">
+      {/* Increased max-width and height for larger screens */}
+      <DialogContent className="sm:max-w-[1200px] w-[90vw] h-[80vh] min-h-[550px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
@@ -53,7 +53,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="flex-grow overflow-y-auto py-4 pr-2">
           {/* Remove height/flex constraints from Tabs */}
           <Tabs defaultValue="general">
-            <TabsList className="flex-shrink-0 sticky top-0 bg-background z-10">
+            <TabsList className="flex-shrink-0 sticky top-0 bg-background z-10 mb-4 flex-wrap h-auto justify-start">
               <TabsTrigger value="general">General</TabsTrigger>
               <TabsTrigger value="providers">Providers</TabsTrigger>
               {context.enableAdvancedSettings && (
@@ -64,6 +64,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
               <TabsTrigger value="data">Data</TabsTrigger>
               <TabsTrigger value="mods">Mods</TabsTrigger>
+              {/* Mod-added tabs rendering logic (seems correct) */}
               {context.customSettingsTabs.map((tab: CustomSettingTab) => (
                 <TabsTrigger key={tab.id} value={tab.id}>
                   {tab.title}
@@ -71,7 +72,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               ))}
             </TabsList>
 
-            <div className="mt-4">
+            {/* Content area - removed mt-4 to be closer to tabs */}
+            <div>
               <TabsContent value="general">
                 <SettingsGeneral />
               </TabsContent>
@@ -94,6 +96,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <TabsContent value="mods">
                 <SettingsMods />
               </TabsContent>
+              {/* Mod-added tab content rendering logic (seems correct) */}
               {context.customSettingsTabs.map((tab: CustomSettingTab) => (
                 <TabsContent key={tab.id} value={tab.id}>
                   <tab.component context={context} />

@@ -31,7 +31,7 @@ import {
   CoreChatContext,
   useCoreChatContext,
 } from "@/context/core-chat-context";
-import { useAiInteraction } from "@/hooks/use-ai-interaction";
+import { useAiInteraction } from "@/hooks/ai-interaction";
 import { useMessageHandling } from "@/hooks/use-message-handling";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { toast } from "sonner";

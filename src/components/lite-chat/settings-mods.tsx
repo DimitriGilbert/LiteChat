@@ -90,6 +90,7 @@ export const SettingsMods: React.FC = () => {
 
   const handleDeleteMod = useCallback(
     async (mod: DbMod) => {
+      // Confirmation already exists here
       if (
         !window.confirm(
           `Are you sure you want to delete the mod "${mod.name}"? This cannot be undone.`,
@@ -177,7 +178,7 @@ export const SettingsMods: React.FC = () => {
         </div>
         <Button onClick={handleAddMod} disabled={isAdding}>
           {isAdding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Add Mod
+          {isAdding ? "Adding..." : "Add Mod"}
         </Button>
       </div>
 
@@ -242,6 +243,9 @@ export const SettingsMods: React.FC = () => {
                         disabled={isDisabled}
                         aria-label={`Enable ${mod.name}`}
                       />
+                      {isModUpdating && (
+                        <Loader2 className="h-4 w-4 animate-spin inline-block ml-2" />
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
