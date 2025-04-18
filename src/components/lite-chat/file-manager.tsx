@@ -1,82 +1,20 @@
 // src/components/lite-chat/file-manager.tsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useChatContext } from "@/hooks/use-chat-context";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { FileSystemEntry } from "@/lib/types";
 import { toast } from "sonner";
+import { AlertCircleIcon } from "lucide-react";
 import {
-  FolderIcon,
-  FileIcon,
-  DownloadIcon,
-  Trash2Icon,
-  UploadCloudIcon,
-  ArchiveIcon,
-  FolderUpIcon,
-  RefreshCwIcon,
-  FileArchiveIcon,
-  HomeIcon,
-  Edit2Icon,
-  CheckIcon,
-  XIcon,
-  FolderPlusIcon,
-  Loader2Icon,
-  UsersIcon,
-  AlertCircleIcon, // Added for error display
-} from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
-const formatBytes = (bytes: number, decimals = 2): string => {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
-};
-const normalizePath = (path: string): string => {
-  // Ensure leading slash, remove trailing slash (unless root), collapse multiple slashes
-  let p = path.replace(/\/+/g, "/");
-  if (!p.startsWith("/")) {
-    p = "/" + p;
-  }
-  if (p !== "/" && p.endsWith("/")) {
-    p = p.slice(0, -1);
-  }
-  return p;
-};
-const joinPath = (...segments: string[]): string => {
-  return normalizePath(
-    segments
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .join("/"),
-  );
-};
-const dirname = (path: string): string => {
-  const normalized = normalizePath(path);
-  if (normalized === "/") return "/";
-  const lastSlash = normalized.lastIndexOf("/");
-  if (lastSlash === -1) return "/"; // Should not happen with normalizePath
-  if (lastSlash === 0) return "/"; // Parent of /file is /
-  return normalized.substring(0, lastSlash);
-};
-const basename = (path: string): string => {
-  const normalized = normalizePath(path);
-  if (normalized === "/") return ""; // No basename for root
-  return normalized.substring(normalized.lastIndexOf("/") + 1);
-};
+  normalizePath,
+  joinPath,
+  dirname,
+  basename,
+} from "@/utils/file-manager-utils";
+import { FileManagerBanner } from "./file-manager-banner";
+import { FileManagerToolbar } from "./file-manager-toolbar";
+import { FileManagerTable } from "./file-manager-table";
 
 export const FileManager: React.FC<{ className?: string }> = ({
   className,
@@ -223,7 +161,6 @@ WARNING: This will delete all contents inside!`
         // isOperationLoading set/unset within vfs.deleteItem
         await vfs.deleteItem(entry.path, entry.isDirectory);
         // Success toast handled by the hook if deletion succeeds
-        // toast.success(`"${entry.name}" deleted.`); // Removed: Handled by hook
         if (!entry.isDirectory && checkedPaths.has(entry.path)) {
           removeSelectedVfsPath(entry.path); // Update selection state immediately
         }
@@ -380,7 +317,6 @@ WARNING: This will delete all contents inside!`
       // isOperationLoading set/unset within vfs.rename
       await vfs.rename(editingPath, newPath);
       // Success toast handled by the hook
-      // toast.success(`Renamed "${oldName}" to "${trimmedNewName}"`); // Removed: Handled by hook
       if (checkedPaths.has(editingPath)) {
         removeSelectedVfsPath(editingPath);
         addSelectedVfsPath(newPath);
@@ -391,7 +327,6 @@ WARNING: This will delete all contents inside!`
       // Error already toasted by the hook
       console.error("FileManager Rename Error (already toasted):", error);
       // Don't cancel editing on error, let user retry or cancel explicitly
-      // cancelEditing();
     }
   };
   useEffect(() => {
@@ -438,7 +373,6 @@ WARNING: This will delete all contents inside!`
         error,
       );
       // Don't cancel creating on error, let user retry or cancel explicitly
-      // cancelCreatingFolder();
     }
   };
   useEffect(() => {
@@ -446,40 +380,6 @@ WARNING: This will delete all contents inside!`
       newFolderInputRef.current?.focus();
     }
   }, [creatingFolder]);
-
-  // --- VFS Sharing Banner ---
-  // (No changes needed here based on requirements)
-  let vfsBanner: React.ReactNode = null;
-  if (vfs.vfsKey === "orphan") {
-    vfsBanner = (
-      <div className="flex items-center gap-2 text-xs text-blue-300 bg-blue-900/40 px-2 py-1 rounded mb-1">
-        <UsersIcon className="h-4 w-4" />
-        <span>
-          <b>Shared VFS:</b> All chats <i>not</i> in a project share this
-          filesystem.
-        </span>
-      </div>
-    );
-  } else if (vfs.vfsKey && selectedItemType === "conversation") {
-    vfsBanner = (
-      <div className="flex items-center gap-2 text-xs text-blue-300 bg-blue-900/40 px-2 py-1 rounded mb-1">
-        <UsersIcon className="h-4 w-4" />
-        <span>
-          <b>Project-shared VFS:</b> All chats in this project share this
-          filesystem.
-        </span>
-      </div>
-    );
-  } else if (vfs.vfsKey && selectedItemType === "project") {
-    vfsBanner = (
-      <div className="flex items-center gap-2 text-xs text-blue-300 bg-blue-900/40 px-2 py-1 rounded mb-1">
-        <FolderIcon className="h-4 w-4" />
-        <span>
-          <b>Project VFS:</b> Filesystem for this project and all its chats.
-        </span>
-      </div>
-    );
-  }
 
   // --- Render Logic ---
   if (isConfigLoading) {
@@ -514,402 +414,53 @@ WARNING: This will delete all contents inside!`
   // --- Main File Manager UI ---
   return (
     <div className={cn("flex flex-col h-[400px]", className)}>
-      {vfsBanner}
-      {/* Hidden Inputs */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        className="hidden"
-        multiple
-        disabled={isAnyLoading} // Disable hidden input as well
+      <FileManagerBanner
+        vfsKey={vfs.vfsKey}
+        selectedItemType={selectedItemType}
       />
-      <input
-        type="file"
-        ref={folderInputRef}
-        onChange={handleFileChange}
-        className="hidden"
-        {...{
-          webkitdirectory: "true",
-          mozdirectory: "true",
-          directory: "true",
-        }}
-        disabled={isAnyLoading} // Disable hidden input as well
+      <FileManagerToolbar
+        currentPath={currentPath}
+        isAnyLoading={isAnyLoading}
+        isOperationLoading={isOperationLoading}
+        entries={entries}
+        editingPath={editingPath}
+        creatingFolder={creatingFolder}
+        handleNavigateHome={handleNavigateHome}
+        handleNavigateUp={handleNavigateUp}
+        handleRefresh={handleRefresh}
+        startCreatingFolder={startCreatingFolder}
+        handleUploadClick={handleUploadClick}
+        handleFolderUploadClick={handleFolderUploadClick}
+        handleArchiveUploadClick={handleArchiveUploadClick}
+        handleDownloadAll={handleDownloadAll}
+        fileInputRef={fileInputRef}
+        folderInputRef={folderInputRef}
+        archiveInputRef={archiveInputRef}
+        handleFileChange={handleFileChange}
+        handleArchiveChange={handleArchiveChange}
       />
-      <input
-        type="file"
-        ref={archiveInputRef}
-        onChange={handleArchiveChange}
-        className="hidden"
-        accept=".zip"
-        disabled={isAnyLoading} // Disable hidden input as well
+      <FileManagerTable
+        entries={entries}
+        editingPath={editingPath}
+        newName={newName}
+        creatingFolder={creatingFolder}
+        newFolderName={newFolderName}
+        checkedPaths={checkedPaths}
+        isOperationLoading={isOperationLoading}
+        handleNavigate={handleNavigate}
+        handleCheckboxChange={handleCheckboxChange}
+        startEditing={startEditing}
+        cancelEditing={cancelEditing}
+        handleRename={handleRename}
+        cancelCreatingFolder={cancelCreatingFolder}
+        handleCreateFolder={handleCreateFolder}
+        handleDownload={handleDownload}
+        handleDelete={handleDelete}
+        setNewName={setNewName}
+        setNewFolderName={setNewFolderName}
+        renameInputRef={renameInputRef}
+        newFolderInputRef={newFolderInputRef}
       />
-
-      {/* Toolbar */}
-      <div className="flex items-center gap-1 p-2 border-b border-gray-700 flex-shrink-0">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleNavigateHome}
-          disabled={currentPath === "/" || isAnyLoading}
-          title="Go to root directory"
-          className="h-8 w-8"
-        >
-          <HomeIcon className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleNavigateUp}
-          disabled={currentPath === "/" || isAnyLoading}
-          title="Go up one level"
-          className="h-8 w-8"
-        >
-          <FolderUpIcon className="h-4 w-4" />
-        </Button>
-        <span
-          className="text-sm font-mono text-gray-400 truncate flex-shrink min-w-0 px-2 py-1 rounded bg-gray-800/50"
-          title={currentPath}
-        >
-          {currentPath}
-        </span>
-        <div className="flex-grow" />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleRefresh}
-          disabled={isAnyLoading} // Disable refresh if config loading OR operation loading
-          title="Refresh current directory"
-          className="h-8 w-8"
-        >
-          {isOperationLoading ? ( // Show spinner only for operations, not config loading
-            <Loader2Icon className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCwIcon className="h-4 w-4" />
-          )}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={startCreatingFolder}
-          disabled={isAnyLoading || creatingFolder || !!editingPath}
-          className="h-8"
-          title="Create New Folder"
-        >
-          {isOperationLoading && creatingFolder ? ( // Spinner if creating
-            <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
-          ) : (
-            <FolderPlusIcon className="h-4 w-4 mr-1" />
-          )}
-          Folder
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleUploadClick}
-          disabled={isAnyLoading}
-          className="h-8"
-          title="Upload Files"
-        >
-          {isOperationLoading ? ( // Generic spinner if any operation is loading
-            <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
-          ) : (
-            <UploadCloudIcon className="h-4 w-4 mr-1" />
-          )}
-          Files
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleFolderUploadClick}
-          disabled={isAnyLoading}
-          className="h-8"
-          title="Upload Folder"
-        >
-          {isOperationLoading ? (
-            <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
-          ) : (
-            <FolderIcon className="h-4 w-4 mr-1" />
-          )}
-          Folder
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleArchiveUploadClick}
-          disabled={isAnyLoading}
-          className="h-8"
-          title="Upload & Extract ZIP"
-        >
-          {isOperationLoading ? (
-            <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
-          ) : (
-            <FileArchiveIcon className="h-4 w-4 mr-1" />
-          )}
-          ZIP
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleDownloadAll}
-          disabled={isAnyLoading || entries.length === 0}
-          className="h-8"
-          title="Download Current Directory as ZIP"
-        >
-          {isOperationLoading ? (
-            <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
-          ) : (
-            <ArchiveIcon className="h-4 w-4 mr-1" />
-          )}
-          Export
-        </Button>
-      </div>
-
-      {/* File List Table */}
-      <ScrollArea className="flex-grow">
-        <Table className="text-xs">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[40px] px-2"></TableHead>
-              <TableHead className="w-[40px] px-2"></TableHead>
-              <TableHead className="px-2">Name</TableHead>
-              <TableHead className="w-[100px] px-2">Size</TableHead>
-              <TableHead className="w-[150px] px-2">Modified</TableHead>
-              <TableHead className="w-[100px] text-right px-2">
-                Actions
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {creatingFolder && (
-              <TableRow className="bg-gray-700/50">
-                <TableCell className="px-2">
-                  <FolderIcon className="h-4 w-4 text-yellow-400" />
-                </TableCell>
-                <TableCell className="px-2"></TableCell>
-                <TableCell className="px-2" colSpan={3}>
-                  <div className="flex items-center gap-1">
-                    <Input
-                      ref={newFolderInputRef}
-                      type="text"
-                      value={newFolderName}
-                      onChange={(e) => setNewFolderName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleCreateFolder();
-                        if (e.key === "Escape") cancelCreatingFolder();
-                      }}
-                      // onBlur={handleCreateFolder} // Avoid auto-create on blur if operation is loading
-                      placeholder="New folder name..."
-                      className="h-6 px-1 text-xs flex-grow bg-gray-800 border-gray-600 focus:ring-blue-500"
-                      disabled={isOperationLoading} // Disable input during any operation
-                    />
-                  </div>
-                </TableCell>
-                <TableCell className="text-right px-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-green-500 hover:bg-green-900/50"
-                    onClick={handleCreateFolder}
-                    disabled={isOperationLoading || !newFolderName.trim()} // Disable during op or if name empty
-                    title="Create folder"
-                  >
-                    {isOperationLoading ? (
-                      <Loader2Icon className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <CheckIcon className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-gray-400 hover:bg-gray-600/50"
-                    onClick={cancelCreatingFolder}
-                    disabled={isOperationLoading} // Disable cancel during op
-                    title="Cancel"
-                  >
-                    <XIcon className="h-4 w-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            )}
-            {entries.map((entry) => (
-              <TableRow
-                key={entry.path}
-                className={cn(
-                  "hover:bg-gray-700/50 group",
-                  editingPath === entry.path && "bg-gray-700/70",
-                  isOperationLoading && "opacity-70 cursor-not-allowed", // Dim rows during operations
-                )}
-                onDoubleClick={() =>
-                  !isOperationLoading && !editingPath && handleNavigate(entry)
-                } // Prevent double click during op
-              >
-                <TableCell className="px-2">
-                  {entry.isDirectory ? (
-                    <FolderIcon className="h-4 w-4 text-yellow-400" />
-                  ) : (
-                    <FileIcon className="h-4 w-4 text-gray-400" />
-                  )}
-                </TableCell>
-                <TableCell className="px-2">
-                  {!entry.isDirectory && (
-                    <Checkbox
-                      id={`select-${entry.path}`}
-                      checked={checkedPaths.has(entry.path)}
-                      onCheckedChange={(checked) =>
-                        handleCheckboxChange(!!checked, entry.path)
-                      }
-                      disabled={isOperationLoading} // Disable checkbox during op
-                      aria-label={`Select file ${entry.name}`}
-                      className="mt-0.5"
-                    />
-                  )}
-                </TableCell>
-                <TableCell
-                  className="font-medium truncate max-w-[200px] px-2"
-                  title={entry.name}
-                >
-                  {editingPath === entry.path ? (
-                    <div className="flex items-center gap-1">
-                      <Input
-                        ref={renameInputRef}
-                        type="text"
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleRename();
-                          if (e.key === "Escape") cancelEditing();
-                        }}
-                        // onBlur={handleRename} // Avoid auto-rename on blur if operation is loading
-                        className="h-6 px-1 text-xs flex-grow bg-gray-800 border-gray-600 focus:ring-blue-500"
-                        onClick={(e) => e.stopPropagation()} // Prevent row navigation
-                        disabled={isOperationLoading} // Disable input during op
-                      />
-                    </div>
-                  ) : (
-                    <span
-                      className={cn(
-                        entry.isDirectory && "cursor-pointer",
-                        !entry.isDirectory && "cursor-default",
-                      )}
-                      onClick={() =>
-                        !isOperationLoading && handleNavigate(entry)
-                      } // Allow click nav only if not loading
-                    >
-                      {entry.name}
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell className="px-2">
-                  {entry.isDirectory ? "-" : formatBytes(entry.size)}
-                </TableCell>
-                <TableCell className="px-2">
-                  {entry.lastModified.toLocaleString()}
-                </TableCell>
-                <TableCell className="text-right px-2">
-                  {editingPath === entry.path ? (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-green-500 hover:bg-green-900/50"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRename();
-                        }}
-                        disabled={isOperationLoading || !newName.trim()} // Disable during op or if name empty
-                        title="Save name"
-                      >
-                        {isOperationLoading ? (
-                          <Loader2Icon className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <CheckIcon className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-gray-400 hover:bg-gray-600/50"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          cancelEditing();
-                        }}
-                        disabled={isOperationLoading} // Disable cancel during op
-                        title="Cancel rename"
-                      >
-                        <XIcon className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <div
-                      className={cn(
-                        "opacity-0 group-hover:opacity-100 transition-opacity flex justify-end gap-0.5",
-                        isOperationLoading && "opacity-30", // Dim actions during op
-                      )}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 hover:bg-gray-600/50"
-                        title="Rename"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startEditing(entry);
-                        }}
-                        disabled={isAnyLoading || creatingFolder} // Disable if any loading or creating folder
-                      >
-                        <Edit2Icon className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 hover:bg-gray-600/50"
-                        title={
-                          entry.isDirectory
-                            ? "Download Folder (ZIP)"
-                            : "Download File"
-                        }
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDownload(entry);
-                        }}
-                        disabled={isAnyLoading} // Disable if any loading
-                      >
-                        <DownloadIcon className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-red-500 hover:text-red-400 hover:bg-red-900/30"
-                        title="Delete"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(entry);
-                        }}
-                        disabled={isAnyLoading} // Disable if any loading
-                      >
-                        <Trash2Icon className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-            {entries.length === 0 && !creatingFolder && !isOperationLoading && (
-              // Show empty message only if not loading and not creating
-              <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="text-center text-gray-500 py-6"
-                >
-                  Folder is empty
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </ScrollArea>
     </div>
   );
 };
