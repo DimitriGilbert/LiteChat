@@ -6,17 +6,12 @@ import type {
   CustomPromptAction,
   CustomMessageAction,
   CustomSettingTab,
-  DbProviderType,
   SidebarItemType,
 } from "@/lib/types";
 import { modEvents, ModEvent } from "@/mods/events";
 import {
-  ModMiddlewareHook,
   type ReadonlyChatContextSnapshot,
 } from "@/mods/api";
-import type {
-  ModMiddlewarePayloadMap,
-} from "@/mods/types";
 import { ChatContext } from "@/hooks/use-chat-context";
 import { useCoreChatContext } from "@/context/core-chat-context";
 import { useAiInteraction } from "@/hooks/ai-interaction";
@@ -28,7 +23,8 @@ import { useSettingsContext } from "./settings-context";
 import { useVfsContext } from "./vfs-context";
 import { useModContext } from "./mod-context";
 import { useChatMiddleware } from "./chat-middleware";
-import { decodeUint8Array, isCodeFile, requiresApiKey, EMPTY_DB_PROVIDER_CONFIGS } from "@/utils/chat-utils";
+import { EMPTY_DB_PROVIDER_CONFIGS } from "@/utils/chat-utils";
+import { ChatSubmissionService } from "@/services/chat-submission-service";
 
 interface ChatProviderInnerProps {
   children: React.ReactNode;
@@ -185,198 +181,48 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
       attachedFilesValue: File[],
       vfsPathsToSubmit: string[],
     ) => {
-      const currentPrompt = promptValue.trim();
-      const canSubmit =
-        currentPrompt.length > 0 ||
-        attachedFilesValue.length > 0 ||
-        vfsPathsToSubmit.length > 0;
-
-      if (!canSubmit) return;
-      if (isStreaming) {
-        toast.info("Please wait for the current response to finish.");
-        return;
-      }
-      if (!providerMgmt.selectedProvider || !providerMgmt.selectedModel) {
-        setError("Error: Please select an active AI Provider and Model first.");
-        toast.error("Please select an AI Provider and Model.");
-        return;
-      }
-
-      const selectedDbConfig = (
-        providerMgmt.dbProviderConfigs || EMPTY_DB_PROVIDER_CONFIGS
-      ).find((p) => p.id === providerMgmt.selectedProviderId);
-      const needsKeyCheck =
-        selectedDbConfig?.apiKeyId ||
-        requiresApiKey(selectedDbConfig?.type as DbProviderType);
-
-      if (needsKeyCheck && !getApiKeyForSelectedProvider()) {
-        const errorMsg = `API Key for ${providerMgmt.selectedProvider.name} is not set, selected, or linked. Check Settings -> Providers.`;
-        setError(errorMsg);
-        toast.error(errorMsg);
-        if (!providerMgmt.enableApiKeyManagement) {
-          toast.info(
-            "API Key management is disabled. Ensure keys are configured correctly if needed by the provider.",
-          );
-        }
-        return;
-      }
-
-      let conversationIdToSubmit: string | null = null;
-      let parentProjectId: string | null = null;
-
-      if (sidebar.selectedItemType === "project" && sidebar.selectedItemId) {
-        parentProjectId = sidebar.selectedItemId;
-      } else if (
-        sidebar.selectedItemType === "conversation" &&
-        sidebar.selectedItemId
-      ) {
-        parentProjectId = sidebar.activeConversationData?.parentId ?? null;
-        conversationIdToSubmit = sidebar.selectedItemId;
-      }
-
-      let newConvCreated = false;
-      if (!conversationIdToSubmit) {
-        try {
-          const title = currentPrompt.substring(0, 50) || "New Chat";
-          const newConvId = await sidebar.createConversation(
-            parentProjectId,
-            title,
-          );
-          if (!newConvId)
-            throw new Error("Failed to get ID for new conversation.");
-          conversationIdToSubmit = newConvId;
-          newConvCreated = true;
-          modEvents.emit(ModEvent.CHAT_CREATED, {
-            id: newConvId,
-            type: "conversation",
-            parentId: parentProjectId,
-          });
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : "Unknown error";
-          setError(`Error: Could not start chat - ${message}`);
-          toast.error(`Failed to start chat: ${message}`);
-          return;
-        }
-      }
-
-      if (!conversationIdToSubmit) {
-        setError("Error: Could not determine target conversation for submit.");
-        toast.error("Could not determine target conversation.");
-        return;
-      }
-
-      let contextPrefix = "";
-      const pathsIncludedInContext: string[] = [];
-
-      if (
-        vfs.enableVfs &&
-        vfs.isVfsEnabledForItem &&
-        vfs.vfs.isReady &&
-        vfs.vfs.configuredVfsKey === vfs.vfs.vfsKey &&
-        vfsPathsToSubmit.length > 0
-      ) {
-        modEvents.emit(ModEvent.VFS_CONTEXT_ADDED, {
-          paths: vfsPathsToSubmit,
-        });
-        const vfsContentPromises = vfsPathsToSubmit.map(async (path) => {
-          try {
-            const contentBytes = await vfs.vfs.readFile(path);
-            const contentText = decodeUint8Array(contentBytes);
-            pathsIncludedInContext.push(path);
-            const fileExtension = path.split(".").pop()?.toLowerCase() || "";
-            return `<vfs_file path="${path}" extension="${fileExtension}">
-\`\`\`${fileExtension}
-${contentText}
-\`\`\`
-</vfs_file>`;
-          } catch (readErr) {
-            console.error(`Error reading VFS file ${path}:`, readErr);
-            toast.error(`Failed to read VFS file: ${path}`);
-            return `<vfs_file path="${path}" error="Failed to read"/>`;
-          }
-        });
-        const vfsContents = await Promise.all(vfsContentPromises);
-        if (vfsContents.length > 0) {
-          contextPrefix += vfsContents.join("\n") + "\n";
-        }
-      } else if (vfsPathsToSubmit.length > 0) {
-        toast.warning("VFS not enabled for this chat. Selected files ignored.");
-      }
-
-      if (attachedFilesValue.length > 0) {
-        const attachedContentPromises = attachedFilesValue.map(async (file) => {
-          if (file.type.startsWith("text/") || isCodeFile(file.name)) {
-            try {
-              const contentText = await file.text();
-              const fileExtension =
-                file.name.split(".").pop()?.toLowerCase() || "";
-              return `<attached_file name="${file.name}" type="${file.type}" extension="${fileExtension}">
-\`\`\`${fileExtension}
-${contentText}
-\`\`\`
-</attached_file>`;
-            } catch (readErr) {
-              let errmsg = "";
-              if (readErr instanceof Error) {
-                errmsg = readErr.message;
-              } else {
-                errmsg = String(readErr);
-              }
-              toast.error(
-                `Failed to read attached file: ${file.name}\n${errmsg}`,
-              );
-              return `<attached_file name="${file.name}" type="${file.type}" error="Failed to read"/>`;
-            }
-          } else {
-            toast.info(`Skipping unsupported file: ${file.name}`);
-            return `<attached_file name="${file.name}" type="${file.type}" status="skipped_unsupported"/>`;
-          }
-        });
-        const attachedContents = await Promise.all(attachedContentPromises);
-        if (attachedContents.length > 0) {
-          contextPrefix += attachedContents.join("\n") + "\n";
-        }
-      }
-
-      const originalUserPrompt = currentPrompt;
-      const promptToSendToAI = contextPrefix + originalUserPrompt;
-
-      if (promptToSendToAI.trim().length > 0) {
-        let submitPayload: ModMiddlewarePayloadMap[typeof ModMiddlewareHook.SUBMIT_PROMPT] =
+      try {
+        await ChatSubmissionService.submitChat(
+          promptValue,
+          attachedFilesValue,
+          vfsPathsToSubmit,
           {
-            prompt: promptToSendToAI,
-            originalUserPrompt,
-            attachedFiles: attachedFilesValue,
-            vfsPaths: pathsIncludedInContext,
-            conversationId: conversationIdToSubmit || '',
-          };
-
-        modEvents.emit(ModEvent.MESSAGE_BEFORE_SUBMIT, {
-          prompt: originalUserPrompt,
-          attachedFiles: attachedFilesValue,
-          vfsPaths: pathsIncludedInContext,
-        });
-
-        const middlewareResult = await middleware.runMiddleware(
-          ModMiddlewareHook.SUBMIT_PROMPT,
-          submitPayload,
-        );
-
-        if (middlewareResult === false) {
-          toast.info("Submission cancelled by a mod.");
-          if (newConvCreated && conversationIdToSubmit) {
-            await sidebar.deleteItem(conversationIdToSubmit, "conversation");
+            // Provider management
+            selectedProviderId: providerMgmt.selectedProviderId,
+            selectedProvider: providerMgmt.selectedProvider || null,
+            selectedModel: providerMgmt.selectedModel,
+            getApiKeyForProvider: getApiKeyForSelectedProvider,
+            dbProviderConfigs: providerMgmt.dbProviderConfigs || EMPTY_DB_PROVIDER_CONFIGS,
+            enableApiKeyManagement: providerMgmt.enableApiKeyManagement,
+            
+            // Streaming state
+            isStreaming,
+            setError,
+            
+            // Sidebar/Item management
+            selectedItemType: sidebar.selectedItemType,
+            selectedItemId: sidebar.selectedItemId,
+            activeConversationData: sidebar.activeConversationData,
+            createConversation: sidebar.createConversation,
+            selectItem: sidebar.selectItem,
+            deleteItem: sidebar.deleteItem,
+            
+            // VFS
+            vfs: vfs.vfs,
+            enableVfs: vfs.enableVfs,
+            isVfsEnabledForItem: vfs.isVfsEnabledForItem,
+            
+            // Middleware
+            runMiddleware: middleware.runMiddleware,
+            
+            // Message handling
+            handleSubmitCore: messageHandling.handleSubmitCore,
           }
-          return;
-        }
-        submitPayload = middlewareResult;
-
-        await messageHandling.handleSubmitCore(
-          submitPayload.originalUserPrompt,
-          submitPayload.conversationId,
-          submitPayload.prompt,
-          submitPayload.vfsPaths,
         );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setError(`Error: ${message}`);
+        toast.error(`Failed: ${message}`);
       }
     },
     [
