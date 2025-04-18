@@ -25,3 +25,5 @@ dist-ssr
 plop
 prompt_4_*
 src/test/**/*.notest.*
+*.todo.md
+.proompts/

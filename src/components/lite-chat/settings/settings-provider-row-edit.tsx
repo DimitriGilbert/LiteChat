@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { SaveIcon, XIcon, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ApiKeySelector } from "./api-key-selector";
+import { ApiKeySelector } from "@/components/lite-chat/api-key-selector";
 import {
   requiresApiKey,
   requiresBaseURL,
@@ -37,7 +37,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { SortableModelItem } from "./sortable-model-item";
+import { SortableModelItem } from "@/components/lite-chat/sortable-model-item";
 
 interface ProviderRowEditModeProps {
   providerId: string;

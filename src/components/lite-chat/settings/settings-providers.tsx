@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { PlusIcon, SaveIcon, XIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ApiKeySelector } from "./api-key-selector";
+import { ApiKeySelector } from "@/components/lite-chat/api-key-selector";
 import { ProviderRow } from "./settings-provider-row";
 import {
   supportsModelFetching,

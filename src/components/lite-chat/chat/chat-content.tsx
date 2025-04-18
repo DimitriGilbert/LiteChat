@@ -7,7 +7,7 @@ import React, {
   useLayoutEffect,
 } from "react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { MemoizedMessageBubble } from "./message-bubble";
+import { MemoizedMessageBubble } from "@/components/lite-chat/message/message-bubble";
 import { useCoreChatContext } from "@/context/core-chat-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";

@@ -11,8 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ApiKeySelector } from "./api-key-selector";
-import { FileManager } from "./file-manager";
+import { ApiKeySelector } from "@/components/lite-chat/api-key-selector";
+import { FileManager } from "@/components/lite-chat/file-manager";
 import { cn } from "@/lib/utils";
 import { SaveIcon, InfoIcon } from "lucide-react";
 import {

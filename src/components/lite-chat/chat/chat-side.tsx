@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChatHistory } from "./chat-history";
-import { SettingsModal } from "./settings-modal";
+import { SettingsModal } from "@/components/lite-chat/settings/settings-modal";
 import { Button } from "@/components/ui/button";
 import {
   SettingsIcon,

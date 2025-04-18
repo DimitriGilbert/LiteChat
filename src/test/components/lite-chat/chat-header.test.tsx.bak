@@ -1,7 +1,7 @@
 // src/test/components/lite-chat/chat-header.test.tsx
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { ChatHeader } from "@/components/lite-chat/chat-header"; // Alias used here
+import { ChatHeader } from "@/components/lite-chat/chat/chat-header"; // Alias used here
 import { ChatContext } from "@/hooks/use-chat-context"; // Verify path
 import type { ChatContextProps, DbConversation, DbProject } from "@/lib/types"; // Verify path
 import { useLiveQuery } from "dexie-react-hooks";

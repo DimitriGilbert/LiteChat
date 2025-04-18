@@ -3,7 +3,7 @@ import React from "react";
 import type { Message } from "@/lib/types";
 import { MessageRoleLabel } from "./message-role-label";
 import { MessageContentRenderer } from "./message-content-renderer";
-import { VfsContextDisplay } from "./vfs-context-display";
+import { VfsContextDisplay } from "@/components/lite-chat/vfs-context-display";
 import { MessageMetadataDisplay } from "./message-metadata-display";
 import { MessageErrorDisplay } from "./message-error-display";
 

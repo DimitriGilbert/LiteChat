@@ -1,8 +1,8 @@
 // src/components/lite-chat/chat.tsx
 import React, { useState } from "react";
 import { ChatProvider } from "@/context/chat-context";
-import { ChatSide } from "./chat-side";
-import { ChatWrapper } from "./chat-wrapper";
+import { ChatSide } from "./chat/chat-side";
+import { ChatWrapper } from "./chat/chat-wrapper";
 import { useChatContext } from "@/hooks/use-chat-context";
 import type { SidebarItemType, LiteChatConfig, SidebarItem } from "@/lib/types";
 import { cn } from "@/lib/utils";

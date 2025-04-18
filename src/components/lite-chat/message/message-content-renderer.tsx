@@ -4,7 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/lib/types";
-import { CodeBlock } from "./code-block"; // Import CodeBlock
+import { CodeBlock } from "@/components/lite-chat/code-block"; // Import CodeBlock
 
 interface MessageContentRendererProps {
   message: Message;

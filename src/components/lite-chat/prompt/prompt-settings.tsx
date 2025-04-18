@@ -1,7 +1,7 @@
 // src/components/lite-chat/prompt-settings.tsx
 import React, { useState, useEffect } from "react"; // Added useEffect
-import { ProviderSelector } from "./provider-selector";
-import { ModelSelector } from "./model-selector";
+import { ProviderSelector } from "@/components/lite-chat/provider-selector";
+import { ModelSelector } from "@/components/lite-chat/model-selector";
 import { PromptSettingsAdvanced } from "./prompt-settings-advanced"; // Ensure this is imported
 // Import specific context hooks
 import { useProviderManagementContext } from "@/context/provider-management-context";

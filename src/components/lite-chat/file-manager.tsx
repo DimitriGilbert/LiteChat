@@ -12,9 +12,9 @@ import {
   dirname,
   basename,
 } from "@/utils/file-manager-utils";
-import { FileManagerBanner } from "./file-manager-banner";
-import { FileManagerToolbar } from "./file-manager-toolbar";
-import { FileManagerTable } from "./file-manager-table";
+import { FileManagerBanner } from "./file-manager/file-manager-banner";
+import { FileManagerToolbar } from "./file-manager/file-manager-toolbar";
+import { FileManagerTable } from "./file-manager/file-manager-table";
 
 export const FileManager: React.FC<{ className?: string }> = ({
   className,

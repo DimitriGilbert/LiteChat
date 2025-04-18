@@ -3,7 +3,7 @@ import React, { useEffect } from "react";
 import { PromptInput } from "./prompt-input";
 import { PromptSettings } from "./prompt-settings";
 import { PromptFiles } from "./prompt-files";
-import { SelectedVfsFilesDisplay } from "./selected-vfs-files-display";
+import { SelectedVfsFilesDisplay } from "@/components/lite-chat/selected-vfs-files-display";
 import { PromptActions } from "./prompt-actions";
 import { useChatContext } from "@/hooks/use-chat-context";
 import { useChatInput } from "@/hooks/use-chat-input";

@@ -1,7 +1,7 @@
 // src/components/lite-chat/chat-wrapper.tsx
 import React from "react";
 import { ChatContent } from "./chat-content";
-import { PromptWrapper } from "./prompt-wrapper";
+import { PromptWrapper } from "@/components/lite-chat/prompt/prompt-wrapper";
 import { ChatHeader } from "./chat-header";
 import { cn } from "@/lib/utils";
 import type { SidebarItem, SidebarItemType } from "@/lib/types";
