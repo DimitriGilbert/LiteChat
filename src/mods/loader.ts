@@ -48,10 +48,13 @@ export async function loadMods(
 
   for (const mod of enabledMods) {
     let scriptContent = mod.scriptContent;
-    // FIX: Initialize instance later based on success/error
-    // let instance: ModInstance | null = null;
+    let modApi: LiteChatModApi | null = null; // Initialize API object reference
+    let instanceError: Error | string | null = null; // Store potential error
 
     try {
+      // Create the API object for this specific mod *before* fetching/executing
+      modApi = createApiForMod(mod, registrationCallbacks, getContextSnapshot);
+
       // Fetch script if sourceUrl is provided
       if (mod.sourceUrl) {
         console.log(
@@ -73,13 +76,6 @@ export async function loadMods(
         throw new Error("Mod script content is empty.");
       }
 
-      // Create the API object for this specific mod
-      const modApi: LiteChatModApi = createApiForMod(
-        mod,
-        registrationCallbacks,
-        getContextSnapshot,
-      );
-
       // Execute the script in a controlled environment
       console.log(
         `[ModLoader] Executing script for mod "${mod.name}" (ID: ${mod.id})`,
@@ -87,43 +83,67 @@ export async function loadMods(
       // Using Function constructor for basic sandboxing (limited effectiveness in browser)
       // The script should call registration functions on the provided `modApi` object.
       const modFunction = new Function("modApi", scriptContent);
-      modFunction(modApi);
-      console.log(
-        `[ModLoader] Script executed successfully for mod "${mod.name}".`,
+      // Wrap execution in its own try-catch to differentiate execution errors
+      try {
+        modFunction(modApi);
+        console.log(
+          `[ModLoader] Script executed successfully for mod "${mod.name}".`,
+        );
+      } catch (executionError) {
+        // Capture execution-specific errors
+        instanceError =
+          executionError instanceof Error
+            ? executionError
+            : String(executionError);
+        console.error(
+          `[ModLoader] Error *executing* mod "${mod.name}" (ID: ${mod.id}):`,
+          executionError,
+        );
+        toast.error(
+          `Error executing mod "${mod.name}": ${instanceError instanceof Error ? instanceError.message : instanceError}`,
+        );
+        // Re-throw or handle as needed - here we store it and continue to create the instance
+      }
+    } catch (loadingError) {
+      // Capture loading/fetching/compilation errors
+      instanceError =
+        loadingError instanceof Error ? loadingError : String(loadingError);
+      console.error(
+        `[ModLoader] Error *loading* mod "${mod.name}" (ID: ${mod.id}):`,
+        loadingError,
       );
+      toast.error(
+        `Error loading mod "${mod.name}": ${instanceError instanceof Error ? instanceError.message : instanceError}`,
+      );
+    } finally {
+      // Always create an instance, including the error if one occurred
+      // Ensure modApi is created even if loading fails early, for consistency
+      if (!modApi) {
+        modApi = createApiForMod(
+          mod,
+          registrationCallbacks,
+          getContextSnapshot,
+        );
+      }
 
-      // FIX: Create instance on success (without error property)
       const instance: ModInstance = {
         id: mod.id,
         name: mod.name,
         api: modApi, // Store the API instance
+        error: instanceError ?? undefined, // Assign error if it exists
       };
       loadedInstances.push(instance);
-      modEvents.emit(ModEvent.MOD_LOADED, { id: mod.id, name: mod.name });
-    } catch (error) {
-      const errorMessage = String(error); // String() handles various types
-      console.error(
-        `[ModLoader] Error loading mod "${mod.name}" (ID: ${mod.id}):`,
-        error,
-      );
-      toast.error(`Error loading mod "${mod.name}": ${errorMessage}`);
 
-      // FIX: Create instance on error, assigning the error property
-      const instance: ModInstance = {
-        id: mod.id,
-        name: mod.name,
-        // Provide API even on error for potential cleanup/reporting? Or a dummy?
-        // Using the created API for now.
-        api: createApiForMod(mod, registrationCallbacks, getContextSnapshot),
-        // Assign the error, ensuring it's Error or string
-        error: error instanceof Error ? error : errorMessage,
-      };
-      loadedInstances.push(instance); // Add error instance to the list
-      modEvents.emit(ModEvent.MOD_ERROR, {
-        id: mod.id,
-        name: mod.name,
-        error: instance.error ?? "",
-      });
+      // Emit appropriate event based on whether an error occurred
+      if (instance.error) {
+        modEvents.emit(ModEvent.MOD_ERROR, {
+          id: mod.id,
+          name: mod.name,
+          error: instance.error,
+        });
+      } else {
+        modEvents.emit(ModEvent.MOD_LOADED, { id: mod.id, name: mod.name });
+      }
     }
   }
 

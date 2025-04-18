@@ -18,6 +18,12 @@ import {
 import { AlertTriangle, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { DbMod } from "@/mods/types";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"; // Import Tooltip components
 
 export const SettingsMods: React.FC = () => {
   const { dbMods, loadedMods, addDbMod, updateDbMod, deleteDbMod } =
@@ -51,7 +57,7 @@ export const SettingsMods: React.FC = () => {
         sourceUrl: modUrl.trim() || null,
         scriptContent: modScript.trim() || null,
         enabled: true, // Enable by default
-        loadOrder: 0, // Default load order
+        loadOrder: (dbMods.length + 1) * 10, // Simple load order increment
       };
       await addDbMod(modData);
       toast.success(`Mod "${modName.trim()}" added successfully.`);
@@ -66,7 +72,7 @@ export const SettingsMods: React.FC = () => {
     } finally {
       setIsAdding(false);
     }
-  }, [modName, modUrl, modScript, addDbMod]);
+  }, [modName, modUrl, modScript, addDbMod, dbMods.length]);
 
   const handleToggleEnable = useCallback(
     async (mod: DbMod) => {
@@ -90,7 +96,6 @@ export const SettingsMods: React.FC = () => {
 
   const handleDeleteMod = useCallback(
     async (mod: DbMod) => {
-      // Confirmation already exists here
       if (
         !window.confirm(
           `Are you sure you want to delete the mod "${mod.name}"? This cannot be undone.`,
@@ -116,16 +121,27 @@ export const SettingsMods: React.FC = () => {
 
   const getModStatus = (
     modId: string,
-  ): { status: string; error?: string | Error } => {
+  ): { status: string; error?: string | Error; tooltip?: string } => {
     const loaded = loadedMods.find((m) => m.id === modId);
     if (loaded) {
-      return loaded.error
-        ? { status: "Error", error: loaded.error }
-        : { status: "Loaded" };
+      if (loaded.error) {
+        const errorMessage =
+          loaded.error instanceof Error
+            ? loaded.error.message
+            : String(loaded.error);
+        return { status: "Error", error: loaded.error, tooltip: errorMessage };
+      } else {
+        return { status: "Loaded" };
+      }
     }
-    // Check if it exists in dbMods but not loaded (could be disabled or failed before instance creation)
+    // Check if it exists in dbMods but not loaded
     const dbMod = dbMods.find((m) => m.id === modId);
-    return dbMod?.enabled ? { status: "Load Pending" } : { status: "Disabled" }; // Or just "Not Loaded" if enabled?
+    if (!dbMod) {
+      return { status: "Unknown" }; // Should not happen if called from map
+    }
+    return dbMod.enabled
+      ? { status: "Load Pending" } // Mod is enabled but not yet in loadedMods (app loading?)
+      : { status: "Disabled" }; // Mod exists but is disabled
   };
 
   return (
@@ -189,85 +205,101 @@ export const SettingsMods: React.FC = () => {
           fully take effect.
         </p>
         <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-center">Enabled</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {dbMods.length === 0 && (
+          <TooltipProvider delayDuration={100}>
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    No mods installed yet.
-                  </TableCell>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-center">Enabled</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              )}
-              {dbMods.map((mod) => {
-                const { status, error } = getModStatus(mod.id);
-                const sourceDisplay = mod.sourceUrl
-                  ? new URL(mod.sourceUrl).hostname
-                  : "Direct Script";
-                const isModUpdating = isUpdating[mod.id];
-                const isModDeleting = isDeleting[mod.id];
-                const isDisabled = isModUpdating || isModDeleting;
-
-                return (
-                  <TableRow key={mod.id}>
-                    <TableCell className="font-medium">{mod.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {sourceDisplay}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={status === "Error" ? "text-destructive" : ""}
-                      >
-                        {status}
-                      </span>
-                      {error && (
-                        <p className="text-xs text-destructive truncate">
-                          {error instanceof Error
-                            ? error.message
-                            : String(error)}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Switch
-                        checked={mod.enabled}
-                        onCheckedChange={() => handleToggleEnable(mod)}
-                        disabled={isDisabled}
-                        aria-label={`Enable ${mod.name}`}
-                      />
-                      {isModUpdating && (
-                        <Loader2 className="h-4 w-4 animate-spin inline-block ml-2" />
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteMod(mod)}
-                        disabled={isDisabled}
-                        aria-label={`Delete ${mod.name}`}
-                        className="text-destructive hover:text-destructive/80"
-                      >
-                        {isModDeleting ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
+              </TableHeader>
+              <TableBody>
+                {dbMods.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-24 text-center">
+                      No mods installed yet.
                     </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                )}
+                {dbMods.map((mod) => {
+                  const { status, error, tooltip } = getModStatus(mod.id);
+                  const sourceDisplay = mod.sourceUrl
+                    ? new URL(mod.sourceUrl).hostname
+                    : "Direct Script";
+                  const isModUpdating = isUpdating[mod.id];
+                  const isModDeleting = isDeleting[mod.id];
+                  const isDisabled = isModUpdating || isModDeleting;
+                  const hasError = status === "Error";
+
+                  return (
+                    <TableRow key={mod.id}>
+                      <TableCell className="font-medium">{mod.name}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {sourceDisplay}
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className={
+                                hasError
+                                  ? "text-destructive font-semibold cursor-help"
+                                  : ""
+                              }
+                            >
+                              {status}
+                            </span>
+                          </TooltipTrigger>
+                          {tooltip && (
+                            <TooltipContent className="max-w-xs break-words">
+                              <p>{tooltip}</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                        {hasError && error && (
+                          <p className="text-xs text-destructive truncate">
+                            {error instanceof Error
+                              ? error.message
+                              : String(error)}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Switch
+                          checked={mod.enabled}
+                          onCheckedChange={() => handleToggleEnable(mod)}
+                          disabled={isDisabled}
+                          aria-label={`Enable ${mod.name}`}
+                        />
+                        {isModUpdating && (
+                          <Loader2 className="h-4 w-4 animate-spin inline-block ml-2" />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteMod(mod)}
+                          disabled={isDisabled}
+                          aria-label={`Delete ${mod.name}`}
+                          className="text-destructive hover:text-destructive/80"
+                        >
+                          {isModDeleting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TooltipProvider>
         </div>
       </div>
     </div>
