@@ -305,6 +305,10 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                     <p className="text-xs text-gray-400">
                       Upload and manage files for your AI to reference
                     </p>
+                    <p className="text-xs text-gray-400">
+                      Now with (limited) support for Git !! Clone, pull, all
+                      that good stuff :D
+                    </p>
                   </div>
                   <div className="bg-gray-700/50 p-3 rounded-md">
                     <p className="font-medium text-gray-300 mb-1">
@@ -312,6 +316,18 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                     </p>
                     <p className="text-xs text-gray-400">
                       Organize your chats by topic or purpose
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Synchronize you conversation using Git (no tried yet, but
+                      my issues are open :D)
+                    </p>
+                  </div>
+                  <div className="bg-gray-700/50 p-3 rounded-md">
+                    <p className="font-medium text-gray-300 mb-1">
+                      Chat parameters control
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      System prompt, Temperature, Top Somethings, Penalty(ies) !
                     </p>
                   </div>
                   <div className="bg-gray-700/50 p-3 rounded-md">
