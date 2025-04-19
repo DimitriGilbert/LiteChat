@@ -4,9 +4,10 @@ import type { DbMod, ModInstance } from "@/mods/types";
 // Import the global fs object to use its type
 // Removed unused FileSystem import
 import { fs } from "@zenfs/core";
+import type { CoreMessage as AiCoreMessage } from "ai"; // Use alias to avoid naming conflict
 
 // --- Basic Types ---
-export type Role = "user" | "assistant" | "system";
+export type Role = "user" | "assistant" | "system" | "tool"; // Added 'tool' role
 export type SidebarItemType = "conversation" | "project";
 export type DbProviderType =
   | "openai"
@@ -14,6 +15,23 @@ export type DbProviderType =
   | "openrouter"
   | "ollama"
   | "openai-compatible";
+
+// --- AI SDK Core Message Parts (Aligned with reference) ---
+export interface TextPart {
+  type: "text";
+  text: string;
+}
+
+export interface ImagePart {
+  type: "image";
+  /** Base64 encoded data URL */
+  image: string;
+  /** Optional mime type */
+  mediaType?: string;
+}
+
+// Define the multi-modal content type based on AI SDK structure
+export type MessageContent = string | Array<TextPart | ImagePart>;
 
 // --- Database Schemas ---
 export interface DbBase {
@@ -44,8 +62,12 @@ export interface DbConversation extends DbBase {
 export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {
   conversationId: string;
   role: Role;
-  content: string;
+  /** Updated content type */
+  content: MessageContent;
   vfsContextPaths?: string[];
+  // Add fields for potential future use with tool calls if needed
+  toolCallId?: string;
+  toolName?: string;
 }
 
 export interface DbApiKey extends Pick<DbBase, "id" | "createdAt"> {
@@ -77,11 +99,13 @@ export interface DbProviderConfig extends DbBase {
 // --- UI & State Types ---
 export interface Message {
   role: Role;
-  content: string;
+  /** Updated content type */
+  content: MessageContent;
   id?: string;
   conversationId?: string;
   createdAt?: Date;
   isStreaming?: boolean;
+  /** Stores partial streamed text content */
   streamedContent?: string;
   error?: string | null;
   vfsContextPaths?: string[];
@@ -90,6 +114,9 @@ export interface Message {
   tokensInput?: number;
   tokensOutput?: number;
   tokensPerSecond?: number;
+  // Add fields for potential future use with tool calls if needed
+  toolCallId?: string;
+  toolName?: string;
 }
 
 export interface SidebarItemBase extends DbBase {
@@ -190,9 +217,9 @@ export interface CoreChatContextProps {
   error: string | null;
   setError: (error: string | null) => void;
   handleSubmitCore: (
-    originalUserPrompt: string,
+    originalUserPrompt: string, // Keep original prompt for display/DB
     currentConversationId: string,
-    promptToSendToAI: string,
+    contentToSendToAI: MessageContent, // Use the multi-modal type
     vfsContextPaths?: string[],
   ) => Promise<void>;
   stopStreamingCore: () => void;
@@ -362,3 +389,8 @@ export interface ChatContextProps {
   isSettingsModalOpen: boolean;
   onSettingsModalOpenChange: (open: boolean) => void;
 }
+
+// --- AI SDK CoreMessage Re-export/Alias ---
+// Re-exporting or aliasing the CoreMessage type from 'ai' package
+// This ensures we use the canonical type definition from the SDK
+export type CoreMessage = AiCoreMessage;

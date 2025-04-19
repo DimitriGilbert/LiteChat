@@ -1,11 +1,12 @@
 // src/hooks/ai-interaction/types.ts
 import React from "react";
-import { CoreMessage } from "ai";
-import { 
-  AiModelConfig, 
+// Use the aliased/re-exported CoreMessage from our types
+import {
+  AiModelConfig,
   AiProviderConfig,
   Message,
-  DbMessage 
+  DbMessage,
+  CoreMessage, // Use the type defined in src/lib/types.ts
 } from "@/lib/types";
 
 // --- Interface Definitions ---
@@ -29,7 +30,7 @@ export interface UseAiInteractionProps {
 
 export interface PerformAiStreamParams {
   conversationIdToUse: string;
-  messagesToSend: CoreMessage[];
+  messagesToSend: CoreMessage[]; // Use CoreMessage from types.ts
   currentTemperature: number;
   currentMaxTokens: number | null;
   currentTopP: number | null;

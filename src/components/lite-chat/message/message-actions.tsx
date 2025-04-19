@@ -1,10 +1,10 @@
-// src/components/lite-chat/message-actions.tsx
+// src/components/lite-chat/message/message-actions.tsx
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { CopyIcon, RefreshCwIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useChatContext } from "@/hooks/use-chat-context";
-import type { Message } from "@/lib/types";
+import type { Message, TextPart } from "@/lib/types"; // Import TextPart
 import {
   Tooltip,
   TooltipContent,
@@ -26,8 +26,27 @@ export const MessageActions: React.FC<MessageActionsProps> = React.memo(
     const { customMessageActions = [] } = context;
 
     const handleCopy = () => {
+      let textToCopy = "";
+      if (typeof message.content === "string") {
+        textToCopy = message.content;
+      } else if (Array.isArray(message.content)) {
+        // Extract text from TextPart elements for copying
+        textToCopy = message.content
+          .filter((part): part is TextPart => part.type === "text")
+          .map((part) => part.text)
+          .join("\n\n"); // Join text parts with double newline
+        if (!textToCopy) {
+          textToCopy = "[Image content - cannot copy text]"; // Placeholder if only images
+        }
+      }
+
+      if (!textToCopy) {
+        toast.info("Nothing to copy.");
+        return;
+      }
+
       navigator.clipboard
-        .writeText(message.content) // Use message.content
+        .writeText(textToCopy) // Use the extracted/formatted text
         .then(() => {
           toast.success("Copied to clipboard!");
         })

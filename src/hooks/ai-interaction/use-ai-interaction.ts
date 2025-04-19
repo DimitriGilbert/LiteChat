@@ -2,27 +2,24 @@
 import { useCallback } from "react";
 import { toast } from "sonner";
 import { ModEvent, modEvents } from "@/mods/events";
-import { type CoreMessage } from "ai";
-import { Message } from "@/lib/types";
-
-import { 
-  UseAiInteractionProps, 
-  PerformAiStreamParams,
-  UseAiInteractionReturn 
-} from "./types";
+// Use the aliased/re-exported CoreMessage from our types
+import { Message, CoreMessage } from "@/lib/types";
 
 import {
-  validateAiParameters,
-  handleStreamError
-} from "./error-handler";
+  UseAiInteractionProps,
+  PerformAiStreamParams,
+  UseAiInteractionReturn,
+} from "./types";
+
+import { validateAiParameters, handleStreamError } from "./error-handler";
 
 import {
   createAssistantPlaceholder,
   createStreamUpdater,
   getStreamHeaders,
   finalizeStreamedMessage,
-  executeAiStream
-} from "./stream-handler";
+  executeAiStream, // Assuming this function exists in stream-handler.ts
+} from "./stream-handler"; // Assuming this path
 
 /**
  * Hook for handling AI interactions with streaming capabilities
@@ -41,7 +38,7 @@ export function useAiInteraction({
   const performAiStream = useCallback(
     async ({
       conversationIdToUse,
-      messagesToSend,
+      messagesToSend, // This is CoreMessage[] and SHOULD contain the correct structure
       currentTemperature,
       currentMaxTokens,
       currentTopP,
@@ -57,20 +54,23 @@ export function useAiInteraction({
         selectedModel,
         selectedProvider,
         apiKey,
-        setError
+        setError,
       );
-      
+
       if (validationError) {
-        throw validationError;
+        throw validationError; // Re-throw to be caught by caller (useMessageHandling)
       }
 
       // 2. Create placeholder message for streaming
-      const { id: assistantMessageId, message: assistantPlaceholder, timestamp: assistantPlaceholderTimestamp } = 
-        createAssistantPlaceholder(
-          conversationIdToUse,
-          selectedProvider!.id, // Non-null assertion is safe after validation
-          selectedModel!.id     // Non-null assertion is safe after validation
-        );
+      const {
+        id: assistantMessageId,
+        message: assistantPlaceholder,
+        timestamp: assistantPlaceholderTimestamp,
+      } = createAssistantPlaceholder(
+        conversationIdToUse,
+        selectedProvider!.id, // Non-null assertion is safe after validation
+        selectedModel!.id, // Non-null assertion is safe after validation
+      );
 
       // 3. Add placeholder message to UI
       setLocalMessages((prev) => [...prev, assistantPlaceholder]);
@@ -82,37 +82,51 @@ export function useAiInteraction({
       abortControllerRef.current = currentAbortController;
 
       // 5. References to track state during streaming
-      const contentRef = { current: "" };
+      const contentRef = { current: "" }; // Tracks the streamed *text* content
       let streamError: Error | null = null;
-      let finalContent = "";
+      let finalContent = ""; // Stores the final aggregated text content
       let finalMessageObject: Message | null = null;
-      
+
       // 6. Create throttled update function
       const throttledStreamUpdate = createStreamUpdater(
         assistantMessageId,
         contentRef,
         setLocalMessages,
-        streamingThrottleRate
+        streamingThrottleRate,
       );
 
       const startTime = Date.now();
-      
-      // 7. Prepare system message if provided
+
+      // 7. Prepare messages for API (already CoreMessage[] including multi-modal user message)
       const messagesForApi: CoreMessage[] = [];
       if (systemPromptToUse) {
         messagesForApi.push({ role: "system", content: systemPromptToUse });
       }
-      messagesForApi.push(
-        ...messagesToSend.filter((m) => m.role !== "system")
+      messagesForApi.push(...messagesToSend.filter((m) => m.role !== "system"));
+
+      // --- CRITICAL DEBUGGING STEP ---
+      // Log the exact structure being passed to the execution function
+      console.log(
+        "--- Preparing to call executeAiStream ---",
+        "\nProvider:",
+        selectedProvider?.name,
+        "\nModel:",
+        selectedModel?.name,
+        "\nMessages Structure:",
+        JSON.stringify(messagesForApi, null, 2), // Log the full structure
       );
+      // --- END DEBUGGING STEP ---
 
       try {
         // 8. Get API headers
         const headers = getStreamHeaders(selectedProvider!.type, apiKey);
-        
+
         // 9. Execute streaming
+        // Ensure executeAiStream is called with the CORRECT messagesForApi structure.
+        // The implementation of executeAiStream itself needs to handle this correctly
+        // when calling the underlying AI SDK function (e.g., streamText).
         await executeAiStream(
-          messagesForApi,
+          messagesForApi, // Pass the CoreMessage[] array directly
           currentAbortController.signal,
           currentTemperature,
           currentMaxTokens,
@@ -120,17 +134,18 @@ export function useAiInteraction({
           currentTopK,
           currentPresencePenalty,
           currentFrequencyPenalty,
-          selectedModel!.instance,
+          selectedModel!.instance, // The provider model instance from AI SDK
           headers,
           conversationIdToUse,
-          contentRef,
-          throttledStreamUpdate
+          contentRef, // contentRef tracks the text part of the response
+          throttledStreamUpdate,
         );
-        
+
         // If we get here, streaming completed successfully
-        finalContent = contentRef.current;
+        finalContent = contentRef.current; // Final text content
       } catch (err: unknown) {
         // 10. Handle streaming errors
+        console.error("Error during executeAiStream call:", err); // Log the actual error
         [streamError, finalContent] = handleStreamError(err, setError);
       } finally {
         // 11. Clean up controller reference
@@ -142,11 +157,11 @@ export function useAiInteraction({
         // 12. Update message with final content
         finalMessageObject = finalizeStreamedMessage(
           assistantMessageId,
-          finalContent,
+          finalContent, // Use the aggregated text content
           streamError,
-          messagesToSend,
+          messagesToSend, // Pass original messages for context if needed
           startTime,
-          setLocalMessages
+          setLocalMessages,
         );
 
         // 13. Save to database if successful
@@ -156,11 +171,10 @@ export function useAiInteraction({
               id: assistantMessageId,
               conversationId: conversationIdToUse,
               role: "assistant",
-              content: finalContent,
+              content: finalContent, // Save the final text content
               createdAt: assistantPlaceholderTimestamp,
-              // TODO: Add provider/model info to DbMessage schema if needed
             });
-            
+
             if (finalMessageObject) {
               modEvents.emit(ModEvent.RESPONSE_DONE, {
                 message: finalMessageObject,
@@ -175,14 +189,23 @@ export function useAiInteraction({
               prev.map((msg) =>
                 msg.id === assistantMessageId
                   ? { ...msg, error: dbErrorMessage }
-                  : msg
-              )
+                  : msg,
+              ),
             );
           }
         } else if (streamError) {
-          // Error already handled in catch block
+          // Error already handled
         } else {
-          console.log("DB save skipped due to empty final content.");
+          if (!streamError) {
+            setLocalMessages((prev) =>
+              prev.filter((msg) => msg.id !== assistantMessageId),
+            );
+            console.log(
+              "DB save skipped and placeholder removed due to empty final content.",
+            );
+          } else {
+            console.log("DB save skipped due to empty final content.");
+          }
         }
       }
     },
@@ -196,7 +219,7 @@ export function useAiInteraction({
       setError,
       addDbMessage,
       abortControllerRef,
-    ]
+    ],
   );
 
   return {

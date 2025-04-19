@@ -1,5 +1,5 @@
 // src/mods/types.ts
-import type { Message, SidebarItemType } from "@/lib/types";
+import type { Message, SidebarItemType, MessageContent } from "@/lib/types"; // Import MessageContent
 import type { LiteChatModApi } from "./api";
 
 // --- Database Schema for Mods ---
@@ -36,11 +36,12 @@ export interface ChatDeletedPayload {
   id: string;
   type: SidebarItemType;
 }
-export interface MessageBeforeSubmitPayload {
-  prompt: string;
-  attachedFiles: File[]; // Consider making ReadonlyArray<File>
-  vfsPaths: string[];
-}
+// This event seems deprecated or unused based on ChatSubmissionService logic
+// export interface MessageBeforeSubmitPayload {
+//   prompt: string;
+//   attachedFiles: File[]; // Consider making ReadonlyArray<File>
+//   vfsPaths: string[];
+// }
 export interface MessageSubmittedPayload {
   message: Message; // Use the Message type from lib/types
 }
@@ -81,7 +82,7 @@ export interface ModEventPayloadMap {
   "chat:selected": ChatSelectedPayload;
   "chat:created": ChatCreatedPayload;
   "chat:deleted": ChatDeletedPayload;
-  "message:beforeSubmit": MessageBeforeSubmitPayload;
+  // "message:beforeSubmit": MessageBeforeSubmitPayload; // Removed as it seems unused
   "message:submitted": MessageSubmittedPayload;
   "response:start": ResponseStartPayload;
   "response:chunk": ResponseChunkPayload;
@@ -99,13 +100,18 @@ export interface ModEventPayloadMap {
 
 // --- Middleware Payloads & Returns ---
 // Define specific payload and return types for each middleware hook
+
+/** Payload for the SUBMIT_PROMPT middleware hook. */
 export interface SubmitPromptPayload {
-  prompt: string;
-  originalUserPrompt: string;
-  attachedFiles: File[]; // Consider ReadonlyArray<File>
+  /** The prompt content, which can be a string or an array of parts (text/image). */
+  prompt: MessageContent;
+  /** VFS paths included in the context for this submission. */
   vfsPaths: string[];
+  /** The ID of the conversation the prompt belongs to. */
   conversationId: string;
+  // Removed originalUserPrompt and attachedFiles as they are processed before this hook
 }
+/** Return type for the SUBMIT_PROMPT middleware hook. Can modify the payload or cancel submission. */
 export type SubmitPromptReturn = SubmitPromptPayload | false;
 
 export interface ProcessResponseChunkPayload {

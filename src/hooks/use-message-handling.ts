@@ -1,14 +1,20 @@
 // src/hooks/use-message-handling.ts
 import React, { useCallback, useEffect } from "react";
-import type { Message, DbMessage } from "@/lib/types";
+import type {
+  Message,
+  DbMessage,
+  MessageContent, // Import the multi-modal content type
+  CoreMessage, // Use the aliased/re-exported CoreMessage
+  // Removed unused TextPart, ImagePart imports
+} from "@/lib/types";
 import { toast } from "sonner";
-import type { CoreMessage } from "ai";
+// Removed unused CoreMessage import from 'ai'
 import { modEvents, ModEvent } from "@/mods/events"; // Import mod events and ModEvent constants
 
-// ... (interfaces remain the same) ...
+// --- Interface Definitions ---
 export interface PerformAiStreamParams {
   conversationIdToUse: string;
-  messagesToSend: CoreMessage[];
+  messagesToSend: CoreMessage[]; // Use CoreMessage from types.ts
   currentTemperature: number;
   currentMaxTokens: number | null;
   currentTopP: number | null;
@@ -47,9 +53,9 @@ interface UseMessageHandlingProps {
 
 interface UseMessageHandlingReturn {
   handleSubmitCore: (
-    originalUserPrompt: string,
+    // Removed originalUserPrompt
     currentConversationId: string,
-    promptToSendToAI: string,
+    contentToSendToAI: MessageContent, // Use the multi-modal type
     vfsContextPaths?: string[],
   ) => Promise<void>;
   regenerateMessageCore: (messageId: string) => Promise<void>;
@@ -90,9 +96,12 @@ export function useMessageHandling({
       getMessagesForConversation(selectedConversationId)
         .then((messagesFromDb) => {
           if (isMounted) {
+            // Map DbMessage to Message, ensuring content structure is preserved
             setLocalMessages(
               messagesFromDb.map((dbMsg) => ({
                 ...dbMsg,
+                // Ensure content is correctly typed
+                content: dbMsg.content, // Should already be MessageContent type
                 isStreaming: false,
                 streamedContent: undefined,
                 error: null,
@@ -123,7 +132,6 @@ export function useMessageHandling({
       isMounted = false;
     };
   }, [
-    // --- MODIFIED DEPENDENCY ARRAY ---
     selectedConversationId,
     getMessagesForConversation,
     setLocalMessages,
@@ -141,8 +149,12 @@ export function useMessageHandling({
           ? {
               ...msg,
               isStreaming: false,
-              content: msg.streamedContent || msg.content || "Stopped by user",
-              streamedContent: undefined,
+              // If content was string, update it. If array, keep array but stop streaming.
+              content:
+                typeof msg.content === "string"
+                  ? msg.streamedContent || msg.content || "Stopped by user"
+                  : msg.content,
+              streamedContent: undefined, // Clear streamed content buffer
             }
           : msg,
       ),
@@ -153,9 +165,9 @@ export function useMessageHandling({
   // --- Handle Submission ---
   const handleSubmitCore = useCallback(
     async (
-      originalUserPrompt: string,
+      // Removed originalUserPrompt
       currentConversationId: string,
-      promptToSendToAI: string,
+      contentToSendToAI: MessageContent, // Use the multi-modal type (string or array)
       vfsContextPaths?: string[],
     ) => {
       if (!currentConversationId) {
@@ -166,32 +178,55 @@ export function useMessageHandling({
 
       setError(null);
 
-      const messagesForAi: CoreMessage[] = [
-        ...localMessages
-          .filter(
-            (m) => !m.error && (m.role === "user" || m.role === "assistant"),
-          )
-          .map((m): CoreMessage => ({ role: m.role, content: m.content })),
-        { role: "user", content: promptToSendToAI },
-      ];
+      // --- Construct messagesForAi adhering to CoreMessage structure ---
+      const messagesForAi: CoreMessage[] = [];
 
-      const hasUserOrAssistantMessage = messagesForAi.some(
-        (m) => m.role === "user" || m.role === "assistant",
-      );
-      if (!hasUserOrAssistantMessage) {
-        console.error("useMessageHandling: Attempting to send empty history.");
+      // 1. Add previous messages from local state
+      localMessages
+        .filter(
+          (m) => !m.error && (m.role === "user" || m.role === "assistant"),
+        )
+        .forEach((m) => {
+          // Directly use the content from localMessages, as it should match MessageContent type
+          // The role also comes directly from the local message
+          messagesForAi.push({
+            role: m.role,
+            content: m.content, // Pass the string or array directly
+          } as CoreMessage); // Cast might still be needed due to TS complexity
+        });
+
+      // 2. Add the new user message
+      //    The 'contentToSendToAI' parameter *must* be the correct structure (string or array)
+      //    as prepared by the calling service (e.g., ChatSubmissionService).
+      messagesForAi.push({
+        role: "user",
+        content: contentToSendToAI, // Pass the received structure directly
+      });
+      // --- End constructing messagesForAi ---
+
+      // Basic check if there's anything to send (at least the new user message)
+      if (messagesForAi.length === 0) {
+        console.error(
+          "useMessageHandling: Attempting to send empty message list.",
+        );
         setError("Internal Error: Cannot send empty message list.");
         toast.error("Cannot send message: Chat history is effectively empty.");
         return;
       }
 
+      // Log the structure being sent for debugging (optional)
+      // console.log("Messages being sent to performAiStream:", JSON.stringify(messagesForAi, null, 2));
+
       let userMessageId: string;
       let userMessageForState: Message;
       const userMessageTimestamp = new Date();
       try {
+        // Save the message to DB. Use the original contentToSendToAI structure.
+        const dbContent = contentToSendToAI;
+
         const userMessageData = {
           role: "user" as const,
-          content: originalUserPrompt,
+          content: dbContent, // Save the potentially multi-modal content
           conversationId: currentConversationId,
           createdAt: userMessageTimestamp,
           vfsContextPaths: vfsContextPaths,
@@ -231,7 +266,7 @@ export function useMessageHandling({
       try {
         await performAiStream({
           conversationIdToUse: currentConversationId,
-          messagesToSend: messagesForAi,
+          messagesToSend: messagesForAi, // Pass the correctly structured CoreMessage array
           currentTemperature: temperature,
           currentMaxTokens: maxTokens,
           currentTopP: topP,
@@ -293,17 +328,23 @@ export function useMessageHandling({
         return;
       }
 
-      const historyForRegen = localMessages
+      // Prepare history up to the message *before* the one being regenerated
+      const historyForRegen: CoreMessage[] = [];
+      localMessages
         .slice(0, messageIndex)
         .filter(
           (m) => !m.error && (m.role === "user" || m.role === "assistant"),
         )
-        .map((m): CoreMessage => ({ role: m.role, content: m.content }));
+        .forEach((m) => {
+          // Directly use the content from localMessages
+          historyForRegen.push({
+            role: m.role,
+            content: m.content, // Pass the string or array directly
+          } as CoreMessage);
+        });
 
-      const hasUserOrAssistantMessage = historyForRegen.some(
-        (m) => m.role === "user" || m.role === "assistant",
-      );
-      if (!hasUserOrAssistantMessage) {
+      // Ensure there's something to send (at least one user/assistant message)
+      if (historyForRegen.length === 0) {
         console.error(
           "useMessageHandling: Cannot regenerate with empty history.",
         );
@@ -312,6 +353,7 @@ export function useMessageHandling({
         return;
       }
 
+      // Delete the message being regenerated and any subsequent messages
       const messagesToDelete = localMessages.slice(messageIndex);
       try {
         const idsToDelete = messagesToDelete
@@ -331,13 +373,15 @@ export function useMessageHandling({
         return;
       }
 
+      // Update local state to remove the messages
       setLocalMessages((prev) => prev.slice(0, messageIndex));
       // TODO: Phase 5 - Emit 'message:regenerating' event if needed
 
       try {
+        // Perform the AI stream with the history up to the point of regeneration
         await performAiStream({
           conversationIdToUse: conversationIdToUse,
-          messagesToSend: historyForRegen,
+          messagesToSend: historyForRegen, // Pass the correctly structured history
           currentTemperature: temperature,
           currentMaxTokens: maxTokens,
           currentTopP: topP,

@@ -8,6 +8,7 @@ import type {
   DbProject,
   SidebarItemType,
   DbProviderConfig, // Import new type
+  MessageContent, // Import the multi-modal content type
 } from "@/lib/types";
 import type { DbMod } from "@/mods/types"; // Import DbMod type
 import { nanoid } from "nanoid";
@@ -215,6 +216,7 @@ export function useChatStorage() {
   // === Messages (Wrap functions in useCallback) ===
   const getMessagesForConversation = useCallback(
     async (conversationId: string): Promise<DbMessage[]> => {
+      // Dexie automatically handles retrieving the complex 'content' object
       return db.messages
         .where("conversationId")
         .equals(conversationId)
@@ -225,6 +227,7 @@ export function useChatStorage() {
 
   const addDbMessage = useCallback(
     async (
+      // Accept the potentially complex MessageContent type for 'content'
       messageData: Omit<DbMessage, "id" | "createdAt"> &
         Partial<Pick<DbMessage, "id" | "createdAt">>,
     ): Promise<string> => {
@@ -235,13 +238,17 @@ export function useChatStorage() {
         id: messageData.id ?? nanoid(),
         createdAt: messageData.createdAt ?? new Date(),
         role: messageData.role,
-        content: messageData.content,
+        content: messageData.content, // Store the MessageContent directly
         conversationId: messageData.conversationId,
         vfsContextPaths: messageData.vfsContextPaths ?? undefined,
+        // Add toolCallId and toolName if they exist in messageData
+        toolCallId: messageData.toolCallId ?? undefined,
+        toolName: messageData.toolName ?? undefined,
       };
       const conversation = await db.conversations.get(
         messageData.conversationId,
       );
+      // Dexie handles storing the object/array structure in the 'content' field
       await db.messages.add(newMessage);
       const now = new Date();
       await db.conversations.update(messageData.conversationId, {
@@ -256,7 +263,9 @@ export function useChatStorage() {
   );
 
   const updateDbMessageContent = useCallback(
-    async (messageId: string, newContent: string): Promise<void> => {
+    // Accept MessageContent for the new content
+    async (messageId: string, newContent: MessageContent): Promise<void> => {
+      // Dexie handles updating the object/array structure
       await db.messages.update(messageId, { content: newContent });
     },
     [],
@@ -284,6 +293,7 @@ export function useChatStorage() {
 
   const bulkAddMessages = useCallback(
     async (messages: DbMessage[]): Promise<unknown> => {
+      // Dexie handles bulk adding objects with complex fields
       return db.messages.bulkAdd(messages);
     },
     [],
