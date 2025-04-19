@@ -1,5 +1,5 @@
 // src/mods/loader.ts
-import type { DbMod, ModInstance } from "./types";
+import type { DbMod, ModInstance, ModEventPayloadMap } from "./types"; // Import ModEventPayloadMap
 import type { LiteChatModApi, ReadonlyChatContextSnapshot } from "./api";
 import { toast } from "sonner";
 import { modEvents } from "./events"; // Use modEvents instance
@@ -9,21 +9,22 @@ import type {
   CustomMessageAction,
   CustomSettingTab,
 } from "@/lib/types";
-import type { ModEventName } from "./events";
+// Removed unused ModEventName import
 import type { ModMiddlewareHookName } from "./api";
 
 // Type for the registration callbacks passed from ChatProvider
+// Updated to match the definition in chat-middleware.tsx and mods/api.ts
 interface RegistrationCallbacks {
   registerPromptAction: (action: CustomPromptAction) => () => void;
   registerMessageAction: (action: CustomMessageAction) => () => void;
   registerSettingsTab: (tab: CustomSettingTab) => () => void;
-  registerEventListener: <E extends ModEventName>(
+  registerEventListener: <E extends keyof ModEventPayloadMap>( // Use keyof ModEventPayloadMap
     eventName: E,
-    callback: (payload: any) => void, // Use 'any' here, type safety is in the API definition
+    callback: (payload: ModEventPayloadMap[E]) => void, // Use specific payload type
   ) => () => void;
   registerMiddleware: <H extends ModMiddlewareHookName>(
     hookName: H,
-    callback: (payload: any) => any, // Use 'any' here, type safety is in the API definition
+    callback: (payload: any) => any, // Keep 'any' here for simplicity in loader, API enforces type
   ) => () => void;
 }
 
@@ -36,7 +37,7 @@ interface RegistrationCallbacks {
  */
 export async function loadMods(
   dbMods: DbMod[],
-  registrationCallbacks: RegistrationCallbacks,
+  registrationCallbacks: RegistrationCallbacks, // Now expects the updated type
   getContextSnapshot: () => ReadonlyChatContextSnapshot,
 ): Promise<ModInstance[]> {
   const loadedInstances: ModInstance[] = [];
@@ -186,11 +187,11 @@ function createApiForMod(
       unsubscribeCallbacks.add(unsubscribe);
       return unsubscribe;
     },
+    // The 'on' method here now correctly aligns with the updated RegistrationCallbacks type
     on: (eventName, callback) => {
-      // Type assertion needed because the callback in RegistrationCallbacks uses 'any'
       const unsubscribe = registrationCallbacks.registerEventListener(
         eventName,
-        callback as (payload: any) => void,
+        callback, // No assertion needed now as types match
       );
       unsubscribeCallbacks.add(unsubscribe);
       return unsubscribe;

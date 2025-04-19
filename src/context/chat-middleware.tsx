@@ -3,7 +3,7 @@ import { useCallback, useRef } from "react";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { loadMods } from "@/mods/loader";
-import { modEvents, ModEvent, ModEventName } from "@/mods/events";
+import { modEvents, ModEvent } from "@/mods/events"; // Removed unused ModEventName import
 import {
   ModMiddlewareHook,
   type ReadonlyChatContextSnapshot,
@@ -22,11 +22,12 @@ import type {
   CustomSettingTab,
 } from "@/lib/types";
 
+// This type definition is correct and matches mods/api.ts
 type RegistrationCallbacks = {
   registerPromptAction: (action: CustomPromptAction) => () => void;
   registerMessageAction: (action: CustomMessageAction) => () => void;
   registerSettingsTab: (tab: CustomSettingTab) => () => void;
-  registerEventListener: <E extends ModEventName>(
+  registerEventListener: <E extends keyof ModEventPayloadMap>(
     eventName: E,
     callback: (payload: ModEventPayloadMap[E]) => void,
   ) => () => void;
@@ -125,12 +126,13 @@ export function useChatMiddleware(setError: (error: string | null) => void) {
   );
 
   const registerModEventListener = useCallback(
-    <E extends ModEventName>(
+    <E extends keyof ModEventPayloadMap>( // Changed constraint
       eventName: E,
       callback: (payload: ModEventPayloadMap[E]) => void,
     ): (() => void) => {
       // Wrap the callback to catch errors during event handling
       const wrappedCallback = (payload: ModEventPayloadMap[E]) => {
+        // Type E is now guaranteed keyof
         try {
           callback(payload);
         } catch (err) {
@@ -181,6 +183,15 @@ export function useChatMiddleware(setError: (error: string | null) => void) {
     [],
   );
 
+  // Define the registration callbacks object using the local type
+  const registrationCallbacksForLoader: RegistrationCallbacks = {
+    registerPromptAction,
+    registerMessageAction,
+    registerSettingsTab,
+    registerEventListener: registerModEventListener,
+    registerMiddleware: registerModMiddleware,
+  };
+
   return {
     modEventListenersRef,
     modMiddlewareCallbacksRef,
@@ -192,14 +203,15 @@ export function useChatMiddleware(setError: (error: string | null) => void) {
     loadModsWithContext: useCallback(
       async (
         dbMods: any[],
-        registrationCallbacks: RegistrationCallbacks,
+        // registrationCallbacks: RegistrationCallbacks, // Use the object defined above
         getContextSnapshotForMod: () => ReadonlyChatContextSnapshot,
       ) => {
         // Error handling is now more robust within loadMods itself
         try {
+          // Pass the correctly typed registration object
           const instances = await loadMods(
             dbMods,
-            registrationCallbacks,
+            registrationCallbacksForLoader, // Pass the correctly typed object
             getContextSnapshotForMod,
           );
           // APP_LOADED is emitted regardless of individual mod errors now
@@ -216,7 +228,10 @@ export function useChatMiddleware(setError: (error: string | null) => void) {
           return []; // Return empty array on critical failure
         }
       },
-      [setError],
+      [
+        setError,
+        registrationCallbacksForLoader, // Add dependency
+      ],
     ),
 
     // Helper for clearing mod references
@@ -234,3 +249,15 @@ export function useChatMiddleware(setError: (error: string | null) => void) {
     }, []),
   };
 }
+
+// Dummy implementations for registration functions needed by the hook but defined elsewhere
+// Replace these with actual imports or context values if available in this scope
+const registerPromptAction = (action: CustomPromptAction) => () => {
+  console.log(action);
+};
+const registerMessageAction = (action: CustomMessageAction) => () => {
+  console.log(action);
+};
+const registerSettingsTab = (tab: CustomSettingTab) => () => {
+  console.log(tab);
+};

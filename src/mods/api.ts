@@ -10,7 +10,7 @@ import type {
   ModMiddlewarePayloadMap,
   ModMiddlewareReturnMap,
 } from "./types";
-import type { ModEventName } from "./events"; // Import the event name type
+// Removed unused ModEventName import
 
 // --- Readonly Context Snapshot ---
 // Define a specific type for the read-only snapshot provided to mods
@@ -62,7 +62,7 @@ export interface LiteChatModApi {
    * @param callback The function to execute when the event occurs.
    * @returns An unsubscribe function to remove the listener.
    */
-  on: <E extends ModEventName>(
+  on: <E extends keyof ModEventPayloadMap>( // Changed constraint
     eventName: E,
     callback: (payload: ModEventPayloadMap[E]) => void,
   ) => () => void;

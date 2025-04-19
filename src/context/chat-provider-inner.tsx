@@ -9,9 +9,7 @@ import type {
   SidebarItemType,
 } from "@/lib/types";
 import { modEvents, ModEvent } from "@/mods/events";
-import {
-  type ReadonlyChatContextSnapshot,
-} from "@/mods/api";
+import { type ReadonlyChatContextSnapshot } from "@/mods/api";
 import { ChatContext } from "@/hooks/use-chat-context";
 import { useCoreChatContext } from "@/context/core-chat-context";
 import { useAiInteraction } from "@/hooks/ai-interaction";
@@ -81,15 +79,16 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
   const vfs = useVfsContext();
   const modCtx = useModContext();
   const storage = useChatStorage();
-  
+
   const middleware = useChatMiddleware(setError);
-  
+
   // Keep stable references to functions/objects to prevent dependency loops
   const stableReferences = useRef<StableReferences>({
     providerMgmt: {
       selectedProviderId: null,
       selectedModelId: null,
-      getApiKeyForProvider: (id: string) => providerMgmt.getApiKeyForProvider(id),
+      getApiKeyForProvider: (id: string) =>
+        providerMgmt.getApiKeyForProvider(id),
     },
     sidebar: {
       selectedItemId: null,
@@ -103,27 +102,36 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
     },
     vfs: {
       isVfsEnabledForItem: false,
-    }
+    },
   });
-  
+
   // Keep stable references updated with latest values
   useEffect(() => {
-    stableReferences.current.providerMgmt.selectedProviderId = providerMgmt.selectedProviderId;
-    stableReferences.current.providerMgmt.selectedModelId = providerMgmt.selectedModelId;
+    stableReferences.current.providerMgmt.selectedProviderId =
+      providerMgmt.selectedProviderId;
+    stableReferences.current.providerMgmt.selectedModelId =
+      providerMgmt.selectedModelId;
   }, [providerMgmt.selectedProviderId, providerMgmt.selectedModelId]);
-  
+
   useEffect(() => {
     stableReferences.current.sidebar.selectedItemId = sidebar.selectedItemId;
-    stableReferences.current.sidebar.selectedItemType = sidebar.selectedItemType;
+    stableReferences.current.sidebar.selectedItemType =
+      sidebar.selectedItemType;
   }, [sidebar.selectedItemId, sidebar.selectedItemType]);
-  
+
   useEffect(() => {
-    stableReferences.current.settings.activeSystemPrompt = settings.activeSystemPrompt || "";
+    stableReferences.current.settings.activeSystemPrompt =
+      settings.activeSystemPrompt || "";
     stableReferences.current.settings.temperature = settings.temperature || 0;
     stableReferences.current.settings.maxTokens = settings.maxTokens || 0;
     stableReferences.current.settings.theme = settings.theme;
-  }, [settings.activeSystemPrompt, settings.temperature, settings.maxTokens, settings.theme]);
-  
+  }, [
+    settings.activeSystemPrompt,
+    settings.temperature,
+    settings.maxTokens,
+    settings.theme,
+  ]);
+
   useEffect(() => {
     stableReferences.current.vfs.isVfsEnabledForItem = vfs.isVfsEnabledForItem;
   }, [vfs.isVfsEnabledForItem]);
@@ -192,13 +200,14 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
             selectedProvider: providerMgmt.selectedProvider || null,
             selectedModel: providerMgmt.selectedModel,
             getApiKeyForProvider: getApiKeyForSelectedProvider,
-            dbProviderConfigs: providerMgmt.dbProviderConfigs || EMPTY_DB_PROVIDER_CONFIGS,
+            dbProviderConfigs:
+              providerMgmt.dbProviderConfigs || EMPTY_DB_PROVIDER_CONFIGS,
             enableApiKeyManagement: providerMgmt.enableApiKeyManagement,
-            
+
             // Streaming state
             isStreaming,
             setError,
-            
+
             // Sidebar/Item management
             selectedItemType: sidebar.selectedItemType,
             selectedItemId: sidebar.selectedItemId,
@@ -206,18 +215,18 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
             createConversation: sidebar.createConversation,
             selectItem: sidebar.selectItem,
             deleteItem: sidebar.deleteItem,
-            
+
             // VFS
             vfs: vfs.vfs,
             enableVfs: vfs.enableVfs,
             isVfsEnabledForItem: vfs.isVfsEnabledForItem,
-            
+
             // Middleware
             runMiddleware: middleware.runMiddleware,
-            
+
             // Message handling
             handleSubmitCore: messageHandling.handleSubmitCore,
-          }
+          },
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -297,22 +306,26 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
     );
   }, [sidebar, vfs.isVfsEnabledForItem, vfs.enableVfs]);
 
-  const getContextSnapshotForMod = useCallback((): ReadonlyChatContextSnapshot => {
-    return Object.freeze({
-      selectedItemId: stableReferences.current.sidebar.selectedItemId,
-      selectedItemType: stableReferences.current.sidebar.selectedItemType,
-      messages,
-      isStreaming,
-      selectedProviderId: stableReferences.current.providerMgmt.selectedProviderId,
-      selectedModelId: stableReferences.current.providerMgmt.selectedModelId,
-      activeSystemPrompt: stableReferences.current.settings.activeSystemPrompt,
-      temperature: stableReferences.current.settings.temperature,
-      maxTokens: stableReferences.current.settings.maxTokens,
-      theme: stableReferences.current.settings.theme,
-      isVfsEnabledForItem: stableReferences.current.vfs.isVfsEnabledForItem,
-      getApiKeyForProvider: stableReferences.current.providerMgmt.getApiKeyForProvider,
-    });
-  }, [messages, isStreaming]); // Minimal dependencies to prevent loops
+  const getContextSnapshotForMod =
+    useCallback((): ReadonlyChatContextSnapshot => {
+      return Object.freeze({
+        selectedItemId: stableReferences.current.sidebar.selectedItemId,
+        selectedItemType: stableReferences.current.sidebar.selectedItemType,
+        messages,
+        isStreaming,
+        selectedProviderId:
+          stableReferences.current.providerMgmt.selectedProviderId,
+        selectedModelId: stableReferences.current.providerMgmt.selectedModelId,
+        activeSystemPrompt:
+          stableReferences.current.settings.activeSystemPrompt,
+        temperature: stableReferences.current.settings.temperature,
+        maxTokens: stableReferences.current.settings.maxTokens,
+        theme: stableReferences.current.settings.theme,
+        isVfsEnabledForItem: stableReferences.current.vfs.isVfsEnabledForItem,
+        getApiKeyForProvider:
+          stableReferences.current.providerMgmt.getApiKeyForProvider,
+      });
+    }, [messages, isStreaming]); // Minimal dependencies to prevent loops
 
   // Track if effect has already run to avoid double initialization
   const hasInitializedMods = useRef(false);
@@ -321,34 +334,33 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
     // Skip if already initialized or if dependencies aren't ready
     if (hasInitializedMods.current) return;
     hasInitializedMods.current = true;
-    
+
     const dbMods = modCtx.dbMods;
     modCtx._clearRegisteredModItems();
     middleware.clearModReferences();
 
     if (dbMods.length > 0) {
-      const registrationCallbacks = {
-        registerPromptAction: modCtx._registerModPromptAction,
-        registerMessageAction: modCtx._registerModMessageAction,
-        registerSettingsTab: modCtx._registerModSettingsTab,
-        registerEventListener: middleware.registerModEventListener,
-        registerMiddleware: middleware.registerModMiddleware,
-      };
-      
-      middleware.loadModsWithContext(
-        dbMods,
-        registrationCallbacks,
-        getContextSnapshotForMod
-      ).then(instances => {
-        modCtx._setLoadedMods(instances);
-      }).catch(error => {
-        console.error("Error loading mods:", error);
-      });
+      // const registrationCallbacks = {
+      //   registerPromptAction: modCtx._registerModPromptAction,
+      //   registerMessageAction: modCtx._registerModMessageAction,
+      //   registerSettingsTab: modCtx._registerModSettingsTab,
+      //   registerEventListener: middleware.registerModEventListener,
+      //   registerMiddleware: middleware.registerModMiddleware,
+      // };
+
+      middleware
+        .loadModsWithContext(dbMods, getContextSnapshotForMod)
+        .then((instances) => {
+          modCtx._setLoadedMods(instances);
+        })
+        .catch((error) => {
+          console.error("Error loading mods:", error);
+        });
     } else {
       modCtx._setLoadedMods([]);
       modEvents.emit(ModEvent.APP_LOADED);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array to run only once
 
   const combinedPromptActions = useMemo(
