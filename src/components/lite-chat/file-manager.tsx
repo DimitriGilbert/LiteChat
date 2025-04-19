@@ -1,11 +1,12 @@
 // src/components/lite-chat/file-manager.tsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useChatContext } from "@/hooks/use-chat-context";
+import { useGit } from "@/hooks/use-git";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { FileSystemEntry } from "@/lib/types";
 import { toast } from "sonner";
-import { AlertCircleIcon } from "lucide-react";
+import { AlertCircleIcon, Loader2Icon } from "lucide-react";
 import {
   normalizePath,
   joinPath,
@@ -15,6 +16,30 @@ import {
 import { FileManagerBanner } from "./file-manager/file-manager-banner";
 import { FileManagerToolbar } from "./file-manager/file-manager-toolbar";
 import { FileManagerTable } from "./file-manager/file-manager-table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+// Removed unused import: import type { GitRepoInfoData } from "@/utils/git-utils";
+
+// Helper function to extract repo name from URL
+const getRepoNameFromUrl = (url: string): string => {
+  try {
+    const cleanUrl = url.endsWith("/") ? url.slice(0, -1) : url;
+    const lastPart = cleanUrl.substring(cleanUrl.lastIndexOf("/") + 1);
+    return lastPart.endsWith(".git") ? lastPart.slice(0, -4) : lastPart;
+  } catch (e) {
+    console.error("Failed to parse repo name from URL:", url, e);
+    return "repository";
+  }
+};
 
 export const FileManager: React.FC<{ className?: string }> = ({
   className,
@@ -26,6 +51,8 @@ export const FileManager: React.FC<{ className?: string }> = ({
     addSelectedVfsPath,
     removeSelectedVfsPath,
   } = useChatContext();
+  const git = useGit(vfs.fs);
+
   const [currentPath, setCurrentPath] = useState("/");
   const [entries, setEntries] = useState<FileSystemEntry[]>([]);
   const [editingPath, setEditingPath] = useState<string | null>(null);
@@ -37,34 +64,69 @@ export const FileManager: React.FC<{ className?: string }> = ({
     () => new Set(selectedVfsPaths),
   );
 
+  const [gitRepoStatus, setGitRepoStatus] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [isCommitDialogOpen, setIsCommitDialogOpen] = useState(false);
+  const [commitPath, setCommitPath] = useState<string | null>(null);
+  const [commitMessage, setCommitMessage] = useState("");
+  const [isCommitting, setIsCommitting] = useState(false);
+
+  const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
+  const [cloneRepoUrl, setCloneRepoUrl] = useState("");
+  const [cloneBranch, setCloneBranch] = useState("main");
+  const [isCloning, setIsCloning] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const archiveInputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const newFolderInputRef = useRef<HTMLInputElement>(null);
 
-  // Use VFS hook states directly
-  const isConfigLoading = vfs.isLoading; // Reflects initial configuration loading
-  const isOperationLoading = vfs.isOperationLoading; // Reflects ongoing FS operations
-  const configError = vfs.error; // Reflects configuration/readiness errors
-  const isAnyLoading = isConfigLoading || isOperationLoading; // Combined loading state for disabling UI
+  const isConfigLoading = vfs.isLoading;
+  const isOperationLoading = vfs.isOperationLoading || git.loading;
+  const configError = vfs.error;
+  const isAnyLoading = isConfigLoading || isOperationLoading;
 
-  // Sync local checked state when context selection changes
   useEffect(() => {
     setCheckedPaths(new Set(selectedVfsPaths));
   }, [selectedVfsPaths]);
 
+  const checkGitStatusForEntries = useCallback(
+    async (currentEntries: FileSystemEntry[]) => {
+      if (!git.initialized) return;
+
+      const statusUpdates: Record<string, boolean> = {};
+      const promises = currentEntries
+        .filter((entry) => entry.isDirectory)
+        .map(async (dirEntry) => {
+          try {
+            const isRepo = await git.isGitRepository(dirEntry.path);
+            statusUpdates[dirEntry.path] = isRepo;
+          } catch (error) {
+            console.error(
+              `Error checking git status for ${dirEntry.path}:`,
+              error,
+            );
+            statusUpdates[dirEntry.path] = false;
+          }
+        });
+
+      await Promise.allSettled(promises);
+      setGitRepoStatus((prev) => ({ ...prev, ...statusUpdates }));
+    },
+    [git],
+  );
+
   const loadEntries = useCallback(
     async (path: string) => {
-      // Prevent loading if VFS isn't ready, already loading, or key mismatch
       if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey || isAnyLoading) {
         return;
       }
       try {
         const normalizedPath = normalizePath(path);
-        // No need to set isOperationLoading here, listFiles is read-only
         const fetchedEntries = await vfs.listFiles(normalizedPath);
-        fetchedEntries.sort((a, b) => {
+        fetchedEntries.sort((a: FileSystemEntry, b: FileSystemEntry) => {
           if (a.isDirectory !== b.isDirectory) {
             return a.isDirectory ? -1 : 1;
           }
@@ -72,35 +134,29 @@ export const FileManager: React.FC<{ className?: string }> = ({
         });
         setEntries(fetchedEntries);
         setCurrentPath(normalizedPath);
+        await checkGitStatusForEntries(fetchedEntries);
       } catch (error) {
-        // Error is already toasted by the hook, just log here if needed
         console.error("FileManager List Error (already toasted):", error);
-        // Optionally clear entries or show an error message in the table
         setEntries([]);
       }
     },
-    [vfs, isAnyLoading], // Depend on vfs object and loading state
+    [vfs, isAnyLoading, checkGitStatusForEntries],
   );
 
   useEffect(() => {
-    // Load entries when VFS becomes ready for the correct key, or when the key changes
     if (vfs.isReady && vfs.configuredVfsKey === vfs.vfsKey) {
       loadEntries(currentPath);
     } else {
-      // Clear state if VFS is not ready or key mismatch
       setEntries([]);
-      // Don't reset currentPath here, allow it to persist until a ready VFS loads it
-      // setCurrentPath("/");
+      setGitRepoStatus({});
       setEditingPath(null);
       setCreatingFolder(false);
     }
-    // Re-run when readiness, configured key, or target key changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vfs.isReady, vfs.configuredVfsKey, vfs.vfsKey]);
 
-  // --- Navigation Handlers ---
   const handleNavigate = (entry: FileSystemEntry) => {
-    if (isAnyLoading || editingPath) return; // Prevent navigation while loading or editing
+    if (isAnyLoading || editingPath) return;
     if (entry.isDirectory) {
       loadEntries(entry.path);
     }
@@ -120,10 +176,9 @@ export const FileManager: React.FC<{ className?: string }> = ({
     loadEntries(currentPath);
   };
 
-  // --- Checkbox Handler ---
   const handleCheckboxChange = useCallback(
     (checked: boolean, path: string) => {
-      if (isOperationLoading) return; // Prevent changes during operations
+      if (isOperationLoading) return;
       setCheckedPaths((prev) => {
         const next = new Set(prev);
         if (checked) {
@@ -139,9 +194,8 @@ export const FileManager: React.FC<{ className?: string }> = ({
     [addSelectedVfsPath, removeSelectedVfsPath, isOperationLoading],
   );
 
-  // --- Action Handlers ---
   const handleDelete = async (entry: FileSystemEntry) => {
-    if (isAnyLoading) return; // Prevent action while loading
+    if (isAnyLoading) return;
     if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready.");
       return;
@@ -158,41 +212,31 @@ WARNING: This will delete all contents inside!`
     );
     if (confirmation) {
       try {
-        // isOperationLoading set/unset within vfs.deleteItem
         await vfs.deleteItem(entry.path, entry.isDirectory);
-        // Success toast handled by the hook if deletion succeeds
         if (!entry.isDirectory && checkedPaths.has(entry.path)) {
-          removeSelectedVfsPath(entry.path); // Update selection state immediately
+          removeSelectedVfsPath(entry.path);
         }
-        loadEntries(currentPath); // Refresh list after successful deletion
+        loadEntries(currentPath);
       } catch (error) {
-        // Error already toasted by the hook
         console.error("FileManager Delete Error (already toasted):", error);
       }
     }
   };
 
   const handleDownload = async (entry: FileSystemEntry) => {
-    if (isAnyLoading) return; // Prevent action while loading
+    if (isAnyLoading) return;
     if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready.");
       return;
     }
     try {
       if (entry.isDirectory) {
-        // Use downloadAllAsZip scoped to the directory path
         const filename = `vfs_${entry.name}.zip`;
-        // isOperationLoading set/unset within vfs.downloadAllAsZip
         await vfs.downloadAllAsZip(filename, entry.path);
-        // Success toast handled by the hook
       } else {
-        // Use downloadFile for single files
-        // isOperationLoading NOT set for single file download (usually fast)
         await vfs.downloadFile(entry.path, entry.name);
-        // No success toast for single file download by default
       }
     } catch (error) {
-      // Error already toasted by the hook
       console.error("FileManager Download Error (already toasted):", error);
     }
   };
@@ -212,7 +256,7 @@ WARNING: This will delete all contents inside!`
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isAnyLoading) {
-      e.target.value = ""; // Clear input if loading
+      e.target.value = "";
       return;
     }
     if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
@@ -223,23 +267,20 @@ WARNING: This will delete all contents inside!`
     const files = e.target.files;
     if (files && files.length > 0) {
       try {
-        // isOperationLoading set/unset within vfs.uploadFiles
         await vfs.uploadFiles(files, currentPath);
-        // Success/summary toast handled by the hook
-        loadEntries(currentPath); // Refresh list after upload attempt
+        loadEntries(currentPath);
       } catch (error) {
-        // Error already toasted by the hook
         console.error("FileManager Upload Error (already toasted):", error);
       }
     }
-    e.target.value = ""; // Clear input after processing
+    e.target.value = "";
   };
 
   const handleArchiveChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     if (isAnyLoading) {
-      e.target.value = ""; // Clear input if loading
+      e.target.value = "";
       return;
     }
     if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
@@ -251,52 +292,44 @@ WARNING: This will delete all contents inside!`
     if (file) {
       if (file.name.toLowerCase().endsWith(".zip")) {
         try {
-          // isOperationLoading set/unset within vfs.uploadAndExtractZip
           await vfs.uploadAndExtractZip(file, currentPath);
-          // Success/summary toast handled by the hook
-          loadEntries(currentPath); // Refresh list after extraction attempt
+          loadEntries(currentPath);
         } catch (error) {
-          // Error already toasted by the hook
           console.error("FileManager Extract Error (already toasted):", error);
         }
       } else {
         toast.error("Only ZIP archive extraction is currently supported.");
       }
     }
-    e.target.value = ""; // Clear input after processing
+    e.target.value = "";
   };
 
   const handleDownloadAll = async () => {
-    if (isAnyLoading) return; // Prevent action while loading
+    if (isAnyLoading) return;
     if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready for export.");
       return;
     }
     try {
-      // Export current directory (rootPath = currentPath)
       const filename = `vfs_${basename(currentPath) || "root"}_export.zip`;
-      // isOperationLoading set/unset within vfs.downloadAllAsZip
       await vfs.downloadAllAsZip(filename, currentPath);
-      // Success toast handled by the hook
     } catch (error) {
-      // Error already toasted by the hook
       console.error("FileManager Export Error (already toasted):", error);
     }
   };
 
-  // --- Rename Logic ---
   const startEditing = (entry: FileSystemEntry) => {
-    if (isAnyLoading || creatingFolder) return; // Prevent editing while loading or creating
+    if (isAnyLoading || creatingFolder) return;
     setEditingPath(entry.path);
     setNewName(entry.name);
-    setCreatingFolder(false); // Ensure not in create mode
+    setCreatingFolder(false);
   };
   const cancelEditing = () => {
     setEditingPath(null);
     setNewName("");
   };
   const handleRename = async () => {
-    if (isOperationLoading) return; // Prevent rename if another operation is running
+    if (isOperationLoading) return;
     if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready for rename.");
       cancelEditing();
@@ -314,19 +347,15 @@ WARNING: This will delete all contents inside!`
     }
     const newPath = joinPath(dirname(editingPath), trimmedNewName);
     try {
-      // isOperationLoading set/unset within vfs.rename
       await vfs.rename(editingPath, newPath);
-      // Success toast handled by the hook
       if (checkedPaths.has(editingPath)) {
         removeSelectedVfsPath(editingPath);
         addSelectedVfsPath(newPath);
       }
       cancelEditing();
-      loadEntries(currentPath); // Refresh list after successful rename
+      loadEntries(currentPath);
     } catch (error) {
-      // Error already toasted by the hook
       console.error("FileManager Rename Error (already toasted):", error);
-      // Don't cancel editing on error, let user retry or cancel explicitly
     }
   };
   useEffect(() => {
@@ -336,19 +365,18 @@ WARNING: This will delete all contents inside!`
     }
   }, [editingPath]);
 
-  // --- Create Folder Logic ---
   const startCreatingFolder = () => {
-    if (isAnyLoading || editingPath) return; // Prevent creating while loading or editing
+    if (isAnyLoading || editingPath) return;
     setCreatingFolder(true);
     setNewFolderName("");
-    setEditingPath(null); // Ensure not in rename mode
+    setEditingPath(null);
   };
   const cancelCreatingFolder = () => {
     setCreatingFolder(false);
     setNewFolderName("");
   };
   const handleCreateFolder = async () => {
-    if (isOperationLoading) return; // Prevent create if another operation is running
+    if (isOperationLoading) return;
     if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
       toast.error("Filesystem not ready to create folder.");
       cancelCreatingFolder();
@@ -361,18 +389,15 @@ WARNING: This will delete all contents inside!`
     }
     const newPath = joinPath(currentPath, trimmedName);
     try {
-      // isOperationLoading set/unset within vfs.createDirectory
       await vfs.createDirectory(newPath);
-      toast.success(`Folder "${trimmedName}" created.`); // Keep specific success toast here
+      toast.success(`Folder "${trimmedName}" created.`);
       cancelCreatingFolder();
-      loadEntries(currentPath); // Refresh list after successful creation
+      loadEntries(currentPath);
     } catch (error) {
-      // Error already toasted by the hook
       console.error(
         "FileManager Create Folder Error (already toasted):",
         error,
       );
-      // Don't cancel creating on error, let user retry or cancel explicitly
     }
   };
   useEffect(() => {
@@ -381,9 +406,161 @@ WARNING: This will delete all contents inside!`
     }
   }, [creatingFolder]);
 
+  // --- Git Handlers ---
+  const handleGitInit = useCallback(
+    async (path: string) => {
+      if (!git.initialized) {
+        toast.error("Git is not ready.");
+        return;
+      }
+      const result = await git.initRepository(path);
+      if (result.success) {
+        setGitRepoStatus((prev) => ({ ...prev, [path]: true }));
+      }
+      // No need to check result.data as init returns void
+    },
+    [git],
+  );
+
+  const handleGitPull = useCallback(
+    async (path: string) => {
+      if (!git.initialized) {
+        toast.error("Git is not ready.");
+        return;
+      }
+      const result = await git.pullChanges(path);
+      if (result.success) {
+        // Pull might return data (PullResult), but we don't use it here
+        loadEntries(currentPath); // Refresh after pull
+      }
+    },
+    [git, loadEntries, currentPath],
+  );
+
+  const handleGitCommit = useCallback((path: string) => {
+    setCommitPath(path);
+    setCommitMessage("");
+    setIsCommitDialogOpen(true);
+  }, []);
+
+  const handleGitPush = useCallback(
+    async (path: string) => {
+      if (!git.initialized) {
+        toast.error("Git is not ready.");
+        return;
+      }
+      await git.pushChanges(path); // Success/error handled by hook
+    },
+    [git],
+  );
+
+  const handleGitStatus = useCallback(
+    async (path: string) => {
+      if (!git.initialized) {
+        toast.error("Git is not ready.");
+        return;
+      }
+      const result = await git.getRepoInfo(path);
+      // ONLY check result.success before accessing result.data
+      if (result.success) {
+        // Now TypeScript knows result is the success type and has 'data'
+        console.log(`Git Status for ${path}:`, result.data);
+        const branch = result.data.branch ?? "Unknown";
+        // Use optional chaining for nested properties within data
+        const commitMsg = result.data.lastCommit?.message ?? "No commits yet";
+        toast.info(
+          `Git Status for ${basename(path)}: Branch: ${branch}, Last Commit: ${commitMsg.substring(0, 50)}...`,
+        );
+      } else {
+        // Error handled by hook, but we could add context
+        toast.error(`Failed to get Git status for ${basename(path)}.`);
+      }
+    },
+    [git],
+  );
+
+  const submitCommit = useCallback(async () => {
+    if (!commitPath || !commitMessage.trim() || !git.initialized) {
+      toast.error("Commit message cannot be empty.");
+      return;
+    }
+    setIsCommitting(true);
+    const author = { name: "LiteChat User", email: "user@litechat.dev" };
+    await git.addFile(commitPath, ".");
+    const result = await git.commitChanges(commitPath, {
+      message: commitMessage.trim(),
+      author,
+    });
+    setIsCommitting(false);
+    if (result.success) {
+      // Commit returns { sha: string } in result.data if needed
+      // console.log("Commit successful, SHA:", result.data.sha);
+      setIsCommitDialogOpen(false);
+      setCommitPath(null);
+    }
+  }, [commitPath, commitMessage, git]);
+
+  // --- Clone Handlers ---
+  const handleCloneClick = () => {
+    if (isAnyLoading) return;
+    setCloneRepoUrl("");
+    setCloneBranch("main");
+    setIsCloneDialogOpen(true);
+  };
+
+  const submitClone = async () => {
+    const trimmedUrl = cloneRepoUrl.trim();
+    const trimmedBranch = cloneBranch.trim();
+
+    if (!trimmedUrl) {
+      toast.error("Repository URL cannot be empty.");
+      return;
+    }
+    if (!git.initialized) {
+      toast.error("Git is not initialized. Please wait and try again.");
+      return;
+    }
+
+    const repoName = getRepoNameFromUrl(trimmedUrl);
+    if (!repoName) {
+      toast.error("Could not determine repository name from URL.");
+      return;
+    }
+    const expectedRepoPath = joinPath(currentPath, repoName);
+
+    setIsCloning(true);
+
+    try {
+      const currentEntries = await vfs.listFiles(currentPath);
+      const conflict = currentEntries.find((entry) => entry.name === repoName);
+
+      if (conflict) {
+        toast.error(
+          `Cannot clone: An item named "${repoName}" already exists in ${currentPath === "/" ? "the root directory" : `"${basename(currentPath)}"`}.`,
+        );
+        setIsCloning(false);
+        return;
+      }
+
+      const result = await git.cloneRepository(trimmedUrl, expectedRepoPath, {
+        branch: trimmedBranch || undefined,
+      });
+
+      if (result.success) {
+        // Clone returns void, no data to access
+        setIsCloneDialogOpen(false);
+        loadEntries(currentPath);
+      }
+    } catch (listError) {
+      console.error("Error checking for existing directory:", listError);
+      toast.error("Failed to check destination path before cloning.");
+    } finally {
+      setIsCloning(false);
+    }
+  };
+
   // --- Render Logic ---
   if (isConfigLoading) {
-    // Show skeletons only during initial config loading
     return (
       <div className={cn("p-4 space-y-2", className)}>
         <Skeleton className="h-8 w-1/2 bg-gray-700" />
@@ -394,7 +571,6 @@ WARNING: This will delete all contents inside!`
     );
   }
   if (configError) {
-    // Show configuration/readiness errors prominently
     return (
       <div className="p-4 text-center text-red-400 flex items-center justify-center gap-2">
         <AlertCircleIcon className="h-5 w-5" />
@@ -403,7 +579,6 @@ WARNING: This will delete all contents inside!`
     );
   }
   if (!vfs.isReady || vfs.configuredVfsKey !== vfs.vfsKey) {
-    // Show message if VFS is disabled or not configured for the current item
     return (
       <div className="p-4 text-center text-sm text-gray-500">
         Virtual Filesystem not available or not enabled for this item.
@@ -411,7 +586,6 @@ WARNING: This will delete all contents inside!`
     );
   }
 
-  // --- Main File Manager UI ---
   return (
     <div className={cn("flex flex-col h-[400px]", className)}>
       <FileManagerBanner
@@ -433,6 +607,7 @@ WARNING: This will delete all contents inside!`
         handleFolderUploadClick={handleFolderUploadClick}
         handleArchiveUploadClick={handleArchiveUploadClick}
         handleDownloadAll={handleDownloadAll}
+        handleCloneClick={handleCloneClick}
         fileInputRef={fileInputRef}
         folderInputRef={folderInputRef}
         archiveInputRef={archiveInputRef}
@@ -460,7 +635,142 @@ WARNING: This will delete all contents inside!`
         setNewFolderName={setNewFolderName}
         renameInputRef={renameInputRef}
         newFolderInputRef={newFolderInputRef}
+        gitRepoStatus={gitRepoStatus}
+        handleGitInit={handleGitInit}
+        handleGitPull={handleGitPull}
+        handleGitCommit={handleGitCommit}
+        handleGitPush={handleGitPush}
+        handleGitStatus={handleGitStatus}
       />
+
+      {/* Commit Dialog */}
+      <Dialog
+        open={isCommitDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsCommitDialogOpen(false);
+            setCommitPath(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Commit Changes</DialogTitle>
+            <DialogDescription>
+              Enter a commit message for the changes in{" "}
+              <code>{commitPath}</code>. All current changes in this directory
+              will be staged and committed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="commit-msg" className="text-right">
+                Message
+              </Label>
+              <Input
+                id="commit-msg"
+                value={commitMessage}
+                onChange={(e) => setCommitMessage(e.target.value)}
+                className="col-span-3"
+                placeholder="e.g., Add feature X"
+                disabled={isCommitting}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCommitDialogOpen(false)}
+              disabled={isCommitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={submitCommit}
+              disabled={isCommitting || !commitMessage.trim()}
+            >
+              {isCommitting ? (
+                <>
+                  <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                  Committing...
+                </>
+              ) : (
+                "Commit"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clone Dialog */}
+      <Dialog
+        open={isCloneDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsCloneDialogOpen(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clone Git Repository</DialogTitle>
+            <DialogDescription>
+              Enter the repository URL. It will be cloned into a new folder
+              named after the repository within <code>{currentPath}</code>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="clone-url" className="text-right">
+                URL
+              </Label>
+              <Input
+                id="clone-url"
+                value={cloneRepoUrl}
+                onChange={(e) => setCloneRepoUrl(e.target.value)}
+                className="col-span-3"
+                placeholder="https://github.com/user/repo.git"
+                disabled={isCloning}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="clone-branch" className="text-right">
+                Branch
+              </Label>
+              <Input
+                id="clone-branch"
+                value={cloneBranch}
+                onChange={(e) => setCloneBranch(e.target.value)}
+                className="col-span-3"
+                placeholder="main (default)"
+                disabled={isCloning}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCloneDialogOpen(false)}
+              disabled={isCloning}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={submitClone}
+              disabled={isCloning || !cloneRepoUrl.trim()}
+            >
+              {isCloning ? (
+                <>
+                  <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                  Cloning...
+                </>
+              ) : (
+                "Clone"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

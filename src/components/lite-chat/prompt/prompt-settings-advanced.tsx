@@ -1,10 +1,9 @@
 // src/components/lite-chat/prompt-settings-advanced.tsx
-import React, { useState, useEffect, useMemo, useCallback } from "react"; // Added useCallback
-// Use specific context hooks
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useSettingsContext } from "@/context/settings-context";
 import { useSidebarContext } from "@/context/sidebar-context";
 import { useVfsContext } from "@/context/vfs-context";
-import { useProviderManagementContext } from "@/context/provider-management-context"; // Import provider context
+import { useProviderManagementContext } from "@/context/provider-management-context";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
@@ -12,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiKeySelector } from "@/components/lite-chat/api-key-selector";
-import { FileManager } from "@/components/lite-chat/file-manager";
+import { FileManager } from "@/components/lite-chat/file-manager"; // Changed import
 import { cn } from "@/lib/utils";
 import { SaveIcon, InfoIcon } from "lucide-react";
 import {
@@ -21,7 +20,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { toast } from "sonner"; // Import toast
+import { toast } from "sonner";
 
 interface PromptSettingsAdvancedProps {
   className?: string;
@@ -32,11 +31,10 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
   className,
   initialTab = "parameters",
 }) => {
-  // Use specific context hooks
   const settings = useSettingsContext();
   const sidebar = useSidebarContext();
   const vfs = useVfsContext();
-  const providerMgmt = useProviderManagementContext(); // Use provider context
+  const providerMgmt = useProviderManagementContext();
 
   const conversationId = useMemo(() => {
     return sidebar.selectedItemType === "conversation"
@@ -49,15 +47,12 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
   >(null);
   const [isConvoPromptDirty, setIsConvoPromptDirty] = useState(false);
 
-  // Effect to load conversation-specific prompt
   useEffect(() => {
     if (
       settings.enableAdvancedSettings &&
       conversationId &&
       sidebar.selectedItemId
     ) {
-      // Assuming getConversation is available via sidebar or storage context if needed
-      // For now, let's assume activeConversationData holds the latest
       const convoData = sidebar.activeConversationData;
       setLocalConvoSystemPrompt(convoData?.systemPrompt ?? null);
       setIsConvoPromptDirty(false);
@@ -68,7 +63,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
   }, [
     conversationId,
     sidebar.selectedItemId,
-    sidebar.activeConversationData, // Depend on active data
+    sidebar.activeConversationData,
     settings.enableAdvancedSettings,
   ]);
 
@@ -115,7 +110,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setter(value[0]);
   };
 
-  // --- API Key Selection Logic ---
   const selectedDbProviderConfig = useMemo(() => {
     return providerMgmt.dbProviderConfigs.find(
       (p) => p.id === providerMgmt.selectedProviderId,
@@ -142,7 +136,6 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     },
     [selectedDbProviderConfig, providerMgmt.updateDbProviderConfig],
   );
-  // --- End API Key Selection Logic ---
 
   const isConversationSelected = !!conversationId;
   const isConversationPromptSet =
@@ -330,7 +323,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
               value={
                 isConversationSelected
                   ? (localConvoSystemPrompt ?? "")
-                  : (settings.activeSystemPrompt ?? "") // Show active prompt if no convo selected
+                  : (settings.activeSystemPrompt ?? "")
               }
               onChange={handleConvoSystemPromptChange}
               className="text-xs min-h-[80px] max-h-[150px]"
@@ -376,7 +369,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
                 selectedKeyId={selectedDbProviderConfig.apiKeyId ?? null}
                 onKeySelected={handleApiKeySelectionChange}
                 apiKeys={providerMgmt.apiKeys}
-                disabled={!selectedDbProviderConfig} // Disable if no provider config selected
+                disabled={!selectedDbProviderConfig}
               />
             ) : (
               <p className="text-xs text-gray-500">Select a provider first.</p>
@@ -391,7 +384,8 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
         {/* Files Tab */}
         <TabsContent value="files" className="mt-0">
           {vfs.isVfsEnabledForItem && vfs.vfs.isReady ? (
-            <FileManager key={sidebar.selectedItemId} /> // Use sidebar context for key
+            // Use FileManager directly, pass key for potential re-renders
+            <FileManager key={sidebar.selectedItemId} />
           ) : (
             <div className="text-center text-sm text-gray-500 py-8">
               {vfs.isVfsEnabledForItem && vfs.vfs.isLoading

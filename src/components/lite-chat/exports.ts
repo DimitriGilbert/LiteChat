@@ -15,7 +15,7 @@ export { ProviderSelector } from "@/components/lite-chat/provider-selector";
 export { SettingsModal } from "@/components/lite-chat/settings/settings-modal";
 export { FileManager } from "@/components/lite-chat/file-manager";
 export { GitManager } from "@/components/lite-chat/git-manager";
-export { FileManagerWithGit } from "@/components/lite-chat/file-manager-with-git";
+// export { FileManagerWithGit } from "@/components/lite-chat/file-manager-with-git";
 export { ProjectGitConfig } from "@/components/lite-chat/project/project-git-config";
 export { ProjectSettingsModal } from "@/components/lite-chat/project/project-settings-modal";
 export { useChatContext } from "@/hooks/use-chat-context";

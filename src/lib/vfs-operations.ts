@@ -1,17 +1,25 @@
 // src/lib/vfs-operations.ts
-import { fs as zenfs_fs } from "@zenfs/core"; // Import the fs object itself
+// Import promise-based functions directly
+import {
+  mkdir,
+  readdir,
+  stat,
+  readFile,
+  writeFile,
+  rm,
+  unlink,
+  rename,
+} from "@zenfs/core/promises";
+// Import Stats type from @zenfs/core
+import { type Stats } from "@zenfs/core";
 import JSZip from "jszip";
 import { toast } from "sonner";
 import type { FileSystemEntry } from "@/lib/types";
 import { modEvents, ModEvent } from "@/mods/events";
 
-// Define the type based on the imported fs object
-type ZenFsType = typeof zenfs_fs;
-
 // --- Path Utilities (Remain the same) ---
 
 const normalizePath = (path: string): string => {
-  // Ensure leading slash, remove trailing slash (unless root), collapse multiple slashes
   let p = path.replace(/\/+/g, "/");
   if (!p.startsWith("/")) {
     p = "/" + p;
@@ -35,31 +43,28 @@ const dirname = (path: string): string => {
   const normalized = normalizePath(path);
   if (normalized === "/") return "/";
   const lastSlash = normalized.lastIndexOf("/");
-  if (lastSlash === -1) return "/"; // Should not happen with normalizePath
-  if (lastSlash === 0) return "/"; // Parent of /file is /
+  if (lastSlash === -1) return "/";
+  if (lastSlash === 0) return "/";
   return normalized.substring(0, lastSlash);
 };
 
 const basename = (path: string): string => {
   const normalized = normalizePath(path);
-  if (normalized === "/") return ""; // No basename for root
+  if (normalized === "/") return "";
   return normalized.substring(normalized.lastIndexOf("/") + 1);
 };
 
 // --- Operation Implementations ---
+// Removed fsInstance parameter, using imported promise functions
 
-// Helper to create directories internally
-const createDirectoryRecursive = async (
-  fs: ZenFsType, // Use the inferred type
-  path: string,
-): Promise<void> => {
+const createDirectoryRecursive = async (path: string): Promise<void> => {
   const normalized = normalizePath(path);
   if (normalized === "/") return;
 
   try {
-    // Access .promises here
-    await fs.promises.mkdir(normalized, { recursive: true });
-  } catch (err) {
+    // Use imported mkdir with options object
+    await mkdir(normalized, { recursive: true });
+  } catch (err: unknown) {
     if (err instanceof Error && (err as any).code === "EEXIST") {
       console.warn(
         `[VFS Op] Directory already exists or created concurrently: ${normalized}`,
@@ -74,35 +79,34 @@ const createDirectoryRecursive = async (
   }
 };
 
-export const listFilesOp = async (
-  fs: ZenFsType, // Use the inferred type
-  path: string,
-): Promise<FileSystemEntry[]> => {
+export const listFilesOp = async (path: string): Promise<FileSystemEntry[]> => {
   const normalized = normalizePath(path);
   try {
-    // Access .promises here
-    const entries = await fs.promises.readdir(normalized);
-    const stats = await Promise.all(
-      entries.map(async (name) => {
+    // Use imported readdir
+    const entries = await readdir(normalized);
+    const statsPromises = entries.map(
+      async (name: string): Promise<FileSystemEntry | null> => {
         const fullPath = joinPath(normalized, name);
         try {
-          // Access .promises here
-          const stat = await fs.promises.stat(fullPath);
+          // Use imported stat
+          const fileStat: Stats = await stat(fullPath);
           return {
             name,
             path: fullPath,
-            isDirectory: stat.isDirectory(),
-            size: stat.size,
-            lastModified: stat.mtime,
+            isDirectory: fileStat.isDirectory(),
+            size: fileStat.size,
+            lastModified: fileStat.mtime,
           };
-        } catch (statErr) {
+        } catch (statErr: unknown) {
           console.error(`[VFS Op] Failed to stat ${fullPath}:`, statErr);
           return null;
         }
-      }),
+      },
     );
+    const stats = await Promise.all(statsPromises);
+    // Add type guard for s
     return stats.filter((s): s is FileSystemEntry => s !== null);
-  } catch (err) {
+  } catch (err: unknown) {
     if (err instanceof Error && (err as any).code === "ENOENT") {
       console.warn(`[VFS Op] Directory not found for listing: ${normalized}`);
       return [];
@@ -115,17 +119,15 @@ export const listFilesOp = async (
   }
 };
 
-export const readFileOp = async (
-  fs: ZenFsType, // Use the inferred type
-  path: string,
-): Promise<Uint8Array> => {
+export const readFileOp = async (path: string): Promise<Uint8Array> => {
   const normalizedPath = normalizePath(path);
   try {
-    // Access .promises here
-    const data = await fs.promises.readFile(normalizedPath);
+    // Use imported readFile
+    const data = await readFile(normalizedPath);
     modEvents.emit(ModEvent.VFS_FILE_READ, { path: normalizedPath });
+    // readFile from promises API should return Buffer, which is Uint8Array compatible
     return data;
-  } catch (err) {
+  } catch (err: unknown) {
     console.error(`[VFS Op] Failed to read file ${normalizedPath}:`, err);
     toast.error(
       `Error reading file "${basename(normalizedPath)}": ${err instanceof Error ? err.message : String(err)}`,
@@ -135,7 +137,6 @@ export const readFileOp = async (
 };
 
 export const writeFileOp = async (
-  fs: ZenFsType, // Use the inferred type
   setIsLoading: (loading: boolean) => void,
   path: string,
   data: Uint8Array | string,
@@ -145,12 +146,13 @@ export const writeFileOp = async (
   setIsLoading(true);
   try {
     if (parentDir !== "/") {
-      await createDirectoryRecursive(fs, parentDir); // Pass fs
+      // Call helper which uses imported mkdir
+      await createDirectoryRecursive(parentDir);
     }
-    // Access .promises here
-    await fs.promises.writeFile(normalized, data);
+    // Use imported writeFile
+    await writeFile(normalized, data);
     modEvents.emit(ModEvent.VFS_FILE_WRITTEN, { path: normalized });
-  } catch (err) {
+  } catch (err: unknown) {
     if (
       !(
         err instanceof Error && err.message.includes("Error creating directory")
@@ -168,7 +170,6 @@ export const writeFileOp = async (
 };
 
 export const deleteItemOp = async (
-  fs: ZenFsType, // Use the inferred type
   setIsLoading: (loading: boolean) => void,
   path: string,
   recursive: boolean = false,
@@ -180,20 +181,26 @@ export const deleteItemOp = async (
   }
   setIsLoading(true);
   try {
-    // Access .promises here
-    const stat = await fs.promises.stat(normalized);
-    if (stat.isDirectory()) {
-      // Access .promises here
-      await fs.promises.rm(normalized, { recursive });
+    // Use imported stat
+    const fileStat = await stat(normalized);
+    if (fileStat.isDirectory()) {
+      // Use imported rm with options object
+      await rm(normalized, { recursive });
+      // Emit event - Payload needs to match VfsFileOpPayload definition
+      // Temporarily removing 'isDirectory' until definition is known
+      modEvents.emit(ModEvent.VFS_FILE_DELETED, { path: normalized });
     } else {
-      // Access .promises here
-      await fs.promises.unlink(normalized);
+      // Use imported unlink
+      await unlink(normalized);
+      // Emit event - Payload needs to match VfsFileOpPayload definition
+      // Temporarily removing 'isDirectory' until definition is known
       modEvents.emit(ModEvent.VFS_FILE_DELETED, { path: normalized });
     }
     toast.success(`"${basename(normalized)}" deleted.`);
-  } catch (err) {
+  } catch (err: unknown) {
     if (err instanceof Error && (err as any).code === "ENOENT") {
       console.warn(`[VFS Op] Item not found for deletion: ${normalized}`);
+      setIsLoading(false);
       return;
     }
     console.error(`[VFS Op] Failed to delete ${normalized}:`, err);
@@ -207,14 +214,14 @@ export const deleteItemOp = async (
 };
 
 export const createDirectoryOp = async (
-  fs: ZenFsType, // Use the inferred type
   setIsLoading: (loading: boolean) => void,
   path: string,
 ): Promise<void> => {
   setIsLoading(true);
   try {
-    await createDirectoryRecursive(fs, path); // Pass fs
-  } catch (err) {
+    // Call helper which uses imported mkdir
+    await createDirectoryRecursive(path);
+  } catch (err: unknown) {
     throw err;
   } finally {
     setIsLoading(false);
@@ -222,12 +229,12 @@ export const createDirectoryOp = async (
 };
 
 export const downloadFileOp = async (
-  fs: ZenFsType, // Use the inferred type
   path: string,
   filename?: string,
 ): Promise<void> => {
   try {
-    const data = await readFileOp(fs, path); // Pass fs
+    // Calls helper which uses imported readFile
+    const data = await readFileOp(path);
     const blob = new Blob([data]);
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -238,13 +245,17 @@ export const downloadFileOp = async (
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  } catch (err) {
+  } catch (err: unknown) {
     console.error(`[VFS Op] Failed to initiate download for ${path}:`, err);
+    if (!(err instanceof Error && err.message.includes("Error reading file"))) {
+      toast.error(
+        `Download failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 };
 
 export const uploadFilesOp = async (
-  fs: ZenFsType, // Use the inferred type
   setIsLoading: (loading: boolean) => void,
   files: FileList | File[],
   targetPath: string,
@@ -256,17 +267,18 @@ export const uploadFilesOp = async (
   const fileArray = Array.from(files);
 
   try {
-    await createDirectoryRecursive(fs, normalizedTargetPath); // Pass fs
+    // Calls helper which uses imported mkdir
+    await createDirectoryRecursive(normalizedTargetPath);
 
     for (const file of fileArray) {
       const filePath = joinPath(normalizedTargetPath, file.name);
       try {
         const buffer = await file.arrayBuffer();
-        // Access .promises here
-        await fs.promises.writeFile(filePath, new Uint8Array(buffer));
+        // Use imported writeFile
+        await writeFile(filePath, new Uint8Array(buffer));
         modEvents.emit(ModEvent.VFS_FILE_WRITTEN, { path: filePath });
         successCount++;
-      } catch (err) {
+      } catch (err: unknown) {
         errorCount++;
         console.error(`[VFS Op] Failed to upload ${file.name}:`, err);
         toast.error(
@@ -274,7 +286,7 @@ export const uploadFilesOp = async (
         );
       }
     }
-  } catch (err) {
+  } catch (err: unknown) {
     errorCount = fileArray.length;
     console.error(
       `[VFS Op] Failed to prepare target directory ${normalizedTargetPath} for upload:`,
@@ -290,12 +302,13 @@ export const uploadFilesOp = async (
       toast.success(
         `Successfully uploaded ${successCount} file(s) to ${normalizedTargetPath === "/" ? "root" : basename(normalizedTargetPath)}.`,
       );
+    } else if (errorCount > 0 && successCount === 0) {
+      toast.error(`Upload failed. Could not upload any files.`);
     }
   }
 };
 
 export const uploadAndExtractZipOp = async (
-  fs: ZenFsType, // Use the inferred type
   setIsLoading: (loading: boolean) => void,
   file: File,
   targetPath: string,
@@ -310,103 +323,95 @@ export const uploadAndExtractZipOp = async (
   let zip: JSZip;
 
   try {
-    await createDirectoryRecursive(fs, normalizedTargetPath); // Pass fs
+    // Calls helper which uses imported mkdir
+    await createDirectoryRecursive(normalizedTargetPath);
 
     zip = await JSZip.loadAsync(file);
-    const fileWritePromises: Promise<void>[] = [];
-    let fileCount = 0;
-    let dirCount = 0;
+    const entries = Object.values(zip.files);
 
-    zip.forEach((_, zipEntry) => {
-      const fullTargetPath = joinPath(normalizedTargetPath, zipEntry.name);
-      if (zipEntry.dir) {
-        dirCount++;
-        fileWritePromises.push(
-          // Access .promises here
-          new Promise((resolve, reject) => {
-            fs.promises
-              .mkdir(fullTargetPath, { recursive: true })
-              .then(() => resolve())
-              .catch((err) => {
-                if (!(err instanceof Error && (err as any).code === "EEXIST")) {
-                  console.error(
-                    `[VFS Op] Failed to create directory during ZIP extraction ${fullTargetPath}:`,
-                    err,
-                  );
-                  reject(err);
-                }
-              });
-          }),
-        );
-      } else {
-        fileCount++;
-        const writePromise = zipEntry
-          .async("uint8array")
-          .then((content) => {
+    const results = await Promise.allSettled(
+      entries.map(async (zipEntry) => {
+        const fullTargetPath = joinPath(normalizedTargetPath, zipEntry.name);
+        if (zipEntry.dir) {
+          try {
+            // Use imported mkdir with options object
+            await mkdir(fullTargetPath, { recursive: true });
+          } catch (err: unknown) {
+            if (!(err instanceof Error && (err as any).code === "EEXIST")) {
+              console.error(
+                `[VFS Op] Failed to create directory during ZIP extraction ${fullTargetPath}:`,
+                err,
+              );
+              throw err;
+            }
+          }
+        } else {
+          try {
+            const content = await zipEntry.async("uint8array");
             const parentDir = dirname(fullTargetPath);
-            return (
-              (
-                parentDir === normalizedTargetPath
-                  ? Promise.resolve()
-                  : // Access .promises here
-                    fs.promises.mkdir(parentDir, { recursive: true })
-              )
-                .catch((mkdirErr) => {
-                  if (
-                    !(
-                      mkdirErr instanceof Error &&
-                      (mkdirErr as any).code === "EEXIST"
-                    )
-                  ) {
-                    console.error(
-                      `[VFS Op] Failed to create parent directory ${parentDir} during ZIP extraction:`,
-                      mkdirErr,
-                    );
-                    throw mkdirErr;
-                  }
-                })
-                // Access .promises here
-                .then(() => fs.promises.writeFile(fullTargetPath, content))
-                .then(() => {
-                  modEvents.emit(ModEvent.VFS_FILE_WRITTEN, {
-                    path: fullTargetPath,
-                  });
-                })
-            );
-          })
-          .catch((err) => {
+            if (parentDir !== normalizedTargetPath) {
+              try {
+                // Use imported mkdir with options object
+                await mkdir(parentDir, { recursive: true });
+              } catch (mkdirErr: unknown) {
+                if (
+                  !(
+                    mkdirErr instanceof Error &&
+                    (mkdirErr as any).code === "EEXIST"
+                  )
+                ) {
+                  console.error(
+                    `[VFS Op] Failed to create parent directory ${parentDir} during ZIP extraction:`,
+                    mkdirErr,
+                  );
+                  throw mkdirErr;
+                }
+              }
+            }
+            // Use imported writeFile
+            await writeFile(fullTargetPath, content);
+            modEvents.emit(ModEvent.VFS_FILE_WRITTEN, {
+              path: fullTargetPath,
+            });
+          } catch (err: unknown) {
             console.error(
               `[VFS Op] Failed to process ZIP entry ${zipEntry.name}:`,
               err,
             );
             throw err;
-          });
-        fileWritePromises.push(writePromise);
-      }
-    });
+          }
+        }
+        return { name: zipEntry.name, isDir: zipEntry.dir };
+      }),
+    );
 
-    const results = await Promise.allSettled(fileWritePromises);
-    const failedCount = results.filter((r) => r.status === "rejected").length;
+    let successFileCount = 0;
+    let successDirCount = 0;
+    let failedCount = 0;
 
     results.forEach((result) => {
-      if (result.status === "rejected") {
+      if (result.status === "fulfilled" && result.value) {
+        if (result.value.isDir) {
+          successDirCount++;
+        } else {
+          successFileCount++;
+        }
+      } else if (result.status === "rejected") {
+        failedCount++;
         console.error("[VFS Op] ZIP Extraction item failed:", result.reason);
-        toast.error(
-          `Error during ZIP extraction: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
-        );
       }
     });
 
     if (failedCount > 0) {
       toast.warning(
-        `Finished extracting "${file.name}". ${fileCount + dirCount - failedCount} items succeeded, ${failedCount} failed.`,
+        `Finished extracting "${file.name}". ${successFileCount + successDirCount} items succeeded, ${failedCount} failed.`,
       );
     } else {
       toast.success(
-        `Successfully extracted ${fileCount} files and ${dirCount} folders from "${file.name}" to ${normalizedTargetPath === "/" ? "root" : basename(normalizedTargetPath)}.`,
+        `Successfully extracted ${successFileCount} files and ${successDirCount} folders from "${file.name}" to ${normalizedTargetPath === "/" ? "root" : basename(normalizedTargetPath)}.`,
       );
     }
-  } catch (err) {
+  } catch (err: unknown) {
     if (
       !(
         err instanceof Error && err.message.includes("Error creating directory")
@@ -423,7 +428,6 @@ export const uploadAndExtractZipOp = async (
 };
 
 export const downloadAllAsZipOp = async (
-  fs: ZenFsType, // Use the inferred type
   setIsLoading: (loading: boolean) => void,
   filename?: string,
   rootPath: string = "/",
@@ -435,14 +439,14 @@ export const downloadAllAsZipOp = async (
 
   try {
     try {
-      // Access .promises here
-      const rootStat = await fs.promises.stat(normalizedRoot);
+      // Use imported stat
+      const rootStat = await stat(normalizedRoot);
       if (!rootStat.isDirectory()) {
         toast.error(`Cannot export: "${rootDirName}" is not a directory.`);
         setIsLoading(false);
         return;
       }
-    } catch (statErr) {
+    } catch (statErr: unknown) {
       if (statErr instanceof Error && (statErr as any).code === "ENOENT") {
         toast.error(`Cannot export: Path "${rootDirName}" not found.`);
       } else {
@@ -454,29 +458,27 @@ export const downloadAllAsZipOp = async (
       return;
     }
 
-    const addFolderToZip = async (
-      folderPath: string,
-      zipFolder: JSZip | null,
-    ) => {
-      const currentZipLevel = zipFolder || zip;
-      const entries = await listFilesOp(fs, folderPath); // Pass fs
+    const addFolderToZip = async (folderPath: string, zipFolder: JSZip) => {
+      // Calls helper which uses imported readdir/stat
+      const entries = await listFilesOp(folderPath);
 
       for (const entry of entries) {
         if (entry.isDirectory) {
-          const subFolder = currentZipLevel.folder(entry.name);
+          const subFolder = zipFolder.folder(entry.name);
           if (subFolder) {
             await addFolderToZip(entry.path, subFolder);
           } else {
             throw new Error(`Failed to create subfolder ${entry.name} in zip.`);
           }
         } else {
-          const content = await readFileOp(fs, entry.path); // Pass fs
-          currentZipLevel.file(entry.name, content);
+          // Calls helper which uses imported readFile
+          const content = await readFileOp(entry.path);
+          zipFolder.file(entry.name, content);
         }
       }
     };
 
-    await addFolderToZip(normalizedRoot, null);
+    await addFolderToZip(normalizedRoot, zip);
 
     const zipBlob = await zip.generateAsync({ type: "blob" });
     const url = URL.createObjectURL(zipBlob);
@@ -489,7 +491,7 @@ export const downloadAllAsZipOp = async (
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     toast.success(`"${rootDirName}" exported as ${link.download}.`);
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("[VFS Op] Failed to download all as zip:", err);
     if (
       !(
@@ -509,7 +511,6 @@ export const downloadAllAsZipOp = async (
 };
 
 export const renameOp = async (
-  fs: ZenFsType, // Use the inferred type
   setIsLoading: (loading: boolean) => void,
   oldPath: string,
   newPath: string,
@@ -529,18 +530,23 @@ export const renameOp = async (
   try {
     const parentDir = dirname(normalizedNew);
     if (parentDir !== "/") {
-      await createDirectoryRecursive(fs, parentDir); // Pass fs
+      // Calls helper which uses imported mkdir
+      await createDirectoryRecursive(parentDir);
     }
-    // Access .promises here
-    await fs.promises.rename(normalizedOld, normalizedNew);
+    // Use imported rename
+    await rename(normalizedOld, normalizedNew);
     toast.success(
       `Renamed "${basename(normalizedOld)}" to "${basename(normalizedNew)}"`,
     );
-  } catch (err) {
+  } catch (err: unknown) {
     if (err instanceof Error && (err as any).code === "ENOENT") {
-      toast.error(
-        `Rename failed: Original item "${basename(normalizedOld)}" not found.`,
-      );
+      if (err.message.includes("Error creating directory")) {
+        // Handled by createDirectoryRecursive
+      } else {
+        toast.error(
+          `Rename failed: Original item "${basename(normalizedOld)}" not found.`,
+        );
+      }
     } else if (err instanceof Error && (err as any).code === "EEXIST") {
       toast.error(
         `Rename failed: An item named "${basename(normalizedNew)}" already exists.`,

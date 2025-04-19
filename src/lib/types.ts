@@ -1,6 +1,9 @@
 // src/lib/types.ts
 import React from "react";
 import type { DbMod, ModInstance } from "@/mods/types";
+// Import the global fs object to use its type
+// Removed unused FileSystem import
+import { fs } from "@zenfs/core";
 
 // --- Basic Types ---
 export type Role = "user" | "assistant" | "system";
@@ -200,10 +203,12 @@ export interface CoreChatContextProps {
 // VFS object within the context
 export interface VfsContextObject {
   isReady: boolean;
-  configuredVfsKey: string | null;
   isLoading: boolean;
   isOperationLoading: boolean;
   error: string | null;
+  configuredVfsKey: string | null;
+  // Use the type of the imported global fs object
+  fs: typeof fs | null;
   listFiles: (path: string) => Promise<FileSystemEntry[]>;
   readFile: (path: string) => Promise<Uint8Array>;
   writeFile: (path: string, data: Uint8Array | string) => Promise<void>;
@@ -212,9 +217,9 @@ export interface VfsContextObject {
   downloadFile: (path: string, filename?: string) => Promise<void>;
   uploadFiles: (files: FileList | File[], targetPath: string) => Promise<void>;
   uploadAndExtractZip: (file: File, targetPath: string) => Promise<void>;
-  downloadAllAsZip: (filename?: string, rootPath?: string) => Promise<void>; // Added rootPath
+  downloadAllAsZip: (filename?: string, rootPath?: string) => Promise<void>;
   rename: (oldPath: string, newPath: string) => Promise<void>;
-  vfsKey?: string | null;
+  vfsKey: string | null;
 }
 
 // Full Context (Aggregated - Consumers should ideally use specific context hooks)

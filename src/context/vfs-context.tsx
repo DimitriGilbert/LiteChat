@@ -3,13 +3,16 @@ import React, { createContext, useContext, useMemo, useEffect } from "react";
 import type { VfsContextObject, SidebarItemType } from "@/lib/types";
 import { useVirtualFileSystem } from "@/hooks/use-virtual-file-system";
 import { useState as useVfsState, useCallback as useVfsCallback } from "react";
+// Removed unused FileSystem import from @zenfs/core
 
+// Add fs: null to dummyVfs
 const dummyVfs: VfsContextObject = {
   isReady: false,
   isLoading: false,
   isOperationLoading: false,
   error: null,
   configuredVfsKey: null,
+  fs: null, // Added null fs property
   listFiles: async () => {
     console.warn("VFS not enabled/ready");
     return [];
@@ -56,7 +59,7 @@ const dummyVfs: VfsContextObject = {
 interface VfsContextProps {
   enableVfs: boolean;
   isVfsEnabledForItem: boolean;
-  vfs: VfsContextObject;
+  vfs: VfsContextObject; // This should be the correct type
   selectedVfsPaths: string[];
   addSelectedVfsPath: (path: string) => void;
   removeSelectedVfsPath: (path: string) => void;
@@ -68,11 +71,10 @@ const VfsContext = createContext<VfsContextProps | undefined>(undefined);
 interface VfsProviderProps {
   children: React.ReactNode;
   enableVfs?: boolean;
-  // Dependencies from SidebarContext
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
-  isVfsEnabledForItem: boolean; // Derived state from SidebarContext
-  vfsKey: string | null; // Derived state from SidebarContext
+  isVfsEnabledForItem: boolean;
+  vfsKey: string | null;
 }
 
 export const VfsProvider: React.FC<VfsProviderProps> = ({
@@ -83,7 +85,6 @@ export const VfsProvider: React.FC<VfsProviderProps> = ({
   isVfsEnabledForItem,
   vfsKey,
 }) => {
-  // VFS Selection State (for prompt input)
   const [selectedVfsPaths, setSelectedVfsPaths] = useVfsState<string[]>([]);
   const addSelectedVfsPath = useVfsCallback((path: string) => {
     setSelectedVfsPaths((prev) =>
@@ -97,33 +98,34 @@ export const VfsProvider: React.FC<VfsProviderProps> = ({
     setSelectedVfsPaths([]);
   }, []);
 
-  // VFS Instance Logic
-  const realVfs = useVirtualFileSystem({
+  // Explicitly type the return of useVirtualFileSystem
+  const realVfs: VfsContextObject = useVirtualFileSystem({
     itemId: selectedItemId,
     itemType: selectedItemType,
     isEnabled: isVfsEnabledForItem && !!selectedItemId,
     vfsKey,
   });
 
-  const vfs = useMemo(() => {
+  // Explicitly type the vfs variable
+  const vfs: VfsContextObject = useMemo(() => {
     if (enableVfs && isVfsEnabledForItem && selectedItemId) {
       return realVfs;
     }
     return dummyVfs;
   }, [enableVfs, isVfsEnabledForItem, selectedItemId, realVfs]);
 
-  // Effect to clear selection if VFS becomes disabled for the item
   useEffect(() => {
     if (!isVfsEnabledForItem && selectedVfsPaths.length > 0) {
       clearSelectedVfsPaths();
     }
   }, [isVfsEnabledForItem, selectedVfsPaths, clearSelectedVfsPaths]);
 
-  const value = useMemo(
+  // The value passed to the provider should now match VfsContextProps
+  const value: VfsContextProps = useMemo(
     () => ({
       enableVfs: enableVfs ?? true,
       isVfsEnabledForItem,
-      vfs,
+      vfs, // Pass the correctly typed vfs object
       selectedVfsPaths,
       addSelectedVfsPath,
       removeSelectedVfsPath,

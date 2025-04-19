@@ -3,11 +3,25 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 // https://vitejs.dev/config/
 export default defineConfig({
   base: "/LiteChat/",
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    nodePolyfills({
+      // Optionally specify which globals to polyfill (true by default)
+      globals: {
+        Buffer: true, // Ensure Buffer is polyfilled
+        global: true,
+        process: true,
+      },
+      // Optionally specify which protocols to polyfill (true by default)
+      protocolImports: true,
+    }),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -1,10 +1,14 @@
 // src/hooks/use-virtual-file-system.ts
 import { useState, useEffect, useCallback, useRef } from "react";
-import { configureSingle, fs as zenfs_fs } from "@zenfs/core";
+// Import fs directly for type usage and configureSingle
+import { configureSingle, fs } from "@zenfs/core";
 import { IndexedDB } from "@zenfs/dom";
-// Removed JSZip import as it's now in vfs-operations
-import type { FileSystemEntry, SidebarItemType } from "@/lib/types";
-import * as VfsOps from "@/lib/vfs-operations"; // Import the operations module
+import type {
+  FileSystemEntry,
+  SidebarItemType,
+  VfsContextObject, // Type definition updated in types.ts
+} from "@/lib/types";
+import * as VfsOps from "@/lib/vfs-operations";
 
 interface UseVirtualFileSystemProps {
   itemId: string | null;
@@ -13,31 +17,10 @@ interface UseVirtualFileSystemProps {
   vfsKey: string | null;
 }
 
-interface UseVirtualFileSystemReturn {
-  isReady: boolean;
-  isLoading: boolean;
-  isOperationLoading: boolean;
-  error: string | null;
-  configuredVfsKey: string | null;
-  listFiles: (path: string) => Promise<FileSystemEntry[]>;
-  readFile: (path: string) => Promise<Uint8Array>;
-  writeFile: (path: string, data: Uint8Array | string) => Promise<void>;
-  deleteItem: (path: string, recursive?: boolean) => Promise<void>;
-  createDirectory: (path: string) => Promise<void>;
-  downloadFile: (path: string, filename?: string) => Promise<void>;
-  uploadFiles: (files: FileList | File[], targetPath: string) => Promise<void>;
-  uploadAndExtractZip: (file: File, targetPath: string) => Promise<void>;
-  downloadAllAsZip: (filename?: string, rootPath?: string) => Promise<void>; // Added rootPath
-  rename: (oldPath: string, newPath: string) => Promise<void>;
-  vfsKey: string | null;
-}
-
-// Path utilities are now in vfs-operations.ts
-
 export function useVirtualFileSystem({
   isEnabled,
   vfsKey,
-}: UseVirtualFileSystemProps): UseVirtualFileSystemReturn {
+}: UseVirtualFileSystemProps): VfsContextObject {
   const [isLoading, setIsLoading] = useState(false);
   const [isOperationLoading, setIsOperationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,8 +28,9 @@ export function useVirtualFileSystem({
   const isMountedRef = useRef(false);
   const configuredVfsKeyRef = useRef<string | null>(null);
   const configuringForVfsKeyRef = useRef<string | null>(null);
+  // Store the global fs instance reference
+  const fsInstanceRef = useRef<typeof fs | null>(null);
 
-  // --- Configuration Effect (Remains the same) ---
   useEffect(() => {
     isMountedRef.current = true;
 
@@ -62,6 +46,7 @@ export function useVirtualFileSystem({
       setIsOperationLoading(false);
       setError(null);
       setIsReady(false);
+      fsInstanceRef.current = null;
 
       try {
         const vfsConf = {
@@ -69,6 +54,8 @@ export function useVirtualFileSystem({
           name: `litechat_vfs_${key}`,
         };
         await configureSingle(vfsConf);
+        // Assign the configured global fs object to the ref.
+        fsInstanceRef.current = fs;
 
         if (
           isMountedRef.current &&
@@ -88,6 +75,7 @@ export function useVirtualFileSystem({
           if (vfsKey !== key) {
             setIsReady(false);
             configuredVfsKeyRef.current = null;
+            fsInstanceRef.current = null;
           }
         }
       } catch (err) {
@@ -97,6 +85,7 @@ export function useVirtualFileSystem({
           setError(errorMsg);
           setIsReady(false);
           configuredVfsKeyRef.current = null;
+          fsInstanceRef.current = null;
         }
       } finally {
         if (configuringForVfsKeyRef.current === key) {
@@ -113,11 +102,15 @@ export function useVirtualFileSystem({
         if (!isReady) setIsReady(true);
         if (isLoading) setIsLoading(false);
         if (error !== null) setError(null);
+        if (!fsInstanceRef.current && isReady) {
+          fsInstanceRef.current = fs;
+        }
       }
     } else {
       if (isReady) setIsReady(false);
       if (configuredVfsKeyRef.current !== null) {
         configuredVfsKeyRef.current = null;
+        fsInstanceRef.current = null;
         console.log(
           "[VFS Hook] Cleared configured FS key and readiness due to disable/unselect.",
         );
@@ -130,173 +123,133 @@ export function useVirtualFileSystem({
     return () => {
       isMountedRef.current = false;
     };
-  }, [vfsKey, isEnabled, isReady, isLoading, isOperationLoading, error]);
+  }, [vfsKey, isEnabled]);
 
-  // --- Readiness Check (Remains the same) ---
-  const checkReadyInternal = useCallback(() => {
-    if (!isReady || configuredVfsKeyRef.current !== vfsKey) {
+  // Renamed: Checks readiness and throws if not ready. Doesn't return fs.
+  const ensureReadyOrThrow = useCallback((): void => {
+    if (
+      !isReady ||
+      configuredVfsKeyRef.current !== vfsKey ||
+      !fsInstanceRef.current // Check if fs instance exists (post-configuration)
+    ) {
       const message =
         "Filesystem is not ready or not configured for the current VFS key.";
       console.error(
-        `[VFS Hook] Operation prevented: ${message} (isReady: ${isReady}, configuredVfsKey: ${configuredVfsKeyRef.current}, expectedVfsKey: ${vfsKey})`,
+        `[VFS Hook] Operation prevented: ${message} (isReady: ${isReady}, configuredVfsKey: ${configuredVfsKeyRef.current}, expectedVfsKey: ${vfsKey}, fsInstance: ${!!fsInstanceRef.current})`,
       );
       throw new Error(message);
     }
-    return zenfs_fs;
-  }, [isReady, vfsKey]);
+    // If checks pass, execution continues
+  }, [isReady, vfsKey]); // fsInstanceRef is stable
 
-  // --- API Wrappers ---
-  // These wrappers check readiness and then call the corresponding operation function.
+  // --- Operations using ensureReadyOrThrow ---
+  // Call ensureReadyOrThrow first, then the standalone VfsOps function
 
   const listFiles = useCallback(
     async (path: string): Promise<FileSystemEntry[]> => {
+      ensureReadyOrThrow(); // Check readiness first
       try {
-        const fs = checkReadyInternal();
-        return await VfsOps.listFilesOp(fs, path);
+        // VfsOps functions now use imported promise functions
+        return await VfsOps.listFilesOp(path);
       } catch (err) {
-        // checkReadyInternal throws and toasts, listFilesOp handles its own errors/toasts
-        // Return empty array as a fallback if readiness check fails or listFilesOp re-throws
-        return [];
+        // Error logging/toast handled within VfsOps
+        return []; // Return empty array on error
       }
     },
-    [checkReadyInternal],
+    [ensureReadyOrThrow],
   );
 
   const readFile = useCallback(
     async (path: string): Promise<Uint8Array> => {
-      try {
-        const fs = checkReadyInternal();
-        return await VfsOps.readFileOp(fs, path);
-      } catch (err) {
-        // checkReadyInternal throws and toasts, readFileOp handles its own errors/toasts
-        // Re-throw the error to signal failure to the caller
-        throw err;
-      }
+      ensureReadyOrThrow();
+      // Let VfsOps handle errors
+      return await VfsOps.readFileOp(path);
     },
-    [checkReadyInternal],
+    [ensureReadyOrThrow],
   );
 
   const writeFile = useCallback(
     async (path: string, data: Uint8Array | string): Promise<void> => {
-      try {
-        const fs = checkReadyInternal();
-        // Pass the state setter for loading management
-        await VfsOps.writeFileOp(fs, setIsOperationLoading, path, data);
-      } catch (err) {
-        // checkReadyInternal throws and toasts, writeFileOp handles its own errors/toasts
-        // No need to re-throw, failure is indicated by toast and loading state change
-      }
+      ensureReadyOrThrow();
+      // Pass setIsLoading for operation loading state
+      await VfsOps.writeFileOp(setIsOperationLoading, path, data);
     },
-    [checkReadyInternal],
+    [ensureReadyOrThrow],
   );
 
   const deleteItem = useCallback(
     async (path: string, recursive: boolean = false): Promise<void> => {
-      try {
-        const fs = checkReadyInternal();
-        await VfsOps.deleteItemOp(fs, setIsOperationLoading, path, recursive);
-      } catch (err) {
-        // checkReadyInternal throws and toasts, deleteItemOp handles its own errors/toasts
-      }
+      ensureReadyOrThrow();
+      await VfsOps.deleteItemOp(setIsOperationLoading, path, recursive);
     },
-    [checkReadyInternal],
+    [ensureReadyOrThrow],
   );
 
   const createDirectory = useCallback(
     async (path: string): Promise<void> => {
-      try {
-        const fs = checkReadyInternal();
-        await VfsOps.createDirectoryOp(fs, setIsOperationLoading, path);
-      } catch (err) {
-        // checkReadyInternal throws and toasts, createDirectoryOp handles its own errors/toasts
-      }
+      ensureReadyOrThrow();
+      await VfsOps.createDirectoryOp(setIsOperationLoading, path);
     },
-    [checkReadyInternal],
+    [ensureReadyOrThrow],
   );
 
   const downloadFile = useCallback(
     async (path: string, filename?: string): Promise<void> => {
-      try {
-        const fs = checkReadyInternal();
-        await VfsOps.downloadFileOp(fs, path, filename);
-      } catch (err) {
-        // checkReadyInternal throws and toasts, downloadFileOp handles its own errors/toasts
-      }
+      ensureReadyOrThrow();
+      await VfsOps.downloadFileOp(path, filename);
     },
-    [checkReadyInternal],
+    [ensureReadyOrThrow],
   );
 
   const uploadFiles = useCallback(
     async (files: FileList | File[], targetPath: string): Promise<void> => {
-      try {
-        const fs = checkReadyInternal();
-        await VfsOps.uploadFilesOp(
-          fs,
-          setIsOperationLoading,
-          files,
-          targetPath,
-        );
-      } catch (err) {
-        // checkReadyInternal throws and toasts, uploadFilesOp handles its own errors/toasts
-      }
+      ensureReadyOrThrow();
+      await VfsOps.uploadFilesOp(setIsOperationLoading, files, targetPath);
     },
-    [checkReadyInternal],
+    [ensureReadyOrThrow],
   );
 
   const uploadAndExtractZip = useCallback(
     async (file: File, targetPath: string): Promise<void> => {
-      try {
-        const fs = checkReadyInternal();
-        await VfsOps.uploadAndExtractZipOp(
-          fs,
-          setIsOperationLoading,
-          file,
-          targetPath,
-        );
-      } catch (err) {
-        // checkReadyInternal throws and toasts, uploadAndExtractZipOp handles its own errors/toasts
-      }
+      ensureReadyOrThrow();
+      await VfsOps.uploadAndExtractZipOp(
+        setIsOperationLoading,
+        file,
+        targetPath,
+      );
     },
-    [checkReadyInternal],
+    [ensureReadyOrThrow],
   );
 
   const downloadAllAsZip = useCallback(
     async (filename?: string, rootPath: string = "/"): Promise<void> => {
-      try {
-        const fs = checkReadyInternal();
-        await VfsOps.downloadAllAsZipOp(
-          fs,
-          setIsOperationLoading,
-          filename,
-          rootPath,
-        );
-      } catch (err) {
-        // checkReadyInternal throws and toasts, downloadAllAsZipOp handles its own errors/toasts
-      }
+      ensureReadyOrThrow();
+      await VfsOps.downloadAllAsZipOp(
+        setIsOperationLoading,
+        filename,
+        rootPath,
+      );
     },
-    [checkReadyInternal],
+    [ensureReadyOrThrow],
   );
 
   const rename = useCallback(
     async (oldPath: string, newPath: string): Promise<void> => {
-      try {
-        const fs = checkReadyInternal();
-        await VfsOps.renameOp(fs, setIsOperationLoading, oldPath, newPath);
-      } catch (err) {
-        // checkReadyInternal throws and toasts, renameOp handles its own errors/toasts
-      }
+      ensureReadyOrThrow();
+      await VfsOps.renameOp(setIsOperationLoading, oldPath, newPath);
     },
-    [checkReadyInternal],
+    [ensureReadyOrThrow],
   );
 
-  // --- Return Value ---
+  // Return object matching VfsContextObject
   return {
     isReady: isReady,
     isLoading: isLoading,
     isOperationLoading: isOperationLoading,
     error: error,
     configuredVfsKey: configuredVfsKeyRef.current,
-    // Expose the wrapper functions
+    // Return the reference to the global fs instance
+    fs: fsInstanceRef.current,
     listFiles,
     readFile,
     writeFile,
