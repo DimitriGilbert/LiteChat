@@ -13,7 +13,13 @@ export { PromptSettings } from "@/components/lite-chat/prompt/prompt-settings";
 export { PromptWrapper } from "@/components/lite-chat/prompt/prompt-wrapper";
 export { ProviderSelector } from "@/components/lite-chat/provider-selector";
 export { SettingsModal } from "@/components/lite-chat/settings/settings-modal";
+export { FileManager } from "@/components/lite-chat/file-manager";
+export { GitManager } from "@/components/lite-chat/git-manager";
+export { FileManagerWithGit } from "@/components/lite-chat/file-manager-with-git";
+export { ProjectGitConfig } from "@/components/lite-chat/project/project-git-config";
+export { ProjectSettingsModal } from "@/components/lite-chat/project/project-settings-modal";
 export { useChatContext } from "@/hooks/use-chat-context";
+export { useGit } from "@/hooks/use-git";
 export { ChatProvider } from "@/context/chat-context";
 export type {
   AiProviderConfig,

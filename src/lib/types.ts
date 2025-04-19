@@ -23,6 +23,9 @@ export interface DbProject extends DbBase {
   name: string;
   parentId: string | null;
   vfsEnabled: boolean;
+  gitRepoUrl?: string | null;
+  gitRepoBranch?: string | null;
+  gitRepoEnabled?: boolean;
 }
 
 export interface DbConversation extends DbBase {
@@ -30,6 +33,9 @@ export interface DbConversation extends DbBase {
   systemPrompt: string | null;
   parentId: string | null;
   vfsEnabled: boolean;
+  gitRepoUrl?: string | null;
+  gitRepoBranch?: string | null;
+  gitRepoEnabled?: boolean;
 }
 
 export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {

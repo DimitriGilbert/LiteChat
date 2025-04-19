@@ -12,6 +12,7 @@ import {
   MessageSquareIcon,
   CheckIcon,
   XIcon,
+  CogIcon,
 } from "lucide-react";
 import {
   Tooltip,
@@ -22,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { SidebarItem } from "@/lib/types";
 import { toast } from "sonner";
+import { ProjectSettingsModal } from "@/components/lite-chat/project/project-settings-modal";
 
 // --- History Item Component ---
 interface HistoryItemProps {
@@ -41,6 +43,7 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
     useChatContext();
 
   const [isEditing, setIsEditing] = useState(startInEditMode);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const currentItemName = item.type === "project" ? item.name : item.title;
   const [editedName, setEditedName] = useState(currentItemName);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -291,6 +294,27 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
                 </Tooltip>
               </TooltipProvider>
             )}
+            {item.type === "project" && (
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-gray-400 hover:text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsSettingsOpen(true);
+                      }}
+                      aria-label="Project settings"
+                    >
+                      <CogIcon className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Project settings</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             <TooltipProvider delayDuration={100}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -310,6 +334,14 @@ const HistoryItem: React.FC<HistoryItemProps> = ({
           </>
         )}
       </div>
+
+      {item.type === "project" && isSettingsOpen && (
+        <ProjectSettingsModal
+          projectId={item.id}
+          open={isSettingsOpen}
+          onOpenChange={setIsSettingsOpen}
+        />
+      )}
     </div>
   );
 };
