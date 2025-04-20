@@ -11,8 +11,8 @@ import { modEvents, ModEvent } from "@/mods/events";
 export function createAssistantPlaceholder(
   conversationId: string,
   providerId: string,
-  modelId: string
-): { id: string, message: Message, timestamp: Date } {
+  modelId: string,
+): { id: string; message: Message; timestamp: Date } {
   const assistantMessageId = nanoid();
   const assistantPlaceholderTimestamp = new Date();
   const assistantPlaceholder: Message = {
@@ -28,10 +28,10 @@ export function createAssistantPlaceholder(
     modelId: modelId,
   };
 
-  return { 
-    id: assistantMessageId, 
+  return {
+    id: assistantMessageId,
     message: assistantPlaceholder,
-    timestamp: assistantPlaceholderTimestamp 
+    timestamp: assistantPlaceholderTimestamp,
   };
 }
 
@@ -42,23 +42,26 @@ export function createStreamUpdater(
   assistantMessageId: string,
   contentRef: { current: string },
   setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>,
-  throttleRate: number
+  throttleRate: number,
 ) {
   return throttle(() => {
     const currentAccumulatedContent = contentRef.current;
-    setLocalMessages((prev) => {
-      const targetMessageIndex = prev.findIndex(
-        (msg) => msg.id === assistantMessageId
+    // Use functional update for setLocalMessages
+    setLocalMessages((prevMessages) => {
+      const targetMessageIndex = prevMessages.findIndex(
+        (msg) => msg.id === assistantMessageId,
       );
+      // If message not found or not streaming anymore, return previous state
       if (
         targetMessageIndex === -1 ||
-        !prev[targetMessageIndex].isStreaming
+        !prevMessages[targetMessageIndex].isStreaming
       ) {
-        return prev;
+        return prevMessages;
       }
-      const updatedMessages = [...prev];
+      // Create a new array with the updated message
+      const updatedMessages = [...prevMessages];
       updatedMessages[targetMessageIndex] = {
-        ...prev[targetMessageIndex],
+        ...prevMessages[targetMessageIndex],
         streamedContent: currentAccumulatedContent,
       };
       return updatedMessages;
@@ -71,7 +74,7 @@ export function createStreamUpdater(
  */
 export function getStreamHeaders(
   providerType: string,
-  apiKey: string | undefined
+  apiKey: string | undefined,
 ): Record<string, string> | undefined {
   if (!apiKey) {
     // For providers that don't need a key or optional OpenRouter headers
@@ -103,35 +106,43 @@ export function finalizeStreamedMessage(
   streamError: Error | null,
   messagesToSend: CoreMessage[],
   startTime: number,
-  setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>
+  setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>,
 ): Message | null {
   let finalMessageObject: Message | null = null;
 
-  setLocalMessages((prev) =>
-    prev.map((msg) => {
-      if (msg.id === messageId) {
-        finalMessageObject = {
-          ...msg,
-          content: finalContent,
-          isStreaming: false,
-          streamedContent: undefined,
-          error: streamError ? streamError.message : null,
-          // providerId and modelId already set in placeholder
-          tokensInput: messagesToSend.reduce(
-            (sum, m) => sum + (m.content.length || 0),
-            0
-          ),
-          tokensOutput: finalContent.length,
-          tokensPerSecond:
-            streamError || !startTime
-              ? undefined
-              : finalContent.length / ((Date.now() - startTime) / 1000 || 1),
-        };
-        return finalMessageObject;
-      }
-      return msg;
-    })
-  );
+  // Use functional update for setLocalMessages
+  setLocalMessages((prevMessages) => {
+    const messageIndex = prevMessages.findIndex((msg) => msg.id === messageId);
+    if (messageIndex === -1) {
+      console.warn(
+        `[finalizeStreamedMessage] Could not find message ${messageId} to finalize.`,
+      );
+      return prevMessages; // Message not found, return previous state
+    }
+
+    const updatedMessages = [...prevMessages];
+    const originalMessage = updatedMessages[messageIndex];
+
+    finalMessageObject = {
+      ...originalMessage,
+      content: finalContent,
+      isStreaming: false,
+      streamedContent: undefined,
+      error: streamError ? streamError.message : null,
+      // providerId and modelId already set in placeholder
+      tokensInput: messagesToSend.reduce(
+        (sum, m) => sum + (m.content.length || 0),
+        0,
+      ),
+      tokensOutput: finalContent.length,
+      tokensPerSecond:
+        streamError || !startTime
+          ? undefined
+          : finalContent.length / ((Date.now() - startTime) / 1000 || 1),
+    };
+    updatedMessages[messageIndex] = finalMessageObject;
+    return updatedMessages;
+  });
 
   return finalMessageObject;
 }
@@ -152,7 +163,7 @@ export async function executeAiStream(
   headers: Record<string, string> | undefined,
   conversationId: string,
   contentRef: { current: string },
-  throttledUpdate: () => void
+  throttledUpdate: () => void,
 ): Promise<void> {
   modEvents.emit(ModEvent.RESPONSE_START, {
     conversationId: conversationId,

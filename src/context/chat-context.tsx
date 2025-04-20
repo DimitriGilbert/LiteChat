@@ -61,7 +61,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 }) => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoadingMessages, setIsLoadingMessages] = useState(true);
+  // Initialize isLoadingMessages based on whether an initial item is selected
+  const [isLoadingMessages, setIsLoadingMessages] = useState(
+    !!initialSelectedItemId,
+  );
   const [error, setErrorState] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -123,6 +126,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       setErrorState(null);
       setActiveItemId(id);
       setActiveItemType(type);
+      // Set loading to true *only if* an item is actually selected
       setIsLoadingMessages(!!id);
       modEvents.emit(ModEvent.CHAT_SELECTED, { id, type });
     },
