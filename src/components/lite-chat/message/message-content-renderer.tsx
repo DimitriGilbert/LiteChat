@@ -3,7 +3,8 @@ import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
-import type { Message } from "@/lib/types"; // Import ImagePart
+// Ensure TextPart and ImagePart are NOT imported if unused
+import type { Message } from "@/lib/types";
 import { CodeBlock } from "@/components/lite-chat/code-block";
 
 interface MessageContentRendererProps {
@@ -12,26 +13,23 @@ interface MessageContentRendererProps {
 
 export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
   React.memo(({ message }) => {
-    const streamingContent = message.streamedContent ?? "";
+    const streamedContent = message.streamedContent ?? "";
     const finalContent = message.content;
 
     // --- Streaming Case (Handles only text streaming) ---
-    if (message.isStreaming && typeof finalContent === "string") {
-      // Only show streaming indicator if the base content is text
-      const baseContent = finalContent;
+    if (message.isStreaming) {
+      // Display accumulated streamed content + cursor
       return (
         <div className="text-gray-200 text-sm whitespace-pre-wrap break-words">
-          {baseContent}
-          {streamingContent}
+          {/* Render streamed content using Markdown for partial formatting */}
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{ code: CodeBlock }}
+          >
+            {streamedContent}
+          </ReactMarkdown>
+          {/* Blinking cursor */}
           <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"></span>
-        </div>
-      );
-    } else if (message.isStreaming) {
-      // Handle streaming placeholder for non-text (e.g., image generation)
-      return (
-        <div className="text-gray-400 text-sm italic">
-          {typeof finalContent === "string" ? finalContent : "Processing..."}
-          <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-gray-400 align-baseline"></span>
         </div>
       );
     }
@@ -43,7 +41,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
       return null;
     }
 
-    // --- Render based on content type ---
+    // --- Render based on final content type ---
     const renderContent = () => {
       if (typeof finalContent === "string") {
         // --- String Content: Render with ReactMarkdown ---
@@ -84,6 +82,36 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                 }
                 className="my-2 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg h-auto rounded border border-gray-600" // Adjusted max-width
               />
+            );
+          } else if (part.type === "tool-call") {
+            // --- Tool Call Part: Render placeholder ---
+            return (
+              <div
+                key={index}
+                className="my-2 p-3 rounded border border-dashed border-blue-700 bg-blue-900/20 text-xs text-blue-300"
+              >
+                <p className="font-semibold">
+                  Tool Call: <code>{part.toolName}</code>
+                </p>
+                <pre className="mt-1 text-blue-200/80 overflow-x-auto">
+                  {JSON.stringify(part.args, null, 2)}
+                </pre>
+              </div>
+            );
+          } else if (part.type === "tool-result") {
+            // --- Tool Result Part: Render placeholder ---
+            return (
+              <div
+                key={index}
+                className={`my-2 p-3 rounded border border-dashed ${part.isError ? "border-red-700 bg-red-900/20 text-red-300" : "border-gray-700 bg-gray-800/30 text-gray-400"} text-xs`}
+              >
+                <p className="font-semibold">Tool Result ({part.toolName}):</p>
+                <pre className="mt-1 text-gray-300 overflow-x-auto">
+                  {typeof part.result === "string"
+                    ? part.result
+                    : JSON.stringify(part.result, null, 2)}
+                </pre>
+              </div>
             );
           }
           // Handle potential unknown part types gracefully

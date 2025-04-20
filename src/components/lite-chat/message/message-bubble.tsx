@@ -70,21 +70,23 @@ const messagesAreEqual = (
   if (
     prevMsg.id !== nextMsg.id ||
     prevMsg.role !== nextMsg.role ||
-    prevMsg.isStreaming !== nextMsg.isStreaming || // Crucial for detecting stream end
+    prevMsg.isStreaming !== nextMsg.isStreaming || // Crucial for detecting stream end/start
     prevMsg.error !== nextMsg.error // Check for error changes
   ) {
-    // console.log(`[Memo] Diff found (basic): id=${prevMsg.id !== nextMsg.id}, role=${prevMsg.role !== nextMsg.role}, streaming=${prevMsg.isStreaming !== nextMsg.isStreaming}, error=${prevMsg.error !== nextMsg.error}`);
     return false;
   }
 
-  // Compare content - use stringify for robust comparison of string or array
-  if (JSON.stringify(prevMsg.content) !== JSON.stringify(nextMsg.content)) {
-    // console.log(`[Memo] Diff found (content): ${prevMsg.id}`);
-    return false;
-  }
-
-  // If not streaming, compare other potentially changing metadata
-  if (!nextMsg.isStreaming) {
+  // If streaming, compare streamedContent
+  if (nextMsg.isStreaming) {
+    if (prevMsg.streamedContent !== nextMsg.streamedContent) {
+      return false;
+    }
+  } else {
+    // If not streaming, compare final content
+    if (JSON.stringify(prevMsg.content) !== JSON.stringify(nextMsg.content)) {
+      return false;
+    }
+    // Compare other potentially changing metadata only when not streaming
     if (
       JSON.stringify(prevMsg.tool_calls) !==
         JSON.stringify(nextMsg.tool_calls) ||
@@ -97,13 +99,11 @@ const messagesAreEqual = (
       JSON.stringify(prevMsg.vfsContextPaths) !==
         JSON.stringify(nextMsg.vfsContextPaths)
     ) {
-      // console.log(`[Memo] Diff found (metadata): ${prevMsg.id}`);
       return false;
     }
   }
 
   // If none of the above differences were found, the props are considered equal
-  // console.log(`[Memo] No diff found: ${prevMsg.id}`);
   return true;
 };
 

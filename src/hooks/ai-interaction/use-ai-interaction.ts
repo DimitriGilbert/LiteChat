@@ -1,39 +1,13 @@
 // src/hooks/ai-interaction/use-ai-interaction.ts
 import { useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import { ModEvent, modEvents } from "@/mods/events";
 import {
-  Message,
-  CoreMessage,
-  ImagePart as LocalImagePart, // Alias local ImagePart
-  DbMessage,
-  MessageContent,
-  ToolCallPart as LocalToolCallPart, // Alias local ToolCallPart
-  ToolResultPart as LocalToolResultPart, // Alias local ToolResultPart
-  TextPart as LocalTextPart, // Alias local TextPart
-  Role,
-} from "@/lib/types";
-// Import necessary types from 'ai'
-import {
-  experimental_generateImage as generateImage,
   streamText,
-  tool,
-  Tool as VercelTool,
-  ToolExecutionOptions,
-  ImageModelCallWarning,
   StreamTextResult,
-  ResponseMessage,
-  StepResult,
-  FinishReason,
-  LanguageModelUsage,
-  ProviderMetadata,
-  TextPart, // Use SDK TextPart
-  ImagePart, // Use SDK ImagePart
-  ToolCallPart, // Use SDK ToolCallPart
-  ToolResultPart, // Use SDK ToolResultPart
+  ToolCallPart,
+  ToolResultPart, // Import ToolResultPart from 'ai'
 } from "ai";
-import { nanoid } from "nanoid";
-import { useModContext, RegisteredToolEntry } from "@/context/mod-context";
+import { useModContext } from "@/context/mod-context";
 
 import {
   UseAiInteractionProps,
@@ -43,8 +17,28 @@ import {
   UseAiInteractionReturn,
 } from "./types";
 
+// Import specific part types and MessageContent
+import {
+  DbMessage,
+  Message,
+  MessageContent,
+  TextPart, // Import TextPart
+  ToolCallPart as LocalToolCallPartType, // Alias to avoid name clash
+  ToolResultPart as LocalToolResultPartType, // Alias to avoid name clash
+} from "@/lib/types";
+
 import { validateAiParameters } from "./error-handler";
-import { getStreamHeaders } from "./stream-handler";
+import {
+  getStreamHeaders,
+  createAssistantPlaceholder,
+  createStreamUpdater,
+  finalizeStreamedMessageUI, // Renamed import
+} from "./stream-handler"; // Import necessary functions
+import { mapToCoreMessages } from "./message-mapper";
+import { createSdkTools } from "./tool-handler";
+import { performImageGeneration } from "./image-generator";
+import { modEvents, ModEvent } from "@/mods/events"; // Import mod events
+import { nanoid } from "nanoid"; // Import nanoid
 
 /**
  * Hook for handling AI interactions with streaming, image generation, and tool calling capabilities
@@ -53,154 +47,30 @@ export function useAiInteraction({
   selectedModel,
   selectedProvider,
   getApiKeyForProvider,
+  streamingThrottleRate, // Added throttle rate
   setLocalMessages,
   setIsAiStreaming,
   setError,
   addDbMessage,
   abortControllerRef,
   getContextSnapshotForMod,
-  bulkAddMessages,
+  bulkAddMessages, // Keep bulkAddMessages prop
 }: UseAiInteractionProps): UseAiInteractionReturn {
   const { modTools } = useModContext();
-  const streamingMessageIdRef = useRef<string | null>(null);
+  const contentRef = useRef<string>(""); // Ref to accumulate streamed content
+  const placeholderRef = useRef<{
+    id: string;
+    timestamp: Date;
+    providerId: string;
+    modelId: string;
+    conversationId: string;
+  } | null>(null); // Ref to store placeholder details
 
-  const sdkTools = useMemo(() => {
-    const toolsForSdk: Record<string, VercelTool<any, any>> = {};
-    modTools.forEach(
-      (registeredTool: RegisteredToolEntry, toolName: string) => {
-        if (!registeredTool.definition.parameters) {
-          console.error(
-            `Tool "${toolName}" is missing parameters definition. Skipping.`,
-          );
-          return;
-        }
-        const originalExecuteFn =
-          registeredTool.implementation ?? registeredTool.definition.execute;
-        if (!originalExecuteFn) {
-          console.error(
-            `Tool "${toolName}" is missing an implementation or execute function. Skipping.`,
-          );
-          return;
-        }
-        toolsForSdk[toolName] = tool({
-          description: registeredTool.definition.description,
-          parameters: registeredTool.definition.parameters,
-          execute: async (args: any, options: ToolExecutionOptions) => {
-            const contextSnapshot = getContextSnapshotForMod();
-            try {
-              const result = await originalExecuteFn(args, contextSnapshot);
-              return result;
-            } catch (error) {
-              console.error(`Error executing tool "${toolName}":`, error);
-              throw error;
-            }
-          },
-        });
-      },
-    );
-    return toolsForSdk;
-  }, [modTools, getContextSnapshotForMod]);
-
-  const mapToCoreMessages = useCallback(
-    (localMessages: Message[]): CoreMessage[] => {
-      return localMessages
-        .filter((m) => m.role !== "system")
-        .map((m): CoreMessage | null => {
-          try {
-            if (m.role === "user") {
-              let coreContent: CoreMessage["content"];
-              if (typeof m.content === "string") {
-                coreContent = m.content;
-              } else if (Array.isArray(m.content)) {
-                coreContent = m.content
-                  .map((part) => {
-                    if (part.type === "text") return part as TextPart;
-                    if (part.type === "image") {
-                      const base64Data = part.image.startsWith("data:")
-                        ? part.image.split(",")[1]
-                        : part.image;
-                      if (!base64Data) return null;
-                      return {
-                        type: "image" as const,
-                        image: base64Data,
-                        mimeType: part.mediaType,
-                      } as ImagePart;
-                    }
-                    return null;
-                  })
-                  .filter((p): p is TextPart | ImagePart => p !== null);
-              } else {
-                coreContent = "";
-              }
-              return { role: "user", content: coreContent };
-            } else if (m.role === "assistant") {
-              const contentParts: Array<TextPart | ToolCallPart> = [];
-              if (typeof m.content === "string") {
-                contentParts.push({ type: "text", text: m.content });
-              } else if (Array.isArray(m.content)) {
-                m.content.forEach((part) => {
-                  if (part.type === "text") contentParts.push(part as TextPart);
-                  else if (part.type === "tool-call")
-                    contentParts.push({
-                      type: "tool-call",
-                      toolCallId: part.toolCallId,
-                      toolName: part.toolName,
-                      args: part.args,
-                    } as ToolCallPart);
-                });
-              }
-              if (
-                m.tool_calls &&
-                !contentParts.some((p) => p.type === "tool-call")
-              ) {
-                m.tool_calls.forEach((tc) => {
-                  try {
-                    contentParts.push({
-                      type: "tool-call",
-                      toolCallId: tc.id,
-                      toolName: tc.function.name,
-                      args: JSON.parse(tc.function.arguments || "{}"),
-                    } as ToolCallPart);
-                  } catch (e) {
-                    console.error(
-                      "Failed to parse tool call arguments:",
-                      tc.function.arguments,
-                      e,
-                    );
-                  }
-                });
-              }
-              return { role: "assistant", content: contentParts };
-            } else if (m.role === "tool") {
-              const toolResultPart = Array.isArray(m.content)
-                ? (m.content.find((p) => p.type === "tool-result") as
-                    | LocalToolResultPart
-                    | undefined)
-                : undefined;
-              if (!toolResultPart || !m.tool_call_id) return null;
-              return {
-                role: "tool",
-                content: [
-                  {
-                    type: "tool-result",
-                    toolCallId: m.tool_call_id,
-                    toolName: toolResultPart.toolName,
-                    result: toolResultPart.result,
-                    isError: toolResultPart.isError,
-                  } as ToolResultPart,
-                ],
-              };
-            }
-            return null;
-          } catch (error) {
-            console.error("Error mapping message to CoreMessage:", m, error);
-            return null;
-          }
-        })
-        .filter((m): m is CoreMessage => m !== null);
-    },
-    [],
-  ); // No dependencies needed for this pure function
+  // Create SDK-compatible tools from registered mod tools
+  const sdkTools = useMemo(
+    () => createSdkTools(modTools, getContextSnapshotForMod),
+    [modTools, getContextSnapshotForMod],
+  );
 
   const performAiStream = useCallback(
     async ({
@@ -236,15 +106,58 @@ export function useAiInteraction({
 
       setIsAiStreaming(true);
       setError(null);
-      streamingMessageIdRef.current = null; // Reset ref
+      contentRef.current = ""; // Reset accumulated content
+      placeholderRef.current = null; // Reset placeholder ref
 
       const currentAbortController = new AbortController();
       abortControllerRef.current = currentAbortController;
 
-      const messagesForApi: CoreMessage[] = mapToCoreMessages(messagesToSend);
+      // Create placeholder message
+      const {
+        id: assistantMessageId,
+        message: assistantPlaceholder,
+        timestamp: assistantTimestamp,
+      } = createAssistantPlaceholder(
+        conversationIdToUse,
+        selectedProvider!.id,
+        selectedModel!.id,
+      );
+      // Store placeholder details in ref
+      placeholderRef.current = {
+        id: assistantMessageId,
+        timestamp: assistantTimestamp,
+        providerId: selectedProvider!.id,
+        modelId: selectedModel!.id,
+        conversationId: conversationIdToUse,
+      };
+      setLocalMessages((prev) => [...prev, assistantPlaceholder]);
+
+      // Create throttled UI updater
+      const throttledUpdate = createStreamUpdater(
+        assistantMessageId,
+        contentRef,
+        setLocalMessages,
+        streamingThrottleRate,
+      );
+
+      const messagesForApi = mapToCoreMessages(
+        messagesToSend as unknown as Message[],
+      );
       const headers = getStreamHeaders(selectedProvider!.type, apiKey);
+      const startTime = Date.now();
+      let streamError: Error | null = null;
+      let finalUsage:
+        | { promptTokens: number; completionTokens: number }
+        | undefined = undefined;
+      let finalFinishReason: string | undefined = undefined;
+      const finalToolCalls: ToolCallPart[] = [];
 
       try {
+        modEvents.emit(ModEvent.RESPONSE_START, {
+          conversationId: conversationIdToUse,
+        });
+
+        // Provide the correct type arguments for StreamTextResult (TOOLS, PARTIAL_OUTPUT = never)
         const result: StreamTextResult<typeof sdkTools, never> =
           await streamText({
             model: selectedModel!.instance,
@@ -260,523 +173,239 @@ export function useAiInteraction({
             frequencyPenalty: currentFrequencyPenalty ?? undefined,
             headers,
             abortSignal: currentAbortController.signal,
+            // Removed onFinish callback here
+          });
 
-            onFinish: async (event) => {
-              console.log("streamText onFinish event:", event);
-              const lastStep = event.steps[event.steps.length - 1];
-              if (!lastStep) {
-                console.error("onFinish: No last step found.");
-                setError("Stream finish error: No final step data.");
-                toast.error("Error processing stream finish.");
-                if (streamingMessageIdRef.current) {
-                  const finalId = streamingMessageIdRef.current;
-                  setLocalMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === finalId
-                        ? {
-                            ...msg,
-                            isStreaming: false,
-                            error: "Stream finish error",
-                          }
-                        : msg,
-                    ),
-                  );
-                }
-                return;
-              }
-
-              const finalMessagesFromStep: ResponseMessage[] =
-                lastStep.response?.messages ?? [];
-              console.log(
-                "onFinish: Final messages from last step:",
-                finalMessagesFromStep,
-              );
-
-              if (finalMessagesFromStep.length === 0) {
-                console.warn("onFinish: No messages in last step response.");
-                if (streamingMessageIdRef.current) {
-                  const finalId = streamingMessageIdRef.current;
-                  setLocalMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === finalId
-                        ? {
-                            ...msg,
-                            isStreaming: false,
-                            tokensInput: event.usage.promptTokens,
-                            tokensOutput: event.usage.completionTokens,
-                          }
-                        : msg,
-                    ),
-                  );
-                }
-                return;
-              }
-
-              const now = new Date();
-              const messagesToSave: DbMessage[] = [];
-              const finalMessageObjects = new Map<string, Message>(); // Store final Message objects for state update
-
-              finalMessagesFromStep.forEach((responseMsg) => {
-                let dbContent: MessageContent;
-                if (typeof responseMsg.content === "string")
-                  dbContent = responseMsg.content;
-                else if (Array.isArray(responseMsg.content)) {
-                  dbContent = responseMsg.content
-                    .map((part) => {
-                      if (part.type === "text") return part as LocalTextPart;
-                      if (part.type === "tool-call")
-                        return part as LocalToolCallPart;
-                      if (part.type === "tool-result")
-                        return part as LocalToolResultPart;
-                      return null;
-                    })
-                    .filter((p) => p !== null) as MessageContent;
-                } else dbContent = "";
-
-                const baseDbMessage = {
-                  id: responseMsg.id,
-                  conversationId: conversationIdToUse,
-                  role: responseMsg.role as Role,
-                  content: dbContent,
-                  createdAt: now,
-                  providerId: selectedProvider?.id,
-                  modelId: selectedModel?.id,
-                  tokensInput:
-                    responseMsg.role === "assistant"
-                      ? event.usage.promptTokens
-                      : undefined,
-                  tokensOutput:
-                    responseMsg.role === "assistant"
-                      ? event.usage.completionTokens
-                      : undefined,
-                };
-
-                let tool_calls: Message["tool_calls"] | undefined = undefined;
-                let tool_call_id: string | undefined = undefined;
-
-                if (responseMsg.role === "assistant") {
-                  tool_calls = Array.isArray(responseMsg.content)
-                    ? responseMsg.content
-                        .filter(
-                          (part): part is ToolCallPart =>
-                            part.type === "tool-call",
-                        )
-                        .map((tc) => ({
-                          id: tc.toolCallId,
-                          type: "function" as const,
-                          function: {
-                            name: tc.toolName,
-                            arguments:
-                              typeof tc.args === "string"
-                                ? tc.args
-                                : JSON.stringify(tc.args),
-                          },
-                        }))
-                    : undefined;
-                  messagesToSave.push({
-                    ...baseDbMessage,
-                    role: "assistant",
-                    tool_calls,
-                  });
-                } else if (responseMsg.role === "tool") {
-                  const toolResultPart = Array.isArray(responseMsg.content)
-                    ? responseMsg.content.find(
-                        (part): part is ToolResultPart =>
-                          part.type === "tool-result",
-                      )
-                    : undefined;
-                  tool_call_id = toolResultPart?.toolCallId;
-                  messagesToSave.push({
-                    ...baseDbMessage,
-                    role: "tool",
-                    tool_call_id,
-                  });
-                }
-
-                // Store the final Message object shape for UI update
-                finalMessageObjects.set(responseMsg.id, {
-                  ...baseDbMessage, // Spread the common fields
-                  tool_calls, // Add specific fields
-                  tool_call_id,
-                  isStreaming: false, // Final state
-                  error: null,
-                });
-              });
-
-              if (messagesToSave.length > 0) {
-                console.log(
-                  "onFinish: Attempting to save messages to DB:",
-                  messagesToSave,
-                );
-                try {
-                  await bulkAddMessages(messagesToSave);
-                  console.log(
-                    "onFinish: Successfully saved messages to DB:",
-                    messagesToSave.map((m) => m.id),
-                  );
-
-                  // --- Refined State Update ---
-                  setLocalMessages((prevLocalMessages) => {
-                    const streamingId = streamingMessageIdRef.current;
-                    let streamingMessageReplaced = false;
-
-                    // Map over previous messages, replacing based on final data
-                    const updatedMessages = prevLocalMessages.map(
-                      (localMsg) => {
-                        if (finalMessageObjects.has(localMsg.id)) {
-                          // Replace with the final version from DB save
-                          const finalMsg = finalMessageObjects.get(
-                            localMsg.id,
-                          )!;
-                          finalMessageObjects.delete(localMsg.id); // Remove from map
-                          if (localMsg.id === streamingId) {
-                            streamingMessageReplaced = true;
-                          }
-                          return finalMsg;
-                        }
-                        return localMsg; // Keep other messages
-                      },
-                    );
-
-                    // If the streaming message wasn't in the final batch (error?), ensure it's finalized
-                    if (streamingId && !streamingMessageReplaced) {
-                      console.warn(
-                        `[onFinish] Finalizing streaming message ${streamingId} which wasn't in final save batch.`,
-                      );
-                      const index = updatedMessages.findIndex(
-                        (m) => m.id === streamingId,
-                      );
-                      if (index > -1) {
-                        updatedMessages[index] = {
-                          ...updatedMessages[index],
-                          isStreaming: false,
-                        };
-                      }
-                    }
-
-                    // Add any remaining new messages (e.g., tool results not seen during stream)
-                    finalMessageObjects.forEach((finalMsg) => {
-                      updatedMessages.push(finalMsg);
-                    });
-
-                    return updatedMessages;
-                  });
-                  // --- End Refined State Update ---
-
-                  const finalAssistantDbMsg = messagesToSave.find(
-                    (m) => m.role === "assistant",
-                  );
-                  if (finalAssistantDbMsg) {
-                    const finalAssistantMsgForEvent: Message =
-                      finalMessageObjects.get(finalAssistantDbMsg.id) || {
-                        // Fallback if somehow not in map
-                        id: finalAssistantDbMsg.id,
-                        role: "assistant",
-                        content: finalAssistantDbMsg.content,
-                        tool_calls: finalAssistantDbMsg.tool_calls,
-                        createdAt: finalAssistantDbMsg.createdAt,
-                        conversationId: finalAssistantDbMsg.conversationId,
-                        providerId: finalAssistantDbMsg.providerId,
-                        modelId: finalAssistantDbMsg.modelId,
-                        tokensInput: finalAssistantDbMsg.tokensInput,
-                        tokensOutput: finalAssistantDbMsg.tokensOutput,
-                        isStreaming: false,
-                      };
-                    modEvents.emit(ModEvent.RESPONSE_DONE, {
-                      message: finalAssistantMsgForEvent,
-                    });
-                  }
-                } catch (dbErr: unknown) {
-                  const dbErrorMessage = `Save failed: ${dbErr instanceof Error ? dbErr.message : "Unknown DB error"}`;
-                  console.error("onFinish: Failed to save messages:", dbErr);
-                  setError(`Error saving response: ${dbErrorMessage}`);
-                  toast.error(`Failed to save response: ${dbErrorMessage}`);
-                  const savedIds = messagesToSave.map((m) => m.id);
-                  setLocalMessages((prev) =>
-                    prev.map((m) =>
-                      savedIds.includes(m.id) ||
-                      m.id === streamingMessageIdRef.current
-                        ? { ...m, error: dbErrorMessage, isStreaming: false }
-                        : m,
-                    ),
-                  );
-                }
-              } else {
-                console.log(
-                  "onFinish: No messages derived from SDK response to save.",
-                );
-                if (streamingMessageIdRef.current) {
-                  const finalId = streamingMessageIdRef.current;
-                  setLocalMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === finalId ? { ...msg, isStreaming: false } : msg,
-                    ),
-                  );
-                }
-              }
-            }, // End of onFinish
-          }); // End of streamText call
-
-        // --- Stream Processing for UI Updates ---
-        console.log("Starting stream processing loop...");
+        // Process the stream parts that ARE yielded during iteration
         for await (const part of result.fullStream) {
           if (currentAbortController.signal.aborted) {
-            console.log("Stream aborted by user.");
+            streamError = new Error("Stream aborted by user.");
             toast.info("AI response stopped.");
             break;
           }
 
-          setLocalMessages((prevMessages) => {
-            const currentStreamingId = streamingMessageIdRef.current;
-
-            // Create Assistant Message ONLY on the very first relevant part
-            if (
-              !currentStreamingId &&
-              (part.type === "text-delta" || part.type === "tool-call")
-            ) {
-              const newId = nanoid();
-              streamingMessageIdRef.current = newId; // Set the ID for this stream
-              let initialContent: MessageContent = "";
-              let initialToolCalls: Message["tool_calls"] | undefined =
-                undefined;
-
-              if (part.type === "text-delta") initialContent = part.textDelta;
-              else {
-                // part.type === 'tool-call'
-                const toolCallContentPart: LocalToolCallPart = {
-                  type: "tool-call",
-                  toolCallId: part.toolCallId,
-                  toolName: part.toolName,
-                  args: part.args,
-                };
-                initialContent = [toolCallContentPart];
-                initialToolCalls = [
-                  {
-                    id: part.toolCallId,
-                    type: "function",
-                    function: {
-                      name: part.toolName,
-                      arguments: JSON.stringify(part.args),
-                    },
-                  },
-                ];
-                toast.info(`Calling tool: ${part.toolName}...`);
-              }
-              const newMessage: Message = {
-                id: newId,
-                role: "assistant",
-                content: initialContent,
-                tool_calls: initialToolCalls,
-                isStreaming: true,
-                createdAt: new Date(),
+          switch (part.type) {
+            case "text-delta":
+              contentRef.current += part.textDelta;
+              modEvents.emit(ModEvent.RESPONSE_CHUNK, {
+                chunk: part.textDelta,
                 conversationId: conversationIdToUse,
-                providerId: selectedProvider?.id,
-                modelId: selectedModel?.id,
-              };
-              console.log(`[${part.type}] CREATED message ${newId}`);
-              return [...prevMessages, newMessage];
-            }
-
-            // Update Existing Assistant Message if ID matches
-            if (currentStreamingId) {
-              let messageFoundAndUpdate = false;
-              const updatedMessages = prevMessages.map((msg) => {
-                if (msg.id === currentStreamingId) {
-                  messageFoundAndUpdate = true;
-                  let newContent = msg.content;
-                  let newToolCalls = msg.tool_calls;
-                  let changed = false;
-
-                  if (part.type === "text-delta") {
-                    let currentText = "";
-                    let contentArray: Array<LocalTextPart | LocalToolCallPart> =
-                      [];
-                    if (typeof newContent === "string")
-                      currentText = newContent;
-                    else if (Array.isArray(newContent)) {
-                      contentArray = newContent as Array<
-                        LocalTextPart | LocalToolCallPart
-                      >;
-                      const lastPart = contentArray[contentArray.length - 1];
-                      if (lastPart?.type === "text")
-                        currentText = lastPart.text;
-                    }
-
-                    const updatedText = currentText + part.textDelta;
-
-                    if (typeof newContent === "string")
-                      newContent = updatedText;
-                    else if (Array.isArray(newContent)) {
-                      const lastPart = newContent[newContent.length - 1];
-                      if (lastPart?.type === "text")
-                        newContent = [
-                          ...newContent.slice(0, -1),
-                          { ...lastPart, text: updatedText },
-                        ];
-                      else
-                        newContent = [
-                          ...newContent,
-                          { type: "text", text: part.textDelta },
-                        ];
-                    } else newContent = updatedText; // Fallback
-                    changed = true;
-                  } else if (part.type === "tool-call") {
-                    const toolCallContentPart: LocalToolCallPart = {
-                      type: "tool-call",
-                      toolCallId: part.toolCallId,
-                      toolName: part.toolName,
-                      args: part.args,
-                    };
-                    const toolCallForState = {
-                      id: part.toolCallId,
-                      type: "function" as const,
-                      function: {
-                        name: part.toolName,
-                        arguments: JSON.stringify(part.args),
-                      },
-                    };
-                    const currentContentArray = Array.isArray(newContent)
-                      ? newContent
-                      : typeof newContent === "string" && newContent.length > 0
-                        ? [{ type: "text" as const, text: newContent }]
-                        : [];
-
-                    if (
-                      !currentContentArray.some(
-                        (p) =>
-                          p.type === "tool-call" &&
-                          p.toolCallId === part.toolCallId,
-                      )
-                    ) {
-                      newContent = [
-                        ...currentContentArray,
-                        toolCallContentPart,
-                      ];
-                      newToolCalls = [
-                        ...(newToolCalls ?? []),
-                        toolCallForState,
-                      ];
-                      toast.info(`Calling tool: ${part.toolName}...`);
-                      changed = true;
-                    }
-                  }
-                  // Only return new object if changed
-                  return changed
-                    ? {
-                        ...msg,
-                        content: newContent,
-                        tool_calls: newToolCalls,
-                        isStreaming: true,
-                      }
-                    : msg;
-                }
-                return msg;
               });
-              // If the message was found and potentially updated, return the new array
-              if (messageFoundAndUpdate) return updatedMessages;
-            }
+              throttledUpdate();
+              break;
+            case "tool-call":
+              // Collect tool calls as they appear in the stream
+              finalToolCalls.push(part);
+              toast.info(`Calling tool: ${part.toolName}...`);
+              break;
+            // --- REMOVED 'tool-result' case ---
+            case "error":
+              streamError =
+                part.error instanceof Error
+                  ? part.error
+                  : new Error(String(part.error));
+              setError(
+                `Streaming error: ${streamError ? streamError.message : "Unknown error"}`,
+              );
+              toast.error(
+                `Streaming error: ${streamError ? streamError.message : "Unknown error"}`,
+              );
+              break;
+            case "finish": // Handle finish event if provided by SDK stream part
+              finalUsage = part.usage;
+              finalFinishReason = part.finishReason;
+              break;
+            // Other cases like 'step-start', 'step-finish' can be handled if needed
+          }
+        } // End of for await loop
 
-            // Handle Tool Result (Always creates a new message)
-            if (part.type === "tool-result") {
-              const toolResultContentPart: LocalToolResultPart = {
+        // --- Process Tool Results AFTER the stream loop ---
+        if (!streamError && hasTools) {
+          // Await the results promise
+          const toolResults: ToolResultPart[] = await result.toolResults;
+          if (toolResults && toolResults.length > 0) {
+            const toolResultMessages: Message[] = [];
+            const toolResultDbMessages: DbMessage[] = [];
+            const now = new Date();
+
+            // Explicitly type toolResult here
+            toolResults.forEach((toolResult: ToolResultPart) => {
+              const toolResultContentPart: LocalToolResultPartType = {
                 type: "tool-result",
-                toolCallId: part.toolCallId,
-                toolName: part.toolName,
-                result: part.result,
-                isError: (part as any).isError ?? false,
+                toolCallId: toolResult.toolCallId, // No TS error
+                toolName: toolResult.toolName, // No TS error
+                result: toolResult.result, // No TS error
+                isError: false, // Assuming success if no error thrown by SDK
               };
               const toolResultMessage: Message = {
                 id: nanoid(),
                 role: "tool",
                 content: [toolResultContentPart],
-                tool_call_id: part.toolCallId,
-                createdAt: new Date(),
+                tool_call_id: toolResult.toolCallId, // No TS error
+                createdAt: now,
                 conversationId: conversationIdToUse,
+                providerId: selectedProvider?.id,
+                modelId: selectedModel?.id,
+                isStreaming: false,
+                error: null,
               };
+              toolResultMessages.push(toolResultMessage);
+              toolResultDbMessages.push({
+                id: toolResultMessage.id,
+                conversationId: conversationIdToUse,
+                role: "tool",
+                content: toolResultMessage.content as MessageContent,
+                createdAt: toolResultMessage.createdAt ?? new Date(),
+                tool_call_id: toolResultMessage.tool_call_id,
+              });
+            });
+
+            // Update UI with all tool results at once
+            setLocalMessages((prev) => [...prev, ...toolResultMessages]);
+
+            // Save tool results to DB
+            try {
+              await bulkAddMessages(toolResultDbMessages);
               console.log(
-                `[tool-result] ADDED tool result message for ${part.toolName} (${part.toolCallId})`,
+                "Saved tool result messages to DB:",
+                toolResultDbMessages.map((m) => m.id),
               );
-              return [...prevMessages, toolResultMessage];
-            }
-
-            // Handle Error
-            if (part.type === "error") {
-              const errorMsg =
-                part.error instanceof Error
-                  ? part.error.message
-                  : String(part.error);
-              setError(`Streaming error: ${errorMsg}`);
-              toast.error(`Streaming error: ${errorMsg}`);
-              if (currentStreamingId) {
-                console.log(
-                  `[error] Marking message ${currentStreamingId} with error: ${errorMsg}`,
-                );
-                return prevMessages.map((msg) =>
-                  msg.id === currentStreamingId
-                    ? {
-                        ...msg,
-                        error: `Streaming error: ${errorMsg}`,
-                        isStreaming: false,
-                      }
+            } catch (dbErr) {
+              console.error("Failed to save tool result messages:", dbErr);
+              toast.error("Failed to save tool results.");
+              // Optionally update UI messages with error
+              const errorMsg = `DB save failed: ${dbErr instanceof Error ? dbErr.message : "Unknown"}`;
+              setLocalMessages((prev) =>
+                prev.map((msg) =>
+                  toolResultMessages.find((trm) => trm.id === msg.id)
+                    ? { ...msg, error: errorMsg }
                     : msg,
-                );
-              }
-              return prevMessages;
+                ),
+              );
             }
-
-            // Ignore other part types for UI updates
-            return prevMessages;
-          }); // End of setLocalMessages functional update
-        } // End of for await loop
-
-        console.log("Finished iterating stream parts.");
-      } catch (err: unknown) {
-        // --- Catch block ---
-        if ((err as any)?.name === "AbortError") console.log("Stream aborted.");
-        else {
-          console.error("Error during streamText processing:", err);
-          const error = err instanceof Error ? err : new Error(String(err));
-          if (!error.message.startsWith("Streaming error:")) {
-            setError(`Error: ${error.message}`);
-            toast.error(`Error: ${error.message}`);
           }
-          if (streamingMessageIdRef.current) {
-            const finalId = streamingMessageIdRef.current;
+        }
+
+        // Get final usage/reason if not already captured by 'finish' part
+        if (!finalUsage) finalUsage = await result.usage;
+        if (!finalFinishReason) finalFinishReason = await result.finishReason;
+      } catch (err: unknown) {
+        // Handle errors from streamText or result promises
+        if ((err as any)?.name === "AbortError") {
+          streamError = new Error("Stream aborted by user.");
+          console.log("Stream aborted.");
+        } else {
+          streamError = err instanceof Error ? err : new Error(String(err));
+          console.error("Error during streamText processing:", streamError);
+          if (
+            streamError &&
+            !streamError.message.startsWith("Streaming error:")
+          ) {
+            setError(`Error: ${streamError.message}`);
+            toast.error(`Error: ${streamError.message}`);
+          }
+        }
+      } finally {
+        console.log("Stream finally block executing.");
+        if (abortControllerRef.current === currentAbortController) {
+          abortControllerRef.current = null;
+        }
+        setIsAiStreaming(false);
+
+        // Finalize the UI state for the streaming message
+        finalizeStreamedMessageUI(
+          assistantMessageId, // Use the ID stored at the start
+          contentRef.current, // Use accumulated content
+          streamError,
+          finalUsage,
+          startTime,
+          setLocalMessages,
+        );
+
+        // Construct the final message object for DB saving *directly*
+        // using the known ID and accumulated content.
+        const placeholderData = placeholderRef.current;
+        if (placeholderData && !streamError) {
+          console.log(
+            `Attempting to save final message with ID: ${placeholderData.id}`,
+          );
+
+          let finalDbContent: MessageContent;
+          if (finalToolCalls.length > 0) {
+            const parts: Array<TextPart | LocalToolCallPartType> = [];
+            if (contentRef.current) {
+              parts.push({ type: "text", text: contentRef.current });
+            }
+            finalToolCalls.forEach((tc) => {
+              parts.push({
+                type: "tool-call",
+                toolCallId: tc.toolCallId,
+                toolName: tc.toolName,
+                args: tc.args,
+              });
+            });
+            finalDbContent = parts.length > 0 ? parts : "";
+          } else {
+            finalDbContent = contentRef.current;
+          }
+
+          const dbMessageToSave: DbMessage = {
+            id: placeholderData.id,
+            conversationId: placeholderData.conversationId,
+            role: "assistant",
+            content: finalDbContent,
+            createdAt: placeholderData.timestamp, // Use original timestamp
+            tool_calls:
+              finalToolCalls.length > 0
+                ? finalToolCalls.map((tc) => ({
+                    id: tc.toolCallId,
+                    type: "function",
+                    function: {
+                      name: tc.toolName,
+                      arguments: JSON.stringify(tc.args),
+                    },
+                  }))
+                : undefined,
+            tokensInput: finalUsage?.promptTokens,
+            tokensOutput: finalUsage?.completionTokens,
+          };
+
+          try {
+            await addDbMessage(dbMessageToSave);
             console.log(
-              `[catch] Marking message ${finalId} with error: ${error.message}`,
+              "Saved final assistant message to DB:",
+              placeholderData.id,
             );
+          } catch (dbErr: unknown) {
+            const dbErrorMessage = `Save failed: ${dbErr instanceof Error ? dbErr.message : "Unknown DB error"}`;
+            console.error("Failed to save final assistant message:", dbErr);
+            setError(`Error saving response: ${dbErrorMessage}`);
+            toast.error(`Failed to save response: ${dbErrorMessage}`);
+            // Update the UI message with the DB error (still needed)
             setLocalMessages((prev) =>
               prev.map((msg) =>
-                msg.id === finalId
-                  ? { ...msg, error: error.message, isStreaming: false }
+                msg.id === placeholderData.id
+                  ? { ...msg, error: dbErrorMessage }
                   : msg,
               ),
             );
           }
-        }
-      } finally {
-        // --- Finally block ---
-        console.log("Stream finally block executing.");
-        if (abortControllerRef.current === currentAbortController)
-          abortControllerRef.current = null;
-        setIsAiStreaming(false);
-
-        // Final check to ensure the streaming message's flag is false
-        if (streamingMessageIdRef.current) {
-          const finalId = streamingMessageIdRef.current;
+        } else if (streamError) {
           console.log(
-            `[finally] Setting message ${finalId} isStreaming to false`,
+            `Skipping DB save for assistant message (ID: ${placeholderData?.id || "unknown"}) due to stream error:`,
+            streamError.message,
           );
-          setLocalMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === finalId && msg.isStreaming
-                ? { ...msg, isStreaming: false }
-                : msg,
-            ),
+        } else {
+          // This case means placeholderRef.current was null, which shouldn't happen
+          console.error(
+            // @ts-expect-error If*ing do not care if streamError is Never XD
+            `[Finally Block] Critical error: Placeholder data ref was null. Cannot save message. Stream Error: ${streamError?.message || "None"}`,
           );
+          setError("Internal error: Failed to finalize message for saving.");
+          toast.error("Internal error: Failed to finalize message for saving.");
         }
-        streamingMessageIdRef.current = null; // Clear ref
-      }
+        placeholderRef.current = null; // Clear the ref after use
+      } // End finally
     },
     [
       selectedModel,
@@ -787,166 +416,28 @@ export function useAiInteraction({
       setError,
       abortControllerRef,
       sdkTools,
-      bulkAddMessages,
-      getContextSnapshotForMod,
-      mapToCoreMessages,
+      bulkAddMessages, // Keep for saving tool results
+      addDbMessage, // Use for saving final assistant message
+      streamingThrottleRate,
     ],
   );
 
-  // --- performImageGeneration (remains the same) ---
-  const performImageGeneration = useCallback(
-    async ({
-      conversationIdToUse,
-      prompt,
-      n = 1,
-      size = "1024x1024",
-      aspectRatio,
-    }: PerformImageGenerationParams): Promise<PerformImageGenerationResult> => {
-      const apiKey = getApiKeyForProvider();
-      const validationError = validateAiParameters(
-        conversationIdToUse,
+  // Image generation remains the same
+  const performImageGenerationCallback = useCallback(
+    async (
+      params: PerformImageGenerationParams,
+    ): Promise<PerformImageGenerationResult> => {
+      return performImageGeneration({
+        ...params,
         selectedModel,
         selectedProvider,
-        apiKey,
+        getApiKeyForProvider,
+        setLocalMessages,
+        setIsAiStreaming,
         setError,
-        true,
-      );
-      if (validationError) return { error: validationError.message };
-      if (!selectedModel?.instance || !selectedModel?.supportsImageGeneration) {
-        const errorMsg = "Selected model does not support image generation.";
-        setError(errorMsg);
-        toast.error(errorMsg);
-        return { error: errorMsg };
-      }
-
-      setIsAiStreaming(true);
-      setError(null);
-      const currentAbortController = new AbortController();
-      abortControllerRef.current = currentAbortController;
-      const placeholderId = nanoid();
-      const placeholderTimestamp = new Date();
-      const placeholderMessage: Message = {
-        id: placeholderId,
-        conversationId: conversationIdToUse,
-        role: "assistant",
-        content: `Generating image with prompt: "${prompt}"...`,
-        isStreaming: true,
-        createdAt: placeholderTimestamp,
-        providerId: selectedProvider!.id,
-        modelId: selectedModel!.id,
-      };
-      setLocalMessages((prev) => [...prev, placeholderMessage]);
-
-      try {
-        const { images, warnings } = await generateImage({
-          model: selectedModel.instance,
-          prompt: prompt,
-          n: n,
-          size: size as `${number}x${number}`,
-          aspectRatio: aspectRatio as `${number}:${number}`,
-          headers: getStreamHeaders(selectedProvider!.type, apiKey),
-          abortSignal: currentAbortController.signal,
-        });
-
-        if (warnings && warnings.length > 0)
-          warnings.forEach((warning: ImageModelCallWarning) =>
-            toast.warning(
-              `Image generation warning: ${JSON.stringify(warning)}`,
-            ),
-          );
-
-        const imageParts: LocalImagePart[] = images.map((img) => ({
-          type: "image",
-          image: `data:${img.mimeType ?? "image/png"};base64,${img.base64}`,
-          mediaType: img.mimeType ?? "image/png",
-        }));
-        const finalImageMessageData = {
-          id: placeholderId,
-          role: "assistant" as Role,
-          content: imageParts as MessageContent,
-          createdAt: placeholderTimestamp,
-          conversationId: conversationIdToUse,
-          providerId: selectedProvider!.id,
-          modelId: selectedModel!.id,
-        };
-
-        setLocalMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === placeholderId
-              ? { ...finalImageMessageData, isStreaming: false, error: null }
-              : msg,
-          ),
-        );
-
-        try {
-          await addDbMessage(finalImageMessageData);
-          console.log("Saved image generation message to DB:", placeholderId);
-          modEvents.emit(ModEvent.RESPONSE_DONE, {
-            message: { ...finalImageMessageData, isStreaming: false },
-          });
-        } catch (dbErr: unknown) {
-          const dbErrorMessage = `Save failed: ${dbErr instanceof Error ? dbErr.message : "Unknown DB error"}`;
-          console.error("Failed to save image generation message:", dbErr);
-          setError(`Error saving image: ${dbErrorMessage}`);
-          toast.error(`Failed to save image: ${dbErrorMessage}`);
-          setLocalMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === placeholderId
-                ? { ...msg, error: dbErrorMessage, isStreaming: false }
-                : msg,
-            ),
-          );
-          return { error: dbErrorMessage, warnings };
-        }
-        return { images: imageParts, warnings };
-      } catch (err: unknown) {
-        if ((err as any)?.name === "AbortError") {
-          console.log("Image generation aborted.");
-          toast.info("Image generation stopped.");
-          setLocalMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === placeholderId
-                ? {
-                    ...msg,
-                    content: "Image generation cancelled.",
-                    isStreaming: false,
-                    error: "Cancelled by user.",
-                  }
-                : msg,
-            ),
-          );
-          return { error: "Cancelled by user." };
-        } else {
-          const error = err instanceof Error ? err : new Error(String(err));
-          const errorMessage = `Image generation failed: ${error.message}`;
-          setError(errorMessage);
-          toast.error(errorMessage);
-          setLocalMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === placeholderId
-                ? {
-                    ...msg,
-                    error: errorMessage,
-                    isStreaming: false,
-                    content: "",
-                  }
-                : msg,
-            ),
-          );
-          return { error: errorMessage };
-        }
-      } finally {
-        if (abortControllerRef.current === currentAbortController)
-          abortControllerRef.current = null;
-        setIsAiStreaming(false);
-        setLocalMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === placeholderId && msg.isStreaming
-              ? { ...msg, isStreaming: false }
-              : msg,
-          ),
-        );
-      }
+        addDbMessage,
+        abortControllerRef,
+      });
     },
     [
       selectedModel,
@@ -960,5 +451,8 @@ export function useAiInteraction({
     ],
   );
 
-  return { performAiStream, performImageGeneration };
+  return {
+    performAiStream,
+    performImageGeneration: performImageGenerationCallback,
+  };
 }

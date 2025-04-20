@@ -2,7 +2,6 @@
 import React from "react";
 import type { DbMod, ModInstance } from "@/mods/types";
 // Import the global fs object to use its type
-// Removed unused FileSystem import
 import { fs } from "@zenfs/core";
 import type { CoreMessage as AiCoreMessage } from "ai"; // Use alias to avoid naming conflict
 
@@ -96,6 +95,9 @@ export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {
   }>;
   /** Present on tool messages to link them to the corresponding tool call */
   tool_call_id?: string; // Matches toolCallId in ToolResultPart
+  // Add optional token fields
+  tokensInput?: number;
+  tokensOutput?: number;
 }
 
 export interface DbApiKey extends Pick<DbBase, "id" | "createdAt"> {
@@ -128,7 +130,7 @@ export interface DbProviderConfig extends DbBase {
 export interface Message {
   id: string; // Make ID mandatory for UI state consistency
   role: Role; // Updated Role type
-  /** Updated content type - can be string or array of parts */
+  // Use the MessageContent type directly
   content: MessageContent;
   conversationId?: string;
   createdAt?: Date;
@@ -137,8 +139,8 @@ export interface Message {
   streamedContent?: string;
   error?: string | null;
   vfsContextPaths?: string[];
-  providerId?: string;
-  modelId?: string;
+  providerId?: string | null;
+  modelId?: string | null;
   tokensInput?: number;
   tokensOutput?: number;
   tokensPerSecond?: number;

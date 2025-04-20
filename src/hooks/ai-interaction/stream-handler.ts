@@ -1,9 +1,9 @@
 // src/hooks/ai-interaction/stream-handler.ts
 import { nanoid } from "nanoid";
-import { streamText, type CoreMessage } from "ai";
 import { Message } from "@/lib/types";
 import { throttle } from "@/lib/throttle";
 import { modEvents, ModEvent } from "@/mods/events";
+// Removed unused CoreMessage import
 
 /**
  * Creates an assistant message placeholder for streaming
@@ -19,10 +19,10 @@ export function createAssistantPlaceholder(
     id: assistantMessageId,
     conversationId: conversationId,
     role: "assistant",
-    content: "",
+    content: "", // Keep final content empty initially
     createdAt: assistantPlaceholderTimestamp,
     isStreaming: true,
-    streamedContent: "", // Start empty
+    streamedContent: "", // Initialize streamed content
     error: null,
     providerId: providerId,
     modelId: modelId,
@@ -60,6 +60,7 @@ export function createStreamUpdater(
       }
       // Create a new array with the updated message
       const updatedMessages = [...prevMessages];
+      // Update ONLY streamedContent
       updatedMessages[targetMessageIndex] = {
         ...prevMessages[targetMessageIndex],
         streamedContent: currentAccumulatedContent,
@@ -98,24 +99,25 @@ export function getStreamHeaders(
 }
 
 /**
- * Updates the message list with the final message content after streaming
+ * Updates the UI state for the message that was streaming, marking it as finished.
+ * It finds the message by ID and updates its properties.
  */
-export function finalizeStreamedMessage(
+export function finalizeStreamedMessageUI(
   messageId: string,
   finalContent: string,
   streamError: Error | null,
-  messagesToSend: CoreMessage[],
+  usage: { promptTokens: number; completionTokens: number } | undefined,
   startTime: number,
   setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>,
-): Message | null {
-  let finalMessageObject: Message | null = null;
+): void {
+  const endTime = Date.now();
 
-  // Use functional update for setLocalMessages
   setLocalMessages((prevMessages) => {
     const messageIndex = prevMessages.findIndex((msg) => msg.id === messageId);
+
     if (messageIndex === -1) {
       console.warn(
-        `[finalizeStreamedMessage] Could not find message ${messageId} to finalize.`,
+        `[finalizeStreamedMessageUI] Could not find message ${messageId} in state to finalize UI.`,
       );
       return prevMessages; // Message not found, return previous state
     }
@@ -123,71 +125,35 @@ export function finalizeStreamedMessage(
     const updatedMessages = [...prevMessages];
     const originalMessage = updatedMessages[messageIndex];
 
-    finalMessageObject = {
+    // Calculate tokens per second, avoid division by zero
+    const durationSeconds = (endTime - startTime) / 1000;
+    const tokensPerSecond =
+      streamError || durationSeconds <= 0 || !usage?.completionTokens
+        ? undefined
+        : usage.completionTokens / durationSeconds;
+
+    // Construct the final message object for UI update
+    const finalMessageObject: Message = {
       ...originalMessage,
-      content: finalContent,
+      content: finalContent, // Set the final content
       isStreaming: false,
-      streamedContent: undefined,
+      streamedContent: undefined, // Clear streamed content
       error: streamError ? streamError.message : null,
-      // providerId and modelId already set in placeholder
-      tokensInput: messagesToSend.reduce(
-        (sum, m) => sum + (m.content.length || 0),
-        0,
-      ),
-      tokensOutput: finalContent.length,
-      tokensPerSecond:
-        streamError || !startTime
-          ? undefined
-          : finalContent.length / ((Date.now() - startTime) / 1000 || 1),
+      tokensInput: usage?.promptTokens,
+      tokensOutput: usage?.completionTokens,
+      tokensPerSecond: tokensPerSecond,
     };
+
     updatedMessages[messageIndex] = finalMessageObject;
+    console.log(
+      `[finalizeStreamedMessageUI] Successfully finalized UI for message ${messageId}.`,
+    );
+
+    // Emit event only if the message was successfully finalized without error
+    if (!streamError) {
+      modEvents.emit(ModEvent.RESPONSE_DONE, { message: finalMessageObject });
+    }
+
     return updatedMessages;
   });
-
-  return finalMessageObject;
-}
-
-/**
- * Executes the AI stream and processes the response
- */
-export async function executeAiStream(
-  messagesToSend: CoreMessage[],
-  abortSignal: AbortSignal,
-  temperature: number,
-  maxTokens: number | null,
-  topP: number | null,
-  topK: number | null,
-  presencePenalty: number | null,
-  frequencyPenalty: number | null,
-  modelInstance: any,
-  headers: Record<string, string> | undefined,
-  conversationId: string,
-  contentRef: { current: string },
-  throttledUpdate: () => void,
-): Promise<void> {
-  modEvents.emit(ModEvent.RESPONSE_START, {
-    conversationId: conversationId,
-  });
-
-  const result = streamText({
-    model: modelInstance,
-    messages: messagesToSend,
-    abortSignal: abortSignal,
-    temperature: temperature,
-    maxTokens: maxTokens ?? undefined,
-    topP: topP ?? undefined,
-    topK: topK ?? undefined,
-    presencePenalty: presencePenalty ?? undefined,
-    frequencyPenalty: frequencyPenalty ?? undefined,
-    headers: headers,
-  });
-
-  for await (const delta of result.textStream) {
-    contentRef.current += delta;
-    modEvents.emit(ModEvent.RESPONSE_CHUNK, {
-      chunk: delta,
-      conversationId: conversationId,
-    });
-    throttledUpdate();
-  }
 }
