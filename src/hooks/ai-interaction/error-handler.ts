@@ -1,74 +1,82 @@
 // src/hooks/ai-interaction/error-handler.ts
 import { toast } from "sonner";
+import type { AiModelConfig, AiProviderConfig } from "@/lib/types";
 
 /**
- * Handles AI interaction errors and updates state accordingly
+ * Validates essential parameters before making an AI call.
  */
-export function handleStreamError(
-  err: unknown,
-  setErrorFn: (error: string | null) => void
-): [Error | null, string] {
-  let streamError: Error | null = null;
-  let finalContent = "";
-
-  if (err instanceof Error) {
-    streamError = err;
-    if (err.name === "AbortError") {
-      streamError = null; // Not a real error for the user
-    } else {
-      console.error(`streamText error:`, err);
-      finalContent = `Error: ${err.message || "Failed to get response"}`;
-      setErrorFn(`AI Error: ${finalContent}`);
-      toast.error(`AI Error: ${err.message || "Unknown error"}`);
-    }
-  } else {
-    console.error("Unknown stream error:", err);
-    streamError = new Error("Unknown streaming error");
-    finalContent = `Error: ${streamError.message}`;
-    setErrorFn(`AI Error: ${finalContent}`);
-    toast.error(`AI Error: Unknown error`);
+export function validateAiParameters(
+  conversationId: string | null,
+  model: AiModelConfig | undefined,
+  provider: AiProviderConfig | undefined,
+  apiKey: string | undefined,
+  setError: (error: string | null) => void,
+  isImageGeneration: boolean = false, // Add flag for image generation check
+): Error | null {
+  if (!conversationId) {
+    const msg = "No active conversation selected.";
+    setError(msg);
+    toast.error(msg);
+    return new Error(msg);
+  }
+  if (!provider) {
+    const msg = "No AI provider selected.";
+    setError(msg);
+    toast.error(msg);
+    return new Error(msg);
+  }
+  if (!model) {
+    const msg = "No AI model selected.";
+    setError(msg);
+    toast.error(msg);
+    return new Error(msg);
+  }
+  // Check API key requirement based on provider type
+  const requiresApiKey = !["ollama"].includes(provider.type); // Ollama typically doesn't need a key via API
+  if (requiresApiKey && !apiKey) {
+    const msg = `API key required for ${provider.name} but not found. Please add it in Settings > Providers.`;
+    setError(msg);
+    toast.error(msg);
+    return new Error(msg);
   }
 
-  return [streamError, finalContent];
+  // Specific check for image generation support
+  if (isImageGeneration && !model.supportsImageGeneration) {
+    const msg = `Model '${model.name}' does not support image generation.`;
+    setError(msg);
+    toast.error(msg);
+    return new Error(msg);
+  }
+
+  return null; // No error
 }
 
 /**
- * Validates the required parameters for AI interaction
+ * Handles errors during the AI stream execution.
+ * Returns the error object and potentially partial content.
  */
-export function validateAiParameters(
-  conversationId: string,
-  selectedModel: any,
-  selectedProvider: any,
-  apiKey: string | undefined,
-  setErrorFn: (error: string | null) => void
-): Error | null {
-  if (!conversationId) {
-    const err = new Error(
-      "Internal Error: No active conversation ID provided."
-    );
-    setErrorFn(err.message);
-    return err;
-  }
-  
-  if (!selectedModel || !selectedProvider) {
-    const err = new Error("AI provider or model not selected.");
-    setErrorFn(err.message);
-    return err;
-  }
+export function handleStreamError(
+  err: unknown,
+  setError: (error: string | null) => void,
+): [Error, string] {
+  let error: Error;
+  const finalContent = ""; // Usually empty on error, but could capture partial
 
-  // Determine if a key is *needed* based on type
-  const needsKey = ["openai", "google", "openrouter"].includes(
-    selectedProvider.type
-  );
-
-  if (needsKey && !apiKey) {
-    const err = new Error(
-      `API Key for ${selectedProvider.name} is not available or configured.`
-    );
-    setErrorFn(err.message);
-    toast.error(err.message);
-    return err;
+  if (err instanceof Error && err.name === "AbortError") {
+    error = new Error("Stream aborted by user.");
+    // Optionally capture partial content if available before abort
+    // finalContent = contentRef.current;
+    toast.info("Stream stopped.");
+  } else if (err instanceof Error) {
+    error = err;
+    const errorMsg = `Streaming Error: ${error.message}`;
+    setError(errorMsg);
+    toast.error(errorMsg);
+  } else {
+    error = new Error("An unknown streaming error occurred.");
+    setError(error.message);
+    toast.error(error.message);
   }
-
-  return null;
+  console.error("Stream Error Details:", error);
+  return [error, finalContent];
 }

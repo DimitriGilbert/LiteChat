@@ -12,7 +12,6 @@ import { modEvents, ModEvent } from "@/mods/events";
 import { type ReadonlyChatContextSnapshot } from "@/mods/api";
 import { ChatContext } from "@/hooks/use-chat-context";
 import { useCoreChatContext } from "@/context/core-chat-context";
-import { useAiInteraction } from "@/hooks/ai-interaction";
 import { useMessageHandling } from "@/hooks/use-message-handling";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useProviderManagementContext } from "./provider-management-context";
@@ -45,9 +44,9 @@ interface StableReferences {
     selectedItemType: SidebarItemType | null;
   };
   settings: {
-    activeSystemPrompt: string;
+    activeSystemPrompt: string | null; // Allow null
     temperature: number;
-    maxTokens: number;
+    maxTokens: number | null; // Allow null
     theme: Theme;
   };
   vfs: {
@@ -95,9 +94,9 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
       selectedItemType: null,
     },
     settings: {
-      activeSystemPrompt: "",
+      activeSystemPrompt: null,
       temperature: 0,
-      maxTokens: 0,
+      maxTokens: null,
       theme: "system", // default to system theme
     },
     vfs: {
@@ -121,9 +120,9 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
 
   useEffect(() => {
     stableReferences.current.settings.activeSystemPrompt =
-      settings.activeSystemPrompt || "";
-    stableReferences.current.settings.temperature = settings.temperature || 0;
-    stableReferences.current.settings.maxTokens = settings.maxTokens || 0;
+      settings.activeSystemPrompt;
+    stableReferences.current.settings.temperature = settings.temperature;
+    stableReferences.current.settings.maxTokens = settings.maxTokens;
     stableReferences.current.settings.theme = settings.theme;
   }, [
     settings.activeSystemPrompt,
@@ -141,46 +140,33 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
     return providerMgmt.getApiKeyForProvider(providerMgmt.selectedProviderId);
   }, [providerMgmt]);
 
-  const aiInteraction = useAiInteraction({
+  // Pass necessary props to useMessageHandling
+  const messageHandling = useMessageHandling({
     selectedModel: providerMgmt.selectedModel,
     selectedProvider: providerMgmt.selectedProvider,
     getApiKeyForProvider: getApiKeyForSelectedProvider,
     streamingThrottleRate,
-    setLocalMessages: setMessages,
-    setIsAiStreaming: setIsStreaming,
-    setError,
-    addDbMessage: storage.addDbMessage,
-    abortControllerRef,
-  });
-
-  const messageHandling = useMessageHandling({
-    selectedConversationId: sidebar.activeConversationData?.id ?? null,
-    performAiStream: aiInteraction.performAiStream,
-    stopStreamingCallback: useCallback(() => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-      setIsStreaming(false);
-    }, [abortControllerRef, setIsStreaming]),
-    activeSystemPrompt: settings.activeSystemPrompt,
     temperature: settings.temperature,
     maxTokens: settings.maxTokens,
     topP: settings.topP,
     topK: settings.topK,
     presencePenalty: settings.presencePenalty,
     frequencyPenalty: settings.frequencyPenalty,
-    isAiStreaming: isStreaming,
-    setIsAiStreaming: setIsStreaming,
+    activeSystemPrompt: settings.activeSystemPrompt,
     localMessages: messages,
     setLocalMessages: setMessages,
     isLoadingMessages: isLoadingMessages,
     setIsLoadingMessages: setIsLoadingMessages,
+    isStreaming: isStreaming,
+    setIsStreaming: setIsStreaming,
     error: error,
     setError,
     addDbMessage: storage.addDbMessage,
     deleteDbMessage: storage.deleteDbMessage,
     getMessagesForConversation: storage.getMessagesForConversation,
+    getDbMessagesUpTo: storage.getDbMessagesUpTo,
+    abortControllerRef,
+    selectedConversationId: sidebar.activeConversationData?.id ?? null, // Add this line
   });
 
   const handleSubmit = useCallback(
@@ -224,8 +210,10 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
             // Middleware
             runMiddleware: middleware.runMiddleware,
 
-            // Message handling
+            // Message handling - Pass both core handlers
             handleSubmitCore: messageHandling.handleSubmitCore,
+            handleImageGenerationCore:
+              messageHandling.handleImageGenerationCore,
           },
         );
       } catch (error) {
@@ -236,10 +224,10 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
     },
     [
       isStreaming,
-      providerMgmt,
+      providerMgmt, // Includes selectedModel, selectedProvider, etc.
       getApiKeyForSelectedProvider,
       setError,
-      messageHandling,
+      messageHandling, // Includes both core handlers
       vfs,
       middleware,
       sidebar,
@@ -248,43 +236,24 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
 
   const regenerateMessage = useCallback(
     async (messageId: string) => {
-      if (
-        sidebar.selectedItemType !== "conversation" ||
-        !sidebar.selectedItemId
-      ) {
-        toast.error("Please select the conversation containing the message.");
-        return;
-      }
+      // selectedConversationId is implicitly handled inside messageHandling now
       if (isStreaming) {
         toast.info("Please wait for the current response to finish.");
         return;
       }
       await messageHandling.regenerateMessageCore(messageId);
     },
-    [
-      messageHandling,
-      sidebar.selectedItemType,
-      sidebar.selectedItemId,
-      isStreaming,
-    ],
+    [messageHandling, isStreaming], // Removed sidebar dependencies
   );
 
   const stopStreaming = useCallback(() => {
     messageHandling.stopStreamingCore();
-    toast.info("AI response stopped.");
+    // toast.info("AI response stopped."); // Toast moved inside stopStreamingCore
   }, [messageHandling]);
 
   const handleImportConversation = useCallback(
-    async (file: File) => {
-      let parentId: string | null = null;
-      if (sidebar.selectedItemType === "project" && sidebar.selectedItemId) {
-        parentId = sidebar.selectedItemId;
-      } else if (
-        sidebar.selectedItemType === "conversation" &&
-        sidebar.selectedItemId
-      ) {
-        parentId = sidebar.activeConversationData?.parentId ?? null;
-      }
+    async (file: File, parentId: string | null) => {
+      // Parent ID logic moved inside sidebar context's importConversation
       await sidebar.importConversation(file, parentId);
     },
     [sidebar],
@@ -332,7 +301,7 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
 
   useEffect(() => {
     // Skip if already initialized or if dependencies aren't ready
-    if (hasInitializedMods.current) return;
+    if (hasInitializedMods.current || !modCtx.dbMods) return;
     hasInitializedMods.current = true;
 
     const dbMods = modCtx.dbMods;
@@ -340,14 +309,6 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
     middleware.clearModReferences();
 
     if (dbMods.length > 0) {
-      // const registrationCallbacks = {
-      //   registerPromptAction: modCtx._registerModPromptAction,
-      //   registerMessageAction: modCtx._registerModMessageAction,
-      //   registerSettingsTab: modCtx._registerModSettingsTab,
-      //   registerEventListener: middleware.registerModEventListener,
-      //   registerMiddleware: middleware.registerModMiddleware,
-      // };
-
       middleware
         .loadModsWithContext(dbMods, getContextSnapshotForMod)
         .then((instances) => {
@@ -361,7 +322,7 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
       modEvents.emit(ModEvent.APP_LOADED);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array to run only once
+  }, [modCtx.dbMods]); // Depend on dbMods to re-run if mods change
 
   const combinedPromptActions = useMemo(
     () => [...userCustomPromptActions, ...modCtx.modPromptActions],
@@ -378,23 +339,29 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
 
   const fullContextValue: ChatContextProps = useMemo(
     () => ({
+      // Feature Flags
       enableApiKeyManagement: providerMgmt.enableApiKeyManagement,
       enableAdvancedSettings: settings.enableAdvancedSettings,
       enableSidebar: sidebar.enableSidebar,
       enableVfs: vfs.enableVfs,
+      // Provider/Model Selection
       activeProviders: providerMgmt.activeProviders,
       selectedProviderId: providerMgmt.selectedProviderId,
       setSelectedProviderId: providerMgmt.setSelectedProviderId,
       selectedModelId: providerMgmt.selectedModelId,
       setSelectedModelId: providerMgmt.setSelectedModelId,
       getApiKeyForProvider: getApiKeyForSelectedProvider,
+      selectedModel: providerMgmt.selectedModel, // Add selectedModel
+      // API Key Management
       apiKeys: providerMgmt.apiKeys,
       addApiKey: providerMgmt.addApiKey,
       deleteApiKey: providerMgmt.deleteApiKey,
+      // Provider Config Management
       dbProviderConfigs: providerMgmt.dbProviderConfigs,
       addDbProviderConfig: providerMgmt.addDbProviderConfig,
       updateDbProviderConfig: providerMgmt.updateDbProviderConfig,
       deleteDbProviderConfig: providerMgmt.deleteDbProviderConfig,
+      // Sidebar / Item Management
       sidebarItems: sidebar.sidebarItems,
       selectedItemId: sidebar.selectedItemId,
       selectedItemType: sidebar.selectedItemType,
@@ -404,19 +371,22 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
       deleteItem: sidebar.deleteItem,
       renameItem: sidebar.renameItem,
       updateConversationSystemPrompt: sidebar.updateConversationSystemPrompt,
+      // Messages & Streaming
       messages: messages,
       isLoading: isLoadingMessages,
       isStreaming: isStreaming,
       error: error,
       setError: setError,
+      // Interaction Handlers
       handleSubmit,
       stopStreaming,
       regenerateMessage,
-      // VFS
+      // VFS Selection State
       selectedVfsPaths: vfs.selectedVfsPaths,
       addSelectedVfsPath: vfs.addSelectedVfsPath,
       removeSelectedVfsPath: vfs.removeSelectedVfsPath,
       clearSelectedVfsPaths: vfs.clearSelectedVfsPaths,
+      // VFS Context
       isVfsEnabledForItem: vfs.isVfsEnabledForItem,
       toggleVfsEnabled: handleToggleVfs,
       vfs: vfs.vfs,
@@ -441,43 +411,108 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
       streamingThrottleRate,
       searchTerm: settings.searchTerm,
       setSearchTerm: settings.setSearchTerm,
-      // Data Management
+      // Import/Export & Data Management
       exportConversation: sidebar.exportConversation,
-      importConversation: handleImportConversation,
+      importConversation: handleImportConversation, // Use wrapped handler
       exportAllConversations: sidebar.exportAllConversations,
       clearAllData: storage.clearAllData,
+      // DB Accessors
       getConversation: storage.getConversation,
       getProject: storage.getProject,
+      // Extensibility
       customPromptActions: combinedPromptActions,
       customMessageActions: combinedMessageActions,
       customSettingsTabs: combinedSettingsTabs,
+      // Mod System
       dbMods: modCtx.dbMods,
       loadedMods: modCtx.loadedMods,
       addDbMod: modCtx.addDbMod,
       updateDbMod: modCtx.updateDbMod,
       deleteDbMod: modCtx.deleteDbMod,
+      // Settings Modal Control
       isSettingsModalOpen: settings.isSettingsModalOpen,
       onSettingsModalOpenChange: settings.onSettingsModalOpenChange,
     }),
-    // Only depend on specific props to avoid infinite re-renders
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Carefully selected dependencies
     [
+      providerMgmt.enableApiKeyManagement,
+      settings.enableAdvancedSettings,
+      sidebar.enableSidebar,
+      vfs.enableVfs,
+      providerMgmt.activeProviders,
+      providerMgmt.selectedProviderId,
+      providerMgmt.setSelectedProviderId,
+      providerMgmt.selectedModelId,
+      providerMgmt.setSelectedModelId,
+      getApiKeyForSelectedProvider,
+      providerMgmt.selectedModel, // Add dependency
+      providerMgmt.apiKeys,
+      providerMgmt.addApiKey,
+      providerMgmt.deleteApiKey,
+      providerMgmt.dbProviderConfigs,
+      providerMgmt.addDbProviderConfig,
+      providerMgmt.updateDbProviderConfig,
+      providerMgmt.deleteDbProviderConfig,
+      sidebar.sidebarItems,
+      sidebar.selectedItemId,
+      sidebar.selectedItemType,
+      sidebar.selectItem,
+      sidebar.createConversation,
+      sidebar.createProject,
+      sidebar.deleteItem,
+      sidebar.renameItem,
+      sidebar.updateConversationSystemPrompt,
       messages,
       isLoadingMessages,
       isStreaming,
       error,
+      setError,
       handleSubmit,
       stopStreaming,
       regenerateMessage,
-      handleImportConversation,
+      vfs.selectedVfsPaths,
+      vfs.addSelectedVfsPath,
+      vfs.removeSelectedVfsPath,
+      vfs.clearSelectedVfsPaths,
+      vfs.isVfsEnabledForItem,
       handleToggleVfs,
+      vfs.vfs,
+      settings.temperature,
+      settings.setTemperature,
+      settings.maxTokens,
+      settings.setMaxTokens,
+      settings.globalSystemPrompt,
+      settings.setGlobalSystemPrompt,
+      settings.activeSystemPrompt,
+      settings.topP,
+      settings.setTopP,
+      settings.topK,
+      settings.setTopK,
+      settings.presencePenalty,
+      settings.setPresencePenalty,
+      settings.frequencyPenalty,
+      settings.setFrequencyPenalty,
+      settings.theme,
+      settings.setTheme,
+      streamingThrottleRate,
+      settings.searchTerm,
+      settings.setSearchTerm,
+      sidebar.exportConversation,
+      handleImportConversation, // Use wrapped handler
+      sidebar.exportAllConversations,
+      storage.clearAllData,
+      storage.getConversation,
+      storage.getProject,
       combinedPromptActions,
       combinedMessageActions,
       combinedSettingsTabs,
-      streamingThrottleRate,
-      getApiKeyForSelectedProvider,
-      // Don't include all provider, sidebar, settings, and storage properties
-      // Instead, use them only where they directly affect these callbacks
+      modCtx.dbMods,
+      modCtx.loadedMods,
+      modCtx.addDbMod,
+      modCtx.updateDbMod,
+      modCtx.deleteDbMod,
+      settings.isSettingsModalOpen,
+      settings.onSettingsModalOpenChange,
     ],
   );
 

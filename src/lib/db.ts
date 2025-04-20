@@ -6,14 +6,13 @@ import type {
   DbApiKey,
   DbProject,
   DbProviderConfig,
-  // Removed unused MessageContent import
 } from "./types";
 import type { DbMod } from "@/mods/types";
 
 export class ChatDatabase extends Dexie {
   projects!: Table<DbProject, string>;
-  // Specify DbMessage with its potentially complex 'content' type
   conversations!: Table<DbConversation, string>;
+  // Specify DbMessage with its potentially complex 'content' type
   messages!: Table<DbMessage, string>;
   apiKeys!: Table<DbApiKey, string>;
   mods!: Table<DbMod, string>;
@@ -22,18 +21,19 @@ export class ChatDatabase extends Dexie {
   constructor() {
     super("LiteChatDatabase");
     // Version 7: Added providerConfigs fields
-    // Version 8: No schema changes needed for MessageContent, as 'content' wasn't indexed.
-    //            If we needed to index parts of 'content', a new version would be required.
-    //            Keeping version 7 as the latest for now.
+    // Version 8: No schema changes needed for MessageContent or optional 'type' field,
+    //            as 'content' and 'type' weren't indexed.
+    //            Keeping version 7 as the latest.
     this.version(7).stores({
       providerConfigs:
         "++id, &name, type, apiKeyId, isEnabled, autoFetchModels, modelsLastFetchedAt, createdAt, updatedAt",
       mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
       projects: "++id, name, parentId, createdAt, updatedAt",
       conversations: "id, parentId, createdAt, updatedAt",
-      // 'content' is not indexed, so storing MessageContent (string | object[]) is fine.
-      // Indexing 'vfsContextPaths' which is string[] might require 'multiEntry' index if needed: *vfsContextPaths
-      messages: "id, conversationId, createdAt, vfsContextPaths",
+      // 'content' is not indexed, storing MessageContent (string | object[]) is fine.
+      // 'type' is not indexed.
+      // Indexing 'vfsContextPaths' (string[]) uses default indexing.
+      messages: "id, conversationId, createdAt, vfsContextPaths", // No change needed here
       apiKeys: "id, name, providerId, createdAt",
     });
 

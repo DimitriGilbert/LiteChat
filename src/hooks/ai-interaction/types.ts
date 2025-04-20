@@ -7,6 +7,7 @@ import {
   Message,
   DbMessage,
   CoreMessage, // Use the type defined in src/lib/types.ts
+  ImagePart, // Import ImagePart for return type
 } from "@/lib/types";
 
 // --- Interface Definitions ---
@@ -40,6 +41,27 @@ export interface PerformAiStreamParams {
   systemPromptToUse: string | null;
 }
 
+// New interface for image generation parameters
+export interface PerformImageGenerationParams {
+  conversationIdToUse: string;
+  prompt: string;
+  // Add other potential options like n, size, aspectRatio etc. if needed
+  n?: number;
+  size?: string;
+  aspectRatio?: string;
+}
+
+// New interface for image generation return value
+export interface PerformImageGenerationResult {
+  images?: ImagePart[]; // Return an array of ImagePart containing base64 data
+  error?: string;
+  warnings?: any[]; // Include warnings if provided by the SDK
+}
+
 export interface UseAiInteractionReturn {
   performAiStream: (params: PerformAiStreamParams) => Promise<void>;
+  // Add the new image generation function
+  performImageGeneration: (
+    params: PerformImageGenerationParams,
+  ) => Promise<PerformImageGenerationResult>;
 }

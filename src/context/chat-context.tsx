@@ -14,18 +14,19 @@ import type {
   ConversationSidebarItem,
 } from "@/lib/types";
 import { modEvents, ModEvent } from "@/mods/events";
-// Import ChatContext is in the ChatProviderInner component, not needed here
 import { CoreChatContext } from "@/context/core-chat-context";
 import { useChatStorage } from "@/hooks/use-chat-storage";
-import {
-  ProviderManagementProvider,
-} from "./provider-management-context";
+import { ProviderManagementProvider } from "./provider-management-context";
 import { SidebarProvider } from "./sidebar-context";
 import { SettingsProvider } from "./settings-context";
 import { VfsProvider } from "./vfs-context";
 import { ModProvider } from "./mod-context";
 import ChatProviderInner from "./chat-provider-inner";
-import { EMPTY_CUSTOM_SETTINGS_TABS, EMPTY_CUSTOM_PROMPT_ACTIONS, EMPTY_CUSTOM_MESSAGE_ACTIONS } from "@/utils/chat-utils";
+import {
+  EMPTY_CUSTOM_SETTINGS_TABS,
+  EMPTY_CUSTOM_PROMPT_ACTIONS,
+  EMPTY_CUSTOM_MESSAGE_ACTIONS,
+} from "@/utils/chat-utils";
 
 interface ChatProviderProps {
   children: React.ReactNode;
@@ -85,16 +86,23 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       setError,
       handleSubmitCore: async () => {
         console.warn("handleSubmitCore called on CoreChatContext");
+        return Promise.resolve();
+      },
+      // Add placeholder for image generation core function
+      handleImageGenerationCore: async () => {
+        console.warn("handleImageGenerationCore called on CoreChatContext");
+        return Promise.resolve();
       },
       stopStreamingCore: () => {
         console.warn("stopStreamingCore called on CoreChatContext");
       },
       regenerateMessageCore: async () => {
         console.warn("regenerateMessageCore called on CoreChatContext");
+        return Promise.resolve();
       },
       abortControllerRef,
     }),
-    [messages, isLoadingMessages, isStreaming, error, setError]
+    [messages, isLoadingMessages, isStreaming, error, setError],
   );
 
   const [activeItemId, setActiveItemId] = useState<string | null>(
@@ -105,7 +113,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   );
 
   const handleSelectItem = useCallback(
-    (id: string | null, type: SidebarItemType | null) => {
+    async (id: string | null, type: SidebarItemType | null) => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
@@ -118,7 +126,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       setIsLoadingMessages(!!id);
       modEvents.emit(ModEvent.CHAT_SELECTED, { id, type });
     },
-    []
+    [],
   );
 
   const handleSettingsModalOpenChange = useCallback((open: boolean) => {
@@ -171,7 +179,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
   const isVfsEnabledForItem = useMemo(
     () => (enableVfs ? (activeItemData?.vfsEnabled ?? false) : false),
-    [enableVfs, activeItemData]
+    [enableVfs, activeItemData],
   );
 
   const vfsKey = useMemo(() => {

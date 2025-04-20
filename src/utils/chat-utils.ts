@@ -1,5 +1,16 @@
 // src/utils/chat-utils.ts
-import type { CustomSettingTab, CustomPromptAction, CustomMessageAction, DbProviderConfig, DbProviderType } from "@/lib/types";
+import type {
+  CustomSettingTab,
+  CustomPromptAction,
+  CustomMessageAction,
+  DbProviderConfig,
+  DbProviderType,
+  DbMessage, // Import DbMessage
+  Message, // Import Message
+  CoreMessage, // Import CoreMessage
+  MessageContent, // Import MessageContent
+  Role, // Import Role
+} from "@/lib/types";
 
 // Helper functions
 export const decodeUint8Array = (arr: Uint8Array): string => {
@@ -67,6 +78,28 @@ export const requiresApiKey = (type: DbProviderType | null): boolean => {
   return type === "openai" || type === "openrouter" || type === "google";
 };
 
+/**
+ * Converts an array of DbMessage or Message objects to the CoreMessage format
+ * expected by the AI SDK (filtering out non-user/assistant/system roles).
+ */
+export function convertDbMessagesToCoreMessages(
+  messages: Array<DbMessage | Message>,
+): CoreMessage[] {
+  const validRoles: Role[] = ["user", "assistant", "system"];
+  return messages
+    .filter(
+      (m) => validRoles.includes(m.role), // Filter only by valid roles for AI interaction
+    )
+    .map((m) => ({
+      role: m.role,
+      content: m.content as MessageContent, // Cast content, assuming it's already correct
+      // Add tool_calls and tool_call_id if they exist and are needed by the SDK format
+      // tool_calls: m.toolCalls, // Example if tool calls were stored
+      // tool_call_id: m.toolCallId, // Example if tool call ID was stored
+    })) as CoreMessage[]; // Cast the final array to CoreMessage[]
+}
+
+// Constants
 export const EMPTY_CUSTOM_SETTINGS_TABS: CustomSettingTab[] = [];
 export const EMPTY_CUSTOM_PROMPT_ACTIONS: CustomPromptAction[] = [];
 export const EMPTY_CUSTOM_MESSAGE_ACTIONS: CustomMessageAction[] = [];

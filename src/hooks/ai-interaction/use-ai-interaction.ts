@@ -3,11 +3,14 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 import { ModEvent, modEvents } from "@/mods/events";
 // Use the aliased/re-exported CoreMessage from our types
-import { Message, CoreMessage } from "@/lib/types";
+import { Message, CoreMessage, ImagePart } from "@/lib/types";
+import { experimental_generateImage as generateImage } from "ai"; // Import generateImage
 
 import {
   UseAiInteractionProps,
   PerformAiStreamParams,
+  PerformImageGenerationParams, // Import new type
+  PerformImageGenerationResult, // Import new type
   UseAiInteractionReturn,
 } from "./types";
 
@@ -18,11 +21,12 @@ import {
   createStreamUpdater,
   getStreamHeaders,
   finalizeStreamedMessage,
-  executeAiStream, // Assuming this function exists in stream-handler.ts
-} from "./stream-handler"; // Assuming this path
+  executeAiStream,
+} from "./stream-handler";
+import { nanoid } from "nanoid";
 
 /**
- * Hook for handling AI interactions with streaming capabilities
+ * Hook for handling AI interactions with streaming and image generation capabilities
  */
 export function useAiInteraction({
   selectedModel,
@@ -35,10 +39,11 @@ export function useAiInteraction({
   addDbMessage,
   abortControllerRef,
 }: UseAiInteractionProps): UseAiInteractionReturn {
+  // --- Text Streaming Logic (performAiStream) ---
   const performAiStream = useCallback(
     async ({
       conversationIdToUse,
-      messagesToSend, // This is CoreMessage[] and SHOULD contain the correct structure
+      messagesToSend,
       currentTemperature,
       currentMaxTokens,
       currentTopP,
@@ -68,8 +73,8 @@ export function useAiInteraction({
         timestamp: assistantPlaceholderTimestamp,
       } = createAssistantPlaceholder(
         conversationIdToUse,
-        selectedProvider!.id, // Non-null assertion is safe after validation
-        selectedModel!.id, // Non-null assertion is safe after validation
+        selectedProvider!.id,
+        selectedModel!.id,
       );
 
       // 3. Add placeholder message to UI
@@ -82,9 +87,9 @@ export function useAiInteraction({
       abortControllerRef.current = currentAbortController;
 
       // 5. References to track state during streaming
-      const contentRef = { current: "" }; // Tracks the streamed *text* content
+      const contentRef = { current: "" };
       let streamError: Error | null = null;
-      let finalContent = ""; // Stores the final aggregated text content
+      let finalContent = "";
       let finalMessageObject: Message | null = null;
 
       // 6. Create throttled update function
@@ -97,36 +102,20 @@ export function useAiInteraction({
 
       const startTime = Date.now();
 
-      // 7. Prepare messages for API (already CoreMessage[] including multi-modal user message)
+      // 7. Prepare messages for API
       const messagesForApi: CoreMessage[] = [];
       if (systemPromptToUse) {
         messagesForApi.push({ role: "system", content: systemPromptToUse });
       }
       messagesForApi.push(...messagesToSend.filter((m) => m.role !== "system"));
 
-      // --- CRITICAL DEBUGGING STEP ---
-      // Log the exact structure being passed to the execution function
-      console.log(
-        "--- Preparing to call executeAiStream ---",
-        "\nProvider:",
-        selectedProvider?.name,
-        "\nModel:",
-        selectedModel?.name,
-        "\nMessages Structure:",
-        JSON.stringify(messagesForApi, null, 2), // Log the full structure
-      );
-      // --- END DEBUGGING STEP ---
-
       try {
         // 8. Get API headers
         const headers = getStreamHeaders(selectedProvider!.type, apiKey);
 
         // 9. Execute streaming
-        // Ensure executeAiStream is called with the CORRECT messagesForApi structure.
-        // The implementation of executeAiStream itself needs to handle this correctly
-        // when calling the underlying AI SDK function (e.g., streamText).
         await executeAiStream(
-          messagesForApi, // Pass the CoreMessage[] array directly
+          messagesForApi,
           currentAbortController.signal,
           currentTemperature,
           currentMaxTokens,
@@ -134,18 +123,16 @@ export function useAiInteraction({
           currentTopK,
           currentPresencePenalty,
           currentFrequencyPenalty,
-          selectedModel!.instance, // The provider model instance from AI SDK
+          selectedModel!.instance,
           headers,
           conversationIdToUse,
-          contentRef, // contentRef tracks the text part of the response
+          contentRef,
           throttledStreamUpdate,
         );
 
-        // If we get here, streaming completed successfully
-        finalContent = contentRef.current; // Final text content
+        finalContent = contentRef.current;
       } catch (err: unknown) {
-        // 10. Handle streaming errors
-        console.error("Error during executeAiStream call:", err); // Log the actual error
+        console.error("Error during executeAiStream call:", err);
         [streamError, finalContent] = handleStreamError(err, setError);
       } finally {
         // 11. Clean up controller reference
@@ -157,9 +144,9 @@ export function useAiInteraction({
         // 12. Update message with final content
         finalMessageObject = finalizeStreamedMessage(
           assistantMessageId,
-          finalContent, // Use the aggregated text content
+          finalContent,
           streamError,
-          messagesToSend, // Pass original messages for context if needed
+          messagesToSend,
           startTime,
           setLocalMessages,
         );
@@ -167,12 +154,14 @@ export function useAiInteraction({
         // 13. Save to database if successful
         if (!streamError && finalContent.trim() !== "") {
           try {
+            // Only save fields defined in DbMessage
             await addDbMessage({
               id: assistantMessageId,
               conversationId: conversationIdToUse,
               role: "assistant",
-              content: finalContent, // Save the final text content
+              content: finalContent,
               createdAt: assistantPlaceholderTimestamp,
+              // vfsContextPaths: finalMessageObject?.vfsContextPaths, // If needed
             });
 
             if (finalMessageObject) {
@@ -196,16 +185,13 @@ export function useAiInteraction({
         } else if (streamError) {
           // Error already handled
         } else {
-          if (!streamError) {
-            setLocalMessages((prev) =>
-              prev.filter((msg) => msg.id !== assistantMessageId),
-            );
-            console.log(
-              "DB save skipped and placeholder removed due to empty final content.",
-            );
-          } else {
-            console.log("DB save skipped due to empty final content.");
-          }
+          // Remove placeholder if stream ended with empty content and no error
+          setLocalMessages((prev) =>
+            prev.filter((msg) => msg.id !== assistantMessageId),
+          );
+          console.log(
+            "DB save skipped and placeholder removed due to empty final content.",
+          );
         }
       }
     },
@@ -222,7 +208,176 @@ export function useAiInteraction({
     ],
   );
 
+  // --- Image Generation Logic (performImageGeneration) ---
+  const performImageGeneration = useCallback(
+    async ({
+      conversationIdToUse,
+      prompt,
+      n = 1, // Default to 1 image
+      size = "1024x1024", // Default size
+      aspectRatio,
+    }: PerformImageGenerationParams): Promise<PerformImageGenerationResult> => {
+      // 1. Validate parameters
+      const apiKey = getApiKeyForProvider();
+      const validationError = validateAiParameters(
+        conversationIdToUse,
+        selectedModel,
+        selectedProvider,
+        apiKey,
+        setError,
+        true, // isImageGeneration = true
+      );
+
+      if (validationError) {
+        return { error: validationError.message };
+      }
+
+      // Ensure model instance exists and supports image generation
+      if (!selectedModel?.instance || !selectedModel?.supportsImageGeneration) {
+        const errorMsg = "Selected model does not support image generation.";
+        setError(errorMsg);
+        return { error: errorMsg };
+      }
+
+      // 2. Set loading state and clear errors
+      setIsAiStreaming(true); // Use the same flag for general loading state
+      setError(null);
+
+      // 3. Setup abort controller
+      const currentAbortController = new AbortController();
+      abortControllerRef.current = currentAbortController;
+
+      // 4. Create placeholder message (optional, could show a "Generating image..." text)
+      const placeholderId = nanoid();
+      const placeholderTimestamp = new Date();
+      const placeholderMessage: Message = {
+        id: placeholderId,
+        conversationId: conversationIdToUse,
+        role: "assistant",
+        content: `Generating image for: "${prompt}"...`,
+        isStreaming: true, // Use isStreaming to indicate loading
+        createdAt: placeholderTimestamp,
+        providerId: selectedProvider!.id,
+        modelId: selectedModel!.id,
+      };
+      setLocalMessages((prev) => [...prev, placeholderMessage]);
+
+      try {
+        // 5. Call the AI SDK generateImage function
+        console.log(
+          `--- Calling generateImage ---
+Provider: ${selectedProvider?.name}
+Model: ${selectedModel?.name}
+Prompt: ${prompt}
+n: ${n}
+Size: ${size}
+AspectRatio: ${aspectRatio}`,
+        );
+
+        // Use type assertion 'as any' to bypass strict literal checks
+        const { images, warnings } = await generateImage({
+          model: selectedModel.instance, // Pass the model instance
+          prompt: prompt,
+          n: n,
+          size: size as any, // Use type assertion
+          aspectRatio: aspectRatio as any, // Use type assertion
+          // Pass API key if needed via headers (depends on provider setup in model instance)
+          headers: getStreamHeaders(selectedProvider!.type, apiKey),
+          abortSignal: currentAbortController.signal,
+          // providerOptions: {} // Add provider-specific options if necessary
+        });
+
+        console.log("--- generateImage Response ---", { images, warnings });
+
+        // 6. Process the result - Convert to ImagePart[] with base64
+        const imageParts: ImagePart[] = images.map((img) => ({
+          type: "image",
+          image: `data:${img.mimeType ?? "image/png"};base64,${img.base64}`, // Create data URL
+          mediaType: img.mimeType ?? "image/png",
+        }));
+
+        // 7. Update the placeholder message with the actual images
+        setLocalMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === placeholderId
+              ? {
+                  ...msg,
+                  content: imageParts, // Set content to the array of image parts
+                  isStreaming: false,
+                  error: null,
+                }
+              : msg,
+          ),
+        );
+
+        // 8. Save the final message to DB
+        try {
+          // Only save fields defined in DbMessage
+          await addDbMessage({
+            id: placeholderId,
+            conversationId: conversationIdToUse,
+            role: "assistant",
+            content: imageParts, // Save the array of image parts
+            createdAt: placeholderTimestamp,
+            // vfsContextPaths: undefined, // If needed
+          });
+          // Emit event if needed
+          // modEvents.emit(ModEvent.RESPONSE_DONE, { message: finalMessageObject });
+        } catch (dbErr: unknown) {
+          const dbErrorMessage = `Save failed: ${dbErr instanceof Error ? dbErr.message : "Unknown DB error"}`;
+          console.error("Failed to save image generation message:", dbErr);
+          setError(`Error saving image: ${dbErrorMessage}`);
+          toast.error(`Failed to save image: ${dbErrorMessage}`);
+          setLocalMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === placeholderId
+                ? { ...msg, error: dbErrorMessage, isStreaming: false }
+                : msg,
+            ),
+          );
+        }
+
+        return { images: imageParts, warnings };
+      } catch (err: unknown) {
+        // 9. Handle errors
+        console.error("Error during generateImage call:", err);
+        const error = err instanceof Error ? err : new Error(String(err));
+        const errorMessage = `Image generation failed: ${error.message}`;
+        setError(errorMessage);
+        toast.error(errorMessage);
+
+        // Update placeholder with error
+        setLocalMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === placeholderId
+              ? { ...msg, error: errorMessage, isStreaming: false, content: "" } // Clear content on error
+              : msg,
+          ),
+        );
+
+        return { error: errorMessage };
+      } finally {
+        // 10. Clean up
+        if (abortControllerRef.current === currentAbortController) {
+          abortControllerRef.current = null;
+        }
+        setIsAiStreaming(false);
+      }
+    },
+    [
+      selectedModel,
+      selectedProvider,
+      getApiKeyForProvider,
+      setLocalMessages,
+      setIsAiStreaming,
+      setError,
+      addDbMessage,
+      abortControllerRef,
+    ],
+  );
+
   return {
     performAiStream,
+    performImageGeneration, // Return the new function
   };
 }

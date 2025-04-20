@@ -7,10 +7,10 @@ import type {
   DbApiKey,
   DbProject,
   SidebarItemType,
-  DbProviderConfig, // Import new type
+  DbProviderConfig,
   MessageContent, // Import the multi-modal content type
 } from "@/lib/types";
-import type { DbMod } from "@/mods/types"; // Import DbMod type
+import type { DbMod } from "@/mods/types";
 import { nanoid } from "nanoid";
 import { useCallback } from "react";
 
@@ -36,14 +36,13 @@ export function useChatStorage() {
     [],
     [],
   );
-  // Add providerConfigs live query
   const providerConfigs = useLiveQuery(
     () => db.providerConfigs.orderBy("createdAt").toArray(),
     [],
     [],
   );
 
-  // === Projects (Wrap functions in useCallback) ===
+  // === Projects ===
   const createProject = useCallback(
     async (
       name: string = "New Project",
@@ -98,7 +97,7 @@ export function useChatStorage() {
     [],
   );
 
-  // === Conversations (Wrap functions in useCallback) ===
+  // === Conversations ===
   const createConversation = useCallback(
     async (
       parentId: string | null = null,
@@ -171,7 +170,7 @@ export function useChatStorage() {
     [],
   );
 
-  // === VFS Toggle (Wrap in useCallback) ===
+  // === VFS Toggle ===
   const toggleVfsEnabled = useCallback(
     async (id: string, type: SidebarItemType): Promise<void> => {
       const now = new Date();
@@ -213,7 +212,7 @@ export function useChatStorage() {
     [],
   );
 
-  // === Messages (Wrap functions in useCallback) ===
+  // === Messages ===
   const getMessagesForConversation = useCallback(
     async (conversationId: string): Promise<DbMessage[]> => {
       // Dexie automatically handles retrieving the complex 'content' object
@@ -238,12 +237,13 @@ export function useChatStorage() {
         id: messageData.id ?? nanoid(),
         createdAt: messageData.createdAt ?? new Date(),
         role: messageData.role,
-        content: messageData.content, // Store the MessageContent directly
+        content: messageData.content, // Store the MessageContent directly (string or array)
         conversationId: messageData.conversationId,
         vfsContextPaths: messageData.vfsContextPaths ?? undefined,
-        // Add toolCallId and toolName if they exist in messageData
+        // Add other optional fields from messageData
         toolCallId: messageData.toolCallId ?? undefined,
         toolName: messageData.toolName ?? undefined,
+        // type: messageData.type ?? undefined, // If using optional type field
       };
       const conversation = await db.conversations.get(
         messageData.conversationId,
@@ -310,18 +310,18 @@ export function useChatStorage() {
     [],
   );
 
-  // === API Keys (Wrap functions in useCallback) ===
+  // === API Keys ===
   const addApiKey = useCallback(
     async (
       name: string,
-      providerId: string, // Kept for potential future display/grouping, though not used for linking
+      providerId: string,
       value: string,
     ): Promise<string> => {
       const newId = nanoid();
       const newKey: DbApiKey = {
         id: newId,
         name,
-        providerId, // Stored but not directly used for provider configuration linking
+        providerId,
         value,
         createdAt: new Date(),
       };
@@ -332,10 +332,8 @@ export function useChatStorage() {
   );
 
   const deleteApiKey = useCallback(async (id: string): Promise<void> => {
-    // Also need to potentially update providerConfigs that reference this key
     await db.transaction("rw", db.apiKeys, db.providerConfigs, async () => {
       await db.apiKeys.delete(id);
-      // Find configs using this key and set their apiKeyId to null
       const configsToUpdate = await db.providerConfigs
         .where("apiKeyId")
         .equals(id)
@@ -349,7 +347,7 @@ export function useChatStorage() {
     });
   }, []);
 
-  // === Mods (Wrap functions in useCallback) ===
+  // === Mods ===
   const addMod = useCallback(
     async (modData: Omit<DbMod, "id" | "createdAt">): Promise<string> => {
       const newId = nanoid();
@@ -379,7 +377,7 @@ export function useChatStorage() {
     return db.mods.orderBy("loadOrder").toArray();
   }, []);
 
-  // === Provider Configs (NEW - Wrap functions in useCallback) ===
+  // === Provider Configs ===
   const addProviderConfig = useCallback(
     async (
       configData: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
@@ -415,20 +413,16 @@ export function useChatStorage() {
     [],
   );
 
-  // === Data Management (Wrap in useCallback) ===
+  // === Data Management ===
   const clearAllData = useCallback(async (): Promise<void> => {
-    // Ensure all tables are cleared
     await Promise.all([
       db.projects.clear(),
       db.conversations.clear(),
       db.messages.clear(),
       db.apiKeys.clear(),
       db.mods.clear(),
-      db.providerConfigs.clear(), // Clear new table too
+      db.providerConfigs.clear(),
     ]);
-    // Optionally, fully delete and recreate the DB if simpler
-    // await db.delete();
-    // window.location.reload(); // Reload might be needed after delete
   }, []);
 
   // Return memoized functions and live query results
@@ -453,7 +447,7 @@ export function useChatStorage() {
     toggleVfsEnabled,
     // Messages
     getMessagesForConversation,
-    addDbMessage,
+    addDbMessage, // Handles new content structure implicitly
     updateDbMessageContent,
     deleteDbMessage,
     getDbMessagesUpTo,
@@ -468,7 +462,7 @@ export function useChatStorage() {
     updateMod,
     deleteMod,
     getMods,
-    // Provider Configs (NEW)
+    // Provider Configs
     providerConfigs: providerConfigs || [],
     addProviderConfig,
     updateProviderConfig,

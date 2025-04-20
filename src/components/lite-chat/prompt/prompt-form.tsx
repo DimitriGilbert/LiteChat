@@ -1,4 +1,4 @@
-// src/components/lite-chat/prompt-form.tsx
+// src/components/lite-chat/prompt/prompt-form.tsx
 import React, { useEffect } from "react";
 import { PromptInput } from "./prompt-input";
 import { PromptSettings } from "./prompt-settings";
@@ -72,6 +72,7 @@ export const PromptForm: React.FC<PromptFormProps> = ({ className }) => {
           prompt={prompt}
           isStreaming={isStreaming}
           addAttachedFile={addAttachedFile}
+          setPrompt={setPrompt} // Pass setPrompt here
         />
       </div>
 

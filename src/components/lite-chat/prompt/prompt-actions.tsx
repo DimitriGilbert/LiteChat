@@ -1,8 +1,8 @@
-// src/components/lite-chat/prompt-actions.tsx
+// src/components/lite-chat/prompt/prompt-actions.tsx
 import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { SendHorizonalIcon, PaperclipIcon } from "lucide-react";
-import { useChatContext } from "@/hooks/use-chat-context"; // Still need context for custom actions
+import { SendHorizonalIcon, PaperclipIcon, ImageIcon } from "lucide-react"; // Added ImageIcon
+import { useChatContext } from "@/hooks/use-chat-context";
 import {
   Tooltip,
   TooltipContent,
@@ -13,26 +13,30 @@ import { cn } from "@/lib/utils";
 
 interface PromptActionsProps {
   className?: string;
-  prompt: string; // Add prop for prompt value
-  isStreaming: boolean; // Add prop
-  addAttachedFile: (file: File) => void; // Add prop
+  prompt: string;
+  isStreaming: boolean;
+  addAttachedFile: (file: File) => void;
+  // Add function to modify prompt for image generation
+  setPrompt: (value: string) => void;
 }
 
 export const PromptActions: React.FC<PromptActionsProps> = ({
   className,
-  prompt, // Use prop
-  isStreaming, // Use prop
-  addAttachedFile, // Use prop
+  prompt,
+  isStreaming,
+  addAttachedFile,
+  setPrompt, // Receive setPrompt
 }) => {
-  // Get context only for custom actions
   const context = useChatContext();
   const {
-    customPromptActions = [], // Default to empty array
+    customPromptActions = [],
+    selectedModel, // Get selected model to check capabilities
   } = context;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Use the passed-in prompt prop to determine if submit is possible
   const canSubmit = prompt.trim().length > 0 && !isStreaming;
+  const canGenerateImage =
+    selectedModel?.supportsImageGeneration && !isStreaming;
 
   const handleAttachClick = () => {
     fileInputRef.current?.click();
@@ -42,9 +46,20 @@ export const PromptActions: React.FC<PromptActionsProps> = ({
     const files = event.target.files;
     if (files) {
       for (let i = 0; i < files.length; i++) {
-        addAttachedFile(files[i]); // Use prop
+        addAttachedFile(files[i]);
       }
       event.target.value = "";
+    }
+  };
+
+  // Function to trigger image generation by prefixing prompt
+  const handleImagineClick = () => {
+    if (prompt.trim().length > 0 && !prompt.startsWith("/imagine ")) {
+      setPrompt(`/imagine ${prompt}`);
+      // Optionally trigger submit immediately after setting prompt?
+      // Or let user press send? Let user press send for now.
+    } else if (prompt.trim().length === 0) {
+      setPrompt("/imagine "); // Add prefix even if prompt is empty
     }
   };
 
@@ -66,7 +81,7 @@ export const PromptActions: React.FC<PromptActionsProps> = ({
               variant="outline"
               size="icon"
               onClick={handleAttachClick}
-              disabled={isStreaming} // Use prop
+              disabled={isStreaming}
               className="h-10 w-10 rounded-full border-gray-200 dark:border-gray-700"
               aria-label="Attach file"
             >
@@ -78,6 +93,32 @@ export const PromptActions: React.FC<PromptActionsProps> = ({
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
+      {/* Imagine Button */}
+      {canGenerateImage && (
+        <TooltipProvider delayDuration={100}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={handleImagineClick}
+                disabled={isStreaming || prompt.trim().length === 0} // Disable if no prompt
+                className={cn(
+                  "h-10 w-10 rounded-full border-gray-200 dark:border-gray-700",
+                  prompt.startsWith("/imagine ") && "bg-primary/20", // Indicate active state
+                )}
+                aria-label="Generate Image (Prefixes prompt with /imagine)"
+              >
+                <ImageIcon className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Generate Image (Prefixes prompt with /imagine)</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
       {/* Custom Prompt Actions */}
       {customPromptActions.map((action) => (
         <TooltipProvider key={action.id} delayDuration={100}>
@@ -87,11 +128,11 @@ export const PromptActions: React.FC<PromptActionsProps> = ({
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={() => action.onClick(context)} // Pass full context
-                disabled={isStreaming} // Use prop
+                onClick={() => action.onClick(context)}
+                disabled={isStreaming}
                 className={cn(
                   "h-10 w-10 rounded-full border-gray-200 dark:border-gray-700",
-                  action.className, // Apply custom classes
+                  action.className,
                 )}
                 aria-label={action.tooltip}
               >
@@ -112,10 +153,10 @@ export const PromptActions: React.FC<PromptActionsProps> = ({
               <Button
                 type="submit"
                 size="icon"
-                disabled={!canSubmit} // Use derived state based on prop
+                disabled={!canSubmit}
                 className={cn(
                   "h-10 w-10 rounded-full",
-                  canSubmit // Use derived state based on prop
+                  canSubmit
                     ? "bg-primary hover:bg-primary/90"
                     : "bg-gray-200 dark:bg-gray-700",
                 )}
@@ -125,7 +166,7 @@ export const PromptActions: React.FC<PromptActionsProps> = ({
               </Button>
             </div>
           </TooltipTrigger>
-          {!canSubmit && ( // Use derived state based on prop
+          {!canSubmit && (
             <TooltipContent>
               <p>
                 {isStreaming ? "Waiting for response..." : "Enter a message"}

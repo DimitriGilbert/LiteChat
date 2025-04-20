@@ -24,13 +24,15 @@ export interface TextPart {
 
 export interface ImagePart {
   type: "image";
-  /** Base64 encoded data URL */
+  /** Base64 encoded data URL or raw base64 string */
   image: string;
   /** Optional mime type */
   mediaType?: string;
 }
 
 // Define the multi-modal content type based on AI SDK structure
+// Can be simple text, or an array containing text and image parts.
+// Assistant responses for image generation will use ImagePart[].
 export type MessageContent = string | Array<TextPart | ImagePart>;
 
 // --- Database Schemas ---
@@ -62,12 +64,15 @@ export interface DbConversation extends DbBase {
 export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {
   conversationId: string;
   role: Role;
-  /** Updated content type */
+  /** Updated content type - can be string or array of parts */
   content: MessageContent;
   vfsContextPaths?: string[];
   // Add fields for potential future use with tool calls if needed
   toolCallId?: string;
   toolName?: string;
+  // Optional field to specifically mark image generation messages if needed,
+  // though checking content type might be sufficient.
+  // type?: 'image_generation';
 }
 
 export interface DbApiKey extends Pick<DbBase, "id" | "createdAt"> {
@@ -99,7 +104,7 @@ export interface DbProviderConfig extends DbBase {
 // --- UI & State Types ---
 export interface Message {
   role: Role;
-  /** Updated content type */
+  /** Updated content type - can be string or array of parts */
   content: MessageContent;
   id?: string;
   conversationId?: string;
@@ -117,6 +122,8 @@ export interface Message {
   // Add fields for potential future use with tool calls if needed
   toolCallId?: string;
   toolName?: string;
+  // Optional field to specifically mark image generation messages if needed
+  // type?: 'image_generation';
 }
 
 export interface SidebarItemBase extends DbBase {
@@ -136,8 +143,10 @@ export type SidebarItem = ProjectSidebarItem | ConversationSidebarItem;
 export interface AiModelConfig {
   id: string;
   name: string;
-  instance: any;
+  instance: any; // Holds the AI SDK model instance (e.g., from openai('gpt-4'))
   contextWindow?: number;
+  // Add flag to indicate image generation capability
+  supportsImageGeneration?: boolean;
 }
 
 export interface AiProviderConfig {
@@ -212,15 +221,19 @@ export interface CoreChatContextProps {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   isLoadingMessages: boolean;
   setIsLoadingMessages: React.Dispatch<React.SetStateAction<boolean>>;
-  isStreaming: boolean;
+  isStreaming: boolean; // Covers both text and image generation
   setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>;
   error: string | null;
   setError: (error: string | null) => void;
   handleSubmitCore: (
-    originalUserPrompt: string, // Keep original prompt for display/DB
     currentConversationId: string,
     contentToSendToAI: MessageContent, // Use the multi-modal type
     vfsContextPaths?: string[],
+  ) => Promise<void>;
+  // Add image generation core function
+  handleImageGenerationCore: (
+    currentConversationId: string,
+    prompt: string,
   ) => Promise<void>;
   stopStreamingCore: () => void;
   regenerateMessageCore: (messageId: string) => Promise<void>;
@@ -266,6 +279,8 @@ export interface ChatContextProps {
   selectedModelId: string | null;
   setSelectedModelId: React.Dispatch<React.SetStateAction<string | null>>;
   getApiKeyForProvider: (providerConfigId: string) => string | undefined;
+  // Add selected model details for checking capabilities
+  selectedModel: AiModelConfig | undefined;
 
   // --- API Key Management (from ProviderManagementContext) ---
   apiKeys: DbApiKey[];
@@ -317,7 +332,7 @@ export interface ChatContextProps {
   // --- Messages & Streaming (from CoreChatContext) ---
   messages: Message[];
   isLoading: boolean; // Alias for isLoadingMessages
-  isStreaming: boolean;
+  isStreaming: boolean; // Covers both text and image generation
   error: string | null;
   setError: (error: string | null) => void;
 
