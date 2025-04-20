@@ -1,34 +1,21 @@
 // src/hooks/use-message-handling.ts
-import React, { useCallback, useEffect } from "react"; // Removed unused useRef
+import React, { useCallback, useEffect } from "react";
 import type {
   Message,
   DbMessage,
   MessageContent,
-  CoreMessage,
-  AiModelConfig, // Import missing types
+  // Removed unused CoreMessage import
+  AiModelConfig,
   AiProviderConfig,
 } from "@/lib/types";
 import { toast } from "sonner";
-// Removed unused useChatStorage import
 import { useAiInteraction } from "./ai-interaction";
 import { modEvents, ModEvent } from "@/mods/events";
-import { convertDbMessagesToCoreMessages } from "@/utils/chat-utils"; // Re-added import
+import { convertDbMessagesToCoreMessages } from "@/utils/chat-utils";
 import { nanoid } from "nanoid";
+import { ReadonlyChatContextSnapshot } from "@/mods/api";
 
 // --- Interface Definitions ---
-export interface PerformAiStreamParams {
-  conversationIdToUse: string;
-  messagesToSend: CoreMessage[]; // Use CoreMessage from types.ts
-  currentTemperature: number;
-  currentMaxTokens: number | null;
-  currentTopP: number | null;
-  currentTopK: number | null;
-  currentPresencePenalty: number | null;
-  currentFrequencyPenalty: number | null;
-  systemPromptToUse: string | null;
-}
-
-// Props expected by the hook
 interface UseMessageHandlingProps {
   selectedModel: AiModelConfig | undefined;
   selectedProvider: AiProviderConfig | undefined;
@@ -41,33 +28,27 @@ interface UseMessageHandlingProps {
   presencePenalty: number | null;
   frequencyPenalty: number | null;
   activeSystemPrompt: string | null;
-  // Core state/setters passed directly
   localMessages: Message[];
   setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  isLoadingMessages: boolean; // Keep this, it's used in ChatProviderInner
+  isLoadingMessages: boolean;
   setIsLoadingMessages: React.Dispatch<React.SetStateAction<boolean>>;
   isStreaming: boolean;
   setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>;
-  error: string | null; // Keep this, it's used in ChatProviderInner
+  error: string | null;
   setError: (error: string | null) => void;
-  // DB functions passed directly
   addDbMessage: (
     messageData: Omit<DbMessage, "id" | "createdAt"> &
       Partial<Pick<DbMessage, "id" | "createdAt">>,
   ) => Promise<string>;
   deleteDbMessage: (messageId: string) => Promise<void>;
   getMessagesForConversation: (conversationId: string) => Promise<DbMessage[]>;
-  getDbMessagesUpTo: (
-    convId: string,
-    messageId: string,
-  ) => Promise<DbMessage[]>;
-  // Abort controller ref passed directly
+  // Removed unused getDbMessagesUpTo prop type
   abortControllerRef: React.MutableRefObject<AbortController | null>;
-  // Selected conversation ID needed for loading/regen
   selectedConversationId: string | null;
+  getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
+  bulkAddMessages: (messages: DbMessage[]) => Promise<unknown>;
 }
 
-// Return type includes all core handlers
 export interface UseMessageHandlingReturn {
   loadMessages: (conversationId: string | null) => Promise<void>;
   handleSubmitCore: (
@@ -98,20 +79,19 @@ export function useMessageHandling({
   activeSystemPrompt,
   localMessages,
   setLocalMessages,
-  // isLoadingMessages, // Removed unused destructuring
   setIsLoadingMessages,
   isStreaming,
   setIsStreaming,
-  // error, // Removed unused destructuring
   setError,
   addDbMessage,
   deleteDbMessage,
   getMessagesForConversation,
-  getDbMessagesUpTo,
+  // Removed unused getDbMessagesUpTo destructuring
   abortControllerRef,
   selectedConversationId,
+  getContextSnapshotForMod,
+  bulkAddMessages,
 }: UseMessageHandlingProps): UseMessageHandlingReturn {
-  // Instantiate the AI interaction hook
   const { performAiStream, performImageGeneration } = useAiInteraction({
     selectedModel,
     selectedProvider,
@@ -122,9 +102,10 @@ export function useMessageHandling({
     setError,
     addDbMessage,
     abortControllerRef,
+    getContextSnapshotForMod,
+    bulkAddMessages,
   });
 
-  // --- Message Loading Effect ---
   const loadMessages = useCallback(
     async (conversationId: string | null) => {
       if (!conversationId) {
@@ -136,15 +117,15 @@ export function useMessageHandling({
       setError(null);
       try {
         const dbMessages = await getMessagesForConversation(conversationId);
-        // Convert DbMessage[] to Message[] for UI state
         const uiMessages: Message[] = dbMessages.map((dbMsg) => ({
           id: dbMsg.id,
           conversationId: dbMsg.conversationId,
           role: dbMsg.role,
-          content: dbMsg.content, // Already correct type
+          content: dbMsg.content,
           createdAt: dbMsg.createdAt,
           vfsContextPaths: dbMsg.vfsContextPaths,
-          // Add other fields if they exist in DbMessage and are needed in UI Message
+          tool_calls: dbMsg.tool_calls,
+          tool_call_id: dbMsg.tool_call_id,
         }));
         setLocalMessages(uiMessages);
       } catch (err) {
@@ -166,19 +147,15 @@ export function useMessageHandling({
     ],
   );
 
-  // Load messages when selectedConversationId changes
   useEffect(() => {
     loadMessages(selectedConversationId);
   }, [selectedConversationId, loadMessages]);
-  // --- End Message Loading Effect ---
 
-  // --- Stop Streaming ---
   const stopStreamingCore = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
-      setIsStreaming(false); // Ensure streaming state is reset
-      // Find potentially incomplete message and mark it as finished/aborted
+      setIsStreaming(false);
       setLocalMessages((prev) =>
         prev.map((msg) =>
           msg.isStreaming ? { ...msg, isStreaming: false } : msg,
@@ -188,7 +165,6 @@ export function useMessageHandling({
     }
   }, [abortControllerRef, setIsStreaming, setLocalMessages]);
 
-  // --- Handle Text/Multi-modal Submission ---
   const handleSubmitCore = useCallback(
     async (
       currentConversationId: string,
@@ -206,10 +182,8 @@ export function useMessageHandling({
         vfsContextPaths: vfsContextPaths,
       };
 
-      // Add user message locally first
       setLocalMessages((prev) => [...prev, userMessage]);
 
-      // Save user message to DB (async, don't wait)
       addDbMessage({
         id: userMessageId,
         conversationId: currentConversationId,
@@ -230,21 +204,15 @@ export function useMessageHandling({
           );
         });
 
-      // Prepare messages for AI (use local state which includes the new message)
-      const messagesForApi = convertDbMessagesToCoreMessages(
-        // Filter local messages *before* passing to conversion function
-        localMessages
-          .filter(
-            (m) => !m.error && (m.role === "user" || m.role === "assistant"),
-          )
-          // Add the latest user message again to ensure it's last
-          .concat(userMessage),
-      );
+      const currentMessagesForApi = convertDbMessagesToCoreMessages([
+        ...localMessages,
+        userMessage,
+      ]);
 
       try {
         await performAiStream({
           conversationIdToUse: currentConversationId,
-          messagesToSend: messagesForApi,
+          messagesToSend: currentMessagesForApi,
           currentTemperature: temperature,
           currentMaxTokens: maxTokens,
           currentTopP: topP,
@@ -254,11 +222,11 @@ export function useMessageHandling({
           systemPromptToUse: activeSystemPrompt,
         });
       } catch (err) {
-        console.error("Error setting up AI stream:", err);
+        // Error handled within performAiStream
       }
     },
     [
-      localMessages, // Depend on localMessages to get history
+      localMessages,
       performAiStream,
       addDbMessage,
       temperature,
@@ -270,11 +238,9 @@ export function useMessageHandling({
       activeSystemPrompt,
       setError,
       setLocalMessages,
-      convertDbMessagesToCoreMessages, // Add dependency
     ],
   );
 
-  // --- Handle Image Generation Submission ---
   const handleImageGenerationCore = useCallback(
     async (currentConversationId: string, prompt: string) => {
       const userMessageId = nanoid();
@@ -289,10 +255,8 @@ export function useMessageHandling({
         createdAt: userMessageTimestamp,
       };
 
-      // Add user message locally
       setLocalMessages((prev) => [...prev, userMessage]);
 
-      // Save user message to DB
       addDbMessage({
         id: userMessageId,
         conversationId: currentConversationId,
@@ -318,13 +282,12 @@ export function useMessageHandling({
           prompt: prompt,
         });
       } catch (err) {
-        console.error("Error setting up image generation:", err);
+        // Error handled within performImageGeneration
       }
     },
     [performImageGeneration, addDbMessage, setError, setLocalMessages],
   );
 
-  // --- Regeneration ---
   const regenerateMessageCore = useCallback(
     async (messageId: string) => {
       const messageIndex = localMessages.findIndex((m) => m.id === messageId);
@@ -349,21 +312,20 @@ export function useMessageHandling({
 
       setError(null);
 
-      // Find the user message preceding the assistant message to regenerate
-      let precedingUserMessage: Message | undefined;
+      let precedingUserMessageIndex = -1;
       for (let i = messageIndex - 1; i >= 0; i--) {
         if (localMessages[i].role === "user") {
-          precedingUserMessage = localMessages[i];
+          precedingUserMessageIndex = i;
           break;
         }
       }
 
-      if (!precedingUserMessage || !precedingUserMessage.id) {
+      if (precedingUserMessageIndex === -1) {
         toast.error("Cannot regenerate: Preceding user message not found.");
         return;
       }
+      const precedingUserMessage = localMessages[precedingUserMessageIndex];
 
-      // Check if the preceding user message was an image generation command
       if (
         typeof precedingUserMessage.content === "string" &&
         precedingUserMessage.content.startsWith("/imagine ")
@@ -372,52 +334,29 @@ export function useMessageHandling({
           .substring("/imagine ".length)
           .trim();
         if (imagePrompt) {
-          // Delete the old assistant message (image result)
           setLocalMessages((prev) =>
             prev.filter((msg) => msg.id !== messageId),
           );
           await deleteDbMessage(messageId);
-          // Trigger image generation again
           await handleImageGenerationCore(conversationId, imagePrompt);
         } else {
           toast.error("Cannot regenerate: Invalid image prompt found.");
         }
       } else {
-        // Handle text regeneration
-        // Get history up to the *user* message before the one being regenerated
-        const dbHistory = await getDbMessagesUpTo(
-          conversationId,
-          precedingUserMessage.id, // Get history *before* the user message
+        const historyForApi = convertDbMessagesToCoreMessages(
+          localMessages.slice(0, precedingUserMessageIndex + 1),
         );
 
-        // Combine history with the user message that triggered the response
-        const messagesForApi = convertDbMessagesToCoreMessages([
-          ...dbHistory,
-          {
-            // Add the user message itself
-            id: precedingUserMessage.id,
-            conversationId: precedingUserMessage.conversationId!,
-            role: "user",
-            content: precedingUserMessage.content,
-            createdAt: precedingUserMessage.createdAt!,
-            vfsContextPaths: precedingUserMessage.vfsContextPaths,
-          },
-        ]);
-
-        // Remove the old assistant message and any subsequent messages locally
         setLocalMessages((prev) => prev.slice(0, messageIndex));
 
-        // Delete the old assistant message from DB (async)
         deleteDbMessage(messageId).catch((err) => {
           console.error("Failed to delete old assistant message:", err);
-          // Handle error if needed, maybe restore local message?
         });
 
-        // Perform the stream again
         try {
           await performAiStream({
             conversationIdToUse: conversationId,
-            messagesToSend: messagesForApi,
+            messagesToSend: historyForApi,
             currentTemperature: temperature,
             currentMaxTokens: maxTokens,
             currentTopP: topP,
@@ -427,16 +366,15 @@ export function useMessageHandling({
             systemPromptToUse: activeSystemPrompt,
           });
         } catch (err) {
-          console.error("Error during regeneration stream:", err);
+          // Error handled within performAiStream
         }
       }
     },
     [
       localMessages,
       deleteDbMessage,
-      getDbMessagesUpTo,
       performAiStream,
-      handleImageGenerationCore, // Add dependency
+      handleImageGenerationCore,
       temperature,
       maxTokens,
       topP,
@@ -446,8 +384,7 @@ export function useMessageHandling({
       activeSystemPrompt,
       setLocalMessages,
       setError,
-      isStreaming, // Add dependency
-      convertDbMessagesToCoreMessages, // Add dependency
+      isStreaming,
     ],
   );
 

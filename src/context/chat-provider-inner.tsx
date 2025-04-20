@@ -44,9 +44,9 @@ interface StableReferences {
     selectedItemType: SidebarItemType | null;
   };
   settings: {
-    activeSystemPrompt: string | null; // Allow null
+    activeSystemPrompt: string | null;
     temperature: number;
-    maxTokens: number | null; // Allow null
+    maxTokens: number | null;
     theme: Theme;
   };
   vfs: {
@@ -81,7 +81,6 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
 
   const middleware = useChatMiddleware(setError);
 
-  // Keep stable references to functions/objects to prevent dependency loops
   const stableReferences = useRef<StableReferences>({
     providerMgmt: {
       selectedProviderId: null,
@@ -97,14 +96,13 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
       activeSystemPrompt: null,
       temperature: 0,
       maxTokens: null,
-      theme: "system", // default to system theme
+      theme: "system",
     },
     vfs: {
       isVfsEnabledForItem: false,
     },
   });
 
-  // Keep stable references updated with latest values
   useEffect(() => {
     stableReferences.current.providerMgmt.selectedProviderId =
       providerMgmt.selectedProviderId;
@@ -140,7 +138,27 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
     return providerMgmt.getApiKeyForProvider(providerMgmt.selectedProviderId);
   }, [providerMgmt]);
 
-  // Pass necessary props to useMessageHandling
+  const getContextSnapshotForMod =
+    useCallback((): ReadonlyChatContextSnapshot => {
+      return Object.freeze({
+        selectedItemId: stableReferences.current.sidebar.selectedItemId,
+        selectedItemType: stableReferences.current.sidebar.selectedItemType,
+        messages,
+        isStreaming,
+        selectedProviderId:
+          stableReferences.current.providerMgmt.selectedProviderId,
+        selectedModelId: stableReferences.current.providerMgmt.selectedModelId,
+        activeSystemPrompt:
+          stableReferences.current.settings.activeSystemPrompt,
+        temperature: stableReferences.current.settings.temperature,
+        maxTokens: stableReferences.current.settings.maxTokens,
+        theme: stableReferences.current.settings.theme,
+        isVfsEnabledForItem: stableReferences.current.vfs.isVfsEnabledForItem,
+        getApiKeyForProvider:
+          stableReferences.current.providerMgmt.getApiKeyForProvider,
+      });
+    }, [messages, isStreaming]);
+
   const messageHandling = useMessageHandling({
     selectedModel: providerMgmt.selectedModel,
     selectedProvider: providerMgmt.selectedProvider,
@@ -164,9 +182,11 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
     addDbMessage: storage.addDbMessage,
     deleteDbMessage: storage.deleteDbMessage,
     getMessagesForConversation: storage.getMessagesForConversation,
-    getDbMessagesUpTo: storage.getDbMessagesUpTo,
+    // Removed getDbMessagesUpTo from here
     abortControllerRef,
-    selectedConversationId: sidebar.activeConversationData?.id ?? null, // Add this line
+    selectedConversationId: sidebar.activeConversationData?.id ?? null,
+    getContextSnapshotForMod,
+    bulkAddMessages: storage.bulkAddMessages,
   });
 
   const handleSubmit = useCallback(
@@ -181,7 +201,6 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
           attachedFilesValue,
           vfsPathsToSubmit,
           {
-            // Provider management
             selectedProviderId: providerMgmt.selectedProviderId,
             selectedProvider: providerMgmt.selectedProvider || null,
             selectedModel: providerMgmt.selectedModel,
@@ -189,28 +208,18 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
             dbProviderConfigs:
               providerMgmt.dbProviderConfigs || EMPTY_DB_PROVIDER_CONFIGS,
             enableApiKeyManagement: providerMgmt.enableApiKeyManagement,
-
-            // Streaming state
             isStreaming,
             setError,
-
-            // Sidebar/Item management
             selectedItemType: sidebar.selectedItemType,
             selectedItemId: sidebar.selectedItemId,
             activeConversationData: sidebar.activeConversationData,
             createConversation: sidebar.createConversation,
             selectItem: sidebar.selectItem,
             deleteItem: sidebar.deleteItem,
-
-            // VFS
             vfs: vfs.vfs,
             enableVfs: vfs.enableVfs,
             isVfsEnabledForItem: vfs.isVfsEnabledForItem,
-
-            // Middleware
             runMiddleware: middleware.runMiddleware,
-
-            // Message handling - Pass both core handlers
             handleSubmitCore: messageHandling.handleSubmitCore,
             handleImageGenerationCore:
               messageHandling.handleImageGenerationCore,
@@ -224,10 +233,10 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
     },
     [
       isStreaming,
-      providerMgmt, // Includes selectedModel, selectedProvider, etc.
+      providerMgmt,
       getApiKeyForSelectedProvider,
       setError,
-      messageHandling, // Includes both core handlers
+      messageHandling,
       vfs,
       middleware,
       sidebar,
@@ -236,24 +245,21 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
 
   const regenerateMessage = useCallback(
     async (messageId: string) => {
-      // selectedConversationId is implicitly handled inside messageHandling now
       if (isStreaming) {
         toast.info("Please wait for the current response to finish.");
         return;
       }
       await messageHandling.regenerateMessageCore(messageId);
     },
-    [messageHandling, isStreaming], // Removed sidebar dependencies
+    [messageHandling, isStreaming],
   );
 
   const stopStreaming = useCallback(() => {
     messageHandling.stopStreamingCore();
-    // toast.info("AI response stopped."); // Toast moved inside stopStreamingCore
   }, [messageHandling]);
 
   const handleImportConversation = useCallback(
     async (file: File, parentId: string | null) => {
-      // Parent ID logic moved inside sidebar context's importConversation
       await sidebar.importConversation(file, parentId);
     },
     [sidebar],
@@ -275,37 +281,14 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
     );
   }, [sidebar, vfs.isVfsEnabledForItem, vfs.enableVfs]);
 
-  const getContextSnapshotForMod =
-    useCallback((): ReadonlyChatContextSnapshot => {
-      return Object.freeze({
-        selectedItemId: stableReferences.current.sidebar.selectedItemId,
-        selectedItemType: stableReferences.current.sidebar.selectedItemType,
-        messages,
-        isStreaming,
-        selectedProviderId:
-          stableReferences.current.providerMgmt.selectedProviderId,
-        selectedModelId: stableReferences.current.providerMgmt.selectedModelId,
-        activeSystemPrompt:
-          stableReferences.current.settings.activeSystemPrompt,
-        temperature: stableReferences.current.settings.temperature,
-        maxTokens: stableReferences.current.settings.maxTokens,
-        theme: stableReferences.current.settings.theme,
-        isVfsEnabledForItem: stableReferences.current.vfs.isVfsEnabledForItem,
-        getApiKeyForProvider:
-          stableReferences.current.providerMgmt.getApiKeyForProvider,
-      });
-    }, [messages, isStreaming]); // Minimal dependencies to prevent loops
-
-  // Track if effect has already run to avoid double initialization
   const hasInitializedMods = useRef(false);
-
   useEffect(() => {
-    // Skip if already initialized or if dependencies aren't ready
     if (hasInitializedMods.current || !modCtx.dbMods) return;
     hasInitializedMods.current = true;
 
     const dbMods = modCtx.dbMods;
     modCtx._clearRegisteredModItems();
+    modCtx._clearRegisteredModTools();
     middleware.clearModReferences();
 
     if (dbMods.length > 0) {
@@ -322,7 +305,7 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
       modEvents.emit(ModEvent.APP_LOADED);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modCtx.dbMods]); // Depend on dbMods to re-run if mods change
+  }, [modCtx.dbMods]);
 
   const combinedPromptActions = useMemo(
     () => [...userCustomPromptActions, ...modCtx.modPromptActions],
@@ -339,29 +322,24 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
 
   const fullContextValue: ChatContextProps = useMemo(
     () => ({
-      // Feature Flags
       enableApiKeyManagement: providerMgmt.enableApiKeyManagement,
       enableAdvancedSettings: settings.enableAdvancedSettings,
       enableSidebar: sidebar.enableSidebar,
       enableVfs: vfs.enableVfs,
-      // Provider/Model Selection
       activeProviders: providerMgmt.activeProviders,
       selectedProviderId: providerMgmt.selectedProviderId,
       setSelectedProviderId: providerMgmt.setSelectedProviderId,
       selectedModelId: providerMgmt.selectedModelId,
       setSelectedModelId: providerMgmt.setSelectedModelId,
       getApiKeyForProvider: getApiKeyForSelectedProvider,
-      selectedModel: providerMgmt.selectedModel, // Add selectedModel
-      // API Key Management
+      selectedModel: providerMgmt.selectedModel,
       apiKeys: providerMgmt.apiKeys,
       addApiKey: providerMgmt.addApiKey,
       deleteApiKey: providerMgmt.deleteApiKey,
-      // Provider Config Management
       dbProviderConfigs: providerMgmt.dbProviderConfigs,
       addDbProviderConfig: providerMgmt.addDbProviderConfig,
       updateDbProviderConfig: providerMgmt.updateDbProviderConfig,
       deleteDbProviderConfig: providerMgmt.deleteDbProviderConfig,
-      // Sidebar / Item Management
       sidebarItems: sidebar.sidebarItems,
       selectedItemId: sidebar.selectedItemId,
       selectedItemType: sidebar.selectedItemType,
@@ -371,26 +349,21 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
       deleteItem: sidebar.deleteItem,
       renameItem: sidebar.renameItem,
       updateConversationSystemPrompt: sidebar.updateConversationSystemPrompt,
-      // Messages & Streaming
       messages: messages,
       isLoading: isLoadingMessages,
       isStreaming: isStreaming,
       error: error,
       setError: setError,
-      // Interaction Handlers
       handleSubmit,
       stopStreaming,
       regenerateMessage,
-      // VFS Selection State
       selectedVfsPaths: vfs.selectedVfsPaths,
       addSelectedVfsPath: vfs.addSelectedVfsPath,
       removeSelectedVfsPath: vfs.removeSelectedVfsPath,
       clearSelectedVfsPaths: vfs.clearSelectedVfsPaths,
-      // VFS Context
       isVfsEnabledForItem: vfs.isVfsEnabledForItem,
       toggleVfsEnabled: handleToggleVfs,
       vfs: vfs.vfs,
-      // Settings
       temperature: settings.temperature,
       setTemperature: settings.setTemperature,
       maxTokens: settings.maxTokens,
@@ -411,29 +384,23 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
       streamingThrottleRate,
       searchTerm: settings.searchTerm,
       setSearchTerm: settings.setSearchTerm,
-      // Import/Export & Data Management
       exportConversation: sidebar.exportConversation,
-      importConversation: handleImportConversation, // Use wrapped handler
+      importConversation: handleImportConversation,
       exportAllConversations: sidebar.exportAllConversations,
       clearAllData: storage.clearAllData,
-      // DB Accessors
       getConversation: storage.getConversation,
       getProject: storage.getProject,
-      // Extensibility
       customPromptActions: combinedPromptActions,
       customMessageActions: combinedMessageActions,
       customSettingsTabs: combinedSettingsTabs,
-      // Mod System
       dbMods: modCtx.dbMods,
       loadedMods: modCtx.loadedMods,
       addDbMod: modCtx.addDbMod,
       updateDbMod: modCtx.updateDbMod,
       deleteDbMod: modCtx.deleteDbMod,
-      // Settings Modal Control
       isSettingsModalOpen: settings.isSettingsModalOpen,
       onSettingsModalOpenChange: settings.onSettingsModalOpenChange,
     }),
-    // Carefully selected dependencies
     [
       providerMgmt.enableApiKeyManagement,
       settings.enableAdvancedSettings,
@@ -445,7 +412,7 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
       providerMgmt.selectedModelId,
       providerMgmt.setSelectedModelId,
       getApiKeyForSelectedProvider,
-      providerMgmt.selectedModel, // Add dependency
+      providerMgmt.selectedModel,
       providerMgmt.apiKeys,
       providerMgmt.addApiKey,
       providerMgmt.deleteApiKey,
@@ -498,7 +465,7 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
       settings.searchTerm,
       settings.setSearchTerm,
       sidebar.exportConversation,
-      handleImportConversation, // Use wrapped handler
+      handleImportConversation,
       sidebar.exportAllConversations,
       storage.clearAllData,
       storage.getConversation,

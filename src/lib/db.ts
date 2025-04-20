@@ -20,23 +20,40 @@ export class ChatDatabase extends Dexie {
 
   constructor() {
     super("LiteChatDatabase");
+    // Version 8: Added 'role' and 'tool_call_id' indices to messages table.
+    //            Added compound index for faster message fetching/sorting.
+    this.version(8).stores({
+      // No change from v7
+      providerConfigs:
+        "++id, &name, type, apiKeyId, isEnabled, autoFetchModels, modelsLastFetchedAt, createdAt, updatedAt",
+      // No change from v7
+      mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
+      // No change from v7
+      projects: "++id, name, parentId, createdAt, updatedAt",
+      // No change from v7
+      conversations: "id, parentId, createdAt, updatedAt",
+      // 'content' is not indexed.
+      // 'tool_calls' is not indexed.
+      // Index 'role' for potential filtering.
+      // Index 'tool_call_id' for linking tool results.
+      // Add compound index for efficient sorting within conversations.
+      messages:
+        "id, conversationId, createdAt, role, tool_call_id, [conversationId+createdAt]", // Added role, tool_call_id, compound index
+      // No change from v7
+      apiKeys: "id, name, providerId, createdAt",
+    });
+
+    // --- Keep previous version definitions ---
     // Version 7: Added providerConfigs fields
-    // Version 8: No schema changes needed for MessageContent or optional 'type' field,
-    //            as 'content' and 'type' weren't indexed.
-    //            Keeping version 7 as the latest.
     this.version(7).stores({
       providerConfigs:
         "++id, &name, type, apiKeyId, isEnabled, autoFetchModels, modelsLastFetchedAt, createdAt, updatedAt",
       mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
       projects: "++id, name, parentId, createdAt, updatedAt",
       conversations: "id, parentId, createdAt, updatedAt",
-      // 'content' is not indexed, storing MessageContent (string | object[]) is fine.
-      // 'type' is not indexed.
-      // Indexing 'vfsContextPaths' (string[]) uses default indexing.
-      messages: "id, conversationId, createdAt, vfsContextPaths", // No change needed here
+      messages: "id, conversationId, createdAt, vfsContextPaths", // Previous schema
       apiKeys: "id, name, providerId, createdAt",
     });
-
     // Add upgrade logic for version 7 (remains the same)
     this.version(7).upgrade(async (tx) => {
       await tx
@@ -60,7 +77,6 @@ export class ChatDatabase extends Dexie {
         });
     });
 
-    // --- Keep previous version definitions ---
     this.version(6).stores({
       providerConfigs:
         "++id, &name, type, apiKeyId, isEnabled, createdAt, updatedAt",

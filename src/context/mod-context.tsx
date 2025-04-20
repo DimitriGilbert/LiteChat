@@ -5,18 +5,27 @@ import React, {
   useMemo,
   useState,
   useCallback,
+  // Removed unused useRef import
 } from "react";
+import type { z } from "zod";
 import type {
   CustomPromptAction,
   CustomMessageAction,
   CustomSettingTab,
 } from "@/lib/types";
-import { DbMod, ModInstance } from "@/mods/types";
+import { DbMod, ModInstance, Tool, ToolImplementation } from "@/mods/types"; // Import Tool types
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { nanoid } from "nanoid";
 
 const EMPTY_MOD_INSTANCES: ModInstance[] = [];
 const EMPTY_DB_MODS: DbMod[] = [];
+
+// Define the structure for storing registered tools
+// Use a more generic type for the map value to avoid issues with specific PARAMETERS
+export interface RegisteredToolEntry {
+  definition: Tool<any>; // Use 'any' for the schema here
+  implementation?: ToolImplementation<any>; // Use 'any' for the schema here
+}
 
 interface ModContextProps {
   dbMods: DbMod[];
@@ -27,12 +36,19 @@ interface ModContextProps {
   modPromptActions: CustomPromptAction[];
   modMessageActions: CustomMessageAction[];
   modSettingsTabs: CustomSettingTab[];
-  // Functions to be called by ChatProvider during mod loading
+  modTools: ReadonlyMap<string, RegisteredToolEntry>; // Use ReadonlyMap with the generic entry type
+  // Functions to be called by ChatProvider/Mod API during mod loading/registration
   _setLoadedMods: React.Dispatch<React.SetStateAction<ModInstance[]>>;
   _registerModPromptAction: (action: CustomPromptAction) => () => void;
   _registerModMessageAction: (action: CustomMessageAction) => () => void;
   _registerModSettingsTab: (tab: CustomSettingTab) => () => void;
+  _registerModTool: <PARAMETERS extends z.ZodSchema<any>>(
+    toolName: string,
+    definition: Tool<PARAMETERS>,
+    implementation?: ToolImplementation<PARAMETERS>,
+  ) => () => void;
   _clearRegisteredModItems: () => void;
+  _clearRegisteredModTools: () => void;
 }
 
 const ModContext = createContext<ModContextProps | undefined>(undefined);
@@ -53,6 +69,9 @@ export const ModProvider: React.FC<ModProviderProps> = ({ children }) => {
   >([]);
   const [modSettingsTabs, setModSettingsTabs] = useState<CustomSettingTab[]>(
     [],
+  );
+  const [modTools, setModTools] = useState<Map<string, RegisteredToolEntry>>(
+    () => new Map(),
   );
 
   const registerModPromptAction = useCallback(
@@ -91,10 +110,43 @@ export const ModProvider: React.FC<ModProviderProps> = ({ children }) => {
     [],
   );
 
+  const registerModTool = useCallback(
+    <PARAMETERS extends z.ZodSchema<any>>(
+      toolName: string,
+      definition: Tool<PARAMETERS>,
+      implementation?: ToolImplementation<PARAMETERS>,
+    ): (() => void) => {
+      if (!implementation && !definition.execute) {
+        console.error(
+          `ModContext: Tool "${toolName}" registered without an implementation or an execute function in its definition.`,
+        );
+      }
+      setModTools((prevMap) => {
+        const newMap = new Map(prevMap);
+        // Store with the generic RegisteredToolEntry type
+        newMap.set(toolName, { definition, implementation });
+        return newMap;
+      });
+      // Return unregister function
+      return () => {
+        setModTools((prevMap) => {
+          const newMap = new Map(prevMap);
+          newMap.delete(toolName);
+          return newMap;
+        });
+      };
+    },
+    [],
+  );
+
   const clearRegisteredModItems = useCallback(() => {
     setModPromptActions([]);
     setModMessageActions([]);
     setModSettingsTabs([]);
+  }, []);
+
+  const clearRegisteredModTools = useCallback(() => {
+    setModTools(new Map());
   }, []);
 
   const value = useMemo(
@@ -107,11 +159,14 @@ export const ModProvider: React.FC<ModProviderProps> = ({ children }) => {
       modPromptActions,
       modMessageActions,
       modSettingsTabs,
+      modTools, // Expose the map (state makes it reactive)
       _setLoadedMods: setLoadedMods,
       _registerModPromptAction: registerModPromptAction,
       _registerModMessageAction: registerModMessageAction,
       _registerModSettingsTab: registerModSettingsTab,
+      _registerModTool: registerModTool, // Add tool registration
       _clearRegisteredModItems: clearRegisteredModItems,
+      _clearRegisteredModTools: clearRegisteredModTools, // Add tool clearing
     }),
     [
       storage.mods,
@@ -122,10 +177,13 @@ export const ModProvider: React.FC<ModProviderProps> = ({ children }) => {
       modPromptActions,
       modMessageActions,
       modSettingsTabs,
+      modTools, // Add dependency
       registerModPromptAction,
       registerModMessageAction,
       registerModSettingsTab,
+      registerModTool, // Add dependency
       clearRegisteredModItems,
+      clearRegisteredModTools, // Add dependency
     ],
   );
 

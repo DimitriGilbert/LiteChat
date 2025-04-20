@@ -1,263 +1,248 @@
 // src/context/chat-middleware.tsx
-import { useCallback, useRef } from "react";
-import { nanoid } from "nanoid";
+import { useCallback, useRef } from "react"; // Removed useState import
 import { toast } from "sonner";
-import { loadMods } from "@/mods/loader";
-import { modEvents, ModEvent } from "@/mods/events"; // Removed unused ModEventName import
-import {
-  ModMiddlewareHook,
-  type ReadonlyChatContextSnapshot,
-  type ModMiddlewareHookName,
-} from "@/mods/api";
+import type { z } from "zod";
 import type {
-  ModEventPayloadMap,
+  DbMod,
+  ModInstance,
   ModMiddlewarePayloadMap,
   ModMiddlewareReturnMap,
-  ProcessResponseChunkPayload,
-  RenderMessagePayload,
+  Tool,
+  ToolImplementation,
+  ModEventPayloadMap, // Import ModEventPayloadMap
 } from "@/mods/types";
+import { loadMods } from "@/mods/loader";
+import { modEvents } from "@/mods/events";
+import { ModEvent } from "@/mods/events";
+import type {
+  LiteChatModApi,
+  ModMiddlewareHookName,
+  ReadonlyChatContextSnapshot,
+} from "@/mods/api";
 import type {
   CustomPromptAction,
   CustomMessageAction,
   CustomSettingTab,
 } from "@/lib/types";
+import { useModContext } from "./mod-context";
 
-// This type definition is correct and matches mods/api.ts
-type RegistrationCallbacks = {
+// Define the type for the registration callbacks object
+// Ensure this matches the definition in src/mods/loader.ts
+interface RegistrationCallbacks {
   registerPromptAction: (action: CustomPromptAction) => () => void;
   registerMessageAction: (action: CustomMessageAction) => () => void;
   registerSettingsTab: (tab: CustomSettingTab) => () => void;
-  registerEventListener: <E extends keyof ModEventPayloadMap>(
-    eventName: E,
-    callback: (payload: ModEventPayloadMap[E]) => void,
+  registerTool: <PARAMETERS extends z.ZodSchema<any>>(
+    toolName: string,
+    definition: Tool<PARAMETERS>,
+    implementation?: ToolImplementation<PARAMETERS>,
   ) => () => void;
+  registerEventListener: <E extends keyof ModEventPayloadMap>( // Use imported ModEventPayloadMap
+    eventName: E,
+    callback: (payload: ModEventPayloadMap[E]) => void, // Use imported ModEventPayloadMap
+  ) => () => void;
+  // Update signature to include modId
   registerMiddleware: <H extends ModMiddlewareHookName>(
     hookName: H,
-    callback: (
-      payload: ModMiddlewarePayloadMap[H],
-    ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>,
+    callback: MiddlewareCallback<H>, // Callback type remains the same
+    modId: string, // Add modId parameter
   ) => () => void;
+}
+
+type MiddlewareCallback<H extends ModMiddlewareHookName> = (
+  payload: ModMiddlewarePayloadMap[H],
+) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>;
+
+type MiddlewareRegistry = {
+  [H in ModMiddlewareHookName]?: Array<{
+    modId: string;
+    callback: MiddlewareCallback<H>;
+  }>;
 };
 
 export function useChatMiddleware(setError: (error: string | null) => void) {
-  // Use any[] for the callbacks to avoid linting warnings about using Function type
-  const modEventListenersRef = useRef<Map<string, Map<string, any>>>(new Map());
-  const modMiddlewareCallbacksRef = useRef<Map<string, Map<string, any>>>(
+  const modContext = useModContext();
+  const middlewareRegistry = useRef<MiddlewareRegistry>({});
+  const eventListeners = useRef<Map<string, Set<(...args: any[]) => void>>>(
     new Map(),
   );
+  const modApiInstances = useRef<Map<string, LiteChatModApi>>(new Map());
 
-  const runMiddleware = useCallback(
-    async <H extends ModMiddlewareHookName>(
-      hookName: H,
-      initialPayload: ModMiddlewarePayloadMap[H],
-    ): Promise<ModMiddlewareReturnMap[H] | false> => {
-      const callbacksMap = modMiddlewareCallbacksRef.current.get(hookName);
-
-      // If no middleware registered for this hook, return the default value
-      if (!callbacksMap || callbacksMap.size === 0) {
-        const hook: ModMiddlewareHookName = hookName;
-        switch (hook) {
-          case ModMiddlewareHook.PROCESS_RESPONSE_CHUNK:
-            return (initialPayload as ProcessResponseChunkPayload)
-              .chunk as unknown as ModMiddlewareReturnMap[H];
-          case ModMiddlewareHook.RENDER_MESSAGE:
-            return (initialPayload as RenderMessagePayload)
-              .message as unknown as ModMiddlewareReturnMap[H];
-          case ModMiddlewareHook.SUBMIT_PROMPT:
-          case ModMiddlewareHook.VFS_WRITE:
-            return initialPayload as unknown as ModMiddlewareReturnMap[H];
-          default:
-            // Ensure all cases are handled or have a default
-            return initialPayload as unknown as ModMiddlewareReturnMap[H];
-        }
-      }
-
-      let currentData:
-        | ModMiddlewarePayloadMap[H]
-        | ModMiddlewareReturnMap[H]
-        | false = initialPayload;
-      const callbacks = Array.from(callbacksMap.values());
-
-      for (const callback of callbacks) {
-        // If a previous middleware cancelled the action, stop processing
-        if (currentData === false) {
-          break;
-        }
-        try {
-          // Execute the middleware callback
-          currentData = await callback(currentData as any); // Await handles both sync and async
-        } catch (err) {
-          // Handle errors during middleware execution
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          console.error(
-            `[Middleware] Error executing middleware for hook '${hookName}':`,
-            err,
-          );
-          // TODO: Identify which mod caused the error if possible (needs structural change)
-          toast.error(
-            `Middleware error during ${hookName}: ${errorMessage}. Action cancelled.`,
-          );
-          setError(`Middleware Error (${hookName}): ${errorMessage}`); // Update global error state
-          currentData = false; // Cancel the action
-          break; // Stop processing further middleware for this hook
-        }
-      }
-
-      // If the data wasn't modified by any middleware (and wasn't cancelled),
-      // return the default value based on the hook type.
-      if (currentData !== false && currentData === initialPayload) {
-        const hook: ModMiddlewareHookName = hookName;
-        switch (hook) {
-          case ModMiddlewareHook.PROCESS_RESPONSE_CHUNK:
-            return (initialPayload as ProcessResponseChunkPayload)
-              .chunk as unknown as ModMiddlewareReturnMap[H];
-          case ModMiddlewareHook.RENDER_MESSAGE:
-            return (initialPayload as RenderMessagePayload)
-              .message as unknown as ModMiddlewareReturnMap[H];
-          default:
-            return initialPayload as unknown as ModMiddlewareReturnMap[H];
-        }
-      }
-
-      // Return the final data (potentially modified) or false if cancelled
-      return currentData as ModMiddlewareReturnMap[H] | false;
-    },
-    [setError], // Added setError dependency
-  );
-
-  const registerModEventListener = useCallback(
-    <E extends keyof ModEventPayloadMap>( // Changed constraint
+  const registerEventListener = useCallback(
+    <E extends keyof ModEventPayloadMap>( // Use imported ModEventPayloadMap
       eventName: E,
-      callback: (payload: ModEventPayloadMap[E]) => void,
+      callback: (payload: ModEventPayloadMap[E]) => void, // Use imported ModEventPayloadMap
     ): (() => void) => {
-      // Wrap the callback to catch errors during event handling
-      const wrappedCallback = (payload: ModEventPayloadMap[E]) => {
-        // Type E is now guaranteed keyof
-        try {
-          callback(payload);
-        } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          // TODO: Identify which mod's listener failed if possible
-          console.error(
-            `[Event Listener] Error executing listener for event '${eventName}':`,
-            err,
-          );
-          toast.error(`Mod Error during event ${eventName}: ${errorMessage}.`);
-          // Optionally update global error state?
-          // setError(`Mod Event Listener Error (${eventName}): ${errorMessage}`);
-        }
-      };
-
-      modEvents.on(eventName, wrappedCallback);
-      const unsubscribe = () => {
-        modEvents.off(eventName, wrappedCallback);
-      };
-      return unsubscribe;
-    },
-    [], // Removed setError dependency here, as errors are handled locally
-  );
-
-  const registerModMiddleware = useCallback(
-    <H extends ModMiddlewareHookName>(
-      hookName: H,
-      callback: (
-        payload: ModMiddlewarePayloadMap[H],
-      ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>,
-    ): (() => void) => {
-      const middlewareId = nanoid();
-      const currentMap = modMiddlewareCallbacksRef.current;
-      if (!currentMap.has(hookName)) {
-        currentMap.set(hookName, new Map());
+      if (!eventListeners.current.has(eventName)) {
+        eventListeners.current.set(eventName, new Set());
       }
-      currentMap.get(hookName)?.set(middlewareId, callback);
+      const listeners = eventListeners.current.get(eventName)!;
+      listeners.add(callback);
       return () => {
-        const hookCallbacks = currentMap.get(hookName);
-        if (hookCallbacks) {
-          hookCallbacks.delete(middlewareId);
-          if (hookCallbacks.size === 0) {
-            currentMap.delete(hookName);
-          }
+        listeners.delete(callback);
+        if (listeners.size === 0) {
+          eventListeners.current.delete(eventName);
         }
       };
     },
     [],
   );
 
-  // Define the registration callbacks object using the local type
-  const registrationCallbacksForLoader: RegistrationCallbacks = {
-    registerPromptAction,
-    registerMessageAction,
-    registerSettingsTab,
-    registerEventListener: registerModEventListener,
-    registerMiddleware: registerModMiddleware,
-  };
+  const clearModReferences = useCallback(() => {
+    middlewareRegistry.current = {};
+    eventListeners.current.clear();
+    modApiInstances.current.clear();
+    modContext._clearRegisteredModItems();
+    modContext._clearRegisteredModTools();
+  }, [modContext]);
+
+  const loadModsWithContext = useCallback(
+    async (
+      dbMods: DbMod[],
+      getContextSnapshot: () => ReadonlyChatContextSnapshot,
+    ): Promise<ModInstance[]> => {
+      clearModReferences();
+
+      // This definition now matches the updated interface in loader.ts
+      const registrationCallbacks: RegistrationCallbacks = {
+        registerPromptAction: modContext._registerModPromptAction,
+        registerMessageAction: modContext._registerModMessageAction,
+        registerSettingsTab: modContext._registerModSettingsTab,
+        registerTool: modContext._registerModTool,
+        registerEventListener: registerEventListener,
+        // This function is passed to createApiForMod in loader.ts
+        // It expects hookName, callback, and modId
+        registerMiddleware: <H extends ModMiddlewareHookName>(
+          hookName: H,
+          callback: MiddlewareCallback<H>,
+          modId: string, // modId is now an expected parameter
+        ) => {
+          if (!middlewareRegistry.current[hookName]) {
+            // No assertion needed if MiddlewareRegistry type is correct
+            middlewareRegistry.current[hookName] = [];
+          }
+          // No assertion needed if MiddlewareRegistry type is correct
+          const middlewareList = middlewareRegistry.current[hookName]!;
+
+          const registration = { modId, callback };
+          middlewareList.push(registration);
+
+          // Return the unsubscribe function
+          return () => {
+            const list = middlewareRegistry.current[hookName];
+            if (list) {
+              // No assertion needed if MiddlewareRegistry type is correct
+              // @ts-expect-error we might need a fix for that, or not, I do not know
+              middlewareRegistry.current[hookName] = list.filter(
+                (reg) => reg !== registration,
+              );
+            }
+          };
+        },
+      };
+
+      // FIX: No TS error here now as the types match
+      const instances = await loadMods(
+        dbMods,
+        registrationCallbacks,
+        getContextSnapshot,
+      );
+
+      instances.forEach((instance) => {
+        if (instance.api) {
+          modApiInstances.current.set(instance.id, instance.api);
+        }
+      });
+
+      // Ensure APP_LOADED listeners are correctly handled
+      const appLoadedListeners =
+        eventListeners.current.get(ModEvent.APP_LOADED) ?? new Set();
+      modEvents.on(ModEvent.APP_LOADED, () => {
+        appLoadedListeners.forEach((cb) => cb(undefined));
+      });
+
+      modEvents.emit(ModEvent.APP_LOADED);
+
+      return instances;
+    },
+    [
+      clearModReferences,
+      modContext._registerModPromptAction,
+      modContext._registerModMessageAction,
+      modContext._registerModSettingsTab,
+      modContext._registerModTool,
+      registerEventListener,
+    ], // Added missing dependencies from registrationCallbacks
+  );
+
+  const runMiddleware = useCallback(
+    async <H extends ModMiddlewareHookName>(
+      hookName: H,
+      initialPayload: ModMiddlewarePayloadMap[H],
+    ): Promise<ModMiddlewareReturnMap[H]> => {
+      const callbacks = middlewareRegistry.current[hookName];
+      if (!callbacks || callbacks.length === 0) {
+        // FIX: Use 'as unknown as' for safer type assertion
+        // If no middleware runs, the initial payload is the result.
+        // The return type allows the payload type.
+        return initialPayload as unknown as ModMiddlewareReturnMap[H];
+      }
+
+      let currentPayload = initialPayload;
+
+      console.log(
+        `[Middleware] Running ${callbacks.length} middleware for hook ${hookName}`,
+      );
+
+      for (const { modId, callback } of callbacks) {
+        try {
+          console.log(`[Middleware] Executing ${hookName} for mod ${modId}`);
+          const result: ModMiddlewareReturnMap[H] =
+            await callback(currentPayload);
+
+          // Check for explicit cancellation first
+          if (result === false) {
+            console.log(
+              `[Middleware] Mod ${modId} cancelled action for hook ${hookName}`,
+            );
+            // Return type allows boolean, so direct return is fine
+            return false;
+          } else if (result === undefined || result === null) {
+            // No change, continue with the current payload
+            console.warn(
+              `[Middleware] Mod ${modId} returned undefined/null for hook ${hookName}. Assuming no change.`,
+            );
+          } else {
+            // FIX: Use 'as unknown as' for safer type assertion
+            // If not false/null/undefined, assume it's the modified payload
+            currentPayload = result as unknown as ModMiddlewarePayloadMap[H];
+          }
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          console.error(
+            `[Middleware] Error in mod ${modId} for hook ${hookName}:`,
+            error,
+          );
+          toast.error(`Middleware error in mod ${modId}: ${errorMessage}`);
+          setError(`Middleware error in mod ${modId}: ${errorMessage}`);
+          // Return false to indicate cancellation due to error
+          // Return type allows boolean, so direct return is fine
+          return false;
+        }
+      }
+
+      console.log(`[Middleware] Finished hook ${hookName}`);
+      // FIX: Use 'as unknown as' for safer type assertion
+      // The final payload is the result. Return type allows the payload type.
+      return currentPayload as unknown as ModMiddlewareReturnMap[H];
+    },
+    [setError],
+  );
 
   return {
-    modEventListenersRef,
-    modMiddlewareCallbacksRef,
+    loadModsWithContext,
     runMiddleware,
-    registerModEventListener,
-    registerModMiddleware,
-
-    // Helper for loading mods
-    loadModsWithContext: useCallback(
-      async (
-        dbMods: any[],
-        // registrationCallbacks: RegistrationCallbacks, // Use the object defined above
-        getContextSnapshotForMod: () => ReadonlyChatContextSnapshot,
-      ) => {
-        // Error handling is now more robust within loadMods itself
-        try {
-          // Pass the correctly typed registration object
-          const instances = await loadMods(
-            dbMods,
-            registrationCallbacksForLoader, // Pass the correctly typed object
-            getContextSnapshotForMod,
-          );
-          // APP_LOADED is emitted regardless of individual mod errors now
-          modEvents.emit(ModEvent.APP_LOADED);
-          return instances;
-        } catch (err: unknown) {
-          // This catch block might be less likely to be hit now,
-          // but kept as a fallback.
-          const message =
-            err instanceof Error ? err.message : "Unknown loading error";
-          setError(`Failed to load mods: ${message}`);
-          console.error("[Middleware] Critical error during loadMods:", err);
-          modEvents.emit(ModEvent.APP_LOADED); // Still emit loaded event
-          return []; // Return empty array on critical failure
-        }
-      },
-      [
-        setError,
-        registrationCallbacksForLoader, // Add dependency
-      ],
-    ),
-
-    // Helper for clearing mod references
-    clearModReferences: useCallback(() => {
-      // Note: This clears the *references* to callbacks, but doesn't
-      // necessarily call any 'unload' logic within the mods themselves.
-      modEventListenersRef.current.clear();
-      modMiddlewareCallbacksRef.current.clear();
-      // We also need to ensure event listeners registered via modEvents.on are cleared.
-      // This is handled by the unsubscribe function returned by registerModEventListener.
-      // Proper cleanup requires mods to be explicitly unloaded or the app to reload.
-      console.warn(
-        "[Middleware] Cleared mod references. Full cleanup may require mod unload logic or app reload.",
-      );
-    }, []),
+    clearModReferences,
   };
 }
-
-// Dummy implementations for registration functions needed by the hook but defined elsewhere
-// Replace these with actual imports or context values if available in this scope
-const registerPromptAction = (action: CustomPromptAction) => () => {
-  console.log(action);
-};
-const registerMessageAction = (action: CustomMessageAction) => () => {
-  console.log(action);
-};
-const registerSettingsTab = (tab: CustomSettingTab) => () => {
-  console.log(tab);
-};

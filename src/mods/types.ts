@@ -1,6 +1,7 @@
 // src/mods/types.ts
 import type { Message, SidebarItemType, MessageContent } from "@/lib/types"; // Import MessageContent
 import type { LiteChatModApi } from "./api";
+import type { Tool, ToolImplementation } from "./tools"; // Import Tool types
 
 // --- Database Schema for Mods ---
 export interface DbMod {
@@ -148,3 +149,6 @@ export interface ModMiddlewareReturnMap {
   "middleware:vfsWrite": VfsWriteReturn;
   // Add other middleware hooks here...
 }
+
+// --- Tool Types Re-export ---
+export type { Tool, ToolImplementation };

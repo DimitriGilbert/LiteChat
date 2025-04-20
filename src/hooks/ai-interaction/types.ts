@@ -6,7 +6,7 @@ import {
   AiProviderConfig,
   Message,
   DbMessage,
-  CoreMessage, // Use the type defined in src/lib/types.ts
+  CoreMessage, // Use the type defined in src/lib/types.ts (already updated)
   ImagePart, // Import ImagePart for return type
 } from "@/lib/types";
 
@@ -27,6 +27,26 @@ export interface UseAiInteractionProps {
   ) => Promise<string>;
   // Abort controller ref passed directly
   abortControllerRef: React.MutableRefObject<AbortController | null>;
+  // Function to get context snapshot for tool execution
+  getContextSnapshotForMod: () => Readonly<
+    Pick<
+      import("@/lib/types").ChatContextProps,
+      | "selectedItemId"
+      | "selectedItemType"
+      | "messages"
+      | "isStreaming"
+      | "selectedProviderId"
+      | "selectedModelId"
+      | "activeSystemPrompt"
+      | "temperature"
+      | "maxTokens"
+      | "theme"
+      | "isVfsEnabledForItem"
+      | "getApiKeyForProvider"
+    >
+  >;
+  // Function to bulk add messages to DB
+  bulkAddMessages: (messages: DbMessage[]) => Promise<unknown>;
 }
 
 export interface PerformAiStreamParams {

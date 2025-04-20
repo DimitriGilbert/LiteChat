@@ -1,5 +1,13 @@
 // src/mods/loader.ts
-import type { DbMod, ModInstance, ModEventPayloadMap } from "./types"; // Import ModEventPayloadMap
+import type {
+  DbMod,
+  ModInstance,
+  ModEventPayloadMap,
+  Tool, // Import Tool types
+  ToolImplementation,
+  ModMiddlewarePayloadMap, // Import payload map
+  ModMiddlewareReturnMap, // Import return map
+} from "./types";
 import type { LiteChatModApi, ReadonlyChatContextSnapshot } from "./api";
 import { toast } from "sonner";
 import { modEvents } from "./events"; // Use modEvents instance
@@ -9,163 +17,164 @@ import type {
   CustomMessageAction,
   CustomSettingTab,
 } from "@/lib/types";
-// Removed unused ModEventName import
 import type { ModMiddlewareHookName } from "./api";
+import type { z } from "zod"; // Import z
 
 // Type for the registration callbacks passed from ChatProvider
-// Updated to match the definition in chat-middleware.tsx and mods/api.ts
 interface RegistrationCallbacks {
   registerPromptAction: (action: CustomPromptAction) => () => void;
   registerMessageAction: (action: CustomMessageAction) => () => void;
   registerSettingsTab: (tab: CustomSettingTab) => () => void;
-  registerEventListener: <E extends keyof ModEventPayloadMap>( // Use keyof ModEventPayloadMap
-    eventName: E,
-    callback: (payload: ModEventPayloadMap[E]) => void, // Use specific payload type
+  // Add registerTool callback type
+  registerTool: <PARAMETERS extends z.ZodSchema<any>>(
+    toolName: string,
+    definition: Tool<PARAMETERS>,
+    implementation?: ToolImplementation<PARAMETERS>,
   ) => () => void;
+  registerEventListener: <E extends keyof ModEventPayloadMap>(
+    eventName: E,
+    callback: (payload: ModEventPayloadMap[E]) => void,
+  ) => () => void;
+  // FIX: Add modId to the signature to match usage
   registerMiddleware: <H extends ModMiddlewareHookName>(
     hookName: H,
-    callback: (payload: any) => any, // Keep 'any' here for simplicity in loader, API enforces type
+    callback: (
+      payload: ModMiddlewarePayloadMap[H],
+    ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>,
+    modId: string, // Add modId here
   ) => () => void;
 }
 
 /**
  * Loads and executes enabled mods from the database.
- * @param dbMods Array of mod data from the database.
- * @param registrationCallbacks Object containing functions to register actions, tabs, listeners, middleware.
- * @param getContextSnapshot Function to get a read-only snapshot of the current chat context.
- * @returns A promise that resolves to an array of loaded ModInstance objects.
  */
 export async function loadMods(
-  dbMods: DbMod[],
-  registrationCallbacks: RegistrationCallbacks, // Now expects the updated type
+  dbMods: DbMod[], // FIX: Use dbMods parameter
+  registrationCallbacks: RegistrationCallbacks,
   getContextSnapshot: () => ReadonlyChatContextSnapshot,
 ): Promise<ModInstance[]> {
-  const loadedInstances: ModInstance[] = [];
+  console.log(`[ModLoader] Loading ${dbMods.length} mods from DB.`);
+
+  // FIX: Filter enabled mods from dbMods
   const enabledMods = dbMods.filter((mod) => mod.enabled);
+  console.log(`[ModLoader] ${enabledMods.length} mods are enabled.`);
 
-  console.log(
-    `[ModLoader] Attempting to load ${enabledMods.length} enabled mods.`,
-  );
+  const instances = await Promise.all(
+    // FIX: Use enabledMods and type the 'mod' parameter
+    enabledMods.map(async (mod: DbMod) => {
+      let scriptContent = mod.scriptContent;
+      let modApi: LiteChatModApi | null = null;
+      let instanceError: Error | string | null = null;
+      const modId = mod.id; // Keep modId accessible
 
-  for (const mod of enabledMods) {
-    let scriptContent = mod.scriptContent;
-    let modApi: LiteChatModApi | null = null; // Initialize API object reference
-    let instanceError: Error | string | null = null; // Store potential error
-
-    try {
-      // Create the API object for this specific mod *before* fetching/executing
-      modApi = createApiForMod(mod, registrationCallbacks, getContextSnapshot);
-
-      // Fetch script if sourceUrl is provided
-      if (mod.sourceUrl) {
-        console.log(
-          `[ModLoader] Fetching script for mod "${mod.name}" from ${mod.sourceUrl}`,
-        );
-        const response = await fetch(mod.sourceUrl);
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch script: ${response.status} ${response.statusText}`,
-          );
-        }
-        scriptContent = await response.text();
-        console.log(
-          `[ModLoader] Fetched script for mod "${mod.name}" successfully.`,
-        );
-      }
-
-      if (!scriptContent) {
-        throw new Error("Mod script content is empty.");
-      }
-
-      // Execute the script in a controlled environment
-      console.log(
-        `[ModLoader] Executing script for mod "${mod.name}" (ID: ${mod.id})`,
-      );
-      // Using Function constructor for basic sandboxing (limited effectiveness in browser)
-      // The script should call registration functions on the provided `modApi` object.
-      const modFunction = new Function("modApi", scriptContent);
-      // Wrap execution in its own try-catch to differentiate execution errors
       try {
-        modFunction(modApi);
-        console.log(
-          `[ModLoader] Script executed successfully for mod "${mod.name}".`,
-        );
-      } catch (executionError) {
-        // Capture execution-specific errors
-        instanceError =
-          executionError instanceof Error
-            ? executionError
-            : String(executionError);
-        console.error(
-          `[ModLoader] Error *executing* mod "${mod.name}" (ID: ${mod.id}):`,
-          executionError,
-        );
-        toast.error(
-          `Error executing mod "${mod.name}": ${instanceError instanceof Error ? instanceError.message : instanceError}`,
-        );
-        // Re-throw or handle as needed - here we store it and continue to create the instance
-      }
-    } catch (loadingError) {
-      // Capture loading/fetching/compilation errors
-      instanceError =
-        loadingError instanceof Error ? loadingError : String(loadingError);
-      console.error(
-        `[ModLoader] Error *loading* mod "${mod.name}" (ID: ${mod.id}):`,
-        loadingError,
-      );
-      toast.error(
-        `Error loading mod "${mod.name}": ${instanceError instanceof Error ? instanceError.message : instanceError}`,
-      );
-    } finally {
-      // Always create an instance, including the error if one occurred
-      // Ensure modApi is created even if loading fails early, for consistency
-      if (!modApi) {
+        // Pass the modId to createApiForMod so it can be used in registerMiddleware
         modApi = createApiForMod(
-          mod,
+          mod, // Pass the full mod object
           registrationCallbacks,
           getContextSnapshot,
         );
-      }
 
-      const instance: ModInstance = {
-        id: mod.id,
-        name: mod.name,
-        api: modApi, // Store the API instance
-        error: instanceError ?? undefined, // Assign error if it exists
-      };
-      loadedInstances.push(instance);
+        if (mod.sourceUrl) {
+          try {
+            console.log(
+              `[ModLoader] Fetching script for mod ${mod.name} from ${mod.sourceUrl}`,
+            );
+            const response = await fetch(mod.sourceUrl);
+            if (!response.ok) {
+              throw new Error(
+                `Failed to fetch mod script: ${response.statusText}`,
+              );
+            }
+            scriptContent = await response.text();
+            console.log(
+              `[ModLoader] Fetched script for mod ${mod.name} successfully.`,
+            );
+          } catch (fetchError) {
+            throw new Error(
+              `Error fetching script from ${mod.sourceUrl}: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`,
+            );
+          }
+        }
 
-      // Emit appropriate event based on whether an error occurred
-      if (instance.error) {
-        modEvents.emit(ModEvent.MOD_ERROR, {
-          id: mod.id,
+        if (!scriptContent) {
+          throw new Error("Mod script content is empty.");
+        }
+
+        // Execute the mod script
+        console.log(`[ModLoader] Executing script for mod ${mod.name}`);
+        const modFunction = new Function("modApi", scriptContent);
+        try {
+          modFunction(modApi);
+          console.log(`[ModLoader] Successfully executed mod ${mod.name}`);
+        } catch (executionError) {
+          instanceError =
+            executionError instanceof Error
+              ? executionError
+              : String(executionError);
+          console.error(
+            `[ModLoader] Error executing script for mod ${mod.name} (ID: ${modId}):`,
+            instanceError,
+          );
+          toast.error(
+            `Error executing mod "${mod.name}": ${instanceError instanceof Error ? instanceError.message : instanceError}`,
+          );
+        }
+      } catch (loadingError) {
+        instanceError =
+          loadingError instanceof Error ? loadingError : String(loadingError);
+        console.error(
+          `[ModLoader] Error loading mod ${mod.name} (ID: ${modId}):`,
+          instanceError,
+        );
+        toast.error(
+          `Error loading mod "${mod.name}": ${instanceError instanceof Error ? instanceError.message : instanceError}`,
+        );
+      } finally {
+        // Ensure API exists even if loading/execution failed, for potential cleanup/error reporting
+        if (!modApi) {
+          modApi = createApiForMod(
+            mod, // Pass the full mod object
+            registrationCallbacks,
+            getContextSnapshot,
+          );
+        }
+        const instance: ModInstance = {
+          id: modId,
           name: mod.name,
-          error: instance.error,
-        });
-      } else {
-        modEvents.emit(ModEvent.MOD_LOADED, { id: mod.id, name: mod.name });
+          api: modApi, // API is always attached
+          error: instanceError ?? undefined, // Store error if one occurred
+        };
+
+        // Emit events based on success or failure
+        if (instance.error) {
+          modEvents.emit(ModEvent.MOD_ERROR, {
+            id: modId,
+            name: mod.name,
+            error: instance.error,
+          });
+        } else {
+          modEvents.emit(ModEvent.MOD_LOADED, { id: modId, name: mod.name });
+        }
+        return instance; // Return instance for Promise.all
       }
-    }
-  }
+    }),
+  );
 
   console.log(
-    `[ModLoader] Finished loading. ${loadedInstances.length} instances created (including errors).`,
+    `[ModLoader] Finished loading. ${instances.length} instances created (including errors).`,
   );
-  return loadedInstances;
+  return instances;
 }
 
-/**
- * Creates the API object passed to a single mod's script.
- */
 function createApiForMod(
-  mod: DbMod,
+  mod: DbMod, // Receive the full mod object
   registrationCallbacks: RegistrationCallbacks,
   getContextSnapshot: () => ReadonlyChatContextSnapshot,
 ): LiteChatModApi {
-  const modId = mod.id;
+  const modId = mod.id; // Get modId from the mod object
   const modName = mod.name;
 
-  // Store unsubscribe functions for this mod
   const unsubscribeCallbacks: Set<() => void> = new Set();
 
   const api: LiteChatModApi = {
@@ -187,20 +196,37 @@ function createApiForMod(
       unsubscribeCallbacks.add(unsubscribe);
       return unsubscribe;
     },
-    // The 'on' method here now correctly aligns with the updated RegistrationCallbacks type
-    on: (eventName, callback) => {
-      const unsubscribe = registrationCallbacks.registerEventListener(
-        eventName,
-        callback, // No assertion needed now as types match
+    registerTool: (toolName, definition, implementation) => {
+      const unsubscribe = registrationCallbacks.registerTool(
+        toolName,
+        definition,
+        implementation,
       );
       unsubscribeCallbacks.add(unsubscribe);
       return unsubscribe;
     },
-    addMiddleware: (hookName, callback) => {
-      // Type assertion needed because the callback in RegistrationCallbacks uses 'any'
+    on: (eventName, callback) => {
+      const unsubscribe = registrationCallbacks.registerEventListener(
+        eventName,
+        callback,
+      );
+      unsubscribeCallbacks.add(unsubscribe);
+      return unsubscribe;
+    },
+    // This addMiddleware is the one exposed to the mod script
+    addMiddleware: <H extends ModMiddlewareHookName>(
+      hookName: H,
+      // Use the specific callback type from the maps
+      callback: (
+        payload: ModMiddlewarePayloadMap[H],
+      ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>,
+    ) => {
+      // Call the internal registration function, passing the modId
+      // FIX: No need for 'as any' here if types align
       const unsubscribe = registrationCallbacks.registerMiddleware(
         hookName,
-        callback as (payload: any) => any,
+        callback,
+        modId, // Pass the modId
       );
       unsubscribeCallbacks.add(unsubscribe);
       return unsubscribe;
@@ -215,11 +241,11 @@ function createApiForMod(
       console[level](`[Mod: ${modName}]`, ...args);
     },
 
-    // TODO: Implement unload function if needed, which would call all unsubscribe callbacks
-    // unload: () => {
-    //   unsubscribeCallbacks.forEach(unsub => unsub());
+    // TODO: Implement cleanup logic if needed, e.g., called when mod is disabled/unloaded
+    // cleanup: () => {
+    //   unsubscribeCallbacks.forEach(cb => cb());
     //   unsubscribeCallbacks.clear();
-    //   console.log(`[ModLoader] Unloaded mod "${modName}" (ID: ${modId})`);
+    //   console.log(`[Mod: ${modName}] Cleaned up registrations.`);
     // }
   };
 

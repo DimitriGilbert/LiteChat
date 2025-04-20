@@ -30,10 +30,30 @@ export interface ImagePart {
   mediaType?: string;
 }
 
+// --- AI SDK Tool Call/Result Parts ---
+// Structure matching the 'tool_calls' property in assistant messages
+export interface ToolCallPart {
+  type: "tool-call";
+  toolCallId: string;
+  toolName: string;
+  args: any; // Arguments provided by the model for the tool call
+}
+
+// Structure matching the content of 'tool' role messages
+export interface ToolResultPart {
+  type: "tool-result";
+  toolCallId: string;
+  toolName: string;
+  result: any; // The result returned by the tool execution
+  /** Optional: Set to true if the tool execution resulted in an error */
+  isError?: boolean;
+}
+
 // Define the multi-modal content type based on AI SDK structure
-// Can be simple text, or an array containing text and image parts.
-// Assistant responses for image generation will use ImagePart[].
-export type MessageContent = string | Array<TextPart | ImagePart>;
+// Can be simple text, or an array containing text, image, tool-call, or tool-result parts.
+export type MessageContent =
+  | string
+  | Array<TextPart | ImagePart | ToolCallPart | ToolResultPart>;
 
 // --- Database Schemas ---
 export interface DbBase {
@@ -63,16 +83,19 @@ export interface DbConversation extends DbBase {
 
 export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {
   conversationId: string;
-  role: Role;
+  role: Role; // Updated Role type
   /** Updated content type - can be string or array of parts */
   content: MessageContent;
   vfsContextPaths?: string[];
-  // Add fields for potential future use with tool calls if needed
-  toolCallId?: string;
-  toolName?: string;
-  // Optional field to specifically mark image generation messages if needed,
-  // though checking content type might be sufficient.
-  // type?: 'image_generation';
+  // Optional fields matching AI SDK structure for tool interactions
+  /** Present on assistant messages that contain tool calls */
+  tool_calls?: Array<{
+    id: string; // Matches toolCallId in ToolCallPart
+    type: "function"; // AI SDK uses 'function' here
+    function: { name: string; arguments: string }; // Raw arguments string from AI
+  }>;
+  /** Present on tool messages to link them to the corresponding tool call */
+  tool_call_id?: string; // Matches toolCallId in ToolResultPart
 }
 
 export interface DbApiKey extends Pick<DbBase, "id" | "createdAt"> {
@@ -103,10 +126,10 @@ export interface DbProviderConfig extends DbBase {
 
 // --- UI & State Types ---
 export interface Message {
-  role: Role;
+  id: string; // Make ID mandatory for UI state consistency
+  role: Role; // Updated Role type
   /** Updated content type - can be string or array of parts */
   content: MessageContent;
-  id?: string;
   conversationId?: string;
   createdAt?: Date;
   isStreaming?: boolean;
@@ -119,11 +142,15 @@ export interface Message {
   tokensInput?: number;
   tokensOutput?: number;
   tokensPerSecond?: number;
-  // Add fields for potential future use with tool calls if needed
-  toolCallId?: string;
-  toolName?: string;
-  // Optional field to specifically mark image generation messages if needed
-  // type?: 'image_generation';
+  // Optional fields matching AI SDK structure for tool interactions
+  /** Present on assistant messages that contain tool calls */
+  tool_calls?: Array<{
+    id: string; // Matches toolCallId in ToolCallPart
+    type: "function"; // AI SDK uses 'function' here
+    function: { name: string; arguments: string }; // Raw arguments string from AI
+  }>;
+  /** Present on tool messages to link them to the corresponding tool call */
+  tool_call_id?: string; // Matches toolCallId in ToolResultPart
 }
 
 export interface SidebarItemBase extends DbBase {
@@ -147,6 +174,8 @@ export interface AiModelConfig {
   contextWindow?: number;
   // Add flag to indicate image generation capability
   supportsImageGeneration?: boolean;
+  // Flag to indicate tool calling capability (can be refined later)
+  supportsToolCalling?: boolean;
 }
 
 export interface AiProviderConfig {
@@ -399,6 +428,8 @@ export interface ChatContextProps {
   addDbMod: (modData: Omit<DbMod, "id" | "createdAt">) => Promise<string>;
   updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>;
   deleteDbMod: (id: string) => Promise<void>;
+  // Add modTools access if needed directly in context, though usually accessed via ModContext
+  // modTools: ReadonlyMap<string, import('../mods/types').RegisteredTool>;
 
   // --- Settings Modal Control (from SettingsContext) ---
   isSettingsModalOpen: boolean;
@@ -408,4 +439,5 @@ export interface ChatContextProps {
 // --- AI SDK CoreMessage Re-export/Alias ---
 // Re-exporting or aliasing the CoreMessage type from 'ai' package
 // This ensures we use the canonical type definition from the SDK
+// Includes 'role', 'content', and optional 'tool_calls' / 'tool_call_id'
 export type CoreMessage = AiCoreMessage;

@@ -1,4 +1,4 @@
-// src/components/lite-chat/message-bubble.tsx
+// src/components/lite-chat/message/message-bubble.tsx
 import React, { useState } from "react";
 import type { Message } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -55,7 +55,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   );
 };
 
-// --- Memoization Comparison Function (Adjusted for potential role changes) ---
+// --- Memoization Comparison Function (Revised) ---
 const messagesAreEqual = (
   prevProps: MessageBubbleProps,
   nextProps: MessageBubbleProps,
@@ -63,32 +63,48 @@ const messagesAreEqual = (
   const prevMsg = prevProps.message;
   const nextMsg = nextProps.message;
 
-  // Basic checks for changes that always warrant a rerender
+  // Quick exit for identical objects
+  if (prevMsg === nextMsg) return true;
+
+  // Check fields that determine fundamental state or identity
   if (
     prevMsg.id !== nextMsg.id ||
-    prevMsg.role !== nextMsg.role || // Role change is significant
-    prevMsg.error !== nextMsg.error ||
-    prevMsg.isStreaming !== nextMsg.isStreaming ||
-    // Deep compare VFS paths array if it exists
-    JSON.stringify(prevMsg.vfsContextPaths) !==
-      JSON.stringify(nextMsg.vfsContextPaths) ||
-    // Compare metadata that might change after streaming finishes
-    prevMsg.providerId !== nextMsg.providerId ||
-    prevMsg.modelId !== nextMsg.modelId ||
-    prevMsg.tokensInput !== nextMsg.tokensInput ||
-    prevMsg.tokensOutput !== nextMsg.tokensOutput ||
-    prevMsg.tokensPerSecond !== nextMsg.tokensPerSecond
+    prevMsg.role !== nextMsg.role ||
+    prevMsg.isStreaming !== nextMsg.isStreaming || // Crucial for detecting stream end
+    prevMsg.error !== nextMsg.error // Check for error changes
   ) {
+    // console.log(`[Memo] Diff found (basic): id=${prevMsg.id !== nextMsg.id}, role=${prevMsg.role !== nextMsg.role}, streaming=${prevMsg.isStreaming !== nextMsg.isStreaming}, error=${prevMsg.error !== nextMsg.error}`);
     return false;
   }
 
-  // If streaming, compare streamedContent
-  if (nextMsg.isStreaming) {
-    return prevMsg.streamedContent === nextMsg.streamedContent;
+  // Compare content - use stringify for robust comparison of string or array
+  if (JSON.stringify(prevMsg.content) !== JSON.stringify(nextMsg.content)) {
+    // console.log(`[Memo] Diff found (content): ${prevMsg.id}`);
+    return false;
   }
 
-  // If not streaming, compare final content
-  return prevMsg.content === nextMsg.content;
+  // If not streaming, compare other potentially changing metadata
+  if (!nextMsg.isStreaming) {
+    if (
+      JSON.stringify(prevMsg.tool_calls) !==
+        JSON.stringify(nextMsg.tool_calls) ||
+      prevMsg.tool_call_id !== nextMsg.tool_call_id ||
+      prevMsg.providerId !== nextMsg.providerId ||
+      prevMsg.modelId !== nextMsg.modelId ||
+      prevMsg.tokensInput !== nextMsg.tokensInput ||
+      prevMsg.tokensOutput !== nextMsg.tokensOutput ||
+      prevMsg.tokensPerSecond !== nextMsg.tokensPerSecond ||
+      JSON.stringify(prevMsg.vfsContextPaths) !==
+        JSON.stringify(nextMsg.vfsContextPaths)
+    ) {
+      // console.log(`[Memo] Diff found (metadata): ${prevMsg.id}`);
+      return false;
+    }
+  }
+
+  // If none of the above differences were found, the props are considered equal
+  // console.log(`[Memo] No diff found: ${prevMsg.id}`);
+  return true;
 };
 
 export const MemoizedMessageBubble = React.memo(

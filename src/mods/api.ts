@@ -9,6 +9,8 @@ import type {
   ModEventPayloadMap,
   ModMiddlewarePayloadMap,
   ModMiddlewareReturnMap,
+  Tool, // Import Tool type
+  ToolImplementation, // Import ToolImplementation type
 } from "./types";
 // Removed unused ModEventName import
 
@@ -54,6 +56,18 @@ export interface LiteChatModApi {
   registerMessageAction: (action: CustomMessageAction) => () => void;
   /** Registers a new tab in the main Settings modal. Returns an unsubscribe function. */
   registerSettingsTab: (tab: CustomSettingTab) => () => void;
+  /**
+   * Registers a tool that the AI can call.
+   * @param toolName - The name the AI will use to call the tool.
+   * @param toolDefinition - The definition of the tool (description, parameters).
+   * @param implementation - Optional implementation function. If not provided here, it must be included in the toolDefinition.
+   * @returns An unsubscribe function to remove the tool.
+   */
+  registerTool: <PARAMETERS extends import("zod").ZodSchema<any>>(
+    toolName: string,
+    toolDefinition: Tool<PARAMETERS>,
+    implementation?: ToolImplementation<PARAMETERS>,
+  ) => () => void;
 
   // --- Event Listening ---
   /**
