@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from "react"; // Added useCallback
-// Removed unused useSidebarStore import
-// import { useSidebarStore } from "@/store/sidebar.store"; // Assuming getProject is here
+// src/components/lite-chat/project/project-git-config.tsx
+import React, { useState, useEffect, useCallback } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { GitBranchIcon } from "lucide-react";
+import { GitBranchIcon, Loader2 } from "lucide-react"; // Added Loader2
 import { toast } from "sonner";
+import { db } from "@/lib/db"; // Import db instance
+import type { DbProject } from "@/lib/types"; // Import DbProject
 
 export interface ProjectGitConfigProps {
   projectId: string;
@@ -15,16 +16,6 @@ export interface ProjectGitConfigProps {
 export const ProjectGitConfig: React.FC<ProjectGitConfigProps> = ({
   projectId,
 }) => {
-  // Wrap placeholder functions in useCallback
-  const getProject = useCallback(async (id: string) => {
-    console.warn("getProject not implemented in store", id);
-    return undefined;
-  }, []); // Empty dependency array as it's a placeholder
-
-  const updateProject = useCallback(async (id: string, data: any) => {
-    console.warn("updateProject not implemented in store", id, data);
-  }, []); // Empty dependency array as it's a placeholder
-
   const [gitEnabled, setGitEnabled] = useState(false);
   const [gitRepoUrl, setGitRepoUrl] = useState("");
   const [gitRepoBranch, setGitRepoBranch] = useState("main");
@@ -37,14 +28,13 @@ export const ProjectGitConfig: React.FC<ProjectGitConfigProps> = ({
       if (projectId) {
         setIsLoading(true);
         try {
-          // Use store action/selector
-          const project = await getProject(projectId); // Now uses useCallback version
+          const project = await db.projects.get(projectId); // Use Dexie directly
           if (project) {
-            // Assuming these fields exist on the project object in the store
-            // setGitEnabled(!!project.gitRepoEnabled);
-            // setGitRepoUrl(project.gitRepoUrl || '');
-            // setGitRepoBranch(project.gitRepoBranch || 'main');
-            console.warn("Project git config loading not fully implemented");
+            setGitEnabled(!!project.gitRepoEnabled);
+            setGitRepoUrl(project.gitRepoUrl || "");
+            setGitRepoBranch(project.gitRepoBranch || "main");
+          } else {
+            toast.error("Project not found.");
           }
         } catch (error) {
           console.error("Failed to load project configuration:", error);
@@ -56,10 +46,10 @@ export const ProjectGitConfig: React.FC<ProjectGitConfigProps> = ({
     };
 
     loadProjectConfig();
-  }, [projectId, getProject]); // getProject is now stable
+  }, [projectId]);
 
   // Save project git configuration
-  const handleSaveConfig = async () => {
+  const handleSaveConfig = useCallback(async () => {
     if (!gitRepoUrl && gitEnabled) {
       toast.error("Please enter a repository URL");
       return;
@@ -67,13 +57,13 @@ export const ProjectGitConfig: React.FC<ProjectGitConfigProps> = ({
 
     setIsSaving(true);
     try {
-      // Use store action
-      await updateProject(projectId, {
-        // Now uses useCallback version
+      const updateData: Partial<DbProject> = {
         gitRepoEnabled: gitEnabled,
-        gitRepoUrl: gitRepoUrl,
-        gitRepoBranch: gitRepoBranch || "main",
-      });
+        gitRepoUrl: gitEnabled ? gitRepoUrl : null, // Store null if disabled
+        gitRepoBranch: gitEnabled ? gitRepoBranch || "main" : null, // Store null if disabled
+        updatedAt: new Date(), // Update timestamp
+      };
+      await db.projects.update(projectId, updateData); // Use Dexie directly
       toast.success("Project git configuration saved");
     } catch (error) {
       console.error("Failed to save git configuration:", error);
@@ -81,7 +71,7 @@ export const ProjectGitConfig: React.FC<ProjectGitConfigProps> = ({
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [projectId, gitEnabled, gitRepoUrl, gitRepoBranch]);
 
   if (isLoading) {
     return (
@@ -98,6 +88,7 @@ export const ProjectGitConfig: React.FC<ProjectGitConfigProps> = ({
             id="project-git-enabled"
             checked={gitEnabled}
             onCheckedChange={setGitEnabled}
+            disabled={isSaving}
           />
           <Label htmlFor="project-git-enabled" className="cursor-pointer">
             {gitEnabled ? "Enabled" : "Disabled"}
@@ -116,7 +107,7 @@ export const ProjectGitConfig: React.FC<ProjectGitConfigProps> = ({
                 placeholder="https://github.com/username/repo.git"
                 value={gitRepoUrl}
                 onChange={(e) => setGitRepoUrl(e.target.value)}
-                disabled={!gitEnabled}
+                disabled={!gitEnabled || isSaving}
               />
             </div>
           </div>
@@ -128,7 +119,7 @@ export const ProjectGitConfig: React.FC<ProjectGitConfigProps> = ({
               placeholder="main"
               value={gitRepoBranch}
               onChange={(e) => setGitRepoBranch(e.target.value)}
-              disabled={!gitEnabled}
+              disabled={!gitEnabled || isSaving}
             />
           </div>
 
@@ -138,11 +129,12 @@ export const ProjectGitConfig: React.FC<ProjectGitConfigProps> = ({
               disabled={!gitEnabled || isSaving || !gitRepoUrl}
               className="w-full"
             >
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSaving ? "Saving..." : "Save Configuration"}
             </Button>
             <p className="text-xs text-gray-500 mt-2">
               This configuration will automatically sync all conversations in
-              this project with the specified git repository.
+              this project with the specified git repository. (Feature WIP)
             </p>
           </div>
         </div>

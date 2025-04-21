@@ -5,17 +5,20 @@ import { cn } from "@/lib/utils";
 import { MessageHeader } from "./message-header";
 import { MessageBody } from "./message-body";
 import { MessageActionsContainer } from "./message-actions-container";
+import type { ReadonlyChatContextSnapshot } from "@/mods/api"; // Import snapshot type
 
 interface MessageBubbleProps {
   message: Message;
   onRegenerate?: (messageId: string) => void;
   className?: string;
+  getContextSnapshotForMod: () => ReadonlyChatContextSnapshot; // Add prop
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   onRegenerate,
   className,
+  getContextSnapshotForMod, // Destructure prop
 }) => {
   // System messages might not need folding state or have different behavior
   const initialFoldState = message.role === "system" ? true : false; // Example: Fold system by default
@@ -50,7 +53,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         onToggleFold={toggleMessageFold}
       />
       <MessageBody message={message} isFolded={isMessageFolded} />
-      <MessageActionsContainer message={message} onRegenerate={onRegenerate} />
+      {/* Pass getContextSnapshotForMod down */}
+      <MessageActionsContainer
+        message={message}
+        onRegenerate={onRegenerate}
+        getContextSnapshotForMod={getContextSnapshotForMod} // Pass prop
+      />
     </div>
   );
 };
@@ -101,6 +109,13 @@ const messagesAreEqual = (
     ) {
       return false;
     }
+  }
+
+  // Compare getContextSnapshotForMod function reference
+  if (
+    prevProps.getContextSnapshotForMod !== nextProps.getContextSnapshotForMod
+  ) {
+    return false;
   }
 
   // If none of the above differences were found, the props are considered equal

@@ -6,11 +6,26 @@ import { ChatHeader } from "./chat-header";
 import { cn } from "@/lib/utils";
 // Import prop types from parent
 import type { ChatWrapperProps } from "../chat";
+import type {
+  Message,
+  SidebarItemType,
+  SidebarItem,
+  MessageContent,
+  DbProviderConfig,
+  DbApiKey,
+  DbConversation,
+  CustomPromptAction,
+  AiModelConfig,
+} from "@/lib/types";
+import type { ReadonlyChatContextSnapshot } from "@/mods/api";
 
 // Wrap component logic in a named function for React.memo
 const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
   className,
-  // Destructure all props passed from LiteChatInner
+  // Destructure input state separately
+  promptInputValue,
+  setPromptInputValue,
+  // Destructure all other props passed from LiteChatInner
   selectedItemId,
   selectedItemType,
   sidebarItems,
@@ -18,12 +33,10 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
   isLoadingMessages,
   isStreaming,
   error,
-  promptInputValue,
   attachedFiles,
   selectedVfsPaths,
   isVfsEnabledForItem,
   regenerateMessage,
-  setPromptInputValue,
   addAttachedFile,
   removeAttachedFile,
   clearPromptInput,
@@ -63,14 +76,12 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
   vfsError,
   vfsKey,
   enableAdvancedSettings,
-  isSettingsModalOpen,
-  setIsSettingsModalOpen,
   setSelectedProviderId,
   setSelectedModelId,
   toggleVfsEnabledAction,
   stopStreaming,
   customPromptActions,
-  getContextSnapshotForMod, // Added
+  getContextSnapshotForMod,
   selectedModel,
   setError,
   removeSelectedVfsPath,
@@ -98,17 +109,18 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
         isLoadingMessages={isLoadingMessages}
         isStreaming={isStreaming}
         regenerateMessage={regenerateMessage}
+        getContextSnapshotForMod={getContextSnapshotForMod}
       />
       {/* Pass necessary props down to PromptWrapper */}
       <PromptWrapper
         error={error}
         // State/Actions for PromptForm
-        promptInputValue={promptInputValue}
+        promptInputValue={promptInputValue} // Pass down
+        setPromptInputValue={setPromptInputValue} // Pass down
         attachedFiles={attachedFiles}
         selectedVfsPaths={selectedVfsPaths}
         isVfsEnabledForItem={isVfsEnabledForItem}
         isStreaming={isStreaming}
-        setPromptInputValue={setPromptInputValue}
         addAttachedFile={addAttachedFile}
         removeAttachedFile={removeAttachedFile}
         clearPromptInput={clearPromptInput}
@@ -133,8 +145,6 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
         removeSelectedVfsPath={removeSelectedVfsPath}
         isVfsReady={isVfsReady}
         toggleVfsEnabledAction={toggleVfsEnabledAction}
-        isSettingsModalOpen={isSettingsModalOpen}
-        setIsSettingsModalOpen={setIsSettingsModalOpen}
         enableAdvancedSettings={enableAdvancedSettings}
         temperature={temperature}
         setTemperature={setTemperature}

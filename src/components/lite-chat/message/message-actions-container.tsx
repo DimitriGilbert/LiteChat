@@ -1,15 +1,25 @@
-// src/components/lite-chat/message-actions-container.tsx
+// src/components/lite-chat/message/message-actions-container.tsx
 import React from "react";
 import type { Message } from "@/lib/types";
-import { MessageActions } from "./message-actions"; // Assumes MessageActions is in the same directory
+import { MessageActions } from "./message-actions";
+import type { ReadonlyChatContextSnapshot } from "@/mods/api";
+import { useModStore } from "@/store/mod.store"; // Import store
 
 interface MessageActionsContainerProps {
   message: Message;
   onRegenerate?: (messageId: string) => void;
+  getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
 }
 
 export const MessageActionsContainer: React.FC<MessageActionsContainerProps> =
-  React.memo(({ message, onRegenerate }) => {
+  React.memo(({ message, onRegenerate, getContextSnapshotForMod }) => {
+    // Select custom actions here, outside MessageActions
+    const customMessageActions = useModStore((s) => s.modMessageActions);
+
+    console.log(
+      `[MessageActionsContainer] Rendering for msg ${message.id}. Custom actions count: ${customMessageActions.length}`,
+    );
+
     // Hide actions for system messages
     if (message.role === "system") {
       return null;
@@ -27,9 +37,14 @@ export const MessageActionsContainer: React.FC<MessageActionsContainerProps> =
 
     return (
       <div className="absolute right-4 h-full top-0">
-        {/* Adjust sticky positioning if needed, especially with folding */}
         <div className="sticky top-3.5 z-[1]">
-          <MessageActions message={message} onRegenerate={handleRegenerate} />
+          {/* Pass custom actions and snapshot function as props */}
+          <MessageActions
+            message={message}
+            onRegenerate={handleRegenerate}
+            getContextSnapshotForMod={getContextSnapshotForMod}
+            customMessageActions={customMessageActions} // Pass as prop
+          />
         </div>
       </div>
     );

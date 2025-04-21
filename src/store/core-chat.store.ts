@@ -6,146 +6,15 @@ import { toast } from "sonner";
 import { modEvents, ModEvent } from "@/mods/events";
 import { convertDbMessagesToCoreMessages } from "@/utils/chat-utils";
 import React from "react"; // Needed for MutableRefObject type
+import { db } from "@/lib/db"; // Import Dexie instance
+import { Dexie } from "dexie"; // Import Dexie for Dexie.minKey/maxKey
 
-// --- Mock/Placeholder Dependencies ---
-// These represent external dependencies that need proper injection (Task 8)
-
-// Placeholder for AbortController - needs external management
-const abortControllerRef: React.MutableRefObject<AbortController | null> = {
-  current: null,
-};
-
-// Placeholder DB functions (simulating access via a service/hook result)
-const storage = {
-  getMessagesForConversation: async (
-    conversationId: string,
-  ): Promise<DbMessage[]> => {
-    console.warn(
-      "Placeholder storage.getMessagesForConversation called",
-      conversationId,
-    );
-    // Simulate fetching data
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    // Return dummy data matching the type
-    if (conversationId === "error-case") {
-      throw new Error("Simulated DB load error");
-    }
-    return []; // Return empty array for now
-  },
-  addDbMessage: async (
-    messageData: Omit<DbMessage, "id" | "createdAt"> &
-      Partial<Pick<DbMessage, "id" | "createdAt">>,
-  ): Promise<string> => {
-    console.warn("Placeholder storage.addDbMessage called", messageData);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    return messageData.id ?? nanoid(); // Return provided/new ID
-  },
-  deleteDbMessage: async (messageId: string): Promise<void> => {
-    console.warn("Placeholder storage.deleteDbMessage called", messageId);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  },
-  // Add bulkAddMessages placeholder if needed by AI interaction
-  bulkAddMessages: async (messages: DbMessage[]): Promise<unknown> => {
-    console.warn("Placeholder storage.bulkAddMessages called", messages);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    return true;
-  },
-};
-
-// Placeholder AI Interaction functions (simulating access via a service/hook result)
-const aiInteraction = {
-  performAiStream: async (params: any): Promise<void> => {
-    console.warn("Placeholder aiInteraction.performAiStream called", params);
-    const { conversationIdToUse } = params;
-    // Simulate streaming: Set streaming true, add placeholder, update, finalize
-    useCoreChatStore.setState({ isStreaming: true, error: null });
-    const assistantId = nanoid();
-    const placeholder: Message = {
-      id: assistantId,
-      role: "assistant",
-      content: "",
-      createdAt: new Date(),
-      isStreaming: true,
-      conversationId: conversationIdToUse,
-    };
-    useCoreChatStore.getState().addMessage(placeholder);
-
-    await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate delay 1
-    useCoreChatStore
-      .getState()
-      .updateMessage(assistantId, { streamedContent: "Thinking..." }); // Update streamedContent
-
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate delay 2
-    useCoreChatStore.getState().updateMessage(assistantId, {
-      content: "This is a streamed response.", // Set final content
-      isStreaming: false, // Mark as finished
-      streamedContent: undefined, // Clear streamed content
-    });
-
-    useCoreChatStore.setState({ isStreaming: false });
-    // Simulate saving the final message (would happen inside performAiStream)
-    await storage.addDbMessage({
-      id: assistantId,
-      role: "assistant",
-      content: "This is a streamed response.",
-      createdAt: placeholder.createdAt,
-      conversationId: conversationIdToUse,
-    });
-  },
-  performImageGeneration: async (params: any): Promise<void> => {
-    console.warn(
-      "Placeholder aiInteraction.performImageGeneration called",
-      params,
-    );
-    const { conversationIdToUse, prompt } = params;
-    useCoreChatStore.setState({ isStreaming: true, error: null });
-    const assistantId = nanoid();
-    const placeholder: Message = {
-      id: assistantId,
-      role: "assistant",
-      content: `Generating image for: ${prompt}...`,
-      createdAt: new Date(),
-      isStreaming: true, // Indicate loading state
-      conversationId: conversationIdToUse,
-    };
-    useCoreChatStore.getState().addMessage(placeholder);
-
-    await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate generation
-
-    // Simulate result (e.g., a data URL)
-    const imageUrl =
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="; // 1x1 black pixel
-    const finalContent: MessageContent = [
-      { type: "text", text: `Generated image for: ${prompt}` },
-      { type: "image", image: imageUrl },
-    ];
-    useCoreChatStore.getState().updateMessage(assistantId, {
-      content: finalContent,
-      isStreaming: false,
-    });
-    useCoreChatStore.setState({ isStreaming: false });
-    // Simulate saving
-    await storage.addDbMessage({
-      id: assistantId,
-      role: "assistant",
-      content: finalContent,
-      createdAt: placeholder.createdAt,
-      conversationId: conversationIdToUse,
-    });
-  },
-};
-
-// Placeholder for getting settings - needs cross-store access (Task 8)
-const getSettings = () => ({
-  temperature: 0.7,
-  maxTokens: null,
-  topP: null,
-  topK: null,
-  presencePenalty: null,
-  frequencyPenalty: null,
-  activeSystemPrompt: null, // This needs proper derivation (global vs conversation)
-});
-// --- End Mock/Placeholder Dependencies ---
+// --- REMOVE Placeholder Dependencies ---
+// const abortControllerRef: React.MutableRefObject<AbortController | null> = { current: null };
+// const storage = { ... };
+// const aiInteraction = { ... };
+// const getSettings = () => { ... };
+// --- End REMOVE Placeholder Dependencies ---
 
 export interface CoreChatState {
   messages: Message[];
@@ -181,6 +50,7 @@ export interface CoreChatActions {
       Partial<Pick<DbMessage, "id" | "createdAt">>,
   ) => Promise<string>;
   bulkAddMessages: (messages: DbMessage[]) => Promise<unknown>;
+  deleteDbMessage: (messageId: string) => Promise<void>; // Add deleteDbMessage
 }
 
 export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
@@ -224,9 +94,15 @@ export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
       }
       set({ isLoadingMessages: true, error: null });
       try {
-        // Dependency: storage.getMessagesForConversation
-        const dbMessages =
-          await storage.getMessagesForConversation(conversationId);
+        // Use Dexie directly
+        const dbMessages = await db.messages
+          .where("[conversationId+createdAt]")
+          .between(
+            [conversationId, Dexie.minKey],
+            [conversationId, Dexie.maxKey],
+          )
+          .sortBy("createdAt");
+
         // Explicitly type dbMsg here
         const uiMessages: Message[] = dbMessages.map((dbMsg: DbMessage) => ({
           id: dbMsg.id,
@@ -253,11 +129,13 @@ export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
     },
 
     stopStreamingCore: () => {
-      // Dependency: abortControllerRef
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-        // Ensure streaming state is false
+      // This action needs access to the abortControllerRef, which is managed externally (e.g., in LiteChatInner)
+      // The external component should call this action AND manage the ref.
+      // For now, just update the state.
+      console.warn(
+        "stopStreamingCore called, but AbortController management is external.",
+      );
+      if (get().isStreaming) {
         set({ isStreaming: false });
         // Update any message that was actively streaming
         set((state) => ({
@@ -266,11 +144,6 @@ export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
           ),
         }));
         toast.info("Processing stopped.");
-      } else {
-        // If no controller, ensure streaming state is false anyway
-        if (get().isStreaming) {
-          set({ isStreaming: false });
-        }
       }
     },
 
@@ -279,6 +152,13 @@ export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
       contentToSendToAI,
       vfsContextPaths,
     ) => {
+      // This action depends on external AI interaction logic and settings.
+      // It should primarily handle saving the user message and triggering the external AI call.
+      // The external AI call handler (useAiInteraction) will then update state via store actions.
+      console.warn(
+        "handleSubmitCore called - relies on external AI interaction hook.",
+      );
+
       const userMessageId = nanoid();
       const userMessageTimestamp = new Date();
       const userMessage: Message = {
@@ -290,13 +170,11 @@ export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
         vfsContextPaths: vfsContextPaths,
       };
 
-      // Optimistic UI update
       get().addMessage(userMessage);
-      set({ error: null }); // Clear previous errors
+      set({ error: null });
 
       try {
-        // Dependency: storage.addDbMessage
-        await storage.addDbMessage({
+        await get().addDbMessage({
           id: userMessageId,
           conversationId: currentConversationId,
           role: "user",
@@ -304,58 +182,26 @@ export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
           createdAt: userMessageTimestamp,
           vfsContextPaths: vfsContextPaths,
         });
-        // Dependency: modEvents
         modEvents.emit(ModEvent.MESSAGE_SUBMITTED, { message: userMessage });
+        // Triggering the actual AI call is now the responsibility of the component using this store (e.g., LiteChatInner via useAiInteraction)
       } catch (err) {
         console.error("Failed to save user message:", err);
         set({ error: "Failed to save your message." });
         toast.error("Failed to save your message.");
-        // Rollback optimistic update
         get().removeMessage(userMessageId);
-        return; // Stop processing if DB save fails
-      }
-
-      // Prepare for AI call
-      const currentMessagesForApi = convertDbMessagesToCoreMessages(
-        get().messages, // Get current messages from state
-      );
-      // Dependency: getSettings (for AI params)
-      const settings = getSettings();
-      // Dependency: aiInteraction.performAiStream
-      try {
-        // aiInteraction functions should handle setting state via store setters
-        await aiInteraction.performAiStream({
-          conversationIdToUse: currentConversationId,
-          messagesToSend: currentMessagesForApi,
-          currentTemperature: settings.temperature,
-          currentMaxTokens: settings.maxTokens,
-          currentTopP: settings.topP,
-          currentTopK: settings.topK,
-          currentPresencePenalty: settings.presencePenalty,
-          currentFrequencyPenalty: settings.frequencyPenalty,
-          systemPromptToUse: settings.activeSystemPrompt,
-          // Pass necessary setters/refs if the real implementation needs them
-          // (though ideally the service manages state via store actions)
-          abortControllerRef: abortControllerRef,
-        });
-      } catch (err) {
-        console.error("Error during performAiStream call:", err);
-        const errorMsg =
-          err instanceof Error ? err.message : "Unknown AI error";
-        set({ error: `AI Error: ${errorMsg}` });
-        toast.error(`AI Error: ${errorMsg}`);
-        // Ensure streaming is off if an error bubbles up unexpectedly
-        if (get().isStreaming) {
-          set({ isStreaming: false });
-        }
+        throw err; // Re-throw to indicate failure
       }
     },
 
     handleImageGenerationCore: async (currentConversationId, prompt) => {
+      // Similar to handleSubmitCore, this triggers the external AI call.
+      console.warn(
+        "handleImageGenerationCore called - relies on external AI interaction hook.",
+      );
+
       const userMessageId = nanoid();
       const userMessageTimestamp = new Date();
       const userMessageContent = `/imagine ${prompt}`;
-
       const userMessage: Message = {
         id: userMessageId,
         conversationId: currentConversationId,
@@ -364,51 +210,35 @@ export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
         createdAt: userMessageTimestamp,
       };
 
-      // Optimistic UI update
       get().addMessage(userMessage);
-      set({ error: null }); // Clear previous errors
+      set({ error: null });
 
       try {
-        // Dependency: storage.addDbMessage
-        await storage.addDbMessage({
+        await get().addDbMessage({
           id: userMessageId,
           conversationId: currentConversationId,
           role: "user",
           content: userMessageContent,
           createdAt: userMessageTimestamp,
         });
-        // Dependency: modEvents
         modEvents.emit(ModEvent.MESSAGE_SUBMITTED, { message: userMessage });
+        // Triggering the actual AI call is external
       } catch (err) {
         console.error("Failed to save user image prompt message:", err);
         set({ error: "Failed to save your image prompt." });
         toast.error("Failed to save your image prompt.");
-        // Rollback optimistic update
         get().removeMessage(userMessageId);
-        return; // Stop processing if DB save fails
-      }
-
-      // Dependency: aiInteraction.performImageGeneration
-      try {
-        await aiInteraction.performImageGeneration({
-          conversationIdToUse: currentConversationId,
-          prompt: prompt,
-          // Pass necessary setters/refs if needed
-          abortControllerRef: abortControllerRef,
-        });
-      } catch (err) {
-        console.error("Error during performImageGeneration call:", err);
-        const errorMsg =
-          err instanceof Error ? err.message : "Unknown AI error";
-        set({ error: `AI Image Error: ${errorMsg}` });
-        toast.error(`AI Image Error: ${errorMsg}`);
-        if (get().isStreaming) {
-          set({ isStreaming: false });
-        }
+        throw err; // Re-throw
       }
     },
 
     regenerateMessageCore: async (messageId) => {
+      // This action also relies on external AI interaction logic.
+      // It should handle deleting the old message and preparing for the external call.
+      console.warn(
+        "regenerateMessageCore called - relies on external AI interaction hook.",
+      );
+
       const messages = get().messages;
       const messageIndex = messages.findIndex((m) => m.id === messageId);
 
@@ -430,7 +260,7 @@ export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
 
       set({ error: null });
 
-      // Find the preceding user message to determine context/type
+      // Find the preceding user message
       let precedingUserMessageIndex = -1;
       for (let i = messageIndex - 1; i >= 0; i--) {
         if (messages[i].role === "user") {
@@ -443,80 +273,98 @@ export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
         toast.error("Cannot regenerate: Preceding user message not found.");
         return;
       }
-      const precedingUserMessage = messages[precedingUserMessageIndex];
 
-      // --- Delete the old assistant message (DB and State) ---
+      // Delete the old assistant message (DB and State)
       try {
-        // Dependency: storage.deleteDbMessage
-        await storage.deleteDbMessage(messageId);
+        await get().deleteDbMessage(messageId); // Use store action
       } catch (err) {
         console.error("Failed to delete old assistant message from DB:", err);
         toast.warning("Could not delete previous message from database.");
       }
-      // Remove the message to be regenerated and any subsequent messages from state
       const messagesToKeep = messages.slice(0, messageIndex);
       set({ messages: messagesToKeep });
-      // --- End Deletion ---
 
-      // --- Trigger appropriate generation ---
-      if (
-        typeof precedingUserMessage.content === "string" &&
-        precedingUserMessage.content.startsWith("/imagine ")
-      ) {
-        // Regenerate Image
-        const imagePrompt = precedingUserMessage.content
-          .substring("/imagine ".length)
-          .trim();
-        if (imagePrompt) {
-          // Call the store's own action
-          await get().handleImageGenerationCore(conversationId, imagePrompt);
-        } else {
-          toast.error("Cannot regenerate: Invalid image prompt found.");
-          set({ error: "Cannot regenerate: Invalid image prompt found." });
-        }
-      } else {
-        // Regenerate Text
-        // Use the messages *before* deletion for history
-        const historyForApi = convertDbMessagesToCoreMessages(
-          messages.slice(0, precedingUserMessageIndex + 1),
+      // The component calling this (e.g., LiteChatInner) will now
+      // determine whether to call performAiStream or performImageGeneration
+      // based on the precedingUserMessage.
+    },
+
+    // Implement DB actions using Dexie
+    addDbMessage: async (messageData) => {
+      try {
+        const newMessage: DbMessage = {
+          id: messageData.id ?? nanoid(),
+          createdAt: messageData.createdAt ?? new Date(),
+          role: messageData.role,
+          content: messageData.content,
+          conversationId: messageData.conversationId,
+          vfsContextPaths: messageData.vfsContextPaths ?? undefined,
+          tool_calls: messageData.tool_calls ?? undefined,
+          tool_call_id: messageData.tool_call_id ?? undefined,
+        };
+        await db.messages.add(newMessage);
+        const conversation = await db.conversations.get(
+          messageData.conversationId,
         );
-        // Dependency: getSettings (for AI params)
-        const settings = getSettings();
-        // Dependency: aiInteraction.performAiStream
-        try {
-          await aiInteraction.performAiStream({
-            conversationIdToUse: conversationId,
-            messagesToSend: historyForApi,
-            currentTemperature: settings.temperature,
-            currentMaxTokens: settings.maxTokens,
-            currentTopP: settings.topP,
-            currentTopK: settings.topK,
-            currentPresencePenalty: settings.presencePenalty,
-            currentFrequencyPenalty: settings.frequencyPenalty,
-            systemPromptToUse: settings.activeSystemPrompt,
-            abortControllerRef: abortControllerRef,
-          });
-        } catch (err) {
-          console.error("Error during regeneration performAiStream call:", err);
-          const errorMsg =
-            err instanceof Error ? err.message : "Unknown AI error";
-          set({ error: `AI Error: ${errorMsg}` });
-          toast.error(`AI Error: ${errorMsg}`);
-          if (get().isStreaming) {
-            set({ isStreaming: false });
-          }
+        const now = new Date();
+        await db.conversations.update(messageData.conversationId, {
+          updatedAt: now,
+        });
+        if (conversation?.parentId) {
+          await db.projects.update(conversation.parentId, { updatedAt: now });
         }
+        return newMessage.id;
+      } catch (error) {
+        console.error("Failed to add DB message:", error);
+        toast.error(
+          `Failed to save message: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw error;
       }
     },
-
-    // Implement missing actions with placeholders
-    addDbMessage: async (messageData) => {
-      // This action should ideally just call the storage service
-      return storage.addDbMessage(messageData);
-    },
     bulkAddMessages: async (messages) => {
-      // This action should ideally just call the storage service
-      return storage.bulkAddMessages(messages);
+      if (messages.length === 0) return;
+      try {
+        const latestMessage = messages.reduce((latest, current) =>
+          latest.createdAt > current.createdAt ? latest : current,
+        );
+        const conversationId = latestMessage.conversationId;
+        const conversation = await db.conversations.get(conversationId);
+        const now = new Date();
+
+        await db.transaction(
+          "rw",
+          db.messages,
+          db.conversations,
+          db.projects,
+          async () => {
+            await db.messages.bulkAdd(messages);
+            await db.conversations.update(conversationId, { updatedAt: now });
+            if (conversation?.parentId) {
+              await db.projects.update(conversation.parentId, {
+                updatedAt: now,
+              });
+            }
+          },
+        );
+      } catch (error) {
+        console.error("Failed to bulk add DB messages:", error);
+        toast.error(
+          `Failed to save messages: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw error;
+      }
+    },
+    deleteDbMessage: async (messageId) => {
+      try {
+        await db.messages.delete(messageId);
+      } catch (error) {
+        console.error("Failed to delete DB message:", error);
+        toast.error(
+          `Failed to delete message: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw error;
+      }
     },
   }),
 );

@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { throttle } from "@/lib/throttle";
 import type { Message } from "@/lib/types"; // Import Message type
+import type { ReadonlyChatContextSnapshot } from "@/mods/api"; // Import snapshot type
 
 // Define props based on what ChatWrapper passes down
 interface ChatContentProps {
@@ -29,6 +30,7 @@ interface ChatContentProps {
   isLoadingMessages: boolean;
   isStreaming: boolean;
   regenerateMessage: (messageId: string) => void;
+  getContextSnapshotForMod: () => ReadonlyChatContextSnapshot; // Add prop
 }
 
 const SCROLL_THRESHOLD = 50;
@@ -41,6 +43,7 @@ const ChatContentComponent: React.FC<ChatContentProps> = ({
   isLoadingMessages,
   isStreaming,
   regenerateMessage,
+  getContextSnapshotForMod, // Destructure prop
 }) => {
   // REMOVED store access
 
@@ -376,7 +379,7 @@ const ChatContentComponent: React.FC<ChatContentProps> = ({
           {!isLoadingMessages &&
             messages.map((message) => (
               <div key={message.id}>
-                {/* MemoizedMessageBubble needs no store access, just props */}
+                {/* Pass getContextSnapshotForMod down */}
                 <MemoizedMessageBubble
                   message={message}
                   onRegenerate={
@@ -384,6 +387,7 @@ const ChatContentComponent: React.FC<ChatContentProps> = ({
                       ? handleRegenerate
                       : undefined
                   }
+                  getContextSnapshotForMod={getContextSnapshotForMod} // Pass prop
                 />
                 {/* Error display remains the same */}
                 {message.error && (

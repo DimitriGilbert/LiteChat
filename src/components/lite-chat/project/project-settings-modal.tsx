@@ -1,7 +1,5 @@
 // src/components/lite-chat/project/project-settings-modal.tsx
-import React, { useState, useEffect } from "react"; // Added useEffect
-// Import necessary store hooks
-import { useSidebarStore } from "@/store/sidebar.store"; // Assuming getProject is here
+import React, { useState, useEffect } from "react";
 import { ProjectGitConfig } from "./project-git-config";
 import {
   Dialog,
@@ -11,7 +9,9 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import type { DbProject } from "@/lib/types"; // Import DbProject
+import type { DbProject } from "@/lib/types";
+import { db } from "@/lib/db"; // Import db instance
+import { toast } from "sonner"; // Import toast
 
 export interface ProjectSettingsModalProps {
   projectId: string;
@@ -24,33 +24,47 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   open,
   onOpenChange,
 }) => {
-  // Get function to read state directly when needed
-  const getSidebarState = useSidebarStore.getState;
+  const [projectName, setProjectName] = useState("Loading...");
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [projectName, setProjectName] = useState("");
-
-  // Load project details when modal opens
+  // Load project details when modal opens or projectId changes
   useEffect(() => {
-    if (open && projectId) {
-      // Get current projects directly from store state inside the effect
-      const currentProjects = getSidebarState().dbProjects;
-      const project = currentProjects.find(
-        (p: DbProject) => p.id === projectId,
-      );
-      if (project) {
-        setProjectName(project.name);
-      } else {
-        console.warn(`Project ${projectId} not found in store state.`);
-        setProjectName("Unknown Project");
+    const loadProject = async () => {
+      if (open && projectId) {
+        setIsLoading(true);
+        try {
+          const project = await db.projects.get(projectId); // Use Dexie
+          if (project) {
+            setProjectName(project.name);
+          } else {
+            setProjectName("Unknown Project");
+            toast.error("Could not load project details.");
+            console.warn(`Project ${projectId} not found in DB.`);
+          }
+        } catch (error) {
+          setProjectName("Error Loading");
+          toast.error("Failed to load project details.");
+          console.error("Failed to load project:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      } else if (!open) {
+        // Reset when closed
+        setProjectName("Loading...");
+        setIsLoading(true);
       }
-    }
-  }, [open, projectId, getSidebarState]); // Depend on IDs and getState
+    };
+
+    loadProject();
+  }, [open, projectId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Project Settings: {projectName}</DialogTitle>
+          <DialogTitle>
+            Project Settings: {isLoading ? "Loading..." : projectName}
+          </DialogTitle>
           <DialogDescription>
             Configure settings for this project and all its conversations.
           </DialogDescription>
@@ -58,12 +72,20 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
 
         <Tabs defaultValue="git" className="w-full">
           <TabsList className="grid grid-cols-2 mb-4">
-            <TabsTrigger value="git">Git Repository</TabsTrigger>
-            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="git" disabled={isLoading}>
+              Git Repository
+            </TabsTrigger>
+            <TabsTrigger value="general" disabled={isLoading}>
+              General
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="git" className="space-y-4">
-            <ProjectGitConfig projectId={projectId} />
+            {isLoading ? (
+              <div className="p-4 text-center">Loading...</div>
+            ) : (
+              <ProjectGitConfig projectId={projectId} />
+            )}
           </TabsContent>
 
           <TabsContent value="general" className="space-y-4">

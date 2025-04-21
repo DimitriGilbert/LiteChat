@@ -18,6 +18,7 @@ import { modEvents, ModEvent } from "@/mods/events";
 import { useCoreChatStore } from "./core-chat.store";
 import { useVfsStore } from "./vfs.store";
 import { db } from "@/lib/db"; // Import Dexie instance
+import { Dexie } from "dexie"; // Import Dexie
 
 // Import Schema
 const messageImportSchema = z.object({
@@ -116,26 +117,38 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
       const currentId = get().selectedItemId;
       const currentType = get().selectedItemType;
 
-      if (currentId === id && currentType === type) return;
+      if (currentId === id && currentType === type) {
+        console.log(
+          `[SidebarStore] SelectItem: Already selected ${type}-${id}. Skipping.`,
+        );
+        return;
+      }
 
-      console.log(`[SidebarStore] Selecting item: ${type} - ${id}`);
+      console.log(`[SidebarStore] SelectItem: START selecting ${type} - ${id}`);
       set({
         selectedItemId: id,
         selectedItemType: type,
       });
 
       const coreChatActions = useCoreChatStore.getState();
+      console.log(
+        `[SidebarStore] SelectItem: Calling coreChatActions.loadMessages(${id})`,
+      );
       if (type === "conversation" && id) {
         await coreChatActions.loadMessages(id);
       } else {
         await coreChatActions.loadMessages(null);
       }
+      console.log(
+        `[SidebarStore] SelectItem: Finished coreChatActions.loadMessages(${id})`,
+      );
 
       const vfsActions = useVfsStore.getState();
       let isVfsEnabledForItem = false;
       let vfsKey: string | null = null;
 
       if (id && type) {
+        // Use live query data directly from the store state
         const allItems: SidebarItem[] = [
           ...get().dbProjects.map(
             (p): ProjectSidebarItem => ({ ...p, type: "project" }),
@@ -159,23 +172,34 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             ) as ProjectSidebarItem | undefined;
             if (parentProject?.vfsEnabled) {
               vfsKey = `project-${convo.parentId}`;
-              isVfsEnabledForItem = true;
+              isVfsEnabledForItem = true; // Inherit enabled state from parent project
             } else {
-              vfsKey = null;
+              // If parent project exists but VFS is disabled, conversation VFS is also disabled
+              vfsKey = null; // No specific key needed if disabled
               isVfsEnabledForItem = false;
             }
           } else {
+            // Orphan conversation
             vfsKey = "orphan";
-            isVfsEnabledForItem = convo?.vfsEnabled ?? false;
+            isVfsEnabledForItem = convo?.vfsEnabled ?? false; // Use its own setting
           }
         }
       }
 
+      console.log(
+        `[SidebarStore] SelectItem: Setting VFS key=${vfsKey}, enabled=${isVfsEnabledForItem}`,
+      );
       vfsActions.setVfsKey(vfsKey);
       vfsActions.setIsVfsEnabledForItem(isVfsEnabledForItem);
       vfsActions.clearSelectedVfsPaths();
 
+      console.log(
+        `[SidebarStore] SelectItem: Emitting ModEvent.CHAT_SELECTED for ${type}-${id}`,
+      );
       modEvents.emit(ModEvent.CHAT_SELECTED, { id, type });
+      console.log(
+        `[SidebarStore] SelectItem: FINISHED selecting ${type}-${id}`,
+      );
     },
 
     createConversation: async (parentId, title = "New Chat") => {
@@ -189,7 +213,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           systemPrompt: null,
           createdAt: now,
           updatedAt: now,
-          vfsEnabled: false,
+          vfsEnabled: false, // Default VFS to false for new conversations
         };
         await db.conversations.add(newConversation);
         if (parentId) {
@@ -221,7 +245,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           parentId,
           createdAt: now,
           updatedAt: now,
-          vfsEnabled: false,
+          vfsEnabled: false, // Default VFS to false for new projects
         };
         await db.projects.add(newProject);
         if (parentId) {
@@ -287,11 +311,16 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         modEvents.emit(ModEvent.CHAT_DELETED, { id, type });
 
         if (currentSelectedId === id) {
+          // Re-fetch items after deletion to get the correct next item
+          const [projects, conversations] = await Promise.all([
+            db.projects.orderBy("updatedAt").reverse().toArray(),
+            db.conversations.orderBy("updatedAt").reverse().toArray(),
+          ]);
           const remainingItems: SidebarItem[] = [
-            ...get().dbProjects.map(
+            ...projects.map(
               (p): ProjectSidebarItem => ({ ...p, type: "project" }),
             ),
-            ...get().dbConversations.map(
+            ...conversations.map(
               (c): ConversationSidebarItem => ({ ...c, type: "conversation" }),
             ),
           ];
@@ -329,9 +358,12 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         } else if (type === "project") {
           await db.projects.update(id, { name: trimmedName, updatedAt: now });
         }
-        console.warn(
-          "ModEvent.CHAT_RENAMED event emission skipped (event definition missing?)",
-        );
+        // Emit event (assuming definition exists)
+        modEvents.emit(ModEvent.CHAT_RENAMED, {
+          id,
+          type,
+          newName: trimmedName,
+        });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Unknown error";
         console.error(`Failed to rename ${type}:`, err);
@@ -346,9 +378,11 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           systemPrompt: systemPrompt,
           updatedAt: new Date(),
         });
-        console.warn(
-          "ModEvent.CHAT_SYSTEM_PROMPT_UPDATED event emission skipped (event definition missing?)",
-        );
+        // Emit event (assuming definition exists)
+        modEvents.emit(ModEvent.CHAT_SYSTEM_PROMPT_UPDATED, {
+          id,
+          systemPrompt,
+        });
       } catch (error) {
         console.error("Failed to update system prompt:", error);
         toast.error(
@@ -374,7 +408,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           toast.warning("Cannot export non-existent conversation.");
           return;
         }
-        // FIX: Add explicit type for msg
         const exportData = messagesToExport.map((msg: DbMessage) => ({
           role: msg.role,
           content:
@@ -488,7 +521,8 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
     exportAllConversations: async () => {
       toast.info("Exporting all conversations...");
       try {
-        const allConversations = get().dbConversations;
+        // Fetch directly from DB for the most up-to-date list
+        const allConversations = await db.conversations.toArray();
         if (!allConversations || allConversations.length === 0) {
           toast.info("No conversations found to export.");
           return;
@@ -509,7 +543,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             createdAt: conversation.createdAt.toISOString(),
             updatedAt: conversation.updatedAt.toISOString(),
             vfsEnabled: conversation.vfsEnabled,
-            // FIX: Add explicit type for msg
             messages: messages.map((msg: DbMessage) => ({
               role: msg.role,
               content:
@@ -543,15 +576,12 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
     },
 
     toggleVfsEnabled: async (id, type) => {
-      const allItems: SidebarItem[] = [
-        ...get().dbProjects.map(
-          (p): ProjectSidebarItem => ({ ...p, type: "project" }),
-        ),
-        ...get().dbConversations.map(
-          (c): ConversationSidebarItem => ({ ...c, type: "conversation" }),
-        ),
-      ];
-      const item = allItems.find((i) => i.id === id && i.type === type);
+      let item: DbProject | DbConversation | undefined;
+      if (type === "conversation") {
+        item = await db.conversations.get(id);
+      } else {
+        item = await db.projects.get(id);
+      }
 
       if (!item) {
         toast.warning("Item not found to toggle VFS.");
@@ -562,9 +592,12 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
       }
 
       const optimisticNewVfsState = !item.vfsEnabled;
+      console.log(
+        `[SidebarStore] toggleVfsEnabled: START toggling VFS for ${type} ${id} to ${optimisticNewVfsState}`,
+        new Error().stack, // Log stack trace
+      );
 
       try {
-        // FIX: Use db.table.update
         const now = new Date();
         if (type === "conversation") {
           await db.conversations.update(id, {
@@ -583,18 +616,27 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             await db.projects.update(item.parentId, { updatedAt: now });
           }
         }
-        // State update via live query
 
+        // Update VFS store state *if* this is the currently selected item
         if (get().selectedItemId === id) {
+          console.log(
+            `[SidebarStore] toggleVfsEnabled: Updating VFS store state for selected item.`,
+          );
           useVfsStore.getState().setIsVfsEnabledForItem(optimisticNewVfsState);
         }
 
-        console.warn(
-          "ModEvent.CHAT_VFS_TOGGLED event emission skipped (event definition missing?)",
-        );
+        // Emit event (assuming definition exists)
+        modEvents.emit(ModEvent.CHAT_VFS_TOGGLED, {
+          id,
+          type,
+          enabled: optimisticNewVfsState,
+        });
 
         toast.success(
           `Virtual Filesystem ${optimisticNewVfsState ? "enabled" : "disabled"} for ${type}.`,
+        );
+        console.log(
+          `[SidebarStore] toggleVfsEnabled: FINISHED toggling VFS for ${type} ${id}`,
         );
       } catch (err) {
         console.error("Failed to toggle VFS:", err);

@@ -1,7 +1,6 @@
 // src/components/lite-chat/prompt/prompt-wrapper.tsx
 import React from "react";
 import { PromptForm } from "./prompt-form";
-// REMOVED store imports
 import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 // Import prop types needed by PromptForm
@@ -11,22 +10,22 @@ import type {
   DbApiKey,
   DbConversation,
   SidebarItemType,
-  CustomPromptAction, // Added
-  ReadonlyChatContextSnapshot, // Import from lib/types
-  AiModelConfig, // Added
+  CustomPromptAction,
+  ReadonlyChatContextSnapshot,
+  AiModelConfig,
 } from "@/lib/types";
 
-// Define props based on what ChatWrapper passes down
+// Define props based on what ChatWrapper passes down (Remove modal props)
 interface PromptWrapperProps {
   className?: string;
   error: string | null;
   // State/Actions for PromptForm
-  promptInputValue: string;
+  promptInputValue: string; // Receive separately
+  setPromptInputValue: (value: string) => void; // Receive separately
   attachedFiles: File[];
   selectedVfsPaths: string[];
   isVfsEnabledForItem: boolean;
   isStreaming: boolean;
-  setPromptInputValue: (value: string) => void;
   addAttachedFile: (file: File) => void;
   removeAttachedFile: (fileName: string) => void;
   clearPromptInput: () => void;
@@ -68,8 +67,6 @@ interface PromptWrapperProps {
   removeSelectedVfsPath: (path: string) => void;
   isVfsReady: boolean;
   toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>;
-  isSettingsModalOpen: boolean;
-  setIsSettingsModalOpen: (isOpen: boolean) => void;
   enableAdvancedSettings: boolean;
   temperature: number;
   setTemperature: (temp: number) => void;
@@ -92,7 +89,7 @@ interface PromptWrapperProps {
   setSelectedProviderId: (id: string | null) => void;
   setSelectedModelId: (id: string | null) => void;
   customPromptActions: CustomPromptAction[];
-  getContextSnapshotForMod: () => ReadonlyChatContextSnapshot; // Changed name
+  getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   selectedModel: AiModelConfig | undefined;
   stopStreaming: () => void;
   isVfsLoading: boolean;
@@ -103,12 +100,10 @@ interface PromptWrapperProps {
 // Wrap component logic in a named function for React.memo
 const PromptWrapperComponent: React.FC<PromptWrapperProps> = ({
   className,
-  error, // Use prop
+  error,
   // Pass all other props down to PromptForm
   ...promptFormProps
 }) => {
-  // REMOVED store access
-
   return (
     <div className={cn("flex-shrink-0", className)}>
       {error && (

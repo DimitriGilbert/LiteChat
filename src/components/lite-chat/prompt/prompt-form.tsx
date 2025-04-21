@@ -147,7 +147,7 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   setSelectedModelId,
   selectedItemId,
   selectedItemType,
-  dbConversations, // Keep for deriving activeConversationData
+  // dbConversations, // REMOVED - Unused directly
   createConversation,
   selectItem,
   deleteItem,
@@ -382,8 +382,7 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
           isVfsLoading={isVfsLoading}
           vfsError={vfsError}
           vfsKey={vfsKey}
-          // Pass down stopStreaming
-          stopStreaming={stopStreaming}
+          // REMOVED: stopStreaming={stopStreaming}
         />
       </div>
     </form>

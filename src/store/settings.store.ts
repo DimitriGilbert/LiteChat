@@ -72,8 +72,13 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
       // not directly within the store action.
     },
     setSearchTerm: (searchTerm) => set({ searchTerm }),
-    setIsSettingsModalOpen: (isSettingsModalOpen) =>
-      set({ isSettingsModalOpen }),
+    setIsSettingsModalOpen: (isOpen) => {
+      console.log(
+        `[SettingsStore] setIsSettingsModalOpen called with: ${isOpen}`,
+        new Error().stack, // Log stack trace
+      );
+      set({ isSettingsModalOpen: isOpen });
+    },
     setTemperature: (temperature) => set({ temperature }),
     setMaxTokens: (maxTokens) => set({ maxTokens }),
     setGlobalSystemPrompt: (globalSystemPrompt) => set({ globalSystemPrompt }),

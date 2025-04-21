@@ -12,7 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 // REMOVED: import type { SidebarItem, DbConversation, SidebarItemType } from "@/lib/types";
-import type { DbConversation } from "@/lib/types"; // Keep DbConversation if needed
+import type { DbConversation, SidebarItem, SidebarItemType } from "@/lib/types"; // Keep DbConversation if needed
 import type { ChatSideProps } from "../chat"; // Import props from parent
 
 // Wrap component logic in a named function for React.memo
@@ -42,7 +42,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   );
 
   console.log(
-    `[ChatSide] Rendering. Items count: ${sidebarItems.length}, Editing: ${editingItemId}`,
+    `[ChatSide] Rendering. Items count: ${sidebarItems.length}, Editing: ${editingItemId}, Modal Open: ${isSettingsModalOpen}`,
   );
 
   // Effect to determine parent ID for new items based on selection props
@@ -101,6 +101,14 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
       event.target.value = "";
     }
   };
+
+  // Add logging to the settings modal trigger
+  const handleOpenSettingsModal = useCallback(() => {
+    console.log(
+      "[ChatSide] Settings button clicked. Calling setIsSettingsModalOpen(true).",
+    );
+    setIsSettingsModalOpen(true);
+  }, [setIsSettingsModalOpen]);
 
   return (
     <aside
@@ -169,7 +177,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
         <Button
           variant="outline"
           className="w-full justify-start gap-2 text-sm h-9 border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
-          onClick={() => setIsSettingsModalOpen(true)}
+          onClick={handleOpenSettingsModal} // Use the new handler
         >
           <SettingsIcon className="h-4 w-4" />
           Settings
@@ -179,7 +187,12 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
       {/* Settings Modal - Pass down bundled props */}
       <SettingsModal
         isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
+        onClose={() => {
+          console.log(
+            "[ChatSide] SettingsModal onClose triggered. Calling setIsSettingsModalOpen(false).",
+          );
+          setIsSettingsModalOpen(false);
+        }}
         settingsProps={settingsProps} // Pass the bundled props object
       />
     </aside>

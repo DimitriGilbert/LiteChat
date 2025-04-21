@@ -1,12 +1,10 @@
 // src/components/lite-chat/message/message-actions.tsx
-import React from "react";
+import React, { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { CopyIcon, RefreshCwIcon } from "lucide-react";
 import { toast } from "sonner";
-// Removed useChatContext import
-// Import necessary store hooks
-import { useModStore } from "@/store/mod.store";
-import type { Message, TextPart } from "@/lib/types"; // Import TextPart
+// REMOVED: import { useModStore } from "@/store/mod.store"; // No longer needed here
+import type { Message, TextPart, CustomMessageAction } from "@/lib/types"; // Added CustomMessageAction
 import {
   Tooltip,
   TooltipContent,
@@ -14,28 +12,32 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import type { ReadonlyChatContextSnapshot } from "@/mods/api";
 
 interface MessageActionsProps {
-  message: Message; // Accept the full message object
+  message: Message;
   onRegenerate?: () => void;
   className?: string;
+  getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
+  customMessageActions: CustomMessageAction[]; // Receive as prop
 }
 
 export const MessageActions: React.FC<MessageActionsProps> = React.memo(
-  ({ message, onRegenerate, className }) => {
-    // Get custom actions from mod store
-    const { customMessageActions } = useModStore((s) => ({
-      customMessageActions: s.modMessageActions,
-    }));
+  ({
+    message,
+    onRegenerate,
+    className,
+    getContextSnapshotForMod,
+    customMessageActions, // Use prop
+  }) => {
+    // Use the stable prop directly
+    const getContextSnapshot = getContextSnapshotForMod;
 
-    // TODO: Get context snapshot function if needed by custom actions
-    // This might require importing multiple stores or a dedicated selector
-    const getContextSnapshot = () => {
-      console.warn("Context snapshot for message actions not implemented");
-      return {}; // Placeholder
-    };
+    console.log(
+      `[MessageActions] Rendering for msg ${message.id}. Custom actions count: ${customMessageActions.length}`,
+    );
 
-    const handleCopy = () => {
+    const handleCopy = useCallback(() => {
       let textToCopy = "";
       if (typeof message.content === "string") {
         textToCopy = message.content;
@@ -63,7 +65,7 @@ export const MessageActions: React.FC<MessageActionsProps> = React.memo(
           toast.error("Failed to copy text.");
           console.error("Copy failed:", err);
         });
-    };
+    }, [message.content]);
 
     return (
       <div
@@ -72,13 +74,19 @@ export const MessageActions: React.FC<MessageActionsProps> = React.memo(
           className,
         )}
       >
-        {/* Custom Message Actions */}
+        {/* Custom Message Actions - Use prop */}
         {customMessageActions.map((action) => {
-          const contextSnapshot = getContextSnapshot(); // Get snapshot if needed
+          // Simplify visibility check for now - assume visible if defined
           const isVisible = action.isVisible
-            ? action.isVisible(message, contextSnapshot as any) // Pass snapshot
+            ? action.isVisible(message, {} as any) // Still passing dummy context
             : true;
+
           if (!isVisible) return null;
+
+          const handleClick = () => {
+            const contextSnapshot = getContextSnapshot();
+            action.onClick(message, contextSnapshot as any);
+          };
 
           return (
             <TooltipProvider key={action.id} delayDuration={100}>
@@ -88,9 +96,7 @@ export const MessageActions: React.FC<MessageActionsProps> = React.memo(
                     variant="ghost"
                     size="icon"
                     className={cn("h-6 w-6", action.className)}
-                    onClick={() =>
-                      action.onClick(message, contextSnapshot as any)
-                    } // Pass snapshot
+                    onClick={handleClick}
                     aria-label={action.tooltip}
                   >
                     {action.icon}
