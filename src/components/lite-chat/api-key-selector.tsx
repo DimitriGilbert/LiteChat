@@ -6,10 +6,9 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
-// import { useProviderManagementContext } from "@/context/provider-management-context";
 import { KeyIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { DbApiKey } from "@/lib/types"; // Import DbApiKey
+import type { DbApiKey } from "@/lib/types";
 
 interface ApiKeySelectorProps {
   className?: string;
@@ -51,26 +50,26 @@ export const ApiKeySelector: React.FC<ApiKeySelectorProps> = ({
     >
       <SelectTrigger
         className={cn(
-          "w-full h-9 text-sm bg-gray-700 border-gray-600 text-gray-200", // Changed default width to full
+          "w-full h-9 text-sm bg-background border-border text-foreground",
           className,
         )}
         aria-label={label || "Select API Key"}
       >
         <div className="flex items-center overflow-hidden">
-          <KeyIcon className="h-3 w-3 mr-1.5 text-gray-400 flex-shrink-0" />
+          <KeyIcon className="h-3 w-3 mr-1.5 text-muted-foreground flex-shrink-0" />
           <span className="truncate flex-grow text-left">
             {label && <span className="mr-1">{label}</span>}
             {apiKeys.length === 0 ? (
-              <span className="text-gray-400">No keys available</span>
+              <span className="text-muted-foreground">No keys available</span>
             ) : (
               displayValue
             )}
           </span>
         </div>
       </SelectTrigger>
-      <SelectContent className="bg-gray-700 border-gray-600 text-gray-200">
+      <SelectContent className="bg-popover border-border text-popover-foreground">
         <SelectItem value="none">
-          <span className="text-gray-400">None</span>
+          <span className="text-muted-foreground">None</span>
         </SelectItem>
         {apiKeys.map((key) => (
           <SelectItem key={key.id} value={key.id}>

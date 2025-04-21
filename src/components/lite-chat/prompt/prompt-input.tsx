@@ -3,24 +3,21 @@ import React, { useRef, useEffect, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-// Define props based on what PromptForm passes down
 interface PromptInputProps {
   className?: string;
   prompt: string;
-  setPrompt: (value: string) => void; // Use the prop setter type
+  setPrompt: (value: string) => void;
   isStreaming: boolean;
 }
 
-// Wrap component logic in a named function for React.memo
 const PromptInputComponent: React.FC<PromptInputProps> = ({
   className,
-  prompt, // Use prop
-  setPrompt, // Use prop
-  isStreaming, // Use prop
+  prompt,
+  setPrompt,
+  isStreaming,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Internal logic remains the same, uses props
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       const isModKey = e.metaKey || e.ctrlKey;
@@ -47,29 +44,28 @@ const PromptInputComponent: React.FC<PromptInputProps> = ({
     if (textarea) {
       textarea.style.height = "auto";
       const scrollHeight = textarea.scrollHeight;
-      const maxHeight = 200; // Or get from config/props if needed
+      const maxHeight = 200;
       textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
     }
-  }, [prompt]); // Depend on prop
+  }, [prompt]);
 
   return (
     <Textarea
       ref={textareaRef}
-      value={prompt} // Use prop
-      onChange={(e) => setPrompt(e.target.value)} // Use prop action
+      value={prompt}
+      onChange={(e) => setPrompt(e.target.value)}
       onKeyDown={handleKeyDown}
       placeholder="Type a message... (Shift+Enter for new line)"
       className={cn(
-        "flex-grow resize-none rounded-md border border-gray-700 bg-gray-800 px-4 py-3 text-base shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-50 text-gray-200",
+        "flex-grow resize-none rounded-md border border-border bg-background px-4 py-3 text-base shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 text-foreground transition-all",
         "min-h-[60px] max-h-[200px]",
         className,
       )}
       rows={3}
-      disabled={isStreaming} // Use prop
+      disabled={isStreaming}
       aria-label="Chat input"
     />
   );
 };
 
-// Export the memoized component
 export const PromptInput = React.memo(PromptInputComponent);

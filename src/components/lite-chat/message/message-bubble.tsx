@@ -1,34 +1,32 @@
 // src/components/lite-chat/message/message-bubble.tsx
 import React, { useState } from "react";
-import type { Message, CustomMessageAction } from "@/lib/types"; // Added CustomMessageAction
+import type { Message, CustomMessageAction } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { MessageHeader } from "./message-header";
 import { MessageBody } from "./message-body";
 import { MessageActionsContainer } from "./message-actions-container";
-import type { ReadonlyChatContextSnapshot } from "@/mods/api"; // Import snapshot type
+import type { ReadonlyChatContextSnapshot } from "@/mods/api";
 
 interface MessageBubbleProps {
   message: Message;
   onRegenerate?: (messageId: string) => void;
   className?: string;
-  getContextSnapshotForMod: () => ReadonlyChatContextSnapshot; // Add prop
-  modMessageActions: CustomMessageAction[]; // Add prop for custom actions
+  getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
+  modMessageActions: CustomMessageAction[];
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   onRegenerate,
   className,
-  getContextSnapshotForMod, // Destructure prop
-  modMessageActions, // Destructure prop
+  getContextSnapshotForMod,
+  modMessageActions,
 }) => {
-  // System messages might not need folding state or have different behavior
-  const initialFoldState = message.role === "system" ? true : false; // Example: Fold system by default
+  const initialFoldState = message.role === "system" ? true : false;
   const [isMessageFolded, setIsMessageFolded] = useState(initialFoldState);
 
   const toggleMessageFold = () => setIsMessageFolded((prev) => !prev);
 
-  // Skip rendering entirely for system messages if they have no content and no error
   if (message.role === "system" && !message.content && !message.error) {
     return null;
   }
@@ -41,11 +39,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       className={cn(
         "group/message flex gap-3 px-4 py-3 transition-colors relative rounded-lg",
         isUser
-          ? "bg-gray-900/50"
+          ? "bg-background/50"
           : isSystem
-            ? "bg-gray-800/30 border border-dashed border-gray-700/50" // Example style for system
-            : "bg-gray-800/60",
-        !isSystem && "hover:bg-gray-800", // Don't apply hover to system messages
+            ? "bg-muted/30 border border-dashed border-border"
+            : "bg-muted/60",
+        !isSystem && "hover:bg-muted/80 transition-all duration-200",
         className,
       )}
     >
@@ -55,18 +53,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         onToggleFold={toggleMessageFold}
       />
       <MessageBody message={message} isFolded={isMessageFolded} />
-      {/* Pass getContextSnapshotForMod and modMessageActions down */}
       <MessageActionsContainer
         message={message}
         onRegenerate={onRegenerate}
-        getContextSnapshotForMod={getContextSnapshotForMod} // Pass prop
-        modMessageActions={modMessageActions} // Pass prop
+        getContextSnapshotForMod={getContextSnapshotForMod}
+        modMessageActions={modMessageActions}
       />
     </div>
   );
 };
 
-// --- Memoization Comparison Function (Revised) ---
 const messagesAreEqual = (
   prevProps: MessageBubbleProps,
   nextProps: MessageBubbleProps,
@@ -74,30 +70,25 @@ const messagesAreEqual = (
   const prevMsg = prevProps.message;
   const nextMsg = nextProps.message;
 
-  // Quick exit for identical objects
   if (prevMsg === nextMsg) return true;
 
-  // Check fields that determine fundamental state or identity
   if (
     prevMsg.id !== nextMsg.id ||
     prevMsg.role !== nextMsg.role ||
-    prevMsg.isStreaming !== nextMsg.isStreaming || // Crucial for detecting stream end/start
-    prevMsg.error !== nextMsg.error // Check for error changes
+    prevMsg.isStreaming !== nextMsg.isStreaming ||
+    prevMsg.error !== nextMsg.error
   ) {
     return false;
   }
 
-  // If streaming, compare streamedContent
   if (nextMsg.isStreaming) {
     if (prevMsg.streamedContent !== nextMsg.streamedContent) {
       return false;
     }
   } else {
-    // If not streaming, compare final content
     if (JSON.stringify(prevMsg.content) !== JSON.stringify(nextMsg.content)) {
       return false;
     }
-    // Compare other potentially changing metadata only when not streaming
     if (
       JSON.stringify(prevMsg.tool_calls) !==
         JSON.stringify(nextMsg.tool_calls) ||
@@ -114,19 +105,16 @@ const messagesAreEqual = (
     }
   }
 
-  // Compare getContextSnapshotForMod function reference
   if (
     prevProps.getContextSnapshotForMod !== nextProps.getContextSnapshotForMod
   ) {
     return false;
   }
 
-  // Compare custom message actions reference (important for mods)
   if (prevProps.modMessageActions !== nextProps.modMessageActions) {
     return false;
   }
 
-  // If none of the above differences were found, the props are considered equal
   return true;
 };
 

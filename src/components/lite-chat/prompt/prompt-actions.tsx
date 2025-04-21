@@ -1,10 +1,7 @@
 // src/components/lite-chat/prompt/prompt-actions.tsx
-import React, { useRef } from "react"; // Removed useMemo, useCallback
+import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { SendHorizonalIcon, PaperclipIcon, ImageIcon } from "lucide-react";
-// REMOVED store imports
-// import { useModStore } from "@/store/mod.store";
-// import { useProviderStore } from "@/store/provider.store";
 import {
   Tooltip,
   TooltipContent,
@@ -12,43 +9,31 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type {
-  AiModelConfig,
-  // DbProviderConfig, // REMOVED
-  CustomPromptAction, // Import type
-} from "@/lib/types";
+import type { AiModelConfig, CustomPromptAction } from "@/lib/types";
 
-// Define props based on what PromptForm passes down
 interface PromptActionsProps {
   className?: string;
   prompt: string;
   isStreaming: boolean;
   addAttachedFile: (file: File) => void;
   setPrompt: (value: string) => void;
-  // Props needed for internal logic/derivations
-  selectedModel: AiModelConfig | undefined; // Pass the derived model object
-  // Custom actions (assuming passed from a higher level or mod store via props)
+  selectedModel: AiModelConfig | undefined;
   customPromptActions: CustomPromptAction[];
-  // Context snapshot getter (assuming passed from a higher level)
-  getContextSnapshot: () => any; // Replace 'any' with a proper snapshot type if defined
+  getContextSnapshot: () => any;
 }
 
-// Wrap component logic in a named function for React.memo
 const PromptActionsComponent: React.FC<PromptActionsProps> = ({
   className,
   prompt,
   isStreaming,
   addAttachedFile,
   setPrompt,
-  selectedModel, // Use prop
-  customPromptActions, // Use prop
-  getContextSnapshot, // Use prop
+  selectedModel,
+  customPromptActions,
+  getContextSnapshot,
 }) => {
-  // REMOVED store access
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Use props for internal logic
   const canSubmit = prompt.trim().length > 0 && !isStreaming;
   const canGenerateImage =
     selectedModel?.supportsImageGeneration && !isStreaming;
@@ -61,7 +46,7 @@ const PromptActionsComponent: React.FC<PromptActionsProps> = ({
     const files = event.target.files;
     if (files) {
       for (let i = 0; i < files.length; i++) {
-        addAttachedFile(files[i]); // Use prop action
+        addAttachedFile(files[i]);
       }
       event.target.value = "";
     }
@@ -69,9 +54,9 @@ const PromptActionsComponent: React.FC<PromptActionsProps> = ({
 
   const handleImagineClick = () => {
     if (prompt.trim().length > 0 && !prompt.startsWith("/imagine ")) {
-      setPrompt(`/imagine ${prompt}`); // Use prop action
+      setPrompt(`/imagine ${prompt}`);
     } else if (prompt.trim().length === 0) {
-      setPrompt("/imagine "); // Use prop action
+      setPrompt("/imagine ");
     }
   };
 
@@ -84,7 +69,6 @@ const PromptActionsComponent: React.FC<PromptActionsProps> = ({
         className="hidden"
         multiple
       />
-      {/* Attach Button */}
       <TooltipProvider delayDuration={100}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -93,8 +77,8 @@ const PromptActionsComponent: React.FC<PromptActionsProps> = ({
               variant="outline"
               size="icon"
               onClick={handleAttachClick}
-              disabled={isStreaming} // Use prop
-              className="h-10 w-10 rounded-full border-gray-200 dark:border-gray-700"
+              disabled={isStreaming}
+              className="h-10 w-10 rounded-full border-border transition-colors hover:bg-muted"
               aria-label="Attach file"
             >
               <PaperclipIcon className="h-5 w-5" />
@@ -105,7 +89,6 @@ const PromptActionsComponent: React.FC<PromptActionsProps> = ({
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      {/* Imagine Button */}
       {canGenerateImage && (
         <TooltipProvider delayDuration={100}>
           <Tooltip>
@@ -115,10 +98,10 @@ const PromptActionsComponent: React.FC<PromptActionsProps> = ({
                 variant="outline"
                 size="icon"
                 onClick={handleImagineClick}
-                disabled={isStreaming || prompt.trim().length === 0} // Use props
+                disabled={isStreaming || prompt.trim().length === 0}
                 className={cn(
-                  "h-10 w-10 rounded-full border-gray-200 dark:border-gray-700",
-                  prompt.startsWith("/imagine ") && "bg-primary/20", // Use prop
+                  "h-10 w-10 rounded-full border-border transition-colors hover:bg-muted",
+                  prompt.startsWith("/imagine ") && "bg-primary/20",
                 )}
                 aria-label="Generate Image (Prefixes prompt with /imagine)"
               >
@@ -131,8 +114,6 @@ const PromptActionsComponent: React.FC<PromptActionsProps> = ({
           </Tooltip>
         </TooltipProvider>
       )}
-      {/* Custom Prompt Actions */}
-      {/* Use customPromptActions prop */}
       {customPromptActions.map((action) => (
         <TooltipProvider key={action.id} delayDuration={100}>
           <Tooltip>
@@ -141,10 +122,10 @@ const PromptActionsComponent: React.FC<PromptActionsProps> = ({
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={() => action.onClick(getContextSnapshot())} // Use prop getter
-                disabled={isStreaming} // Use prop
+                onClick={() => action.onClick(getContextSnapshot())}
+                disabled={isStreaming}
                 className={cn(
-                  "h-10 w-10 rounded-full border-gray-200 dark:border-gray-700",
+                  "h-10 w-10 rounded-full border-border transition-colors hover:bg-muted",
                   action.className,
                 )}
                 aria-label={action.tooltip}
@@ -158,7 +139,6 @@ const PromptActionsComponent: React.FC<PromptActionsProps> = ({
           </Tooltip>
         </TooltipProvider>
       ))}
-      {/* Send Button */}
       <TooltipProvider delayDuration={100}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -166,12 +146,12 @@ const PromptActionsComponent: React.FC<PromptActionsProps> = ({
               <Button
                 type="submit"
                 size="icon"
-                disabled={!canSubmit} // Use derived state
+                disabled={!canSubmit}
                 className={cn(
-                  "h-10 w-10 rounded-full",
+                  "h-10 w-10 rounded-full transition-all",
                   canSubmit
-                    ? "bg-primary hover:bg-primary/90"
-                    : "bg-gray-200 dark:bg-gray-700",
+                    ? "bg-primary hover:bg-primary/90 hover:scale-105"
+                    : "bg-muted dark:bg-muted",
                 )}
                 aria-label="Send message"
               >
@@ -192,5 +172,4 @@ const PromptActionsComponent: React.FC<PromptActionsProps> = ({
   );
 };
 
-// Export the memoized component
 export const PromptActions = React.memo(PromptActionsComponent);

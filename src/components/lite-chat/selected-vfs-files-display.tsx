@@ -1,32 +1,26 @@
 // src/components/lite-chat/selected-vfs-files-display.tsx
 import React from "react";
-// REMOVED store imports
 import { Button } from "@/components/ui/button";
 import { XIcon, FileTextIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Define props based on what PromptForm passes down
 interface SelectedVfsFilesDisplayProps {
   className?: string;
   selectedVfsPaths: string[];
   removeSelectedVfsPath: (path: string) => void;
   isVfsEnabledForItem: boolean;
-  isVfsReady: boolean; // Pass readiness state
+  isVfsReady: boolean;
 }
 
-// Wrap component logic in a named function for React.memo
 const SelectedVfsFilesDisplayComponent: React.FC<
   SelectedVfsFilesDisplayProps
 > = ({
   className,
-  selectedVfsPaths, // Use prop
-  removeSelectedVfsPath, // Use prop
-  isVfsEnabledForItem, // Use prop
-  isVfsReady, // Use prop
+  selectedVfsPaths,
+  removeSelectedVfsPath,
+  isVfsEnabledForItem,
+  isVfsReady,
 }) => {
-  // REMOVED store access
-
-  // Use props for conditional rendering
   if (!isVfsEnabledForItem || !isVfsReady || selectedVfsPaths.length === 0) {
     return null;
   }
@@ -34,28 +28,28 @@ const SelectedVfsFilesDisplayComponent: React.FC<
   return (
     <div
       className={cn(
-        "flex flex-wrap gap-2 px-4 pt-3 pb-2 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50",
+        "flex flex-wrap gap-2 px-4 pt-3 pb-2 border-b border-border bg-background dark:bg-background/50",
         className,
       )}
     >
-      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 w-full mb-1">
+      <p className="text-xs font-medium text-muted-foreground w-full mb-1">
         Selected files for context:
       </p>
       {selectedVfsPaths.map((path) => (
         <div
           key={path}
-          className="flex items-center gap-1.5 bg-white dark:bg-gray-800 rounded-md pl-2 pr-1 py-1 text-xs border border-gray-200 dark:border-gray-700 shadow-sm"
+          className="flex items-center gap-1.5 bg-card dark:bg-card rounded-md pl-2 pr-1 py-1 text-xs border border-border shadow-sm transition-all hover:shadow-md animate-fadeIn"
           title={path}
         >
-          <FileTextIcon className="h-3.5 w-3.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
+          <FileTextIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
           <span className="font-mono truncate max-w-[150px]">
             {path.startsWith("/") ? path.substring(1) : path}{" "}
           </span>
           <Button
             variant="ghost"
             size="icon"
-            className="h-5 w-5 text-gray-500 hover:text-red-600 dark:hover:text-red-400 ml-1 flex-shrink-0"
-            onClick={() => removeSelectedVfsPath(path)} // Use prop action
+            className="h-5 w-5 text-muted-foreground hover:text-destructive transition-colors ml-1 flex-shrink-0"
+            onClick={() => removeSelectedVfsPath(path)}
             aria-label={`Remove file ${path} from context`}
           >
             <XIcon className="h-3 w-3" />
@@ -66,7 +60,6 @@ const SelectedVfsFilesDisplayComponent: React.FC<
   );
 };
 
-// Export the memoized component
 export const SelectedVfsFilesDisplay = React.memo(
   SelectedVfsFilesDisplayComponent,
 );

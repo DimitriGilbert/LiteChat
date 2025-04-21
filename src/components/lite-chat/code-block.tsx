@@ -21,7 +21,7 @@ export const CodeBlock: React.FC<{
   const [isFolded, setIsFolded] = useState(false);
   const match = /language-(\w+)/.exec(className || "");
   const language = match ? match[1] : "text";
-  const codeContent = String(children).replace(/\\n$/, "");
+  const codeContent = String(children).replace(/\n$/, "");
 
   const handleCopy = () => {
     navigator.clipboard.writeText(codeContent);
@@ -32,7 +32,7 @@ export const CodeBlock: React.FC<{
     return (
       <code
         className={cn(
-          "font-mono text-sm px-1 py-0.5 rounded-sm bg-gray-700",
+          "font-mono text-sm px-1 py-0.5 rounded-sm bg-muted",
           className,
         )}
         {...props}
@@ -43,9 +43,9 @@ export const CodeBlock: React.FC<{
   }
 
   return (
-    <div className="relative group/codeblock my-3 rounded-md border border-gray-700/50 bg-gray-800 dark:bg-gray-900">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-gray-700/30 dark:bg-gray-800/40 border-b border-gray-700/50">
-        <span className="text-xs font-semibold text-gray-400 select-none">
+    <div className="relative group/codeblock my-3 rounded-md border border-border bg-card dark:bg-card transition-all">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30 dark:bg-muted/40 border-b border-border">
+        <span className="text-xs font-semibold text-muted-foreground select-none">
           {language}
         </span>
         <div className="flex items-center gap-1">
@@ -55,7 +55,7 @@ export const CodeBlock: React.FC<{
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   onClick={() => setIsFolded(!isFolded)}
                   aria-label={isFolded ? "Expand code" : "Collapse code"}
                 >
@@ -77,7 +77,7 @@ export const CodeBlock: React.FC<{
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   onClick={handleCopy}
                   aria-label="Copy code"
                 >
@@ -96,11 +96,7 @@ export const CodeBlock: React.FC<{
           style={vscDarkPlus}
           language={language}
           PreTag="div"
-          // Add overflow-x-auto class to the PreTag element
-          className={cn(
-            "!py-3 !px-0 !m-0 !bg-transparent",
-            "overflow-x-auto", // Enable horizontal scrolling
-          )}
+          className={cn("!py-3 !px-0 !m-0 !bg-transparent", "overflow-x-auto")}
           codeTagProps={{
             style: {
               fontFamily: "var(--font-mono)",
@@ -109,7 +105,6 @@ export const CodeBlock: React.FC<{
               display: "block",
               paddingLeft: "1rem",
               paddingRight: "1rem",
-              // Ensure code doesn't wrap unexpectedly
               whiteSpace: "pre",
             },
           }}
@@ -120,13 +115,12 @@ export const CodeBlock: React.FC<{
             textAlign: "right",
             color: "#858585",
             userSelect: "none",
-            // Make line numbers sticky to the left during horizontal scroll
             position: "sticky",
             left: 0,
-            background: "inherit", // Match background
-            zIndex: 1, // Ensure it's above the code lines
+            background: "inherit",
+            zIndex: 1,
           }}
-          wrapLines={false} // Explicitly disable line wrapping in the highlighter
+          wrapLines={false}
           {...props}
         >
           {codeContent}

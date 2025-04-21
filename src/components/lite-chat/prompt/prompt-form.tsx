@@ -233,6 +233,7 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
         await handleImageGenerationCore(currentConversationId, imagePrompt);
         clearPromptInput(); // Clear input after successful submission
         clearSelectedVfsPaths();
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
         // Error handled by handleImageGenerationCore wrapper
       }

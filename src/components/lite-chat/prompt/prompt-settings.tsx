@@ -27,7 +27,6 @@ import type {
 import { toast } from "sonner";
 import { requiresApiKey } from "@/lib/litechat";
 
-// Define props based on what PromptForm passes down
 interface PromptSettingsProps {
   className?: string;
   // Provider/Model related
@@ -37,11 +36,11 @@ interface PromptSettingsProps {
   apiKeys: DbApiKey[];
   enableApiKeyManagement: boolean;
   // VFS related
-  enableVfs: boolean; // Global flag
+  enableVfs: boolean;
   isVfsEnabledForItem: boolean;
-  selectedItemId: string | null; // Needed for VFS toggle
-  selectedItemType: SidebarItemType | null; // Needed for VFS toggle
-  toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>; // Action from sidebar store
+  selectedItemId: string | null;
+  selectedItemType: SidebarItemType | null;
+  toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>;
   // Advanced Settings related
   enableAdvancedSettings: boolean;
   // Props needed for PromptSettingsAdvanced
@@ -58,16 +57,16 @@ interface PromptSettingsProps {
   frequencyPenalty: number | null;
   setFrequencyPenalty: (penalty: number | null) => void;
   globalSystemPrompt: string | null;
-  activeConversationData: DbConversation | null; // Pass derived data
+  activeConversationData: DbConversation | null;
   updateConversationSystemPrompt: (
     id: string,
     systemPrompt: string | null,
-  ) => Promise<void>; // Action from sidebar store
+  ) => Promise<void>;
   updateDbProviderConfig: (
     id: string,
     changes: Partial<DbProviderConfig>,
-  ) => Promise<void>; // Action from provider store
-  // Provider/Model setters (needed by selectors)
+  ) => Promise<void>;
+  // Provider/Model setters
   setSelectedProviderId: (id: string | null) => void;
   setSelectedModelId: (id: string | null) => void;
   // VFS State for PromptSettingsAdvanced
@@ -79,10 +78,8 @@ interface PromptSettingsProps {
   stopStreaming: () => void;
 }
 
-// Wrap component logic in a named function for React.memo
 const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
   className,
-  // Destructure all props
   selectedProviderId,
   selectedModelId,
   dbProviderConfigs,
@@ -96,7 +93,6 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
   enableAdvancedSettings,
   setSelectedProviderId,
   setSelectedModelId,
-  // Props for PromptSettingsAdvanced
   temperature,
   setTemperature,
   topP,
@@ -118,12 +114,10 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
   vfsError,
   vfsKey,
 }) => {
-  // Local state for advanced panel visibility
   const [isAdvancedPanelOpen, setIsAdvancedPanelOpen] = useState(false);
   const [advancedInitialTab, setAdvancedInitialTab] =
     useState<string>("parameters");
 
-  // --- Derivations and Callbacks using props ---
   const getApiKeyForProvider = useCallback(
     (providerId: string): string | undefined => {
       const config = dbProviderConfigs.find((p) => p.id === providerId);
@@ -148,7 +142,6 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
 
   const isItemSelected = !!selectedItemId;
 
-  // Function to open the advanced panel with a specific tab
   const openAdvancedPanel = useCallback((tabId: string = "parameters") => {
     console.log(
       `[PromptSettings] openAdvancedPanel called with tabId: ${tabId}. Setting isAdvancedPanelOpen(true).`,
@@ -157,19 +150,16 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
     setIsAdvancedPanelOpen(true);
   }, []);
 
-  // Toggle button handler uses local state
   const handleToggleAdvancedClick = useCallback(() => {
     console.log(
       `[PromptSettings] handleToggleAdvancedClick called. Current panel state: ${isAdvancedPanelOpen}`,
     );
     setIsAdvancedPanelOpen((prev) => !prev);
-    // If opening, default to parameters tab (or keep last tab?)
     if (!isAdvancedPanelOpen) {
       setAdvancedInitialTab("parameters");
     }
   }, [isAdvancedPanelOpen]);
 
-  // API Key icon click opens the advanced panel to the 'api_keys' tab
   const handleApiKeyIconClick = useCallback(() => {
     console.log("[PromptSettings] handleApiKeyIconClick called.");
     if (enableApiKeyManagement) {
@@ -179,7 +169,6 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
     }
   }, [enableApiKeyManagement, openAdvancedPanel]);
 
-  // VFS container click opens the advanced panel to the 'files' tab
   const handleVfsContainerClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
       console.log("[PromptSettings] handleVfsContainerClick called.");
@@ -210,7 +199,6 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
     ],
   );
 
-  // VFS switch change calls the action prop directly
   const handleVfsSwitchChange = useCallback(() => {
     console.log(
       `[PromptSettings] handleVfsSwitchChange called for item ${selectedItemId} (${selectedItemType})`,
@@ -226,7 +214,7 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
   }, [selectedItemId, selectedItemType, toggleVfsEnabledAction]);
 
   return (
-    <div className={cn("bg-gray-800 text-gray-300", className)}>
+    <div className={cn("bg-card text-card-foreground", className)}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
         {/* Group 1: Selectors */}
         <div className="flex items-center gap-x-2 flex-shrink min-w-0 flex-grow sm:flex-grow-0">
@@ -259,7 +247,7 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
                   type="button"
                   onClick={handleApiKeyIconClick}
                   className={cn(
-                    "flex items-center justify-center h-9 w-9 rounded focus:outline-none focus:ring-1 focus:ring-blue-500",
+                    "flex items-center justify-center h-9 w-9 rounded focus:outline-none focus:ring-1 focus:ring-primary transition-colors",
                     needsKey ? "cursor-pointer" : "cursor-default",
                   )}
                   disabled={!needsKey}
@@ -269,7 +257,7 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
                     <AlertTriangleIcon className="h-4 w-4 text-amber-500" />
                   )}
                   {showKeyProvidedIndicator && (
-                    <KeyIcon className="h-4 w-4 text-green-500" />
+                    <KeyIcon className="h-4 w-4 text-primary" />
                   )}
                   {!needsKey && <div className="w-4 h-4" />}
                 </button>
@@ -298,9 +286,9 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
                   <div
                     onClick={handleVfsContainerClick}
                     className={cn(
-                      "flex items-center space-x-1 h-9 px-2 rounded",
+                      "flex items-center space-x-1 h-9 px-2 rounded transition-colors",
                       isItemSelected && isVfsEnabledForItem
-                        ? "cursor-pointer hover:bg-gray-700"
+                        ? "cursor-pointer hover:bg-muted"
                         : "cursor-default",
                       !isItemSelected && "opacity-50 cursor-not-allowed",
                     )}
@@ -327,8 +315,8 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
                       className={cn(
                         "h-4 w-4 transition-colors",
                         isItemSelected && isVfsEnabledForItem
-                          ? "text-blue-400"
-                          : "text-gray-500",
+                          ? "text-primary"
+                          : "text-muted-foreground",
                       )}
                     />
                     <Switch
@@ -338,7 +326,7 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
                       disabled={!isItemSelected}
                       aria-label="Toggle Virtual Filesystem"
                       onClick={(e) => e.stopPropagation()}
-                      className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-gray-600 scale-75"
+                      className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground scale-75"
                     />
                   </div>
                 </TooltipTrigger>
@@ -366,8 +354,8 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
                     size="icon"
                     onClick={handleToggleAdvancedClick}
                     className={cn(
-                      "h-8 w-8 text-gray-400 hover:text-gray-200",
-                      isAdvancedPanelOpen && "bg-gray-700 text-gray-200", // Use local state
+                      "h-8 w-8 text-muted-foreground hover:text-foreground transition-colors",
+                      isAdvancedPanelOpen && "bg-muted text-foreground",
                     )}
                     aria-label="Toggle advanced settings"
                   >
@@ -385,12 +373,11 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
         </div>
       </div>
 
-      {/* Advanced Settings Panel - Conditionally render based on local state */}
+      {/* Advanced Settings Panel */}
       {enableAdvancedSettings && isAdvancedPanelOpen && (
         <PromptSettingsAdvanced
-          className="border-t border-gray-700"
+          className="border-t border-border animate-slideInFromTop"
           initialTab={advancedInitialTab}
-          // Pass all necessary props down
           enableAdvancedSettings={enableAdvancedSettings}
           temperature={temperature}
           setTemperature={setTemperature}
@@ -410,12 +397,10 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
           updateConversationSystemPrompt={updateConversationSystemPrompt}
           activeConversationData={activeConversationData}
           isVfsEnabledForItem={isVfsEnabledForItem}
-          // VFS state needed by FileManager inside Advanced
           isVfsReady={isVfsReady}
           isVfsLoading={isVfsLoading}
           vfsError={vfsError}
           vfsKey={vfsKey}
-          // API Key Management related
           enableApiKeyManagement={enableApiKeyManagement}
           selectedProviderId={selectedProviderId}
           dbProviderConfigs={dbProviderConfigs}
@@ -427,5 +412,4 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
   );
 };
 
-// Export the memoized component
 export const PromptSettings = React.memo(PromptSettingsComponent);

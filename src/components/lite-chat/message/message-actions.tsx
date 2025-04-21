@@ -3,8 +3,7 @@ import React, { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { CopyIcon, RefreshCwIcon } from "lucide-react";
 import { toast } from "sonner";
-// REMOVED: import { useModStore } from "@/store/mod.store"; // No longer needed here
-import type { Message, TextPart, CustomMessageAction } from "@/lib/types"; // Added CustomMessageAction
+import type { Message, TextPart, CustomMessageAction } from "@/lib/types";
 import {
   Tooltip,
   TooltipContent,
@@ -19,7 +18,7 @@ interface MessageActionsProps {
   onRegenerate?: () => void;
   className?: string;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
-  customMessageActions: CustomMessageAction[]; // Receive as prop
+  customMessageActions: CustomMessageAction[];
 }
 
 export const MessageActions: React.FC<MessageActionsProps> = React.memo(
@@ -28,14 +27,9 @@ export const MessageActions: React.FC<MessageActionsProps> = React.memo(
     onRegenerate,
     className,
     getContextSnapshotForMod,
-    customMessageActions = [], // Default to empty array
+    customMessageActions = [],
   }) => {
-    // Use the stable prop directly
     const getContextSnapshot = getContextSnapshotForMod;
-
-    // console.log(
-    //   `[MessageActions] Rendering for msg ${message.id}. Custom actions count: ${customMessageActions.length}`
-    // );
 
     const handleCopy = useCallback(() => {
       let textToCopy = "";
@@ -70,15 +64,13 @@ export const MessageActions: React.FC<MessageActionsProps> = React.memo(
     return (
       <div
         className={cn(
-          "flex items-center gap-0.5 opacity-0 group-hover/message:opacity-100 transition-opacity",
+          "flex items-center gap-0.5 opacity-0 group-hover/message:opacity-100 transition-opacity duration-200",
           className,
         )}
       >
-        {/* Custom Message Actions - Use prop */}
         {customMessageActions.map((action) => {
-          // Simplify visibility check for now - assume visible if defined
           const isVisible = action.isVisible
-            ? action.isVisible(message, {} as any) // Still passing dummy context
+            ? action.isVisible(message, {} as any)
             : true;
 
           if (!isVisible) return null;
@@ -95,7 +87,10 @@ export const MessageActions: React.FC<MessageActionsProps> = React.memo(
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={cn("h-6 w-6", action.className)}
+                    className={cn(
+                      "h-6 w-6 transition-colors",
+                      action.className,
+                    )}
                     onClick={handleClick}
                     aria-label={action.tooltip}
                   >
@@ -110,7 +105,6 @@ export const MessageActions: React.FC<MessageActionsProps> = React.memo(
           );
         })}
 
-        {/* Default Regenerate Action */}
         {onRegenerate && (
           <TooltipProvider delayDuration={100}>
             <Tooltip>
@@ -118,7 +112,7 @@ export const MessageActions: React.FC<MessageActionsProps> = React.memo(
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors"
                   onClick={onRegenerate}
                   aria-label="Regenerate response"
                 >
@@ -132,14 +126,13 @@ export const MessageActions: React.FC<MessageActionsProps> = React.memo(
           </TooltipProvider>
         )}
 
-        {/* Default Copy Action */}
         <TooltipProvider delayDuration={100}>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6"
+                className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors"
                 onClick={handleCopy}
                 aria-label="Copy message"
               >

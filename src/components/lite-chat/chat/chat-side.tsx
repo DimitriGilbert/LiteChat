@@ -24,12 +24,10 @@ import type {
   ProjectSidebarItem,
   ConversationSidebarItem,
 } from "@/lib/types";
-import type { ChatSideProps } from "../chat"; // Use the updated type from chat.tsx
+import type { ChatSideProps } from "../chat";
 
-// Wrap component logic in a named function for React.memo
 const ChatSideComponent: React.FC<ChatSideProps> = ({
   className,
-  // Receive live data directly
   dbProjects,
   dbConversations,
   editingItemId,
@@ -46,16 +44,13 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   importConversation,
   isSettingsModalOpen,
   setIsSettingsModalOpen,
-  settingsProps, // Receive bundled settings props
+  settingsProps,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parentIdForNewItem, setParentIdForNewItem] = useState<string | null>(
     null,
   );
 
-  // --- Derive Sidebar Items HERE ---
-  // This useMemo now depends on the direct dbProjects/dbConversations props,
-  // which should have more stable references from LiteChatInner.
   const sidebarItems = useMemo<SidebarItem[]>(() => {
     const allProjects: DbProject[] = dbProjects || [];
     const allConversations: DbConversation[] = dbConversations || [];
@@ -70,42 +65,27 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
     combinedItems.sort(
       (a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
     );
-    // console.log(
-    //   `[ChatSide] Derived sidebarItems. Count: ${combinedItems.length}`,
-    // );
     return combinedItems;
-  }, [dbProjects, dbConversations]); // Depend on direct live data props
+  }, [dbProjects, dbConversations]);
 
-  // console.log(
-  //   `[ChatSide] Rendering. Items count from props: Proj=${dbProjects?.length}, Conv=${dbConversations?.length}. Derived count: ${sidebarItems.length}, Editing: ${editingItemId}, Modal Open: ${isSettingsModalOpen}`,
-  // );
-
-  // Effect to determine parent ID for new items based on selection props
-  // This effect still depends on dbConversations. If its reference changes too often,
-  // this could still cause state updates.
   useEffect(() => {
-    // console.log(`[ChatSide useEffect] Running. Selected: ${selectedItemType} - ${selectedItemId}`);
     let determinedParentId: string | null = null;
     if (selectedItemType === "project") {
       determinedParentId = selectedItemId;
     } else if (selectedItemType === "conversation" && selectedItemId) {
-      // Find conversation in the raw data prop
       const convo = dbConversations.find((item) => item.id === selectedItemId);
       determinedParentId = convo?.parentId ?? null;
     } else {
       determinedParentId = null;
     }
-    // Only update state if the value actually changes
     setParentIdForNewItem((prev) => {
       if (prev !== determinedParentId) {
-        // console.log(`[ChatSide useEffect] Updating parentIdForNewItem from ${prev} to ${determinedParentId}`);
         return determinedParentId;
       }
       return prev;
     });
-  }, [selectedItemId, selectedItemType, dbConversations]); // Depend on direct live data prop
+  }, [selectedItemId, selectedItemType, dbConversations]);
 
-  // Use actions passed via props
   const handleCreateChat = useCallback(async () => {
     await createConversation(parentIdForNewItem);
   }, [createConversation, parentIdForNewItem]);
@@ -135,22 +115,20 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   };
 
   const handleOpenSettingsModal = useCallback(() => {
-    // console.log("[ChatSide] Settings button clicked. Calling setIsSettingsModalOpen(true).");
     setIsSettingsModalOpen(true);
   }, [setIsSettingsModalOpen]);
 
   return (
     <aside
       className={cn(
-        "h-full flex flex-col bg-gray-800 border-r border-gray-700",
+        "h-full flex flex-col bg-card border-r border-border",
         className,
       )}
     >
-      {/* Action Buttons */}
-      <div className="p-3 border-b border-gray-700 flex gap-2">
+      <div className="p-3 border-b border-border flex gap-2">
         <Button
           variant="outline"
-          className="flex-1 justify-center gap-2 border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white h-9"
+          className="flex-1 justify-center gap-2 border-border text-card-foreground hover:bg-muted hover:text-foreground h-9 transition-colors"
           onClick={handleCreateChat}
           title="New Chat"
         >
@@ -159,7 +137,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
         </Button>
         <Button
           variant="outline"
-          className="flex-1 justify-center gap-2 border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white h-9"
+          className="flex-1 justify-center gap-2 border-border text-card-foreground hover:bg-muted hover:text-foreground h-9 transition-colors"
           onClick={handleCreateProject}
           title="New Project"
         >
@@ -168,12 +146,10 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
         </Button>
       </div>
 
-      {/* History Area */}
       <div className="flex-grow overflow-hidden flex flex-col">
-        {/* Pass the memoized sidebarItems down */}
         <ChatHistory
           className="flex-grow"
-          sidebarItems={sidebarItems} // Pass derived items (stable ref from useMemo)
+          sidebarItems={sidebarItems}
           editingItemId={editingItemId}
           selectedItemId={selectedItemId}
           onEditComplete={onEditComplete}
@@ -184,7 +160,6 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
         />
       </div>
 
-      {/* Hidden file input for import */}
       <input
         type="file"
         ref={fileInputRef}
@@ -193,11 +168,10 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
         style={{ display: "none" }}
       />
 
-      {/* Settings & Import Buttons */}
-      <div className="border-t border-gray-700 p-3 space-y-2 bg-gray-800">
+      <div className="border-t border-border p-3 space-y-2 bg-card">
         <Button
           variant="outline"
-          className="w-full justify-start gap-2 text-sm h-9 border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+          className="w-full justify-start gap-2 text-sm h-9 border-border text-card-foreground hover:bg-muted hover:text-foreground transition-colors"
           onClick={handleImportClick}
         >
           <DownloadIcon className="h-4 w-4 transform rotate-180" />
@@ -206,26 +180,23 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
 
         <Button
           variant="outline"
-          className="w-full justify-start gap-2 text-sm h-9 border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
-          onClick={handleOpenSettingsModal} // Use the new handler
+          className="w-full justify-start gap-2 text-sm h-9 border-border text-card-foreground hover:bg-muted hover:text-foreground transition-colors"
+          onClick={handleOpenSettingsModal}
         >
           <SettingsIcon className="h-4 w-4" />
           Settings
         </Button>
       </div>
 
-      {/* Settings Modal - Pass down bundled props */}
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => {
-          // console.log("[ChatSide] SettingsModal onClose triggered. Calling setIsSettingsModalOpen(false).");
           setIsSettingsModalOpen(false);
         }}
-        settingsProps={settingsProps} // Pass the bundled props object (stable)
+        settingsProps={settingsProps}
       />
     </aside>
   );
 };
 
-// Export the component WITH memoization, as its direct props should now be stable
 export const ChatSide = React.memo(ChatSideComponent);

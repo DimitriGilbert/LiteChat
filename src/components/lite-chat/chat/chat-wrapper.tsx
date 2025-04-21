@@ -4,18 +4,14 @@ import { ChatContent } from "./chat-content";
 import { PromptWrapper } from "@/components/lite-chat/prompt/prompt-wrapper";
 import { ChatHeader } from "./chat-header";
 import { cn } from "@/lib/utils";
-// Import the updated prop types
 import type { ChatWrapperDirectProps, ChatWrapperBundledProps } from "../chat";
 
-// Combine direct and bundled props for the component's signature
 type ChatWrapperProps = ChatWrapperDirectProps & {
   bundledProps: ChatWrapperBundledProps;
 };
 
-// Wrap component logic in a named function for React.memo
 const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
   className,
-  // Destructure direct props (including volatile state)
   promptInputValue,
   setPromptInputValue,
   messages,
@@ -25,15 +21,13 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
   addAttachedFile,
   removeAttachedFile,
   clearPromptInput,
-  // Destructure the bundled props object (now stable)
   bundledProps,
 }) => {
-  // Destructure necessary values from bundledProps (stable props)
   const {
     selectedItemId,
     selectedItemType,
     sidebarItems,
-    attachedFiles, // Keep for PromptFiles display
+    attachedFiles,
     selectedVfsPaths,
     isVfsEnabledForItem,
     regenerateMessage,
@@ -92,7 +86,6 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
         className,
       )}
     >
-      {/* Pass necessary props down to ChatHeader (from stable bundle) */}
       <ChatHeader
         selectedItemId={selectedItemId}
         selectedItemType={selectedItemType}
@@ -101,28 +94,23 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
         setSearchTerm={setSearchTerm}
         exportConversation={exportConversation}
       />
-      {/* Pass volatile props directly to ChatContent */}
       <ChatContent
         className="flex-grow h-0"
-        messages={messages} // Direct prop
-        isLoadingMessages={isLoadingMessages} // Direct prop
-        isStreaming={isStreaming} // Direct prop
-        regenerateMessage={regenerateMessage} // From stable bundle
-        getContextSnapshotForMod={getContextSnapshotForMod} // From stable bundle
-        modMessageActions={modMessageActions} // From stable bundle
+        messages={messages}
+        isLoadingMessages={isLoadingMessages}
+        isStreaming={isStreaming}
+        regenerateMessage={regenerateMessage}
+        getContextSnapshotForMod={getContextSnapshotForMod}
+        modMessageActions={modMessageActions}
       />
-      {/* Pass volatile and stable props down to PromptWrapper */}
       <PromptWrapper
-        // Direct volatile props
         error={error}
         isStreaming={isStreaming}
-        // Direct input state/actions
         promptInputValue={promptInputValue}
         setPromptInputValue={setPromptInputValue}
         addAttachedFile={addAttachedFile}
         removeAttachedFile={removeAttachedFile}
         clearPromptInput={clearPromptInput}
-        // Bundled stable props (pass the rest)
         attachedFiles={attachedFiles}
         selectedVfsPaths={selectedVfsPaths}
         isVfsEnabledForItem={isVfsEnabledForItem}
@@ -164,7 +152,7 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
         setSelectedProviderId={setSelectedProviderId}
         setSelectedModelId={setSelectedModelId}
         customPromptActions={customPromptActions}
-        getContextSnapshotForMod={getContextSnapshotForMod}
+        getContextSnapshot={getContextSnapshotForMod}
         selectedModel={selectedModel}
         stopStreaming={stopStreaming}
         isVfsLoading={isVfsLoading}
@@ -175,6 +163,4 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
   );
 };
 
-// Export the memoized component
-// React.memo should now be effective as bundledProps is stable
 export const ChatWrapper = React.memo(ChatWrapperComponent);

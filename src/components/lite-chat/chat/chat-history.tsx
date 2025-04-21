@@ -1,6 +1,5 @@
 // src/components/lite-chat/chat/chat-history.tsx
 import React, { useState, useRef, useEffect, useCallback } from "react";
-// REMOVED store imports
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,14 +24,11 @@ import type { SidebarItem, SidebarItemType } from "@/lib/types";
 import { toast } from "sonner";
 import { ProjectSettingsModal } from "@/components/lite-chat/project/project-settings-modal";
 
-// --- History Item Component ---
-// Define props based on what ChatHistory passes down
 interface HistoryItemProps {
   item: SidebarItem;
   isSelected: boolean;
   startInEditMode: boolean;
   onEditComplete: (id: string) => void;
-  // Receive actions as props
   selectItem: (id: string, type: SidebarItemType) => Promise<void>;
   deleteItem: (id: string, type: SidebarItemType) => Promise<void>;
   renameItem: (
@@ -43,15 +39,12 @@ interface HistoryItemProps {
   exportConversation: (conversationId: string) => Promise<void>;
 }
 
-// HistoryItem remains largely the same internally, just uses props
-// Keep React.memo for individual items as they are numerous
 const HistoryItem: React.FC<HistoryItemProps> = React.memo(
   ({
     item,
     isSelected,
     startInEditMode,
     onEditComplete,
-    // Destructure action props
     selectItem,
     deleteItem,
     renameItem,
@@ -88,38 +81,34 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
       }
     }, [isEditing]);
 
-    // Use action props in callbacks
     const handleSave = useCallback(async () => {
       const trimmedName = editedName.trim();
       if (trimmedName && trimmedName !== nameBeforeEdit.current) {
-        // console.log(`HistoryItem: Attempting rename for ${item.type} ${item.id} from "${nameBeforeEdit.current}" to "${trimmedName}"`);
         try {
-          await renameItem(item.id, trimmedName, item.type); // Use prop
+          await renameItem(item.id, trimmedName, item.type);
           toast.success(
             `${item.type === "project" ? "Project" : "Chat"} renamed.`,
           );
           setIsEditing(false);
-          onEditComplete(item.id); // Pass ID
+          onEditComplete(item.id);
         } catch (error) {
           console.error("HistoryItem: Rename failed", error);
-          setEditedName(nameBeforeEdit.current); // Revert on error
+          setEditedName(nameBeforeEdit.current);
           setIsEditing(false);
-          onEditComplete(item.id); // Pass ID
+          onEditComplete(item.id);
         }
       } else if (!trimmedName) {
         toast.error("Name cannot be empty.");
-        // Keep editing state active
       } else {
-        // console.log(`HistoryItem: Rename skipped for ${item.id} (no change or only whitespace)`);
         setIsEditing(false);
-        onEditComplete(item.id); // Pass ID
+        onEditComplete(item.id);
       }
-    }, [editedName, item.id, item.type, renameItem, onEditComplete]); // Add renameItem to deps
+    }, [editedName, item.id, item.type, renameItem, onEditComplete]);
 
     const handleCancel = useCallback(() => {
       setEditedName(nameBeforeEdit.current);
       setIsEditing(false);
-      onEditComplete(item.id); // Pass ID
+      onEditComplete(item.id);
     }, [onEditComplete, item.id]);
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -133,7 +122,7 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
     const handleExportClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       if (item.type === "conversation") {
-        exportConversation(item.id); // Use prop
+        exportConversation(item.id);
       }
     };
 
@@ -145,7 +134,7 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
           ? `Delete project "${name}"? This cannot be undone.`
           : `Delete chat "${name}" and all its messages? This cannot be undone.`;
       if (window.confirm(confirmationMessage)) {
-        deleteItem(item.id, item.type); // Use prop
+        deleteItem(item.id, item.type);
       }
     };
 
@@ -159,38 +148,43 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
 
     const handleClick = () => {
       if (!isEditing) {
-        selectItem(item.id, item.type); // Use prop
+        selectItem(item.id, item.type);
       }
     };
 
     const Icon = item.type === "project" ? FolderIcon : MessageSquareIcon;
     const displayName = item.type === "project" ? item.name : item.title;
-    const indentLevel = item.parentId ? 1 : 0; // Assuming parentId indicates nesting
+    const indentLevel = item.parentId ? 1 : 0;
 
     return (
       <div
         className={cn(
           "grid grid-cols-[auto_1fr_auto] items-center gap-x-2",
           "p-2 rounded-md cursor-pointer group text-sm w-full overflow-hidden",
-          "hover:bg-gray-700",
-          isSelected && !isEditing && "bg-gray-600 text-white",
-          isEditing && "bg-gray-700 ring-1 ring-blue-600",
+          "hover:bg-muted/70 transition-colors duration-200",
+          isSelected && !isEditing && "bg-muted text-foreground",
+          isEditing && "bg-muted ring-1 ring-primary",
         )}
         style={{ paddingLeft: `${0.5 + indentLevel * 1}rem` }}
         onClick={handleClick}
         title={displayName}
       >
-        <Icon className="h-4 w-4 flex-shrink-0 text-gray-400" />
+        <Icon
+          className={cn(
+            "h-4 w-4 flex-shrink-0 text-muted-foreground transition-colors",
+            isSelected && "text-primary",
+          )}
+        />
         <div className="min-w-0 overflow-hidden">
           {isEditing ? (
             <Input
               ref={inputRef}
               value={editedName}
               onChange={(e) => setEditedName(e.target.value)}
-              onBlur={handleSave} // Save on blur
+              onBlur={handleSave}
               onKeyDown={handleKeyDown}
-              className="h-6 px-1 py-0 text-sm bg-gray-800 border-gray-600 focus:ring-1 focus:ring-blue-500 w-full"
-              onClick={(e) => e.stopPropagation()} // Prevent item selection when clicking input
+              className="h-6 px-1 py-0 text-sm bg-background border-border focus:ring-1 focus:ring-primary w-full"
+              onClick={(e) => e.stopPropagation()}
             />
           ) : (
             <TooltipProvider delayDuration={300}>
@@ -200,7 +194,7 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
                 </TooltipTrigger>
                 <TooltipContent
                   side="bottom"
-                  className="max-w-[300px] break-words bg-gray-900 text-gray-100 border border-gray-700 shadow-lg"
+                  className="max-w-[300px] break-words bg-popover text-popover-foreground border border-border shadow-lg"
                 >
                   {displayName}
                 </TooltipContent>
@@ -212,10 +206,10 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
           className={cn(
             "flex items-center gap-0.5",
             isEditing
-              ? "opacity-100" // Always show controls when editing
-              : "opacity-0 group-hover:opacity-100 focus-within:opacity-100", // Show on hover/focus when not editing
+              ? "opacity-100"
+              : "opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200",
           )}
-          onClick={(e) => e.stopPropagation()} // Prevent item selection when clicking buttons
+          onClick={(e) => e.stopPropagation()}
         >
           {isEditing ? (
             <>
@@ -225,7 +219,7 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 text-green-500 hover:text-green-400"
+                      className="h-6 w-6 text-green-500 hover:text-green-400 transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleSave();
@@ -244,7 +238,7 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 text-gray-400 hover:text-gray-300"
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleCancel();
@@ -266,7 +260,7 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 text-gray-400 hover:text-white"
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors"
                       onClick={handleEditClick}
                       aria-label="Rename"
                     >
@@ -283,7 +277,7 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6 text-gray-400 hover:text-white"
+                        className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors"
                         onClick={handleExportClick}
                         aria-label="Export this chat"
                       >
@@ -301,7 +295,7 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6 text-gray-400 hover:text-white"
+                        className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
                           setIsSettingsOpen(true);
@@ -321,7 +315,7 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 text-red-500 hover:text-red-400"
+                      className="h-6 w-6 text-destructive hover:text-destructive/80 transition-colors"
                       onClick={handleDeleteClick}
                       aria-label={`Delete ${item.type}`}
                     >
@@ -334,7 +328,6 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
             </>
           )}
         </div>
-        {/* ProjectSettingsModal likely needs refactoring too if it uses stores */}
         {item.type === "project" && isSettingsOpen && (
           <ProjectSettingsModal
             projectId={item.id}
@@ -348,15 +341,12 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
 );
 HistoryItem.displayName = "HistoryItem";
 
-// --- Main Chat History Component ---
-// Define props based on what ChatSide passes down
 interface ChatHistoryProps {
   className?: string;
-  sidebarItems: SidebarItem[]; // Receive derived items
+  sidebarItems: SidebarItem[];
   editingItemId: string | null;
-  selectedItemId: string | null; // Receive selectedItemId for isSelected prop
+  selectedItemId: string | null;
   onEditComplete: (id: string) => void;
-  // Receive actions to pass down
   selectItem: (id: string, type: SidebarItemType) => Promise<void>;
   deleteItem: (id: string, type: SidebarItemType) => Promise<void>;
   renameItem: (
@@ -367,40 +357,34 @@ interface ChatHistoryProps {
   exportConversation: (conversationId: string) => Promise<void>;
 }
 
-// Re-introduce React.memo as props should be stable now
 const ChatHistoryComponent: React.FC<ChatHistoryProps> = ({
   className,
-  sidebarItems, // Use the derived prop directly
+  sidebarItems,
   editingItemId,
   selectedItemId,
   onEditComplete,
-  // Destructure action props
   selectItem,
   deleteItem,
   renameItem,
   exportConversation,
 }) => {
   const itemsToDisplay = sidebarItems;
-  // console.log(
-  //   `[ChatHistory] Rendering. Items count from prop: ${itemsToDisplay.length}`,
-  // ); // Add log
 
   return (
     <ScrollArea className={cn("flex-grow h-0", className)}>
       <div className="block p-2 space-y-1">
         {itemsToDisplay.length === 0 && (
-          <p className="text-xs text-gray-500 text-center py-4 px-2">
+          <p className="text-xs text-muted-foreground text-center py-4 px-2">
             No projects or chats yet. Use the buttons above to create one.
           </p>
         )}
         {itemsToDisplay.map((item) => (
           <HistoryItem
-            key={item.id} // Key ensures React knows which item is which
+            key={item.id}
             item={item}
-            isSelected={item.id === selectedItemId} // Use prop
-            startInEditMode={item.id === editingItemId} // Use prop
-            onEditComplete={onEditComplete} // Pass prop
-            // Pass actions down
+            isSelected={item.id === selectedItemId}
+            startInEditMode={item.id === editingItemId}
+            onEditComplete={onEditComplete}
             selectItem={selectItem}
             deleteItem={deleteItem}
             renameItem={renameItem}
@@ -412,5 +396,4 @@ const ChatHistoryComponent: React.FC<ChatHistoryProps> = ({
   );
 };
 
-// Export the memoized component
 export const ChatHistory = React.memo(ChatHistoryComponent);
