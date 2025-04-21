@@ -8,6 +8,7 @@ import {
   DbMessage,
   CoreMessage, // Use the type defined in src/lib/types.ts (already updated)
   ImagePart, // Import ImagePart for return type
+  ChatContextProps, // Import ChatContextProps
 } from "@/lib/types";
 
 // --- Interface Definitions ---
@@ -18,7 +19,8 @@ export interface UseAiInteractionProps {
   streamingThrottleRate: number;
   // Core state/setters passed directly
   setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  setIsAiStreaming: React.Dispatch<React.SetStateAction<boolean>>;
+  // FIX: Type matches Zustand setter
+  setIsAiStreaming: (isStreaming: boolean) => void;
   setError: (error: string | null) => void;
   // DB function passed directly
   addDbMessage: (
@@ -30,7 +32,7 @@ export interface UseAiInteractionProps {
   // Function to get context snapshot for tool execution
   getContextSnapshotForMod: () => Readonly<
     Pick<
-      import("@/lib/types").ChatContextProps,
+      ChatContextProps, // Use imported ChatContextProps
       | "selectedItemId"
       | "selectedItemType"
       | "messages"
@@ -65,10 +67,19 @@ export interface PerformAiStreamParams {
 export interface PerformImageGenerationParams {
   conversationIdToUse: string;
   prompt: string;
-  // Add other potential options like n, size, aspectRatio etc. if needed
   n?: number;
   size?: string;
   aspectRatio?: string;
+  // Add fields passed from useAiInteraction
+  selectedModel: AiModelConfig | undefined; // Pass the model object
+  selectedProvider: AiProviderConfig | undefined; // Pass the provider object
+  getApiKeyForProvider: () => string | undefined;
+  setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>; // Keep React setter type for internal use? No, use store setter.
+  // FIX: Change type to match Zustand setter
+  setIsAiStreaming: (isStreaming: boolean) => void;
+  setError: (error: string | null) => void;
+  addDbMessage: (message: DbMessage) => Promise<string | void>;
+  abortControllerRef: React.MutableRefObject<AbortController | null>;
 }
 
 // New interface for image generation return value
@@ -80,8 +91,17 @@ export interface PerformImageGenerationResult {
 
 export interface UseAiInteractionReturn {
   performAiStream: (params: PerformAiStreamParams) => Promise<void>;
-  // Add the new image generation function
   performImageGeneration: (
-    params: PerformImageGenerationParams,
+    params: Omit<
+      PerformImageGenerationParams,
+      | "selectedModel"
+      | "selectedProvider"
+      | "getApiKeyForProvider"
+      | "setLocalMessages"
+      | "setIsAiStreaming"
+      | "setError"
+      | "addDbMessage"
+      | "abortControllerRef"
+    >, // Omit props passed internally by the hook
   ) => Promise<PerformImageGenerationResult>;
 }

@@ -1,7 +1,13 @@
 // src/context/settings-context.tsx
-import React, { createContext, useContext, useMemo } from "react";
-import type { DbConversation, DbProject } from "@/lib/types";
-import { useChatSettings } from "@/hooks/use-chat-settings";
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useEffect,
+} from "react";
+import type { DbConversation } from "@/lib/types"; // Removed DbProject import
+// Removed useChatSettings import
 
 interface SettingsContextProps {
   enableAdvancedSettings: boolean;
@@ -35,74 +41,179 @@ const SettingsContext = createContext<SettingsContextProps | undefined>(
 interface SettingsProviderProps {
   children: React.ReactNode;
   enableAdvancedSettings?: boolean;
-  // Pass active item data needed by useChatSettings
+  // Pass active item data needed for activeSystemPrompt derivation
   activeConversationData: DbConversation | null;
-  activeProjectData: DbProject | null;
+  // activeProjectData: DbProject | null; // REMOVED - Unused
   // Pass modal state control
   isSettingsModalOpen: boolean;
   onSettingsModalOpenChange: (open: boolean) => void;
+}
+
+// Default global system prompt (can be moved to constants later)
+const defaultGlobalPrompt = `You are a helpful, concise AI assistant designed to provide accurate, relevant answers.
+Follow all instructions exactly, prioritizing clarity, specificity, and relevance.
+Define your role and limitations in context, and adhere strictly to them.
+Format responses according to specified output format (e.g., JSON, code block, bullet list).
+If unsure, admit uncertainty rather than guessing, and ask a single clarifying question if required.
+When reasoning is needed, provide brief chain‑of‑thought steps to improve transparency.
+Keep responses concise; avoid unnecessary preamble or filler words.
+`;
+
+// Custom hook to apply theme changes to the DOM (copied from useChatSettings)
+function useThemeEffect(theme: "light" | "dark" | "system") {
+  useEffect(() => {
+    // Skip DOM manipulation during server-side rendering or tests
+    if (typeof window === "undefined" || !window.document?.documentElement) {
+      return;
+    }
+    // Skip during Vitest runs if needed
+    if (import.meta.env.VITEST) {
+      return;
+    }
+
+    const root = window.document.documentElement;
+    root.classList.remove("light", "dark"); // Remove previous theme classes
+
+    let effectiveTheme = theme;
+    // Determine effective theme if 'system' is selected
+    if (theme === "system") {
+      effectiveTheme =
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+    }
+
+    // Add the calculated theme class to the root element
+    root.classList.add(effectiveTheme);
+  }, [theme]); // Re-run effect only when the theme state changes
 }
 
 export const SettingsProvider: React.FC<SettingsProviderProps> = ({
   children,
   enableAdvancedSettings = true,
   activeConversationData,
-  activeProjectData,
+  // activeProjectData, // REMOVED - Unused
   isSettingsModalOpen,
   onSettingsModalOpenChange,
 }) => {
-  const chatSettings = useChatSettings({
-    activeConversationData,
-    activeProjectData,
-    enableAdvancedSettings,
-  });
+  // --- Manage Settings State Directly ---
+  const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
+  const [searchTerm, setSearchTerm] = useState("");
+  const defaultTemp = 0.7;
+  const [temperature, setTemperature] = useState(defaultTemp);
+  const [maxTokens, setMaxTokens] = useState<number | null>(null);
+  const [globalSystemPrompt, setGlobalSystemPrompt] = useState<string | null>(
+    enableAdvancedSettings ? defaultGlobalPrompt : null,
+  );
+  const [topP, setTopP] = useState<number | null>(null);
+  const [topK, setTopK] = useState<number | null>(null);
+  const [presencePenalty, setPresencePenalty] = useState<number | null>(null);
+  const [frequencyPenalty, setFrequencyPenalty] = useState<number | null>(null);
+
+  // Effect to reset advanced settings if the flag changes to disabled
+  useEffect(() => {
+    if (!enableAdvancedSettings) {
+      setTemperature(defaultTemp); // Reset to default
+      setMaxTokens(null);
+      setGlobalSystemPrompt(null);
+      setTopP(null);
+      setTopK(null);
+      setPresencePenalty(null);
+      setFrequencyPenalty(null);
+    } else {
+      // Re-initialize global prompt if it became null when disabled
+      if (globalSystemPrompt === null) {
+        setGlobalSystemPrompt(defaultGlobalPrompt);
+      }
+    }
+    // Only run when enableAdvancedSettings changes
+  }, [enableAdvancedSettings, globalSystemPrompt]); // Added globalSystemPrompt dependency
+
+  // Determine the active system prompt
+  const activeSystemPrompt = useMemo(() => {
+    if (!enableAdvancedSettings) {
+      return null;
+    }
+    if (
+      activeConversationData?.systemPrompt &&
+      activeConversationData.systemPrompt.trim() !== ""
+    ) {
+      return activeConversationData.systemPrompt;
+    }
+    if (globalSystemPrompt && globalSystemPrompt.trim() !== "") {
+      return globalSystemPrompt;
+    }
+    return null;
+  }, [enableAdvancedSettings, activeConversationData, globalSystemPrompt]);
+
+  // Apply theme effect
+  useThemeEffect(theme);
+
+  // --- Create dummy setters if advanced settings are disabled ---
+  const noOpSetter = () => {};
+  const setTemperatureFinal = enableAdvancedSettings
+    ? setTemperature
+    : noOpSetter;
+  const setMaxTokensFinal = enableAdvancedSettings ? setMaxTokens : noOpSetter;
+  const setGlobalSystemPromptFinal = enableAdvancedSettings
+    ? setGlobalSystemPrompt
+    : noOpSetter;
+  const setTopPFinal = enableAdvancedSettings ? setTopP : noOpSetter;
+  const setTopKFinal = enableAdvancedSettings ? setTopK : noOpSetter;
+  const setPresencePenaltyFinal = enableAdvancedSettings
+    ? setPresencePenalty
+    : noOpSetter;
+  const setFrequencyPenaltyFinal = enableAdvancedSettings
+    ? setFrequencyPenalty
+    : noOpSetter;
 
   const value = useMemo(
     () => ({
       enableAdvancedSettings: enableAdvancedSettings ?? true,
-      theme: chatSettings.theme,
-      setTheme: chatSettings.setTheme,
-      searchTerm: chatSettings.searchTerm,
-      setSearchTerm: chatSettings.setSearchTerm,
-      temperature: chatSettings.temperature,
-      setTemperature: chatSettings.setTemperature,
-      maxTokens: chatSettings.maxTokens,
-      setMaxTokens: chatSettings.setMaxTokens,
-      globalSystemPrompt: chatSettings.globalSystemPrompt,
-      setGlobalSystemPrompt: chatSettings.setGlobalSystemPrompt,
-      activeSystemPrompt: chatSettings.activeSystemPrompt,
-      topP: chatSettings.topP,
-      setTopP: chatSettings.setTopP,
-      topK: chatSettings.topK,
-      setTopK: chatSettings.setTopK,
-      presencePenalty: chatSettings.presencePenalty,
-      setPresencePenalty: chatSettings.setPresencePenalty,
-      frequencyPenalty: chatSettings.frequencyPenalty,
-      setFrequencyPenalty: chatSettings.setFrequencyPenalty,
+      theme,
+      setTheme,
+      searchTerm,
+      setSearchTerm,
+      temperature,
+      setTemperature: setTemperatureFinal,
+      maxTokens,
+      setMaxTokens: setMaxTokensFinal,
+      globalSystemPrompt,
+      setGlobalSystemPrompt: setGlobalSystemPromptFinal,
+      activeSystemPrompt,
+      topP,
+      setTopP: setTopPFinal,
+      topK,
+      setTopK: setTopKFinal,
+      presencePenalty,
+      setPresencePenalty: setPresencePenaltyFinal,
+      frequencyPenalty,
+      setFrequencyPenalty: setFrequencyPenaltyFinal,
       isSettingsModalOpen,
       onSettingsModalOpenChange,
     }),
     [
       enableAdvancedSettings,
-      chatSettings.theme,
-      chatSettings.setTheme,
-      chatSettings.searchTerm,
-      chatSettings.setSearchTerm,
-      chatSettings.temperature,
-      chatSettings.setTemperature,
-      chatSettings.maxTokens,
-      chatSettings.setMaxTokens,
-      chatSettings.globalSystemPrompt,
-      chatSettings.setGlobalSystemPrompt,
-      chatSettings.activeSystemPrompt,
-      chatSettings.topP,
-      chatSettings.setTopP,
-      chatSettings.topK,
-      chatSettings.setTopK,
-      chatSettings.presencePenalty,
-      chatSettings.setPresencePenalty,
-      chatSettings.frequencyPenalty,
-      chatSettings.setFrequencyPenalty,
+      theme,
+      setTheme,
+      searchTerm,
+      setSearchTerm,
+      temperature,
+      setTemperatureFinal,
+      maxTokens,
+      setMaxTokensFinal,
+      globalSystemPrompt,
+      setGlobalSystemPromptFinal,
+      activeSystemPrompt,
+      topP,
+      setTopPFinal,
+      topK,
+      setTopKFinal,
+      presencePenalty,
+      setPresencePenaltyFinal,
+      frequencyPenalty,
+      setFrequencyPenaltyFinal,
       isSettingsModalOpen,
       onSettingsModalOpenChange,
     ],

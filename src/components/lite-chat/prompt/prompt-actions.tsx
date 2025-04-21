@@ -1,8 +1,10 @@
 // src/components/lite-chat/prompt/prompt-actions.tsx
-import React, { useRef } from "react";
+import React, { useRef } from "react"; // Removed useMemo, useCallback
 import { Button } from "@/components/ui/button";
-import { SendHorizonalIcon, PaperclipIcon, ImageIcon } from "lucide-react"; // Added ImageIcon
-import { useChatContext } from "@/hooks/use-chat-context";
+import { SendHorizonalIcon, PaperclipIcon, ImageIcon } from "lucide-react";
+// REMOVED store imports
+// import { useModStore } from "@/store/mod.store";
+// import { useProviderStore } from "@/store/provider.store";
 import {
   Tooltip,
   TooltipContent,
@@ -10,30 +12,43 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import type {
+  AiModelConfig,
+  // DbProviderConfig, // REMOVED
+  CustomPromptAction, // Import type
+} from "@/lib/types";
 
+// Define props based on what PromptForm passes down
 interface PromptActionsProps {
   className?: string;
   prompt: string;
   isStreaming: boolean;
   addAttachedFile: (file: File) => void;
-  // Add function to modify prompt for image generation
   setPrompt: (value: string) => void;
+  // Props needed for internal logic/derivations
+  selectedModel: AiModelConfig | undefined; // Pass the derived model object
+  // Custom actions (assuming passed from a higher level or mod store via props)
+  customPromptActions: CustomPromptAction[];
+  // Context snapshot getter (assuming passed from a higher level)
+  getContextSnapshot: () => any; // Replace 'any' with a proper snapshot type if defined
 }
 
-export const PromptActions: React.FC<PromptActionsProps> = ({
+// Wrap component logic in a named function for React.memo
+const PromptActionsComponent: React.FC<PromptActionsProps> = ({
   className,
   prompt,
   isStreaming,
   addAttachedFile,
-  setPrompt, // Receive setPrompt
+  setPrompt,
+  selectedModel, // Use prop
+  customPromptActions, // Use prop
+  getContextSnapshot, // Use prop
 }) => {
-  const context = useChatContext();
-  const {
-    customPromptActions = [],
-    selectedModel, // Get selected model to check capabilities
-  } = context;
+  // REMOVED store access
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Use props for internal logic
   const canSubmit = prompt.trim().length > 0 && !isStreaming;
   const canGenerateImage =
     selectedModel?.supportsImageGeneration && !isStreaming;
@@ -46,20 +61,17 @@ export const PromptActions: React.FC<PromptActionsProps> = ({
     const files = event.target.files;
     if (files) {
       for (let i = 0; i < files.length; i++) {
-        addAttachedFile(files[i]);
+        addAttachedFile(files[i]); // Use prop action
       }
       event.target.value = "";
     }
   };
 
-  // Function to trigger image generation by prefixing prompt
   const handleImagineClick = () => {
     if (prompt.trim().length > 0 && !prompt.startsWith("/imagine ")) {
-      setPrompt(`/imagine ${prompt}`);
-      // Optionally trigger submit immediately after setting prompt?
-      // Or let user press send? Let user press send for now.
+      setPrompt(`/imagine ${prompt}`); // Use prop action
     } else if (prompt.trim().length === 0) {
-      setPrompt("/imagine "); // Add prefix even if prompt is empty
+      setPrompt("/imagine "); // Use prop action
     }
   };
 
@@ -81,7 +93,7 @@ export const PromptActions: React.FC<PromptActionsProps> = ({
               variant="outline"
               size="icon"
               onClick={handleAttachClick}
-              disabled={isStreaming}
+              disabled={isStreaming} // Use prop
               className="h-10 w-10 rounded-full border-gray-200 dark:border-gray-700"
               aria-label="Attach file"
             >
@@ -103,10 +115,10 @@ export const PromptActions: React.FC<PromptActionsProps> = ({
                 variant="outline"
                 size="icon"
                 onClick={handleImagineClick}
-                disabled={isStreaming || prompt.trim().length === 0} // Disable if no prompt
+                disabled={isStreaming || prompt.trim().length === 0} // Use props
                 className={cn(
                   "h-10 w-10 rounded-full border-gray-200 dark:border-gray-700",
-                  prompt.startsWith("/imagine ") && "bg-primary/20", // Indicate active state
+                  prompt.startsWith("/imagine ") && "bg-primary/20", // Use prop
                 )}
                 aria-label="Generate Image (Prefixes prompt with /imagine)"
               >
@@ -120,6 +132,7 @@ export const PromptActions: React.FC<PromptActionsProps> = ({
         </TooltipProvider>
       )}
       {/* Custom Prompt Actions */}
+      {/* Use customPromptActions prop */}
       {customPromptActions.map((action) => (
         <TooltipProvider key={action.id} delayDuration={100}>
           <Tooltip>
@@ -128,8 +141,8 @@ export const PromptActions: React.FC<PromptActionsProps> = ({
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={() => action.onClick(context)}
-                disabled={isStreaming}
+                onClick={() => action.onClick(getContextSnapshot())} // Use prop getter
+                disabled={isStreaming} // Use prop
                 className={cn(
                   "h-10 w-10 rounded-full border-gray-200 dark:border-gray-700",
                   action.className,
@@ -153,7 +166,7 @@ export const PromptActions: React.FC<PromptActionsProps> = ({
               <Button
                 type="submit"
                 size="icon"
-                disabled={!canSubmit}
+                disabled={!canSubmit} // Use derived state
                 className={cn(
                   "h-10 w-10 rounded-full",
                   canSubmit
@@ -178,3 +191,6 @@ export const PromptActions: React.FC<PromptActionsProps> = ({
     </div>
   );
 };
+
+// Export the memoized component
+export const PromptActions = React.memo(PromptActionsComponent);

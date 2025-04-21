@@ -1,27 +1,33 @@
 // src/components/lite-chat/selected-vfs-files-display.tsx
 import React from "react";
-import { useChatContext } from "@/hooks/use-chat-context"; // Use full context again
+// REMOVED store imports
 import { Button } from "@/components/ui/button";
 import { XIcon, FileTextIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Define props based on what PromptForm passes down
 interface SelectedVfsFilesDisplayProps {
   className?: string;
+  selectedVfsPaths: string[];
+  removeSelectedVfsPath: (path: string) => void;
+  isVfsEnabledForItem: boolean;
+  isVfsReady: boolean; // Pass readiness state
 }
 
-export const SelectedVfsFilesDisplay: React.FC<
+// Wrap component logic in a named function for React.memo
+const SelectedVfsFilesDisplayComponent: React.FC<
   SelectedVfsFilesDisplayProps
-> = ({ className }) => {
-  // Get VFS selection state/actions from context again
-  const {
-    selectedVfsPaths, // Use context
-    removeSelectedVfsPath, // Use context
-    isVfsEnabledForItem,
-    vfs,
-  } = useChatContext();
+> = ({
+  className,
+  selectedVfsPaths, // Use prop
+  removeSelectedVfsPath, // Use prop
+  isVfsEnabledForItem, // Use prop
+  isVfsReady, // Use prop
+}) => {
+  // REMOVED store access
 
-  // Only render if VFS is enabled for the item, the hook is ready, and paths are selected
-  if (!isVfsEnabledForItem || !vfs.isReady || selectedVfsPaths.length === 0) {
+  // Use props for conditional rendering
+  if (!isVfsEnabledForItem || !isVfsReady || selectedVfsPaths.length === 0) {
     return null;
   }
 
@@ -39,18 +45,17 @@ export const SelectedVfsFilesDisplay: React.FC<
         <div
           key={path}
           className="flex items-center gap-1.5 bg-white dark:bg-gray-800 rounded-md pl-2 pr-1 py-1 text-xs border border-gray-200 dark:border-gray-700 shadow-sm"
-          title={path} // Show full path on hover
+          title={path}
         >
           <FileTextIcon className="h-3.5 w-3.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
-          <span className="truncate max-w-[150px] font-mono">
+          <span className="font-mono truncate max-w-[150px]">
             {path.startsWith("/") ? path.substring(1) : path}{" "}
-            {/* Hide leading slash */}
           </span>
           <Button
             variant="ghost"
             size="icon"
             className="h-5 w-5 text-gray-500 hover:text-red-600 dark:hover:text-red-400 ml-1 flex-shrink-0"
-            onClick={() => removeSelectedVfsPath(path)} // Use context action
+            onClick={() => removeSelectedVfsPath(path)} // Use prop action
             aria-label={`Remove file ${path} from context`}
           >
             <XIcon className="h-3 w-3" />
@@ -60,3 +65,8 @@ export const SelectedVfsFilesDisplay: React.FC<
     </div>
   );
 };
+
+// Export the memoized component
+export const SelectedVfsFilesDisplay = React.memo(
+  SelectedVfsFilesDisplayComponent,
+);

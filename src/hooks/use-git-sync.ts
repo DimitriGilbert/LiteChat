@@ -1,22 +1,33 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useChatContext } from '@/hooks/use-chat-context';
-import { GitSyncManager } from '@/utils/git-sync-manager';
+import { useState, useEffect, useCallback } from "react";
+// Removed useChatContext import
+// Import necessary store hooks
+import { useVfsStore } from "@/store/vfs.store";
+import { GitSyncManager } from "@/utils/git-sync-manager";
+import { fs } from "@zenfs/core"; // Import fs
 
 export function useGitSync() {
-  const { vfs } = useChatContext();
+  // Get VFS state from store
+  const { isVfsReady, vfsKey } = useVfsStore((s) => ({
+    isVfsReady: s.isVfsReady,
+    vfsKey: s.vfsKey,
+  }));
+
+  // Local state remains
   const [syncManager, setSyncManager] = useState<GitSyncManager | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Initialize the sync manager when VFS is ready
   useEffect(() => {
-    if (vfs && vfs.isReady) {
-      setSyncManager(new GitSyncManager(vfs, vfs.vfsKey || null));
+    // Use store state for readiness check
+    if (isVfsReady) {
+      // Pass the global fs instance and vfsKey from store
+      setSyncManager(new GitSyncManager(fs, vfsKey || null));
     } else {
       setSyncManager(null);
     }
-  }, [vfs, vfs?.isReady, vfs?.vfsKey]);
+  }, [isVfsReady, vfsKey]); // Depend on store state
 
-  // Initialize a project repository
+  // Callbacks remain the same, use local syncManager instance
   const initializeProjectRepo = useCallback(
     async (project: any) => {
       if (!syncManager || !project) return false;
@@ -27,10 +38,9 @@ export function useGitSync() {
         setIsLoading(false);
       }
     },
-    [syncManager]
+    [syncManager],
   );
 
-  // Initialize the root repository
   const initializeRootRepo = useCallback(
     async (rootConfig: any) => {
       if (!syncManager || !rootConfig) return false;
@@ -41,10 +51,9 @@ export function useGitSync() {
         setIsLoading(false);
       }
     },
-    [syncManager]
+    [syncManager],
   );
 
-  // Pull latest changes for a project
   const pullProjectChanges = useCallback(
     async (project: any) => {
       if (!syncManager || !project) return false;
@@ -55,10 +64,9 @@ export function useGitSync() {
         setIsLoading(false);
       }
     },
-    [syncManager]
+    [syncManager],
   );
 
-  // Pull latest changes for root repository
   const pullRootChanges = useCallback(
     async (rootConfig: any) => {
       if (!syncManager || !rootConfig) return false;
@@ -69,35 +77,49 @@ export function useGitSync() {
         setIsLoading(false);
       }
     },
-    [syncManager]
+    [syncManager],
   );
 
-  // Commit and push changes for a project
   const commitAndPushProjectChanges = useCallback(
-    async (project: any, message: string, author: { name: string; email: string }) => {
+    async (
+      project: any,
+      message: string,
+      author: { name: string; email: string },
+    ) => {
       if (!syncManager || !project) return false;
       setIsLoading(true);
       try {
-        return await syncManager.commitAndPushProjectChanges(project, message, author);
+        return await syncManager.commitAndPushProjectChanges(
+          project,
+          message,
+          author,
+        );
       } finally {
         setIsLoading(false);
       }
     },
-    [syncManager]
+    [syncManager],
   );
 
-  // Commit and push changes for root repository
   const commitAndPushRootChanges = useCallback(
-    async (rootConfig: any, message: string, author: { name: string; email: string }) => {
+    async (
+      rootConfig: any,
+      message: string,
+      author: { name: string; email: string },
+    ) => {
       if (!syncManager || !rootConfig) return false;
       setIsLoading(true);
       try {
-        return await syncManager.commitAndPushRootChanges(rootConfig, message, author);
+        return await syncManager.commitAndPushRootChanges(
+          rootConfig,
+          message,
+          author,
+        );
       } finally {
         setIsLoading(false);
       }
     },
-    [syncManager]
+    [syncManager],
   );
 
   return {

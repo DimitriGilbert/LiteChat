@@ -1,62 +1,72 @@
-// src/components/lite-chat/settings-data-management.tsx
-import React, { useRef, useState } from "react";
-import { useChatContext } from "@/hooks/use-chat-context";
+// src/components/lite-chat/settings/settings-data-management.tsx
+import React, { useRef, useState, useCallback } from "react";
+// REMOVED store imports
 import { Button } from "@/components/ui/button";
 import { UploadIcon, DownloadIcon, Trash2Icon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-export const SettingsDataManagement: React.FC = () => {
-  const {
-    importConversation,
-    exportAllConversations,
-    clearAllData, // Get clearAllData from context
-  } = useChatContext();
+// Define props based on what SettingsModal passes down
+interface SettingsDataManagementProps {
+  importConversation: (file: File, parentId: string | null) => Promise<void>;
+  exportAllConversations: () => Promise<void>;
+  clearAllData: () => Promise<void>; // Action to clear all data
+}
+
+// Wrap component logic in a named function for React.memo
+const SettingsDataManagementComponent: React.FC<
+  SettingsDataManagementProps
+> = ({
+  importConversation, // Use prop action
+  exportAllConversations, // Use prop action
+  clearAllData, // Use prop action
+}) => {
+  // REMOVED store access
+
+  // Local UI state remains
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
+  // Handlers use prop actions
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setIsImporting(true);
-      try {
-        // Pass null for parentId to import at root level from settings
-        await importConversation(file, null);
-        // Success toast is handled within importConversation hook
-      } catch (error) {
-        console.error("Import failed (from component):", error);
-        // Error toast is handled within importConversation hook
-      } finally {
-        if (fileInputRef.current) {
-          fileInputRef.current.value = ""; // Reset file input
+  const handleFileChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) {
+        setIsImporting(true);
+        try {
+          await importConversation(file, null); // Use prop action
+        } catch (error) {
+          console.error("Import failed (from component):", error);
+          // Error toast likely handled by the action itself
+        } finally {
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
+          setIsImporting(false);
         }
-        setIsImporting(false);
       }
-    }
-  };
+    },
+    [importConversation],
+  ); // Depend on prop action
 
-  const handleExportAllClick = async () => {
+  const handleExportAllClick = useCallback(async () => {
     setIsExporting(true);
     try {
-      await exportAllConversations();
-      // Success toast is handled within exportAllConversations hook
+      await exportAllConversations(); // Use prop action
     } catch (error) {
       console.error("Export all failed (from component):", error);
-      // Error toast is handled within exportAllConversations hook
+      // Error toast likely handled by the action itself
     } finally {
       setIsExporting(false);
     }
-  };
+  }, [exportAllConversations]); // Depend on prop action
 
-  const handleClearAllDataClick = async () => {
-    // Renamed handler for clarity
+  const handleClearAllDataClick = useCallback(async () => {
     if (
       window.confirm(
         "🚨 ARE YOU ABSOLUTELY SURE? 🚨\n\nThis will permanently delete ALL conversations, messages, and stored API keys from your browser. This action cannot be undone.",
@@ -69,20 +79,19 @@ export const SettingsDataManagement: React.FC = () => {
       ) {
         setIsClearing(true);
         try {
-          await clearAllData(); // Use function from context
+          await clearAllData(); // Use prop action
           toast.success("All local data cleared. Reloading the application...");
           setTimeout(() => window.location.reload(), 1500);
-          // No need to setIsClearing(false) as the page reloads
         } catch (error: unknown) {
           console.error("Failed to clear all data:", error);
           const message =
             error instanceof Error ? error.message : "Unknown error";
           toast.error(`Failed to clear data: ${message}`);
-          setIsClearing(false); // Set back to false on error
+          setIsClearing(false); // Only reset state on error, as success reloads
         }
       }
     }
-  };
+  }, [clearAllData]); // Depend on prop action
 
   return (
     <div className="space-y-6 p-1">
@@ -162,3 +171,8 @@ export const SettingsDataManagement: React.FC = () => {
     </div>
   );
 };
+
+// Export the memoized component
+export const SettingsDataManagement = React.memo(
+  SettingsDataManagementComponent,
+);

@@ -1,44 +1,106 @@
 // src/components/lite-chat/model-selector.tsx
-import React from "react";
-import { useProviderManagementContext } from "@/context/provider-management-context";
+import React, { useMemo } from "react";
+// REMOVED store imports
 import { Combobox } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
+import type {
+  AiProviderConfig,
+  DbProviderConfig,
+  // AiModelConfig, // REMOVED
+} from "@/lib/types";
 
-export function ModelSelector() {
-  const {
-    selectedProvider,
-    selectedModelId,
-    setSelectedModelId,
-    activeProviders,
-  } = useProviderManagementContext();
+// Define props based on what PromptSettings passes down
+interface ModelSelectorProps {
+  selectedProviderId: string | null;
+  selectedModelId: string | null;
+  setSelectedModelId: (id: string | null) => void;
+  dbProviderConfigs: DbProviderConfig[]; // Needed to derive models for selected provider
+}
 
-  const isLoading = !activeProviders || activeProviders.length === 0;
+// Wrap component logic in a named function for React.memo
+const ModelSelectorComponent: React.FC<ModelSelectorProps> = ({
+  selectedProviderId, // Use prop
+  selectedModelId, // Use prop
+  setSelectedModelId, // Use prop action
+  dbProviderConfigs, // Use prop
+}) => {
+  // REMOVED store access
 
-  // modelOptions uses the filtered/sorted list from the context for the dropdown
-  const modelOptions = React.useMemo(() => {
-    if (!selectedProvider?.models) {
-      return [];
+  // Derive selectedDbProviderConfig using props
+  const selectedDbProviderConfig = useMemo(
+    () => dbProviderConfigs.find((p) => p.id === selectedProviderId),
+    [dbProviderConfigs, selectedProviderId],
+  );
+
+  // Derive selectedProvider (for model list) using props
+  const selectedProvider = useMemo((): AiProviderConfig | undefined => {
+    if (!selectedDbProviderConfig) return undefined;
+    const allModels = selectedDbProviderConfig.fetchedModels || [];
+    const enabledIds = new Set(selectedDbProviderConfig.enabledModels ?? []);
+    let displayModels =
+      enabledIds.size > 0
+        ? allModels.filter((m) => enabledIds.has(m.id))
+        : allModels;
+
+    // Apply sorting based on modelSortOrder
+    const sortOrder = selectedDbProviderConfig.modelSortOrder ?? [];
+    if (sortOrder.length > 0 && displayModels.length > 0) {
+      const orderedList: { id: string; name: string }[] = [];
+      const addedIds = new Set<string>();
+      const displayModelMap = new Map(displayModels.map((m) => [m.id, m]));
+
+      for (const modelId of sortOrder) {
+        const model = displayModelMap.get(modelId);
+        if (model && !addedIds.has(modelId)) {
+          orderedList.push(model);
+          addedIds.add(modelId);
+        }
+      }
+      const remaining = displayModels
+        .filter((m) => !addedIds.has(m.id))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      displayModels = [...orderedList, ...remaining];
+    } else {
+      displayModels.sort((a, b) => a.name.localeCompare(b.name));
     }
+
+    return {
+      id: selectedDbProviderConfig.id,
+      name: selectedDbProviderConfig.name,
+      type: selectedDbProviderConfig.type,
+      models: displayModels.map((m) => ({
+        id: m.id,
+        name: m.name,
+        instance: null, // Instance not needed here
+      })),
+      allAvailableModels: allModels,
+    };
+  }, [selectedDbProviderConfig]); // Depend on derived config
+
+  // Derive model options using derived selectedProvider
+  const modelOptions = useMemo(() => {
+    if (!selectedProvider?.models) return [];
     return selectedProvider.models.map((model) => ({
       value: model.id,
       label: model.name,
     }));
   }, [selectedProvider?.models]);
 
-  // allModelOptions uses the complete list from the context for search/placeholders
-  const allModelOptions = React.useMemo(() => {
-    if (!selectedProvider?.allAvailableModels) {
-      return [];
-    }
+  const allModelOptions = useMemo(() => {
+    if (!selectedProvider?.allAvailableModels) return [];
     return selectedProvider.allAvailableModels.map((model) => ({
       value: model.id,
       label: model.name,
     }));
   }, [selectedProvider?.allAvailableModels]);
 
+  // Use prop action
   const handleModelChange = (value: string | null) => {
     setSelectedModelId(value);
   };
+
+  // Loading/disabled states based on derived data
+  const isLoading = false; // Loading state might need to be passed if relevant
 
   if (isLoading) {
     return <Skeleton className="h-9" />;
@@ -56,7 +118,6 @@ export function ModelSelector() {
     );
   }
 
-  // Check if there are *any* models available at all for the provider
   if (allModelOptions.length === 0) {
     return (
       <Combobox
@@ -71,15 +132,11 @@ export function ModelSelector() {
     );
   }
 
-  // Check if there are models specifically *enabled* for the dropdown
   if (modelOptions.length === 0) {
-    // If no models are explicitly enabled (but some exist), allow searching all.
     return (
       <Combobox
-        // Provide ALL models to the combobox ONLY in this specific case
-        // so search can find them.
         options={allModelOptions}
-        value={selectedModelId}
+        value={selectedModelId} // Use prop
         onChange={handleModelChange}
         placeholder="No models enabled (Search all)"
         searchPlaceholder={`Search ${allModelOptions.length} models...`}
@@ -90,18 +147,19 @@ export function ModelSelector() {
     );
   }
 
-  // Default case: Show enabled models in dropdown, search within them.
   return (
     <Combobox
-      options={modelOptions} // Use the filtered list for the dropdown
-      value={selectedModelId}
+      options={modelOptions}
+      value={selectedModelId} // Use prop
       onChange={handleModelChange}
       placeholder="Select model..."
-      // Search placeholder reflects the number of models in the dropdown list
       searchPlaceholder={`Search ${modelOptions.length} enabled models...`}
       emptyText="No matching models found."
       triggerClassName="text-xs h-9"
       contentClassName="text-xs"
     />
   );
-}
+};
+
+// Export the memoized component
+export const ModelSelector = React.memo(ModelSelectorComponent);

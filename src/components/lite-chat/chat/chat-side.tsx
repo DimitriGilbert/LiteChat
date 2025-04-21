@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
+// src/components/lite-chat/chat/chat-side.tsx
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import { ChatHistory } from "./chat-history";
 import { SettingsModal } from "@/components/lite-chat/settings/settings-modal";
 import { Button } from "@/components/ui/button";
@@ -9,73 +10,83 @@ import {
   DownloadIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useChatContext } from "@/hooks/use-chat-context";
 import { toast } from "sonner";
+// REMOVED: import type { SidebarItem, DbConversation, SidebarItemType } from "@/lib/types";
+import type { DbConversation } from "@/lib/types"; // Keep DbConversation if needed
+import type { ChatSideProps } from "../chat"; // Import props from parent
 
-interface ChatSideProps {
-  className?: string;
-}
-
-export const ChatSide: React.FC<ChatSideProps> = ({ className }) => {
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const {
-    createConversation,
-    createProject,
-    selectedItemId,
-    selectedItemType,
-    importConversation,
-    getConversation,
-    // getProject, // REMOVE unused
-  } = useChatContext();
+// Wrap component logic in a named function for React.memo
+const ChatSideComponent: React.FC<ChatSideProps> = ({
+  className,
+  sidebarItems,
+  editingItemId,
+  selectedItemId,
+  selectedItemType,
+  onEditComplete,
+  setEditingItemId,
+  // Destructure actions from props
+  selectItem,
+  deleteItem,
+  renameItem,
+  exportConversation,
+  createConversation,
+  createProject,
+  importConversation,
+  isSettingsModalOpen,
+  setIsSettingsModalOpen,
+  settingsProps, // Receive bundled settings props
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [parentIdForNewItem, setParentIdForNewItem] = useState<string | null>(
     null,
   );
 
+  console.log(
+    `[ChatSide] Rendering. Items count: ${sidebarItems.length}, Editing: ${editingItemId}`,
+  );
+
+  // Effect to determine parent ID for new items based on selection props
   useEffect(() => {
+    console.log(
+      `[ChatSide useEffect] Running. Selected: ${selectedItemType} - ${selectedItemId}`,
+    );
     let determinedParentId: string | null = null;
     if (selectedItemType === "project") {
       determinedParentId = selectedItemId;
-    } else if (selectedItemType === "conversation") {
-      if (selectedItemId) {
-        getConversation(selectedItemId).then((convo) => {
-          if (convo) {
-            setParentIdForNewItem(convo.parentId);
-          } else {
-            setParentIdForNewItem(null);
-          }
-        });
-        return;
-      } else {
-        determinedParentId = null;
-      }
+    } else if (selectedItemType === "conversation" && selectedItemId) {
+      const convo = sidebarItems.find(
+        (item): item is DbConversation & { type: "conversation" } =>
+          item.type === "conversation" && item.id === selectedItemId,
+      );
+      determinedParentId = convo?.parentId ?? null;
     } else {
       determinedParentId = null;
     }
-    setParentIdForNewItem(determinedParentId);
-  }, [selectedItemId, selectedItemType, getConversation]);
+    setParentIdForNewItem((prev) => {
+      if (prev !== determinedParentId) {
+        console.log(
+          `[ChatSide useEffect] Updating parentIdForNewItem from ${prev} to ${determinedParentId}`,
+        );
+        return determinedParentId;
+      }
+      return prev;
+    });
+  }, [selectedItemId, selectedItemType, sidebarItems]);
 
-  const handleCreateChat = async () => {
+  // Use actions passed via props
+  const handleCreateChat = useCallback(async () => {
     await createConversation(parentIdForNewItem);
-  };
+  }, [createConversation, parentIdForNewItem]);
 
-  const handleCreateProject = async () => {
+  const handleCreateProject = useCallback(async () => {
     try {
       const { id: newProjectId } = await createProject(parentIdForNewItem);
-      setEditingProjectId(newProjectId);
+      setEditingItemId(newProjectId);
     } catch (error) {
       console.error("Failed to create project:", error);
       toast.error("Failed to create project.");
     }
-  };
-
-  const onEditComplete = (id: string) => {
-    if (editingProjectId === id) {
-      setEditingProjectId(null);
-    }
-  };
+  }, [createProject, parentIdForNewItem, setEditingItemId]);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -124,8 +135,14 @@ export const ChatSide: React.FC<ChatSideProps> = ({ className }) => {
       <div className="flex-grow overflow-hidden flex flex-col">
         <ChatHistory
           className="flex-grow"
-          editingItemId={editingProjectId}
+          sidebarItems={sidebarItems}
+          editingItemId={editingItemId}
+          selectedItemId={selectedItemId}
           onEditComplete={onEditComplete}
+          selectItem={selectItem}
+          deleteItem={deleteItem}
+          renameItem={renameItem}
+          exportConversation={exportConversation}
         />
       </div>
 
@@ -152,17 +169,22 @@ export const ChatSide: React.FC<ChatSideProps> = ({ className }) => {
         <Button
           variant="outline"
           className="w-full justify-start gap-2 text-sm h-9 border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
-          onClick={() => setIsSettingsOpen(true)}
+          onClick={() => setIsSettingsModalOpen(true)}
         >
           <SettingsIcon className="h-4 w-4" />
           Settings
         </Button>
       </div>
 
+      {/* Settings Modal - Pass down bundled props */}
       <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        settingsProps={settingsProps} // Pass the bundled props object
       />
     </aside>
   );
 };
+
+// Export the memoized component
+export const ChatSide = React.memo(ChatSideComponent);

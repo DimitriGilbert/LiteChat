@@ -1,4 +1,4 @@
-// src/components/lite-chat/chat-header-actions.tsx
+// src/components/lite-chat/chat/chat-header-actions.tsx
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,28 +9,33 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useChatContext } from "@/hooks/use-chat-context";
+// REMOVED store imports
 import { cn } from "@/lib/utils";
 
+// Define props based on what ChatHeader passes down
 interface ChatHeaderActionsProps {
   className?: string;
-  conversationId: string | null; // Accept conversationId as prop
+  conversationId: string | null;
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  exportConversation: (conversationId: string) => Promise<void>; // Expects non-null ID here
 }
 
-export const ChatHeaderActions: React.FC<ChatHeaderActionsProps> = ({
+// Wrap component logic in a named function for React.memo
+const ChatHeaderActionsComponent: React.FC<ChatHeaderActionsProps> = ({
   className,
-  conversationId, // Use the prop
+  conversationId,
+  searchTerm,
+  setSearchTerm,
+  exportConversation,
 }) => {
-  const {
-    exportConversation, // Keep export function
-    searchTerm,
-    setSearchTerm,
-  } = useChatContext();
+  // REMOVED store access
 
+  // Use props directly
   const handleExportClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (conversationId) {
-      exportConversation(conversationId);
+      exportConversation(conversationId); // Use prop action
     }
   };
 
@@ -42,9 +47,9 @@ export const ChatHeaderActions: React.FC<ChatHeaderActionsProps> = ({
         <Input
           type="search"
           placeholder="Search messages..."
-          className="pl-8 h-9 w-full bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400" // Adjusted style
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-8 h-9 w-full bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+          value={searchTerm} // Use prop
+          onChange={(e) => setSearchTerm(e.target.value)} // Use prop action
         />
       </div>
 
@@ -56,9 +61,9 @@ export const ChatHeaderActions: React.FC<ChatHeaderActionsProps> = ({
               variant="ghost"
               size="icon"
               onClick={handleExportClick}
-              disabled={!conversationId} // Disable if no conversation is selected
+              disabled={!conversationId} // Use prop
               aria-label="Export current chat"
-              className="h-9 w-9 text-gray-400 hover:text-white hover:bg-gray-700" // Adjusted style
+              className="h-9 w-9 text-gray-400 hover:text-white hover:bg-gray-700"
             >
               <DownloadIcon className="h-4 w-4" />
             </Button>
@@ -71,3 +76,6 @@ export const ChatHeaderActions: React.FC<ChatHeaderActionsProps> = ({
     </div>
   );
 };
+
+// Export the memoized component
+export const ChatHeaderActions = React.memo(ChatHeaderActionsComponent);

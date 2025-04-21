@@ -1,9 +1,8 @@
 // src/hooks/ai-interaction/stream-handler.ts
 import { nanoid } from "nanoid";
-import { Message } from "@/lib/types";
+import { Message } from "@/lib/types"; // Ensure Message type is imported
 import { throttle } from "@/lib/throttle";
 import { modEvents, ModEvent } from "@/mods/events";
-// Removed unused CoreMessage import
 
 /**
  * Creates an assistant message placeholder for streaming
@@ -81,7 +80,7 @@ export function getStreamHeaders(
     // For providers that don't need a key or optional OpenRouter headers
     return providerType === "openrouter"
       ? {
-          "HTTP-Referer": "http://localhost:5173",
+          "HTTP-Referer": globalThis.location?.origin || "http://localhost", // Use actual origin
           "X-Title": "LiteChat",
         }
       : undefined;
@@ -92,7 +91,7 @@ export function getStreamHeaders(
     Authorization: `Bearer ${apiKey}`,
     // Add OpenRouter headers if needed
     ...(providerType === "openrouter" && {
-      "HTTP-Referer": "http://localhost:5173",
+      "HTTP-Referer": globalThis.location?.origin || "http://localhost", // Use actual origin
       "X-Title": "LiteChat",
     }),
   };
@@ -133,6 +132,7 @@ export function finalizeStreamedMessageUI(
         : usage.completionTokens / durationSeconds;
 
     // Construct the final message object for UI update
+    // FIX: Ensure finalMessageObject is explicitly typed as Message
     const finalMessageObject: Message = {
       ...originalMessage,
       content: finalContent, // Set the final content
@@ -151,6 +151,7 @@ export function finalizeStreamedMessageUI(
 
     // Emit event only if the message was successfully finalized without error
     if (!streamError) {
+      // FIX: Pass the correctly typed finalMessageObject
       modEvents.emit(ModEvent.RESPONSE_DONE, { message: finalMessageObject });
     }
 

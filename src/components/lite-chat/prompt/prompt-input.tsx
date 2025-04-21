@@ -1,16 +1,18 @@
-// src/components/lite-chat/prompt-input.tsx
+// src/components/lite-chat/prompt/prompt-input.tsx
 import React, { useRef, useEffect, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
+// Define props based on what PromptForm passes down
 interface PromptInputProps {
   className?: string;
-  prompt: string; // Add prop
-  setPrompt: React.Dispatch<React.SetStateAction<string>>; // Add prop
-  isStreaming: boolean; // Add prop
+  prompt: string;
+  setPrompt: (value: string) => void; // Use the prop setter type
+  isStreaming: boolean;
 }
 
-export const PromptInput: React.FC<PromptInputProps> = ({
+// Wrap component logic in a named function for React.memo
+const PromptInputComponent: React.FC<PromptInputProps> = ({
   className,
   prompt, // Use prop
   setPrompt, // Use prop
@@ -18,6 +20,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Internal logic remains the same, uses props
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       const isModKey = e.metaKey || e.ctrlKey;
@@ -44,16 +47,16 @@ export const PromptInput: React.FC<PromptInputProps> = ({
     if (textarea) {
       textarea.style.height = "auto";
       const scrollHeight = textarea.scrollHeight;
-      const maxHeight = 200;
+      const maxHeight = 200; // Or get from config/props if needed
       textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
     }
-  }, [prompt]);
+  }, [prompt]); // Depend on prop
 
   return (
     <Textarea
       ref={textareaRef}
-      value={prompt}
-      onChange={(e) => setPrompt(e.target.value)}
+      value={prompt} // Use prop
+      onChange={(e) => setPrompt(e.target.value)} // Use prop action
       onKeyDown={handleKeyDown}
       placeholder="Type a message... (Shift+Enter for new line)"
       className={cn(
@@ -62,8 +65,11 @@ export const PromptInput: React.FC<PromptInputProps> = ({
         className,
       )}
       rows={3}
-      disabled={isStreaming}
+      disabled={isStreaming} // Use prop
       aria-label="Chat input"
     />
   );
 };
+
+// Export the memoized component
+export const PromptInput = React.memo(PromptInputComponent);

@@ -1,4 +1,4 @@
-// src/components/lite-chat/settings-provider-row-view.tsx
+// src/components/lite-chat/settings/settings-provider-row-view.tsx
 import React from "react";
 import type { DbProviderConfig, DbApiKey } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -17,27 +17,31 @@ import {
   supportsModelFetching,
 } from "@/lib/litechat";
 
+// Define props based on what ProviderRow passes down
+type FetchStatus = "idle" | "fetching" | "error" | "success";
 interface ProviderRowViewModeProps {
   provider: DbProviderConfig;
   apiKeys: DbApiKey[];
   onEdit: () => void;
   onDelete: () => Promise<void>;
   onFetchModels: () => Promise<void>;
-  fetchStatus: "idle" | "fetching" | "error" | "success";
+  fetchStatus: FetchStatus;
   isDeleting: boolean;
   getAllAvailableModelDefs: () => { id: string; name: string }[];
 }
 
-export const ProviderRowViewMode: React.FC<ProviderRowViewModeProps> = ({
-  provider,
-  apiKeys,
-  onEdit,
-  onDelete,
-  onFetchModels,
-  fetchStatus,
-  isDeleting,
-  getAllAvailableModelDefs,
+// Wrap component logic in a named function for React.memo
+const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
+  provider, // Use prop
+  apiKeys, // Use prop
+  onEdit, // Use prop action
+  onDelete, // Use prop action
+  onFetchModels, // Use prop action
+  fetchStatus, // Use prop
+  isDeleting, // Use prop
+  getAllAvailableModelDefs, // Use prop function
 }) => {
+  // Derivations use props
   const needsKey = requiresApiKey(provider.type);
   const needsURL = requiresBaseURL(provider.type);
   const canFetch = supportsModelFetching(provider.type);
@@ -45,7 +49,7 @@ export const ProviderRowViewMode: React.FC<ProviderRowViewModeProps> = ({
   const isEditButtonDisabled = isDeleting;
   const isDeleteButtonDisabled = isDeleting || fetchStatus === "fetching";
 
-  const allAvailableModels = getAllAvailableModelDefs();
+  const allAvailableModels = getAllAvailableModelDefs(); // Use prop function
   const enabledModelsSet = new Set(provider.enabledModels ?? []);
   const orderedDisplayModels = (
     provider.modelSortOrder ??
@@ -53,7 +57,7 @@ export const ProviderRowViewMode: React.FC<ProviderRowViewModeProps> = ({
     []
   )
     .map((modelId) => {
-      if (!enabledModelsSet.has(modelId)) return null; // Only show enabled models
+      if (!enabledModelsSet.has(modelId)) return null;
       const modelDef = allAvailableModels.find((m) => m.id === modelId);
       return { id: modelId, name: modelDef?.name || modelId };
     })
@@ -74,7 +78,7 @@ export const ProviderRowViewMode: React.FC<ProviderRowViewModeProps> = ({
           <Button
             variant="ghost"
             size="icon"
-            onClick={onEdit}
+            onClick={onEdit} // Use prop action
             disabled={isEditButtonDisabled}
             aria-label="Edit provider"
           >
@@ -83,12 +87,12 @@ export const ProviderRowViewMode: React.FC<ProviderRowViewModeProps> = ({
           <Button
             variant="ghost"
             size="icon"
-            onClick={onDelete}
+            onClick={onDelete} // Use prop action
             disabled={isDeleteButtonDisabled}
             className="text-red-500 hover:text-red-400"
             aria-label="Delete provider"
           >
-            {isDeleting ? (
+            {isDeleting ? ( // Use prop
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Trash2Icon className="h-4 w-4" />
@@ -133,7 +137,7 @@ export const ProviderRowViewMode: React.FC<ProviderRowViewModeProps> = ({
             </ScrollArea>
           </div>
         )}
-        {/* Display All Available Models List (if fetched or default) */}
+        {/* Display All Available Models List */}
         {allAvailableModels.length > 0 && (
           <div className="pt-1">
             <span className="font-medium text-gray-300">
@@ -141,7 +145,7 @@ export const ProviderRowViewMode: React.FC<ProviderRowViewModeProps> = ({
             </span>
             <ScrollArea className="h-20 mt-1 rounded-md border border-gray-600 p-2 bg-gray-900 text-xs">
               {allAvailableModels
-                .slice() // Create a copy before sorting
+                .slice()
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .map((m) => (
                   <div key={m.id}>{m.name || m.id}</div>
@@ -163,20 +167,20 @@ export const ProviderRowViewMode: React.FC<ProviderRowViewModeProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={onFetchModels}
-              disabled={isFetchButtonDisabled}
+              onClick={onFetchModels} // Use prop action
+              disabled={isFetchButtonDisabled} // Use derived state
               className="text-xs"
             >
-              {fetchStatus === "fetching" && (
+              {fetchStatus === "fetching" && ( // Use prop
                 <Loader2 className="h-3 w-3 mr-1 animate-spin" />
               )}
-              {fetchStatus === "success" && (
+              {fetchStatus === "success" && ( // Use prop
                 <CheckIcon className="h-3 w-3 mr-1 text-green-500" />
               )}
-              {fetchStatus === "error" && (
+              {fetchStatus === "error" && ( // Use prop
                 <AlertCircleIcon className="h-3 w-3 mr-1 text-red-500" />
               )}
-              {fetchStatus === "idle" && (
+              {fetchStatus === "idle" && ( // Use prop
                 <RefreshCwIcon className="h-3 w-3 mr-1" />
               )}
               {fetchStatus === "fetching" ? "Fetching..." : "Fetch Models Now"}
@@ -187,3 +191,6 @@ export const ProviderRowViewMode: React.FC<ProviderRowViewModeProps> = ({
     </div>
   );
 };
+
+// Export the memoized component
+export const ProviderRowViewMode = React.memo(ProviderRowViewModeComponent);

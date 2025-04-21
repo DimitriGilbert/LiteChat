@@ -1,7 +1,9 @@
 // src/components/lite-chat/git-manager.tsx
 import React, { useState, useEffect } from "react";
-import { useChatContext } from "@/hooks/use-chat-context";
-import { useGit } from "@/hooks/use-git";
+// Removed useChatContext import
+// Import necessary store hooks
+import { useVfsStore } from "@/store/vfs.store";
+import { useGit } from "@/hooks/use-git"; // Keep useGit
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,12 +20,20 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { GitRepoInfoData } from "@/utils/git-utils";
+import { fs } from "@zenfs/core"; // Import fs for useGit
 
 export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
-  const { vfs } = useChatContext();
-  const git = useGit(vfs.fs);
+  // Get VFS state from store
+  const { isVfsReady, vfsKey } = useVfsStore((s) => ({
+    isVfsReady: s.isVfsReady,
+    vfsKey: s.vfsKey, // Needed to re-initialize git if VFS key changes
+  }));
 
-  const [currentPath] = useState("/");
+  // Initialize useGit with fs instance when ready
+  const git = useGit(isVfsReady ? fs : null);
+
+  // Local UI state remains
+  const [currentPath] = useState("/"); // Assuming root for now
   const [repoUrl, setRepoUrl] = useState("");
   const [branch, setBranch] = useState("main");
   const [commitMessage, setCommitMessage] = useState("");
@@ -37,6 +47,7 @@ export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
   const [isCloning, setIsCloning] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
 
+  // Effect to check repo status depends on git.initialized and vfsKey
   useEffect(() => {
     const checkIfRepo = async () => {
       if (git.initialized && currentPath) {
@@ -62,8 +73,10 @@ export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
     };
 
     checkIfRepo();
-  }, [git.initialized, currentPath]);
+    // Re-run if git becomes initialized OR if the underlying VFS key changes
+  }, [git.initialized, currentPath, vfsKey]);
 
+  // Handlers remain the same, using the git hook instance
   const handleClone = async () => {
     if (!repoUrl) {
       toast.error("Please enter a repository URL");
@@ -143,9 +156,7 @@ export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
       toast.error("Git is not initialized. Please wait and try again.");
       return;
     }
-    // Call pushChanges but don't need to store the result if unused
     await git.pushChanges(currentPath);
-    // Success/error toast is handled by the hook
   };
 
   const handleRefreshInfo = async () => {
@@ -167,21 +178,17 @@ export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
     setIsAdvancedVisible(!isAdvancedVisible);
   };
 
-  if (
-    !vfs ||
-    !vfs.isReady ||
-    vfs.configuredVfsKey !== vfs.vfsKey ||
-    !git.initialized
-  ) {
+  // Render logic depends on VFS readiness and git initialization
+  if (!isVfsReady || !git.initialized) {
     let message =
       "Virtual Filesystem not available or not enabled for this item.";
-    if (vfs?.isReady && !git.initialized) {
+    if (isVfsReady && !git.initialized) {
       message = "Initializing Git functionality...";
     }
     return (
       <div className="p-4 text-center text-sm text-gray-500">
         {message}
-        {vfs?.isReady && !git.initialized && (
+        {isVfsReady && !git.initialized && (
           <Loader2Icon className="inline-block ml-2 h-4 w-4 animate-spin" />
         )}
       </div>

@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import * as git from "isomorphic-git";
 import http from "isomorphic-git/http/web";
+// Removed unused basename import
 
 // Specific type for the data returned by getRepoInfo
 export interface GitRepoInfoData {
@@ -73,7 +74,7 @@ export class GitUtils {
       });
       return {
         success: true,
-        message: `Repository cloned successfully into ${basename(dir)}`,
+        message: `Repository cloned successfully into ${dir}`, // Use dir instead of basename
       };
     } catch (error) {
       console.error("Clone error:", error);
@@ -92,7 +93,7 @@ export class GitUtils {
       await git.init({ fs: this.fs, dir });
       return {
         success: true,
-        message: `Git repository initialized in ${basename(dir)}`,
+        message: `Git repository initialized in ${dir}`, // Use dir instead of basename
       };
     } catch (error) {
       console.error("Init error:", error);
@@ -386,10 +387,3 @@ export class GitUtils {
     }
   }
 }
-
-// Helper function
-const basename = (path: string): string => {
-  const normalized = path.replace(/\/+/g, "/");
-  if (normalized === "/") return "";
-  return normalized.substring(normalized.lastIndexOf("/") + 1);
-};

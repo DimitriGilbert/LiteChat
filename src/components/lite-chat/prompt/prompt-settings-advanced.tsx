@@ -1,9 +1,6 @@
-// src/components/lite-chat/prompt-settings-advanced.tsx
+// src/components/lite-chat/prompt/prompt-settings-advanced.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useSettingsContext } from "@/context/settings-context";
-import { useSidebarContext } from "@/context/sidebar-context";
-import { useVfsContext } from "@/context/vfs-context";
-import { useProviderManagementContext } from "@/context/provider-management-context";
+// REMOVED store imports
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
@@ -11,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiKeySelector } from "@/components/lite-chat/api-key-selector";
-import { FileManager } from "@/components/lite-chat/file-manager"; // Changed import
+import { FileManager } from "@/components/lite-chat/file-manager"; // Keep FileManager
 import { cn } from "@/lib/utils";
 import { SaveIcon, InfoIcon } from "lucide-react";
 import {
@@ -21,52 +18,140 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import type {
+  DbConversation,
+  SidebarItemType, // Added
+  DbProviderConfig, // Added
+  DbApiKey, // Added
+} from "@/lib/types";
 
+// Define props based on what PromptSettings passes down
 interface PromptSettingsAdvancedProps {
   className?: string;
   initialTab?: string;
+  // Feature Flags
+  enableAdvancedSettings: boolean;
+  enableApiKeyManagement: boolean;
+  // AI Parameters State/Setters
+  temperature: number;
+  setTemperature: (temp: number) => void;
+  topP: number | null;
+  setTopP: (topP: number | null) => void;
+  maxTokens: number | null;
+  setMaxTokens: (tokens: number | null) => void;
+  topK: number | null;
+  setTopK: (topK: number | null) => void;
+  presencePenalty: number | null;
+  setPresencePenalty: (penalty: number | null) => void;
+  frequencyPenalty: number | null;
+  setFrequencyPenalty: (penalty: number | null) => void;
+  // System Prompt State/Actions
+  globalSystemPrompt: string | null;
+  selectedItemId: string | null;
+  selectedItemType: SidebarItemType | null;
+  activeConversationData: DbConversation | null; // Pass derived data
+  updateConversationSystemPrompt: (
+    id: string,
+    systemPrompt: string | null,
+  ) => Promise<void>;
+  // VFS State (needed for Files tab)
+  isVfsEnabledForItem: boolean;
+  isVfsReady: boolean;
+  isVfsLoading: boolean;
+  vfsError: string | null;
+  vfsKey: string | null;
+  // API Key Management State/Actions
+  selectedProviderId: string | null;
+  dbProviderConfigs: DbProviderConfig[];
+  apiKeys: DbApiKey[];
+  updateDbProviderConfig: (
+    id: string,
+    changes: Partial<DbProviderConfig>,
+  ) => Promise<void>;
 }
 
-export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
+// Wrap component logic in a named function for React.memo
+const PromptSettingsAdvancedComponent: React.FC<
+  PromptSettingsAdvancedProps
+> = ({
   className,
   initialTab = "parameters",
+  // Destructure all props
+  enableAdvancedSettings,
+  enableApiKeyManagement,
+  temperature,
+  setTemperature,
+  topP,
+  setTopP,
+  maxTokens,
+  setMaxTokens,
+  topK,
+  setTopK,
+  presencePenalty,
+  setPresencePenalty,
+  frequencyPenalty,
+  setFrequencyPenalty,
+  globalSystemPrompt,
+  selectedItemId,
+  selectedItemType,
+  activeConversationData, // Use prop
+  updateConversationSystemPrompt, // Use prop action
+  isVfsEnabledForItem,
+  isVfsReady,
+  isVfsLoading,
+  vfsError,
+  vfsKey,
+  selectedProviderId,
+  dbProviderConfigs,
+  apiKeys,
+  updateDbProviderConfig, // Use prop action
 }) => {
-  const settings = useSettingsContext();
-  const sidebar = useSidebarContext();
-  const vfs = useVfsContext();
-  const providerMgmt = useProviderManagementContext();
+  // REMOVED store access
 
-  const conversationId = useMemo(() => {
-    return sidebar.selectedItemType === "conversation"
-      ? sidebar.selectedItemId
-      : null;
-  }, [sidebar.selectedItemId, sidebar.selectedItemType]);
-
+  // --- Local State ---
   const [localConvoSystemPrompt, setLocalConvoSystemPrompt] = useState<
     string | null
   >(null);
   const [isConvoPromptDirty, setIsConvoPromptDirty] = useState(false);
 
-  useEffect(() => {
+  // --- Derived State ---
+  const conversationId = useMemo(() => {
+    return selectedItemType === "conversation" ? selectedItemId : null;
+  }, [selectedItemId, selectedItemType]);
+
+  // Derive activeSystemPrompt using props
+  const activeSystemPrompt = useMemo(() => {
+    if (!enableAdvancedSettings) {
+      return null;
+    }
     if (
-      settings.enableAdvancedSettings &&
-      conversationId &&
-      sidebar.selectedItemId
+      activeConversationData?.systemPrompt &&
+      activeConversationData.systemPrompt.trim() !== ""
     ) {
-      const convoData = sidebar.activeConversationData;
-      setLocalConvoSystemPrompt(convoData?.systemPrompt ?? null);
+      return activeConversationData.systemPrompt;
+    }
+    if (globalSystemPrompt && globalSystemPrompt.trim() !== "") {
+      return globalSystemPrompt;
+    }
+    return null;
+  }, [enableAdvancedSettings, activeConversationData, globalSystemPrompt]);
+
+  // --- Effects ---
+  // Effect to sync local prompt state with prop data
+  useEffect(() => {
+    if (enableAdvancedSettings && conversationId) {
+      const promptFromProp = activeConversationData?.systemPrompt ?? null;
+      setLocalConvoSystemPrompt((prev) =>
+        prev === promptFromProp ? prev : promptFromProp,
+      );
       setIsConvoPromptDirty(false);
     } else {
       setLocalConvoSystemPrompt(null);
       setIsConvoPromptDirty(false);
     }
-  }, [
-    conversationId,
-    sidebar.selectedItemId,
-    sidebar.activeConversationData,
-    settings.enableAdvancedSettings,
-  ]);
+  }, [conversationId, enableAdvancedSettings, activeConversationData]); // Depend on props
 
+  // --- Handlers ---
   const handleConvoSystemPromptChange = (
     e: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
@@ -74,16 +159,12 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     setIsConvoPromptDirty(true);
   };
 
-  const saveConvoSystemPrompt = () => {
-    if (
-      settings.enableAdvancedSettings &&
-      conversationId &&
-      isConvoPromptDirty
-    ) {
+  // Use prop action
+  const saveConvoSystemPrompt = useCallback(() => {
+    if (enableAdvancedSettings && conversationId && isConvoPromptDirty) {
       const promptToSave =
         localConvoSystemPrompt?.trim() === "" ? null : localConvoSystemPrompt;
-      sidebar
-        .updateConversationSystemPrompt(conversationId, promptToSave)
+      updateConversationSystemPrompt(conversationId, promptToSave)
         .then(() => {
           setIsConvoPromptDirty(false);
           toast.success("Conversation system prompt saved.");
@@ -93,36 +174,45 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           toast.error("Failed to save system prompt.");
         });
     }
-  };
+  }, [
+    enableAdvancedSettings,
+    conversationId,
+    isConvoPromptDirty,
+    localConvoSystemPrompt,
+    updateConversationSystemPrompt, // Use prop action
+  ]);
 
-  const handleNumberInputChange = (
-    setter: (value: number | null) => void,
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const value = e.target.value;
-    setter(value === "" ? null : parseInt(value, 10) || null);
-  };
+  // Use prop setters
+  const handleNumberInputChange = useCallback(
+    (
+      setter: (value: number | null) => void,
+      e: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+      const value = e.target.value;
+      setter(value === "" ? null : parseInt(value, 10) || null);
+    },
+    [],
+  );
 
-  const handleSliderChange = (
-    setter: (value: number | null) => void,
-    value: number[],
-  ) => {
-    setter(value[0]);
-  };
+  const handleSliderChange = useCallback(
+    (setter: (value: number | null) => void, value: number[]) => {
+      setter(value[0]);
+    },
+    [],
+  );
 
+  // Derive selectedDbProviderConfig using props
   const selectedDbProviderConfig = useMemo(() => {
-    return providerMgmt.dbProviderConfigs.find(
-      (p) => p.id === providerMgmt.selectedProviderId,
-    );
-  }, [providerMgmt.dbProviderConfigs, providerMgmt.selectedProviderId]);
+    return dbProviderConfigs.find((p) => p.id === selectedProviderId);
+  }, [dbProviderConfigs, selectedProviderId]);
 
+  // Use prop action
   const handleApiKeySelectionChange = useCallback(
     (keyId: string | null) => {
       if (selectedDbProviderConfig) {
-        providerMgmt
-          .updateDbProviderConfig(selectedDbProviderConfig.id, {
-            apiKeyId: keyId,
-          })
+        updateDbProviderConfig(selectedDbProviderConfig.id, {
+          apiKeyId: keyId,
+        })
           .then(() => {
             toast.success(
               `API Key ${keyId ? "linked" : "unlinked"} for ${selectedDbProviderConfig.name}.`,
@@ -134,15 +224,15 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           });
       }
     },
-    [selectedDbProviderConfig, providerMgmt.updateDbProviderConfig],
+    [selectedDbProviderConfig, updateDbProviderConfig], // Use prop action
   );
 
+  // Use props for conditional rendering
   const isConversationSelected = !!conversationId;
   const isConversationPromptSet =
     localConvoSystemPrompt !== null && localConvoSystemPrompt.trim() !== "";
   const isUsingGlobalOrDefault =
-    settings.activeSystemPrompt === settings.globalSystemPrompt ||
-    !isConversationPromptSet;
+    activeSystemPrompt === globalSystemPrompt || !isConversationPromptSet;
 
   return (
     <div className={cn("p-3", className)}>
@@ -154,7 +244,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           <TabsTrigger value="system_prompt" className="text-xs px-2 h-7">
             System Prompt
           </TabsTrigger>
-          {providerMgmt.enableApiKeyManagement && (
+          {enableApiKeyManagement && (
             <TabsTrigger value="api_keys" className="text-xs px-2 h-7">
               API Keys
             </TabsTrigger>
@@ -162,41 +252,39 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           <TabsTrigger
             value="files"
             className="text-xs px-2 h-7"
-            disabled={!vfs.isVfsEnabledForItem}
+            disabled={!isVfsEnabledForItem} // Use prop
           >
             Files
           </TabsTrigger>
         </TabsList>
 
-        {/* Parameters Tab */}
+        {/* Parameters Tab - Use props */}
         <TabsContent value="parameters" className="space-y-4 mt-0">
           <div className="grid grid-cols-2 gap-4 items-end">
             <div className="space-y-1.5">
               <Label htmlFor="temperature" className="text-xs">
-                Temperature ({settings.temperature.toFixed(2)})
+                Temperature ({temperature.toFixed(2)})
               </Label>
               <Slider
                 id="temperature"
                 min={0}
                 max={1}
                 step={0.01}
-                value={[settings.temperature]}
-                onValueChange={(value) => settings.setTemperature(value[0])}
+                value={[temperature]}
+                onValueChange={(value) => setTemperature(value[0])} // Use prop setter
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="top-p" className="text-xs">
-                Top P ({(settings.topP ?? 1.0).toFixed(2)})
+                Top P ({(topP ?? 1.0).toFixed(2)})
               </Label>
               <Slider
                 id="top-p"
                 min={0}
                 max={1}
                 step={0.01}
-                value={[settings.topP ?? 1.0]}
-                onValueChange={(value) =>
-                  handleSliderChange(settings.setTopP, value)
-                }
+                value={[topP ?? 1.0]}
+                onValueChange={(value) => handleSliderChange(setTopP, value)} // Use prop setter
               />
             </div>
           </div>
@@ -209,10 +297,8 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
                 id="max-tokens"
                 type="number"
                 placeholder="Default"
-                value={settings.maxTokens ?? ""}
-                onChange={(e) =>
-                  handleNumberInputChange(settings.setMaxTokens, e)
-                }
+                value={maxTokens ?? ""}
+                onChange={(e) => handleNumberInputChange(setMaxTokens, e)} // Use prop setter
                 min="1"
                 className="h-8 text-xs"
               />
@@ -225,8 +311,8 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
                 id="top-k"
                 type="number"
                 placeholder="Default"
-                value={settings.topK ?? ""}
-                onChange={(e) => handleNumberInputChange(settings.setTopK, e)}
+                value={topK ?? ""}
+                onChange={(e) => handleNumberInputChange(setTopK, e)} // Use prop setter
                 min="1"
                 className="h-8 text-xs"
               />
@@ -235,40 +321,38 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           <div className="grid grid-cols-2 gap-4 items-end">
             <div className="space-y-1.5">
               <Label htmlFor="presence-penalty" className="text-xs">
-                Presence Penalty ({(settings.presencePenalty ?? 0.0).toFixed(2)}
-                )
+                Presence Penalty ({(presencePenalty ?? 0.0).toFixed(2)})
               </Label>
               <Slider
                 id="presence-penalty"
                 min={-2}
                 max={2}
                 step={0.01}
-                value={[settings.presencePenalty ?? 0.0]}
+                value={[presencePenalty ?? 0.0]}
                 onValueChange={(value) =>
-                  handleSliderChange(settings.setPresencePenalty, value)
-                }
+                  handleSliderChange(setPresencePenalty, value)
+                } // Use prop setter
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="frequency-penalty" className="text-xs">
-                Frequency Penalty (
-                {(settings.frequencyPenalty ?? 0.0).toFixed(2)})
+                Frequency Penalty ({(frequencyPenalty ?? 0.0).toFixed(2)})
               </Label>
               <Slider
                 id="frequency-penalty"
                 min={-2}
                 max={2}
                 step={0.01}
-                value={[settings.frequencyPenalty ?? 0.0]}
+                value={[frequencyPenalty ?? 0.0]}
                 onValueChange={(value) =>
-                  handleSliderChange(settings.setFrequencyPenalty, value)
-                }
+                  handleSliderChange(setFrequencyPenalty, value)
+                } // Use prop setter
               />
             </div>
           </div>
         </TabsContent>
 
-        {/* System Prompt Tab */}
+        {/* System Prompt Tab - Use props */}
         <TabsContent value="system_prompt" className="space-y-3 mt-0">
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
@@ -289,7 +373,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
-                        onClick={saveConvoSystemPrompt}
+                        onClick={saveConvoSystemPrompt} // Use callback with prop action
                         disabled={!isConvoPromptDirty}
                       >
                         <SaveIcon
@@ -323,7 +407,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
               value={
                 isConversationSelected
                   ? (localConvoSystemPrompt ?? "")
-                  : (settings.activeSystemPrompt ?? "")
+                  : (activeSystemPrompt ?? "")
               }
               onChange={handleConvoSystemPromptChange}
               className="text-xs min-h-[80px] max-h-[150px]"
@@ -350,7 +434,7 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
             <Textarea
               id="global-system-prompt-ref"
               readOnly
-              value={settings.globalSystemPrompt ?? "Not set or disabled"}
+              value={globalSystemPrompt ?? "Not set or disabled"} // Use prop
               className="text-xs min-h-[60px] max-h-[100px] bg-gray-800/50 border-gray-700/50"
               rows={3}
             />
@@ -361,14 +445,14 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
           </div>
         </TabsContent>
 
-        {/* API Keys Tab */}
-        {providerMgmt.enableApiKeyManagement && (
+        {/* API Keys Tab - Use props */}
+        {enableApiKeyManagement && (
           <TabsContent value="api_keys" className="mt-0">
             {selectedDbProviderConfig ? (
               <ApiKeySelector
                 selectedKeyId={selectedDbProviderConfig.apiKeyId ?? null}
-                onKeySelected={handleApiKeySelectionChange}
-                apiKeys={providerMgmt.apiKeys}
+                onKeySelected={handleApiKeySelectionChange} // Use callback with prop action
+                apiKeys={apiKeys} // Use prop
                 disabled={!selectedDbProviderConfig}
               />
             ) : (
@@ -376,25 +460,26 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
             )}
             <p className="text-xs text-gray-400 mt-2">
               Select the API key to use for the current provider configuration.
-              Manage all keys in the main Settings dialog (Providers tab).
+              Manage all keys in the main Settings dialog (API Keys tab).
             </p>
           </TabsContent>
         )}
 
-        {/* Files Tab */}
+        {/* Files Tab - Use props */}
         <TabsContent value="files" className="mt-0">
-          {vfs.isVfsEnabledForItem && vfs.vfs.isReady ? (
-            // Use FileManager directly, pass key for potential re-renders
-            <FileManager key={sidebar.selectedItemId} />
+          {/* Use props for conditional rendering */}
+          {isVfsEnabledForItem && isVfsReady ? (
+            // FileManager still uses its own store access for now
+            <FileManager key={vfsKey} />
           ) : (
             <div className="text-center text-sm text-gray-500 py-8">
-              {vfs.isVfsEnabledForItem && vfs.vfs.isLoading
+              {isVfsEnabledForItem && isVfsLoading
                 ? "Initializing filesystem..."
-                : vfs.isVfsEnabledForItem && vfs.vfs.error
-                  ? `Error: ${vfs.vfs.error}`
+                : isVfsEnabledForItem && vfsError
+                  ? `Error: ${vfsError}`
                   : "Virtual Filesystem is not enabled for the selected item."}
               <br />
-              {!vfs.isVfsEnabledForItem && (
+              {!isVfsEnabledForItem && (
                 <span>
                   Enable it using the toggle in the basic prompt settings area.
                 </span>
@@ -406,3 +491,8 @@ export const PromptSettingsAdvanced: React.FC<PromptSettingsAdvancedProps> = ({
     </div>
   );
 };
+
+// Export the memoized component
+export const PromptSettingsAdvanced = React.memo(
+  PromptSettingsAdvancedComponent,
+);

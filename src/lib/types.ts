@@ -4,6 +4,8 @@ import type { DbMod, ModInstance } from "@/mods/types";
 // Import the global fs object to use its type
 import { fs } from "@zenfs/core";
 import type { CoreMessage as AiCoreMessage } from "ai"; // Use alias to avoid naming conflict
+// Import ReadonlyChatContextSnapshot from mods/api
+import type { ReadonlyChatContextSnapshot as ModApiSnapshot } from "@/mods/api";
 
 // --- Basic Types ---
 export type Role = "user" | "assistant" | "system" | "tool"; // Added 'tool' role
@@ -292,6 +294,9 @@ export interface VfsContextObject {
   rename: (oldPath: string, newPath: string) => Promise<void>;
   vfsKey: string | null;
 }
+
+// Export the snapshot type from mods/api
+export type ReadonlyChatContextSnapshot = ModApiSnapshot;
 
 // Full Context (Aggregated - Consumers should ideally use specific context hooks)
 // This acts as the central hub providing access to everything if needed,

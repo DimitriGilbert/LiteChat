@@ -24,32 +24,9 @@ import type { RegisteredToolEntry } from "@/context/mod-context";
 import { nanoid } from "nanoid";
 import { z } from "zod"; // Import Zod
 import { toast } from "sonner"; // Import toast for feedback
+import { db } from "@/lib/db"; // Import Dexie instance
 
-// --- Placeholder Dependencies ---
-// These represent external dependencies that need proper injection (Task 8)
-
-// Placeholder storage functions (simulating access via a service/hook result)
-// TODO: Replace with actual injected storage service in Task 8
-const storage = {
-  addMod: async (modData: Omit<DbMod, "id" | "createdAt">): Promise<string> => {
-    console.warn("Placeholder storage.addMod called", { modData });
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    const newId = nanoid();
-    // Simulate adding to a DB
-    return newId;
-  },
-  updateMod: async (id: string, changes: Partial<DbMod>): Promise<void> => {
-    console.warn("Placeholder storage.updateMod called", { id, changes });
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    // Simulate update
-  },
-  deleteMod: async (id: string): Promise<void> => {
-    console.warn("Placeholder storage.deleteMod called", { id });
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    // Simulate deletion
-  },
-};
-// --- End Placeholder Dependencies ---
+// --- REMOVE Placeholder Dependencies ---
 
 export interface ModState {
   dbMods: DbMod[];
@@ -90,6 +67,7 @@ export interface ModActions {
   applyVfsWriteMiddleware: (
     payload: VfsWritePayload,
   ) => Promise<VfsWriteReturn>;
+  initializeFromDb: () => Promise<void>; // Action to load initial data
 }
 
 export const useModStore = create<ModState & ModActions>()((set, get) => ({
@@ -104,102 +82,68 @@ export const useModStore = create<ModState & ModActions>()((set, get) => ({
   // Actions
   setDbMods: (dbMods) => set({ dbMods }), // Used to load initial mods from storage
 
-  addDbMod: async (modData) => {
-    console.warn("addDbMod using placeholder storage implementation", {
-      modData,
-    });
-    const newId = nanoid();
-    const newMod: DbMod = {
-      id: newId,
-      createdAt: new Date(),
-      ...modData,
-      // Ensure loadOrder has a default if not provided
-      loadOrder: modData.loadOrder ?? Date.now(),
-    };
-    // Optimistic update
-    set((state) => ({ dbMods: [...state.dbMods, newMod] }));
+  initializeFromDb: async () => {
     try {
-      // TODO: Replace with actual storage call in Task 8
-      const confirmedId = await storage.addMod(modData);
-      // If storage returns a different ID (shouldn't happen with nanoid), update state?
-      if (confirmedId !== newId) {
-        console.warn(
-          `Mod Store: Storage returned different ID (${confirmedId}) than optimistic (${newId})`,
-        );
-        set((state) => ({
-          dbMods: state.dbMods.map((m) =>
-            m.id === newId ? { ...m, id: confirmedId } : m,
-          ),
-        }));
-        return confirmedId;
-      }
-      toast.success(`Mod "${newMod.name}" added.`);
+      const mods = await db.mods.orderBy("loadOrder").toArray(); // Use Dexie
+      set({ dbMods: mods });
+      console.log("[ModStore] Initialized from DB.");
+    } catch (error) {
+      console.error("[ModStore] Failed to initialize from DB:", error);
+      toast.error("Failed to load mod data.");
+    }
+  },
+
+  addDbMod: async (modData) => {
+    try {
+      // FIX: Use db.mods.add
+      const newId = nanoid();
+      const newMod: DbMod = {
+        id: newId,
+        createdAt: new Date(),
+        ...modData,
+        loadOrder: modData.loadOrder ?? Date.now(),
+      };
+      await db.mods.add(newMod);
+      // State update via live query
+      toast.success(`Mod "${modData.name}" added.`);
       return newId;
     } catch (error) {
       console.error("Failed to add mod:", error);
       toast.error(
         `Failed to add Mod: ${error instanceof Error ? error.message : String(error)}`,
       );
-      // Rollback optimistic update
-      set((state) => ({ dbMods: state.dbMods.filter((m) => m.id !== newId) }));
       throw error;
     }
   },
 
   updateDbMod: async (id, changes) => {
-    console.warn("updateDbMod using placeholder storage implementation", {
-      id,
-      changes,
-    });
-    const originalMods = get().dbMods;
-    const modToUpdate = originalMods.find((m) => m.id === id);
-    if (!modToUpdate) {
-      toast.error("Mod not found for update.");
-      throw new Error("Mod not found");
-    }
-    const updatedMod = { ...modToUpdate, ...changes };
-    // Optimistic update
-    set({
-      dbMods: originalMods.map((m) => (m.id === id ? updatedMod : m)),
-    });
     try {
-      // TODO: Replace with actual storage call in Task 8
-      await storage.updateMod(id, changes);
-      // No success toast, usually internal
+      // FIX: Use db.mods.update
+      await db.mods.update(id, changes);
+      // State update via live query
     } catch (error) {
       console.error("Failed to update mod:", error);
       toast.error(
         `Failed to update Mod: ${error instanceof Error ? error.message : String(error)}`,
       );
-      // Rollback optimistic update
-      set({ dbMods: originalMods });
       throw error;
     }
   },
 
   deleteDbMod: async (id) => {
-    console.warn("deleteDbMod using placeholder storage implementation", {
-      id,
-    });
-    const originalMods = get().dbMods;
-    const modToDelete = originalMods.find((m) => m.id === id);
-    if (!modToDelete) {
-      toast.error("Mod not found for deletion.");
-      return; // Don't throw, just inform
-    }
-    // Optimistic update
-    set((state) => ({ dbMods: state.dbMods.filter((m) => m.id !== id) }));
+    const modToDelete = get().dbMods.find((m) => m.id === id); // Get name before delete
     try {
-      // TODO: Replace with actual storage call in Task 8
-      await storage.deleteMod(id);
-      toast.success(`Mod "${modToDelete.name}" deleted.`);
+      // FIX: Use db.mods.delete
+      await db.mods.delete(id);
+      // State update via live query
+      if (modToDelete) {
+        toast.success(`Mod "${modToDelete.name}" deleted.`);
+      }
     } catch (error) {
       console.error("Failed to delete mod:", error);
       toast.error(
         `Failed to delete Mod: ${error instanceof Error ? error.message : String(error)}`,
       );
-      // Rollback optimistic update
-      set({ dbMods: originalMods });
       throw error;
     }
   },
@@ -257,7 +201,6 @@ export const useModStore = create<ModState & ModActions>()((set, get) => ({
       console.error(
         `Mod Store: Tool "${toolName}" registered without implementation or execute function.`,
       );
-      // Potentially throw an error or skip registration? For now, just log.
     }
     set((state) => {
       const newMap = new Map(state.modTools);
@@ -285,15 +228,11 @@ export const useModStore = create<ModState & ModActions>()((set, get) => ({
   },
 
   // --- Placeholder Middleware ---
-  // TODO: Implement middleware execution logic in a separate service/hook
-  // that calls these store functions or directly accesses loadedMods.
   applySubmitPromptMiddleware: async (payload) => {
     console.warn(
       "applySubmitPromptMiddleware placeholder called - needs implementation",
       payload,
     );
-    // Placeholder: Iterate through loadedMods and apply relevant middleware
-    // For now, just pass through
     return payload;
   },
   applyProcessResponseChunkMiddleware: async (payload) => {
@@ -301,8 +240,6 @@ export const useModStore = create<ModState & ModActions>()((set, get) => ({
       "applyProcessResponseChunkMiddleware placeholder called - needs implementation",
       payload,
     );
-    // Placeholder: Iterate through loadedMods and apply relevant middleware
-    // For now, just pass through
     return payload.chunk;
   },
   applyRenderMessageMiddleware: async (payload) => {
@@ -310,8 +247,6 @@ export const useModStore = create<ModState & ModActions>()((set, get) => ({
       "applyRenderMessageMiddleware placeholder called - needs implementation",
       payload,
     );
-    // Placeholder: Iterate through loadedMods and apply relevant middleware
-    // For now, just pass through
     return payload.message;
   },
   applyVfsWriteMiddleware: async (payload) => {
@@ -319,8 +254,6 @@ export const useModStore = create<ModState & ModActions>()((set, get) => ({
       "applyVfsWriteMiddleware placeholder called - needs implementation",
       payload,
     );
-    // Placeholder: Iterate through loadedMods and apply relevant middleware
-    // For now, just pass through
     return payload;
   },
 }));

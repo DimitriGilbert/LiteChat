@@ -37,6 +37,21 @@ export interface ChatDeletedPayload {
   id: string;
   type: SidebarItemType;
 }
+// Added payload types
+export interface ChatRenamedPayload {
+  id: string;
+  type: SidebarItemType;
+  newName: string;
+}
+export interface ChatSystemPromptUpdatedPayload {
+  id: string; // Conversation ID
+  systemPrompt: string | null;
+}
+export interface ChatVfsToggledPayload {
+  id: string;
+  type: SidebarItemType;
+  enabled: boolean;
+}
 // This event seems deprecated or unused based on ChatSubmissionService logic
 // export interface MessageBeforeSubmitPayload {
 //   prompt: string;
@@ -83,6 +98,9 @@ export interface ModEventPayloadMap {
   "chat:selected": ChatSelectedPayload;
   "chat:created": ChatCreatedPayload;
   "chat:deleted": ChatDeletedPayload;
+  "chat:renamed": ChatRenamedPayload; // Added
+  "chat:systemPromptUpdated": ChatSystemPromptUpdatedPayload; // Added
+  "chat:vfsToggled": ChatVfsToggledPayload; // Added
   // "message:beforeSubmit": MessageBeforeSubmitPayload; // Removed as it seems unused
   "message:submitted": MessageSubmittedPayload;
   "response:start": ResponseStartPayload;

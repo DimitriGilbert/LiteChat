@@ -16,10 +16,7 @@ import type {
 } from "@/lib/types";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useProviderModelSelection } from "@/hooks/use-provider-model-selection";
-import {
-  useApiKeysManagement,
-  type UseApiKeysManagementReturn,
-} from "@/hooks/use-api-keys-management";
+// Removed useApiKeysManagement import
 import { toast } from "sonner";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -52,18 +49,18 @@ const requiresApiKey = (type: DbProviderType | null): boolean => {
   // OpenAI-Compatible *might* require a key, but it's optional in the SDK call
   return type === "openai" || type === "openrouter" || type === "google";
 };
-const dummyApiKeysMgmt: UseApiKeysManagementReturn = {
-  addApiKey: async () => {
-    console.warn("API Key Management is disabled.");
-    toast.error("API Key Management is disabled in configuration.");
-    throw new Error("API Key Management is disabled.");
-  },
-  deleteApiKey: async () => {
-    console.warn("API Key Management is disabled.");
-    toast.error("API Key Management is disabled in configuration.");
-    throw new Error("API Key Management is disabled.");
-  },
+// Dummy functions for when API Key Management is disabled
+const dummyAddApiKey = async (): Promise<string> => {
+  console.warn("API Key Management is disabled.");
+  toast.error("API Key Management is disabled in configuration.");
+  throw new Error("API Key Management is disabled.");
 };
+const dummyDeleteApiKey = async (): Promise<void> => {
+  console.warn("API Key Management is disabled.");
+  toast.error("API Key Management is disabled in configuration.");
+  throw new Error("API Key Management is disabled.");
+};
+
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 interface ProviderManagementContextProps {
   enableApiKeyManagement: boolean;
@@ -328,20 +325,26 @@ export const ProviderManagementProvider: React.FC<
         const finalModelsForDropdown: AiModelConfig[] = modelsForDropdownList
           .map((modelDef) => {
             try {
+              // Attempt to instantiate the model; might fail if provider/model combo is invalid
+              const modelInstance = providerInstance(modelDef.id);
+              // Basic check if instantiation returned something truthy
+              if (!modelInstance)
+                throw new Error("Instantiation returned null/undefined");
               return {
                 id: modelDef.id,
                 name: modelDef.name,
-                instance: providerInstance(modelDef.id),
+                instance: modelInstance,
+                // TODO: Add supportsImages, supportsToolCalling based on model ID patterns or fetched capabilities
               };
             } catch (modelErr) {
               console.error(
                 `[ProviderMgmt] Failed to instantiate model "${modelDef.name}" (ID: ${modelDef.id}) for provider "${config.name}":`,
                 modelErr,
               );
-              return null;
+              return null; // Filter out models that fail instantiation
             }
           })
-          .filter((m): m is AiModelConfig => m !== null);
+          .filter((m): m is AiModelConfig => m !== null); // Ensure only valid models remain
 
         // Add the provider config if it has models to show
         if (finalModelsForDropdown.length > 0) {
@@ -350,7 +353,8 @@ export const ProviderManagementProvider: React.FC<
             name: config.name,
             type: config.type,
             models: finalModelsForDropdown,
-            allAvailableModels: allAvailableModelDefs,
+            allAvailableModels: allAvailableModelDefs, // Keep original list for settings UI
+            // TODO: Add provider-level supportsImages, supportsToolCalling based on type/config
           });
         } else {
           console.warn(
@@ -377,14 +381,29 @@ export const ProviderManagementProvider: React.FC<
     initialModelId,
   });
 
-  // --- API Key Management ---
-  const realApiKeysMgmt = useApiKeysManagement({
-    addDbApiKey: storage.addApiKey,
-    deleteDbApiKey: storage.deleteApiKey,
-  });
-  const apiKeysMgmt: UseApiKeysManagementReturn = useMemo(() => {
-    return enableApiKeyManagement ? realApiKeysMgmt : dummyApiKeysMgmt;
-  }, [enableApiKeyManagement, realApiKeysMgmt]);
+  // --- API Key Management Actions ---
+  // Use storage functions directly, conditionally based on enableApiKeyManagement
+  const addApiKeyAction = useCallback(
+    async (
+      name: string,
+      providerId: string,
+      value: string,
+    ): Promise<string> => {
+      if (!enableApiKeyManagement) return dummyAddApiKey();
+      // Add any validation or pre-processing if needed
+      return storage.addApiKey(name, providerId, value);
+    },
+    [enableApiKeyManagement, storage],
+  );
+
+  const deleteApiKeyAction = useCallback(
+    async (id: string): Promise<void> => {
+      if (!enableApiKeyManagement) return dummyDeleteApiKey();
+      // Add any confirmation logic if needed
+      return storage.deleteApiKey(id);
+    },
+    [enableApiKeyManagement, storage],
+  );
 
   // --- Helper to get API Key Value ---
   const getApiKeyForProvider = useCallback(
@@ -410,8 +429,8 @@ export const ProviderManagementProvider: React.FC<
       selectedProvider: providerModel.selectedProvider,
       selectedModel: providerModel.selectedModel,
       apiKeys,
-      addApiKey: apiKeysMgmt.addApiKey,
-      deleteApiKey: apiKeysMgmt.deleteApiKey,
+      addApiKey: addApiKeyAction, // Use the conditional action
+      deleteApiKey: deleteApiKeyAction, // Use the conditional action
       getApiKeyForProvider,
       dbProviderConfigs,
       addDbProviderConfig: storage.addProviderConfig,
@@ -431,8 +450,8 @@ export const ProviderManagementProvider: React.FC<
       providerModel.selectedProvider,
       providerModel.selectedModel,
       apiKeys,
-      apiKeysMgmt.addApiKey,
-      apiKeysMgmt.deleteApiKey,
+      addApiKeyAction, // Dependency on the action itself
+      deleteApiKeyAction, // Dependency on the action itself
       getApiKeyForProvider,
       dbProviderConfigs,
       storage.addProviderConfig,

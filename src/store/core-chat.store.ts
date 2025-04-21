@@ -73,12 +73,13 @@ const aiInteraction = {
     await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate delay 1
     useCoreChatStore
       .getState()
-      .updateMessage(assistantId, { content: "Thinking..." });
+      .updateMessage(assistantId, { streamedContent: "Thinking..." }); // Update streamedContent
 
     await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate delay 2
     useCoreChatStore.getState().updateMessage(assistantId, {
-      content: "This is a streamed response.",
+      content: "This is a streamed response.", // Set final content
       isStreaming: false, // Mark as finished
+      streamedContent: undefined, // Clear streamed content
     });
 
     useCoreChatStore.setState({ isStreaming: false });
@@ -155,7 +156,7 @@ export interface CoreChatState {
 }
 
 export interface CoreChatActions {
-  setMessages: (messages: Message[]) => void;
+  setMessages: (messages: Message[] | ((prev: Message[]) => Message[])) => void; // Allow functional updates
   addMessage: (message: Message) => void;
   updateMessage: (messageId: string, updates: Partial<Message>) => void;
   removeMessage: (messageId: string) => void;
@@ -174,6 +175,12 @@ export interface CoreChatActions {
   ) => Promise<void>;
   stopStreamingCore: () => void;
   regenerateMessageCore: (messageId: string) => Promise<void>;
+  // Add missing actions
+  addDbMessage: (
+    messageData: Omit<DbMessage, "id" | "createdAt"> &
+      Partial<Pick<DbMessage, "id" | "createdAt">>,
+  ) => Promise<string>;
+  bulkAddMessages: (messages: DbMessage[]) => Promise<unknown>;
 }
 
 export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
@@ -185,7 +192,14 @@ export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
     error: null,
 
     // --- Simple Setters ---
-    setMessages: (messages) => set({ messages }),
+    // Allow functional updates for setMessages
+    setMessages: (messagesOrUpdater) =>
+      set((state) => ({
+        messages:
+          typeof messagesOrUpdater === "function"
+            ? messagesOrUpdater(state.messages)
+            : messagesOrUpdater,
+      })),
     addMessage: (message) =>
       set((state) => ({ messages: [...state.messages, message] })),
     updateMessage: (messageId, updates) =>
@@ -493,6 +507,16 @@ export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
           }
         }
       }
+    },
+
+    // Implement missing actions with placeholders
+    addDbMessage: async (messageData) => {
+      // This action should ideally just call the storage service
+      return storage.addDbMessage(messageData);
+    },
+    bulkAddMessages: async (messages) => {
+      // This action should ideally just call the storage service
+      return storage.bulkAddMessages(messages);
     },
   }),
 );

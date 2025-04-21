@@ -1,4 +1,4 @@
-// src/components/lite-chat/chat-content.tsx
+// src/components/lite-chat/chat/chat-content.tsx
 import React, {
   useRef,
   useEffect,
@@ -8,7 +8,9 @@ import React, {
 } from "react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { MemoizedMessageBubble } from "@/components/lite-chat/message/message-bubble";
-import { useCoreChatContext } from "@/context/core-chat-context";
+// REMOVED store imports
+// import { useCoreChatStore } from "@/store/core-chat.store";
+// import { useShallow } from "zustand/react/shallow";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,115 +20,137 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { throttle } from "@/lib/throttle";
+import type { Message } from "@/lib/types"; // Import Message type
 
+// Define props based on what ChatWrapper passes down
 interface ChatContentProps {
   className?: string;
+  messages: Message[];
+  isLoadingMessages: boolean;
+  isStreaming: boolean;
   regenerateMessage: (messageId: string) => void;
 }
 
-// Threshold for considering the user "at the bottom"
 const SCROLL_THRESHOLD = 50;
 
-export const ChatContent: React.FC<ChatContentProps> = ({
+// Wrap component logic in a named function for React.memo
+const ChatContentComponent: React.FC<ChatContentProps> = ({
   className,
+  // Destructure props
+  messages,
+  isLoadingMessages,
+  isStreaming,
   regenerateMessage,
 }) => {
-  const { messages, isLoadingMessages, isStreaming } = useCoreChatContext();
+  // REMOVED store access
 
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null); // Keep this for potential future use
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Tracks if the user is scrolled near the bottom
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  // Tracks if new messages arrived while the user was scrolled up
-  const [newMessagesWhileScrolledUp, setNewMessagesWhileScrolledUp] =
-    useState(false);
-  // Stores the scroll height before the last message update
+  const [showScrollButton, setShowScrollButton] = useState(false);
   const prevScrollHeightRef = useRef<number | null>(null);
+  const userHasScrolledUpRef = useRef(false);
+  const isAutoScrollingRef = useRef(false);
 
-  const getViewport = (root: HTMLDivElement | null): HTMLDivElement | null => {
+  // Internal logic remains largely the same, using props
+  const getViewport = useCallback((): HTMLDivElement | null => {
+    if (viewportRef.current) return viewportRef.current;
+    const root = scrollAreaRootRef.current;
     if (!root) return null;
-    return root.querySelector("[data-radix-scroll-area-viewport]");
-  };
-
-  // --- Scroll Management ---
-
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    const viewport = getViewport(scrollAreaRootRef.current);
-    if (viewport) {
-      viewport.scrollTo({ top: viewport.scrollHeight, behavior });
-      // Immediately update state assuming scroll was successful
-      setIsAtBottom(true);
-      setNewMessagesWhileScrolledUp(false);
-    }
+    const vp = root.querySelector<HTMLDivElement>(
+      "[data-radix-scroll-area-viewport]",
+    );
+    viewportRef.current = vp;
+    return vp;
   }, []);
 
-  // Check scroll position and update state
+  const scrollToBottom = useCallback(
+    (behavior: ScrollBehavior = "smooth", force: boolean = false) => {
+      const viewport = getViewport();
+      if (viewport) {
+        if (force || !userHasScrolledUpRef.current) {
+          isAutoScrollingRef.current = true;
+          viewport.scrollTo({ top: viewport.scrollHeight, behavior });
+          setShowScrollButton((prev) => (prev === false ? prev : false));
+          userHasScrolledUpRef.current = false;
+          setTimeout(
+            () => {
+              isAutoScrollingRef.current = false;
+            },
+            behavior === "smooth" ? 300 : 50,
+          );
+        }
+      }
+    },
+    [getViewport],
+  );
+
   const checkScrollPosition = useCallback(() => {
-    const viewport = getViewport(scrollAreaRootRef.current);
+    if (isAutoScrollingRef.current) {
+      return;
+    }
+    const viewport = getViewport();
     if (viewport) {
+      const { scrollHeight, scrollTop, clientHeight } = viewport;
       const atBottom =
-        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
-        SCROLL_THRESHOLD;
-      setIsAtBottom(atBottom);
-      // If user scrolls back to bottom manually, clear the new message indicator
-      if (atBottom && newMessagesWhileScrolledUp) {
-        setNewMessagesWhileScrolledUp(false);
+        scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
+      const shouldShowButton = !atBottom;
+      setShowScrollButton((prev) =>
+        prev === shouldShowButton ? prev : shouldShowButton,
+      );
+      if (atBottom && userHasScrolledUpRef.current) {
+        userHasScrolledUpRef.current = false;
+      } else if (!atBottom && !userHasScrolledUpRef.current) {
+        userHasScrolledUpRef.current = true;
       }
     }
-  }, [newMessagesWhileScrolledUp]);
+  }, [getViewport]);
 
-  // Throttled version for scroll event handler
-  const throttledCheckScrollPosition = throttle(checkScrollPosition, 100);
+  const throttledCheckScrollPosition = throttle(checkScrollPosition, 150);
 
-  // Effect to handle automatic scrolling on new messages/streaming
-  useLayoutEffect(() => {
-    const viewport = getViewport(scrollAreaRootRef.current);
-    if (!viewport) return;
-
-    // Store the scroll height *before* potential DOM updates from new messages
-    const currentScrollHeight = viewport.scrollHeight;
-
-    // Determine if user was at the bottom *before* this update
-    const wasAtBottom =
-      (prevScrollHeightRef.current ?? currentScrollHeight) -
-        viewport.scrollTop -
-        viewport.clientHeight <
-      SCROLL_THRESHOLD;
-
-    // If user was at the bottom, scroll smoothly after the update
-    // Use requestAnimationFrame to ensure scroll happens after paint
-    if (wasAtBottom) {
-      requestAnimationFrame(() => {
-        scrollToBottom("smooth");
-      });
-    } else if (messages.length > 0) {
-      // If not at bottom and messages exist, show the indicator
-      setNewMessagesWhileScrolledUp(true);
-    }
-
-    // Update the previous scroll height for the next check
-    prevScrollHeightRef.current = currentScrollHeight;
-
-    // We only want this effect to run when messages change or streaming status changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, isStreaming]); // Rerun when messages array or streaming status changes
-
-  // Effect to check scroll position on initial load or when scrolling stops
   useEffect(() => {
-    const viewport = getViewport(scrollAreaRootRef.current);
+    const viewport = getViewport();
     if (viewport) {
-      // Initial check
-      checkScrollPosition();
-      // Add scroll listener
       viewport.addEventListener("scroll", throttledCheckScrollPosition);
+      checkScrollPosition(); // Initial check
       return () => {
-        // Cleanup listener
         viewport.removeEventListener("scroll", throttledCheckScrollPosition);
       };
     }
-  }, [checkScrollPosition, throttledCheckScrollPosition]); // Dependencies for setup/cleanup
+  }, [getViewport, throttledCheckScrollPosition, checkScrollPosition]);
 
+  const messagesLength = messages.length; // Use prop
+  useLayoutEffect(() => {
+    const viewport = getViewport();
+    if (!viewport) return;
+    const currentScrollHeight = viewport.scrollHeight;
+    const previousScrollHeight = prevScrollHeightRef.current;
+
+    // Scroll down automatically if:
+    // - Not manually scrolled up
+    // - There are messages OR messages are loading
+    // - Scroll height has increased (new message added or skeleton appeared)
+    if (
+      !userHasScrolledUpRef.current &&
+      (messagesLength > 0 || isLoadingMessages) && // Use props
+      previousScrollHeight !== null &&
+      currentScrollHeight > previousScrollHeight
+    ) {
+      requestAnimationFrame(() => {
+        scrollToBottom("smooth");
+      });
+    }
+    prevScrollHeightRef.current = currentScrollHeight;
+  }, [
+    messagesLength, // Use prop
+    isStreaming, // Use prop
+    isLoadingMessages, // Use prop
+    getViewport,
+    scrollToBottom,
+  ]);
+
+  // Use prop action
   const handleRegenerate = (messageId: string) => {
     regenerateMessage(messageId);
   };
@@ -135,11 +159,10 @@ export const ChatContent: React.FC<ChatContentProps> = ({
     <div className={cn("relative flex flex-col", className)}>
       <ScrollArea
         className={cn("flex-grow bg-gray-900", className)}
-        // Remove onScroll prop here, handled by direct event listener in useEffect
         ref={scrollAreaRootRef}
       >
         <div className="py-6 px-4 md:px-6 space-y-6 min-h-full">
-          {/* --- Loading Skeleton --- */}
+          {/* Use isLoadingMessages prop */}
           {isLoadingMessages && (
             <div className="space-y-4 mt-4">
               <Skeleton className="h-16 w-3/4 bg-gray-800" />
@@ -147,9 +170,10 @@ export const ChatContent: React.FC<ChatContentProps> = ({
               <Skeleton className="h-16 w-2/3 bg-gray-800" />
             </div>
           )}
-          {/* --- Empty State --- */}
+          {/* Use messages prop */}
           {!isLoadingMessages && messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] text-center pt-36 px-4">
+              {/* Welcome message remains the same */}
               <div className="rounded-full bg-gray-800 p-5 mb-5">
                 <MessageSquarePlusIcon className="h-12 w-12 text-gray-400" />
               </div>
@@ -161,7 +185,6 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                 lives right in your browser. No servers(ish), no tracking, just
                 conversations.
               </p>
-
               <div className="bg-gray-800/80 p-5 rounded-lg border border-gray-700 text-left max-w-[1600px] mb-6">
                 <h4 className="font-medium text-gray-200 mb-2 flex items-center">
                   <span className="text-yellow-400 mr-2">💡</span> A little
@@ -174,7 +197,7 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                     href="https://t3.chat"
                     className="text-blue-400 hover:underline"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener noreferrer"
                   >
                     T3.chat
                   </a>{" "}
@@ -190,7 +213,7 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                     href="https://t3.chat"
                     className="text-blue-400 hover:underline"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener noreferrer"
                   >
                     T3.chat
                   </a>
@@ -207,7 +230,6 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                   between you and your favorite AI provider.
                 </p>
               </div>
-
               <div className="bg-gray-800/80 p-5 rounded-lg border border-gray-700 text-left max-w-[1600px] mb-6">
                 <h4 className="font-medium text-gray-200 mb-3 flex items-center">
                   <span className="text-blue-400 mr-2">🔑</span> Bring Your Own
@@ -234,7 +256,7 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                       href="https://openrouter.ai/keys"
                       className="text-blue-400 hover:underline flex items-center"
                       target="_blank"
-                      rel="noopener"
+                      rel="noopener noreferrer"
                     >
                       <span className="mr-1">→</span> OpenRouter API Keys (Many
                       models in one place)
@@ -243,7 +265,7 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                       href="https://platform.openai.com/account/api-keys"
                       className="text-blue-400 hover:underline flex items-center"
                       target="_blank"
-                      rel="noopener"
+                      rel="noopener noreferrer"
                     >
                       <span className="mr-1">→</span> OpenAI API Keys (GPT
                       models)
@@ -252,7 +274,7 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                       href="https://console.anthropic.com/keys"
                       className="text-blue-400 hover:underline flex items-center"
                       target="_blank"
-                      rel="noopener"
+                      rel="noopener noreferrer"
                     >
                       <span className="mr-1">→</span> Anthropic API Keys (Claude
                       models)
@@ -273,6 +295,7 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                     href="https://ollama.ai"
                     target="_blank"
                     rel="noopener noreferrer"
+                    className="text-blue-400 hover:underline"
                   >
                     Ollama
                   </a>{" "}
@@ -281,6 +304,7 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                     href="https://lmstudio.app"
                     target="_blank"
                     rel="noopener noreferrer"
+                    className="text-blue-400 hover:underline"
                   >
                     LMStudio
                   </a>
@@ -291,7 +315,6 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                   out !
                 </p>
               </div>
-
               <div className="bg-gray-800/80 p-5 rounded-lg border border-gray-700 text-left max-w-[1600px] mb-6">
                 <h4 className="font-medium text-gray-200 mb-2 flex items-center">
                   <span className="text-green-400 mr-2">✨</span> What makes
@@ -349,10 +372,11 @@ export const ChatContent: React.FC<ChatContentProps> = ({
               </div>
             </div>
           )}
-          {/* --- Messages --- */}
+          {/* Use messages prop */}
           {!isLoadingMessages &&
             messages.map((message) => (
               <div key={message.id}>
+                {/* MemoizedMessageBubble needs no store access, just props */}
                 <MemoizedMessageBubble
                   message={message}
                   onRegenerate={
@@ -361,7 +385,7 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                       : undefined
                   }
                 />
-                {/* Error display remains unchanged */}
+                {/* Error display remains the same */}
                 {message.error && (
                   <div className="flex items-center gap-2 text-xs text-red-400 ml-12 -mt-2 mb-2">
                     <AlertCircle className="h-4 w-4" />
@@ -370,29 +394,27 @@ export const ChatContent: React.FC<ChatContentProps> = ({
                 )}
               </div>
             ))}
-          {/* --- End Ref (optional) --- */}
           <div ref={messagesEndRef} className="h-1" />
         </div>
         <ScrollBar orientation="vertical" />
       </ScrollArea>
-      {/* --- Scroll to Bottom Button --- */}
-      {(!isAtBottom || newMessagesWhileScrolledUp) && (
+      {/* Scroll button logic remains the same */}
+      {showScrollButton && (
         <div className="absolute bottom-4 right-4 z-10">
           <Button
             variant="outline"
             size="icon"
             className="rounded-full h-10 w-10 bg-gray-700/80 hover:bg-gray-600/90 border-gray-600 text-gray-200 backdrop-blur-sm"
-            onClick={() => scrollToBottom("smooth")} // Use smooth scroll on click
+            onClick={() => scrollToBottom("smooth", true)}
             title="Scroll to bottom"
           >
             <ArrowDownCircle className="h-5 w-5" />
-            {/* New message indicator */}
-            {newMessagesWhileScrolledUp && (
-              <span className="absolute -top-1 -right-1 block h-3 w-3 rounded-full bg-blue-500 border-2 border-gray-700" />
-            )}
           </Button>
         </div>
       )}
     </div>
   );
 };
+
+// Export the memoized component
+export const ChatContent = React.memo(ChatContentComponent);

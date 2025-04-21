@@ -24,6 +24,7 @@ import {
 /**
  * Handles image generation using AI models
  */
+// FIX: Update the signature to match PerformImageGenerationParams from types.ts
 export async function performImageGeneration({
   conversationIdToUse,
   prompt,
@@ -33,21 +34,13 @@ export async function performImageGeneration({
   selectedModel,
   selectedProvider,
   getApiKeyForProvider,
-  setLocalMessages,
-  setIsAiStreaming,
+  setLocalMessages, // This should ideally be replaced by store actions if possible
+  setIsAiStreaming, // Type now matches Zustand setter: (isStreaming: boolean) => void
   setError,
   addDbMessage,
   abortControllerRef,
-}: PerformImageGenerationParams & {
-  selectedModel: any;
-  selectedProvider: any;
-  getApiKeyForProvider: () => string | undefined;
-  setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  setIsAiStreaming: React.Dispatch<React.SetStateAction<boolean>>;
-  setError: (error: string | null) => void;
-  addDbMessage: (message: DbMessage) => Promise<string | void>;
-  abortControllerRef: React.MutableRefObject<AbortController | null>;
-}): Promise<PerformImageGenerationResult> {
+}: PerformImageGenerationParams): Promise<PerformImageGenerationResult> {
+  // Use the defined type
   const apiKey = getApiKeyForProvider();
   const validationError = validateAiParameters(
     conversationIdToUse,
@@ -60,8 +53,16 @@ export async function performImageGeneration({
 
   if (validationError) return { error: validationError.message };
 
-  const providerId = selectedProvider!.id;
-  const modelId = selectedModel!.id;
+  // Ensure provider and model are valid before proceeding
+  if (!selectedProvider || !selectedModel) {
+    const errorMsg = "Provider or Model is not selected.";
+    setError(errorMsg);
+    toast.error(errorMsg);
+    return { error: errorMsg };
+  }
+
+  const providerId = selectedProvider.id;
+  const modelId = selectedModel.id;
 
   if (!selectedModel?.instance || !selectedModel?.supportsImageGeneration) {
     const errorMsg = "Selected model does not support image generation.";
@@ -70,7 +71,7 @@ export async function performImageGeneration({
     return { error: errorMsg };
   }
 
-  setIsAiStreaming(true);
+  setIsAiStreaming(true); // Call the Zustand setter
   setError(null);
   const currentAbortController = new AbortController();
   abortControllerRef.current = currentAbortController;
@@ -88,6 +89,7 @@ export async function performImageGeneration({
     modelId: modelId,
   };
 
+  // TODO: Replace setLocalMessages with store action if possible
   setLocalMessages((prev) => [...prev, placeholderMessage]);
 
   try {
@@ -97,7 +99,7 @@ export async function performImageGeneration({
       n: n,
       size: size as `${number}x${number}`,
       aspectRatio: aspectRatio as `${number}:${number}`,
-      headers: getStreamHeaders(selectedProvider!.type, apiKey),
+      headers: getStreamHeaders(selectedProvider.type, apiKey), // Use selectedProvider.type
       abortSignal: currentAbortController.signal,
     });
 
@@ -126,6 +128,7 @@ export async function performImageGeneration({
       modelId: modelId,
     };
 
+    // TODO: Replace setLocalMessages with store action if possible
     setLocalMessages((prev) =>
       prev.map((msg) =>
         msg.id === placeholderId ? finalImageMessageData : msg,
@@ -152,6 +155,7 @@ export async function performImageGeneration({
       console.error("Failed to save image generation message:", dbErr);
       setError(`Error saving image: ${dbErrorMessage}`);
       toast.error(`Failed to save image: ${dbErrorMessage}`);
+      // TODO: Replace setLocalMessages with store action if possible
       setLocalMessages((prev) =>
         prev.map((msg) =>
           msg.id === placeholderId
@@ -167,6 +171,7 @@ export async function performImageGeneration({
     if ((err as any)?.name === "AbortError") {
       console.log("Image generation aborted.");
       toast.info("Image generation stopped.");
+      // TODO: Replace setLocalMessages with store action if possible
       setLocalMessages((prev) =>
         prev.map((msg) =>
           msg.id === placeholderId
@@ -185,6 +190,7 @@ export async function performImageGeneration({
       const errorMessage = `Image generation failed: ${error.message}`;
       setError(errorMessage);
       toast.error(errorMessage);
+      // TODO: Replace setLocalMessages with store action if possible
       setLocalMessages((prev) =>
         prev.map((msg) =>
           msg.id === placeholderId
@@ -202,7 +208,8 @@ export async function performImageGeneration({
   } finally {
     if (abortControllerRef.current === currentAbortController)
       abortControllerRef.current = null;
-    setIsAiStreaming(false);
+    setIsAiStreaming(false); // Call the Zustand setter
+    // TODO: Replace setLocalMessages with store action if possible
     setLocalMessages((prev) =>
       prev.map((msg) =>
         msg.id === placeholderId && msg.isStreaming

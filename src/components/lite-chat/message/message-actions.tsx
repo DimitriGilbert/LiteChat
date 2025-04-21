@@ -3,7 +3,9 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { CopyIcon, RefreshCwIcon } from "lucide-react";
 import { toast } from "sonner";
-import { useChatContext } from "@/hooks/use-chat-context";
+// Removed useChatContext import
+// Import necessary store hooks
+import { useModStore } from "@/store/mod.store";
 import type { Message, TextPart } from "@/lib/types"; // Import TextPart
 import {
   Tooltip,
@@ -21,22 +23,29 @@ interface MessageActionsProps {
 
 export const MessageActions: React.FC<MessageActionsProps> = React.memo(
   ({ message, onRegenerate, className }) => {
-    // Get custom actions and the full context
-    const context = useChatContext();
-    const { customMessageActions = [] } = context;
+    // Get custom actions from mod store
+    const { customMessageActions } = useModStore((s) => ({
+      customMessageActions: s.modMessageActions,
+    }));
+
+    // TODO: Get context snapshot function if needed by custom actions
+    // This might require importing multiple stores or a dedicated selector
+    const getContextSnapshot = () => {
+      console.warn("Context snapshot for message actions not implemented");
+      return {}; // Placeholder
+    };
 
     const handleCopy = () => {
       let textToCopy = "";
       if (typeof message.content === "string") {
         textToCopy = message.content;
       } else if (Array.isArray(message.content)) {
-        // Extract text from TextPart elements for copying
         textToCopy = message.content
           .filter((part): part is TextPart => part.type === "text")
           .map((part) => part.text)
-          .join("\n\n"); // Join text parts with double newline
+          .join("\n");
         if (!textToCopy) {
-          textToCopy = "[Image content - cannot copy text]"; // Placeholder if only images
+          textToCopy = "[Image content - cannot copy text]";
         }
       }
 
@@ -46,7 +55,7 @@ export const MessageActions: React.FC<MessageActionsProps> = React.memo(
       }
 
       navigator.clipboard
-        .writeText(textToCopy) // Use the extracted/formatted text
+        .writeText(textToCopy)
         .then(() => {
           toast.success("Copied to clipboard!");
         })
@@ -59,15 +68,15 @@ export const MessageActions: React.FC<MessageActionsProps> = React.memo(
     return (
       <div
         className={cn(
-          "flex items-center gap-0.5 opacity-0 group-hover/message:opacity-100 transition-opacity", // Use group-hover/message
+          "flex items-center gap-0.5 opacity-0 group-hover/message:opacity-100 transition-opacity",
           className,
         )}
       >
         {/* Custom Message Actions */}
         {customMessageActions.map((action) => {
-          // Check visibility condition if provided
+          const contextSnapshot = getContextSnapshot(); // Get snapshot if needed
           const isVisible = action.isVisible
-            ? action.isVisible(message, context)
+            ? action.isVisible(message, contextSnapshot as any) // Pass snapshot
             : true;
           if (!isVisible) return null;
 
@@ -78,8 +87,10 @@ export const MessageActions: React.FC<MessageActionsProps> = React.memo(
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={cn("h-6 w-6", action.className)} // Apply custom classes
-                    onClick={() => action.onClick(message, context)} // Pass message and context
+                    className={cn("h-6 w-6", action.className)}
+                    onClick={() =>
+                      action.onClick(message, contextSnapshot as any)
+                    } // Pass snapshot
                     aria-label={action.tooltip}
                   >
                     {action.icon}

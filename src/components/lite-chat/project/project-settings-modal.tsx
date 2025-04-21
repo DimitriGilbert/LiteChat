@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
-import { useChatContext } from '@/hooks/use-chat-context';
-import { ProjectGitConfig } from './project-git-config';
+// src/components/lite-chat/project/project-settings-modal.tsx
+import React, { useState, useEffect } from "react"; // Added useEffect
+// Import necessary store hooks
+import { useSidebarStore } from "@/store/sidebar.store"; // Assuming getProject is here
+import { ProjectGitConfig } from "./project-git-config";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/dialog';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+} from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import type { DbProject } from "@/lib/types"; // Import DbProject
 
 export interface ProjectSettingsModalProps {
   projectId: string;
@@ -21,19 +24,27 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   open,
   onOpenChange,
 }) => {
-  const { getProject } = useChatContext();
-  const [projectName, setProjectName] = useState('');
+  // Get function to read state directly when needed
+  const getSidebarState = useSidebarStore.getState;
+
+  const [projectName, setProjectName] = useState("");
 
   // Load project details when modal opens
-  React.useEffect(() => {
+  useEffect(() => {
     if (open && projectId) {
-      getProject(projectId).then((project) => {
-        if (project) {
-          setProjectName(project.name);
-        }
-      });
+      // Get current projects directly from store state inside the effect
+      const currentProjects = getSidebarState().dbProjects;
+      const project = currentProjects.find(
+        (p: DbProject) => p.id === projectId,
+      );
+      if (project) {
+        setProjectName(project.name);
+      } else {
+        console.warn(`Project ${projectId} not found in store state.`);
+        setProjectName("Unknown Project");
+      }
     }
-  }, [open, projectId, getProject]);
+  }, [open, projectId, getSidebarState]); // Depend on IDs and getState
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

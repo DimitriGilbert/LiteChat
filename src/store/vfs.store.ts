@@ -6,6 +6,7 @@ import type { FileSystemEntry } from "@/lib/types";
 // Or, the hook calls these directly and updates store state. Let's assume the latter for now.
 import * as VfsOps from "@/lib/vfs-operations";
 import { toast } from "sonner";
+import { fs } from "@zenfs/core"; // Import fs for type
 
 export interface VfsState {
   enableVfs: boolean; // Global VFS toggle (Set via config)
@@ -18,6 +19,7 @@ export interface VfsState {
   vfsError: string | null;
   configuredVfsKey: string | null; // Identifier for the *type* of backend (e.g., 'indexeddb') - might not be needed if always the same
   vfsKey: string | null; // Unique key for the current FS instance (e.g., item ID or 'orphan') (Set by sidebar store)
+  fs: typeof fs | null; // Add the fs instance to the state
 }
 
 export interface VfsActions {
@@ -36,6 +38,7 @@ export interface VfsActions {
   setVfsOperationLoading: (isLoading: boolean) => void;
   setVfsError: (error: string | null) => void;
   setConfiguredVfsKey: (key: string | null) => void; // Potentially set by hook on init
+  _setFsInstance: (fsInstance: typeof fs | null) => void; // Internal action to set fs
 
   // Actual FS operations - These actions will trigger the operations
   // They manage the operation loading state and call the VfsOps functions.
@@ -47,7 +50,8 @@ export interface VfsActions {
   deleteVfsItem: (path: string, recursive?: boolean) => Promise<void>;
   createDirectory: (path: string) => Promise<void>;
   downloadFile: (path: string, filename?: string) => Promise<void>;
-  uploadFiles: (files: File[], targetPath: string) => Promise<void>; // Use File[]
+  // FIX: Accept FileList | File[]
+  uploadFiles: (files: FileList | File[], targetPath: string) => Promise<void>;
   uploadAndExtractZip: (file: File, targetPath: string) => Promise<void>;
   downloadAllAsZip: (filename?: string, rootPath?: string) => Promise<void>;
   renameVfsItem: (oldPath: string, newPath: string) => Promise<void>;
@@ -64,6 +68,7 @@ export const useVfsStore = create<VfsState & VfsActions>()((set, get) => ({
   vfsError: null,
   configuredVfsKey: null, // e.g., 'indexeddb' - set by hook maybe
   vfsKey: null, // e.g., item ID - set by sidebar store
+  fs: null, // Initialize fs as null
 
   // --- Configuration / Selection State Actions ---
   _setEnableVfs: (enableVfs) => set({ enableVfs }), // Internal setter
@@ -95,6 +100,7 @@ export const useVfsStore = create<VfsState & VfsActions>()((set, get) => ({
     set({ isVfsOperationLoading }),
   setVfsError: (vfsError) => set({ vfsError }),
   setConfiguredVfsKey: (configuredVfsKey) => set({ configuredVfsKey }),
+  _setFsInstance: (fsInstance) => set({ fs: fsInstance }), // Internal action
 
   // --- VFS Operation Actions (Called by UI/Components) ---
   // These actions wrap the VfsOps calls and manage loading state.
@@ -190,6 +196,7 @@ export const useVfsStore = create<VfsState & VfsActions>()((set, get) => ({
       // Don't re-throw, as it's usually just a UI action
     }
   },
+  // FIX: Accept FileList | File[]
   uploadFiles: async (files, targetPath) => {
     if (!get().isVfsReady) {
       toast.error("Filesystem not ready.");
@@ -198,7 +205,7 @@ export const useVfsStore = create<VfsState & VfsActions>()((set, get) => ({
     }
     const setLoading = get().setVfsOperationLoading;
     try {
-      // VfsOps expects FileList | File[], File[] is compatible
+      // VfsOps expects FileList | File[], pass it directly
       await VfsOps.uploadFilesOp(setLoading, files, targetPath);
     } catch (error) {
       // Error handled by VfsOps (toast)

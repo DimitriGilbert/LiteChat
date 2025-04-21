@@ -1,11 +1,21 @@
-// src/components/lite-chat/settings-assistant.tsx
+// src/components/lite-chat/settings/settings-assistant.tsx
 import React from "react";
-import { useChatContext } from "@/hooks/use-chat-context";
+// REMOVED store imports
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-export const SettingsAssistant: React.FC = () => {
-  const { globalSystemPrompt, setGlobalSystemPrompt } = useChatContext();
+// Define props based on what SettingsModal passes down
+interface SettingsAssistantProps {
+  globalSystemPrompt: string | null;
+  setGlobalSystemPrompt: (prompt: string | null) => void;
+}
+
+// Wrap component logic in a named function for React.memo
+const SettingsAssistantComponent: React.FC<SettingsAssistantProps> = ({
+  globalSystemPrompt, // Use prop
+  setGlobalSystemPrompt, // Use prop action
+}) => {
+  // REMOVED store access
 
   return (
     <div className="space-y-6 p-1">
@@ -20,11 +30,14 @@ export const SettingsAssistant: React.FC = () => {
         <Textarea
           id="assistant-global-system-prompt"
           placeholder="Enter default system instructions for the assistant..."
-          value={globalSystemPrompt ?? ""}
-          onChange={(e) => setGlobalSystemPrompt(e.target.value)}
+          value={globalSystemPrompt ?? ""} // Use prop
+          onChange={(e) => setGlobalSystemPrompt(e.target.value)} // Use prop action
           rows={4}
         />
       </div>
     </div>
   );
 };
+
+// Export the memoized component
+export const SettingsAssistant = React.memo(SettingsAssistantComponent);

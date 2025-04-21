@@ -9,6 +9,9 @@ export const ModEvent = {
   CHAT_SELECTED: "chat:selected",
   CHAT_CREATED: "chat:created",
   CHAT_DELETED: "chat:deleted",
+  CHAT_RENAMED: "chat:renamed", // Added
+  CHAT_SYSTEM_PROMPT_UPDATED: "chat:systemPromptUpdated", // Added
+  CHAT_VFS_TOGGLED: "chat:vfsToggled", // Added
   MESSAGE_BEFORE_SUBMIT: "message:beforeSubmit",
   MESSAGE_SUBMITTED: "message:submitted",
   RESPONSE_START: "response:start",

@@ -1,4 +1,4 @@
-// src/components/lite-chat/settings-provider-row.tsx
+// src/components/lite-chat/settings/settings-provider-row.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import type { DbProviderConfig, DbApiKey } from "@/lib/types";
 import { toast } from "sonner";
@@ -7,27 +7,31 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { ProviderRowViewMode } from "./settings-provider-row-view";
 import { ProviderRowEditMode } from "./settings-provider-row-edit";
 
+// Define props based on what SettingsProviders passes down
+type FetchStatus = "idle" | "fetching" | "error" | "success";
 export interface ProviderRowProps {
   provider: DbProviderConfig;
   apiKeys: DbApiKey[];
   onUpdate: (id: string, changes: Partial<DbProviderConfig>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onFetchModels: (id: string) => Promise<void>;
-  fetchStatus: "idle" | "fetching" | "error" | "success";
+  fetchStatus: FetchStatus;
   getAllAvailableModelDefs: (
     providerConfigId: string,
   ) => { id: string; name: string }[];
 }
 
-export const ProviderRow: React.FC<ProviderRowProps> = ({
-  provider,
-  apiKeys,
-  onUpdate,
-  onDelete,
-  onFetchModels,
-  fetchStatus,
-  getAllAvailableModelDefs,
+// Wrap component logic in a named function for React.memo
+const ProviderRowComponent: React.FC<ProviderRowProps> = ({
+  provider, // Use prop
+  apiKeys, // Use prop
+  onUpdate, // Use prop action
+  onDelete, // Use prop action
+  onFetchModels, // Use prop action
+  fetchStatus, // Use prop
+  getAllAvailableModelDefs, // Use prop function
 }) => {
+  // Local UI state remains
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -36,22 +40,17 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
     { id: string; name: string }[]
   >([]);
 
-  // Memoized list of currently *enabled* models, ordered for the reordering UI
+  // Memoized list derivation remains the same, uses local state/props
   const orderedEnabledModels = useMemo<{ id: string; name: string }[]>(() => {
     if (!isEditing) return [];
-
     const enabledIds = new Set(editData.enabledModels ?? []);
     if (enabledIds.size === 0) return [];
-
     const enabledModelDefs = allAvailableModels.filter((m) =>
       enabledIds.has(m.id),
     );
-
     const currentSortOrder = editData.modelSortOrder ?? [];
     const orderedList: { id: string; name: string }[] = [];
     const addedIds = new Set<string>();
-
-    // Add models based on the current sort order
     for (const modelId of currentSortOrder) {
       if (enabledIds.has(modelId)) {
         const model = enabledModelDefs.find((m) => m.id === modelId);
@@ -61,12 +60,9 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
         }
       }
     }
-
-    // Add any remaining enabled models (not in sort order yet) alphabetically
     const remainingEnabled = enabledModelDefs
       .filter((m) => !addedIds.has(m.id))
       .sort((a, b) => a.name.localeCompare(b.name));
-
     return [...orderedList, ...remainingEnabled];
   }, [
     isEditing,
@@ -75,34 +71,28 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
     allAvailableModels,
   ]);
 
-  // Get IDs for SortableContext items prop
   const orderedEnabledModelIds = useMemo(
     () => orderedEnabledModels.map((m) => m.id),
     [orderedEnabledModels],
   );
 
+  // Drag handler remains the same, uses local state
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
-
       if (over && active.id !== over.id) {
         setEditData((prevEdit) => {
-          // Use the derived orderedEnabledModels for accurate indices
           const currentOrderedIds = orderedEnabledModels.map((m) => m.id);
           const oldIndex = currentOrderedIds.indexOf(active.id as string);
           const newIndex = currentOrderedIds.indexOf(over.id as string);
-
           if (oldIndex === -1 || newIndex === -1) {
-            console.warn("Could not find dragged item indices in derived list");
-            return prevEdit; // Should not happen if logic is correct
+            return prevEdit;
           }
-
           const newOrderedIds = arrayMove(
             currentOrderedIds,
             oldIndex,
             newIndex,
           );
-
           return {
             ...prevEdit,
             modelSortOrder: newOrderedIds,
@@ -110,16 +100,15 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
         });
       }
     },
-    [orderedEnabledModels], // Depend on the derived ordered list for indices
+    [orderedEnabledModels],
   );
 
+  // Effect to initialize edit state uses props
   useEffect(() => {
     if (isEditing) {
-      const models = getAllAvailableModelDefs(provider.id);
+      const models = getAllAvailableModelDefs(provider.id); // Use prop function
       models.sort((a, b) => a.name.localeCompare(b.name));
       setAllAvailableModels(models);
-
-      // Initialize editData with current provider values
       setEditData({
         name: provider.name,
         type: provider.type,
@@ -128,11 +117,10 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
         baseURL: provider.baseURL,
         enabledModels: provider.enabledModels ?? [],
         autoFetchModels: provider.autoFetchModels,
-        // Initialize sort order based on current provider data or derive if null/empty
         modelSortOrder: provider.modelSortOrder ?? null,
       });
     } else {
-      setAllAvailableModels([]); // Clear when not editing
+      setAllAvailableModels([]);
     }
   }, [
     isEditing,
@@ -145,9 +133,10 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
     provider.enabledModels,
     provider.autoFetchModels,
     provider.modelSortOrder,
-    getAllAvailableModelDefs,
+    getAllAvailableModelDefs, // Depend on prop function
   ]);
 
+  // Handlers use props/prop actions
   const handleEdit = () => {
     setIsEditing(true);
   };
@@ -155,17 +144,15 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
   const handleCancel = () => {
     setIsEditing(false);
     setEditData({});
-    setIsSaving(false); // Reset saving state on cancel
+    setIsSaving(false);
   };
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     setIsSaving(true);
     try {
-      // Final sort order comes directly from editData state updated by drag-n-drop
       const finalSortOrder = editData.modelSortOrder;
       const finalEditData = {
         ...editData,
-        // Ensure empty arrays become null for DB consistency
         enabledModels:
           editData.enabledModels && editData.enabledModels.length > 0
             ? editData.enabledModels
@@ -173,7 +160,7 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
         modelSortOrder:
           finalSortOrder && finalSortOrder.length > 0 ? finalSortOrder : null,
       };
-      await onUpdate(provider.id, finalEditData);
+      await onUpdate(provider.id, finalEditData); // Use prop action
       setIsEditing(false);
       setEditData({});
       toast.success(
@@ -186,7 +173,7 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [editData, onUpdate, provider.id, provider.name]); // Depend on local state and prop action
 
   const handleChange = useCallback(
     (
@@ -208,14 +195,10 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
           currentEnabledSet.delete(modelId);
         }
         const newEnabledModels = Array.from(currentEnabledSet);
-
-        // Update modelSortOrder: remove if unchecked, keep order otherwise
-        // The actual visual order is handled by the `orderedEnabledModels` memo
         const currentSortOrder = prev.modelSortOrder ?? [];
         const newSortOrder = checked
-          ? currentSortOrder // Keep existing order, new items handled by memo
-          : currentSortOrder.filter((id) => id !== modelId); // Remove if unchecked
-
+          ? currentSortOrder
+          : currentSortOrder.filter((id) => id !== modelId);
         return {
           ...prev,
           enabledModels: newEnabledModels,
@@ -226,7 +209,7 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
     [],
   );
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     if (
       window.confirm(
         `Are you sure you want to delete the provider "${provider.name}"? This action cannot be undone.`,
@@ -234,29 +217,27 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
     ) {
       setIsDeleting(true);
       try {
-        await onDelete(provider.id);
-        toast.success(`Provider "${provider.name}" deleted.`);
-        // No need to setIsDeleting(false) as the component will unmount
+        await onDelete(provider.id); // Use prop action
+        // Success toast handled by parent/store action
       } catch (error) {
-        toast.error(
-          `Failed to delete provider: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        setIsDeleting(false); // Reset if deletion failed
+        // Error toast handled by parent/store action
+        setIsDeleting(false);
       }
     }
-  };
+  }, [onDelete, provider.id, provider.name]); // Depend on prop action
 
   const handleFetchModels = useCallback(async () => {
-    await onFetchModels(provider.id);
-  }, [onFetchModels, provider.id]);
+    await onFetchModels(provider.id); // Use prop action
+  }, [onFetchModels, provider.id]); // Depend on prop action
 
   const getAvailableModelsForView = useCallback(() => {
-    return getAllAvailableModelDefs(provider.id);
-  }, [getAllAvailableModelDefs, provider.id]);
+    return getAllAvailableModelDefs(provider.id); // Use prop function
+  }, [getAllAvailableModelDefs, provider.id]); // Depend on prop function
 
   return (
     <div className="border-b border-gray-700 p-4 space-y-3">
       {isEditing ? (
+        // Pass props down
         <ProviderRowEditMode
           providerId={provider.id}
           editData={editData}
@@ -272,6 +253,7 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
           onDragEnd={handleDragEnd}
         />
       ) : (
+        // Pass props down
         <ProviderRowViewMode
           provider={provider}
           apiKeys={apiKeys}
@@ -286,3 +268,6 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
     </div>
   );
 };
+
+// Export the memoized component
+export const ProviderRow = React.memo(ProviderRowComponent);

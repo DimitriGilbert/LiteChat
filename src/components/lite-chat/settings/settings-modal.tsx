@@ -1,4 +1,4 @@
-// src/components/lite-chat/settings-modal.tsx
+// src/components/lite-chat/settings/settings-modal.tsx
 import React from "react";
 import {
   Dialog,
@@ -16,30 +16,65 @@ import { SettingsApiKeys } from "./settings-api-keys";
 import { SettingsDataManagement } from "./settings-data-management";
 import { SettingsMods } from "./settings-mods";
 import { SettingsProviders } from "./settings-providers";
-import { useChatContext } from "@/hooks/use-chat-context";
+// REMOVED store imports
 import type { CustomSettingTab } from "@/lib/types";
+// Import the bundled props type from chat.tsx
+import type { SettingsModalTabProps } from "../chat";
 
+// Define props based on what ChatSide passes down
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  settingsProps: SettingsModalTabProps; // Receive the bundled props
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({
+// Wrap component logic in a named function for React.memo
+const SettingsModalComponent: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
+  settingsProps, // Destructure the bundled props
 }) => {
-  const context = useChatContext();
+  // REMOVED store access
 
+  // Handle modal open/close via props/callback
   const handleOpenChange = (open: boolean) => {
-    context.onSettingsModalOpenChange(open);
     if (!open) {
       onClose();
     }
   };
 
+  // Destructure props needed for conditional rendering and passing down
+  const {
+    enableAdvancedSettings,
+    enableApiKeyManagement,
+    customSettingsTabs,
+    // Destructure all other props needed by tabs
+    theme,
+    setTheme,
+    dbProviderConfigs,
+    apiKeys,
+    addDbProviderConfig,
+    updateDbProviderConfig,
+    deleteDbProviderConfig,
+    fetchModels,
+    providerFetchStatus,
+    getAllAvailableModelDefs,
+    globalSystemPrompt,
+    setGlobalSystemPrompt,
+    addApiKey,
+    deleteApiKey,
+    importConversation,
+    exportAllConversations,
+    clearAllData,
+    dbMods,
+    loadedMods,
+    addDbMod,
+    updateDbMod,
+    deleteDbMod,
+  } = settingsProps;
+
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      {/* Increased max-width and height for larger screens */}
       <DialogContent className="sm:max-w-[1200px] w-[90vw] h-[80vh] min-h-[550px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
@@ -49,57 +84,85 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        {/* This div grows and handles scrolling for the content */}
         <div className="flex-grow overflow-y-auto py-4 pr-2">
-          {/* Remove height/flex constraints from Tabs */}
           <Tabs defaultValue="general">
             <TabsList className="flex-shrink-0 sticky top-0 bg-background z-10 mb-4 flex-wrap h-auto justify-start">
               <TabsTrigger value="general">General</TabsTrigger>
               <TabsTrigger value="providers">Providers</TabsTrigger>
-              {context.enableAdvancedSettings && (
+              {enableAdvancedSettings && (
                 <TabsTrigger value="assistant">Assistant</TabsTrigger>
               )}
-              {context.enableApiKeyManagement && (
+              {enableApiKeyManagement && (
                 <TabsTrigger value="apiKeys">API Keys</TabsTrigger>
               )}
               <TabsTrigger value="data">Data</TabsTrigger>
               <TabsTrigger value="mods">Mods</TabsTrigger>
-              {/* Mod-added tabs rendering logic (seems correct) */}
-              {context.customSettingsTabs.map((tab: CustomSettingTab) => (
+              {/* Use customSettingsTabs from props */}
+              {customSettingsTabs.map((tab: CustomSettingTab) => (
                 <TabsTrigger key={tab.id} value={tab.id}>
                   {tab.title}
                 </TabsTrigger>
               ))}
             </TabsList>
 
-            {/* Content area - removed mt-4 to be closer to tabs */}
             <div>
+              {/* Pass necessary props down to each settings tab */}
               <TabsContent value="general">
-                <SettingsGeneral />
+                <SettingsGeneral theme={theme} setTheme={setTheme} />
               </TabsContent>
               <TabsContent value="providers">
-                <SettingsProviders />
+                <SettingsProviders
+                  dbProviderConfigs={dbProviderConfigs}
+                  apiKeys={apiKeys}
+                  addDbProviderConfig={addDbProviderConfig}
+                  updateDbProviderConfig={updateDbProviderConfig}
+                  deleteDbProviderConfig={deleteDbProviderConfig}
+                  fetchModels={fetchModels}
+                  providerFetchStatus={providerFetchStatus}
+                  getAllAvailableModelDefs={getAllAvailableModelDefs}
+                />
               </TabsContent>
-              {context.enableAdvancedSettings && (
+              {enableAdvancedSettings && (
                 <TabsContent value="assistant">
-                  <SettingsAssistant />
+                  <SettingsAssistant
+                    globalSystemPrompt={globalSystemPrompt}
+                    setGlobalSystemPrompt={setGlobalSystemPrompt}
+                  />
                 </TabsContent>
               )}
-              {context.enableApiKeyManagement && (
+              {enableApiKeyManagement && (
                 <TabsContent value="apiKeys">
-                  <SettingsApiKeys />
+                  <SettingsApiKeys
+                    apiKeys={apiKeys}
+                    addApiKey={addApiKey}
+                    deleteApiKey={deleteApiKey}
+                    dbProviderConfigs={dbProviderConfigs}
+                    enableApiKeyManagement={enableApiKeyManagement}
+                  />
                 </TabsContent>
               )}
               <TabsContent value="data">
-                <SettingsDataManagement />
+                <SettingsDataManagement
+                  importConversation={importConversation}
+                  exportAllConversations={exportAllConversations}
+                  clearAllData={clearAllData}
+                />
               </TabsContent>
               <TabsContent value="mods">
-                <SettingsMods />
+                <SettingsMods
+                  dbMods={dbMods}
+                  loadedMods={loadedMods}
+                  addDbMod={addDbMod}
+                  updateDbMod={updateDbMod}
+                  deleteDbMod={deleteDbMod}
+                />
               </TabsContent>
-              {/* Mod-added tab content rendering logic (seems correct) */}
-              {context.customSettingsTabs.map((tab: CustomSettingTab) => (
+              {/* Render custom tabs from props */}
+              {customSettingsTabs.map((tab: CustomSettingTab) => (
                 <TabsContent key={tab.id} value={tab.id}>
-                  <tab.component context={context} />
+                  {/* Custom tabs need a way to get context/props */}
+                  {/* This requires a more defined API for custom tabs */}
+                  <tab.component context={{} as any} />
                 </TabsContent>
               ))}
             </div>
@@ -107,7 +170,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <DialogFooter className="flex-shrink-0 border-t pt-4">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Close
           </Button>
         </DialogFooter>
@@ -115,3 +178,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     </Dialog>
   );
 };
+
+// Export the memoized component
+export const SettingsModal = React.memo(SettingsModalComponent);

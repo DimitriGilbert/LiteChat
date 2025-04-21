@@ -1,493 +1,209 @@
 // src/context/chat-provider-inner.tsx
-import React, { useMemo, useCallback, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react"; // Added useState
 import { toast } from "sonner";
+
+// Store Imports
+import { useCoreChatStore } from "@/store/core-chat.store";
+import { useProviderStore } from "@/store/provider.store";
+import { useSettingsStore } from "@/store/settings.store";
+import { useSidebarStore } from "@/store/sidebar.store";
+import { useVfsStore } from "@/store/vfs.store";
+import { useModStore } from "@/store/mod.store";
+
+// Type Imports (Keep only necessary types)
 import type {
-  ChatContextProps,
-  CustomPromptAction,
-  CustomMessageAction,
-  CustomSettingTab,
-  SidebarItemType,
+  // CustomPromptAction, // REMOVED
+  // CustomMessageAction, // REMOVED
+  // CustomSettingTab, // REMOVED
+  LiteChatConfig, // Assuming LiteChatConfig type is defined elsewhere or in types.ts
 } from "@/lib/types";
-import { modEvents, ModEvent } from "@/mods/events";
-import { type ReadonlyChatContextSnapshot } from "@/mods/api";
-import { ChatContext } from "@/hooks/use-chat-context";
-import { useCoreChatContext } from "@/context/core-chat-context";
-import { useMessageHandling } from "@/hooks/use-message-handling";
-import { useChatStorage } from "@/hooks/use-chat-storage";
-import { useProviderManagementContext } from "./provider-management-context";
-import { useSidebarContext } from "./sidebar-context";
-import { useSettingsContext } from "./settings-context";
-import { useVfsContext } from "./vfs-context";
-import { useModContext } from "./mod-context";
-import { useChatMiddleware } from "./chat-middleware";
-import { EMPTY_DB_PROVIDER_CONFIGS } from "@/utils/chat-utils";
-import { ChatSubmissionService } from "@/services/chat-submission-service";
+
+// Removed storage hook import
+// Removed mod loader imports
 
 interface ChatProviderInnerProps {
   children: React.ReactNode;
-  streamingThrottleRate?: number;
-  userCustomPromptActions: CustomPromptAction[];
-  userCustomMessageActions: CustomMessageAction[];
-  userCustomSettingsTabs: CustomSettingTab[];
-}
-
-type Theme = "light" | "dark" | "system";
-
-interface StableReferences {
-  providerMgmt: {
-    selectedProviderId: string | null;
-    selectedModelId: string | null;
-    getApiKeyForProvider: (id: string) => string | undefined;
-  };
-  sidebar: {
-    selectedItemId: string | null;
-    selectedItemType: SidebarItemType | null;
-  };
-  settings: {
-    activeSystemPrompt: string | null;
-    temperature: number;
-    maxTokens: number | null;
-    theme: Theme;
-  };
-  vfs: {
-    isVfsEnabledForItem: boolean;
-  };
+  // Pass config down to initialize stores
+  config: LiteChatConfig;
+  // REMOVED: userCustomPromptActions: CustomPromptAction[];
+  // REMOVED: userCustomMessageActions: CustomMessageAction[];
+  // REMOVED: userCustomSettingsTabs: CustomSettingTab[];
 }
 
 const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
   children,
-  streamingThrottleRate = 42,
-  userCustomPromptActions,
-  userCustomMessageActions,
-  userCustomSettingsTabs,
+  config,
+  // REMOVED: userCustomPromptActions,
+  // REMOVED: userCustomMessageActions,
+  // REMOVED: userCustomSettingsTabs,
 }) => {
-  const {
-    messages,
-    setMessages,
-    isLoadingMessages,
-    setIsLoadingMessages,
-    isStreaming,
-    setIsStreaming,
-    error,
-    setError,
-    abortControllerRef,
-  } = useCoreChatContext();
-  const providerMgmt = useProviderManagementContext();
-  const sidebar = useSidebarContext();
-  const settings = useSettingsContext();
-  const vfs = useVfsContext();
-  const modCtx = useModContext();
-  const storage = useChatStorage();
+  const [isInitialized, setIsInitialized] = useState(false); // State to track initialization
+  const initStarted = useRef(false); // Prevent multiple initializations
 
-  const middleware = useChatMiddleware(setError);
-
-  const stableReferences = useRef<StableReferences>({
-    providerMgmt: {
-      selectedProviderId: null,
-      selectedModelId: null,
-      getApiKeyForProvider: (id: string) =>
-        providerMgmt.getApiKeyForProvider(id),
-    },
-    sidebar: {
-      selectedItemId: null,
-      selectedItemType: null,
-    },
-    settings: {
-      activeSystemPrompt: null,
-      temperature: 0,
-      maxTokens: null,
-      theme: "system",
-    },
-    vfs: {
-      isVfsEnabledForItem: false,
-    },
-  });
-
+  // --- Initial Data Loading and Store Initialization Effect ---
   useEffect(() => {
-    stableReferences.current.providerMgmt.selectedProviderId =
-      providerMgmt.selectedProviderId;
-    stableReferences.current.providerMgmt.selectedModelId =
-      providerMgmt.selectedModelId;
-  }, [providerMgmt.selectedProviderId, providerMgmt.selectedModelId]);
+    // Prevent running multiple times
+    if (initStarted.current) return;
+    initStarted.current = true;
 
-  useEffect(() => {
-    stableReferences.current.sidebar.selectedItemId = sidebar.selectedItemId;
-    stableReferences.current.sidebar.selectedItemType =
-      sidebar.selectedItemType;
-  }, [sidebar.selectedItemId, sidebar.selectedItemType]);
+    console.log("[ChatProviderInner] Initializing stores...");
 
-  useEffect(() => {
-    stableReferences.current.settings.activeSystemPrompt =
-      settings.activeSystemPrompt;
-    stableReferences.current.settings.temperature = settings.temperature;
-    stableReferences.current.settings.maxTokens = settings.maxTokens;
-    stableReferences.current.settings.theme = settings.theme;
-  }, [
-    settings.activeSystemPrompt,
-    settings.temperature,
-    settings.maxTokens,
-    settings.theme,
-  ]);
+    // 1. Initialize Feature Flags and Configurable Settings from config prop
+    // (Run these synchronously before async initialization)
+    useProviderStore
+      .getState()
+      .setEnableApiKeyManagement(config.enableApiKeyManagement ?? true);
+    useSettingsStore
+      .getState()
+      .setEnableAdvancedSettings(config.enableAdvancedSettings ?? true);
+    useSidebarStore.getState().setEnableSidebar(config.enableSidebar ?? true);
+    useVfsStore.getState()._setEnableVfs(config.enableVfs ?? true); // Use internal setter
+    useSettingsStore
+      .getState()
+      .setStreamingThrottleRate(config.streamingThrottleRate ?? 50);
 
-  useEffect(() => {
-    stableReferences.current.vfs.isVfsEnabledForItem = vfs.isVfsEnabledForItem;
-  }, [vfs.isVfsEnabledForItem]);
-
-  const getApiKeyForSelectedProvider = useCallback((): string | undefined => {
-    if (!providerMgmt.selectedProviderId) return undefined;
-    return providerMgmt.getApiKeyForProvider(providerMgmt.selectedProviderId);
-  }, [providerMgmt]);
-
-  const getContextSnapshotForMod =
-    useCallback((): ReadonlyChatContextSnapshot => {
-      return Object.freeze({
-        selectedItemId: stableReferences.current.sidebar.selectedItemId,
-        selectedItemType: stableReferences.current.sidebar.selectedItemType,
-        messages,
-        isStreaming,
-        selectedProviderId:
-          stableReferences.current.providerMgmt.selectedProviderId,
-        selectedModelId: stableReferences.current.providerMgmt.selectedModelId,
-        activeSystemPrompt:
-          stableReferences.current.settings.activeSystemPrompt,
-        temperature: stableReferences.current.settings.temperature,
-        maxTokens: stableReferences.current.settings.maxTokens,
-        theme: stableReferences.current.settings.theme,
-        isVfsEnabledForItem: stableReferences.current.vfs.isVfsEnabledForItem,
-        getApiKeyForProvider:
-          stableReferences.current.providerMgmt.getApiKeyForProvider,
-      });
-    }, [messages, isStreaming]);
-
-  const messageHandling = useMessageHandling({
-    selectedModel: providerMgmt.selectedModel,
-    selectedProvider: providerMgmt.selectedProvider,
-    getApiKeyForProvider: getApiKeyForSelectedProvider,
-    streamingThrottleRate,
-    temperature: settings.temperature,
-    maxTokens: settings.maxTokens,
-    topP: settings.topP,
-    topK: settings.topK,
-    presencePenalty: settings.presencePenalty,
-    frequencyPenalty: settings.frequencyPenalty,
-    activeSystemPrompt: settings.activeSystemPrompt,
-    localMessages: messages,
-    setLocalMessages: setMessages,
-    isLoadingMessages: isLoadingMessages,
-    setIsLoadingMessages: setIsLoadingMessages,
-    isStreaming: isStreaming,
-    setIsStreaming: setIsStreaming,
-    error: error,
-    setError,
-    addDbMessage: storage.addDbMessage,
-    deleteDbMessage: storage.deleteDbMessage,
-    getMessagesForConversation: storage.getMessagesForConversation,
-    // Removed getDbMessagesUpTo from here
-    abortControllerRef,
-    selectedConversationId: sidebar.activeConversationData?.id ?? null,
-    getContextSnapshotForMod,
-    bulkAddMessages: storage.bulkAddMessages,
-  });
-
-  const handleSubmit = useCallback(
-    async (
-      promptValue: string,
-      attachedFilesValue: File[],
-      vfsPathsToSubmit: string[],
-    ) => {
+    // 2. Trigger store initialization actions (async)
+    const initializeStores = async () => {
       try {
-        await ChatSubmissionService.submitChat(
-          promptValue,
-          attachedFilesValue,
-          vfsPathsToSubmit,
-          {
-            selectedProviderId: providerMgmt.selectedProviderId,
-            selectedProvider: providerMgmt.selectedProvider || null,
-            selectedModel: providerMgmt.selectedModel,
-            getApiKeyForProvider: getApiKeyForSelectedProvider,
-            dbProviderConfigs:
-              providerMgmt.dbProviderConfigs || EMPTY_DB_PROVIDER_CONFIGS,
-            enableApiKeyManagement: providerMgmt.enableApiKeyManagement,
-            isStreaming,
-            setError,
-            selectedItemType: sidebar.selectedItemType,
-            selectedItemId: sidebar.selectedItemId,
-            activeConversationData: sidebar.activeConversationData,
-            createConversation: sidebar.createConversation,
-            selectItem: sidebar.selectItem,
-            deleteItem: sidebar.deleteItem,
-            vfs: vfs.vfs,
-            enableVfs: vfs.enableVfs,
-            isVfsEnabledForItem: vfs.isVfsEnabledForItem,
-            runMiddleware: middleware.runMiddleware,
-            handleSubmitCore: messageHandling.handleSubmitCore,
-            handleImageGenerationCore:
-              messageHandling.handleImageGenerationCore,
-          },
+        console.log(
+          "[ChatProviderInner] Triggering store initialization actions...",
+        );
+        // Call initialization actions concurrently
+        await Promise.all([
+          useSidebarStore.getState().initializeFromDb(),
+          useProviderStore.getState().initializeFromDb(),
+          useModStore.getState().initializeFromDb(),
+          // Add other stores if they need initialization
+        ]);
+
+        console.log(
+          "[ChatProviderInner] Store initialization actions complete.",
+        );
+
+        // 3. Set Initial Selection (if provided in config) AFTER stores are initialized
+        const {
+          initialSelectedItemId,
+          initialSelectedItemType,
+          initialProviderId,
+          initialModelId,
+        } = config;
+
+        // Ensure provider configs are loaded before setting initial provider/model
+        const providerConfigs = useProviderStore.getState().dbProviderConfigs;
+
+        if (initialProviderId) {
+          console.log(
+            `[ChatProviderInner] Setting initial provider: ${initialProviderId}`,
+          );
+          // This action handles selecting the default model for the provider
+          useProviderStore.getState().setSelectedProviderId(initialProviderId);
+          // Override model if specifically provided
+          if (initialModelId) {
+            console.log(
+              `[ChatProviderInner] Setting initial model: ${initialModelId}`,
+            );
+            useProviderStore.getState().setSelectedModelId(initialModelId);
+          }
+        } else {
+          // Optional: Select the first available provider if none specified
+          const firstProviderId = providerConfigs[0]?.id;
+          if (firstProviderId) {
+            console.log(
+              `[ChatProviderInner] Setting initial provider to first available: ${firstProviderId}`,
+            );
+            useProviderStore.getState().setSelectedProviderId(firstProviderId);
+          } else {
+            console.log(
+              "[ChatProviderInner] No initial provider specified and no providers configured.",
+            );
+          }
+        }
+
+        // Set initial sidebar selection AFTER stores are initialized
+        if (initialSelectedItemId && initialSelectedItemType) {
+          console.log(
+            `[ChatProviderInner] Setting initial selection: ${initialSelectedItemType} - ${initialSelectedItemId}`,
+          );
+          // Use the selectItem action which handles side effects (loading messages, VFS state)
+          await useSidebarStore
+            .getState()
+            .selectItem(initialSelectedItemId, initialSelectedItemType);
+        } else {
+          // Optional: Select the most recent item if no initial selection is provided
+          console.log(
+            "[ChatProviderInner] No initial item selection provided. Selecting first item if available.",
+          );
+          const firstItem = useSidebarStore.getState().getFirstItem(); // Assuming getFirstItem exists
+          if (firstItem) {
+            console.log(
+              `[ChatProviderInner] Selecting first item: ${firstItem.type} - ${firstItem.id}`,
+            );
+            await useSidebarStore
+              .getState()
+              .selectItem(firstItem.id, firstItem.type);
+          } else {
+            console.log("[ChatProviderInner] No items found to select.");
+            // Ensure selection state is null if no items exist
+            await useSidebarStore.getState().selectItem(null, null);
+          }
+        }
+
+        // 4. Initialize Mods (Example - refine as needed)
+        const dbMods = useModStore.getState().dbMods;
+        if (dbMods.length > 0) {
+          console.log(
+            `[ChatProviderInner] Initializing ${dbMods.length} mods...`,
+          );
+          // Placeholder for actual mod loading logic
+        }
+
+        console.log("[ChatProviderInner] Post-initialization setup complete.");
+        // --- SET INITIALIZED STATE ---
+        setIsInitialized(true);
+        console.log(
+          "[ChatProviderInner] Initialization complete. Rendering UI.",
         );
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        setError(`Error: ${message}`);
-        toast.error(`Failed: ${message}`);
+        console.error(
+          "[ChatProviderInner] Error during store initialization:",
+          error,
+        );
+        toast.error(
+          `Failed to initialize application data: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
+        // Set error state in core store?
+        useCoreChatStore
+          .getState()
+          .setError("Failed to load initial application data.");
+        // Still set initialized to true to show error state in UI, or handle differently
+        setIsInitialized(true);
       }
-    },
-    [
-      isStreaming,
-      providerMgmt,
-      getApiKeyForSelectedProvider,
-      setError,
-      messageHandling,
-      vfs,
-      middleware,
-      sidebar,
-    ],
-  );
+    };
 
-  const regenerateMessage = useCallback(
-    async (messageId: string) => {
-      if (isStreaming) {
-        toast.info("Please wait for the current response to finish.");
-        return;
-      }
-      await messageHandling.regenerateMessageCore(messageId);
-    },
-    [messageHandling, isStreaming],
-  );
+    initializeStores();
 
-  const stopStreaming = useCallback(() => {
-    messageHandling.stopStreamingCore();
-  }, [messageHandling]);
+    // Note: Custom actions/tabs from props are not handled here.
+    // They should ideally be registered via a mod or a different API.
 
-  const handleImportConversation = useCallback(
-    async (file: File, parentId: string | null) => {
-      await sidebar.importConversation(file, parentId);
-    },
-    [sidebar],
-  );
+    // Cleanup function if needed (e.g., abort fetches)
+    // return () => { ... };
+  }, [
+    config,
+    // Removed dependencies on custom actions/tabs as they aren't used here
+  ]); // Rerun only if config changes (or just once on mount)
 
-  const handleToggleVfs = useCallback(async () => {
-    if (!sidebar.selectedItemId || !sidebar.selectedItemType) {
-      toast.warning("No item selected.");
-      return;
-    }
-    if (!vfs.enableVfs) {
-      toast.error("Virtual Filesystem is disabled in configuration.");
-      return;
-    }
-    await sidebar.toggleVfsEnabled(
-      sidebar.selectedItemId,
-      sidebar.selectedItemType,
-      vfs.isVfsEnabledForItem,
+  // Conditionally render children or a loading indicator
+  if (!isInitialized) {
+    // Optional: Add a more sophisticated loading spinner/indicator
+    return (
+      <div className="flex items-center justify-center h-full w-full bg-gray-900 text-gray-400">
+        Initializing LiteChat...
+      </div>
     );
-  }, [sidebar, vfs.isVfsEnabledForItem, vfs.enableVfs]);
+  }
 
-  const hasInitializedMods = useRef(false);
-  useEffect(() => {
-    if (hasInitializedMods.current || !modCtx.dbMods) return;
-    hasInitializedMods.current = true;
-
-    const dbMods = modCtx.dbMods;
-    modCtx._clearRegisteredModItems();
-    modCtx._clearRegisteredModTools();
-    middleware.clearModReferences();
-
-    if (dbMods.length > 0) {
-      middleware
-        .loadModsWithContext(dbMods, getContextSnapshotForMod)
-        .then((instances) => {
-          modCtx._setLoadedMods(instances);
-        })
-        .catch((error) => {
-          console.error("Error loading mods:", error);
-        });
-    } else {
-      modCtx._setLoadedMods([]);
-      modEvents.emit(ModEvent.APP_LOADED);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modCtx.dbMods]);
-
-  const combinedPromptActions = useMemo(
-    () => [...userCustomPromptActions, ...modCtx.modPromptActions],
-    [userCustomPromptActions, modCtx.modPromptActions],
-  );
-  const combinedMessageActions = useMemo(
-    () => [...userCustomMessageActions, ...modCtx.modMessageActions],
-    [userCustomMessageActions, modCtx.modMessageActions],
-  );
-  const combinedSettingsTabs = useMemo(
-    () => [...userCustomSettingsTabs, ...modCtx.modSettingsTabs],
-    [userCustomSettingsTabs, modCtx.modSettingsTabs],
-  );
-
-  const fullContextValue: ChatContextProps = useMemo(
-    () => ({
-      enableApiKeyManagement: providerMgmt.enableApiKeyManagement,
-      enableAdvancedSettings: settings.enableAdvancedSettings,
-      enableSidebar: sidebar.enableSidebar,
-      enableVfs: vfs.enableVfs,
-      activeProviders: providerMgmt.activeProviders,
-      selectedProviderId: providerMgmt.selectedProviderId,
-      setSelectedProviderId: providerMgmt.setSelectedProviderId,
-      selectedModelId: providerMgmt.selectedModelId,
-      setSelectedModelId: providerMgmt.setSelectedModelId,
-      getApiKeyForProvider: getApiKeyForSelectedProvider,
-      selectedModel: providerMgmt.selectedModel,
-      apiKeys: providerMgmt.apiKeys,
-      addApiKey: providerMgmt.addApiKey,
-      deleteApiKey: providerMgmt.deleteApiKey,
-      dbProviderConfigs: providerMgmt.dbProviderConfigs,
-      addDbProviderConfig: providerMgmt.addDbProviderConfig,
-      updateDbProviderConfig: providerMgmt.updateDbProviderConfig,
-      deleteDbProviderConfig: providerMgmt.deleteDbProviderConfig,
-      sidebarItems: sidebar.sidebarItems,
-      selectedItemId: sidebar.selectedItemId,
-      selectedItemType: sidebar.selectedItemType,
-      selectItem: sidebar.selectItem,
-      createConversation: sidebar.createConversation,
-      createProject: sidebar.createProject,
-      deleteItem: sidebar.deleteItem,
-      renameItem: sidebar.renameItem,
-      updateConversationSystemPrompt: sidebar.updateConversationSystemPrompt,
-      messages: messages,
-      isLoading: isLoadingMessages,
-      isStreaming: isStreaming,
-      error: error,
-      setError: setError,
-      handleSubmit,
-      stopStreaming,
-      regenerateMessage,
-      selectedVfsPaths: vfs.selectedVfsPaths,
-      addSelectedVfsPath: vfs.addSelectedVfsPath,
-      removeSelectedVfsPath: vfs.removeSelectedVfsPath,
-      clearSelectedVfsPaths: vfs.clearSelectedVfsPaths,
-      isVfsEnabledForItem: vfs.isVfsEnabledForItem,
-      toggleVfsEnabled: handleToggleVfs,
-      vfs: vfs.vfs,
-      temperature: settings.temperature,
-      setTemperature: settings.setTemperature,
-      maxTokens: settings.maxTokens,
-      setMaxTokens: settings.setMaxTokens,
-      globalSystemPrompt: settings.globalSystemPrompt,
-      setGlobalSystemPrompt: settings.setGlobalSystemPrompt,
-      activeSystemPrompt: settings.activeSystemPrompt,
-      topP: settings.topP,
-      setTopP: settings.setTopP,
-      topK: settings.topK,
-      setTopK: settings.setTopK,
-      presencePenalty: settings.presencePenalty,
-      setPresencePenalty: settings.setPresencePenalty,
-      frequencyPenalty: settings.frequencyPenalty,
-      setFrequencyPenalty: settings.setFrequencyPenalty,
-      theme: settings.theme,
-      setTheme: settings.setTheme,
-      streamingThrottleRate,
-      searchTerm: settings.searchTerm,
-      setSearchTerm: settings.setSearchTerm,
-      exportConversation: sidebar.exportConversation,
-      importConversation: handleImportConversation,
-      exportAllConversations: sidebar.exportAllConversations,
-      clearAllData: storage.clearAllData,
-      getConversation: storage.getConversation,
-      getProject: storage.getProject,
-      customPromptActions: combinedPromptActions,
-      customMessageActions: combinedMessageActions,
-      customSettingsTabs: combinedSettingsTabs,
-      dbMods: modCtx.dbMods,
-      loadedMods: modCtx.loadedMods,
-      addDbMod: modCtx.addDbMod,
-      updateDbMod: modCtx.updateDbMod,
-      deleteDbMod: modCtx.deleteDbMod,
-      isSettingsModalOpen: settings.isSettingsModalOpen,
-      onSettingsModalOpenChange: settings.onSettingsModalOpenChange,
-    }),
-    [
-      providerMgmt.enableApiKeyManagement,
-      settings.enableAdvancedSettings,
-      sidebar.enableSidebar,
-      vfs.enableVfs,
-      providerMgmt.activeProviders,
-      providerMgmt.selectedProviderId,
-      providerMgmt.setSelectedProviderId,
-      providerMgmt.selectedModelId,
-      providerMgmt.setSelectedModelId,
-      getApiKeyForSelectedProvider,
-      providerMgmt.selectedModel,
-      providerMgmt.apiKeys,
-      providerMgmt.addApiKey,
-      providerMgmt.deleteApiKey,
-      providerMgmt.dbProviderConfigs,
-      providerMgmt.addDbProviderConfig,
-      providerMgmt.updateDbProviderConfig,
-      providerMgmt.deleteDbProviderConfig,
-      sidebar.sidebarItems,
-      sidebar.selectedItemId,
-      sidebar.selectedItemType,
-      sidebar.selectItem,
-      sidebar.createConversation,
-      sidebar.createProject,
-      sidebar.deleteItem,
-      sidebar.renameItem,
-      sidebar.updateConversationSystemPrompt,
-      messages,
-      isLoadingMessages,
-      isStreaming,
-      error,
-      setError,
-      handleSubmit,
-      stopStreaming,
-      regenerateMessage,
-      vfs.selectedVfsPaths,
-      vfs.addSelectedVfsPath,
-      vfs.removeSelectedVfsPath,
-      vfs.clearSelectedVfsPaths,
-      vfs.isVfsEnabledForItem,
-      handleToggleVfs,
-      vfs.vfs,
-      settings.temperature,
-      settings.setTemperature,
-      settings.maxTokens,
-      settings.setMaxTokens,
-      settings.globalSystemPrompt,
-      settings.setGlobalSystemPrompt,
-      settings.activeSystemPrompt,
-      settings.topP,
-      settings.setTopP,
-      settings.topK,
-      settings.setTopK,
-      settings.presencePenalty,
-      settings.setPresencePenalty,
-      settings.frequencyPenalty,
-      settings.setFrequencyPenalty,
-      settings.theme,
-      settings.setTheme,
-      streamingThrottleRate,
-      settings.searchTerm,
-      settings.setSearchTerm,
-      sidebar.exportConversation,
-      handleImportConversation,
-      sidebar.exportAllConversations,
-      storage.clearAllData,
-      storage.getConversation,
-      storage.getProject,
-      combinedPromptActions,
-      combinedMessageActions,
-      combinedSettingsTabs,
-      modCtx.dbMods,
-      modCtx.loadedMods,
-      modCtx.addDbMod,
-      modCtx.updateDbMod,
-      modCtx.deleteDbMod,
-      settings.isSettingsModalOpen,
-      settings.onSettingsModalOpenChange,
-    ],
-  );
-
-  return (
-    <ChatContext.Provider value={fullContextValue}>
-      {children}
-    </ChatContext.Provider>
-  );
+  // Render children only after initialization is complete
+  return <>{children}</>;
 };
 
 export default ChatProviderInner;

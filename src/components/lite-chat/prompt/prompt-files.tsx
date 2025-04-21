@@ -1,19 +1,24 @@
 // src/components/lite-chat/prompt/prompt-files.tsx
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { XIcon, FileIcon } from "lucide-react"; // Icons
+import { XIcon, FileIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Define props based on what PromptForm passes down
 interface PromptFilesProps {
   className?: string;
-  attachedFiles: File[]; // Add prop
-  removeAttachedFile: (fileName: string) => void; // Add prop
+  attachedFiles: File[];
+  removeAttachedFile: (fileName: string) => void;
 }
-export const PromptFiles: React.FC<PromptFilesProps> = ({
+
+// Wrap component logic in a named function for React.memo
+const PromptFilesComponent: React.FC<PromptFilesProps> = ({
   className,
   attachedFiles, // Use prop
   removeAttachedFile, // Use prop
 }) => {
+  // REMOVED store access
+
   if (attachedFiles.length === 0) {
     return null;
   }
@@ -26,9 +31,7 @@ export const PromptFiles: React.FC<PromptFilesProps> = ({
       )}
     >
       {attachedFiles.map((file) => {
-        // Check if file is an image
         const isImage = file.type.startsWith("image/");
-        // Create a preview URL (remember to revoke it if needed, though React usually handles this)
         const previewUrl = isImage ? URL.createObjectURL(file) : null;
 
         return (
@@ -42,8 +45,6 @@ export const PromptFiles: React.FC<PromptFilesProps> = ({
                   src={previewUrl}
                   alt={file.name}
                   className="h-full w-full object-cover"
-                  // Optional: Revoke URL on unmount if issues arise, but often not needed here
-                  // onLoad={() => URL.revokeObjectURL(previewUrl)} // Example, might revoke too early
                 />
               </div>
             ) : (
@@ -64,7 +65,7 @@ export const PromptFiles: React.FC<PromptFilesProps> = ({
               variant="ghost"
               size="icon"
               className="h-6 w-6 text-gray-500 hover:text-red-600 dark:hover:text-red-400 ml-1 flex-shrink-0"
-              onClick={() => removeAttachedFile(file.name)} // Use prop
+              onClick={() => removeAttachedFile(file.name)} // Use prop action
               aria-label={`Remove file ${file.name}`}
             >
               <XIcon className="h-3.5 w-3.5" />
@@ -75,3 +76,6 @@ export const PromptFiles: React.FC<PromptFilesProps> = ({
     </div>
   );
 };
+
+// Export the memoized component
+export const PromptFiles = React.memo(PromptFilesComponent);
