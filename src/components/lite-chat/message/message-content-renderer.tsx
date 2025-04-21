@@ -48,7 +48,29 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
         return (
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
-            components={{ code: CodeBlock }}
+            components={{
+              code: CodeBlock,
+              p: ({ node, children, ...props }) => (
+                <p {...props} className="my-3 leading-relaxed text-[15px]">
+                  {children}
+                </p>
+              ),
+              ul: ({ node, children, ...props }) => (
+                <ul {...props} className="my-3 list-disc list-inside pl-4">
+                  {children}
+                </ul>
+              ),
+              ol: ({ node, children, ...props }) => (
+                <ol {...props} className="my-3 list-decimal list-inside pl-4">
+                  {children}
+                </ol>
+              ),
+              li: ({ node, children, ...props }) => (
+                <li {...props} className="my-1">
+                  {children}
+                </li>
+              ),
+            }}
           >
             {finalContent}
           </ReactMarkdown>
@@ -60,9 +82,33 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
             // --- Text Part: Render with ReactMarkdown ---
             return (
               <ReactMarkdown
-                key={index}
                 remarkPlugins={[remarkGfm]}
-                components={{ code: CodeBlock }}
+                components={{
+                  code: CodeBlock,
+                  p: ({ node, children, ...props }) => (
+                    <p {...props} className="my-3 leading-relaxed text-[15px]">
+                      {children}
+                    </p>
+                  ),
+                  ul: ({ node, children, ...props }) => (
+                    <ul {...props} className="my-3 list-disc list-inside pl-4">
+                      {children}
+                    </ul>
+                  ),
+                  ol: ({ node, children, ...props }) => (
+                    <ol
+                      {...props}
+                      className="my-3 list-decimal list-inside pl-4"
+                    >
+                      {children}
+                    </ol>
+                  ),
+                  li: ({ node, children, ...props }) => (
+                    <li {...props} className="my-1">
+                      {children}
+                    </li>
+                  ),
+                }}
               >
                 {part.text}
               </ReactMarkdown>
@@ -142,6 +188,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
           !isPurelyImages && "[&_img]:my-3",
           // Apply grid layout if content is purely images
           isPurelyImages && "grid grid-cols-2 gap-2 not-prose", // Use grid, disable prose styles for the container
+          "py-2",
         )}
       >
         {renderContent()}
