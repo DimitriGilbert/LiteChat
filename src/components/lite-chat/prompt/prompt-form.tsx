@@ -1,5 +1,5 @@
 // src/components/lite-chat/prompt/prompt-form.tsx
-import React, { useEffect, useMemo, useCallback } from "react";
+import React, { useEffect, useCallback } from "react";
 import { PromptInput } from "./prompt-input";
 import { PromptSettings } from "./prompt-settings";
 import { PromptFiles } from "./prompt-files";
@@ -8,7 +8,6 @@ import { PromptActions } from "./prompt-actions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type {
-  AiProviderConfig,
   AiModelConfig,
   DbProviderConfig,
   DbApiKey,
@@ -71,16 +70,10 @@ interface PromptFormProps {
   setSelectedModelId: (id: string | null) => void;
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
-  dbConversations: DbConversation[]; // Keep for deriving activeConversationData
   createConversation: (
     parentId: string | null,
     title?: string,
   ) => Promise<string>;
-  selectItem: (
-    id: string | null,
-    type: SidebarItemType | null,
-  ) => Promise<void>;
-  deleteItem: (id: string, type: SidebarItemType) => Promise<void>;
   enableAdvancedSettings: boolean;
   temperature: number;
   setTemperature: (temp: number) => void;
@@ -139,10 +132,7 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   setSelectedModelId,
   selectedItemId,
   selectedItemType,
-  dbConversations,
   createConversation,
-  selectItem,
-  deleteItem,
   enableAdvancedSettings,
   temperature,
   setTemperature,
@@ -168,54 +158,6 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   stopStreaming,
   removeSelectedVfsPath,
 }) => {
-  // Derive selectedProvider for PromptActions
-  const derivedSelectedProvider = useMemo((): AiProviderConfig | null => {
-    const config = dbProviderConfigs.find(
-      (p: DbProviderConfig) => p.id === selectedProviderId,
-    );
-    if (!config) return null;
-    return {
-      id: config.id,
-      name: config.name,
-      type: config.type,
-      models: [], // Placeholder - derived elsewhere if needed for UI
-      allAvailableModels: config.fetchedModels || [],
-    };
-  }, [selectedProviderId, dbProviderConfigs]);
-
-  // Get getApiKeyForProvider for ChatSubmissionService
-  const getApiKeyForProvider = useCallback(() => {
-    const config = dbProviderConfigs.find(
-      (p: DbProviderConfig) => p.id === selectedProviderId,
-    );
-    if (!config || !config.apiKeyId) return undefined;
-    return apiKeys.find((k: DbApiKey) => k.id === config.apiKeyId)?.value;
-  }, [selectedProviderId, dbProviderConfigs, apiKeys]);
-
-  // Placeholder for VFS context object if needed directly
-  const vfsContextObject = useMemo(
-    () => ({
-      isReady: false,
-      isLoading: false,
-      isOperationLoading: false,
-      error: null,
-      configuredVfsKey: null,
-      fs: null,
-      listFiles: async () => [],
-      readFile: async () => new Uint8Array(),
-      writeFile: async () => {},
-      deleteItem: async () => {},
-      createDirectory: async () => {},
-      downloadFile: async () => {},
-      uploadFiles: async () => {},
-      uploadAndExtractZip: async () => {},
-      downloadAllAsZip: async () => {},
-      rename: async () => {},
-      vfsKey: null,
-    }),
-    [],
-  );
-
   // Placeholder for runMiddleware
   const runMiddlewarePlaceholder = useCallback(
     async (hookName: any, payload: any) => {
@@ -351,13 +293,6 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       });
       finalContent = combinedText;
     }
-
-    // Construct context for the wrapper function
-    const submissionContext = {
-      selectedItemId: currentConversationId,
-      contentToSendToAI: finalContent,
-      vfsContextPaths: vfsContextResult.pathsIncludedInContext,
-    };
 
     // --- Middleware Placeholder ---
     // This needs to be implemented properly if middleware is used.

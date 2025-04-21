@@ -118,7 +118,10 @@ const PromptWrapperComponent: React.FC<PromptWrapperProps> = ({
       )}
       {/* Pass all necessary props down to PromptForm */}
       {/* PromptForm now receives isStreaming, error, promptInputValue directly */}
-      <PromptForm {...promptFormProps} />
+      <PromptForm
+        {...promptFormProps}
+        getContextSnapshot={promptFormProps.getContextSnapshotForMod}
+      />
     </div>
   );
 };

@@ -75,6 +75,8 @@ interface PromptSettingsProps {
   isVfsLoading: boolean;
   vfsError: string | null;
   vfsKey: string | null;
+  // Add stopStreaming prop
+  stopStreaming: () => void;
 }
 
 // Wrap component logic in a named function for React.memo

@@ -241,6 +241,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             `[SidebarStore] Pre-delete check for project ${id}: Child Projects=${childProjectsCount}, Child Convos=${childConvosCount}`,
           );
           if (childProjectsCount > 0 || childConvosCount > 0) {
+            // @ts-expect-error This is a project.... -_-'
             let errorMsg = `Cannot delete project "${itemToDelete.name}" because it contains `;
             if (childProjectsCount > 0) {
               errorMsg += `${childProjectsCount} project(s)`;
@@ -326,6 +327,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         );
 
         toast.success(
+          // @ts-expect-error yup, no Fs given !
           `${type === "project" ? "Project" : "Chat"} "${itemToDelete.name || itemToDelete.title}" deleted.`,
         );
         modEvents.emit(ModEvent.CHAT_DELETED, { id, type });

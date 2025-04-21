@@ -172,16 +172,11 @@ interface UseLiteChatLogicReturn {
   getApiKeyForProvider: (providerId: string) => string | undefined;
 }
 
-type FetchStatus = "idle" | "fetching" | "error" | "success";
-
 // Apply the explicit return type here
 export function useLiteChatLogic(
   props: UseLiteChatLogicProps,
 ): UseLiteChatLogicReturn {
   const {
-    editingItemId,
-    setEditingItemId,
-    onEditComplete,
     dbConversations, // Receive live conversations needed for derivation
   } = props;
 
@@ -442,6 +437,7 @@ Really delete everything? Consider exporting first.`,
           modelInstance = createOpenAICompatible({
             baseURL: config.baseURL,
             apiKey: currentApiKey,
+            name: config.name || "Custom API",
           })(modelInfo.id);
           break;
         default:
@@ -551,7 +547,12 @@ Really delete everything? Consider exporting first.`,
 
   // --- Interaction Handlers ---
   const handleFormSubmit = useCallback(
-    async (prompt: string, files: File[], vfsPaths: string[], context: any) => {
+    async (
+      _prompt: string,
+      _files: File[],
+      _vfsPaths: string[],
+      context: any,
+    ) => {
       try {
         // Call the core action to save the user message first
         await coreHandleSubmitCore(

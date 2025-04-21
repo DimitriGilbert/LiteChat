@@ -332,7 +332,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     // Derived State
     activeConversationData,
     selectedModel,
-    getApiKeyForProvider,
   } = useLiteChatLogic({
     editingItemId,
     setEditingItemId,
