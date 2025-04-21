@@ -1,5 +1,5 @@
 // src/components/lite-chat/prompt/prompt-settings.tsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { ProviderSelector } from "@/components/lite-chat/provider-selector";
 import { ModelSelector } from "@/components/lite-chat/model-selector";
 import { PromptSettingsAdvanced } from "./prompt-settings-advanced";

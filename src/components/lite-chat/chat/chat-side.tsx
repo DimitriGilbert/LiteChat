@@ -1,5 +1,11 @@
 // src/components/lite-chat/chat/chat-side.tsx
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
 import { ChatHistory } from "./chat-history";
 import { SettingsModal } from "@/components/lite-chat/settings/settings-modal";
 import { Button } from "@/components/ui/button";
@@ -11,20 +17,26 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-// REMOVED: import type { SidebarItem, DbConversation, SidebarItemType } from "@/lib/types";
-import type { DbConversation, SidebarItem, SidebarItemType } from "@/lib/types"; // Keep DbConversation if needed
-import type { ChatSideProps } from "../chat"; // Import props from parent
+import type {
+  DbConversation,
+  SidebarItem,
+  DbProject,
+  ProjectSidebarItem,
+  ConversationSidebarItem,
+} from "@/lib/types";
+import type { ChatSideProps } from "../chat"; // Use the updated type from chat.tsx
 
 // Wrap component logic in a named function for React.memo
 const ChatSideComponent: React.FC<ChatSideProps> = ({
   className,
-  sidebarItems,
+  // Receive live data directly
+  dbProjects,
+  dbConversations,
   editingItemId,
   selectedItemId,
   selectedItemType,
   onEditComplete,
   setEditingItemId,
-  // Destructure actions from props
   selectItem,
   deleteItem,
   renameItem,
@@ -41,37 +53,57 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
     null,
   );
 
-  console.log(
-    `[ChatSide] Rendering. Items count: ${sidebarItems.length}, Editing: ${editingItemId}, Modal Open: ${isSettingsModalOpen}`,
-  );
+  // --- Derive Sidebar Items HERE ---
+  // This useMemo now depends on the direct dbProjects/dbConversations props,
+  // which should have more stable references from LiteChatInner.
+  const sidebarItems = useMemo<SidebarItem[]>(() => {
+    const allProjects: DbProject[] = dbProjects || [];
+    const allConversations: DbConversation[] = dbConversations || [];
+    const combinedItems: SidebarItem[] = [
+      ...allProjects.map(
+        (p): ProjectSidebarItem => ({ ...p, type: "project" }),
+      ),
+      ...allConversations.map(
+        (c): ConversationSidebarItem => ({ ...c, type: "conversation" }),
+      ),
+    ];
+    combinedItems.sort(
+      (a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
+    );
+    // console.log(
+    //   `[ChatSide] Derived sidebarItems. Count: ${combinedItems.length}`,
+    // );
+    return combinedItems;
+  }, [dbProjects, dbConversations]); // Depend on direct live data props
+
+  // console.log(
+  //   `[ChatSide] Rendering. Items count from props: Proj=${dbProjects?.length}, Conv=${dbConversations?.length}. Derived count: ${sidebarItems.length}, Editing: ${editingItemId}, Modal Open: ${isSettingsModalOpen}`,
+  // );
 
   // Effect to determine parent ID for new items based on selection props
+  // This effect still depends on dbConversations. If its reference changes too often,
+  // this could still cause state updates.
   useEffect(() => {
-    console.log(
-      `[ChatSide useEffect] Running. Selected: ${selectedItemType} - ${selectedItemId}`,
-    );
+    // console.log(`[ChatSide useEffect] Running. Selected: ${selectedItemType} - ${selectedItemId}`);
     let determinedParentId: string | null = null;
     if (selectedItemType === "project") {
       determinedParentId = selectedItemId;
     } else if (selectedItemType === "conversation" && selectedItemId) {
-      const convo = sidebarItems.find(
-        (item): item is DbConversation & { type: "conversation" } =>
-          item.type === "conversation" && item.id === selectedItemId,
-      );
+      // Find conversation in the raw data prop
+      const convo = dbConversations.find((item) => item.id === selectedItemId);
       determinedParentId = convo?.parentId ?? null;
     } else {
       determinedParentId = null;
     }
+    // Only update state if the value actually changes
     setParentIdForNewItem((prev) => {
       if (prev !== determinedParentId) {
-        console.log(
-          `[ChatSide useEffect] Updating parentIdForNewItem from ${prev} to ${determinedParentId}`,
-        );
+        // console.log(`[ChatSide useEffect] Updating parentIdForNewItem from ${prev} to ${determinedParentId}`);
         return determinedParentId;
       }
       return prev;
     });
-  }, [selectedItemId, selectedItemType, sidebarItems]);
+  }, [selectedItemId, selectedItemType, dbConversations]); // Depend on direct live data prop
 
   // Use actions passed via props
   const handleCreateChat = useCallback(async () => {
@@ -102,11 +134,8 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
     }
   };
 
-  // Add logging to the settings modal trigger
   const handleOpenSettingsModal = useCallback(() => {
-    console.log(
-      "[ChatSide] Settings button clicked. Calling setIsSettingsModalOpen(true).",
-    );
+    // console.log("[ChatSide] Settings button clicked. Calling setIsSettingsModalOpen(true).");
     setIsSettingsModalOpen(true);
   }, [setIsSettingsModalOpen]);
 
@@ -141,9 +170,10 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
 
       {/* History Area */}
       <div className="flex-grow overflow-hidden flex flex-col">
+        {/* Pass the memoized sidebarItems down */}
         <ChatHistory
           className="flex-grow"
-          sidebarItems={sidebarItems}
+          sidebarItems={sidebarItems} // Pass derived items (stable ref from useMemo)
           editingItemId={editingItemId}
           selectedItemId={selectedItemId}
           onEditComplete={onEditComplete}
@@ -188,16 +218,14 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => {
-          console.log(
-            "[ChatSide] SettingsModal onClose triggered. Calling setIsSettingsModalOpen(false).",
-          );
+          // console.log("[ChatSide] SettingsModal onClose triggered. Calling setIsSettingsModalOpen(false).");
           setIsSettingsModalOpen(false);
         }}
-        settingsProps={settingsProps} // Pass the bundled props object
+        settingsProps={settingsProps} // Pass the bundled props object (stable)
       />
     </aside>
   );
 };
 
-// Export the memoized component
+// Export the component WITH memoization, as its direct props should now be stable
 export const ChatSide = React.memo(ChatSideComponent);

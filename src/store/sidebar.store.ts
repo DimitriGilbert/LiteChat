@@ -5,10 +5,9 @@ import type {
   SidebarItemType,
   DbConversation,
   DbProject,
-  ConversationSidebarItem,
-  ProjectSidebarItem,
-  MessageContent, // Import MessageContent
-  DbMessage, // Import DbMessage
+  // Removed unused imports: ConversationSidebarItem, ProjectSidebarItem
+  MessageContent,
+  DbMessage,
 } from "@/lib/types";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
@@ -18,7 +17,6 @@ import { modEvents, ModEvent } from "@/mods/events";
 import { useCoreChatStore } from "./core-chat.store";
 import { useVfsStore } from "./vfs.store";
 import { db } from "@/lib/db"; // Import Dexie instance
-import { Dexie } from "dexie"; // Import Dexie
 
 // Import Schema
 const messageImportSchema = z.object({
@@ -35,8 +33,8 @@ export interface SidebarState {
   enableSidebar: boolean;
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
-  dbProjects: DbProject[];
-  dbConversations: DbConversation[];
+  // REMOVED: dbProjects: DbProject[];
+  // REMOVED: dbConversations: DbConversation[];
 }
 
 export interface SidebarActions {
@@ -67,8 +65,8 @@ export interface SidebarActions {
   importConversation: (file: File, parentId: string | null) => Promise<void>;
   exportAllConversations: () => Promise<void>;
   toggleVfsEnabled: (id: string, type: SidebarItemType) => Promise<void>;
-  initializeFromDb: () => Promise<void>;
-  getFirstItem: () => SidebarItem | null;
+  // REMOVED: initializeFromDb: () => Promise<void>;
+  // REMOVED: getFirstItem: () => SidebarItem | null;
 }
 
 export const useSidebarStore = create<SidebarState & SidebarActions>()(
@@ -77,81 +75,45 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
     enableSidebar: true,
     selectedItemId: null,
     selectedItemType: null,
-    dbProjects: [],
-    dbConversations: [],
+    // REMOVED: dbProjects: [],
+    // REMOVED: dbConversations: [],
 
     // Actions
     setEnableSidebar: (enableSidebar) => set({ enableSidebar }),
 
-    initializeFromDb: async () => {
-      try {
-        // Use Dexie's live query mechanism implicitly by reading from db
-        // This ensures the store state reflects the DB state initially and reactively
-        // We don't need to manually set state here if components use useLiveQuery via useChatStorage
-        // However, setting initial state might be good for immediate availability
-        const [projects, conversations] = await Promise.all([
-          db.projects.orderBy("updatedAt").reverse().toArray(),
-          db.conversations.orderBy("updatedAt").reverse().toArray(),
-        ]);
-        set({ dbProjects: projects, dbConversations: conversations });
-        console.log("[SidebarStore] Initialized from DB.");
-      } catch (error) {
-        console.error("[SidebarStore] Failed to initialize from DB:", error);
-        toast.error("Failed to load sidebar data.");
-      }
-    },
+    // REMOVED: initializeFromDb action
 
-    getFirstItem: () => {
-      // This should ideally use the live query data if possible,
-      // but for now, it uses the current store state.
-      const { dbProjects, dbConversations } = get();
-      const combinedItems: SidebarItem[] = [
-        ...dbProjects.map(
-          (p): ProjectSidebarItem => ({ ...p, type: "project" }),
-        ),
-        ...dbConversations.map(
-          (c): ConversationSidebarItem => ({ ...c, type: "conversation" }),
-        ),
-      ];
-      combinedItems.sort(
-        (a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
-      );
-      return combinedItems[0] || null;
-    },
+    // REMOVED: getFirstItem action
 
     selectItem: async (id, type) => {
       const currentId = get().selectedItemId;
       const currentType = get().selectedItemType;
 
       if (currentId === id && currentType === type) {
-        // console.log(`[SidebarStore] SelectItem: Already selected ${type}-${id}. Skipping.`);
         return;
       }
 
-      // console.log(`[SidebarStore] SelectItem: START selecting ${type} - ${id}`);
       set({
         selectedItemId: id,
         selectedItemType: type,
       });
 
       const coreChatActions = useCoreChatStore.getState();
-      // console.log(`[SidebarStore] SelectItem: Calling coreChatActions.loadMessages(${id})`);
       if (type === "conversation" && id) {
         await coreChatActions.loadMessages(id);
       } else {
         await coreChatActions.loadMessages(null);
       }
-      // console.log(`[SidebarStore] SelectItem: Finished coreChatActions.loadMessages(${id})`);
 
       const vfsActions = useVfsStore.getState();
       let isVfsEnabledForItem = false;
       let vfsKey: string | null = null;
 
       if (id && type) {
-        // Fetch directly from DB for the most accurate current state
         let selectedItem: DbProject | DbConversation | undefined;
         let parentProject: DbProject | undefined;
 
+        // Fetch directly from DB for accurate state
         if (type === "project") {
           selectedItem = await db.projects.get(id);
         } else {
@@ -168,30 +130,25 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         } else if (type === "conversation") {
           const convo = selectedItem as DbConversation | undefined;
           if (convo?.parentId && parentProject) {
-            // Conversation inside a project
             if (parentProject.vfsEnabled) {
               vfsKey = `project-${convo.parentId}`;
-              isVfsEnabledForItem = true; // Inherit enabled state
+              isVfsEnabledForItem = true;
             } else {
-              vfsKey = null; // No specific key needed if disabled by parent
+              vfsKey = null;
               isVfsEnabledForItem = false;
             }
           } else {
-            // Orphan conversation
             vfsKey = "orphan";
-            isVfsEnabledForItem = convo?.vfsEnabled ?? false; // Use its own setting
+            isVfsEnabledForItem = convo?.vfsEnabled ?? false;
           }
         }
       }
 
-      // console.log(`[SidebarStore] SelectItem: Setting VFS key=${vfsKey}, enabled=${isVfsEnabledForItem}`);
       vfsActions.setVfsKey(vfsKey);
       vfsActions.setIsVfsEnabledForItem(isVfsEnabledForItem);
       vfsActions.clearSelectedVfsPaths();
 
-      // console.log(`[SidebarStore] SelectItem: Emitting ModEvent.CHAT_SELECTED for ${type}-${id}`);
       modEvents.emit(ModEvent.CHAT_SELECTED, { id, type });
-      // console.log(`[SidebarStore] SelectItem: FINISHED selecting ${type}-${id}`);
     },
 
     createConversation: async (parentId, title = "New Chat") => {
@@ -211,7 +168,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         if (parentId) {
           await db.projects.update(parentId, { updatedAt: now });
         }
-        // State update will happen via live query
         modEvents.emit(ModEvent.CHAT_CREATED, {
           id: newId,
           type: "conversation",
@@ -244,14 +200,11 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         if (parentId) {
           await db.projects.update(parentId, { updatedAt: now });
         }
-        // State update will happen via live query
         modEvents.emit(ModEvent.CHAT_CREATED, {
           id: newProject.id,
           type: "project",
           parentId,
         });
-        // Optionally select the new project?
-        // await get().selectItem(newId, "project");
         return { id: newProject.id, name: newProject.name };
       } catch (error) {
         console.error("Failed to create project:", error);
@@ -276,18 +229,28 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
 
       if (type === "project") {
         try {
-          const childProjects = await db.projects
+          const childProjectsCount = await db.projects
             .where("parentId")
             .equals(id)
             .count();
-          const childConvos = await db.conversations
+          const childConvosCount = await db.conversations
             .where("parentId")
             .equals(id)
             .count();
-          if (childProjects > 0 || childConvos > 0) {
-            toast.error(
-              `Cannot delete project "${itemToDelete.name}" with items inside.`,
-            );
+          console.log(
+            `[SidebarStore] Pre-delete check for project ${id}: Child Projects=${childProjectsCount}, Child Convos=${childConvosCount}`,
+          );
+          if (childProjectsCount > 0 || childConvosCount > 0) {
+            let errorMsg = `Cannot delete project "${itemToDelete.name}" because it contains `;
+            if (childProjectsCount > 0) {
+              errorMsg += `${childProjectsCount} project(s)`;
+              if (childConvosCount > 0) errorMsg += " and ";
+            }
+            if (childConvosCount > 0) {
+              errorMsg += `${childConvosCount} conversation(s)`;
+            }
+            errorMsg += ".";
+            toast.error(errorMsg);
             return;
           }
         } catch (countErr) {
@@ -308,21 +271,60 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           db.conversations,
           db.messages,
           db.projects,
-          async () => {
+          async (tx) => {
+            console.log(
+              `[SidebarStore] Transaction START for deleting ${type} ${id}`,
+            );
             if (type === "conversation") {
-              await db.messages.where("conversationId").equals(id).delete();
-              await db.conversations.delete(id);
+              const msgDeleteCount = await tx.messages
+                .where("conversationId")
+                .equals(id)
+                .delete();
+              console.log(
+                `[SidebarStore] Transaction: Deleted ${msgDeleteCount} messages for convo ${id}`,
+              );
+              await tx.conversations.delete(id);
+              console.log(
+                `[SidebarStore] Transaction: Deleted conversation ${id}`,
+              );
             } else if (type === "project") {
-              await db.projects.delete(id);
+              const finalChildProjects = await tx.projects
+                .where("parentId")
+                .equals(id)
+                .count();
+              const finalChildConvos = await tx.conversations
+                .where("parentId")
+                .equals(id)
+                .count();
+              console.log(
+                `[SidebarStore] Transaction check for project ${id}: Child Projects=${finalChildProjects}, Child Convos=${finalChildConvos}`,
+              );
+              if (finalChildProjects === 0 && finalChildConvos === 0) {
+                await tx.projects.delete(id);
+                console.log(
+                  `[SidebarStore] Transaction: Deleted project ${id}`,
+                );
+              } else {
+                console.error(
+                  `[SidebarStore] Transaction check failed: Project ${id} still has children! Proj: ${finalChildProjects}, Conv: ${finalChildConvos}`,
+                );
+                throw new Error(
+                  "Project deletion aborted inside transaction due to existing children.",
+                );
+              }
             }
-            // Update parent timestamp if applicable
             if (parentId) {
-              await db.projects.update(parentId, { updatedAt: now });
+              await tx.projects.update(parentId, { updatedAt: now });
+              console.log(
+                `[SidebarStore] Transaction: Updated parent project ${parentId} timestamp`,
+              );
             }
+            console.log(
+              `[SidebarStore] Transaction COMMIT for deleting ${type} ${id}`,
+            );
           },
         );
 
-        // State update will happen via live query
         toast.success(
           `${type === "project" ? "Project" : "Chat"} "${itemToDelete.name || itemToDelete.title}" deleted.`,
         );
@@ -330,24 +332,24 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
 
         // If the deleted item was selected, select the next most recent item
         if (currentSelectedId === id) {
-          // Fetch fresh data after deletion
+          // Fetch fresh data AFTER deletion transaction is complete
           const [projects, conversations] = await Promise.all([
             db.projects.orderBy("updatedAt").reverse().toArray(),
             db.conversations.orderBy("updatedAt").reverse().toArray(),
           ]);
           const remainingItems: SidebarItem[] = [
-            ...projects.map(
-              (p): ProjectSidebarItem => ({ ...p, type: "project" }),
-            ),
-            ...conversations.map(
-              (c): ConversationSidebarItem => ({ ...c, type: "conversation" }),
-            ),
+            ...projects.map((p) => ({ ...p, type: "project" as const })),
+            ...conversations.map((c) => ({
+              ...c,
+              type: "conversation" as const,
+            })),
           ];
           remainingItems.sort(
             (a, b) =>
               (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
           );
           const nextItem = remainingItems[0];
+          // Select the next item (or null if none left)
           await get().selectItem(nextItem?.id ?? null, nextItem?.type ?? null);
         }
       } catch (err: unknown) {
@@ -380,12 +382,10 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           await db.projects.update(id, { name: trimmedName, updatedAt: now });
         }
 
-        // Update parent timestamp if applicable
         if (parentId) {
           await db.projects.update(parentId, { updatedAt: now });
         }
 
-        // State update will happen via live query
         modEvents.emit(ModEvent.CHAT_RENAMED, {
           id,
           type,
@@ -410,7 +410,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         if (conversation?.parentId) {
           await db.projects.update(conversation.parentId, { updatedAt: now });
         }
-        // State update will happen via live query
         modEvents.emit(ModEvent.CHAT_SYSTEM_PROMPT_UPDATED, {
           id,
           systemPrompt,
@@ -533,7 +532,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
               });
             }
           }
-          // State update via live query
           await get().selectItem(newConversationId, "conversation");
           toast.success(
             `Conversation imported successfully as "${newConversationTitle}"!`,
@@ -623,7 +621,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
       }
 
       const optimisticNewVfsState = !item.vfsEnabled;
-      // console.log(`[SidebarStore] toggleVfsEnabled: START toggling VFS for ${type} ${id} to ${optimisticNewVfsState}`);
 
       try {
         const now = new Date();
@@ -645,11 +642,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           }
         }
 
-        // State update will happen via live query
-
-        // Update VFS store state *if* this is the currently selected item
         if (get().selectedItemId === id) {
-          // console.log(`[SidebarStore] toggleVfsEnabled: Updating VFS store state for selected item.`);
           useVfsStore.getState().setIsVfsEnabledForItem(optimisticNewVfsState);
         }
 
@@ -662,7 +655,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         toast.success(
           `Virtual Filesystem ${optimisticNewVfsState ? "enabled" : "disabled"} for ${type}.`,
         );
-        // console.log(`[SidebarStore] toggleVfsEnabled: FINISHED toggling VFS for ${type} ${id}`);
       } catch (err) {
         console.error("Failed to toggle VFS:", err);
         toast.error("Failed to update VFS setting.");

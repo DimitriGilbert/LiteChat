@@ -3,7 +3,6 @@ import React from "react";
 import { PromptForm } from "./prompt-form";
 import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-// Import prop types needed by PromptForm
 import type {
   MessageContent,
   DbProviderConfig,
@@ -15,31 +14,38 @@ import type {
   AiModelConfig,
 } from "@/lib/types";
 
-// Define props based on what ChatWrapper passes down (Remove modal props)
+// Update props to receive volatile state directly
 interface PromptWrapperProps {
   className?: string;
+  // Direct volatile state
   error: string | null;
-  // State/Actions for PromptForm
-  promptInputValue: string; // Receive separately
-  setPromptInputValue: (value: string) => void; // Receive separately
-  attachedFiles: File[];
-  selectedVfsPaths: string[];
-  isVfsEnabledForItem: boolean;
   isStreaming: boolean;
+  // Direct Input State/Actions
+  promptInputValue: string;
+  setPromptInputValue: (value: string) => void;
   addAttachedFile: (file: File) => void;
   removeAttachedFile: (fileName: string) => void;
   clearPromptInput: () => void;
+  // Bundled Props (less frequently changing / stable)
+  attachedFiles: File[];
+  selectedVfsPaths: string[];
+  isVfsEnabledForItem: boolean;
   handleSubmitCore: (
-    currentConversationId: string,
-    contentToSendToAI: MessageContent,
-    vfsContextPaths?: string[],
+    prompt: string, // Keep original prompt for potential logging
+    files: File[], // Keep original files
+    vfsPaths: string[], // Keep original VFS paths
+    context: {
+      // Pass processed context
+      selectedItemId: string;
+      contentToSendToAI: MessageContent;
+      vfsContextPaths?: string[];
+    },
   ) => Promise<void>;
   handleImageGenerationCore: (
     currentConversationId: string,
     prompt: string,
   ) => Promise<void>;
   clearSelectedVfsPaths: () => void;
-  // State/Actions for PromptSettings
   selectedProviderId: string | null;
   selectedModelId: string | null;
   dbProviderConfigs: DbProviderConfig[];
@@ -59,10 +65,8 @@ interface PromptWrapperProps {
     id: string,
     changes: Partial<DbProviderConfig>,
   ) => Promise<void>;
-  // Need selectedItemId/Type for PromptForm's submit logic
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
-  // Props needed by children
   setError: (error: string | null) => void;
   removeSelectedVfsPath: (path: string) => void;
   isVfsReady: boolean;
@@ -100,9 +104,9 @@ interface PromptWrapperProps {
 // Wrap component logic in a named function for React.memo
 const PromptWrapperComponent: React.FC<PromptWrapperProps> = ({
   className,
-  error,
+  error, // Direct prop
   // Pass all other props down to PromptForm
-  ...promptFormProps
+  ...promptFormProps // Includes isStreaming, promptInputValue etc.
 }) => {
   return (
     <div className={cn("flex-shrink-0", className)}>
@@ -113,10 +117,12 @@ const PromptWrapperComponent: React.FC<PromptWrapperProps> = ({
         </div>
       )}
       {/* Pass all necessary props down to PromptForm */}
+      {/* PromptForm now receives isStreaming, error, promptInputValue directly */}
       <PromptForm {...promptFormProps} />
     </div>
   );
 };
 
 // Export the memoized component
+// React.memo should be effective as most props are stable or less volatile now
 export const PromptWrapper = React.memo(PromptWrapperComponent);

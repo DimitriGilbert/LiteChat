@@ -44,6 +44,7 @@ interface HistoryItemProps {
 }
 
 // HistoryItem remains largely the same internally, just uses props
+// Keep React.memo for individual items as they are numerous
 const HistoryItem: React.FC<HistoryItemProps> = React.memo(
   ({
     item,
@@ -62,8 +63,6 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
     const [editedName, setEditedName] = useState(currentItemName);
     const inputRef = useRef<HTMLInputElement>(null);
     const nameBeforeEdit = useRef(currentItemName);
-
-    // console.log(`[HistoryItem] Rendering ${item.type} ${item.id}`);
 
     useEffect(() => {
       setIsEditing(startInEditMode);
@@ -93,9 +92,7 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
     const handleSave = useCallback(async () => {
       const trimmedName = editedName.trim();
       if (trimmedName && trimmedName !== nameBeforeEdit.current) {
-        console.log(
-          `HistoryItem: Attempting rename for ${item.type} ${item.id} from "${nameBeforeEdit.current}" to "${trimmedName}"`,
-        );
+        // console.log(`HistoryItem: Attempting rename for ${item.type} ${item.id} from "${nameBeforeEdit.current}" to "${trimmedName}"`);
         try {
           await renameItem(item.id, trimmedName, item.type); // Use prop
           toast.success(
@@ -113,9 +110,7 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
         toast.error("Name cannot be empty.");
         // Keep editing state active
       } else {
-        console.log(
-          `HistoryItem: Rename skipped for ${item.id} (no change or only whitespace)`,
-        );
+        // console.log(`HistoryItem: Rename skipped for ${item.id} (no change or only whitespace)`);
         setIsEditing(false);
         onEditComplete(item.id); // Pass ID
       }
@@ -357,7 +352,7 @@ HistoryItem.displayName = "HistoryItem";
 // Define props based on what ChatSide passes down
 interface ChatHistoryProps {
   className?: string;
-  sidebarItems: SidebarItem[];
+  sidebarItems: SidebarItem[]; // Receive derived items
   editingItemId: string | null;
   selectedItemId: string | null; // Receive selectedItemId for isSelected prop
   onEditComplete: (id: string) => void;
@@ -372,12 +367,12 @@ interface ChatHistoryProps {
   exportConversation: (conversationId: string) => Promise<void>;
 }
 
-// Wrap component logic in a named function for React.memo
+// Re-introduce React.memo as props should be stable now
 const ChatHistoryComponent: React.FC<ChatHistoryProps> = ({
   className,
-  sidebarItems,
+  sidebarItems, // Use the derived prop directly
   editingItemId,
-  selectedItemId, // Use prop
+  selectedItemId,
   onEditComplete,
   // Destructure action props
   selectItem,
@@ -385,26 +380,10 @@ const ChatHistoryComponent: React.FC<ChatHistoryProps> = ({
   renameItem,
   exportConversation,
 }) => {
-  // REMOVED store access
-
-  const prevSidebarItemsRef = React.useRef<SidebarItem[]>();
-
-  // console.log(
-  //   `[ChatHistory] Rendering. Items count: ${sidebarItems.length}. First item ID: ${sidebarItems[0]?.id ?? "N/A"}`
-  // );
-  if (prevSidebarItemsRef.current !== sidebarItems) {
-    // console.log(
-    //   "[ChatHistory] sidebarItems prop reference CHANGED.",
-    //   `Prev: ${prevSidebarItemsRef.current?.[0]?.id ?? "N/A"}`,
-    //   `New: ${sidebarItems[0]?.id ?? "N/A"}`
-    // );
-    prevSidebarItemsRef.current = sidebarItems;
-  } else {
-    // console.log("[ChatHistory] sidebarItems prop reference SAME.");
-  }
-
-  // Use the prop directly
   const itemsToDisplay = sidebarItems;
+  // console.log(
+  //   `[ChatHistory] Rendering. Items count from prop: ${itemsToDisplay.length}`,
+  // ); // Add log
 
   return (
     <ScrollArea className={cn("flex-grow h-0", className)}>
@@ -416,7 +395,7 @@ const ChatHistoryComponent: React.FC<ChatHistoryProps> = ({
         )}
         {itemsToDisplay.map((item) => (
           <HistoryItem
-            key={item.id}
+            key={item.id} // Key ensures React knows which item is which
             item={item}
             isSelected={item.id === selectedItemId} // Use prop
             startInEditMode={item.id === editingItemId} // Use prop

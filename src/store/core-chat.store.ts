@@ -1,27 +1,17 @@
 // src/store/core-chat.store.ts
 import { create } from "zustand";
-import type { Message, MessageContent, DbMessage } from "@/lib/types"; // Keep DbMessage
+import type { Message, MessageContent, DbMessage } from "@/lib/types";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { modEvents, ModEvent } from "@/mods/events";
-import { convertDbMessagesToCoreMessages } from "@/utils/chat-utils";
-import React from "react"; // Needed for MutableRefObject type
-import { db } from "@/lib/db"; // Import Dexie instance
-import { Dexie } from "dexie"; // Import Dexie for Dexie.minKey/maxKey
-
-// --- REMOVE Placeholder Dependencies ---
-// const abortControllerRef: React.MutableRefObject<AbortController | null> = { current: null };
-// const storage = { ... };
-// const aiInteraction = { ... };
-// const getSettings = () => { ... };
-// --- End REMOVE Placeholder Dependencies ---
+import { db } from "@/lib/db";
+import { Dexie } from "dexie";
 
 export interface CoreChatState {
   messages: Message[];
   isLoadingMessages: boolean;
   isStreaming: boolean;
   error: string | null;
-  // AbortController Ref is managed externally
 }
 
 export interface CoreChatActions {

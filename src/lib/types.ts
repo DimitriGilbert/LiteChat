@@ -1,6 +1,10 @@
 // src/lib/types.ts
 import React from "react";
-import type { DbMod, ModInstance } from "@/mods/types";
+// Ensure DbMod and ModInstance are exported from their definition file
+import type {
+  DbMod as ModDbType,
+  ModInstance as ModInstanceType,
+} from "@/mods/types";
 // Import the global fs object to use its type
 import { fs } from "@zenfs/core";
 import type { CoreMessage as AiCoreMessage } from "ai"; // Use alias to avoid naming conflict
@@ -127,6 +131,10 @@ export interface DbProviderConfig extends DbBase {
   modelsLastFetchedAt: Date | null;
   modelSortOrder: string[] | null;
 }
+
+// Re-export DbMod and ModInstance from mods/types
+export type DbMod = ModDbType;
+export type ModInstance = ModInstanceType;
 
 // --- UI & State Types ---
 export interface Message {

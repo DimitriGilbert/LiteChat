@@ -1,5 +1,4 @@
 // src/hooks/ai-interaction/use-ai-interaction.ts
-// REMOVED: import React, { useCallback, useMemo, useRef } from "react";
 import { useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import {
@@ -10,8 +9,6 @@ import {
   TextStreamPart,
 } from "ai";
 import { nanoid } from "nanoid";
-
-// Store Imports (REMOVED - state/actions passed as args)
 
 // Type Imports
 import {
@@ -28,11 +25,7 @@ import {
   TextPart as LocalTextPart,
   ToolCallPart as LocalToolCallPartType,
   ToolResultPart as LocalToolResultPartType,
-  // AiModelConfig, // REMOVED
-  // AiProviderConfig, // REMOVED
-  // DbConversation, // REMOVED
 } from "@/lib/types";
-// REMOVED: import { ReadonlyChatContextSnapshot } from "@/mods/api";
 import { modEvents, ModEvent } from "@/mods/events";
 
 // Helper Imports
@@ -47,10 +40,6 @@ import { mapToCoreMessages } from "./message-mapper";
 import { createSdkTools } from "./tool-handler";
 import { performImageGeneration as performImageGenerationFunc } from "./image-generator"; // Rename imported function
 
-// FIX: Use static imports for provider creation functions (if needed internally, though model instance should be passed in)
-// import { createOpenAI } from "@ai-sdk/openai";
-// ... other provider imports ...
-
 /**
  * Hook for handling AI interactions with streaming, image generation, and tool calling capabilities.
  * Receives necessary state and actions as arguments.
@@ -62,15 +51,13 @@ export function useAiInteraction({
   getApiKeyForProvider,
   streamingThrottleRate,
   setLocalMessages,
-  setIsAiStreaming,
+  setIsAiStreaming, // This is the function passed from the store action
   setError,
   addDbMessage,
   abortControllerRef,
   getContextSnapshotForMod,
   bulkAddMessages,
 }: UseAiInteractionProps): UseAiInteractionReturn {
-  // --- Use props directly instead of store hooks ---
-
   // --- Refs ---
   const contentRef = useRef<string>("");
   const placeholderRef = useRef<{
@@ -82,9 +69,6 @@ export function useAiInteraction({
   } | null>(null);
 
   // --- SDK Tools ---
-  // Mod tools need to be passed in or accessed differently if not using ModStore directly
-  // For now, assume modTools are available via getContextSnapshotForMod or passed separately
-  // This part needs refinement based on how modTools state is managed/passed
   const sdkTools = useMemo(() => {
     // Placeholder: Access modTools differently or pass them as a prop
     const modToolsFromContext = new Map(); // Replace with actual access method
@@ -104,23 +88,22 @@ export function useAiInteraction({
       currentFrequencyPenalty,
       systemPromptToUse,
     }: PerformAiStreamParams) => {
-      // Use props directly
       const currentSelectedModel = selectedModel;
       const currentSelectedProvider = selectedProvider;
-      const apiKey = getApiKeyForProvider(); // Call the passed function
+      const apiKey = getApiKeyForProvider();
 
       const validationError = validateAiParameters(
         conversationIdToUse,
         currentSelectedModel,
         currentSelectedProvider,
         apiKey,
-        setError, // Use passed setter
+        setError,
       );
       if (validationError) throw validationError;
 
       if (!currentSelectedModel?.instance) {
         const errorMsg = "Selected model instance is invalid or not loaded.";
-        setError(errorMsg); // Use passed setter
+        setError(errorMsg);
         toast.error(errorMsg);
         throw new Error(errorMsg);
       }
@@ -130,18 +113,19 @@ export function useAiInteraction({
         const toolError = new Error(
           `Selected model "${currentSelectedModel?.name}" does not support tool calling, but tools are registered.`,
         );
-        setError(toolError.message); // Use passed setter
+        setError(toolError.message);
         toast.error(toolError.message);
         throw toolError;
       }
 
-      setIsAiStreaming(true); // Use passed setter
-      setError(null); // Use passed setter
+      // Directly use the passed setIsAiStreaming function
+      setIsAiStreaming(true);
+      setError(null);
       contentRef.current = "";
       placeholderRef.current = null;
 
       const currentAbortController = new AbortController();
-      abortControllerRef.current = currentAbortController; // Use passed ref
+      abortControllerRef.current = currentAbortController;
 
       const {
         id: assistantMessageId,
@@ -159,14 +143,13 @@ export function useAiInteraction({
         modelId: currentSelectedModel.id,
         conversationId: conversationIdToUse,
       };
-      // Use passed setter (functional update recommended)
       setLocalMessages((prev) => [...prev, assistantPlaceholder]);
 
       const throttledUpdate = createStreamUpdater(
         assistantMessageId,
         contentRef,
-        setLocalMessages, // Use passed setter
-        streamingThrottleRate, // Use passed prop
+        setLocalMessages,
+        streamingThrottleRate,
       );
 
       const messagesForApi = mapToCoreMessages(
@@ -281,10 +264,10 @@ export function useAiInteraction({
               });
             });
 
-            setLocalMessages((prev) => [...prev, ...toolResultMessages]); // Use passed setter
+            setLocalMessages((prev) => [...prev, ...toolResultMessages]);
 
             try {
-              await bulkAddMessages(toolResultDbMessages); // Use passed action
+              await bulkAddMessages(toolResultDbMessages);
               console.log(
                 "Saved tool result messages to DB:",
                 toolResultDbMessages.map((m) => m.id),
@@ -317,25 +300,25 @@ export function useAiInteraction({
             streamError &&
             !streamError.message.startsWith("Streaming error:")
           ) {
-            setError(`Error: ${streamError.message}`); // Use passed setter
+            setError(`Error: ${streamError.message}`);
             toast.error(`Error: ${streamError.message}`);
           }
         }
       } finally {
         console.log("Stream finally block executing.");
         if (abortControllerRef.current === currentAbortController) {
-          abortControllerRef.current = null; // Use passed ref
+          abortControllerRef.current = null;
         }
-        setIsAiStreaming(false); // Use passed setter
+        // Directly use the passed setIsAiStreaming function
+        setIsAiStreaming(false);
 
-        // Finalize UI state using the helper function
         finalizeStreamedMessageUI(
           assistantMessageId,
           contentRef.current,
           streamError,
           finalUsage,
           startTime,
-          setLocalMessages, // Use passed setter
+          setLocalMessages,
         );
 
         const placeholderData = placeholderRef.current;
@@ -385,7 +368,7 @@ export function useAiInteraction({
           };
 
           try {
-            await addDbMessage(dbMessageToSave); // Use passed action
+            await addDbMessage(dbMessageToSave);
             console.log(
               "Saved final assistant message to DB:",
               placeholderData.id,
@@ -393,9 +376,8 @@ export function useAiInteraction({
           } catch (dbErr: unknown) {
             const dbErrorMessage = `Save failed: ${dbErr instanceof Error ? dbErr.message : "Unknown DB error"}`;
             console.error("Failed to save final assistant message:", dbErr);
-            setError(`Error saving response: ${dbErrorMessage}`); // Use passed setter
+            setError(`Error saving response: ${dbErrorMessage}`);
             toast.error(`Failed to save response: ${dbErrorMessage}`);
-            // Update local message with error using passed setter
             setLocalMessages((prev) =>
               prev.map((msg) =>
                 msg.id === placeholderData.id
@@ -412,14 +394,13 @@ export function useAiInteraction({
           console.error(
             `[Finally Block] Critical error: Placeholder data ref was null. Cannot save message. Stream Error: ${streamError || "None"}`,
           );
-          setError("Internal error: Failed to finalize message for saving."); // Use passed setter
+          setError("Internal error: Failed to finalize message for saving.");
           toast.error("Internal error: Failed to finalize message for saving.");
         }
         placeholderRef.current = null;
       }
     },
     [
-      // Depend on props passed into the hook
       selectedModel,
       selectedProvider,
       getApiKeyForProvider,
@@ -429,9 +410,9 @@ export function useAiInteraction({
       setError,
       addDbMessage,
       abortControllerRef,
-      getContextSnapshotForMod,
+      // getContextSnapshotForMod,
       bulkAddMessages,
-      sdkTools, // Include derived sdkTools
+      sdkTools,
     ],
   );
 
@@ -440,7 +421,6 @@ export function useAiInteraction({
     async (
       params: Omit<
         PerformImageGenerationParams,
-        // Omit props that are passed internally by the hook itself
         | "selectedModel"
         | "selectedProvider"
         | "getApiKeyForProvider"
@@ -451,7 +431,6 @@ export function useAiInteraction({
         | "abortControllerRef"
       >,
     ): Promise<PerformImageGenerationResult> => {
-      // Use props passed to the hook
       const currentSelectedModel = selectedModel;
       const currentSelectedProvider = selectedProvider;
       const apiKeyGetter = getApiKeyForProvider;
@@ -461,20 +440,19 @@ export function useAiInteraction({
         selectedModel: currentSelectedModel,
         selectedProvider: currentSelectedProvider,
         getApiKeyForProvider: apiKeyGetter,
-        setLocalMessages: setLocalMessages, // Pass setter
-        setIsAiStreaming: setIsAiStreaming, // Pass setter
-        setError: setError, // Pass setter
-        addDbMessage: addDbMessage, // Pass action
-        abortControllerRef, // Pass ref
+        setLocalMessages: setLocalMessages,
+        setIsAiStreaming: setIsAiStreaming, // Pass the function directly
+        setError: setError,
+        addDbMessage: addDbMessage,
+        abortControllerRef,
       });
     },
     [
-      // Depend on props passed into the hook
       selectedModel,
       selectedProvider,
       getApiKeyForProvider,
       setLocalMessages,
-      setIsAiStreaming,
+      setIsAiStreaming, // Add as dependency
       setError,
       addDbMessage,
       abortControllerRef,

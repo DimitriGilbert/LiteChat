@@ -4,6 +4,7 @@ import type { LiteChatModApi } from "./api";
 import type { Tool, ToolImplementation } from "./tools"; // Import Tool types
 
 // --- Database Schema for Mods ---
+// Ensure this interface is exported
 export interface DbMod {
   id: string;
   name: string;
@@ -15,6 +16,7 @@ export interface DbMod {
 }
 
 // --- Loaded Mod Instance ---
+// Ensure this interface is exported
 export interface ModInstance {
   id: string;
   name: string;

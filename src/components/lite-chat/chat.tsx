@@ -3,23 +3,21 @@ import React, {
   useState,
   useMemo,
   useCallback,
-  useRef,
-  useEffect,
+  // Removed useRef, useEffect
 } from "react";
-// Corrected import: Use ChatProviderInner directly for setup
 import ChatProviderInner from "@/context/chat-provider-inner";
 import { ChatSide } from "./chat/chat-side";
 import { ChatWrapper } from "./chat/chat-wrapper";
-// Import ALL necessary store hooks
-import { useSidebarStore } from "@/store/sidebar.store";
-import { useCoreChatStore } from "@/store/core-chat.store";
-import { useProviderStore } from "@/store/provider.store";
-import { useSettingsStore } from "@/store/settings.store";
-import { useVfsStore } from "@/store/vfs.store";
-import { useModStore } from "@/store/mod.store";
+// Import the main logic hook
+import { useLiteChatLogic } from "@/hooks/use-lite-chat-logic";
+// Import Input Store hook directly
 import { useInputStore } from "@/store/input.store";
-// Import useShallow for Zustand optimization
-import { useShallow } from "zustand/react/shallow";
+// Import Core Chat Store hook directly for volatile state
+import { useCoreChatStore } from "@/store/core-chat.store";
+// Import useChatStorage hook directly for live data
+import { useChatStorage } from "@/hooks/use-chat-storage";
+import { useShallow } from "zustand/react/shallow"; // Keep for input/core stores
+
 import type {
   SidebarItemType,
   LiteChatConfig,
@@ -27,33 +25,20 @@ import type {
   DbProject,
   DbConversation,
   Message,
-  MessageContent,
   DbProviderConfig,
   DbApiKey,
   CustomSettingTab,
-  AiProviderConfig,
   AiModelConfig,
   CustomPromptAction,
   CustomMessageAction,
+  DbMod,
+  ModInstance,
+  ReadonlyChatContextSnapshot,
 } from "@/lib/types";
-import type { DbMod, ModInstance } from "@/mods/types";
 import { cn } from "@/lib/utils";
 import { MenuIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ComponentType } from "react";
-import { useAiInteraction } from "@/hooks/ai-interaction";
-import { convertDbMessagesToCoreMessages } from "@/utils/chat-utils";
-import { nanoid } from "nanoid";
-import { toast } from "sonner";
-import { modEvents, ModEvent } from "@/mods/events";
-import { ReadonlyChatContextSnapshot } from "@/mods/api";
-import { db } from "@/lib/db";
-// Import AI SDK provider functions
-import { createOpenAI } from "@ai-sdk/openai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { createOllama } from "ollama-ai-provider";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 // --- Prop Types for Children ---
 
@@ -108,9 +93,11 @@ export interface SettingsModalTabProps {
 // Renamed FetchStatus locally
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 
+// ChatSideProps: Pass raw data
 export interface ChatSideProps {
   className?: string;
-  sidebarItems: SidebarItem[];
+  dbProjects: DbProject[]; // Pass raw data (stable ref)
+  dbConversations: DbConversation[]; // Pass raw data (stable ref)
   editingItemId: string | null;
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
@@ -138,97 +125,105 @@ export interface ChatSideProps {
   importConversation: (file: File, parentId: string | null) => Promise<void>;
   isSettingsModalOpen: boolean; // Prop for the main modal visibility
   setIsSettingsModalOpen: (isOpen: boolean) => void; // Prop for the main modal setter
-  settingsProps: SettingsModalTabProps; // Pass the bundled props object
+  settingsProps: SettingsModalTabProps; // Pass the bundled props object (stable)
 }
 
-// Updated ChatWrapperProps
-export interface ChatWrapperProps {
+// ChatWrapperProps: Define props passed directly vs bundled
+export interface ChatWrapperDirectProps {
   className?: string;
-  // Input state passed separately
+  // Frequently changing state passed directly
   promptInputValue: string;
+  messages: Message[]; // Volatile state now direct
+  isStreaming: boolean; // Volatile state now direct
+  isLoadingMessages: boolean; // Volatile state now direct
+  error: string | null; // Volatile state now direct
+  // Stable input actions passed directly
   setPromptInputValue: (value: string) => void;
-  // Other props
-  selectedItemId: string | null;
-  selectedItemType: SidebarItemType | null;
-  sidebarItems: SidebarItem[];
-  messages: Message[];
-  isLoadingMessages: boolean;
-  isStreaming: boolean;
-  error: string | null;
-  attachedFiles: File[];
-  selectedVfsPaths: string[];
-  isVfsEnabledForItem: boolean;
-  regenerateMessage: (messageId: string) => Promise<void>;
-  addAttachedFile: (file: File) => void;
+  addAttachedFile: (file: File) => void; // Add file actions here
   removeAttachedFile: (fileName: string) => void;
   clearPromptInput: () => void;
+}
+// ChatWrapperBundledProps: Contains only less frequently changing state and stable actions
+export interface ChatWrapperBundledProps {
+  // Less frequently changing state and stable actions/callbacks
+  selectedItemId: string | null;
+  selectedItemType: SidebarItemType | null;
+  sidebarItems: SidebarItem[]; // Stable ref from useMemo
+  attachedFiles: File[]; // Keep here for PromptFiles display if needed, but actions are direct
+  selectedVfsPaths: string[];
+  isVfsEnabledForItem: boolean;
+  regenerateMessage: (messageId: string) => Promise<void>; // Stable callback from hook
   handleSubmitCore: (
     prompt: string,
     files: File[],
     vfsPaths: string[],
     context: any,
-  ) => Promise<void>; // Updated signature
+  ) => Promise<void>; // Stable callback from hook
   handleImageGenerationCore: (
     currentConversationId: string,
     prompt: string,
-  ) => Promise<void>;
-  clearSelectedVfsPaths: () => void;
+  ) => Promise<void>; // Stable callback from hook
+  clearSelectedVfsPaths: () => void; // Stable action from hook
   selectedProviderId: string | null;
   selectedModelId: string | null;
   dbProviderConfigs: DbProviderConfig[];
   apiKeys: DbApiKey[];
   enableApiKeyManagement: boolean;
-  dbConversations: DbConversation[];
+  dbConversations: DbConversation[]; // Pass live conversations (stable ref from hook)
   createConversation: (
     parentId: string | null,
     title?: string,
-  ) => Promise<string>;
+  ) => Promise<string>; // Stable action from hook
   selectItem: (
     id: string | null,
     type: SidebarItemType | null,
-  ) => Promise<void>;
-  deleteItem: (id: string, type: SidebarItemType) => Promise<void>;
+  ) => Promise<void>; // Stable action from hook
+  deleteItem: (id: string, type: SidebarItemType) => Promise<void>; // Stable action from hook
   updateDbProviderConfig: (
     id: string,
     changes: Partial<DbProviderConfig>,
-  ) => Promise<void>;
+  ) => Promise<void>; // Stable action from hook
   searchTerm: string;
-  setSearchTerm: (term: string) => void;
-  exportConversation: (conversationId: string | null) => Promise<void>;
+  setSearchTerm: (term: string) => void; // Stable action from hook
+  exportConversation: (conversationId: string | null) => Promise<void>; // Stable action from hook
   temperature: number;
-  setTemperature: (temp: number) => void;
+  setTemperature: (temp: number) => void; // Stable action from hook
   topP: number | null;
-  setTopP: (topP: number | null) => void;
+  setTopP: (topP: number | null) => void; // Stable action from hook
   maxTokens: number | null;
-  setMaxTokens: (tokens: number | null) => void;
+  setMaxTokens: (tokens: number | null) => void; // Stable action from hook
   topK: number | null;
-  setTopK: (topK: number | null) => void;
+  setTopK: (topK: number | null) => void; // Stable action from hook
   frequencyPenalty: number | null;
-  setFrequencyPenalty: (penalty: number | null) => void;
+  setFrequencyPenalty: (penalty: number | null) => void; // Stable action from hook
   presencePenalty: number | null;
-  setPresencePenalty: (penalty: number | null) => void;
+  setPresencePenalty: (penalty: number | null) => void; // Stable action from hook
   globalSystemPrompt: string | null;
-  activeConversationData: DbConversation | null;
+  activeConversationData: DbConversation | null; // Derived from live data (stable ref from hook)
   updateConversationSystemPrompt: (
     id: string,
     systemPrompt: string | null,
-  ) => Promise<void>;
+  ) => Promise<void>; // Stable action from hook
   isVfsReady: boolean;
   isVfsLoading: boolean;
   vfsError: string | null;
   vfsKey: string | null;
   enableAdvancedSettings: boolean;
-  setSelectedProviderId: (id: string | null) => void;
-  setSelectedModelId: (id: string | null) => void;
-  toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>;
-  stopStreaming: () => void;
+  setSelectedProviderId: (id: string | null) => void; // Stable action from hook
+  setSelectedModelId: (id: string | null) => void; // Stable action from hook
+  toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>; // Stable action from hook
+  stopStreaming: () => void; // Stable callback from hook
   customPromptActions: CustomPromptAction[];
-  getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
-  selectedModel: AiModelConfig | undefined;
-  setError: (error: string | null) => void;
-  removeSelectedVfsPath: (path: string) => void;
-  modMessageActions: CustomMessageAction[]; // Added
+  getContextSnapshotForMod: () => ReadonlyChatContextSnapshot; // Stable callback from hook
+  selectedModel: AiModelConfig | undefined; // Derived state (stable ref from hook)
+  setError: (error: string | null) => void; // Stable action from hook
+  removeSelectedVfsPath: (path: string) => void; // Stable action from hook
+  modMessageActions: CustomMessageAction[];
 }
+// Combine direct and bundled props for the component's signature
+export type ChatWrapperProps = ChatWrapperDirectProps & {
+  bundledProps: ChatWrapperBundledProps;
+};
 
 // --- LiteChat (Top Level) ---
 interface LiteChatProps {
@@ -261,10 +256,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
     setEditingItemId(id);
   }, []);
 
-  // console.log("[LiteChat] Rendering");
-
   return (
-    // Use ChatProviderInner directly and pass correct prop names
     <ChatProviderInner config={config}>
       <LiteChatInner
         className={className}
@@ -305,53 +297,69 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
   setEditingItemId,
   onEditComplete,
 }) => {
-  // --- Select ALL necessary state and actions from stores ---
-  // Wrap store actions in useCallback where appropriate if passed down directly
-  // Sidebar Store
-  const sidebarActions = useSidebarStore(
-    useShallow((state) => ({
-      selectItem: state.selectItem,
-      createConversation: state.createConversation,
-      createProject: state.createProject,
-      deleteItem: state.deleteItem,
-      renameItem: state.renameItem,
-      exportConversation: state.exportConversation,
-      importConversation: state.importConversation,
-      exportAllConversations: state.exportAllConversations,
-      updateConversationSystemPrompt: state.updateConversationSystemPrompt,
-      toggleVfsEnabledAction: state.toggleVfsEnabled,
-    })),
-  );
+  // --- Get Live Data DIRECTLY from useChatStorage ---
+  // These refs should be stable from useLiveQuery unless data changes
+  const { projects: dbProjects, conversations: dbConversations } =
+    useChatStorage();
+
+  // --- Use the custom hook to get non-volatile logic and state ---
+  // Pass live conversations needed for derivations within the hook
   const {
-    enableSidebar: enableSidebarStore,
+    // State & Actions (excluding input and volatile core state)
+    sidebarActions,
+    coreChatActions, // Keep actions
+    vfsActions,
+    providerActions,
+    settingsActions,
+    modActions,
+    // Selection State
     selectedItemId,
     selectedItemType,
-    dbProjects,
-    dbConversations,
-  } = useSidebarStore(
+    enableSidebar: enableSidebarFromHook,
+    // Other store states (excluding volatile core state)
+    vfsState,
+    providerState,
+    settingsState,
+    modState,
+    // Callbacks
+    clearAllData,
+    getAllAvailableModelDefs,
+    handleFormSubmit,
+    handleImageGenerationWrapper,
+    stopStreaming,
+    regenerateMessage,
+    getContextSnapshotForMod,
+    // Derived State
+    activeConversationData,
+    selectedModel,
+    getApiKeyForProvider,
+  } = useLiteChatLogic({
+    editingItemId,
+    setEditingItemId,
+    onEditComplete,
+    dbConversations, // Pass live data to the hook
+  });
+
+  // --- Get Input State/Actions DIRECTLY from Input Store ---
+  const {
+    promptInputValue,
+    attachedFiles,
+    setPromptInputValue,
+    addAttachedFile,
+    removeAttachedFile,
+    clearPromptInput,
+  } = useInputStore(
     useShallow((state) => ({
-      enableSidebar: state.enableSidebar,
-      selectedItemId: state.selectedItemId,
-      selectedItemType: state.selectedItemType,
-      dbProjects: state.dbProjects,
-      dbConversations: state.dbConversations,
+      promptInputValue: state.promptInputValue,
+      attachedFiles: state.attachedFiles,
+      setPromptInputValue: state.setPromptInputValue,
+      addAttachedFile: state.addAttachedFile,
+      removeAttachedFile: state.removeAttachedFile,
+      clearPromptInput: state.clearPromptInput,
     })),
   );
 
-  // Core Chat Store
-  const coreChatActions = useCoreChatStore(
-    useShallow((state) => ({
-      setMessages: state.setMessages,
-      setIsAiStreaming: state.setIsStreaming,
-      setError: state.setError,
-      addDbMessage: state.addDbMessage,
-      bulkAddMessages: state.bulkAddMessages,
-      handleSubmitCore: state.handleSubmitCore,
-      handleImageGenerationCore: state.handleImageGenerationCore,
-      stopStreamingCore: state.stopStreamingCore,
-      regenerateMessageCore: state.regenerateMessageCore,
-    })),
-  );
+  // --- Get Volatile Core Chat State DIRECTLY from Core Chat Store ---
   const { messages, isLoadingMessages, isStreaming, error } = useCoreChatStore(
     useShallow((state) => ({
       messages: state.messages,
@@ -361,218 +369,9 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     })),
   );
 
-  // Input Store
-  const promptInputValue = useInputStore((state) => state.promptInputValue);
-  const inputActions = useInputStore(
-    useShallow((state) => ({
-      setPromptInputValue: state.setPromptInputValue,
-      addAttachedFile: state.addAttachedFile,
-      removeAttachedFile: state.removeAttachedFile,
-      clearPromptInput: state.clearPromptInput,
-    })),
-  );
-  const attachedFiles = useInputStore((state) => state.attachedFiles);
-
-  // VFS Store
-  const vfsActions = useVfsStore(
-    useShallow((state) => ({
-      clearSelectedVfsPaths: state.clearSelectedVfsPaths,
-      removeSelectedVfsPath: state.removeSelectedVfsPath,
-    })),
-  );
-  const {
-    selectedVfsPaths,
-    isVfsEnabledForItem,
-    isVfsReady,
-    isVfsLoading,
-    vfsError,
-    vfsKey,
-  } = useVfsStore(
-    useShallow((state) => ({
-      selectedVfsPaths: state.selectedVfsPaths,
-      isVfsEnabledForItem: state.isVfsEnabledForItem,
-      isVfsReady: state.isVfsReady,
-      isVfsLoading: state.isVfsLoading,
-      vfsError: state.vfsError,
-      vfsKey: state.vfsKey,
-    })),
-  );
-
-  // Provider Store
-  const providerActions = useProviderStore(
-    useShallow((state) => ({
-      setSelectedProviderId: state.setSelectedProviderId,
-      setSelectedModelId: state.setSelectedModelId,
-      addDbProviderConfig: state.addDbProviderConfig,
-      updateDbProviderConfig: state.updateDbProviderConfig,
-      deleteDbProviderConfig: state.deleteDbProviderConfig,
-      fetchModels: state.fetchModels,
-      addApiKey: state.addApiKey,
-      deleteApiKey: state.deleteApiKey,
-    })),
-  );
-  const {
-    selectedProviderId,
-    selectedModelId,
-    dbProviderConfigs,
-    apiKeys,
-    enableApiKeyManagement,
-    providerFetchStatus,
-  } = useProviderStore(
-    useShallow((state) => ({
-      selectedProviderId: state.selectedProviderId,
-      selectedModelId: state.selectedModelId,
-      dbProviderConfigs: state.dbProviderConfigs,
-      apiKeys: state.apiKeys,
-      enableApiKeyManagement: state.enableApiKeyManagement,
-      providerFetchStatus: state.providerFetchStatus,
-    })),
-  );
-
-  // Settings Store
-  const isSettingsModalOpen = useSettingsStore(
-    (state) => state.isSettingsModalOpen,
-  );
-  const settingsActions = useSettingsStore(
-    useShallow((state) => ({
-      setIsSettingsModalOpen: state.setIsSettingsModalOpen,
-      setSearchTerm: state.setSearchTerm,
-      setTheme: state.setTheme,
-      setTemperature: state.setTemperature,
-      setTopP: state.setTopP,
-      setMaxTokens: state.setMaxTokens,
-      setTopK: state.setTopK,
-      setPresencePenalty: state.setPresencePenalty,
-      setFrequencyPenalty: state.setFrequencyPenalty,
-      setGlobalSystemPrompt: state.setGlobalSystemPrompt,
-    })),
-  );
-  const {
-    searchTerm,
-    theme,
-    enableAdvancedSettings,
-    temperature,
-    topP,
-    maxTokens,
-    topK,
-    presencePenalty,
-    frequencyPenalty,
-    globalSystemPrompt,
-    streamingThrottleRate,
-  } = useSettingsStore(
-    useShallow((state) => ({
-      searchTerm: state.searchTerm,
-      theme: state.theme,
-      enableAdvancedSettings: state.enableAdvancedSettings,
-      temperature: state.temperature,
-      topP: state.topP,
-      maxTokens: state.maxTokens,
-      topK: state.topK,
-      presencePenalty: state.presencePenalty,
-      frequencyPenalty: state.frequencyPenalty,
-      globalSystemPrompt: state.globalSystemPrompt,
-      streamingThrottleRate: state.streamingThrottleRate,
-    })),
-  );
-
-  // Mod Store
-  const modActions = useModStore(
-    useShallow((state) => ({
-      addDbMod: state.addDbMod,
-      updateDbMod: state.updateDbMod,
-      deleteDbMod: state.deleteDbMod,
-    })),
-  );
-  const {
-    dbMods,
-    loadedMods,
-    customSettingsTabs,
-    modPromptActions,
-    modMessageActions,
-  } = useModStore(
-    useShallow((state) => ({
-      dbMods: state.dbMods,
-      loadedMods: state.loadedMods,
-      customSettingsTabs: state.modSettingsTabs,
-      modPromptActions: state.modPromptActions,
-      modMessageActions: state.modMessageActions,
-    })),
-  );
-
-  // --- Memoized Callbacks ---
-  const clearAllData = useCallback(async () => {
-    if (
-      window.confirm(
-        `🚨 ARE YOU ABSOLUTELY SURE? 🚨
-
-This will permanently delete ALL conversations, messages, and stored API keys from your browser. This action cannot be undone.`,
-      )
-    ) {
-      if (
-        window.confirm(
-          `SECOND CONFIRMATION:
-
-Really delete everything? Consider exporting first.`,
-        )
-      ) {
-        try {
-          await Promise.all([
-            db.projects.clear(),
-            db.conversations.clear(),
-            db.messages.clear(),
-            db.apiKeys.clear(),
-            db.mods.clear(),
-            db.providerConfigs.clear(),
-          ]);
-          toast.success("All local data cleared. Reloading the application...");
-          setTimeout(() => window.location.reload(), 1500);
-        } catch (error: unknown) {
-          console.error("Failed to clear all data:", error);
-          const message =
-            error instanceof Error ? error.message : "Unknown error";
-          toast.error(`Failed to clear data: ${message}`);
-        }
-      }
-    }
-  }, []);
-
-  const getAllAvailableModelDefs = useCallback(
-    (providerConfigId: string) => {
-      const config = dbProviderConfigs.find((p) => p.id === providerConfigId);
-      return config?.fetchedModels || [];
-    },
-    [dbProviderConfigs],
-  );
-
-  // --- Apply Theme Effect ---
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.document?.documentElement) {
-      return;
-    }
-    if (import.meta.env.VITEST) {
-      return;
-    }
-    const root = window.document.documentElement;
-    root.classList.remove("light", "dark");
-    let effectiveTheme = theme;
-    if (theme === "system") {
-      effectiveTheme =
-        window.matchMedia &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
-    }
-    root.classList.add(effectiveTheme);
-  }, [theme]);
-
-  // --- Derived State ---
-  const enableSidebar = enableSidebarStore ?? enableSidebarConfig;
-
+  // --- Derive Sidebar Items HERE using DIRECT live data ---
+  // This useMemo depends on the potentially more stable refs from useChatStorage
   const sidebarItems = useMemo(() => {
-    // console.log(
-    //   "[LiteChatInner] Recalculating sidebarItems...",
-    //   `Projects: ${dbProjects?.length ?? 0}, Convos: ${dbConversations?.length ?? 0}`
-    // );
     const allProjects: DbProject[] = dbProjects || [];
     const allConversations: DbConversation[] = dbConversations || [];
     const combinedItems: SidebarItem[] = [
@@ -589,536 +388,220 @@ Really delete everything? Consider exporting first.`,
       (a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
     );
     return combinedItems;
-  }, [dbProjects, dbConversations]);
+  }, [dbProjects, dbConversations]); // Depend only on direct live data refs
 
-  const activeConversationData = useMemo(() => {
-    if (selectedItemType === "conversation" && selectedItemId) {
-      return (
-        dbConversations.find((c: DbConversation) => c.id === selectedItemId) ||
-        null
-      );
-    }
-    return null;
-  }, [selectedItemId, selectedItemType, dbConversations]);
-
-  const getApiKeyForProvider = useCallback(
-    (providerId: string): string | undefined => {
-      const config = dbProviderConfigs.find((p) => p.id === providerId);
-      if (!config || !config.apiKeyId) return undefined;
-      return apiKeys.find((k) => k.id === config.apiKeyId)?.value;
-    },
-    [dbProviderConfigs, apiKeys],
-  );
-
-  const selectedProvider = useMemo((): AiProviderConfig | undefined => {
-    const config = dbProviderConfigs.find((p) => p.id === selectedProviderId);
-    if (!config) return undefined;
-    return {
-      id: config.id,
-      name: config.name,
-      type: config.type,
-      models: [],
-      allAvailableModels: config.fetchedModels || [],
-    };
-  }, [selectedProviderId, dbProviderConfigs]);
-
-  const selectedModel = useMemo((): AiModelConfig | undefined => {
-    if (!selectedProviderId || !selectedModelId) return undefined;
-    const config = dbProviderConfigs.find((p) => p.id === selectedProviderId);
-    if (!config) return undefined;
-    const modelInfo = (config.fetchedModels ?? []).find(
-      (m: { id: string }) => m.id === selectedModelId,
-    );
-    if (!modelInfo) return undefined;
-
-    let modelInstance: any = null;
-    const currentApiKey = getApiKeyForProvider(config.id);
-
-    try {
-      switch (config.type) {
-        case "openai":
-          modelInstance = createOpenAI({ apiKey: currentApiKey })(modelInfo.id);
-          break;
-        case "google":
-          modelInstance = createGoogleGenerativeAI({ apiKey: currentApiKey })(
-            modelInfo.id,
-          );
-          break;
-        case "openrouter":
-          modelInstance = createOpenRouter({ apiKey: currentApiKey })(
-            modelInfo.id,
-          );
-          break;
-        case "ollama":
-          modelInstance = createOllama({
-            baseURL: config.baseURL ?? undefined,
-          })(modelInfo.id);
-          break;
-        case "openai-compatible":
-          if (!config.baseURL) {
-            throw new Error("Base URL required for openai-compatible");
-          }
-          modelInstance = createOpenAICompatible({
-            baseURL: config.baseURL,
-            apiKey: currentApiKey,
-          })(modelInfo.id);
-          break;
-        default:
-          throw new Error(`Unsupported provider type: ${config.type}`);
-      }
-    } catch (e) {
-      console.error(
-        `Failed to instantiate model ${modelInfo.id} for provider ${config.name}:`,
-        e,
-      );
-    }
-
-    const supportsImageGen = config.type === "openai";
-    const supportsTools = ["openai", "google", "openrouter"].includes(
-      config.type,
-    );
-
-    return {
-      id: modelInfo.id,
-      name: modelInfo.name,
-      instance: modelInstance,
-      supportsImageGeneration: supportsImageGen,
-      supportsToolCalling: supportsTools,
-    };
-  }, [
-    selectedProviderId,
-    selectedModelId,
-    dbProviderConfigs,
-    getApiKeyForProvider,
-  ]);
-
-  const getContextSnapshotForMod =
-    useCallback((): ReadonlyChatContextSnapshot => {
-      const currentSettings = useSettingsStore.getState();
-      const currentSidebar = useSidebarStore.getState();
-      const currentVfs = useVfsStore.getState();
-      const currentCore = useCoreChatStore.getState();
-      const currentProvider = useProviderStore.getState();
-
-      let activeSystemPrompt: string | null = null;
-      if (currentSettings.enableAdvancedSettings) {
-        if (currentSidebar.selectedItemType === "conversation") {
-          const convo = currentSidebar.dbConversations.find(
-            (c: DbConversation) => c.id === currentSidebar.selectedItemId,
-          );
-          if (convo?.systemPrompt && convo.systemPrompt.trim() !== "") {
-            activeSystemPrompt = convo.systemPrompt;
-          }
-        }
-        if (
-          !activeSystemPrompt &&
-          currentSettings.globalSystemPrompt &&
-          currentSettings.globalSystemPrompt.trim() !== ""
-        ) {
-          activeSystemPrompt = currentSettings.globalSystemPrompt;
-        }
-      }
-
-      const getApiKeyFunc = (id: string): string | undefined => {
-        const config = currentProvider.dbProviderConfigs.find(
-          (p) => p.id === id,
-        );
-        if (!config || !config.apiKeyId) return undefined;
-        return currentProvider.apiKeys.find((k) => k.id === config.apiKeyId)
-          ?.value;
-      };
-
-      return Object.freeze({
-        selectedItemId: currentSidebar.selectedItemId,
-        selectedItemType: currentSidebar.selectedItemType,
-        messages: currentCore.messages,
-        isStreaming: currentCore.isStreaming,
-        selectedProviderId: currentProvider.selectedProviderId,
-        selectedModelId: currentProvider.selectedModelId,
-        activeSystemPrompt: activeSystemPrompt,
-        temperature: currentSettings.temperature,
-        maxTokens: currentSettings.maxTokens,
-        theme: currentSettings.theme,
-        isVfsEnabledForItem: currentVfs.isVfsEnabledForItem,
-        getApiKeyForProvider: getApiKeyFunc,
-      });
-    }, []);
-
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  const { performAiStream, performImageGeneration } = useAiInteraction({
-    selectedModel,
-    selectedProvider,
-    getApiKeyForProvider: useCallback(
-      () => getApiKeyForProvider(selectedProviderId!),
-      [getApiKeyForProvider, selectedProviderId],
-    ),
-    streamingThrottleRate,
-    setLocalMessages: coreChatActions.setMessages,
-    setIsAiStreaming: coreChatActions.setIsAiStreaming,
-    setError: coreChatActions.setError,
-    addDbMessage: coreChatActions.addDbMessage,
-    abortControllerRef,
-    getContextSnapshotForMod,
-    bulkAddMessages: coreChatActions.bulkAddMessages,
-  });
-
-  // --- Interaction Handlers ---
-  const handleFormSubmit = useCallback(
-    async (prompt: string, files: File[], vfsPaths: string[], context: any) => {
-      try {
-        await coreChatActions.handleSubmitCore(
-          context.selectedItemId!,
-          context.contentToSendToAI,
-          context.vfsContextPaths,
-        );
-        const settings = useSettingsStore.getState();
-        const activeSystemPrompt =
-          getContextSnapshotForMod().activeSystemPrompt;
-        const messagesForApi = convertDbMessagesToCoreMessages(
-          useCoreChatStore.getState().messages,
-        );
-        await performAiStream({
-          conversationIdToUse: context.selectedItemId!,
-          messagesToSend: messagesForApi,
-          currentTemperature: settings.temperature,
-          currentMaxTokens: settings.maxTokens,
-          currentTopP: settings.topP,
-          currentTopK: settings.topK,
-          currentPresencePenalty: settings.presencePenalty,
-          currentFrequencyPenalty: settings.frequencyPenalty,
-          systemPromptToUse: activeSystemPrompt,
-        });
-      } catch (err) {
-        console.error("Error during form submission flow:", err);
-      }
-    },
-    [
-      coreChatActions.handleSubmitCore,
-      performAiStream,
-      getContextSnapshotForMod,
-    ],
-  );
-
-  const handleImageGenerationWrapper = useCallback(
-    async (prompt: string) => {
-      if (!selectedItemId || selectedItemType !== "conversation") {
-        toast.error("No active conversation selected.");
-        return;
-      }
-      try {
-        await coreChatActions.handleImageGenerationCore(selectedItemId, prompt);
-        await performImageGeneration({
-          conversationIdToUse: selectedItemId,
-          prompt: prompt,
-        });
-      } catch (err) {
-        console.error("Error in handleImageGenerationWrapper:", err);
-      }
-    },
-    [
-      selectedItemId,
-      selectedItemType,
-      coreChatActions.handleImageGenerationCore,
-      performImageGeneration,
-    ],
-  );
-
-  const stopStreaming = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    coreChatActions.stopStreamingCore();
-  }, [coreChatActions.stopStreamingCore]);
-
-  const regenerateMessage = useCallback(
-    async (messageId: string) => {
-      try {
-        await coreChatActions.regenerateMessageCore(messageId);
-        const originalMessages = useCoreChatStore.getState().messages;
-        const messageIndex = originalMessages.findIndex(
-          (m) => m.id === messageId,
-        );
-        if (messageIndex <= 0) return;
-        let precedingUserMessageIndex = -1;
-        for (let i = messageIndex - 1; i >= 0; i--) {
-          if (originalMessages[i].role === "user") {
-            precedingUserMessageIndex = i;
-            break;
-          }
-        }
-        if (precedingUserMessageIndex === -1) return;
-        const precedingUserMessage =
-          originalMessages[precedingUserMessageIndex];
-        const conversationId = precedingUserMessage.conversationId;
-        if (!conversationId) return;
-
-        if (
-          typeof precedingUserMessage.content === "string" &&
-          precedingUserMessage.content.startsWith("/imagine ")
-        ) {
-          const imagePrompt = precedingUserMessage.content
-            .substring("/imagine ".length)
-            .trim();
-          if (imagePrompt) {
-            await performImageGeneration({
-              conversationIdToUse: conversationId,
-              prompt: imagePrompt,
-            });
-          } else {
-            coreChatActions.setError(
-              "Cannot regenerate: Invalid image prompt found.",
-            );
-            toast.error("Cannot regenerate: Invalid image prompt found.");
-          }
-        } else {
-          const historyForApi = convertDbMessagesToCoreMessages(
-            originalMessages.slice(0, precedingUserMessageIndex + 1),
-          );
-          const settings = useSettingsStore.getState();
-          const activeSystemPrompt =
-            getContextSnapshotForMod().activeSystemPrompt;
-          await performAiStream({
-            conversationIdToUse: conversationId,
-            messagesToSend: historyForApi,
-            currentTemperature: settings.temperature,
-            currentMaxTokens: settings.maxTokens,
-            currentTopP: settings.topP,
-            currentTopK: settings.topK,
-            currentPresencePenalty: settings.presencePenalty,
-            currentFrequencyPenalty: settings.frequencyPenalty,
-            systemPromptToUse: activeSystemPrompt,
-          });
-        }
-      } catch (err) {
-        console.error("Error during regeneration:", err);
-      }
-    },
-    [
-      coreChatActions.regenerateMessageCore,
-      coreChatActions.setError,
-      performAiStream,
-      performImageGeneration,
-      getContextSnapshotForMod,
-    ],
-  );
+  // --- Derived State (from hook values) ---
+  const enableSidebar = enableSidebarFromHook ?? enableSidebarConfig;
 
   // --- Bundle props for SettingsModal ---
+  // This bundle should be stable as its dependencies are stable actions or less volatile state
   const settingsProps: SettingsModalTabProps = useMemo(
     () => ({
-      theme,
+      theme: settingsState.theme,
       setTheme: settingsActions.setTheme,
-      dbProviderConfigs,
-      apiKeys,
+      dbProviderConfigs: providerState.dbProviderConfigs,
+      apiKeys: providerState.apiKeys,
       addDbProviderConfig: providerActions.addDbProviderConfig,
       updateDbProviderConfig: providerActions.updateDbProviderConfig,
       deleteDbProviderConfig: providerActions.deleteDbProviderConfig,
       fetchModels: providerActions.fetchModels,
-      providerFetchStatus,
+      providerFetchStatus: providerState.providerFetchStatus,
       getAllAvailableModelDefs,
-      globalSystemPrompt,
+      globalSystemPrompt: settingsState.globalSystemPrompt,
       setGlobalSystemPrompt: settingsActions.setGlobalSystemPrompt,
       addApiKey: providerActions.addApiKey,
       deleteApiKey: providerActions.deleteApiKey,
       importConversation: sidebarActions.importConversation,
       exportAllConversations: sidebarActions.exportAllConversations,
       clearAllData,
-      dbMods,
-      loadedMods,
+      dbMods: modState.dbMods,
+      loadedMods: modState.loadedMods,
       addDbMod: modActions.addDbMod,
       updateDbMod: modActions.updateDbMod,
       deleteDbMod: modActions.deleteDbMod,
-      enableAdvancedSettings,
-      enableApiKeyManagement,
-      customSettingsTabs,
+      enableAdvancedSettings: settingsState.enableAdvancedSettings,
+      enableApiKeyManagement: providerState.enableApiKeyManagement,
+      customSettingsTabs: modState.modSettingsTabs,
     }),
     [
-      theme,
+      settingsState.theme,
       settingsActions.setTheme,
-      dbProviderConfigs,
-      apiKeys,
+      providerState.dbProviderConfigs,
+      providerState.apiKeys,
       providerActions.addDbProviderConfig,
       providerActions.updateDbProviderConfig,
       providerActions.deleteDbProviderConfig,
       providerActions.fetchModels,
-      providerFetchStatus,
+      providerState.providerFetchStatus,
       getAllAvailableModelDefs,
-      globalSystemPrompt,
+      settingsState.globalSystemPrompt,
       settingsActions.setGlobalSystemPrompt,
       providerActions.addApiKey,
       providerActions.deleteApiKey,
       sidebarActions.importConversation,
       sidebarActions.exportAllConversations,
       clearAllData,
-      dbMods,
-      loadedMods,
+      modState.dbMods,
+      modState.loadedMods,
       modActions.addDbMod,
       modActions.updateDbMod,
       modActions.deleteDbMod,
-      enableAdvancedSettings,
-      enableApiKeyManagement,
-      customSettingsTabs,
+      settingsState.enableAdvancedSettings,
+      providerState.enableApiKeyManagement,
+      modState.modSettingsTabs,
     ],
   );
 
   // --- Bundle props for WrapperComponent ---
-  const wrapperProps = useMemo(
+  // This bundle should be stable as volatile state is removed
+  // It now depends on the memoized sidebarItems
+  const wrapperBundledProps: ChatWrapperBundledProps = useMemo(
     () => ({
-      className: "h-full",
-      selectedItemId,
-      selectedItemType,
-      sidebarItems,
-      messages,
-      isLoadingMessages,
-      isStreaming,
-      error,
-      attachedFiles,
-      selectedVfsPaths,
-      isVfsEnabledForItem,
-      regenerateMessage,
-      addAttachedFile: inputActions.addAttachedFile,
-      removeAttachedFile: inputActions.removeAttachedFile,
-      clearPromptInput: inputActions.clearPromptInput,
-      handleSubmitCore: handleFormSubmit,
-      handleImageGenerationCore: handleImageGenerationWrapper,
-      clearSelectedVfsPaths: vfsActions.clearSelectedVfsPaths,
-      selectedProviderId,
-      selectedModelId,
-      dbProviderConfigs,
-      apiKeys,
-      enableApiKeyManagement,
-      dbConversations,
-      createConversation: sidebarActions.createConversation,
-      selectItem: sidebarActions.selectItem,
-      deleteItem: sidebarActions.deleteItem,
-      updateDbProviderConfig: providerActions.updateDbProviderConfig,
-      searchTerm,
-      setSearchTerm: settingsActions.setSearchTerm,
-      exportConversation: sidebarActions.exportConversation,
-      temperature,
-      setTemperature: settingsActions.setTemperature,
-      topP,
-      setTopP: settingsActions.setTopP,
-      maxTokens,
-      setMaxTokens: settingsActions.setMaxTokens,
-      topK,
-      setTopK: settingsActions.setTopK,
-      presencePenalty,
-      setPresencePenalty: settingsActions.setPresencePenalty,
-      frequencyPenalty,
-      setFrequencyPenalty: settingsActions.setFrequencyPenalty,
-      globalSystemPrompt,
-      activeConversationData,
+      selectedItemId: selectedItemId,
+      selectedItemType: selectedItemType,
+      sidebarItems, // Use the memoized sidebarItems
+      attachedFiles: attachedFiles, // Pass attachedFiles from input store state (stable ref)
+      selectedVfsPaths: vfsState.selectedVfsPaths,
+      isVfsEnabledForItem: vfsState.isVfsEnabledForItem,
+      regenerateMessage, // Stable callback from hook
+      handleSubmitCore: handleFormSubmit, // Stable callback from hook
+      handleImageGenerationCore: handleImageGenerationWrapper, // Stable callback from hook
+      clearSelectedVfsPaths: vfsActions.clearSelectedVfsPaths, // Stable action from hook
+      selectedProviderId: providerState.selectedProviderId,
+      selectedModelId: providerState.selectedModelId,
+      dbProviderConfigs: providerState.dbProviderConfigs,
+      apiKeys: providerState.apiKeys,
+      enableApiKeyManagement: providerState.enableApiKeyManagement,
+      dbConversations: dbConversations, // Pass live conversations (stable ref from storage)
+      createConversation: sidebarActions.createConversation, // Stable action from hook
+      selectItem: sidebarActions.selectItem, // Stable action from hook
+      deleteItem: sidebarActions.deleteItem, // Stable action from hook
+      updateDbProviderConfig: providerActions.updateDbProviderConfig, // Stable action from hook
+      searchTerm: settingsState.searchTerm,
+      setSearchTerm: settingsActions.setSearchTerm, // Stable action from hook
+      exportConversation: sidebarActions.exportConversation, // Stable action from hook
+      temperature: settingsState.temperature,
+      setTemperature: settingsActions.setTemperature, // Stable action from hook
+      topP: settingsState.topP,
+      setTopP: settingsActions.setTopP, // Stable action from hook
+      maxTokens: settingsState.maxTokens,
+      setMaxTokens: settingsActions.setMaxTokens, // Stable action from hook
+      topK: settingsState.topK,
+      setTopK: settingsActions.setTopK, // Stable action from hook
+      presencePenalty: settingsState.presencePenalty,
+      setPresencePenalty: settingsActions.setPresencePenalty, // Stable action from hook
+      frequencyPenalty: settingsState.frequencyPenalty,
+      setFrequencyPenalty: settingsActions.setFrequencyPenalty, // Stable action from hook
+      globalSystemPrompt: settingsState.globalSystemPrompt,
+      activeConversationData, // Derived state (stable ref from hook)
       updateConversationSystemPrompt:
-        sidebarActions.updateConversationSystemPrompt,
-      isVfsReady,
-      isVfsLoading,
-      vfsError,
-      vfsKey,
-      enableAdvancedSettings,
-      setSelectedProviderId: providerActions.setSelectedProviderId,
-      setSelectedModelId: providerActions.setSelectedModelId,
-      toggleVfsEnabledAction: sidebarActions.toggleVfsEnabledAction,
-      stopStreaming,
-      customPromptActions: modPromptActions,
-      getContextSnapshotForMod,
-      selectedModel,
-      setError: coreChatActions.setError,
-      removeSelectedVfsPath: vfsActions.removeSelectedVfsPath,
-      modMessageActions,
+        sidebarActions.updateConversationSystemPrompt, // Stable action from hook
+      isVfsReady: vfsState.isVfsReady,
+      isVfsLoading: vfsState.isVfsLoading,
+      vfsError: vfsState.vfsError,
+      vfsKey: vfsState.vfsKey,
+      enableAdvancedSettings: settingsState.enableAdvancedSettings,
+      setSelectedProviderId: providerActions.setSelectedProviderId, // Stable action from hook
+      setSelectedModelId: providerActions.setSelectedModelId, // Stable action from hook
+      toggleVfsEnabledAction: sidebarActions.toggleVfsEnabled, // Stable action from hook
+      stopStreaming, // Stable callback from hook
+      customPromptActions: modState.modPromptActions,
+      getContextSnapshotForMod, // Stable callback from hook
+      selectedModel, // Derived state (stable ref from hook)
+      setError: coreChatActions.setError, // Stable action from hook
+      removeSelectedVfsPath: vfsActions.removeSelectedVfsPath, // Stable action from hook
+      modMessageActions: modState.modMessageActions,
     }),
     [
+      // Dependencies are now stable refs or less volatile state
       selectedItemId,
       selectedItemType,
-      sidebarItems,
-      messages,
-      isLoadingMessages,
-      isStreaming,
-      error,
+      sidebarItems, // Depend on memoized items
       attachedFiles,
-      selectedVfsPaths,
-      isVfsEnabledForItem,
+      vfsState.selectedVfsPaths,
+      vfsState.isVfsEnabledForItem,
       regenerateMessage,
-      inputActions.addAttachedFile,
-      inputActions.removeAttachedFile,
-      inputActions.clearPromptInput,
       handleFormSubmit,
       handleImageGenerationWrapper,
       vfsActions.clearSelectedVfsPaths,
-      selectedProviderId,
-      selectedModelId,
-      dbProviderConfigs,
-      apiKeys,
-      enableApiKeyManagement,
-      dbConversations,
+      providerState.selectedProviderId,
+      providerState.selectedModelId,
+      providerState.dbProviderConfigs,
+      providerState.apiKeys,
+      providerState.enableApiKeyManagement,
+      dbConversations, // Depend on direct live data ref
       sidebarActions.createConversation,
       sidebarActions.selectItem,
       sidebarActions.deleteItem,
       providerActions.updateDbProviderConfig,
-      searchTerm,
+      settingsState.searchTerm,
       settingsActions.setSearchTerm,
       sidebarActions.exportConversation,
-      temperature,
+      settingsState.temperature,
       settingsActions.setTemperature,
-      topP,
+      settingsState.topP,
       settingsActions.setTopP,
-      maxTokens,
+      settingsState.maxTokens,
       settingsActions.setMaxTokens,
-      topK,
+      settingsState.topK,
       settingsActions.setTopK,
-      presencePenalty,
+      settingsState.presencePenalty,
       settingsActions.setPresencePenalty,
-      frequencyPenalty,
+      settingsState.frequencyPenalty,
       settingsActions.setFrequencyPenalty,
-      globalSystemPrompt,
+      settingsState.globalSystemPrompt,
       activeConversationData,
       sidebarActions.updateConversationSystemPrompt,
-      isVfsReady,
-      isVfsLoading,
-      vfsError,
-      vfsKey,
-      enableAdvancedSettings,
+      vfsState.isVfsReady,
+      vfsState.isVfsLoading,
+      vfsState.vfsError,
+      vfsState.vfsKey,
+      settingsState.enableAdvancedSettings,
       providerActions.setSelectedProviderId,
       providerActions.setSelectedModelId,
-      sidebarActions.toggleVfsEnabledAction,
+      sidebarActions.toggleVfsEnabled,
       stopStreaming,
-      modPromptActions,
+      modState.modPromptActions,
       getContextSnapshotForMod,
       selectedModel,
       coreChatActions.setError,
       vfsActions.removeSelectedVfsPath,
-      modMessageActions,
+      modState.modMessageActions,
     ],
   );
 
   // --- Bundle props for SideComponent ---
-  const sideProps = useMemo(
+  // This bundle should be stable as its dependencies are stable actions or less volatile state/data
+  const sideProps: ChatSideProps = useMemo(
     () => ({
       className: cn("w-72 flex-shrink-0", "hidden md:flex"),
-      sidebarItems,
+      // Pass direct live data refs to ChatSide
+      dbProjects: dbProjects,
+      dbConversations: dbConversations,
       editingItemId,
-      selectedItemId,
-      selectedItemType,
-      isSettingsModalOpen,
-      setIsSettingsModalOpen: settingsActions.setIsSettingsModalOpen,
-      settingsProps,
-      onEditComplete,
-      setEditingItemId,
-      selectItem: sidebarActions.selectItem,
-      deleteItem: sidebarActions.deleteItem,
-      renameItem: sidebarActions.renameItem,
-      exportConversation: sidebarActions.exportConversation,
-      createConversation: sidebarActions.createConversation,
-      createProject: sidebarActions.createProject,
-      importConversation: sidebarActions.importConversation,
+      selectedItemId: selectedItemId,
+      selectedItemType: selectedItemType,
+      isSettingsModalOpen: settingsState.isSettingsModalOpen,
+      setIsSettingsModalOpen: settingsActions.setIsSettingsModalOpen, // Stable action
+      settingsProps, // Memoized bundle (stable)
+      onEditComplete, // Stable callback from parent
+      setEditingItemId, // Stable callback from parent
+      selectItem: sidebarActions.selectItem, // Stable action
+      deleteItem: sidebarActions.deleteItem, // Stable action
+      renameItem: sidebarActions.renameItem, // Stable action
+      exportConversation: sidebarActions.exportConversation, // Stable action
+      createConversation: sidebarActions.createConversation, // Stable action
+      createProject: sidebarActions.createProject, // Stable action
+      importConversation: sidebarActions.importConversation, // Stable action
     }),
     [
-      sidebarItems,
+      // Depend on direct live data refs and stable state/actions
+      dbProjects,
+      dbConversations,
       editingItemId,
       selectedItemId,
       selectedItemType,
-      isSettingsModalOpen,
+      settingsState.isSettingsModalOpen,
       settingsActions.setIsSettingsModalOpen,
       settingsProps,
       onEditComplete,
@@ -1132,10 +615,6 @@ Really delete everything? Consider exporting first.`,
       sidebarActions.importConversation,
     ],
   );
-
-  // console.log(
-  //   `[LiteChatInner] Rendering. Selected: ${selectedItemType} - ${selectedItemId}`
-  // );
 
   return (
     <div
@@ -1164,11 +643,22 @@ Really delete everything? Consider exporting first.`,
             )}
           </Button>
         )}
-        {/* Pass wrapperProps AND input state separately */}
+        {/* Pass frequently changing props directly, others bundled */}
         <WrapperComponent
-          {...wrapperProps}
+          className="h-full" // Pass className directly if needed
+          // Direct Input State/Actions
           promptInputValue={promptInputValue}
-          setPromptInputValue={inputActions.setPromptInputValue}
+          setPromptInputValue={setPromptInputValue}
+          addAttachedFile={addAttachedFile}
+          removeAttachedFile={removeAttachedFile}
+          clearPromptInput={clearPromptInput}
+          // Direct Core Chat State (Volatile)
+          messages={messages}
+          isStreaming={isStreaming}
+          isLoadingMessages={isLoadingMessages}
+          error={error}
+          // Bundled Props (Stable)
+          bundledProps={wrapperBundledProps} // Pass the memoized bundle
         />
       </div>
     </div>

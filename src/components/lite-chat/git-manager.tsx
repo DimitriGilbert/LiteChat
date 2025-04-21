@@ -74,7 +74,7 @@ export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
 
     checkIfRepo();
     // Re-run if git becomes initialized OR if the underlying VFS key changes
-  }, [git.initialized, currentPath, vfsKey]);
+  }, [git, currentPath, vfsKey]);
 
   // Handlers remain the same, using the git hook instance
   const handleClone = async () => {

@@ -9,7 +9,6 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import type { DbProject } from "@/lib/types";
 import { db } from "@/lib/db"; // Import db instance
 import { toast } from "sonner"; // Import toast
 
