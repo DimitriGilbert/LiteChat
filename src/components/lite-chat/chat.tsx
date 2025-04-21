@@ -48,6 +48,12 @@ import { toast } from "sonner";
 import { modEvents, ModEvent } from "@/mods/events";
 import { ReadonlyChatContextSnapshot } from "@/mods/api";
 import { db } from "@/lib/db";
+// Import AI SDK provider functions
+import { createOpenAI } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createOllama } from "ollama-ai-provider";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 // --- Prop Types for Children ---
 
@@ -132,7 +138,7 @@ export interface ChatSideProps {
   importConversation: (file: File, parentId: string | null) => Promise<void>;
   isSettingsModalOpen: boolean; // Prop for the main modal visibility
   setIsSettingsModalOpen: (isOpen: boolean) => void; // Prop for the main modal setter
-  settingsProps: SettingsModalTabProps;
+  settingsProps: SettingsModalTabProps; // Pass the bundled props object
 }
 
 // Updated ChatWrapperProps
@@ -157,10 +163,11 @@ export interface ChatWrapperProps {
   removeAttachedFile: (fileName: string) => void;
   clearPromptInput: () => void;
   handleSubmitCore: (
-    currentConversationId: string,
-    contentToSendToAI: MessageContent,
-    vfsContextPaths?: string[],
-  ) => Promise<void>;
+    prompt: string,
+    files: File[],
+    vfsPaths: string[],
+    context: any,
+  ) => Promise<void>; // Updated signature
   handleImageGenerationCore: (
     currentConversationId: string,
     prompt: string,
@@ -220,6 +227,7 @@ export interface ChatWrapperProps {
   selectedModel: AiModelConfig | undefined;
   setError: (error: string | null) => void;
   removeSelectedVfsPath: (path: string) => void;
+  modMessageActions: CustomMessageAction[]; // Added
 }
 
 // --- LiteChat (Top Level) ---
@@ -253,7 +261,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
     setEditingItemId(id);
   }, []);
 
-  console.log("[LiteChat] Rendering");
+  // console.log("[LiteChat] Rendering");
 
   return (
     // Use ChatProviderInner directly and pass correct prop names
@@ -298,30 +306,10 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
   onEditComplete,
 }) => {
   // --- Select ALL necessary state and actions from stores ---
+  // Wrap store actions in useCallback where appropriate if passed down directly
   // Sidebar Store
-  const {
-    enableSidebar: enableSidebarStore,
-    selectedItemId,
-    selectedItemType,
-    dbProjects,
-    dbConversations,
-    selectItem,
-    createConversation,
-    createProject,
-    deleteItem,
-    renameItem,
-    exportConversation,
-    importConversation,
-    exportAllConversations,
-    updateConversationSystemPrompt,
-    toggleVfsEnabledAction,
-  } = useSidebarStore(
+  const sidebarActions = useSidebarStore(
     useShallow((state) => ({
-      enableSidebar: state.enableSidebar,
-      selectedItemId: state.selectedItemId,
-      selectedItemType: state.selectedItemType,
-      dbProjects: state.dbProjects,
-      dbConversations: state.dbConversations,
       selectItem: state.selectItem,
       createConversation: state.createConversation,
       createProject: state.createProject,
@@ -334,203 +322,197 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       toggleVfsEnabledAction: state.toggleVfsEnabled,
     })),
   );
-
-  // Core Chat Store
   const {
-    messages,
-    setMessages,
-    isLoadingMessages,
-    isStreaming,
-    setIsAiStreaming,
-    error,
-    setError,
-    addDbMessage,
-    bulkAddMessages,
-    addLocalMessage,
-    removeMessage,
-    deleteDbMessage,
-    handleSubmitCore,
-    handleImageGenerationCore,
-  } = useCoreChatStore(
+    enableSidebar: enableSidebarStore,
+    selectedItemId,
+    selectedItemType,
+    dbProjects,
+    dbConversations,
+  } = useSidebarStore(
     useShallow((state) => ({
-      messages: state.messages,
-      setMessages: state.setMessages,
-      isLoadingMessages: state.isLoadingMessages,
-      isStreaming: state.isStreaming,
-      setIsAiStreaming: state.setIsStreaming,
-      error: state.error,
-      setError: state.setError,
-      addDbMessage: state.addDbMessage,
-      bulkAddMessages: state.bulkAddMessages,
-      addLocalMessage: state.addMessage,
-      removeMessage: state.removeMessage,
-      deleteDbMessage: state.deleteDbMessage,
-      handleSubmitCore: state.handleSubmitCore,
-      handleImageGenerationCore: state.handleImageGenerationCore,
+      enableSidebar: state.enableSidebar,
+      selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType,
+      dbProjects: state.dbProjects,
+      dbConversations: state.dbConversations,
     })),
   );
 
-  // Input Store (Get value and setter separately)
-  const promptInputValue = useInputStore((state) => state.promptInputValue);
-  const setPromptInputValue = useInputStore(
-    (state) => state.setPromptInputValue,
-  );
-  const {
-    attachedFiles,
-    addAttachedFile,
-    removeAttachedFile,
-    clearPromptInput,
-  } = useInputStore(
+  // Core Chat Store
+  const coreChatActions = useCoreChatStore(
     useShallow((state) => ({
-      attachedFiles: state.attachedFiles,
+      setMessages: state.setMessages,
+      setIsAiStreaming: state.setIsStreaming,
+      setError: state.setError,
+      addDbMessage: state.addDbMessage,
+      bulkAddMessages: state.bulkAddMessages,
+      handleSubmitCore: state.handleSubmitCore,
+      handleImageGenerationCore: state.handleImageGenerationCore,
+      stopStreamingCore: state.stopStreamingCore,
+      regenerateMessageCore: state.regenerateMessageCore,
+    })),
+  );
+  const { messages, isLoadingMessages, isStreaming, error } = useCoreChatStore(
+    useShallow((state) => ({
+      messages: state.messages,
+      isLoadingMessages: state.isLoadingMessages,
+      isStreaming: state.isStreaming,
+      error: state.error,
+    })),
+  );
+
+  // Input Store
+  const promptInputValue = useInputStore((state) => state.promptInputValue);
+  const inputActions = useInputStore(
+    useShallow((state) => ({
+      setPromptInputValue: state.setPromptInputValue,
       addAttachedFile: state.addAttachedFile,
       removeAttachedFile: state.removeAttachedFile,
       clearPromptInput: state.clearPromptInput,
     })),
   );
+  const attachedFiles = useInputStore((state) => state.attachedFiles);
 
   // VFS Store
+  const vfsActions = useVfsStore(
+    useShallow((state) => ({
+      clearSelectedVfsPaths: state.clearSelectedVfsPaths,
+      removeSelectedVfsPath: state.removeSelectedVfsPath,
+    })),
+  );
   const {
     selectedVfsPaths,
-    clearSelectedVfsPaths,
     isVfsEnabledForItem,
     isVfsReady,
     isVfsLoading,
     vfsError,
     vfsKey,
-    removeSelectedVfsPath,
   } = useVfsStore(
     useShallow((state) => ({
       selectedVfsPaths: state.selectedVfsPaths,
-      clearSelectedVfsPaths: state.clearSelectedVfsPaths,
       isVfsEnabledForItem: state.isVfsEnabledForItem,
       isVfsReady: state.isVfsReady,
       isVfsLoading: state.isVfsLoading,
       vfsError: state.vfsError,
       vfsKey: state.vfsKey,
-      removeSelectedVfsPath: state.removeSelectedVfsPath,
     })),
   );
 
   // Provider Store
-  const {
-    selectedProviderId,
-    setSelectedProviderId,
-    selectedModelId,
-    setSelectedModelId,
-    dbProviderConfigs,
-    apiKeys,
-    enableApiKeyManagement,
-    addDbProviderConfig,
-    updateDbProviderConfig,
-    deleteDbProviderConfig,
-    fetchModels,
-    providerFetchStatus,
-    addApiKey,
-    deleteApiKey,
-  } = useProviderStore(
+  const providerActions = useProviderStore(
     useShallow((state) => ({
-      selectedProviderId: state.selectedProviderId,
       setSelectedProviderId: state.setSelectedProviderId,
-      selectedModelId: state.selectedModelId,
       setSelectedModelId: state.setSelectedModelId,
-      dbProviderConfigs: state.dbProviderConfigs,
-      apiKeys: state.apiKeys,
-      enableApiKeyManagement: state.enableApiKeyManagement,
       addDbProviderConfig: state.addDbProviderConfig,
       updateDbProviderConfig: state.updateDbProviderConfig,
       deleteDbProviderConfig: state.deleteDbProviderConfig,
       fetchModels: state.fetchModels,
-      providerFetchStatus: state.providerFetchStatus,
       addApiKey: state.addApiKey,
       deleteApiKey: state.deleteApiKey,
     })),
   );
+  const {
+    selectedProviderId,
+    selectedModelId,
+    dbProviderConfigs,
+    apiKeys,
+    enableApiKeyManagement,
+    providerFetchStatus,
+  } = useProviderStore(
+    useShallow((state) => ({
+      selectedProviderId: state.selectedProviderId,
+      selectedModelId: state.selectedModelId,
+      dbProviderConfigs: state.dbProviderConfigs,
+      apiKeys: state.apiKeys,
+      enableApiKeyManagement: state.enableApiKeyManagement,
+      providerFetchStatus: state.providerFetchStatus,
+    })),
+  );
 
-  // Settings Store (Get modal state separately)
+  // Settings Store
   const isSettingsModalOpen = useSettingsStore(
     (state) => state.isSettingsModalOpen,
   );
-  const setIsSettingsModalOpen = useSettingsStore(
-    (state) => state.setIsSettingsModalOpen,
+  const settingsActions = useSettingsStore(
+    useShallow((state) => ({
+      setIsSettingsModalOpen: state.setIsSettingsModalOpen,
+      setSearchTerm: state.setSearchTerm,
+      setTheme: state.setTheme,
+      setTemperature: state.setTemperature,
+      setTopP: state.setTopP,
+      setMaxTokens: state.setMaxTokens,
+      setTopK: state.setTopK,
+      setPresencePenalty: state.setPresencePenalty,
+      setFrequencyPenalty: state.setFrequencyPenalty,
+      setGlobalSystemPrompt: state.setGlobalSystemPrompt,
+    })),
   );
   const {
     searchTerm,
-    setSearchTerm,
     theme,
-    setTheme,
     enableAdvancedSettings,
     temperature,
-    setTemperature,
     topP,
-    setTopP,
     maxTokens,
-    setMaxTokens,
     topK,
-    setTopK,
     presencePenalty,
-    setPresencePenalty,
     frequencyPenalty,
-    setFrequencyPenalty,
     globalSystemPrompt,
-    setGlobalSystemPrompt,
     streamingThrottleRate,
   } = useSettingsStore(
     useShallow((state) => ({
       searchTerm: state.searchTerm,
-      setSearchTerm: state.setSearchTerm,
       theme: state.theme,
-      setTheme: state.setTheme,
       enableAdvancedSettings: state.enableAdvancedSettings,
       temperature: state.temperature,
-      setTemperature: state.setTemperature,
       topP: state.topP,
-      setTopP: state.setTopP,
       maxTokens: state.maxTokens,
-      setMaxTokens: state.setMaxTokens,
       topK: state.topK,
-      setTopK: state.setTopK,
       presencePenalty: state.presencePenalty,
-      setPresencePenalty: state.setPresencePenalty,
       frequencyPenalty: state.frequencyPenalty,
-      setFrequencyPenalty: state.setFrequencyPenalty,
       globalSystemPrompt: state.globalSystemPrompt,
-      setGlobalSystemPrompt: state.setGlobalSystemPrompt,
       streamingThrottleRate: state.streamingThrottleRate,
     })),
   );
 
   // Mod Store
+  const modActions = useModStore(
+    useShallow((state) => ({
+      addDbMod: state.addDbMod,
+      updateDbMod: state.updateDbMod,
+      deleteDbMod: state.deleteDbMod,
+    })),
+  );
   const {
     dbMods,
     loadedMods,
-    addDbMod,
-    updateDbMod,
-    deleteDbMod,
     customSettingsTabs,
     modPromptActions,
+    modMessageActions,
   } = useModStore(
     useShallow((state) => ({
       dbMods: state.dbMods,
       loadedMods: state.loadedMods,
-      addDbMod: state.addDbMod,
-      updateDbMod: state.updateDbMod,
-      deleteDbMod: state.deleteDbMod,
       customSettingsTabs: state.modSettingsTabs,
       modPromptActions: state.modPromptActions,
+      modMessageActions: state.modMessageActions,
     })),
   );
 
-  // Placeholder for clearAllData action
+  // --- Memoized Callbacks ---
   const clearAllData = useCallback(async () => {
     if (
       window.confirm(
-        "🚨 ARE YOU ABSOLUTELY SURE? 🚨\n\nThis will permanently delete ALL conversations, messages, and stored API keys from your browser. This action cannot be undone.",
+        `🚨 ARE YOU ABSOLUTELY SURE? 🚨
+
+This will permanently delete ALL conversations, messages, and stored API keys from your browser. This action cannot be undone.`,
       )
     ) {
       if (
         window.confirm(
-          "SECOND CONFIRMATION:\n\nReally delete everything? Consider exporting first.",
+          `SECOND CONFIRMATION:
+
+Really delete everything? Consider exporting first.`,
         )
       ) {
         try {
@@ -554,7 +536,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     }
   }, []);
 
-  // Placeholder for getAllAvailableModelDefs
   const getAllAvailableModelDefs = useCallback(
     (providerConfigId: string) => {
       const config = dbProviderConfigs.find((p) => p.id === providerConfigId);
@@ -588,10 +569,10 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
   const enableSidebar = enableSidebarStore ?? enableSidebarConfig;
 
   const sidebarItems = useMemo(() => {
-    console.log(
-      "[LiteChatInner] Recalculating sidebarItems...",
-      `Projects: ${dbProjects?.length ?? 0}, Convos: ${dbConversations?.length ?? 0}`,
-    );
+    // console.log(
+    //   "[LiteChatInner] Recalculating sidebarItems...",
+    //   `Projects: ${dbProjects?.length ?? 0}, Convos: ${dbConversations?.length ?? 0}`
+    // );
     const allProjects: DbProject[] = dbProjects || [];
     const allConversations: DbConversation[] = dbConversations || [];
     const combinedItems: SidebarItem[] = [
@@ -620,7 +601,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     return null;
   }, [selectedItemId, selectedItemType, dbConversations]);
 
-  // Derive selectedProvider and selectedModel (needed for useAiInteraction)
   const getApiKeyForProvider = useCallback(
     (providerId: string): string | undefined => {
       const config = dbProviderConfigs.find((p) => p.id === providerId);
@@ -643,19 +623,48 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
   }, [selectedProviderId, dbProviderConfigs]);
 
   const selectedModel = useMemo((): AiModelConfig | undefined => {
-    if (!selectedProvider || !selectedModelId) return undefined;
+    if (!selectedProviderId || !selectedModelId) return undefined;
     const config = dbProviderConfigs.find((p) => p.id === selectedProviderId);
     if (!config) return undefined;
     const modelInfo = (config.fetchedModels ?? []).find(
       (m: { id: string }) => m.id === selectedModelId,
     );
     if (!modelInfo) return undefined;
+
     let modelInstance: any = null;
+    const currentApiKey = getApiKeyForProvider(config.id);
+
     try {
-      switch (
-        config.type
-        // ... (model instantiation logic as before) ...
-      ) {
+      switch (config.type) {
+        case "openai":
+          modelInstance = createOpenAI({ apiKey: currentApiKey })(modelInfo.id);
+          break;
+        case "google":
+          modelInstance = createGoogleGenerativeAI({ apiKey: currentApiKey })(
+            modelInfo.id,
+          );
+          break;
+        case "openrouter":
+          modelInstance = createOpenRouter({ apiKey: currentApiKey })(
+            modelInfo.id,
+          );
+          break;
+        case "ollama":
+          modelInstance = createOllama({
+            baseURL: config.baseURL ?? undefined,
+          })(modelInfo.id);
+          break;
+        case "openai-compatible":
+          if (!config.baseURL) {
+            throw new Error("Base URL required for openai-compatible");
+          }
+          modelInstance = createOpenAICompatible({
+            baseURL: config.baseURL,
+            apiKey: currentApiKey,
+          })(modelInfo.id);
+          break;
+        default:
+          throw new Error(`Unsupported provider type: ${config.type}`);
       }
     } catch (e) {
       console.error(
@@ -663,10 +672,12 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
         e,
       );
     }
+
     const supportsImageGen = config.type === "openai";
     const supportsTools = ["openai", "google", "openrouter"].includes(
       config.type,
     );
+
     return {
       id: modelInfo.id,
       name: modelInfo.name,
@@ -675,13 +686,12 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       supportsToolCalling: supportsTools,
     };
   }, [
-    selectedProvider,
+    selectedProviderId,
     selectedModelId,
     dbProviderConfigs,
-    selectedProviderId,
+    getApiKeyForProvider,
   ]);
 
-  // --- Context Snapshot Function ---
   const getContextSnapshotForMod =
     useCallback((): ReadonlyChatContextSnapshot => {
       const currentSettings = useSettingsStore.getState();
@@ -734,10 +744,8 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       });
     }, []);
 
-  // --- Abort Controller Ref (Managed here) ---
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // --- Instantiate useAiInteraction Hook ---
   const { performAiStream, performImageGeneration } = useAiInteraction({
     selectedModel,
     selectedProvider,
@@ -746,106 +754,33 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       [getApiKeyForProvider, selectedProviderId],
     ),
     streamingThrottleRate,
-    setLocalMessages: setMessages,
-    setIsAiStreaming: setIsAiStreaming,
-    setError: setError,
-    addDbMessage: addDbMessage,
+    setLocalMessages: coreChatActions.setMessages,
+    setIsAiStreaming: coreChatActions.setIsAiStreaming,
+    setError: coreChatActions.setError,
+    addDbMessage: coreChatActions.addDbMessage,
     abortControllerRef,
     getContextSnapshotForMod,
-    bulkAddMessages: bulkAddMessages,
+    bulkAddMessages: coreChatActions.bulkAddMessages,
   });
 
-  // --- Interaction Handlers (Now use the hook results) ---
-
-  const handleImageGenerationWrapper = useCallback(
-    async (prompt: string) => {
-      if (!selectedItemId || selectedItemType !== "conversation") {
-        toast.error("No active conversation selected.");
-        return;
-      }
-      // Call core action first to save user message
+  // --- Interaction Handlers ---
+  const handleFormSubmit = useCallback(
+    async (prompt: string, files: File[], vfsPaths: string[], context: any) => {
       try {
-        await handleImageGenerationCore(selectedItemId, prompt);
-        // Then trigger the AI interaction
-        await performImageGeneration({
-          conversationIdToUse: selectedItemId,
-          prompt: prompt,
-        });
-      } catch (err) {
-        // Error handled by core action or performImageGeneration
-        console.error("Error in handleImageGenerationWrapper:", err);
-      }
-    },
-    [
-      selectedItemId,
-      selectedItemType,
-      handleImageGenerationCore,
-      performImageGeneration,
-    ],
-  );
-
-  const stopStreaming = useCallback(() => {
-    // Manage the AbortController here
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    // Call the store action to update state
-    useCoreChatStore.getState().stopStreamingCore();
-  }, []);
-
-  const regenerateMessage = useCallback(
-    async (messageId: string) => {
-      // 1. Call core action to delete message and prepare state
-      await useCoreChatStore.getState().regenerateMessageCore(messageId);
-
-      // 2. Determine if it was text or image based on *original* preceding message
-      // (Need to get messages *before* deletion from core store state)
-      const originalMessages = useCoreChatStore.getState().messages; // Get state *before* deletion happened in regenerateMessageCore
-      const messageIndex = originalMessages.findIndex(
-        (m) => m.id === messageId,
-      );
-      if (messageIndex <= 0) return; // Should not happen if core action succeeded
-
-      let precedingUserMessageIndex = -1;
-      for (let i = messageIndex - 1; i >= 0; i--) {
-        if (originalMessages[i].role === "user") {
-          precedingUserMessageIndex = i;
-          break;
-        }
-      }
-      if (precedingUserMessageIndex === -1) return;
-      const precedingUserMessage = originalMessages[precedingUserMessageIndex];
-      const conversationId = precedingUserMessage.conversationId;
-      if (!conversationId) return;
-
-      // 3. Trigger the appropriate AI interaction hook function
-      if (
-        typeof precedingUserMessage.content === "string" &&
-        precedingUserMessage.content.startsWith("/imagine ")
-      ) {
-        const imagePrompt = precedingUserMessage.content
-          .substring("/imagine ".length)
-          .trim();
-        if (imagePrompt) {
-          await performImageGeneration({
-            conversationIdToUse: conversationId,
-            prompt: imagePrompt,
-          });
-        } else {
-          setError("Cannot regenerate: Invalid image prompt found.");
-          toast.error("Cannot regenerate: Invalid image prompt found.");
-        }
-      } else {
-        const historyForApi = convertDbMessagesToCoreMessages(
-          originalMessages.slice(0, precedingUserMessageIndex + 1),
+        await coreChatActions.handleSubmitCore(
+          context.selectedItemId!,
+          context.contentToSendToAI,
+          context.vfsContextPaths,
         );
         const settings = useSettingsStore.getState();
         const activeSystemPrompt =
           getContextSnapshotForMod().activeSystemPrompt;
+        const messagesForApi = convertDbMessagesToCoreMessages(
+          useCoreChatStore.getState().messages,
+        );
         await performAiStream({
-          conversationIdToUse: conversationId,
-          messagesToSend: historyForApi,
+          conversationIdToUse: context.selectedItemId!,
+          messagesToSend: messagesForApi,
           currentTemperature: settings.temperature,
           currentMaxTokens: settings.maxTokens,
           currentTopP: settings.topP,
@@ -854,13 +789,118 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
           currentFrequencyPenalty: settings.frequencyPenalty,
           systemPromptToUse: activeSystemPrompt,
         });
+      } catch (err) {
+        console.error("Error during form submission flow:", err);
       }
     },
     [
+      coreChatActions.handleSubmitCore,
+      performAiStream,
+      getContextSnapshotForMod,
+    ],
+  );
+
+  const handleImageGenerationWrapper = useCallback(
+    async (prompt: string) => {
+      if (!selectedItemId || selectedItemType !== "conversation") {
+        toast.error("No active conversation selected.");
+        return;
+      }
+      try {
+        await coreChatActions.handleImageGenerationCore(selectedItemId, prompt);
+        await performImageGeneration({
+          conversationIdToUse: selectedItemId,
+          prompt: prompt,
+        });
+      } catch (err) {
+        console.error("Error in handleImageGenerationWrapper:", err);
+      }
+    },
+    [
+      selectedItemId,
+      selectedItemType,
+      coreChatActions.handleImageGenerationCore,
+      performImageGeneration,
+    ],
+  );
+
+  const stopStreaming = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    coreChatActions.stopStreamingCore();
+  }, [coreChatActions.stopStreamingCore]);
+
+  const regenerateMessage = useCallback(
+    async (messageId: string) => {
+      try {
+        await coreChatActions.regenerateMessageCore(messageId);
+        const originalMessages = useCoreChatStore.getState().messages;
+        const messageIndex = originalMessages.findIndex(
+          (m) => m.id === messageId,
+        );
+        if (messageIndex <= 0) return;
+        let precedingUserMessageIndex = -1;
+        for (let i = messageIndex - 1; i >= 0; i--) {
+          if (originalMessages[i].role === "user") {
+            precedingUserMessageIndex = i;
+            break;
+          }
+        }
+        if (precedingUserMessageIndex === -1) return;
+        const precedingUserMessage =
+          originalMessages[precedingUserMessageIndex];
+        const conversationId = precedingUserMessage.conversationId;
+        if (!conversationId) return;
+
+        if (
+          typeof precedingUserMessage.content === "string" &&
+          precedingUserMessage.content.startsWith("/imagine ")
+        ) {
+          const imagePrompt = precedingUserMessage.content
+            .substring("/imagine ".length)
+            .trim();
+          if (imagePrompt) {
+            await performImageGeneration({
+              conversationIdToUse: conversationId,
+              prompt: imagePrompt,
+            });
+          } else {
+            coreChatActions.setError(
+              "Cannot regenerate: Invalid image prompt found.",
+            );
+            toast.error("Cannot regenerate: Invalid image prompt found.");
+          }
+        } else {
+          const historyForApi = convertDbMessagesToCoreMessages(
+            originalMessages.slice(0, precedingUserMessageIndex + 1),
+          );
+          const settings = useSettingsStore.getState();
+          const activeSystemPrompt =
+            getContextSnapshotForMod().activeSystemPrompt;
+          await performAiStream({
+            conversationIdToUse: conversationId,
+            messagesToSend: historyForApi,
+            currentTemperature: settings.temperature,
+            currentMaxTokens: settings.maxTokens,
+            currentTopP: settings.topP,
+            currentTopK: settings.topK,
+            currentPresencePenalty: settings.presencePenalty,
+            currentFrequencyPenalty: settings.frequencyPenalty,
+            systemPromptToUse: activeSystemPrompt,
+          });
+        }
+      } catch (err) {
+        console.error("Error during regeneration:", err);
+      }
+    },
+    [
+      coreChatActions.regenerateMessageCore,
+      coreChatActions.setError,
       performAiStream,
       performImageGeneration,
       getContextSnapshotForMod,
-      setError,
     ],
   );
 
@@ -868,54 +908,54 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
   const settingsProps: SettingsModalTabProps = useMemo(
     () => ({
       theme,
-      setTheme,
+      setTheme: settingsActions.setTheme,
       dbProviderConfigs,
       apiKeys,
-      addDbProviderConfig,
-      updateDbProviderConfig,
-      deleteDbProviderConfig,
-      fetchModels,
+      addDbProviderConfig: providerActions.addDbProviderConfig,
+      updateDbProviderConfig: providerActions.updateDbProviderConfig,
+      deleteDbProviderConfig: providerActions.deleteDbProviderConfig,
+      fetchModels: providerActions.fetchModels,
       providerFetchStatus,
       getAllAvailableModelDefs,
       globalSystemPrompt,
-      setGlobalSystemPrompt,
-      addApiKey,
-      deleteApiKey,
-      importConversation,
-      exportAllConversations,
+      setGlobalSystemPrompt: settingsActions.setGlobalSystemPrompt,
+      addApiKey: providerActions.addApiKey,
+      deleteApiKey: providerActions.deleteApiKey,
+      importConversation: sidebarActions.importConversation,
+      exportAllConversations: sidebarActions.exportAllConversations,
       clearAllData,
       dbMods,
       loadedMods,
-      addDbMod,
-      updateDbMod,
-      deleteDbMod,
+      addDbMod: modActions.addDbMod,
+      updateDbMod: modActions.updateDbMod,
+      deleteDbMod: modActions.deleteDbMod,
       enableAdvancedSettings,
       enableApiKeyManagement,
       customSettingsTabs,
     }),
     [
       theme,
-      setTheme,
+      settingsActions.setTheme,
       dbProviderConfigs,
       apiKeys,
-      addDbProviderConfig,
-      updateDbProviderConfig,
-      deleteDbProviderConfig,
-      fetchModels,
+      providerActions.addDbProviderConfig,
+      providerActions.updateDbProviderConfig,
+      providerActions.deleteDbProviderConfig,
+      providerActions.fetchModels,
       providerFetchStatus,
       getAllAvailableModelDefs,
       globalSystemPrompt,
-      setGlobalSystemPrompt,
-      addApiKey,
-      deleteApiKey,
-      importConversation,
-      exportAllConversations,
+      settingsActions.setGlobalSystemPrompt,
+      providerActions.addApiKey,
+      providerActions.deleteApiKey,
+      sidebarActions.importConversation,
+      sidebarActions.exportAllConversations,
       clearAllData,
       dbMods,
       loadedMods,
-      addDbMod,
-      updateDbMod,
-      deleteDbMod,
+      modActions.addDbMod,
+      modActions.updateDbMod,
+      modActions.deleteDbMod,
       enableAdvancedSettings,
       enableApiKeyManagement,
       customSettingsTabs,
@@ -923,7 +963,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
   );
 
   // --- Bundle props for WrapperComponent ---
-  // Memoize wrapperProps *without* promptInputValue/setter
   const wrapperProps = useMemo(
     () => ({
       className: "h-full",
@@ -938,54 +977,56 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       selectedVfsPaths,
       isVfsEnabledForItem,
       regenerateMessage,
-      addAttachedFile,
-      removeAttachedFile,
-      clearPromptInput,
-      handleSubmitCore,
-      handleImageGenerationCore,
-      clearSelectedVfsPaths,
+      addAttachedFile: inputActions.addAttachedFile,
+      removeAttachedFile: inputActions.removeAttachedFile,
+      clearPromptInput: inputActions.clearPromptInput,
+      handleSubmitCore: handleFormSubmit,
+      handleImageGenerationCore: handleImageGenerationWrapper,
+      clearSelectedVfsPaths: vfsActions.clearSelectedVfsPaths,
       selectedProviderId,
       selectedModelId,
       dbProviderConfigs,
       apiKeys,
       enableApiKeyManagement,
       dbConversations,
-      createConversation,
-      selectItem,
-      deleteItem,
-      updateDbProviderConfig,
+      createConversation: sidebarActions.createConversation,
+      selectItem: sidebarActions.selectItem,
+      deleteItem: sidebarActions.deleteItem,
+      updateDbProviderConfig: providerActions.updateDbProviderConfig,
       searchTerm,
-      setSearchTerm,
-      exportConversation,
+      setSearchTerm: settingsActions.setSearchTerm,
+      exportConversation: sidebarActions.exportConversation,
       temperature,
-      setTemperature,
+      setTemperature: settingsActions.setTemperature,
       topP,
-      setTopP,
+      setTopP: settingsActions.setTopP,
       maxTokens,
-      setMaxTokens,
+      setMaxTokens: settingsActions.setMaxTokens,
       topK,
-      setTopK,
+      setTopK: settingsActions.setTopK,
       presencePenalty,
-      setPresencePenalty,
+      setPresencePenalty: settingsActions.setPresencePenalty,
       frequencyPenalty,
-      setFrequencyPenalty,
+      setFrequencyPenalty: settingsActions.setFrequencyPenalty,
       globalSystemPrompt,
       activeConversationData,
-      updateConversationSystemPrompt,
+      updateConversationSystemPrompt:
+        sidebarActions.updateConversationSystemPrompt,
       isVfsReady,
       isVfsLoading,
       vfsError,
       vfsKey,
       enableAdvancedSettings,
-      setSelectedProviderId,
-      setSelectedModelId,
-      toggleVfsEnabledAction,
+      setSelectedProviderId: providerActions.setSelectedProviderId,
+      setSelectedModelId: providerActions.setSelectedModelId,
+      toggleVfsEnabledAction: sidebarActions.toggleVfsEnabledAction,
       stopStreaming,
       customPromptActions: modPromptActions,
       getContextSnapshotForMod,
       selectedModel,
-      setError,
-      removeSelectedVfsPath,
+      setError: coreChatActions.setError,
+      removeSelectedVfsPath: vfsActions.removeSelectedVfsPath,
+      modMessageActions,
     }),
     [
       selectedItemId,
@@ -999,60 +1040,102 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       selectedVfsPaths,
       isVfsEnabledForItem,
       regenerateMessage,
-      addAttachedFile,
-      removeAttachedFile,
-      clearPromptInput,
-      handleSubmitCore,
-      handleImageGenerationCore,
-      clearSelectedVfsPaths,
+      inputActions.addAttachedFile,
+      inputActions.removeAttachedFile,
+      inputActions.clearPromptInput,
+      handleFormSubmit,
+      handleImageGenerationWrapper,
+      vfsActions.clearSelectedVfsPaths,
       selectedProviderId,
       selectedModelId,
       dbProviderConfigs,
       apiKeys,
       enableApiKeyManagement,
       dbConversations,
-      createConversation,
-      selectItem,
-      deleteItem,
-      updateDbProviderConfig,
+      sidebarActions.createConversation,
+      sidebarActions.selectItem,
+      sidebarActions.deleteItem,
+      providerActions.updateDbProviderConfig,
       searchTerm,
-      setSearchTerm,
-      exportConversation,
+      settingsActions.setSearchTerm,
+      sidebarActions.exportConversation,
       temperature,
-      setTemperature,
+      settingsActions.setTemperature,
       topP,
-      setTopP,
+      settingsActions.setTopP,
       maxTokens,
-      setMaxTokens,
+      settingsActions.setMaxTokens,
       topK,
-      setTopK,
+      settingsActions.setTopK,
       presencePenalty,
-      setPresencePenalty,
+      settingsActions.setPresencePenalty,
       frequencyPenalty,
-      setFrequencyPenalty,
+      settingsActions.setFrequencyPenalty,
       globalSystemPrompt,
       activeConversationData,
-      updateConversationSystemPrompt,
+      sidebarActions.updateConversationSystemPrompt,
       isVfsReady,
       isVfsLoading,
       vfsError,
       vfsKey,
       enableAdvancedSettings,
-      setSelectedProviderId,
-      setSelectedModelId,
-      toggleVfsEnabledAction,
+      providerActions.setSelectedProviderId,
+      providerActions.setSelectedModelId,
+      sidebarActions.toggleVfsEnabledAction,
       stopStreaming,
       modPromptActions,
       getContextSnapshotForMod,
       selectedModel,
-      setError,
-      removeSelectedVfsPath,
+      coreChatActions.setError,
+      vfsActions.removeSelectedVfsPath,
+      modMessageActions,
     ],
   );
 
-  console.log(
-    `[LiteChatInner] Rendering. Selected: ${selectedItemType} - ${selectedItemId}`,
+  // --- Bundle props for SideComponent ---
+  const sideProps = useMemo(
+    () => ({
+      className: cn("w-72 flex-shrink-0", "hidden md:flex"),
+      sidebarItems,
+      editingItemId,
+      selectedItemId,
+      selectedItemType,
+      isSettingsModalOpen,
+      setIsSettingsModalOpen: settingsActions.setIsSettingsModalOpen,
+      settingsProps,
+      onEditComplete,
+      setEditingItemId,
+      selectItem: sidebarActions.selectItem,
+      deleteItem: sidebarActions.deleteItem,
+      renameItem: sidebarActions.renameItem,
+      exportConversation: sidebarActions.exportConversation,
+      createConversation: sidebarActions.createConversation,
+      createProject: sidebarActions.createProject,
+      importConversation: sidebarActions.importConversation,
+    }),
+    [
+      sidebarItems,
+      editingItemId,
+      selectedItemId,
+      selectedItemType,
+      isSettingsModalOpen,
+      settingsActions.setIsSettingsModalOpen,
+      settingsProps,
+      onEditComplete,
+      setEditingItemId,
+      sidebarActions.selectItem,
+      sidebarActions.deleteItem,
+      sidebarActions.renameItem,
+      sidebarActions.exportConversation,
+      sidebarActions.createConversation,
+      sidebarActions.createProject,
+      sidebarActions.importConversation,
+    ],
   );
+
+  // console.log(
+  //   `[LiteChatInner] Rendering. Selected: ${selectedItemType} - ${selectedItemId}`
+  // );
 
   return (
     <div
@@ -1061,27 +1144,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
         className,
       )}
     >
-      {enableSidebar && sidebarOpen && (
-        <SideComponent
-          className={cn("w-72 flex-shrink-0", "hidden md:flex")}
-          sidebarItems={sidebarItems}
-          editingItemId={editingItemId}
-          selectedItemId={selectedItemId}
-          selectedItemType={selectedItemType}
-          isSettingsModalOpen={isSettingsModalOpen} // Pass main modal state
-          setIsSettingsModalOpen={setIsSettingsModalOpen} // Pass main modal setter
-          settingsProps={settingsProps}
-          onEditComplete={onEditComplete}
-          setEditingItemId={setEditingItemId}
-          selectItem={selectItem}
-          deleteItem={deleteItem}
-          renameItem={renameItem}
-          exportConversation={exportConversation}
-          createConversation={createConversation}
-          createProject={createProject}
-          importConversation={importConversation}
-        />
-      )}
+      {enableSidebar && sidebarOpen && <SideComponent {...sideProps} />}
 
       <div className="flex-grow flex flex-col relative w-full min-w-0">
         {enableSidebar && (
@@ -1105,7 +1168,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
         <WrapperComponent
           {...wrapperProps}
           promptInputValue={promptInputValue}
-          setPromptInputValue={setPromptInputValue}
+          setPromptInputValue={inputActions.setPromptInputValue}
         />
       </div>
     </div>

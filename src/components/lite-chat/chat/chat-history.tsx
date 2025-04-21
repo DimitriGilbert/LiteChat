@@ -63,7 +63,7 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
     const inputRef = useRef<HTMLInputElement>(null);
     const nameBeforeEdit = useRef(currentItemName);
 
-    console.log(`[HistoryItem] Rendering ${item.type} ${item.id}`);
+    // console.log(`[HistoryItem] Rendering ${item.type} ${item.id}`);
 
     useEffect(() => {
       setIsEditing(startInEditMode);
@@ -389,18 +389,18 @@ const ChatHistoryComponent: React.FC<ChatHistoryProps> = ({
 
   const prevSidebarItemsRef = React.useRef<SidebarItem[]>();
 
-  console.log(
-    `[ChatHistory] Rendering. Items count: ${sidebarItems.length}. First item ID: ${sidebarItems[0]?.id ?? "N/A"}`,
-  );
+  // console.log(
+  //   `[ChatHistory] Rendering. Items count: ${sidebarItems.length}. First item ID: ${sidebarItems[0]?.id ?? "N/A"}`
+  // );
   if (prevSidebarItemsRef.current !== sidebarItems) {
-    console.log(
-      "[ChatHistory] sidebarItems prop reference CHANGED.",
-      `Prev: ${prevSidebarItemsRef.current?.[0]?.id ?? "N/A"}`,
-      `New: ${sidebarItems[0]?.id ?? "N/A"}`,
-    );
+    // console.log(
+    //   "[ChatHistory] sidebarItems prop reference CHANGED.",
+    //   `Prev: ${prevSidebarItemsRef.current?.[0]?.id ?? "N/A"}`,
+    //   `New: ${sidebarItems[0]?.id ?? "N/A"}`
+    // );
     prevSidebarItemsRef.current = sidebarItems;
   } else {
-    console.log("[ChatHistory] sidebarItems prop reference SAME.");
+    // console.log("[ChatHistory] sidebarItems prop reference SAME.");
   }
 
   // Use the prop directly

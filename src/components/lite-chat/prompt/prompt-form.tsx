@@ -8,7 +8,7 @@ import { PromptActions } from "./prompt-actions";
 // REMOVED store imports
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { ChatSubmissionService } from "@/services/chat-submission-service";
+// REMOVED: import { ChatSubmissionService } from "@/services/chat-submission-service";
 import type {
   AiProviderConfig,
   AiModelConfig,
@@ -23,6 +23,7 @@ import type {
 // Import Mod types if runMiddleware is used
 // import { ModMiddlewareHook, ModMiddlewareHookName } from "@/mods/api";
 // import type { ModMiddlewarePayloadMap, ModMiddlewareReturnMap } from "@/mods/types";
+import { FileHandlingService } from "@/services/file-handling-service"; // Import for content prep
 
 // Define props based on what PromptWrapper passes down
 interface PromptFormProps {
@@ -36,10 +37,12 @@ interface PromptFormProps {
   clearPromptInput: () => void;
   // Core Chat State/Actions
   isStreaming: boolean;
+  // Renamed handleSubmitCore to handleFormSubmitWrapper to avoid confusion
   handleSubmitCore: (
-    currentConversationId: string,
-    contentToSendToAI: MessageContent,
-    vfsContextPaths?: string[],
+    prompt: string,
+    files: File[],
+    vfsPaths: string[],
+    context: any, // Context passed from LiteChatInner
   ) => Promise<void>;
   handleImageGenerationCore: (
     currentConversationId: string,
@@ -79,8 +82,8 @@ interface PromptFormProps {
   ) => Promise<void>;
   deleteItem: (id: string, type: SidebarItemType) => Promise<void>;
   // Settings State/Actions
-  isSettingsModalOpen: boolean;
-  setIsSettingsModalOpen: (isOpen: boolean) => void;
+  // REMOVED: isSettingsModalOpen: boolean;
+  // REMOVED: setIsSettingsModalOpen: (isOpen: boolean) => void;
   enableAdvancedSettings: boolean;
   temperature: number;
   setTemperature: (temp: number) => void;
@@ -128,7 +131,7 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   removeAttachedFile,
   clearPromptInput,
   isStreaming,
-  handleSubmitCore,
+  handleSubmitCore, // Use the renamed prop
   handleImageGenerationCore,
   setError,
   selectedVfsPaths,
@@ -147,12 +150,12 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   setSelectedModelId,
   selectedItemId,
   selectedItemType,
-  // dbConversations, // REMOVED - Unused directly
+  dbConversations, // Keep for deriving activeConversationData
   createConversation,
   selectItem,
   deleteItem,
-  isSettingsModalOpen,
-  setIsSettingsModalOpen,
+  // REMOVED: isSettingsModalOpen,
+  // REMOVED: setIsSettingsModalOpen,
   enableAdvancedSettings,
   temperature,
   setTemperature,
@@ -180,11 +183,9 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   // vfs, // Placeholder
   // enableVfs, // Placeholder
 }) => {
-  // REMOVED all store access hooks
-
   // --- Derivations using props ---
 
-  // Derive selectedProvider for ChatSubmissionService & PromptActions
+  // Derive selectedProvider for PromptActions
   const derivedSelectedProvider = useMemo((): AiProviderConfig | null => {
     const config = dbProviderConfigs.find(
       (p: DbProviderConfig) => p.id === selectedProviderId,
@@ -243,36 +244,143 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
     [],
   );
 
-  // Use ChatSubmissionService for handling submit logic
+  // Use the handleSubmitCore prop passed from LiteChatInner
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    // Construct context object using props
+    // Basic validations
+    if (isStreaming) {
+      toast.warning("Please wait for the current response to finish.");
+      return;
+    }
+    if (!selectedProviderId || !selectedModel) {
+      toast.error("Please select an AI provider and model first.");
+      setError("Provider/Model not selected.");
+      return;
+    }
+    if (
+      !promptInputValue &&
+      attachedFiles.length === 0 &&
+      selectedVfsPaths.length === 0
+    ) {
+      toast.info("Please enter a prompt or attach a file.");
+      return;
+    }
+
+    let currentConversationId =
+      selectedItemType === "conversation" ? selectedItemId : null;
+
+    // Create new conversation if none is selected
+    if (!currentConversationId) {
+      try {
+        const parentId = selectedItemType === "project" ? selectedItemId : null;
+        const newConvId = await createConversation(parentId, "New Chat");
+        // selectItem is handled by the parent store/effect now
+        currentConversationId = newConvId;
+        toast.success("Started new conversation.");
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        setError(`Failed to create conversation: ${message}`);
+        toast.error(`Failed to create conversation: ${message}`);
+        return;
+      }
+    }
+
+    if (!currentConversationId) {
+      setError("Failed to determine active conversation.");
+      toast.error("Could not determine active conversation.");
+      return;
+    }
+
+    // --- Check for Image Generation Command ---
+    const imageGenCommand = "/imagine ";
+    if (
+      promptInputValue.startsWith(imageGenCommand) &&
+      selectedModel.supportsImageGeneration
+    ) {
+      const imagePrompt = promptInputValue
+        .substring(imageGenCommand.length)
+        .trim();
+      if (!imagePrompt) {
+        toast.info("Please enter a prompt after /imagine.");
+        return;
+      }
+      try {
+        await handleImageGenerationCore(currentConversationId, imagePrompt);
+        clearPromptInput(); // Clear input after successful submission
+        clearSelectedVfsPaths();
+      } catch (err) {
+        // Error handled by handleImageGenerationCore
+      }
+      return; // Stop further processing
+    } else if (
+      promptInputValue.startsWith(imageGenCommand) &&
+      !selectedModel.supportsImageGeneration
+    ) {
+      toast.error(
+        `Model '${selectedModel.name}' does not support image generation.`,
+      );
+      setError(
+        `Model '${selectedModel.name}' does not support image generation.`,
+      );
+      return;
+    }
+
+    // --- Proceed with Text/Multi-modal Chat Submission ---
+    // Prepare Content for AI (Text/Multi-modal)
+    let finalContent: MessageContent;
+    // VFS processing needs the actual VFS object, which isn't directly available here.
+    // This logic should ideally happen closer to where VFS state is managed or passed down.
+    // For now, we'll simplify and assume VFS content is handled externally or passed in context.
+    const vfsContextResult = { contextPrefix: "", pathsIncludedInContext: [] }; // Placeholder
+    const attachedFileParts =
+      await FileHandlingService.processAttachedFiles(attachedFiles);
+
+    const vfsText = vfsContextResult.contextPrefix.trim();
+    const userText = promptInputValue.trim();
+
+    const imageParts = attachedFileParts.filter(
+      (p): p is ImagePart => p.type === "image",
+    );
+    const textPartsFromFiles = attachedFileParts.filter(
+      (p): p is TextPart => p.type === "text",
+    );
+
+    if (imageParts.length > 0) {
+      // Multi-modal case
+      finalContent = [];
+      finalContent.push(...imageParts);
+      let combinedText = "";
+      if (vfsText) combinedText += vfsText;
+      if (userText) combinedText += (combinedText ? "\n" : "") + userText;
+      textPartsFromFiles.forEach((part) => {
+        combinedText += (combinedText ? "\n" : "") + part.text;
+      });
+      if (combinedText) {
+        finalContent.push({ type: "text", text: combinedText });
+      }
+    } else {
+      // Text-only case
+      let combinedText = "";
+      if (vfsText) combinedText += vfsText;
+      if (userText) combinedText += (combinedText ? "\n" : "") + userText;
+      textPartsFromFiles.forEach((part) => {
+        combinedText += (combinedText ? "\n" : "") + part.text;
+      });
+      finalContent = combinedText;
+    }
+
+    // Construct context for the wrapper function
     const submissionContext = {
-      selectedProviderId,
-      selectedProvider: derivedSelectedProvider, // Use derived provider
-      selectedModel, // Use prop
-      getApiKeyForProvider,
-      dbProviderConfigs,
-      enableApiKeyManagement,
-      isStreaming,
-      setError,
-      selectedItemType,
-      selectedItemId,
-      activeConversationData, // Use prop
-      createConversation,
-      selectItem,
-      deleteItem,
-      vfs: vfsContextObject, // Pass placeholder or real VFS context
-      enableVfs: true, // Pass global enableVfs flag if available
-      isVfsEnabledForItem,
-      runMiddleware: runMiddlewarePlaceholder, // Pass placeholder or real middleware runner
-      handleSubmitCore,
-      handleImageGenerationCore,
+      selectedItemId: currentConversationId,
+      contentToSendToAI: finalContent,
+      vfsContextPaths: vfsContextResult.pathsIncludedInContext,
+      // Add other context fields if needed by the wrapper
     };
 
     try {
-      await ChatSubmissionService.submitChat(
+      // Call the wrapper function passed via props
+      await handleSubmitCore(
         promptInputValue,
         attachedFiles,
         selectedVfsPaths,
@@ -285,7 +393,6 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       toast.error(
         `Submission failed: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
-      // setError might be called within the service, but can be called here too
       setError(
         `Submission failed: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
@@ -355,9 +462,9 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
           selectedItemId={selectedItemId}
           selectedItemType={selectedItemType}
           toggleVfsEnabledAction={toggleVfsEnabledAction}
-          // Settings Modal related
-          isSettingsModalOpen={isSettingsModalOpen}
-          setIsSettingsModalOpen={setIsSettingsModalOpen}
+          // Settings Modal related (REMOVED)
+          // isSettingsModalOpen={isSettingsModalOpen}
+          // setIsSettingsModalOpen={setIsSettingsModalOpen}
           // Advanced Settings related
           enableAdvancedSettings={enableAdvancedSettings}
           // Pass down AI params for PromptSettingsAdvanced

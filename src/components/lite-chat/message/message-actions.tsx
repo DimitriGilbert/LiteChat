@@ -28,14 +28,14 @@ export const MessageActions: React.FC<MessageActionsProps> = React.memo(
     onRegenerate,
     className,
     getContextSnapshotForMod,
-    customMessageActions, // Use prop
+    customMessageActions = [], // Default to empty array
   }) => {
     // Use the stable prop directly
     const getContextSnapshot = getContextSnapshotForMod;
 
-    console.log(
-      `[MessageActions] Rendering for msg ${message.id}. Custom actions count: ${customMessageActions.length}`,
-    );
+    // console.log(
+    //   `[MessageActions] Rendering for msg ${message.id}. Custom actions count: ${customMessageActions.length}`
+    // );
 
     const handleCopy = useCallback(() => {
       let textToCopy = "";

@@ -1,6 +1,6 @@
 // src/components/lite-chat/message/message-bubble.tsx
 import React, { useState } from "react";
-import type { Message } from "@/lib/types";
+import type { Message, CustomMessageAction } from "@/lib/types"; // Added CustomMessageAction
 import { cn } from "@/lib/utils";
 import { MessageHeader } from "./message-header";
 import { MessageBody } from "./message-body";
@@ -12,6 +12,7 @@ interface MessageBubbleProps {
   onRegenerate?: (messageId: string) => void;
   className?: string;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot; // Add prop
+  modMessageActions: CustomMessageAction[]; // Add prop for custom actions
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -19,6 +20,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onRegenerate,
   className,
   getContextSnapshotForMod, // Destructure prop
+  modMessageActions, // Destructure prop
 }) => {
   // System messages might not need folding state or have different behavior
   const initialFoldState = message.role === "system" ? true : false; // Example: Fold system by default
@@ -53,11 +55,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         onToggleFold={toggleMessageFold}
       />
       <MessageBody message={message} isFolded={isMessageFolded} />
-      {/* Pass getContextSnapshotForMod down */}
+      {/* Pass getContextSnapshotForMod and modMessageActions down */}
       <MessageActionsContainer
         message={message}
         onRegenerate={onRegenerate}
         getContextSnapshotForMod={getContextSnapshotForMod} // Pass prop
+        modMessageActions={modMessageActions} // Pass prop
       />
     </div>
   );
@@ -115,6 +118,11 @@ const messagesAreEqual = (
   if (
     prevProps.getContextSnapshotForMod !== nextProps.getContextSnapshotForMod
   ) {
+    return false;
+  }
+
+  // Compare custom message actions reference (important for mods)
+  if (prevProps.modMessageActions !== nextProps.modMessageActions) {
     return false;
   }
 

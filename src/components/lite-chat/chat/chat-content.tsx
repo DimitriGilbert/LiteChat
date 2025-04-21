@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { throttle } from "@/lib/throttle";
-import type { Message } from "@/lib/types"; // Import Message type
+import type { Message, CustomMessageAction } from "@/lib/types"; // Import Message type, Added CustomMessageAction
 import type { ReadonlyChatContextSnapshot } from "@/mods/api"; // Import snapshot type
 
 // Define props based on what ChatWrapper passes down
@@ -31,6 +31,7 @@ interface ChatContentProps {
   isStreaming: boolean;
   regenerateMessage: (messageId: string) => void;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot; // Add prop
+  modMessageActions: CustomMessageAction[]; // Add prop
 }
 
 const SCROLL_THRESHOLD = 50;
@@ -44,6 +45,7 @@ const ChatContentComponent: React.FC<ChatContentProps> = ({
   isStreaming,
   regenerateMessage,
   getContextSnapshotForMod, // Destructure prop
+  modMessageActions, // Destructure prop
 }) => {
   // REMOVED store access
 
@@ -379,7 +381,7 @@ const ChatContentComponent: React.FC<ChatContentProps> = ({
           {!isLoadingMessages &&
             messages.map((message) => (
               <div key={message.id}>
-                {/* Pass getContextSnapshotForMod down */}
+                {/* Pass getContextSnapshotForMod and modMessageActions down */}
                 <MemoizedMessageBubble
                   message={message}
                   onRegenerate={
@@ -388,6 +390,7 @@ const ChatContentComponent: React.FC<ChatContentProps> = ({
                       : undefined
                   }
                   getContextSnapshotForMod={getContextSnapshotForMod} // Pass prop
+                  modMessageActions={modMessageActions} // Pass prop
                 />
                 {/* Error display remains the same */}
                 {message.error && (
