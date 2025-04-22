@@ -185,7 +185,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
 
   // Replace the loadEntries function with this version that has safeguards
   const loadEntries = useCallback(
-    async (path: string) => {
+    async (path: string, forceRefresh = false) => {
       if (!isVfsReady || isCombinedOperationLoading) {
         console.log(
           `[FileManager] loadEntries skipped. isVfsReady: ${isVfsReady}, isAnyLoading: ${isCombinedOperationLoading}`,
@@ -193,8 +193,8 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
         return;
       }
 
-      // Skip if already showing this path
-      if (path === currentPath) {
+      // Skip if already showing this path AND not forcing a refresh
+      if (path === currentPath && !forceRefresh) {
         console.log(`[FileManager] Already showing path: ${path}`);
         return;
       }
@@ -289,14 +289,14 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
           entry.isDirectory
             ? `
 
-WARNING: This will delete all contents inside!`
+  WARNING: This will delete all contents inside!`
             : ""
         }`,
       );
       if (confirmation) {
         try {
           await deleteVfsItem(entry.path, entry.isDirectory);
-          loadEntries(currentPath);
+          loadEntries(currentPath, true); // Force refresh
         } catch (error) {
           console.error("FileManager Delete Error (handled by store):", error);
         }
@@ -354,7 +354,7 @@ WARNING: This will delete all contents inside!`
       if (files && files.length > 0) {
         try {
           await uploadFiles(Array.from(files), currentPath);
-          loadEntries(currentPath);
+          loadEntries(currentPath, true); // Force refresh
         } catch (error) {
           console.error("FileManager Upload Error (handled by store):", error);
         }
@@ -380,7 +380,7 @@ WARNING: This will delete all contents inside!`
         if (file.name.toLowerCase().endsWith(".zip")) {
           try {
             await uploadAndExtractZip(file, currentPath);
-            loadEntries(currentPath);
+            loadEntries(currentPath, true); // Force refresh
           } catch (error) {
             console.error(
               "FileManager Extract Error (handled by store):",
@@ -446,7 +446,7 @@ WARNING: This will delete all contents inside!`
     try {
       await renameVfsItem(editingPath, newPath);
       cancelEditing();
-      loadEntries(currentPath);
+      loadEntries(currentPath, true); // Force refresh
     } catch (error) {
       console.error("FileManager Rename Error (handled by store):", error);
     }
@@ -495,7 +495,7 @@ WARNING: This will delete all contents inside!`
       await createDirectory(newPath);
       toast.success(`Folder "${trimmedName}" created.`);
       cancelCreatingFolder();
-      loadEntries(currentPath);
+      loadEntries(currentPath, true); // Force refresh even though we're on the same path
     } catch (error) {
       console.error(
         "FileManager Create Folder Error (handled by store):",

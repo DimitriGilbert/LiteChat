@@ -11,7 +11,7 @@ import {
   HomeIcon,
   FolderPlusIcon,
   Loader2Icon,
-  GitBranchIcon, // Added GitBranchIcon
+  GitBranchIcon,
 } from "lucide-react";
 import type { FileSystemEntry } from "@/lib/types";
 
@@ -30,7 +30,7 @@ interface FileManagerToolbarProps {
   handleFolderUploadClick: () => void;
   handleArchiveUploadClick: () => void;
   handleDownloadAll: () => void;
-  handleCloneClick: () => void; // Added handler for clone button
+  handleCloneClick: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   folderInputRef: React.RefObject<HTMLInputElement | null>;
   archiveInputRef: React.RefObject<HTMLInputElement | null>;
@@ -53,7 +53,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
   handleFolderUploadClick,
   handleArchiveUploadClick,
   handleDownloadAll,
-  handleCloneClick, // Added handler prop
+  handleCloneClick,
   fileInputRef,
   folderInputRef,
   archiveInputRef,
@@ -99,20 +99,30 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
           <Button
             variant="ghost"
             size="icon"
-            onClick={handleNavigateHome}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleNavigateHome();
+            }}
             disabled={currentPath === "/" || isAnyLoading}
             title="Go to root directory"
             className="h-8 w-8"
+            type="button"
           >
             <HomeIcon className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            onClick={handleNavigateUp}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleNavigateUp();
+            }}
             disabled={currentPath === "/" || isAnyLoading}
             title="Go up one level"
             className="h-8 w-8"
+            type="button"
           >
             <FolderUpIcon className="h-4 w-4" />
           </Button>
@@ -132,10 +142,15 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
           <Button
             variant="ghost"
             size="icon"
-            onClick={handleRefresh}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleRefresh();
+            }}
             disabled={isAnyLoading}
             title="Refresh current directory"
             className="h-8 w-8"
+            type="button"
           >
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 animate-spin" />
@@ -146,10 +161,15 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
           <Button
             variant="outline"
             size="sm"
-            onClick={startCreatingFolder}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              startCreatingFolder();
+            }}
             disabled={isAnyLoading || creatingFolder || !!editingPath}
             className="h-8"
             title="Create New Folder"
+            type="button"
           >
             {isOperationLoading && creatingFolder ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
@@ -161,10 +181,15 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
           <Button
             variant="outline"
             size="sm"
-            onClick={handleUploadClick}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleUploadClick();
+            }}
             disabled={isAnyLoading}
             className="h-8"
             title="Upload Files"
+            type="button"
           >
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
@@ -176,10 +201,15 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
           <Button
             variant="outline"
             size="sm"
-            onClick={handleFolderUploadClick}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleFolderUploadClick();
+            }}
             disabled={isAnyLoading}
             className="h-8"
             title="Upload Folder"
+            type="button"
           >
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
@@ -191,10 +221,15 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
           <Button
             variant="outline"
             size="sm"
-            onClick={handleArchiveUploadClick}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleArchiveUploadClick();
+            }}
             disabled={isAnyLoading}
             className="h-8"
             title="Upload & Extract ZIP"
+            type="button"
           >
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
@@ -203,14 +238,18 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             )}
             ZIP
           </Button>
-          {/* Added Clone Button */}
           <Button
             variant="outline"
             size="sm"
-            onClick={handleCloneClick}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleCloneClick();
+            }}
             disabled={isAnyLoading}
             className="h-8"
             title="Clone Git Repository"
+            type="button"
           >
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
@@ -222,10 +261,15 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
           <Button
             variant="outline"
             size="sm"
-            onClick={handleDownloadAll}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleDownloadAll();
+            }}
             disabled={isAnyLoading || entries.length === 0}
             className="h-8"
             title="Download Current Directory as ZIP"
+            type="button"
           >
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />

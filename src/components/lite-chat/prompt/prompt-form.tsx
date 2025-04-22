@@ -1,4 +1,4 @@
-// src/components/lite-chat/prompt/prompt-form.tsx
+// src/components/lite-chat/prompt-form.tsx
 import React, { useEffect, useCallback } from "react";
 import { PromptInput } from "./prompt-input";
 import { PromptSettings } from "./prompt-settings";
@@ -242,85 +242,102 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       return;
     }
 
-    let finalContent: MessageContent;
-    // VFS processing needs the actual VFS object, which isn't directly available here.
-    // Assuming FileHandlingService can access it or it's passed implicitly.
-    const vfsContextResult = { contextPrefix: "", pathsIncludedInContext: [] }; // Placeholder
-    const attachedFileParts =
-      await FileHandlingService.processAttachedFiles(attachedFiles);
-
-    const vfsText = vfsContextResult.contextPrefix.trim();
-    const userText = promptInputValue.trim();
-
-    const imageParts = attachedFileParts.filter(
-      (p): p is ImagePart => p.type === "image",
-    );
-    const textPartsFromFiles = attachedFileParts.filter(
-      (p): p is TextPart => p.type === "text",
-    );
-
-    if (imageParts.length > 0) {
-      finalContent = [];
-      finalContent.push(...imageParts);
-      let combinedText = "";
-      if (vfsText) combinedText += vfsText;
-      if (userText)
-        combinedText +=
-          (combinedText
-            ? `
-
-`
-            : "") + userText;
-      textPartsFromFiles.forEach((part) => {
-        combinedText +=
-          (combinedText
-            ? `
-
-`
-            : "") + part.text;
-      });
-      if (combinedText) {
-        finalContent.push({ type: "text", text: combinedText });
-      }
-    } else {
-      let combinedText = "";
-      if (vfsText) combinedText += vfsText;
-      if (userText)
-        combinedText +=
-          (combinedText
-            ? `
-
-`
-            : "") + userText;
-      textPartsFromFiles.forEach((part) => {
-        combinedText +=
-          (combinedText
-            ? `
-
-`
-            : "") + part.text;
-      });
-      finalContent = combinedText;
-    }
-
-    const middlewarePayload: SubmitPromptPayload = {
-      prompt: finalContent,
-      conversationId: currentConversationId,
-      vfsPaths: vfsContextResult.pathsIncludedInContext,
+    // Get the current VFS context state
+    const vfsContext = {
+      isVfsReady,
+      isVfsEnabledForItem,
+      enableVfs: true, // Assuming global VFS is enabled
+      vfsKey,
     };
-    const middlewareResult = await runMiddlewarePlaceholder(
-      ModMiddlewareHook.SUBMIT_PROMPT,
-      middlewarePayload,
-    );
-
-    if (middlewareResult === false) {
-      toast.info("Submission cancelled by a mod.");
-      return;
-    }
-    const contentToSubmit = middlewareResult.prompt;
-    const vfsPathsToSave = middlewareResult.vfsPaths;
 
     try {
+      // Process VFS files to include their content
+      const vfsContextResult =
+        await FileHandlingService.processVfsFilesWithContext(
+          selectedVfsPaths,
+          vfsContext,
+        );
+
+      let finalContent: MessageContent;
+      const attachedFileParts =
+        await FileHandlingService.processAttachedFiles(attachedFiles);
+
+      const vfsText = vfsContextResult.contextPrefix.trim();
+      const userText = promptInputValue.trim();
+
+      const imageParts = attachedFileParts.filter(
+        (p): p is ImagePart => p.type === "image",
+      );
+      const textPartsFromFiles = attachedFileParts.filter(
+        (p): p is TextPart => p.type === "text",
+      );
+
+      if (imageParts.length > 0) {
+        finalContent = [];
+        finalContent.push(...imageParts);
+        let combinedText = "";
+        if (vfsText) combinedText += vfsText;
+        if (userText)
+          combinedText +=
+            (combinedText
+              ? `
+
+`
+              : "") + userText;
+        textPartsFromFiles.forEach((part) => {
+          combinedText +=
+            (combinedText
+              ? `
+
+`
+              : "") + part.text;
+        });
+        if (combinedText) {
+          finalContent.push({ type: "text", text: combinedText });
+        }
+      } else {
+        let combinedText = "";
+        if (vfsText) combinedText += vfsText;
+        if (userText)
+          combinedText +=
+            (combinedText
+              ? `
+
+`
+              : "") + userText;
+        textPartsFromFiles.forEach((part) => {
+          combinedText +=
+            (combinedText
+              ? `
+
+`
+              : "") + part.text;
+        });
+        finalContent = combinedText;
+      }
+
+      const middlewarePayload: SubmitPromptPayload = {
+        prompt: finalContent,
+        conversationId: currentConversationId,
+        vfsPaths: vfsContextResult.pathsIncludedInContext,
+      };
+
+      const middlewareResult = await runMiddlewarePlaceholder(
+        ModMiddlewareHook.SUBMIT_PROMPT,
+        middlewarePayload,
+      );
+
+      if (middlewareResult === false) {
+        toast.info("Submission cancelled by a mod.");
+        return;
+      }
+
+      const contentToSubmit = middlewareResult.prompt;
+      const vfsPathsToSave = middlewareResult.vfsPaths;
+
+      console.log("Submitting with VFS paths:", vfsPathsToSave);
+      console.log("Content to submit:", contentToSubmit);
+
       await handleSubmitCore(
         promptInputValue,
         attachedFiles,

@@ -3,7 +3,7 @@ import React from "react";
 import type { Message } from "@/lib/types";
 import { MessageRoleLabel } from "./message-role-label";
 import { MessageContentRenderer } from "./message-content-renderer";
-import { VfsContextDisplay } from "@/components/lite-chat/vfs-context-display";
+// REMOVED: import { VfsContextDisplay } from "@/components/lite-chat/vfs-context-display";
 import { MessageMetadataDisplay } from "./message-metadata-display";
 import { MessageErrorDisplay } from "./message-error-display";
 
@@ -26,7 +26,7 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
         {!isFolded ? (
           <>
             <MessageContentRenderer message={message} />
-            <VfsContextDisplay paths={message.vfsContextPaths} />
+            {/* REMOVED: <VfsContextDisplay paths={message.vfsContextPaths} /> */}
             <MessageMetadataDisplay message={message} />
             <MessageErrorDisplay error={message.error} />
 

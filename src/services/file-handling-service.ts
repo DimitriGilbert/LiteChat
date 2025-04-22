@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { modEvents, ModEvent } from "@/mods/events";
 import { decodeUint8Array, isCodeFile } from "@/utils/chat-utils";
 import type { VfsContextObject, TextPart, ImagePart } from "@/lib/types";
+import { useVfsStore } from "@/store/vfs.store";
 
 // Define the ContentPart type based on TextPart and ImagePart
 type ContentPart = TextPart | ImagePart;
@@ -11,13 +12,42 @@ type ContentPart = TextPart | ImagePart;
 type MaybeContentPart = ContentPart | null;
 
 export interface FileContextResult {
-  contextPrefix: string; // Keep for VFS text content
+  contextPrefix: string; // This will now contain the <file_context> tags for VFS files
   pathsIncludedInContext: string[];
 }
+
+// Define a simpler context object for the new method
+interface VfsSimpleContext {
+  isVfsReady: boolean;
+  isVfsEnabledForItem: boolean;
+  enableVfs: boolean;
+  vfsKey: string | null;
+}
+
+// Helper function to escape XML characters in content
+const escapeXml = (unsafe: string): string => {
+  return unsafe.replace(/[<>&'"]/g, (c) => {
+    switch (c) {
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case "&":
+        return "&amp;";
+      case "'":
+        return "&apos;";
+      case '"':
+        return "&quot;";
+      default:
+        return c;
+    }
+  });
+};
 
 export class FileHandlingService {
   /**
    * Processes attached files into an array of ContentPart objects for multi-modal input.
+   * Images are returned as ImagePart, text/code files are formatted into <file_context> tags within a TextPart.
    * @param attachedFiles Files attached by the user
    * @returns An array of ContentPart objects (TextPart for text/code, ImagePart for images)
    */
@@ -26,81 +56,70 @@ export class FileHandlingService {
   ): Promise<ContentPart[]> {
     if (attachedFiles.length === 0) return [];
 
-    const contentPartsPromises = attachedFiles.map(
-      async (file): Promise<MaybeContentPart> => {
-        // Explicitly type the promise return
+    const textContextParts: string[] = [];
+    const imageParts: ImagePart[] = [];
+
+    const fileProcessingPromises = attachedFiles.map(
+      async (file): Promise<void> => {
         if (file.type.startsWith("image/")) {
-          // Process images: Read as base64 data URL
           try {
             const base64DataUrl = await this.readFileAsDataURL(file);
-            // Ensure the returned object matches ImagePart exactly
-            const imagePart: ImagePart = {
+            imageParts.push({
               type: "image",
               image: base64DataUrl,
-              mediaType: file.type, // Assign mediaType, it's optional but good to have
-            };
-            return imagePart;
+              mediaType: file.type,
+            });
           } catch (readErr) {
             const errmsg =
               readErr instanceof Error ? readErr.message : String(readErr);
             toast.error(
               `Failed to read attached image: ${file.name}\n${errmsg}`,
             );
-            // Optionally return a text part indicating the error
-            const textPart: TextPart = {
-              type: "text",
-              text: `<attached_file name="${file.name}" type="${file.type}" error="Failed to read"/>`,
-            };
-            return textPart;
+            textContextParts.push(
+              `<file_context type="attached" name="${escapeXml(file.name)}" fileType="${escapeXml(file.type)}" error="Failed to read"/>`,
+            );
           }
         } else if (file.type.startsWith("text/") || isCodeFile(file.name)) {
-          // Process text/code files: Read as text
           try {
             const contentText = await file.text();
             const fileExtension =
               file.name.split(".").pop()?.toLowerCase() || "";
-            // Format as a text block within the message content array
-            const textPart: TextPart = {
-              type: "text",
-              text: `<attached_file name="${file.name}" type="${file.type}" extension="${fileExtension}">
-\`\`\`${fileExtension}
-${contentText}
-\`\`\`
-</attached_file>`,
-            };
-            return textPart;
+            textContextParts.push(
+              `<file_context type="attached" name="${escapeXml(file.name)}" fileType="${escapeXml(file.type)}" extension="${escapeXml(fileExtension)}">
+${escapeXml(contentText)}
+</file_context>`,
+            );
           } catch (readErr) {
             const errmsg =
               readErr instanceof Error ? readErr.message : String(readErr);
             toast.error(
               `Failed to read attached file: ${file.name}\n${errmsg}`,
             );
-            const textPart: TextPart = {
-              type: "text",
-              text: `<attached_file name="${file.name}" type="${file.type}" error="Failed to read"/>`,
-            };
-            return textPart;
+            textContextParts.push(
+              `<file_context type="attached" name="${escapeXml(file.name)}" fileType="${escapeXml(file.type)}" error="Failed to read"/>`,
+            );
           }
         } else {
-          // Skip unsupported files, maybe add a text note
           toast.info(`Skipping unsupported file type: ${file.name}`);
-          const textPart: TextPart = {
-            type: "text",
-            text: `<attached_file name="${file.name}" type="${file.type}" status="skipped_unsupported"/>`,
-          };
-          return textPart;
-          // Or return null if you prefer to completely ignore them
-          // return null;
+          textContextParts.push(
+            `<file_context type="attached" name="${escapeXml(file.name)}" fileType="${escapeXml(file.type)}" status="skipped_unsupported"/>`,
+          );
         }
       },
     );
 
-    // Wait for all promises and filter out nulls using a type predicate
-    const resolvedParts = await Promise.all(contentPartsPromises);
-    const contentParts = resolvedParts.filter(
-      (part): part is ContentPart => part !== null, // Correct type predicate
-    );
-    return contentParts;
+    await Promise.all(fileProcessingPromises);
+
+    const finalParts: ContentPart[] = [...imageParts];
+    if (textContextParts.length > 0) {
+      // Combine all text/code file contexts into a single TextPart
+      finalParts.push({
+        type: "text",
+        text: textContextParts.join("\n\n"), // Separate blocks
+      });
+    }
+
+    return finalParts;
   }
 
   /**
@@ -126,27 +145,24 @@ ${contentText}
   }
 
   /**
-   * Processes VFS files to include in the chat context (as text for now).
+   * Processes VFS files to include in the chat context using the standardized <file_context> tag.
    * @param vfsPaths Array of VFS paths to be included
-   * @param vfs VFS context object
-   * @param isVfsEnabledForItem Whether VFS is enabled for the current item
-   * @param enableVfs Whether VFS is enabled globally
-   * @returns Object containing the formatted text content and included paths
+   * @param vfsContext Simple context object with necessary VFS state
+   * @returns Object containing the formatted text content (as contextPrefix) and included paths
    */
-  public static async processVfsFiles(
+  public static async processVfsFilesWithContext(
     vfsPaths: string[],
-    vfs: VfsContextObject,
-    isVfsEnabledForItem: boolean,
-    enableVfs: boolean,
+    vfsContext: VfsSimpleContext,
   ): Promise<FileContextResult> {
-    let contextPrefix = ""; // Changed from const to let
+    const { isVfsReady, isVfsEnabledForItem, enableVfs, vfsKey } = vfsContext;
+    let contextPrefix = "";
     const pathsIncludedInContext: string[] = [];
 
     if (
       !enableVfs ||
       !isVfsEnabledForItem ||
-      !vfs.isReady ||
-      vfs.configuredVfsKey !== vfs.vfsKey ||
+      !isVfsReady ||
+      !vfsKey ||
       vfsPaths.length === 0
     ) {
       if (vfsPaths.length > 0 && enableVfs && !isVfsEnabledForItem) {
@@ -155,35 +171,43 @@ ${contentText}
       return { contextPrefix, pathsIncludedInContext };
     }
 
+    console.log(`Processing ${vfsPaths.length} VFS files for context`);
+
     modEvents.emit(ModEvent.VFS_CONTEXT_ADDED, {
       paths: vfsPaths,
     });
 
+    const readFile = useVfsStore.getState().readFile;
+
     const vfsContentPromises = vfsPaths.map(async (path) => {
       try {
-        // For now, treat VFS files as text context.
-        // Future enhancement: Could check mime type and potentially return ImagePart if VFS stores images.
-        const contentBytes = await vfs.readFile(path);
+        const contentBytes = await readFile(path);
         const contentText = decodeUint8Array(contentBytes);
         pathsIncludedInContext.push(path);
         const fileExtension = path.split(".").pop()?.toLowerCase() || "";
-        return `<vfs_file path="${path}" extension="${fileExtension}">
-\`\`\`${fileExtension}
-${contentText}
-\`\`\`
-</vfs_file>`;
+        const filename = path.split("/").pop() || path;
+        console.log(`Successfully read VFS file: ${path}`);
+
+        // Use the standardized tag format
+        return `<file_context type="vfs" path="${escapeXml(path)}" name="${escapeXml(filename)}" extension="${escapeXml(fileExtension)}">
+${escapeXml(contentText)}
+</file_context>`;
       } catch (readErr) {
         console.error(`Error reading VFS file ${path}:`, readErr);
         toast.error(`Failed to read VFS file: ${path}`);
-        return `<vfs_file path="${path}" error="Failed to read"/>`;
+        const filename = path.split("/").pop() || path;
+        return `<file_context type="vfs" path="${escapeXml(path)}" name="${escapeXml(filename)}" error="Failed to read"/>`;
       }
     });
 
     const vfsContents = await Promise.all(vfsContentPromises);
     if (vfsContents.length > 0) {
-      contextPrefix = vfsContents.join("\n\n") + "\n\n"; // Assign to contextPrefix
+      contextPrefix = vfsContents.join("\n\n") + "\n\n"; // Separate blocks
     }
 
+    console.log(
+      `Processed ${pathsIncludedInContext.length} files successfully`,
+    );
     return { contextPrefix, pathsIncludedInContext };
   }
 }

@@ -1,35 +1,106 @@
 // src/components/lite-chat/vfs-context-display.tsx
-import React from "react";
-import { FileTextIcon } from "lucide-react";
+import React, { useState } from "react";
+import { cn } from "@/lib/utils";
+import {
+  ChevronDown,
+  ChevronRight,
+  FileIcon,
+  FileTextIcon,
+  ImageIcon,
+  CodeIcon,
+  FileJson2Icon,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface VfsContextDisplayProps {
-  paths: string[] | null | undefined; // Allow null/undefined
+  paths?: string[];
+  className?: string;
 }
 
-export const VfsContextDisplay: React.FC<VfsContextDisplayProps> = React.memo(
-  ({ paths }) => {
-    if (!paths || paths.length === 0) {
-      return null;
-    }
-    return (
-      <div className="mt-2 pt-2 border-t border-gray-700/50 flex flex-wrap gap-x-3 gap-y-1">
-        <span className="text-xs text-gray-500 font-medium w-full mb-0.5 select-none">
-          Included context:
+const getFileIcon = (path: string) => {
+  const extension = path.split(".").pop()?.toLowerCase();
+
+  if (!extension) return <FileIcon className="h-4 w-4" />;
+
+  // Images
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(extension)) {
+    return <ImageIcon className="h-4 w-4 text-blue-400" />;
+  }
+
+  // Code files
+  if (
+    [
+      "js",
+      "ts",
+      "jsx",
+      "tsx",
+      "py",
+      "java",
+      "c",
+      "cpp",
+      "cs",
+      "go",
+      "rs",
+      "php",
+      "rb",
+    ].includes(extension)
+  ) {
+    return <CodeIcon className="h-4 w-4 text-purple-400" />;
+  }
+
+  // JSON & config files
+  if (["json", "yaml", "yml", "toml", "xml", "config"].includes(extension)) {
+    return <FileJson2Icon className="h-4 w-4 text-yellow-400" />;
+  }
+
+  // Default text files
+  return <FileTextIcon className="h-4 w-4 text-gray-400" />;
+};
+
+export const VfsContextDisplay: React.FC<VfsContextDisplayProps> = ({
+  paths,
+  className,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  if (!paths || paths.length === 0) return null;
+
+  const toggleExpanded = () => setIsExpanded((prev) => !prev);
+
+  // Get basename from path
+  const getBasename = (path: string) => {
+    return path.split("/").pop() || path;
+  };
+
+  return (
+    <div className={cn("mt-2 mb-1", className)}>
+      <div
+        className="flex items-center gap-2 text-xs text-gray-400 bg-gray-800/40 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-800/60 transition-colors"
+        onClick={toggleExpanded}
+      >
+        {isExpanded ? (
+          <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+        )}
+        <span className="font-medium">
+          {paths.length} file{paths.length !== 1 ? "s" : ""} included
         </span>
-        {paths.map((path) => (
-          <div
-            key={path}
-            className="flex items-center gap-1 text-xs text-gray-400 bg-gray-800/50 px-1.5 py-0.5 rounded"
-            title={path}
-          >
-            <FileTextIcon className="h-3 w-3 flex-shrink-0" />
-            <span className="font-mono truncate max-w-[200px]">
-              {path.startsWith("/") ? path.substring(1) : path}
-            </span>
-          </div>
-        ))}
       </div>
-    );
-  },
-);
-VfsContextDisplay.displayName = "VfsContextDisplay";
+
+      {isExpanded && (
+        <div className="pl-5 mt-1.5 border-l border-gray-700 ml-1.5 space-y-1.5">
+          {paths.map((path) => (
+            <div
+              key={path}
+              className="flex items-center gap-2 text-xs text-gray-300 hover:text-gray-100 transition-colors"
+            >
+              {getFileIcon(path)}
+              <span className="font-mono truncate">{path}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
