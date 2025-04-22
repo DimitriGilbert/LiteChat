@@ -614,7 +614,7 @@ Really delete everything? Consider exporting first.`,
     setIsAiStreaming: coreChatActions.setIsStreaming,
     setError: coreChatActions.setError,
     addDbMessage: coreChatActions.addDbMessage,
-    abortControllerRef,
+    // abortControllerRef,
     getContextSnapshotForMod,
     bulkAddMessages: coreChatActions.bulkAddMessages,
   });
