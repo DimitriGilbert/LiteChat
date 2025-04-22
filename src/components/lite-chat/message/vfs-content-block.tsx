@@ -47,7 +47,9 @@ export const VfsContentBlock: React.FC<VfsContentBlockProps> = ({
       {isExpanded && (
         <div className="text-sm">
           <div className="bg-gray-900 text-gray-100 rounded-b-md">
-            <CodeBlock language={extension || ""} value={content} />
+            <CodeBlock
+              className={extension ? `language-${extension}` : "language-text"}
+            />
           </div>
         </div>
       )}

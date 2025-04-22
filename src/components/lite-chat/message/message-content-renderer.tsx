@@ -170,22 +170,22 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
               remarkPlugins={[remarkGfm]}
               components={{
                 code: CodeBlock,
-                p: ({ node, children, ...props }) => (
+                p: ({ children, ...props }) => (
                   <p {...props} className="my-3 leading-relaxed text-[15px]">
                     {children}
                   </p>
                 ),
-                ul: ({ node, children, ...props }) => (
+                ul: ({ children, ...props }) => (
                   <ul {...props} className="my-3 list-disc list-inside pl-4">
                     {children}
                   </ul>
                 ),
-                ol: ({ node, children, ...props }) => (
+                ol: ({ children, ...props }) => (
                   <ol {...props} className="my-3 list-decimal list-inside pl-4">
                     {children}
                   </ol>
                 ),
-                li: ({ node, children, ...props }) => (
+                li: ({ children, ...props }) => (
                   <li {...props} className="my-1">
                     {children}
                   </li>
@@ -228,17 +228,17 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                 remarkPlugins={[remarkGfm]}
                 components={{
                   code: CodeBlock,
-                  p: ({ node, children, ...props }) => (
+                  p: ({ children, ...props }) => (
                     <p {...props} className="my-3 leading-relaxed text-[15px]">
                       {children}
                     </p>
                   ),
-                  ul: ({ node, children, ...props }) => (
+                  ul: ({ children, ...props }) => (
                     <ul {...props} className="my-3 list-disc list-inside pl-4">
                       {children}
                     </ul>
                   ),
-                  ol: ({ node, children, ...props }) => (
+                  ol: ({ children, ...props }) => (
                     <ol
                       {...props}
                       className="my-3 list-decimal list-inside pl-4"
@@ -246,7 +246,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                       {children}
                     </ol>
                   ),
-                  li: ({ node, children, ...props }) => (
+                  li: ({ children, ...props }) => (
                     <li {...props} className="my-1">
                       {children}
                     </li>
@@ -279,7 +279,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                   remarkPlugins={[remarkGfm]}
                   components={{
                     code: CodeBlock,
-                    p: ({ node, children, ...props }) => (
+                    p: ({ children, ...props }) => (
                       <p
                         {...props}
                         className="my-3 leading-relaxed text-[15px]"
@@ -287,7 +287,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                         {children}
                       </p>
                     ),
-                    ul: ({ node, children, ...props }) => (
+                    ul: ({ children, ...props }) => (
                       <ul
                         {...props}
                         className="my-3 list-disc list-inside pl-4"
@@ -295,7 +295,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                         {children}
                       </ul>
                     ),
-                    ol: ({ node, children, ...props }) => (
+                    ol: ({ children, ...props }) => (
                       <ol
                         {...props}
                         className="my-3 list-decimal list-inside pl-4"
@@ -303,7 +303,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                         {children}
                       </ol>
                     ),
-                    li: ({ node, children, ...props }) => (
+                    li: ({ children, ...props }) => (
                       <li {...props} className="my-1">
                         {children}
                       </li>
@@ -344,7 +344,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                     remarkPlugins={[remarkGfm]}
                     components={{
                       code: CodeBlock,
-                      p: ({ node, children, ...props }) => (
+                      p: ({ children, ...props }) => (
                         <p
                           {...props}
                           className="my-3 leading-relaxed text-[15px]"
@@ -352,7 +352,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                           {children}
                         </p>
                       ),
-                      ul: ({ node, children, ...props }) => (
+                      ul: ({ children, ...props }) => (
                         <ul
                           {...props}
                           className="my-3 list-disc list-inside pl-4"
@@ -360,7 +360,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                           {children}
                         </ul>
                       ),
-                      ol: ({ node, children, ...props }) => (
+                      ol: ({ children, ...props }) => (
                         <ol
                           {...props}
                           className="my-3 list-decimal list-inside pl-4"
@@ -368,7 +368,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                           {children}
                         </ol>
                       ),
-                      li: ({ node, children, ...props }) => (
+                      li: ({ children, ...props }) => (
                         <li {...props} className="my-1">
                           {children}
                         </li>

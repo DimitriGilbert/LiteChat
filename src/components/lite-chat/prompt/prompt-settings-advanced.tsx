@@ -105,7 +105,6 @@ const PromptSettingsAdvancedComponent: React.FC<
   dbProviderConfigs,
   apiKeys,
   updateDbProviderConfig,
-  stopStreaming,
 }) => {
   const [localConvoSystemPrompt, setLocalConvoSystemPrompt] = useState<
     string | null

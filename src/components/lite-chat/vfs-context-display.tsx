@@ -10,7 +10,6 @@ import {
   CodeIcon,
   FileJson2Icon,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 interface VfsContextDisplayProps {
   paths?: string[];
@@ -66,11 +65,6 @@ export const VfsContextDisplay: React.FC<VfsContextDisplayProps> = ({
   if (!paths || paths.length === 0) return null;
 
   const toggleExpanded = () => setIsExpanded((prev) => !prev);
-
-  // Get basename from path
-  const getBasename = (path: string) => {
-    return path.split("/").pop() || path;
-  };
 
   return (
     <div className={cn("mt-2 mb-1", className)}>

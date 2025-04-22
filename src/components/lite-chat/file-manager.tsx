@@ -62,7 +62,6 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
   const fsInstance = useVfsStore((s) => s.fs);
 
   const selectedItemType = useSidebarStore((s) => s.selectedItemType);
-  const isVfsEnabledForItem = useVfsStore((s) => s.isVfsEnabledForItem);
 
   useEffect(() => {
     // Store the effect cleanup status

@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils";
 import {
   ChevronDown,
   ChevronRight,
-  FileTextIcon,
   PaperclipIcon,
   FolderIcon,
 } from "lucide-react";
@@ -91,7 +90,9 @@ export const FileContextBlock: React.FC<FileContextBlockProps> = ({
         <div className="text-sm border-t border-gray-700/70">
           <div className="bg-gray-900 text-gray-100 rounded-b-md">
             {/* Pass content as children, not value */}
-            <CodeBlock language={extension || ""}>
+            <CodeBlock
+              className={extension ? `language-${extension}` : "language-text"}
+            >
               {typeof content === "string" ? content : ""}
             </CodeBlock>
           </div>

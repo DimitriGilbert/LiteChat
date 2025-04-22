@@ -277,7 +277,11 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         );
 
         toast.success(
-          `${type === "project" ? "Project" : "Chat"} "${itemToDelete.name || itemToDelete.title}" deleted.`,
+          `${type === "project" ? "Project" : "Chat"} "${
+            type === "project"
+              ? (itemToDelete as DbProject).name
+              : (itemToDelete as DbConversation).title
+          }" deleted.`,
         );
         modEvents.emit(ModEvent.CHAT_DELETED, { id, type });
 

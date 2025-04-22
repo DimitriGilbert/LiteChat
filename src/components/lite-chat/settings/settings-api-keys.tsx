@@ -1,6 +1,5 @@
 // src/components/lite-chat/settings/settings-api-keys.tsx
 import React, { useState, useMemo, useCallback } from "react";
-// REMOVED store imports
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,8 +49,6 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
   dbProviderConfigs, // Use prop
   enableApiKeyManagement, // Use prop
 }) => {
-  // REMOVED store access
-
   // Local UI state remains
   const [newKeyName, setNewKeyName] = useState("");
   const [newKeyValue, setNewKeyValue] = useState("");
@@ -60,15 +57,7 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
   const [showValues, setShowValues] = useState<Record<string, boolean>>({});
 
-  // Use props for conditional rendering and actions
-  if (!enableApiKeyManagement) {
-    return (
-      <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2 bg-gray-800/30 rounded-md border border-dashed border-gray-700 min-h-[200px]">
-        <InfoIcon className="h-5 w-5" />
-        API Key Management is disabled in the configuration.
-      </div>
-    );
-  }
+  // --- Hooks moved before early return ---
 
   // Handlers use prop actions
   const handleAddKey = useCallback(
@@ -124,11 +113,6 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
     [deleteApiKey],
   ); // Depend on prop action
 
-  // Local UI logic remains
-  const toggleShowValue = (id: string) => {
-    setShowValues((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
   // Memoize derived data using props
   const linkedProviderNames = useMemo(() => {
     const map = new Map<string, string>();
@@ -145,6 +129,23 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
     });
     return map;
   }, [apiKeys, dbProviderConfigs]); // Depend on props
+
+  // --- End of moved hooks ---
+
+  // Use props for conditional rendering and actions
+  if (!enableApiKeyManagement) {
+    return (
+      <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2 bg-gray-800/30 rounded-md border border-dashed border-gray-700 min-h-[200px]">
+        <InfoIcon className="h-5 w-5" />
+        API Key Management is disabled in the configuration.
+      </div>
+    );
+  }
+
+  // Local UI logic remains
+  const toggleShowValue = (id: string) => {
+    setShowValues((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   // Helper function remains the same
   const getKeyTypeLabel = (providerIdOrType: string): string => {

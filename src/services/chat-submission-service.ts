@@ -157,12 +157,17 @@ export class ChatSubmissionService {
 
     // Prepare Content for AI (Text/Multi-modal)
     let finalContent: MessageContent;
-    const vfsContextResult = await FileHandlingService.processVfsFiles(
-      vfsPaths,
-      vfs,
-      isVfsEnabledForItem,
-      enableVfs,
-    );
+    const vfsSimpleContext = {
+      isVfsReady: vfs.isReady,
+      isVfsEnabledForItem: isVfsEnabledForItem,
+      enableVfs: enableVfs,
+      vfsKey: vfs.vfsKey,
+    };
+    const vfsContextResult =
+      await FileHandlingService.processVfsFilesWithContext(
+        vfsPaths,
+        vfsSimpleContext, // Pass the simplified context
+      );
     const attachedFileParts =
       await FileHandlingService.processAttachedFiles(attachedFiles);
 

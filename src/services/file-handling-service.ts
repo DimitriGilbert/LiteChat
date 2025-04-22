@@ -2,14 +2,11 @@
 import { toast } from "sonner";
 import { modEvents, ModEvent } from "@/mods/events";
 import { decodeUint8Array, isCodeFile } from "@/utils/chat-utils";
-import type { VfsContextObject, TextPart, ImagePart } from "@/lib/types";
+import type { TextPart, ImagePart } from "@/lib/types";
 import { useVfsStore } from "@/store/vfs.store";
 
 // Define the ContentPart type based on TextPart and ImagePart
 type ContentPart = TextPart | ImagePart;
-
-// Define a type for the intermediate result before filtering nulls
-type MaybeContentPart = ContentPart | null;
 
 export interface FileContextResult {
   contextPrefix: string; // This will now contain the <file_context> tags for VFS files
