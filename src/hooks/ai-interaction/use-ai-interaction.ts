@@ -49,7 +49,7 @@ export function useAiInteraction({
   selectedModel,
   selectedProvider,
   getApiKeyForProvider,
-  streamingThrottleRate,
+  streamingRefreshRateMs, // Use the new prop name
   setLocalMessages,
   setIsAiStreaming, // This is the function passed from the store action
   setError,
@@ -149,7 +149,7 @@ export function useAiInteraction({
         assistantMessageId,
         contentRef,
         setLocalMessages,
-        streamingThrottleRate,
+        streamingRefreshRateMs, // Use the new prop name
       );
 
       const messagesForApi = mapToCoreMessages(
@@ -404,7 +404,7 @@ export function useAiInteraction({
       selectedModel,
       selectedProvider,
       getApiKeyForProvider,
-      streamingThrottleRate,
+      streamingRefreshRateMs, // Use the new prop name
       setLocalMessages,
       setIsAiStreaming,
       setError,

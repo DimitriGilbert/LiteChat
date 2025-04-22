@@ -247,6 +247,7 @@ export interface LiteChatConfig {
   initialModelId?: string | null;
   initialSelectedItemId?: string | null;
   initialSelectedItemType?: SidebarItemType | null;
+  streamingRefreshRateMs?: number;
   streamingThrottleRate?: number;
   defaultSidebarOpen?: boolean;
   customPromptActions?: CustomPromptAction[];

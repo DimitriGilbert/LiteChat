@@ -32,7 +32,7 @@ interface SettingsModalProps {
 const SettingsModalComponent: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
-  settingsProps, // Destructure the bundled props
+  settingsProps, // Destructure the bundled props object itself
 }) => {
   // REMOVED store access
 
@@ -43,34 +43,12 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
     }
   };
 
-  // Destructure props needed for conditional rendering and passing down
+  // Destructure only flags needed for conditional rendering here
   const {
     enableAdvancedSettings,
     enableApiKeyManagement,
     customSettingsTabs,
-    // Destructure all other props needed by tabs
-    theme,
-    setTheme,
-    dbProviderConfigs,
-    apiKeys,
-    addDbProviderConfig,
-    updateDbProviderConfig,
-    deleteDbProviderConfig,
-    fetchModels,
-    providerFetchStatus,
-    getAllAvailableModelDefs,
-    globalSystemPrompt,
-    setGlobalSystemPrompt,
-    addApiKey,
-    deleteApiKey,
-    importConversation,
-    exportAllConversations,
-    clearAllData,
-    dbMods,
-    loadedMods,
-    addDbMod,
-    updateDbMod,
-    deleteDbMod,
+    // Pass the rest of settingsProps down directly where needed
   } = settingsProps;
 
   return (
@@ -106,63 +84,67 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
             </TabsList>
 
             <div>
-              {/* Pass necessary props down to each settings tab */}
+              {/* Pass the entire settingsProps bundle down */}
               <TabsContent value="general">
-                <SettingsGeneral theme={theme} setTheme={setTheme} />
+                <SettingsGeneral settingsProps={settingsProps} />
               </TabsContent>
               <TabsContent value="providers">
+                {/* SettingsProviders needs specific props, keep destructuring */}
                 <SettingsProviders
-                  dbProviderConfigs={dbProviderConfigs}
-                  apiKeys={apiKeys}
-                  addDbProviderConfig={addDbProviderConfig}
-                  updateDbProviderConfig={updateDbProviderConfig}
-                  deleteDbProviderConfig={deleteDbProviderConfig}
-                  fetchModels={fetchModels}
-                  providerFetchStatus={providerFetchStatus}
-                  getAllAvailableModelDefs={getAllAvailableModelDefs}
+                  dbProviderConfigs={settingsProps.dbProviderConfigs}
+                  apiKeys={settingsProps.apiKeys}
+                  addDbProviderConfig={settingsProps.addDbProviderConfig}
+                  updateDbProviderConfig={settingsProps.updateDbProviderConfig}
+                  deleteDbProviderConfig={settingsProps.deleteDbProviderConfig}
+                  fetchModels={settingsProps.fetchModels}
+                  providerFetchStatus={settingsProps.providerFetchStatus}
+                  getAllAvailableModelDefs={
+                    settingsProps.getAllAvailableModelDefs
+                  }
                 />
               </TabsContent>
               {enableAdvancedSettings && (
                 <TabsContent value="assistant">
                   <SettingsAssistant
-                    globalSystemPrompt={globalSystemPrompt}
-                    setGlobalSystemPrompt={setGlobalSystemPrompt}
+                    globalSystemPrompt={settingsProps.globalSystemPrompt}
+                    setGlobalSystemPrompt={settingsProps.setGlobalSystemPrompt}
                   />
                 </TabsContent>
               )}
               {enableApiKeyManagement && (
                 <TabsContent value="apiKeys">
                   <SettingsApiKeys
-                    apiKeys={apiKeys}
-                    addApiKey={addApiKey}
-                    deleteApiKey={deleteApiKey}
-                    dbProviderConfigs={dbProviderConfigs}
-                    enableApiKeyManagement={enableApiKeyManagement}
+                    apiKeys={settingsProps.apiKeys}
+                    addApiKey={settingsProps.addApiKey}
+                    deleteApiKey={settingsProps.deleteApiKey}
+                    dbProviderConfigs={settingsProps.dbProviderConfigs}
+                    enableApiKeyManagement={
+                      settingsProps.enableApiKeyManagement
+                    }
                   />
                 </TabsContent>
               )}
               <TabsContent value="data">
                 <SettingsDataManagement
-                  importConversation={importConversation}
-                  exportAllConversations={exportAllConversations}
-                  clearAllData={clearAllData}
+                  importConversation={settingsProps.importConversation}
+                  exportAllConversations={settingsProps.exportAllConversations}
+                  clearAllData={settingsProps.clearAllData}
                 />
               </TabsContent>
               <TabsContent value="mods">
                 <SettingsMods
-                  dbMods={dbMods}
-                  loadedMods={loadedMods}
-                  addDbMod={addDbMod}
-                  updateDbMod={updateDbMod}
-                  deleteDbMod={deleteDbMod}
+                  dbMods={settingsProps.dbMods}
+                  loadedMods={settingsProps.loadedMods}
+                  addDbMod={settingsProps.addDbMod}
+                  updateDbMod={settingsProps.updateDbMod}
+                  deleteDbMod={settingsProps.deleteDbMod}
                 />
               </TabsContent>
               {/* Render custom tabs from props */}
               {customSettingsTabs.map((tab: CustomSettingTab) => (
                 <TabsContent key={tab.id} value={tab.id}>
-                  {/* Custom tabs need a way to get context/props */}
-                  {/* This requires a more defined API for custom tabs */}
-                  <tab.component context={{} as any} />
+                  {/* Pass the context object to custom tabs */}
+                  <tab.component context={settingsProps as any} />
                 </TabsContent>
               ))}
             </div>

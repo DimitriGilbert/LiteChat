@@ -15,7 +15,8 @@ export interface UseAiInteractionProps {
   selectedModel: AiModelConfig | undefined;
   selectedProvider: AiProviderConfig | undefined;
   getApiKeyForProvider: () => string | undefined;
-  streamingThrottleRate: number;
+  /** Refresh rate for UI updates during AI response streaming (in milliseconds). */
+  streamingRefreshRateMs: number;
   setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setIsAiStreaming: (isStreaming: boolean) => void;
   setError: (error: string | null) => void;

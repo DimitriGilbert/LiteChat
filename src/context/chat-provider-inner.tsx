@@ -49,9 +49,12 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
       .setEnableAdvancedSettings(config.enableAdvancedSettings ?? true);
     useSidebarStore.getState().setEnableSidebar(config.enableSidebar ?? true);
     useVfsStore.getState()._setEnableVfs(config.enableVfs ?? true); // Use internal setter
-    useSettingsStore
-      .getState()
-      .setStreamingThrottleRate(config.streamingThrottleRate ?? 50);
+    // Set refresh rate from config if provided, otherwise store default is used
+    if (config.streamingRefreshRateMs !== undefined) {
+      useSettingsStore
+        .getState()
+        .setStreamingRefreshRateMs(config.streamingRefreshRateMs);
+    }
 
     // 2. Trigger store initialization actions (async)
     const initializeStores = async () => {

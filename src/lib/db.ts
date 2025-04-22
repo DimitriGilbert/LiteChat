@@ -9,52 +9,61 @@ import type {
 } from "./types";
 import type { DbMod } from "@/mods/types";
 
+// Define interface for the new table
+export interface DbAppState {
+  key: string; // Primary key (e.g., 'lastSelection')
+  value: any; // Store various state values
+}
+
 export class ChatDatabase extends Dexie {
   projects!: Table<DbProject, string>;
   conversations!: Table<DbConversation, string>;
-  // Specify DbMessage with its potentially complex 'content' type
   messages!: Table<DbMessage, string>;
   apiKeys!: Table<DbApiKey, string>;
   mods!: Table<DbMod, string>;
   providerConfigs!: Table<DbProviderConfig, string>;
+  appState!: Table<DbAppState, string>; // Add the new table definition
 
   constructor() {
     super("LiteChatDatabase");
-    // Version 8: Added 'role' and 'tool_call_id' indices to messages table.
-    //            Added compound index for faster message fetching/sorting.
-    this.version(8).stores({
-      // No change from v7
+    // Increment version number for the schema change
+    this.version(9).stores({
+      // Keep previous definitions
       providerConfigs:
         "++id, &name, type, apiKeyId, isEnabled, autoFetchModels, modelsLastFetchedAt, createdAt, updatedAt",
-      // No change from v7
       mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
-      // No change from v7
       projects: "++id, name, parentId, createdAt, updatedAt",
-      // No change from v7
       conversations: "id, parentId, createdAt, updatedAt",
-      // 'content' is not indexed.
-      // 'tool_calls' is not indexed.
-      // Index 'role' for potential filtering.
-      // Index 'tool_call_id' for linking tool results.
-      // Add compound index for efficient sorting within conversations.
       messages:
-        "id, conversationId, createdAt, role, tool_call_id, [conversationId+createdAt]", // Added role, tool_call_id, compound index
-      // No change from v7
+        "id, conversationId, createdAt, role, tool_call_id, [conversationId+createdAt]",
       apiKeys: "id, name, providerId, createdAt",
+      // Add the new table schema
+      appState: "&key", // Simple key-value store, 'key' is the primary key
     });
 
     // --- Keep previous version definitions ---
-    // Version 7: Added providerConfigs fields
+    this.version(8).stores({
+      providerConfigs:
+        "++id, &name, type, apiKeyId, isEnabled, autoFetchModels, modelsLastFetchedAt, createdAt, updatedAt",
+      mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
+      projects: "++id, name, parentId, createdAt, updatedAt",
+      conversations: "id, parentId, createdAt, updatedAt",
+      messages:
+        "id, conversationId, createdAt, role, tool_call_id, [conversationId+createdAt]",
+      apiKeys: "id, name, providerId, createdAt",
+      // appState table did not exist in v8
+    });
+    // No upgrade needed for v8 -> v9 as we are just adding a new table
+
     this.version(7).stores({
       providerConfigs:
         "++id, &name, type, apiKeyId, isEnabled, autoFetchModels, modelsLastFetchedAt, createdAt, updatedAt",
       mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
       projects: "++id, name, parentId, createdAt, updatedAt",
       conversations: "id, parentId, createdAt, updatedAt",
-      messages: "id, conversationId, createdAt, vfsContextPaths", // Previous schema
+      messages: "id, conversationId, createdAt, vfsContextPaths",
       apiKeys: "id, name, providerId, createdAt",
     });
-    // Add upgrade logic for version 7 (remains the same)
     this.version(7).upgrade(async (tx) => {
       await tx
         .table("providerConfigs")

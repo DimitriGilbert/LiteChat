@@ -1,12 +1,11 @@
 // src/store/provider.store.ts
 import { create } from "zustand";
+// REMOVED persist import
 import type { DbApiKey, DbProviderConfig, DbProviderType } from "@/lib/types";
-// FIX: Removed unused nanoid import
-// import { nanoid } from "nanoid";
-import { toast } from "sonner"; // Import toast for user feedback
-import { db } from "@/lib/db"; // Import Dexie instance
-import { fetchModelsForProvider } from "@/services/model-fetcher"; // Import fetcher
-import { nanoid } from "nanoid"; // Keep nanoid for API key generation
+import { toast } from "sonner";
+import { db } from "@/lib/db";
+import { fetchModelsForProvider } from "@/services/model-fetcher";
+import { nanoid } from "nanoid";
 
 // --- REMOVE Placeholder Dependencies ---
 
@@ -30,6 +29,9 @@ const DEFAULT_MODELS: Record<DbProviderType, { id: string; name: string }[]> = {
 
 // Type for fetch status
 type FetchStatus = "idle" | "fetching" | "error" | "success";
+
+// Key for storing selection in appState table
+const LAST_SELECTION_KEY = "lastProviderSelection";
 
 export interface ProviderState {
   enableApiKeyManagement: boolean;
@@ -65,12 +67,29 @@ export interface ProviderActions {
   initializeFromDb: () => Promise<void>; // Action to load initial data
 }
 
+// Helper to save selection state to Dexie
+const saveSelectionToDb = async (
+  providerId: string | null,
+  modelId: string | null,
+) => {
+  try {
+    await db.appState.put({
+      key: LAST_SELECTION_KEY,
+      value: { providerId, modelId },
+    });
+  } catch (error) {
+    console.error("Failed to save selection state to DB:", error);
+    // Optionally show a non-intrusive warning
+  }
+};
+
+// REMOVE persist wrapper
 export const useProviderStore = create<ProviderState & ProviderActions>()(
   (set, get) => ({
     // Initial State
     enableApiKeyManagement: true,
-    selectedProviderId: null,
-    selectedModelId: null,
+    selectedProviderId: null, // Will be loaded from DB
+    selectedModelId: null, // Will be loaded from DB
     apiKeys: [],
     dbProviderConfigs: [],
     providerFetchStatus: {},
@@ -129,9 +148,15 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
       }
 
       set({ selectedProviderId: id, selectedModelId: defaultModelId });
+      // Save selection to Dexie
+      saveSelectionToDb(id, defaultModelId);
     },
 
-    setSelectedModelId: (selectedModelId) => set({ selectedModelId }),
+    setSelectedModelId: (selectedModelId) => {
+      set({ selectedModelId });
+      // Save selection to Dexie
+      saveSelectionToDb(get().selectedProviderId, selectedModelId);
+    },
 
     setApiKeys: (apiKeys) => set({ apiKeys }),
 
@@ -139,7 +164,6 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
       const keyToAdd = value;
       value = ""; // Clear sensitive data immediately
       try {
-        // FIX: Use db.apiKeys.add
         const newId = nanoid();
         const newKey: DbApiKey = {
           id: newId,
@@ -169,7 +193,6 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
       }
       // Optimistic update handled by live query
       try {
-        // FIX: Use db.apiKeys.delete and transaction
         await db.transaction("rw", db.apiKeys, db.providerConfigs, async () => {
           await db.apiKeys.delete(id);
           const configsToUpdate = await db.providerConfigs
@@ -198,7 +221,6 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
 
     addDbProviderConfig: async (config) => {
       try {
-        // FIX: Use db.providerConfigs.add
         const newId = nanoid();
         const now = new Date();
         const newConfig: DbProviderConfig = {
@@ -222,7 +244,6 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
 
     updateDbProviderConfig: async (id, changes) => {
       try {
-        // FIX: Use db.providerConfigs.update
         await db.providerConfigs.update(id, {
           ...changes,
           updatedAt: new Date(),
@@ -247,10 +268,11 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
       // Optimistic update for selection
       if (get().selectedProviderId === id) {
         set({ selectedProviderId: null, selectedModelId: null });
+        // Also clear DB selection state
+        await saveSelectionToDb(null, null);
       }
 
       try {
-        // FIX: Use db.providerConfigs.delete
         await db.providerConfigs.delete(id);
         // State update via live query
         toast.success(`Provider "${configToDelete.name}" deleted.`);
@@ -317,12 +339,88 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
 
     initializeFromDb: async () => {
       try {
-        const [keys, configs] = await Promise.all([
+        // Fetch keys, configs, AND last selection state
+        const [keys, configs, lastSelectionState] = await Promise.all([
           db.apiKeys.toArray(),
           db.providerConfigs.toArray(),
+          db.appState.get(LAST_SELECTION_KEY),
         ]);
-        set({ apiKeys: keys, dbProviderConfigs: configs });
-        console.log("[ProviderStore] Initialized from DB.");
+
+        let initialProviderId: string | null = null;
+        let initialModelId: string | null = null;
+
+        if (lastSelectionState?.value) {
+          initialProviderId = lastSelectionState.value.providerId ?? null;
+          initialModelId = lastSelectionState.value.modelId ?? null;
+          // Validate the loaded selection against current configs
+          const providerExists = configs.some(
+            (p) => p.id === initialProviderId,
+          );
+          if (!providerExists) {
+            initialProviderId = null;
+            initialModelId = null;
+          } else {
+            const providerConfig = configs.find(
+              (p) => p.id === initialProviderId,
+            );
+            const availableModels =
+              providerConfig?.fetchedModels ??
+              DEFAULT_MODELS[providerConfig?.type as DbProviderType] ??
+              [];
+            const modelExists = availableModels.some(
+              (m) => m.id === initialModelId,
+            );
+            if (!modelExists) {
+              initialModelId = null; // Keep provider, but reset model
+            }
+          }
+        }
+
+        // If still no provider selected, try the first enabled one
+        if (!initialProviderId) {
+          const firstEnabled = configs.find((c) => c.isEnabled);
+          if (firstEnabled) {
+            initialProviderId = firstEnabled.id;
+            // Reset model ID when defaulting provider
+            initialModelId = null;
+          }
+        }
+
+        // If provider is set but model isn't, select default model for that provider
+        if (initialProviderId && !initialModelId) {
+          const providerConfig = configs.find(
+            (p) => p.id === initialProviderId,
+          );
+          if (providerConfig) {
+            const availableModels =
+              providerConfig.fetchedModels ??
+              DEFAULT_MODELS[providerConfig.type] ??
+              [];
+            const enabledModelIds = providerConfig.enabledModels ?? [];
+            let potentialModels = availableModels;
+            if (enabledModelIds.length > 0) {
+              potentialModels = availableModels.filter((m) =>
+                enabledModelIds.includes(m.id),
+              );
+              if (potentialModels.length === 0) {
+                potentialModels = availableModels;
+              }
+            }
+            // Apply sorting if needed before picking the first
+            potentialModels.sort((a, b) => a.name.localeCompare(b.name));
+            initialModelId = potentialModels[0]?.id ?? null;
+          }
+        }
+
+        set({
+          apiKeys: keys,
+          dbProviderConfigs: configs,
+          selectedProviderId: initialProviderId,
+          selectedModelId: initialModelId,
+        });
+        console.log(
+          `[ProviderStore] Initialized from DB. Selected Provider: ${initialProviderId}, Model: ${initialModelId}`,
+        );
       } catch (error) {
         console.error("[ProviderStore] Failed to initialize from DB:", error);
         toast.error("Failed to load provider/API key data.");

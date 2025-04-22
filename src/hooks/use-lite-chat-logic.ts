@@ -102,6 +102,7 @@ interface UseLiteChatLogicReturn {
     | "setPresencePenalty"
     | "setFrequencyPenalty"
     | "setGlobalSystemPrompt"
+    | "setStreamingRefreshRateMs" // Added
   >;
   modActions: Pick<ModActions, "addDbMod" | "updateDbMod" | "deleteDbMod">;
   // Selection State (Stable)
@@ -139,7 +140,7 @@ interface UseLiteChatLogicReturn {
     | "presencePenalty"
     | "frequencyPenalty"
     | "globalSystemPrompt"
-    | "streamingThrottleRate"
+    | "streamingRefreshRateMs" // Changed from streamingThrottleRate
     | "isSettingsModalOpen"
   >;
   modState: Pick<
@@ -285,6 +286,7 @@ export function useLiteChatLogic(
       setPresencePenalty: state.setPresencePenalty,
       setFrequencyPenalty: state.setFrequencyPenalty,
       setGlobalSystemPrompt: state.setGlobalSystemPrompt,
+      setStreamingRefreshRateMs: state.setStreamingRefreshRateMs, // Added
     })),
   );
   const settingsState = useSettingsStore(
@@ -299,7 +301,7 @@ export function useLiteChatLogic(
       presencePenalty: state.presencePenalty,
       frequencyPenalty: state.frequencyPenalty,
       globalSystemPrompt: state.globalSystemPrompt,
-      streamingThrottleRate: state.streamingThrottleRate,
+      streamingRefreshRateMs: state.streamingRefreshRateMs, // Changed
       isSettingsModalOpen: state.isSettingsModalOpen,
     })),
   );
@@ -535,7 +537,7 @@ Really delete everything? Consider exporting first.`,
       () => getApiKeyForProvider(providerState.selectedProviderId!),
       [getApiKeyForProvider, providerState.selectedProviderId],
     ),
-    streamingThrottleRate: settingsState.streamingThrottleRate,
+    streamingRefreshRateMs: settingsState.streamingRefreshRateMs, // Pass the new prop
     setLocalMessages: setCoreMessages,
     setIsAiStreaming: setCoreIsStreaming,
     setError: setCoreError,

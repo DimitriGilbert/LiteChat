@@ -50,21 +50,25 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
             remarkPlugins={[remarkGfm]}
             components={{
               code: CodeBlock,
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               p: ({ node, children, ...props }) => (
                 <p {...props} className="my-3 leading-relaxed text-[15px]">
                   {children}
                 </p>
               ),
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               ul: ({ node, children, ...props }) => (
                 <ul {...props} className="my-3 list-disc list-inside pl-4">
                   {children}
                 </ul>
               ),
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               ol: ({ node, children, ...props }) => (
                 <ol {...props} className="my-3 list-decimal list-inside pl-4">
                   {children}
                 </ol>
               ),
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               li: ({ node, children, ...props }) => (
                 <li {...props} className="my-1">
                   {children}
@@ -85,16 +89,19 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                 remarkPlugins={[remarkGfm]}
                 components={{
                   code: CodeBlock,
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
                   p: ({ node, children, ...props }) => (
                     <p {...props} className="my-3 leading-relaxed text-[15px]">
                       {children}
                     </p>
                   ),
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
                   ul: ({ node, children, ...props }) => (
                     <ul {...props} className="my-3 list-disc list-inside pl-4">
                       {children}
                     </ul>
                   ),
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
                   ol: ({ node, children, ...props }) => (
                     <ol
                       {...props}
@@ -103,6 +110,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                       {children}
                     </ol>
                   ),
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
                   li: ({ node, children, ...props }) => (
                     <li {...props} className="my-1">
                       {children}

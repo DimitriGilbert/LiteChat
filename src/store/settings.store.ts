@@ -17,7 +17,8 @@ export interface SettingsState {
   presencePenalty: number | null;
   frequencyPenalty: number | null;
   // Other Config
-  streamingThrottleRate: number;
+  /** Refresh rate for UI updates during AI response streaming (in milliseconds). */
+  streamingRefreshRateMs: number;
 }
 
 export interface SettingsActions {
@@ -32,7 +33,8 @@ export interface SettingsActions {
   setTopK: (topK: number | null) => void;
   setPresencePenalty: (penalty: number | null) => void;
   setFrequencyPenalty: (penalty: number | null) => void;
-  setStreamingThrottleRate: (rate: number) => void;
+  /** Sets the UI refresh rate during streaming (in milliseconds). */
+  setStreamingRefreshRateMs: (rate: number) => void;
   // Derived data (activeSystemPrompt) should be handled by selectors outside the store
 }
 
@@ -60,7 +62,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     topK: null,
     presencePenalty: null,
     frequencyPenalty: null,
-    streamingThrottleRate: 50, // Default throttle rate
+    streamingRefreshRateMs: 33, // Default ~30 FPS (1000ms / 30)
 
     // Actions
     setEnableAdvancedSettings: (enableAdvancedSettings) =>
@@ -86,7 +88,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     setTopK: (topK) => set({ topK }),
     setPresencePenalty: (presencePenalty) => set({ presencePenalty }),
     setFrequencyPenalty: (frequencyPenalty) => set({ frequencyPenalty }),
-    setStreamingThrottleRate: (streamingThrottleRate) =>
-      set({ streamingThrottleRate }),
+    setStreamingRefreshRateMs: (streamingRefreshRateMs) =>
+      set({ streamingRefreshRateMs }),
   }),
 );

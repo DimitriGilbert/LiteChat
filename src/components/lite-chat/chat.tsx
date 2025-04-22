@@ -68,6 +68,9 @@ export interface SettingsModalTabProps {
   enableAdvancedSettings: boolean;
   enableApiKeyManagement: boolean;
   customSettingsTabs: CustomSettingTab[];
+  // Add streaming refresh rate props
+  streamingRefreshRateMs: number;
+  setStreamingRefreshRateMs: (rate: number) => void;
 }
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
@@ -377,6 +380,9 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       enableAdvancedSettings: settingsState.enableAdvancedSettings,
       enableApiKeyManagement: providerState.enableApiKeyManagement,
       customSettingsTabs: modState.modSettingsTabs,
+      // Add streaming refresh rate props
+      streamingRefreshRateMs: settingsState.streamingRefreshRateMs,
+      setStreamingRefreshRateMs: settingsActions.setStreamingRefreshRateMs,
     }),
     [
       settingsState.theme,
@@ -404,6 +410,9 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       settingsState.enableAdvancedSettings,
       providerState.enableApiKeyManagement,
       modState.modSettingsTabs,
+      // Add streaming refresh rate props
+      settingsState.streamingRefreshRateMs,
+      settingsActions.setStreamingRefreshRateMs,
     ],
   );
 

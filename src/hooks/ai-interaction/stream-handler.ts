@@ -41,7 +41,7 @@ export function createStreamUpdater(
   assistantMessageId: string,
   contentRef: { current: string },
   setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>,
-  throttleRate: number,
+  refreshRateMs: number, // Renamed parameter
 ) {
   return throttle(() => {
     const currentAccumulatedContent = contentRef.current;
@@ -66,7 +66,7 @@ export function createStreamUpdater(
       };
       return updatedMessages;
     });
-  }, throttleRate);
+  }, refreshRateMs); // Use the new parameter name
 }
 
 /**

@@ -1,6 +1,5 @@
 // src/components/lite-chat/settings/settings-general.tsx
 import React, { useState, useCallback } from "react";
-// REMOVED store imports
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SunIcon, MoonIcon, LaptopIcon, GitBranchIcon } from "lucide-react";
@@ -9,24 +8,22 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-// Import Mod types if needed for git config saving
-// import type { DbMod } from "@/mods/types";
+import { Slider } from "@/components/ui/slider";
+// Import the bundled props type
+import type { SettingsModalTabProps } from "../chat";
 
-// Define props based on what SettingsModal passes down
-interface SettingsGeneralProps {
-  theme: "light" | "dark" | "system";
-  setTheme: (theme: "light" | "dark" | "system") => void;
-  // Add props for git config if managed here
-  // updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>; // Example
+// Update component props to expect the bundled object
+interface SettingsGeneralComponentProps {
+  settingsProps: SettingsModalTabProps;
 }
 
 // Wrap component logic in a named function for React.memo
-const SettingsGeneralComponent: React.FC<SettingsGeneralProps> = ({
-  theme, // Use prop
-  setTheme, // Use prop action
-  // updateDbMod, // Example prop
+const SettingsGeneralComponent: React.FC<SettingsGeneralComponentProps> = ({
+  settingsProps, // Receive the bundled props
 }) => {
-  // REMOVED store access
+  // Destructure needed state and actions from the bundled props *inside* the component
+  const { theme, setTheme, streamingRefreshRateMs, setStreamingRefreshRateMs } =
+    settingsProps;
 
   // Local UI state for git config (if managed here)
   const [rootGitEnabled, setRootGitEnabled] = useState(false);
@@ -54,15 +51,25 @@ const SettingsGeneralComponent: React.FC<SettingsGeneralProps> = ({
     }
   }, [rootGitEnabled, rootGitRepoUrl, rootGitRepoBranch /*, updateDbMod */]); // Add prop action to deps
 
+  const handleSliderChange = useCallback(
+    (value: number[]) => {
+      // Use the destructured action function
+      setStreamingRefreshRateMs(value[0]);
+    },
+    [setStreamingRefreshRateMs], // Depend on the destructured action function
+  );
+
+  const fps = Math.round(1000 / streamingRefreshRateMs);
+
   return (
     <div className="space-y-6 p-1">
-      {/* Theme Selection - Uses props */}
+      {/* Theme Selection - Uses destructured props */}
       <div>
         <h3 className="text-lg font-medium mb-2">Appearance</h3>
         <Label className="text-sm mb-3 block">Theme</Label>
         <RadioGroup
-          value={theme} // Use prop
-          onValueChange={setTheme} // Use prop action
+          value={theme} // Use destructured prop
+          onValueChange={setTheme} // Use destructured prop action
           className="flex flex-col sm:flex-row gap-4"
         >
           <Label
@@ -90,6 +97,31 @@ const SettingsGeneralComponent: React.FC<SettingsGeneralProps> = ({
             System
           </Label>
         </RadioGroup>
+      </div>
+
+      <Separator />
+
+      {/* Streaming Refresh Rate - Uses destructured props */}
+      <div>
+        <h3 className="text-lg font-medium mb-2">Performance</h3>
+        <div className="space-y-1.5">
+          <Label htmlFor="streaming-refresh-rate" className="text-sm">
+            Streaming Refresh Rate ({streamingRefreshRateMs}ms ≈ {fps} FPS)
+          </Label>
+          <Slider
+            id="streaming-refresh-rate"
+            min={16} // ~60 FPS
+            max={1000} // 1 FPS
+            step={1}
+            value={[streamingRefreshRateMs]} // Use destructured state
+            onValueChange={handleSliderChange} // Use callback with destructured action
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Lower values (e.g., 16ms) update faster but use more resources.
+            Higher values (e.g., 100ms) are less resource-intensive but may feel
+            less smooth. Default: 33ms (~30 FPS).
+          </p>
+        </div>
       </div>
 
       <Separator />
