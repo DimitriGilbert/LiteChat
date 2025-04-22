@@ -8,6 +8,7 @@ import { useInputStore } from "@/store/input.store";
 import { useCoreChatStore } from "@/store/core-chat.store";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useShallow } from "zustand/react/shallow";
+import { useVfsStore } from "@/store/vfs.store"; // Import VFS store
 
 import type {
   SidebarItemType,
@@ -68,7 +69,6 @@ export interface SettingsModalTabProps {
   enableAdvancedSettings: boolean;
   enableApiKeyManagement: boolean;
   customSettingsTabs: CustomSettingTab[];
-  // Add streaming refresh rate props
   streamingRefreshRateMs: number;
   setStreamingRefreshRateMs: (rate: number) => void;
 }
@@ -109,26 +109,34 @@ export interface ChatSideProps {
   settingsProps: SettingsModalTabProps;
 }
 
+// --- MODIFICATION START: Define ChatWrapperDirectProps explicitly ---
 export interface ChatWrapperDirectProps {
   className?: string;
+  // Volatile state passed directly
   promptInputValue: string;
   messages: Message[];
   isStreaming: boolean;
   isLoadingMessages: boolean;
   error: string | null;
+  isVfsReady: boolean; // Add VFS state here
+  isVfsEnabledForItem: boolean; // Add VFS state here
+  // Input actions passed directly
   setPromptInputValue: (value: string) => void;
   addAttachedFile: (file: File) => void;
   removeAttachedFile: (fileName: string) => void;
   clearPromptInput: () => void;
 }
+// --- MODIFICATION END ---
 
+// --- MODIFICATION START: Adjust ChatWrapperBundledProps ---
+// Remove props that are now passed directly in ChatWrapperDirectProps
 export interface ChatWrapperBundledProps {
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
   sidebarItems: SidebarItem[];
   attachedFiles: File[];
   selectedVfsPaths: string[];
-  isVfsEnabledForItem: boolean;
+  // isVfsEnabledForItem: boolean; // REMOVED - Passed directly
   regenerateMessage: (messageId: string) => Promise<void>;
   handleSubmitCore: (
     prompt: string,
@@ -181,7 +189,7 @@ export interface ChatWrapperBundledProps {
     id: string,
     systemPrompt: string | null,
   ) => Promise<void>;
-  isVfsReady: boolean;
+  // isVfsReady: boolean; // REMOVED - Passed directly
   isVfsLoading: boolean;
   vfsError: string | null;
   vfsKey: string | null;
@@ -197,16 +205,19 @@ export interface ChatWrapperBundledProps {
   removeSelectedVfsPath: (path: string) => void;
   modMessageActions: CustomMessageAction[];
 }
+// --- MODIFICATION END ---
 
+// --- MODIFICATION START: Update ChatWrapperProps type ---
 export type ChatWrapperProps = ChatWrapperDirectProps & {
   bundledProps: ChatWrapperBundledProps;
 };
+// --- MODIFICATION END ---
 
 interface LiteChatProps {
   config?: LiteChatConfig;
   className?: string;
   SideComponent?: ComponentType<ChatSideProps>;
-  WrapperComponent?: ComponentType<ChatWrapperProps>;
+  WrapperComponent?: ComponentType<ChatWrapperProps>; // Use updated type
 }
 
 export const LiteChat: React.FC<LiteChatProps> = ({
@@ -255,7 +266,7 @@ interface LiteChatInnerProps {
   setSidebarOpen: (open: boolean) => void;
   enableSidebarConfig: boolean;
   SideComponent: ComponentType<ChatSideProps>;
-  WrapperComponent: ComponentType<ChatWrapperProps>;
+  WrapperComponent: ComponentType<ChatWrapperProps>; // Use updated type
   editingItemId: string | null;
   setEditingItemId: (id: string | null) => void;
   onEditComplete: (id: string) => void;
@@ -272,9 +283,11 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
   setEditingItemId,
   onEditComplete,
 }) => {
+  // Use live data hook
   const { projects: dbProjects, conversations: dbConversations } =
     useChatStorage();
 
+  // Use logic hook, passing live data
   const {
     sidebarActions,
     coreChatActions,
@@ -285,7 +298,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     selectedItemId,
     selectedItemType,
     enableSidebar: enableSidebarFromHook,
-    vfsState,
+    vfsState, // Keep vfsState for bundled props
     providerState,
     settingsState,
     modState,
@@ -302,9 +315,10 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     editingItemId,
     setEditingItemId,
     onEditComplete,
-    dbConversations,
+    dbConversations, // Pass live data here
   });
 
+  // --- MODIFICATION START: Select volatile state directly ---
   const {
     promptInputValue,
     attachedFiles,
@@ -332,6 +346,16 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     })),
   );
 
+  // Select VFS state needed directly by ChatWrapper
+  const { isVfsReady, isVfsEnabledForItem } = useVfsStore(
+    useShallow((state) => ({
+      isVfsReady: state.isVfsReady,
+      isVfsEnabledForItem: state.isVfsEnabledForItem,
+    })),
+  );
+  // --- MODIFICATION END ---
+
+  // Derive sidebarItems using live data
   const sidebarItems = useMemo(() => {
     const allProjects: DbProject[] = dbProjects || [];
     const allConversations: DbConversation[] = dbConversations || [];
@@ -353,6 +377,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
 
   const enableSidebar = enableSidebarFromHook ?? enableSidebarConfig;
 
+  // Settings props bundle (remains mostly the same)
   const settingsProps: SettingsModalTabProps = useMemo(
     () => ({
       theme: settingsState.theme,
@@ -380,7 +405,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       enableAdvancedSettings: settingsState.enableAdvancedSettings,
       enableApiKeyManagement: providerState.enableApiKeyManagement,
       customSettingsTabs: modState.modSettingsTabs,
-      // Add streaming refresh rate props
       streamingRefreshRateMs: settingsState.streamingRefreshRateMs,
       setStreamingRefreshRateMs: settingsActions.setStreamingRefreshRateMs,
     }),
@@ -410,20 +434,21 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       settingsState.enableAdvancedSettings,
       providerState.enableApiKeyManagement,
       modState.modSettingsTabs,
-      // Add streaming refresh rate props
       settingsState.streamingRefreshRateMs,
       settingsActions.setStreamingRefreshRateMs,
     ],
   );
 
+  // --- MODIFICATION START: Update wrapperBundledProps ---
+  // Remove props that are now passed directly
   const wrapperBundledProps: ChatWrapperBundledProps = useMemo(
     () => ({
       selectedItemId: selectedItemId,
       selectedItemType: selectedItemType,
       sidebarItems,
-      attachedFiles: attachedFiles,
+      attachedFiles: attachedFiles, // Keep attachedFiles here as it's less volatile than promptInputValue
       selectedVfsPaths: vfsState.selectedVfsPaths,
-      isVfsEnabledForItem: vfsState.isVfsEnabledForItem,
+      // isVfsEnabledForItem: vfsState.isVfsEnabledForItem, // REMOVED
       regenerateMessage,
       handleSubmitCore: handleFormSubmit,
       handleImageGenerationCore: handleImageGenerationWrapper,
@@ -433,7 +458,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       dbProviderConfigs: providerState.dbProviderConfigs,
       apiKeys: providerState.apiKeys,
       enableApiKeyManagement: providerState.enableApiKeyManagement,
-      dbConversations: dbConversations,
+      dbConversations: dbConversations, // Pass live data
       createConversation: sidebarActions.createConversation,
       selectItem: sidebarActions.selectItem,
       deleteItem: sidebarActions.deleteItem,
@@ -457,7 +482,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       activeConversationData,
       updateConversationSystemPrompt:
         sidebarActions.updateConversationSystemPrompt,
-      isVfsReady: vfsState.isVfsReady,
+      // isVfsReady: vfsState.isVfsReady, // REMOVED
       isVfsLoading: vfsState.isVfsLoading,
       vfsError: vfsState.vfsError,
       vfsKey: vfsState.vfsKey,
@@ -479,7 +504,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       sidebarItems,
       attachedFiles,
       vfsState.selectedVfsPaths,
-      vfsState.isVfsEnabledForItem,
+      // vfsState.isVfsEnabledForItem, // REMOVED
       regenerateMessage,
       handleFormSubmit,
       handleImageGenerationWrapper,
@@ -489,7 +514,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       providerState.dbProviderConfigs,
       providerState.apiKeys,
       providerState.enableApiKeyManagement,
-      dbConversations,
+      dbConversations, // Depend on live data
       sidebarActions.createConversation,
       sidebarActions.selectItem,
       sidebarActions.deleteItem,
@@ -512,7 +537,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       settingsState.globalSystemPrompt,
       activeConversationData,
       sidebarActions.updateConversationSystemPrompt,
-      vfsState.isVfsReady,
+      // vfsState.isVfsReady, // REMOVED
       vfsState.isVfsLoading,
       vfsState.vfsError,
       vfsState.vfsKey,
@@ -529,12 +554,14 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       modState.modMessageActions,
     ],
   );
+  // --- MODIFICATION END ---
 
+  // Side props bundle (remains the same)
   const sideProps: ChatSideProps = useMemo(
     () => ({
       className: cn("w-72 flex-shrink-0", "hidden md:flex"),
-      dbProjects: dbProjects,
-      dbConversations: dbConversations,
+      dbProjects: dbProjects, // Pass live data
+      dbConversations: dbConversations, // Pass live data
       editingItemId,
       selectedItemId: selectedItemId,
       selectedItemType: selectedItemType,
@@ -552,8 +579,8 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       importConversation: sidebarActions.importConversation,
     }),
     [
-      dbProjects,
-      dbConversations,
+      dbProjects, // Depend on live data
+      dbConversations, // Depend on live data
       editingItemId,
       selectedItemId,
       selectedItemType,
@@ -599,8 +626,10 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
             )}
           </Button>
         )}
+        {/* --- MODIFICATION START: Pass direct props --- */}
         <WrapperComponent
           className="h-full"
+          // Pass direct props explicitly
           promptInputValue={promptInputValue}
           setPromptInputValue={setPromptInputValue}
           addAttachedFile={addAttachedFile}
@@ -610,8 +639,12 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
           isStreaming={isStreaming}
           isLoadingMessages={isLoadingMessages}
           error={error}
+          isVfsReady={isVfsReady}
+          isVfsEnabledForItem={isVfsEnabledForItem}
+          // Pass the bundled props object
           bundledProps={wrapperBundledProps}
         />
+        {/* --- MODIFICATION END --- */}
       </div>
     </div>
   );

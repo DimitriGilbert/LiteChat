@@ -1,6 +1,5 @@
 // src/components/lite-chat/prompt/prompt-settings-advanced.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-// REMOVED store imports
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
@@ -8,9 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiKeySelector } from "@/components/lite-chat/api-key-selector";
-import { FileManager } from "@/components/lite-chat/file-manager"; // Keep FileManager
+import { FileManager } from "@/components/lite-chat/file-manager";
 import { cn } from "@/lib/utils";
-import { SaveIcon, InfoIcon } from "lucide-react";
+import { SaveIcon, InfoIcon, Loader2Icon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -20,12 +19,12 @@ import {
 import { toast } from "sonner";
 import type {
   DbConversation,
-  SidebarItemType, // Added
-  DbProviderConfig, // Added
-  DbApiKey, // Added
+  SidebarItemType,
+  DbProviderConfig,
+  DbApiKey,
 } from "@/lib/types";
+import { useVfsStore } from "@/store/vfs.store";
 
-// Define props based on what PromptSettings passes down
 interface PromptSettingsAdvancedProps {
   className?: string;
   initialTab?: string;
@@ -49,14 +48,15 @@ interface PromptSettingsAdvancedProps {
   globalSystemPrompt: string | null;
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
-  activeConversationData: DbConversation | null; // Pass derived data
+  activeConversationData: DbConversation | null;
   updateConversationSystemPrompt: (
     id: string,
     systemPrompt: string | null,
   ) => Promise<void>;
-  // VFS State (needed for Files tab)
+  // VFS State (Passed directly)
   isVfsEnabledForItem: boolean;
   isVfsReady: boolean;
+  // VFS State (Bundled)
   isVfsLoading: boolean;
   vfsError: string | null;
   vfsKey: string | null;
@@ -68,9 +68,9 @@ interface PromptSettingsAdvancedProps {
     id: string,
     changes: Partial<DbProviderConfig>,
   ) => Promise<void>;
+  stopStreaming: () => void;
 }
 
-// Wrap component logic in a named function for React.memo
 const PromptSettingsAdvancedComponent: React.FC<
   PromptSettingsAdvancedProps
 > = ({
@@ -94,8 +94,8 @@ const PromptSettingsAdvancedComponent: React.FC<
   globalSystemPrompt,
   selectedItemId,
   selectedItemType,
-  activeConversationData, // Use prop
-  updateConversationSystemPrompt, // Use prop action
+  activeConversationData,
+  updateConversationSystemPrompt,
   isVfsEnabledForItem,
   isVfsReady,
   isVfsLoading,
@@ -104,22 +104,18 @@ const PromptSettingsAdvancedComponent: React.FC<
   selectedProviderId,
   dbProviderConfigs,
   apiKeys,
-  updateDbProviderConfig, // Use prop action
+  updateDbProviderConfig,
+  stopStreaming,
 }) => {
-  // REMOVED store access
-
-  // --- Local State ---
   const [localConvoSystemPrompt, setLocalConvoSystemPrompt] = useState<
     string | null
   >(null);
   const [isConvoPromptDirty, setIsConvoPromptDirty] = useState(false);
 
-  // --- Derived State ---
   const conversationId = useMemo(() => {
     return selectedItemType === "conversation" ? selectedItemId : null;
   }, [selectedItemId, selectedItemType]);
 
-  // Derive activeSystemPrompt using props
   const activeSystemPrompt = useMemo(() => {
     if (!enableAdvancedSettings) {
       return null;
@@ -136,8 +132,18 @@ const PromptSettingsAdvancedComponent: React.FC<
     return null;
   }, [enableAdvancedSettings, activeConversationData, globalSystemPrompt]);
 
-  // --- Effects ---
-  // Effect to sync local prompt state with prop data
+  useEffect(() => {
+    // If VFS is enabled but not ready, try to initialize it
+    if (isVfsEnabledForItem && !isVfsReady && !isVfsLoading && vfsKey) {
+      console.log(
+        "[PromptSettingsAdvanced] VFS enabled but not ready, triggering initialization",
+      );
+      const vfsStore = useVfsStore.getState();
+      vfsStore.initializeVfs();
+    }
+    // Only run when these specific dependencies change
+  }, [isVfsEnabledForItem, isVfsReady, isVfsLoading, vfsKey]);
+
   useEffect(() => {
     if (enableAdvancedSettings && conversationId) {
       const promptFromProp = activeConversationData?.systemPrompt ?? null;
@@ -149,9 +155,8 @@ const PromptSettingsAdvancedComponent: React.FC<
       setLocalConvoSystemPrompt(null);
       setIsConvoPromptDirty(false);
     }
-  }, [conversationId, enableAdvancedSettings, activeConversationData]); // Depend on props
+  }, [conversationId, enableAdvancedSettings, activeConversationData]);
 
-  // --- Handlers ---
   const handleConvoSystemPromptChange = (
     e: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
@@ -159,7 +164,6 @@ const PromptSettingsAdvancedComponent: React.FC<
     setIsConvoPromptDirty(true);
   };
 
-  // Use prop action
   const saveConvoSystemPrompt = useCallback(() => {
     if (enableAdvancedSettings && conversationId && isConvoPromptDirty) {
       const promptToSave =
@@ -179,10 +183,9 @@ const PromptSettingsAdvancedComponent: React.FC<
     conversationId,
     isConvoPromptDirty,
     localConvoSystemPrompt,
-    updateConversationSystemPrompt, // Use prop action
+    updateConversationSystemPrompt,
   ]);
 
-  // Use prop setters
   const handleNumberInputChange = useCallback(
     (
       setter: (value: number | null) => void,
@@ -201,12 +204,10 @@ const PromptSettingsAdvancedComponent: React.FC<
     [],
   );
 
-  // Derive selectedDbProviderConfig using props
   const selectedDbProviderConfig = useMemo(() => {
     return dbProviderConfigs.find((p) => p.id === selectedProviderId);
   }, [dbProviderConfigs, selectedProviderId]);
 
-  // Use prop action
   const handleApiKeySelectionChange = useCallback(
     (keyId: string | null) => {
       if (selectedDbProviderConfig) {
@@ -224,15 +225,16 @@ const PromptSettingsAdvancedComponent: React.FC<
           });
       }
     },
-    [selectedDbProviderConfig, updateDbProviderConfig], // Use prop action
+    [selectedDbProviderConfig, updateDbProviderConfig],
   );
 
-  // Use props for conditional rendering
   const isConversationSelected = !!conversationId;
   const isConversationPromptSet =
     localConvoSystemPrompt !== null && localConvoSystemPrompt.trim() !== "";
   const isUsingGlobalOrDefault =
     activeSystemPrompt === globalSystemPrompt || !isConversationPromptSet;
+
+  const showFileManager = isVfsEnabledForItem && isVfsReady;
 
   return (
     <div className={cn("p-3", className)}>
@@ -252,13 +254,12 @@ const PromptSettingsAdvancedComponent: React.FC<
           <TabsTrigger
             value="files"
             className="text-xs px-2 h-7"
-            disabled={!isVfsEnabledForItem} // Use prop
+            disabled={!isVfsEnabledForItem}
           >
             Files
           </TabsTrigger>
         </TabsList>
 
-        {/* Parameters Tab - Use props */}
         <TabsContent value="parameters" className="space-y-4 mt-0">
           <div className="grid grid-cols-2 gap-4 items-end">
             <div className="space-y-1.5">
@@ -271,7 +272,7 @@ const PromptSettingsAdvancedComponent: React.FC<
                 max={1}
                 step={0.01}
                 value={[temperature]}
-                onValueChange={(value) => setTemperature(value[0])} // Use prop setter
+                onValueChange={(value) => setTemperature(value[0])}
               />
             </div>
             <div className="space-y-1.5">
@@ -284,7 +285,7 @@ const PromptSettingsAdvancedComponent: React.FC<
                 max={1}
                 step={0.01}
                 value={[topP ?? 1.0]}
-                onValueChange={(value) => handleSliderChange(setTopP, value)} // Use prop setter
+                onValueChange={(value) => handleSliderChange(setTopP, value)}
               />
             </div>
           </div>
@@ -298,7 +299,7 @@ const PromptSettingsAdvancedComponent: React.FC<
                 type="number"
                 placeholder="Default"
                 value={maxTokens ?? ""}
-                onChange={(e) => handleNumberInputChange(setMaxTokens, e)} // Use prop setter
+                onChange={(e) => handleNumberInputChange(setMaxTokens, e)}
                 min="1"
                 className="h-8 text-xs"
               />
@@ -312,7 +313,7 @@ const PromptSettingsAdvancedComponent: React.FC<
                 type="number"
                 placeholder="Default"
                 value={topK ?? ""}
-                onChange={(e) => handleNumberInputChange(setTopK, e)} // Use prop setter
+                onChange={(e) => handleNumberInputChange(setTopK, e)}
                 min="1"
                 className="h-8 text-xs"
               />
@@ -331,7 +332,7 @@ const PromptSettingsAdvancedComponent: React.FC<
                 value={[presencePenalty ?? 0.0]}
                 onValueChange={(value) =>
                   handleSliderChange(setPresencePenalty, value)
-                } // Use prop setter
+                }
               />
             </div>
             <div className="space-y-1.5">
@@ -346,13 +347,12 @@ const PromptSettingsAdvancedComponent: React.FC<
                 value={[frequencyPenalty ?? 0.0]}
                 onValueChange={(value) =>
                   handleSliderChange(setFrequencyPenalty, value)
-                } // Use prop setter
+                }
               />
             </div>
           </div>
         </TabsContent>
 
-        {/* System Prompt Tab - Use props */}
         <TabsContent value="system_prompt" className="space-y-3 mt-0">
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
@@ -373,7 +373,7 @@ const PromptSettingsAdvancedComponent: React.FC<
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
-                        onClick={saveConvoSystemPrompt} // Use callback with prop action
+                        onClick={saveConvoSystemPrompt}
                         disabled={!isConvoPromptDirty}
                       >
                         <SaveIcon
@@ -434,7 +434,7 @@ const PromptSettingsAdvancedComponent: React.FC<
             <Textarea
               id="global-system-prompt-ref"
               readOnly
-              value={globalSystemPrompt ?? "Not set or disabled"} // Use prop
+              value={globalSystemPrompt ?? "Not set or disabled"}
               className="text-xs min-h-[60px] max-h-[100px] bg-gray-800/50 border-gray-700/50"
               rows={3}
             />
@@ -445,14 +445,13 @@ const PromptSettingsAdvancedComponent: React.FC<
           </div>
         </TabsContent>
 
-        {/* API Keys Tab - Use props */}
         {enableApiKeyManagement && (
           <TabsContent value="api_keys" className="mt-0">
             {selectedDbProviderConfig ? (
               <ApiKeySelector
                 selectedKeyId={selectedDbProviderConfig.apiKeyId ?? null}
-                onKeySelected={handleApiKeySelectionChange} // Use callback with prop action
-                apiKeys={apiKeys} // Use prop
+                onKeySelected={handleApiKeySelectionChange}
+                apiKeys={apiKeys}
                 disabled={!selectedDbProviderConfig}
               />
             ) : (
@@ -465,24 +464,26 @@ const PromptSettingsAdvancedComponent: React.FC<
           </TabsContent>
         )}
 
-        {/* Files Tab - Use props */}
         <TabsContent value="files" className="mt-0">
-          {/* Use props for conditional rendering */}
-          {isVfsEnabledForItem && isVfsReady ? (
-            // FileManager still uses its own store access for now
+          {showFileManager ? (
             <FileManager key={vfsKey} />
           ) : (
             <div className="text-center text-sm text-gray-500 py-8">
-              {isVfsEnabledForItem && isVfsLoading
-                ? "Initializing filesystem..."
-                : isVfsEnabledForItem && vfsError
-                  ? `Error: ${vfsError}`
-                  : "Virtual Filesystem is not enabled for the selected item."}
-              <br />
-              {!isVfsEnabledForItem && (
-                <span>
+              {isVfsEnabledForItem && isVfsLoading ? (
+                <>
+                  <Loader2Icon className="h-4 w-4 mr-2 inline animate-spin" />
+                  <span>Initializing filesystem...</span>
+                </>
+              ) : isVfsEnabledForItem && vfsError ? (
+                `Error: ${vfsError}`
+              ) : !isVfsEnabledForItem ? (
+                <>
+                  Virtual Filesystem is not enabled for the selected item.
+                  <br />
                   Enable it using the toggle in the basic prompt settings area.
-                </span>
+                </>
+              ) : (
+                "Virtual Filesystem is initializing or in an unknown state."
               )}
             </div>
           )}
@@ -492,7 +493,6 @@ const PromptSettingsAdvancedComponent: React.FC<
   );
 };
 
-// Export the memoized component
 export const PromptSettingsAdvanced = React.memo(
   PromptSettingsAdvancedComponent,
 );

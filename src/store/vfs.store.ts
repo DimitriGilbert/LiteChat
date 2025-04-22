@@ -1,56 +1,46 @@
 // src/store/vfs.store.ts
 import { create } from "zustand";
 import type { FileSystemEntry } from "@/lib/types";
-// Import VFS operations - These will be called by the actions below
-// We need a way to access the configured fs instance (maybe pass it?)
-// Or, the hook calls these directly and updates store state. Let's assume the latter for now.
 import * as VfsOps from "@/lib/vfs-operations";
 import { toast } from "sonner";
-import { fs } from "@zenfs/core"; // Import fs for type
+import { fs } from "@zenfs/core";
+import { configureSingle } from "@zenfs/core";
+import { IndexedDB } from "@zenfs/dom";
 
 export interface VfsState {
-  enableVfs: boolean; // Global VFS toggle (Set via config)
-  isVfsEnabledForItem: boolean; // Is VFS active for the *currently selected* item? (Set by sidebar store)
-  selectedVfsPaths: string[]; // Paths selected in the VFS browser for context
-  // VFS Operational State (Managed by useVirtualFileSystem hook via actions)
+  enableVfs: boolean;
+  isVfsEnabledForItem: boolean;
+  selectedVfsPaths: string[];
   isVfsReady: boolean;
-  isVfsLoading: boolean; // Initial loading/mounting of the FS instance
-  isVfsOperationLoading: boolean; // Loading during file ops (write, delete, zip etc.)
+  isVfsLoading: boolean;
+  isVfsOperationLoading: boolean;
   vfsError: string | null;
-  configuredVfsKey: string | null; // Identifier for the *type* of backend (e.g., 'indexeddb') - might not be needed if always the same
-  vfsKey: string | null; // Unique key for the current FS instance (e.g., item ID or 'orphan') (Set by sidebar store)
-  fs: typeof fs | null; // Add the fs instance to the state
+  configuredVfsKey: string | null;
+  vfsKey: string | null;
+  fs: typeof fs | null;
 }
 
 export interface VfsActions {
-  // Configuration / Selection State Actions
-  _setEnableVfs: (enabled: boolean) => void; // Internal setter, usually from initial config
-  setIsVfsEnabledForItem: (enabled: boolean) => void; // Called by sidebar store's selectItem/toggleVfs
-  setVfsKey: (key: string | null) => void; // Called by sidebar store's selectItem
+  _setEnableVfs: (enabled: boolean) => void;
+  setIsVfsEnabledForItem: (enabled: boolean) => void;
+  setVfsKey: (key: string | null) => void;
   setSelectedVfsPaths: (paths: string[]) => void;
   addSelectedVfsPath: (path: string) => void;
   removeSelectedVfsPath: (path: string) => void;
   clearSelectedVfsPaths: () => void;
-
-  // VFS Operational State Actions (Called by useVirtualFileSystem hook)
   setVfsReady: (isReady: boolean) => void;
   setVfsLoading: (isLoading: boolean) => void;
   setVfsOperationLoading: (isLoading: boolean) => void;
   setVfsError: (error: string | null) => void;
-  setConfiguredVfsKey: (key: string | null) => void; // Potentially set by hook on init
-  _setFsInstance: (fsInstance: typeof fs | null) => void; // Internal action to set fs
-
-  // Actual FS operations - These actions will trigger the operations
-  // They manage the operation loading state and call the VfsOps functions.
-  // Note: These assume the FS is already configured and ready (checked by the hook).
-  // The hook should ensure readiness before these are effectively called.
+  setConfiguredVfsKey: (key: string | null) => void;
+  _setFsInstance: (fsInstance: typeof fs | null) => void;
+  initializeVfs: () => Promise<void>;
   listFiles: (path: string) => Promise<FileSystemEntry[]>;
   readFile: (path: string) => Promise<Uint8Array>;
   writeFile: (path: string, data: Uint8Array | string) => Promise<void>;
   deleteVfsItem: (path: string, recursive?: boolean) => Promise<void>;
   createDirectory: (path: string) => Promise<void>;
   downloadFile: (path: string, filename?: string) => Promise<void>;
-  // FIX: Accept FileList | File[]
   uploadFiles: (files: FileList | File[], targetPath: string) => Promise<void>;
   uploadAndExtractZip: (file: File, targetPath: string) => Promise<void>;
   downloadAllAsZip: (filename?: string, rootPath?: string) => Promise<void>;
@@ -59,27 +49,40 @@ export interface VfsActions {
 
 export const useVfsStore = create<VfsState & VfsActions>()((set, get) => ({
   // Initial State
-  enableVfs: true, // Default, can be overridden by config
+  enableVfs: true,
   isVfsEnabledForItem: false,
   selectedVfsPaths: [],
   isVfsReady: false,
   isVfsLoading: false,
   isVfsOperationLoading: false,
   vfsError: null,
-  configuredVfsKey: null, // e.g., 'indexeddb' - set by hook maybe
-  vfsKey: null, // e.g., item ID - set by sidebar store
-  fs: null, // Initialize fs as null
+  configuredVfsKey: null,
+  vfsKey: null,
+  fs: null,
 
-  // --- Configuration / Selection State Actions ---
-  _setEnableVfs: (enableVfs) => set({ enableVfs }), // Internal setter
+  // Configuration / Selection State Actions
+  _setEnableVfs: (enableVfs) => set({ enableVfs }),
   setIsVfsEnabledForItem: (isVfsEnabledForItem) => {
     set({ isVfsEnabledForItem });
-    // If VFS is disabled for the item, clear selections
     if (!isVfsEnabledForItem) {
       get().clearSelectedVfsPaths();
     }
+
+    // Trigger VFS initialization if enabled
+    if (isVfsEnabledForItem && get().vfsKey) {
+      console.log("[VfsStore] VFS enabled for item, triggering initialization");
+      get().initializeVfs();
+    }
   },
-  setVfsKey: (vfsKey) => set({ vfsKey }),
+  setVfsKey: (vfsKey) => {
+    set({ vfsKey });
+
+    // If key changed and VFS is enabled, initialize
+    if (vfsKey !== get().configuredVfsKey && get().isVfsEnabledForItem) {
+      console.log("[VfsStore] VFS key changed, triggering initialization");
+      get().initializeVfs();
+    }
+  },
   setSelectedVfsPaths: (selectedVfsPaths) => set({ selectedVfsPaths }),
   addSelectedVfsPath: (path) =>
     set((state) => ({
@@ -93,63 +96,128 @@ export const useVfsStore = create<VfsState & VfsActions>()((set, get) => ({
     })),
   clearSelectedVfsPaths: () => set({ selectedVfsPaths: [] }),
 
-  // --- VFS Operational State Actions (Called by Hook) ---
+  // VFS Operational State Actions
   setVfsReady: (isVfsReady) => set({ isVfsReady }),
   setVfsLoading: (isVfsLoading) => set({ isVfsLoading }),
   setVfsOperationLoading: (isVfsOperationLoading) =>
     set({ isVfsOperationLoading }),
   setVfsError: (vfsError) => set({ vfsError }),
   setConfiguredVfsKey: (configuredVfsKey) => set({ configuredVfsKey }),
-  _setFsInstance: (fsInstance) => set({ fs: fsInstance }), // Internal action
+  _setFsInstance: (fsInstance) => set({ fs: fsInstance }),
 
-  // --- VFS Operation Actions (Called by UI/Components) ---
-  // These actions wrap the VfsOps calls and manage loading state.
-  // They rely on the hook having already configured the FS.
+  // New direct initialization function
+  initializeVfs: async () => {
+    const state = get();
+    const { vfsKey, isVfsEnabledForItem, enableVfs, isVfsLoading } = state;
+
+    // Skip if already loading or not enabled or no key
+    if (isVfsLoading || !vfsKey || !isVfsEnabledForItem || !enableVfs) {
+      console.log("[VfsStore] initializeVfs skipped", {
+        isVfsLoading,
+        vfsKey,
+        isVfsEnabledForItem,
+        enableVfs,
+      });
+      return;
+    }
+
+    // Skip if already configured with this key
+    if (state.configuredVfsKey === vfsKey && state.isVfsReady) {
+      console.log(
+        "[VfsStore] initializeVfs skipped - already configured with this key",
+      );
+      return;
+    }
+
+    console.log("[VfsStore] Starting VFS initialization for key:", vfsKey);
+
+    // Reset state
+    set({
+      isVfsLoading: true,
+      isVfsOperationLoading: false,
+      vfsError: null,
+      isVfsReady: false,
+    });
+
+    try {
+      const vfsConf = {
+        backend: IndexedDB,
+        name: `litechat_vfs_${vfsKey}`,
+      };
+
+      console.log("[VfsStore] Configuring ZenFS with:", vfsConf);
+      await configureSingle(vfsConf);
+
+      // Check if state is still valid after async operation
+      if (get().vfsKey !== vfsKey) {
+        console.log(
+          "[VfsStore] VFS key changed during initialization, aborting",
+        );
+        set({ isVfsLoading: false });
+        return;
+      }
+
+      console.log("[VfsStore] ZenFS configured successfully, updating state");
+      set({
+        fs: fs,
+        configuredVfsKey: vfsKey,
+        isVfsReady: true,
+        isVfsLoading: false,
+        vfsError: null,
+      });
+    } catch (error) {
+      console.error("[VfsStore] Failed to initialize VFS:", error);
+      set({
+        isVfsLoading: false,
+        isVfsReady: false,
+        vfsError: `Failed to initialize filesystem: ${error instanceof Error ? error.message : String(error)}`,
+      });
+      toast.error(
+        `VFS initialization failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  },
+
+  // VFS Operation Actions (Called by UI/Components)
   listFiles: async (path) => {
-    if (!get().isVfsReady) {
+    if (!get().isVfsReady || !get().fs) {
       toast.error("Filesystem not ready.");
       console.error("[VFS Store] listFiles called when VFS not ready.");
       return [];
     }
-    // No operation loading for listFiles usually
     try {
       return await VfsOps.listFilesOp(path);
     } catch (error) {
-      // Error handled by VfsOps (toast)
       return [];
     }
   },
   readFile: async (path) => {
-    if (!get().isVfsReady) {
+    if (!get().isVfsReady || !get().fs) {
       toast.error("Filesystem not ready.");
       console.error("[VFS Store] readFile called when VFS not ready.");
       throw new Error("Filesystem not ready.");
     }
-    // No operation loading for readFile usually
     try {
       return await VfsOps.readFileOp(path);
     } catch (error) {
-      // Error handled by VfsOps (toast)
-      throw error; // Re-throw
+      throw error;
     }
   },
   writeFile: async (path, data) => {
-    if (!get().isVfsReady) {
+    if (!get().isVfsReady || !get().fs) {
       toast.error("Filesystem not ready.");
       console.error("[VFS Store] writeFile called when VFS not ready.");
       throw new Error("Filesystem not ready.");
     }
-    // Use the store's setter for loading state
     const setLoading = get().setVfsOperationLoading;
     try {
       await VfsOps.writeFileOp(setLoading, path, data);
     } catch (error) {
-      // Error handled by VfsOps (toast)
-      throw error; // Re-throw
+      throw error;
     }
   },
   deleteVfsItem: async (path, recursive = false) => {
-    if (!get().isVfsReady) {
+    if (!get().isVfsReady || !get().fs) {
       toast.error("Filesystem not ready.");
       console.error("[VFS Store] deleteVfsItem called when VFS not ready.");
       throw new Error("Filesystem not ready.");
@@ -157,19 +225,17 @@ export const useVfsStore = create<VfsState & VfsActions>()((set, get) => ({
     const setLoading = get().setVfsOperationLoading;
     try {
       await VfsOps.deleteItemOp(setLoading, path, recursive);
-      // Clear selection if the deleted item was selected
       set((state) => ({
         selectedVfsPaths: state.selectedVfsPaths.filter(
           (p) => p !== path && !p.startsWith(path + "/"),
         ),
       }));
     } catch (error) {
-      // Error handled by VfsOps (toast)
-      throw error; // Re-throw
+      throw error;
     }
   },
   createDirectory: async (path) => {
-    if (!get().isVfsReady) {
+    if (!get().isVfsReady || !get().fs) {
       toast.error("Filesystem not ready.");
       console.error("[VFS Store] createDirectory called when VFS not ready.");
       throw new Error("Filesystem not ready.");
@@ -178,42 +244,36 @@ export const useVfsStore = create<VfsState & VfsActions>()((set, get) => ({
     try {
       await VfsOps.createDirectoryOp(setLoading, path);
     } catch (error) {
-      // Error handled by VfsOps (toast)
-      throw error; // Re-throw
+      throw error;
     }
   },
   downloadFile: async (path, filename) => {
-    if (!get().isVfsReady) {
+    if (!get().isVfsReady || !get().fs) {
       toast.error("Filesystem not ready.");
       console.error("[VFS Store] downloadFile called when VFS not ready.");
       throw new Error("Filesystem not ready.");
     }
-    // Download doesn't usually have a loading spinner state in the UI
     try {
       await VfsOps.downloadFileOp(path, filename);
     } catch (error) {
-      // Error handled by VfsOps (toast)
-      // Don't re-throw, as it's usually just a UI action
+      // Error handled by VfsOps
     }
   },
-  // FIX: Accept FileList | File[]
   uploadFiles: async (files, targetPath) => {
-    if (!get().isVfsReady) {
+    if (!get().isVfsReady || !get().fs) {
       toast.error("Filesystem not ready.");
       console.error("[VFS Store] uploadFiles called when VFS not ready.");
       throw new Error("Filesystem not ready.");
     }
     const setLoading = get().setVfsOperationLoading;
     try {
-      // VfsOps expects FileList | File[], pass it directly
       await VfsOps.uploadFilesOp(setLoading, files, targetPath);
     } catch (error) {
-      // Error handled by VfsOps (toast)
-      throw error; // Re-throw
+      throw error;
     }
   },
   uploadAndExtractZip: async (file, targetPath) => {
-    if (!get().isVfsReady) {
+    if (!get().isVfsReady || !get().fs) {
       toast.error("Filesystem not ready.");
       console.error(
         "[VFS Store] uploadAndExtractZip called when VFS not ready.",
@@ -224,12 +284,11 @@ export const useVfsStore = create<VfsState & VfsActions>()((set, get) => ({
     try {
       await VfsOps.uploadAndExtractZipOp(setLoading, file, targetPath);
     } catch (error) {
-      // Error handled by VfsOps (toast)
-      throw error; // Re-throw
+      throw error;
     }
   },
   downloadAllAsZip: async (filename, rootPath = "/") => {
-    if (!get().isVfsReady) {
+    if (!get().isVfsReady || !get().fs) {
       toast.error("Filesystem not ready.");
       console.error("[VFS Store] downloadAllAsZip called when VFS not ready.");
       throw new Error("Filesystem not ready.");
@@ -238,12 +297,11 @@ export const useVfsStore = create<VfsState & VfsActions>()((set, get) => ({
     try {
       await VfsOps.downloadAllAsZipOp(setLoading, filename, rootPath);
     } catch (error) {
-      // Error handled by VfsOps (toast)
-      // Don't re-throw
+      // Error handled by VfsOps
     }
   },
   renameVfsItem: async (oldPath, newPath) => {
-    if (!get().isVfsReady) {
+    if (!get().isVfsReady || !get().fs) {
       toast.error("Filesystem not ready.");
       console.error("[VFS Store] renameVfsItem called when VFS not ready.");
       throw new Error("Filesystem not ready.");
@@ -251,7 +309,6 @@ export const useVfsStore = create<VfsState & VfsActions>()((set, get) => ({
     const setLoading = get().setVfsOperationLoading;
     try {
       await VfsOps.renameOp(setLoading, oldPath, newPath);
-      // Update selected paths if the renamed item or its children were selected
       set((state) => ({
         selectedVfsPaths: state.selectedVfsPaths.map((p) => {
           if (p === oldPath) return newPath;
@@ -262,8 +319,7 @@ export const useVfsStore = create<VfsState & VfsActions>()((set, get) => ({
         }),
       }));
     } catch (error) {
-      // Error handled by VfsOps (toast)
-      throw error; // Re-throw
+      throw error;
     }
   },
 }));

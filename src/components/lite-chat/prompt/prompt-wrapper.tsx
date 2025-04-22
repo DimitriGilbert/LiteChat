@@ -4,7 +4,6 @@ import { PromptForm } from "./prompt-form";
 import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type {
-  MessageContent,
   DbProviderConfig,
   DbApiKey,
   DbConversation,
@@ -20,26 +19,22 @@ interface PromptWrapperProps {
   // Direct volatile state
   error: string | null;
   isStreaming: boolean;
+  isVfsReady: boolean; // Add direct prop
+  isVfsEnabledForItem: boolean; // Add direct prop
   // Direct Input State/Actions
   promptInputValue: string;
   setPromptInputValue: (value: string) => void;
   addAttachedFile: (file: File) => void;
   removeAttachedFile: (fileName: string) => void;
   clearPromptInput: () => void;
-  // Bundled Props (less frequently changing / stable)
+  // Bundled Props (less frequently changing / stable) - Passed down to PromptForm
   attachedFiles: File[];
   selectedVfsPaths: string[];
-  isVfsEnabledForItem: boolean;
   handleSubmitCore: (
-    prompt: string, // Keep original prompt for potential logging
-    files: File[], // Keep original files
-    vfsPaths: string[], // Keep original VFS paths
-    context: {
-      // Pass processed context
-      selectedItemId: string;
-      contentToSendToAI: MessageContent;
-      vfsContextPaths?: string[];
-    },
+    prompt: string,
+    files: File[],
+    vfsPaths: string[],
+    context: any,
   ) => Promise<void>;
   handleImageGenerationCore: (
     currentConversationId: string,
@@ -69,7 +64,6 @@ interface PromptWrapperProps {
   selectedItemType: SidebarItemType | null;
   setError: (error: string | null) => void;
   removeSelectedVfsPath: (path: string) => void;
-  isVfsReady: boolean;
   toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>;
   enableAdvancedSettings: boolean;
   temperature: number;
@@ -101,12 +95,11 @@ interface PromptWrapperProps {
   vfsKey: string | null;
 }
 
-// Wrap component logic in a named function for React.memo
 const PromptWrapperComponent: React.FC<PromptWrapperProps> = ({
   className,
   error, // Direct prop
   // Pass all other props down to PromptForm
-  ...promptFormProps // Includes isStreaming, promptInputValue etc.
+  ...promptFormProps // Includes isStreaming, promptInputValue, isVfsReady etc.
 }) => {
   return (
     <div className={cn("flex-shrink-0", className)}>
@@ -117,7 +110,7 @@ const PromptWrapperComponent: React.FC<PromptWrapperProps> = ({
         </div>
       )}
       {/* Pass all necessary props down to PromptForm */}
-      {/* PromptForm now receives isStreaming, error, promptInputValue directly */}
+      {/* PromptForm now receives isStreaming, error, promptInputValue, isVfsReady etc. directly */}
       <PromptForm
         {...promptFormProps}
         getContextSnapshot={promptFormProps.getContextSnapshotForMod}
@@ -126,6 +119,4 @@ const PromptWrapperComponent: React.FC<PromptWrapperProps> = ({
   );
 };
 
-// Export the memoized component
-// React.memo should be effective as most props are stable or less volatile now
 export const PromptWrapper = React.memo(PromptWrapperComponent);

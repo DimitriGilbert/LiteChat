@@ -37,7 +37,9 @@ interface PromptSettingsProps {
   enableApiKeyManagement: boolean;
   // VFS related
   enableVfs: boolean;
-  isVfsEnabledForItem: boolean;
+  isVfsEnabledForItem: boolean; // Direct prop
+  isVfsReady: boolean; // Direct prop
+  // Item related
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
   toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>;
@@ -70,7 +72,6 @@ interface PromptSettingsProps {
   setSelectedProviderId: (id: string | null) => void;
   setSelectedModelId: (id: string | null) => void;
   // VFS State for PromptSettingsAdvanced
-  isVfsReady: boolean;
   isVfsLoading: boolean;
   vfsError: string | null;
   vfsKey: string | null;
@@ -86,7 +87,8 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
   apiKeys,
   enableApiKeyManagement,
   enableVfs,
-  isVfsEnabledForItem,
+  isVfsEnabledForItem, // Use direct prop
+  isVfsReady, // Use direct prop
   selectedItemId,
   selectedItemType,
   toggleVfsEnabledAction,
@@ -109,10 +111,10 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
   activeConversationData,
   updateConversationSystemPrompt,
   updateDbProviderConfig,
-  isVfsReady,
   isVfsLoading,
   vfsError,
   vfsKey,
+  stopStreaming,
 }) => {
   const [isAdvancedPanelOpen, setIsAdvancedPanelOpen] = useState(false);
   const [advancedInitialTab, setAdvancedInitialTab] =
@@ -143,17 +145,11 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
   const isItemSelected = !!selectedItemId;
 
   const openAdvancedPanel = useCallback((tabId: string = "parameters") => {
-    console.log(
-      `[PromptSettings] openAdvancedPanel called with tabId: ${tabId}. Setting isAdvancedPanelOpen(true).`,
-    );
     setAdvancedInitialTab(tabId);
     setIsAdvancedPanelOpen(true);
   }, []);
 
   const handleToggleAdvancedClick = useCallback(() => {
-    console.log(
-      `[PromptSettings] handleToggleAdvancedClick called. Current panel state: ${isAdvancedPanelOpen}`,
-    );
     setIsAdvancedPanelOpen((prev) => !prev);
     if (!isAdvancedPanelOpen) {
       setAdvancedInitialTab("parameters");
@@ -161,7 +157,6 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
   }, [isAdvancedPanelOpen]);
 
   const handleApiKeyIconClick = useCallback(() => {
-    console.log("[PromptSettings] handleApiKeyIconClick called.");
     if (enableApiKeyManagement) {
       openAdvancedPanel("api_keys");
     } else {
@@ -171,23 +166,13 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
 
   const handleVfsContainerClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-      console.log("[PromptSettings] handleVfsContainerClick called.");
       if ((e.target as HTMLElement).closest('[role="switch"]')) {
-        console.log(
-          "[PromptSettings] Click was on switch, ignoring container click.",
-        );
         return;
       }
       if (isVfsEnabledForItem && enableAdvancedSettings && enableVfs) {
-        console.log("[PromptSettings] VFS enabled, opening files tab.");
         openAdvancedPanel("files");
       } else if (!isVfsEnabledForItem && enableVfs && isItemSelected) {
-        console.log("[PromptSettings] VFS disabled, showing info toast.");
         toast.info("Toggle the switch to enable the filesystem.");
-      } else {
-        console.log(
-          `[PromptSettings] VFS container clicked but conditions not met (isVfsEnabledForItem: ${isVfsEnabledForItem}, enableAdvancedSettings: ${enableAdvancedSettings}, enableVfs: ${enableVfs}, isItemSelected: ${isItemSelected})`,
-        );
       }
     },
     [
@@ -200,9 +185,6 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
   );
 
   const handleVfsSwitchChange = useCallback(() => {
-    console.log(
-      `[PromptSettings] handleVfsSwitchChange called for item ${selectedItemId} (${selectedItemType})`,
-    );
     if (selectedItemId && selectedItemType) {
       toggleVfsEnabledAction(selectedItemId, selectedItemType);
     } else {
@@ -216,7 +198,6 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
   return (
     <div className={cn("bg-card text-card-foreground", className)}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
-        {/* Group 1: Selectors */}
         <div className="flex items-center gap-x-2 flex-shrink min-w-0 flex-grow sm:flex-grow-0">
           <ProviderSelector
             className="flex-shrink-0"
@@ -237,9 +218,7 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
 
         <div className="flex-grow hidden sm:block" />
 
-        {/* Group 2: Action Icons */}
         <div className="flex items-center gap-x-1 flex-shrink-0">
-          {/* API Key Indicator */}
           <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -278,7 +257,6 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
             </Tooltip>
           </TooltipProvider>
 
-          {/* VFS Toggle */}
           {enableVfs && (
             <TooltipProvider delayDuration={100}>
               <Tooltip>
@@ -343,7 +321,6 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
             </TooltipProvider>
           )}
 
-          {/* Advanced Settings Toggle Button */}
           {enableAdvancedSettings && (
             <TooltipProvider delayDuration={100}>
               <Tooltip>
@@ -373,7 +350,6 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
         </div>
       </div>
 
-      {/* Advanced Settings Panel */}
       {enableAdvancedSettings && isAdvancedPanelOpen && (
         <PromptSettingsAdvanced
           className="border-t border-border animate-slideInFromTop"
@@ -406,6 +382,7 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
           dbProviderConfigs={dbProviderConfigs}
           apiKeys={apiKeys}
           updateDbProviderConfig={updateDbProviderConfig}
+          stopStreaming={stopStreaming}
         />
       )}
     </div>

@@ -7,33 +7,39 @@ import {
   GitRepoInfoData,
 } from "@/utils/git-utils";
 import { toast } from "sonner";
+import { fs } from "@zenfs/core"; // Import fs type
 
 /**
  * Custom hook for git operations in the VFS
  *
- * This hook requires the vfs object from useChatContext to work
+ * @param fsInstance The configured ZenFS instance (can be null if not ready).
  */
-export function useGit(fsInstance: any) {
+// Accept fsInstance as a parameter
+export function useGit(fsInstance: typeof fs | null) {
   const [loading, setLoading] = useState(false);
   const [gitUtils, setGitUtils] = useState<GitUtils | null>(null);
 
   useEffect(() => {
+    // Initialize GitUtils only when a valid fsInstance is provided
     if (fsInstance && typeof fsInstance === "object") {
-      setGitUtils(new GitUtils(fsInstance, null));
+      // Pass the fsInstance to GitUtils constructor
+      // Assuming GitUtils constructor accepts fs instance
+      setGitUtils(new GitUtils(fsInstance, null)); // Pass null for vfsKey for now
+      console.log("[useGit] GitUtils initialized with fs instance.");
     } else {
       setGitUtils(null);
+      console.log("[useGit] fsInstance is null, GitUtils not initialized.");
     }
-  }, [fsInstance]);
+  }, [fsInstance]); // Re-run effect when fsInstance changes
 
-  // Wraps git operations to handle loading state and toasts
   const withLoading = useCallback(
     async <T>(
       operation: () => Promise<GitOperationResult<T>>,
     ): Promise<GitOperationResult<T>> => {
       if (!gitUtils) {
         const errorMsg =
-          "Git functionality is not available (VFS might be initializing).";
-        // For non-void types we return a different shape according to GitOperationResult
+          "Git functionality is not available (VFS/Git might be initializing).";
+        toast.error(errorMsg); // Show toast for user feedback
         return {
           success: false,
           message: errorMsg,
@@ -58,8 +64,6 @@ export function useGit(fsInstance: any) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         toast.error(`Git operation failed: ${errorMessage}`);
-        
-        // Return a properly typed error result
         return {
           success: false,
           message: `Git operation failed: ${errorMessage}`,
@@ -68,10 +72,8 @@ export function useGit(fsInstance: any) {
         setLoading(false);
       }
     },
-    [gitUtils],
+    [gitUtils], // Depends on gitUtils instance
   );
-
-  // --- Git Operations ---
 
   const cloneRepository = useCallback(
     (
@@ -95,13 +97,13 @@ export function useGit(fsInstance: any) {
     (dir: string, filepath: string) => {
       if (!gitUtils) {
         console.error("Git utils not initialized for status check");
-        // For string return type, explicitly typing the failure result
         const failureResult: GitOperationResult<string> = {
           success: false,
           message: "Git utils not initialized",
         };
         return Promise.resolve(failureResult);
       }
+      // Assuming gitUtils.status doesn't need withLoading wrapper if it's read-only
       return gitUtils.status(dir, filepath);
     },
     [gitUtils],
@@ -175,6 +177,7 @@ export function useGit(fsInstance: any) {
   const isGitRepository = useCallback(
     async (dir: string): Promise<boolean> => {
       if (!gitUtils) return false;
+      // Assuming gitUtils.isGitRepo doesn't need withLoading wrapper
       return gitUtils.isGitRepo(dir);
     },
     [gitUtils],
@@ -182,7 +185,7 @@ export function useGit(fsInstance: any) {
 
   return {
     loading,
-    initialized: gitUtils !== null,
+    initialized: gitUtils !== null, // Based on whether gitUtils is initialized
     cloneRepository,
     initRepository,
     getStatus,

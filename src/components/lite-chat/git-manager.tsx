@@ -1,9 +1,7 @@
 // src/components/lite-chat/git-manager.tsx
 import React, { useState, useEffect } from "react";
-// Removed useChatContext import
-// Import necessary store hooks
 import { useVfsStore } from "@/store/vfs.store";
-import { useGit } from "@/hooks/use-git"; // Keep useGit
+import { useGit } from "@/hooks/use-git";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,20 +18,23 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { GitRepoInfoData } from "@/utils/git-utils";
-import { fs } from "@zenfs/core"; // Import fs for useGit
+// REMOVED: import { fs } from "@zenfs/core";
 
 export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
-  // Get VFS state from store
-  const { isVfsReady, vfsKey } = useVfsStore((s) => ({
+  const {
+    isVfsReady,
+    vfsKey,
+    fs: fsInstance, // Get fs instance from store
+  } = useVfsStore((s) => ({
     isVfsReady: s.isVfsReady,
-    vfsKey: s.vfsKey, // Needed to re-initialize git if VFS key changes
+    vfsKey: s.vfsKey,
+    fs: s.fs, // Select fs instance
   }));
 
-  // Initialize useGit with fs instance when ready
-  const git = useGit(isVfsReady ? fs : null);
+  // Initialize useGit with fs instance from the store
+  const git = useGit(fsInstance); // Pass fsInstance
 
-  // Local UI state remains
-  const [currentPath] = useState("/"); // Assuming root for now
+  const [currentPath] = useState("/");
   const [repoUrl, setRepoUrl] = useState("");
   const [branch, setBranch] = useState("main");
   const [commitMessage, setCommitMessage] = useState("");
@@ -47,9 +48,9 @@ export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
   const [isCloning, setIsCloning] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
 
-  // Effect to check repo status depends on git.initialized and vfsKey
   useEffect(() => {
     const checkIfRepo = async () => {
+      // Check git.initialized which depends on fsInstance being ready
       if (git.initialized && currentPath) {
         setIsRefreshing(true);
         const isGitRepo = await git.isGitRepository(currentPath);
@@ -74,9 +75,8 @@ export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
 
     checkIfRepo();
     // Re-run if git becomes initialized OR if the underlying VFS key changes
-  }, [git, currentPath, vfsKey]);
+  }, [git.initialized, currentPath, vfsKey, git]); // Added git dependency
 
-  // Handlers remain the same, using the git hook instance
   const handleClone = async () => {
     if (!repoUrl) {
       toast.error("Please enter a repository URL");
@@ -179,18 +179,19 @@ export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
   };
 
   // Render logic depends on VFS readiness and git initialization
-  if (!isVfsReady || !git.initialized) {
-    let message =
-      "Virtual Filesystem not available or not enabled for this item.";
-    if (isVfsReady && !git.initialized) {
-      message = "Initializing Git functionality...";
-    }
+  if (!isVfsReady) {
     return (
       <div className="p-4 text-center text-sm text-gray-500">
-        {message}
-        {isVfsReady && !git.initialized && (
-          <Loader2Icon className="inline-block ml-2 h-4 w-4 animate-spin" />
-        )}
+        Virtual Filesystem not available or not enabled for this item.
+      </div>
+    );
+  }
+
+  if (!git.initialized) {
+    return (
+      <div className="p-4 text-center text-sm text-gray-500">
+        Initializing Git functionality...
+        <Loader2Icon className="inline-block ml-2 h-4 w-4 animate-spin" />
       </div>
     );
   }
@@ -293,7 +294,6 @@ export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Repository Info */}
           <div className="border rounded-md p-4 space-y-2">
             <div className="flex items-center gap-2">
               <GitBranchIcon className="h-4 w-4" />
@@ -332,7 +332,6 @@ export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
             )}
           </div>
 
-          {/* Git Actions */}
           <div className="space-y-4">
             <div className="flex gap-2">
               <Button
@@ -363,7 +362,6 @@ export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
 
             <Separator />
 
-            {/* Commit Section */}
             <div className="space-y-3">
               <h4 className="font-medium">Commit Changes</h4>
               <div className="space-y-2">

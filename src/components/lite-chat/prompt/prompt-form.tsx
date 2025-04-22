@@ -34,16 +34,16 @@ interface PromptFormProps {
   clearPromptInput: () => void;
   // Direct Core State (Volatile)
   isStreaming: boolean;
+  isVfsReady: boolean; // Add direct prop
+  isVfsEnabledForItem: boolean; // Add direct prop
   // Bundled Props (less frequently changing / stable)
   attachedFiles: File[];
   selectedVfsPaths: string[];
-  isVfsEnabledForItem: boolean;
   handleSubmitCore: (
-    prompt: string, // Keep original prompt for potential logging
-    files: File[], // Keep original files
-    vfsPaths: string[], // Keep original VFS paths
+    prompt: string,
+    files: File[],
+    vfsPaths: string[],
     context: {
-      // Pass processed context
       selectedItemId: string;
       contentToSendToAI: MessageContent;
       vfsContextPaths?: string[];
@@ -53,9 +53,8 @@ interface PromptFormProps {
     currentConversationId: string,
     prompt: string,
   ) => Promise<void>;
-  setError: (error: string | null) => void; // Needed for submit service
+  setError: (error: string | null) => void;
   clearSelectedVfsPaths: () => void;
-  isVfsReady: boolean;
   toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>;
   selectedProviderId: string | null;
   selectedModelId: string | null;
@@ -94,7 +93,7 @@ interface PromptFormProps {
     systemPrompt: string | null,
   ) => Promise<void>;
   customPromptActions: CustomPromptAction[];
-  getContextSnapshot: () => ReadonlyChatContextSnapshot; // Renamed from getContextSnapshotForMod
+  getContextSnapshot: () => ReadonlyChatContextSnapshot;
   selectedModel: AiModelConfig | undefined;
   isVfsLoading: boolean;
   vfsError: string | null;
@@ -105,22 +104,22 @@ interface PromptFormProps {
 
 const PromptFormComponent: React.FC<PromptFormProps> = ({
   className,
-  // Destructure direct props (volatile state + input)
+  // Destructure direct props
   promptInputValue,
   setPromptInputValue,
   addAttachedFile,
   removeAttachedFile,
   clearPromptInput,
   isStreaming,
-  // Destructure bundled props (stable)
+  isVfsReady, // Destructure direct prop
+  isVfsEnabledForItem, // Destructure direct prop
+  // Destructure bundled props
   attachedFiles,
   selectedVfsPaths,
-  isVfsEnabledForItem,
   handleSubmitCore,
   handleImageGenerationCore,
   setError,
   clearSelectedVfsPaths,
-  isVfsReady,
   toggleVfsEnabledAction,
   selectedProviderId,
   selectedModelId,
@@ -158,7 +157,6 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   stopStreaming,
   removeSelectedVfsPath,
 }) => {
-  // Placeholder for runMiddleware
   const runMiddlewarePlaceholder = useCallback(
     async (hookName: any, payload: any) => {
       console.warn(`Placeholder runMiddleware called for ${hookName}`, payload);
@@ -167,11 +165,9 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
     [],
   );
 
-  // Use the handleSubmitCore prop passed from LiteChatInner
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    // Basic validations
     if (isStreaming) {
       toast.warning("Please wait for the current response to finish.");
       return;
@@ -193,12 +189,10 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
     let currentConversationId =
       selectedItemType === "conversation" ? selectedItemId : null;
 
-    // Create new conversation if none is selected
     if (!currentConversationId) {
       try {
         const parentId = selectedItemType === "project" ? selectedItemId : null;
         const newConvId = await createConversation(parentId, "New Chat");
-        // selectItem is handled by the parent store/effect now
         currentConversationId = newConvId;
         toast.success("Started new conversation.");
       } catch (err) {
@@ -215,7 +209,6 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       return;
     }
 
-    // --- Check for Image Generation Command ---
     const imageGenCommand = "/imagine ";
     if (
       promptInputValue.startsWith(imageGenCommand) &&
@@ -229,15 +222,13 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
         return;
       }
       try {
-        // Call the stable wrapper function from props
         await handleImageGenerationCore(currentConversationId, imagePrompt);
-        clearPromptInput(); // Clear input after successful submission
+        clearPromptInput();
         clearSelectedVfsPaths();
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
-        // Error handled by handleImageGenerationCore wrapper
+        // Error handled by core function
       }
-      return; // Stop further processing
+      return;
     } else if (
       promptInputValue.startsWith(imageGenCommand) &&
       !selectedModel.supportsImageGeneration
@@ -251,12 +242,9 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       return;
     }
 
-    // --- Proceed with Text/Multi-modal Chat Submission ---
-    // Prepare Content for AI (Text/Multi-modal)
     let finalContent: MessageContent;
     // VFS processing needs the actual VFS object, which isn't directly available here.
-    // This logic should ideally happen closer to where VFS state is managed or passed down.
-    // For now, we'll simplify and assume VFS content is handled externally or passed in context.
+    // Assuming FileHandlingService can access it or it's passed implicitly.
     const vfsContextResult = { contextPrefix: "", pathsIncludedInContext: [] }; // Placeholder
     const attachedFileParts =
       await FileHandlingService.processAttachedFiles(attachedFiles);
@@ -272,32 +260,49 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
     );
 
     if (imageParts.length > 0) {
-      // Multi-modal case
       finalContent = [];
       finalContent.push(...imageParts);
       let combinedText = "";
       if (vfsText) combinedText += vfsText;
-      if (userText) combinedText += (combinedText ? "\n" : "") + userText;
+      if (userText)
+        combinedText +=
+          (combinedText
+            ? `
+
+`
+            : "") + userText;
       textPartsFromFiles.forEach((part) => {
-        combinedText += (combinedText ? "\n" : "") + part.text;
+        combinedText +=
+          (combinedText
+            ? `
+
+`
+            : "") + part.text;
       });
       if (combinedText) {
         finalContent.push({ type: "text", text: combinedText });
       }
     } else {
-      // Text-only case
       let combinedText = "";
       if (vfsText) combinedText += vfsText;
-      if (userText) combinedText += (combinedText ? "\n" : "") + userText;
+      if (userText)
+        combinedText +=
+          (combinedText
+            ? `
+
+`
+            : "") + userText;
       textPartsFromFiles.forEach((part) => {
-        combinedText += (combinedText ? "\n" : "") + part.text;
+        combinedText +=
+          (combinedText
+            ? `
+
+`
+            : "") + part.text;
       });
       finalContent = combinedText;
     }
 
-    // --- Middleware Placeholder ---
-    // This needs to be implemented properly if middleware is used.
-    // For now, assume no middleware or pass the placeholder function.
     const middlewarePayload: SubmitPromptPayload = {
       prompt: finalContent,
       conversationId: currentConversationId,
@@ -314,23 +319,20 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
     }
     const contentToSubmit = middlewareResult.prompt;
     const vfsPathsToSave = middlewareResult.vfsPaths;
-    // --- End Middleware Placeholder ---
 
     try {
-      // Call the wrapper function passed via props
       await handleSubmitCore(
-        promptInputValue, // Pass original prompt for potential logging/history
-        attachedFiles, // Pass original files
-        selectedVfsPaths, // Pass original VFS paths
+        promptInputValue,
+        attachedFiles,
+        selectedVfsPaths,
         {
-          // Pass the processed context
           selectedItemId: currentConversationId,
-          contentToSendToAI: contentToSubmit, // Use potentially modified content
-          vfsContextPaths: vfsPathsToSave, // Use potentially modified paths
+          contentToSendToAI: contentToSubmit,
+          vfsContextPaths: vfsPathsToSave,
         },
       );
-      clearPromptInput(); // Use direct prop action
-      clearSelectedVfsPaths(); // Use bundled prop action
+      clearPromptInput();
+      clearSelectedVfsPaths();
     } catch (error) {
       console.error("Error during chat submission:", error);
       toast.error(
@@ -342,7 +344,6 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
     }
   };
 
-  // Effect to clear VFS paths if VFS becomes disabled for the item (uses props)
   useEffect(() => {
     if (!isVfsEnabledForItem && selectedVfsPaths.length > 0) {
       clearSelectedVfsPaths();
@@ -354,34 +355,29 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       onSubmit={handleFormSubmit}
       className={cn("flex flex-col", className)}
     >
-      {/* Pass props down */}
       <PromptFiles
-        attachedFiles={attachedFiles} // From bundle
-        removeAttachedFile={removeAttachedFile} // Direct prop
+        attachedFiles={attachedFiles}
+        removeAttachedFile={removeAttachedFile}
       />
-      {/* Pass props down */}
       <SelectedVfsFilesDisplay
-        selectedVfsPaths={selectedVfsPaths} // From bundle
-        removeSelectedVfsPath={removeSelectedVfsPath} // From bundle
-        isVfsEnabledForItem={isVfsEnabledForItem} // From bundle
-        isVfsReady={isVfsReady} // From bundle
+        selectedVfsPaths={selectedVfsPaths}
+        removeSelectedVfsPath={removeSelectedVfsPath}
+        isVfsEnabledForItem={isVfsEnabledForItem} // Pass direct prop
+        isVfsReady={isVfsReady} // Pass direct prop
       />
 
       <div className="flex items-end p-3 md:p-4">
-        {/* Pass direct props down */}
         <PromptInput
           className="min-h-[60px]"
-          prompt={promptInputValue} // Direct prop
-          setPrompt={setPromptInputValue} // Direct prop
-          isStreaming={isStreaming} // Direct prop
+          prompt={promptInputValue}
+          setPrompt={setPromptInputValue}
+          isStreaming={isStreaming}
         />
-        {/* Pass direct props down */}
         <PromptActions
-          prompt={promptInputValue} // Direct prop
-          isStreaming={isStreaming} // Direct prop
-          addAttachedFile={addAttachedFile} // Direct prop
-          setPrompt={setPromptInputValue} // Direct prop
-          // Pass derived/state props needed by PromptActions (from stable bundle)
+          prompt={promptInputValue}
+          isStreaming={isStreaming}
+          addAttachedFile={addAttachedFile}
+          setPrompt={setPromptInputValue}
           selectedModel={selectedModel}
           customPromptActions={customPromptActions}
           getContextSnapshot={getContextSnapshot}
@@ -389,9 +385,8 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       </div>
 
       <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
-        {/* Pass stable props down */}
+        {/* Pass direct props down to PromptSettings */}
         <PromptSettings
-          // Provider/Model related (from stable bundle)
           selectedProviderId={selectedProviderId}
           dbProviderConfigs={dbProviderConfigs}
           apiKeys={apiKeys}
@@ -399,15 +394,12 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
           selectedModelId={selectedModelId}
           setSelectedProviderId={setSelectedProviderId}
           setSelectedModelId={setSelectedModelId}
-          // VFS related (from stable bundle)
-          enableVfs={true} // Pass global flag if available
-          isVfsEnabledForItem={isVfsEnabledForItem}
+          enableVfs={true} // Assuming global VFS is enabled if this renders
+          isVfsEnabledForItem={isVfsEnabledForItem} // Pass direct prop
           selectedItemId={selectedItemId}
           selectedItemType={selectedItemType}
           toggleVfsEnabledAction={toggleVfsEnabledAction}
-          // Advanced Settings related (from stable bundle)
           enableAdvancedSettings={enableAdvancedSettings}
-          // Pass down AI params for PromptSettingsAdvanced (from stable bundle)
           temperature={temperature}
           setTemperature={setTemperature}
           topP={topP}
@@ -424,12 +416,10 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
           activeConversationData={activeConversationData}
           updateConversationSystemPrompt={updateConversationSystemPrompt}
           updateDbProviderConfig={updateDbProviderConfig}
-          // Pass down VFS state for PromptSettingsAdvanced (from stable bundle)
-          isVfsReady={isVfsReady}
+          isVfsReady={isVfsReady} // Pass direct prop
           isVfsLoading={isVfsLoading}
           vfsError={vfsError}
           vfsKey={vfsKey}
-          // Pass down stopStreaming (from stable bundle)
           stopStreaming={stopStreaming}
         />
       </div>
@@ -437,6 +427,4 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   );
 };
 
-// Export the memoized component
-// React.memo should be effective as most props are stable or less volatile now
 export const PromptForm = React.memo(PromptFormComponent);

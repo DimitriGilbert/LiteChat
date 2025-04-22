@@ -1,5 +1,5 @@
 // src/components/lite-chat/file-manager/file-manager-table.tsx
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -130,7 +130,13 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
       cancelHandler();
     }
   };
+  const memoizedEntries = useMemo(() => entries, [entries]);
 
+  if (isOperationLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">loading</div>
+    );
+  }
   return (
     <ScrollArea className="flex-grow h-0 border-t border-gray-700">
       <Table className="w-full text-sm">
@@ -209,7 +215,7 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
               </TableCell>
             </TableRow>
           )}
-          {entries.map((entry) => {
+          {memoizedEntries.map((entry) => {
             const isEditingThis = editingPath === entry.path;
             const isChecked = checkedPaths.has(entry.path);
             const isGitRepo = gitRepoStatus[entry.path] ?? false;

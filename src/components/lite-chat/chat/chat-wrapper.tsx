@@ -4,32 +4,39 @@ import { ChatContent } from "./chat-content";
 import { PromptWrapper } from "@/components/lite-chat/prompt/prompt-wrapper";
 import { ChatHeader } from "./chat-header";
 import { cn } from "@/lib/utils";
+// Import the updated prop types from chat.tsx
 import type { ChatWrapperDirectProps, ChatWrapperBundledProps } from "../chat";
 
+// Use the updated ChatWrapperProps type
 type ChatWrapperProps = ChatWrapperDirectProps & {
   bundledProps: ChatWrapperBundledProps;
 };
 
 const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
   className,
+  // Destructure direct props
   promptInputValue,
   setPromptInputValue,
   messages,
   isStreaming,
   isLoadingMessages,
   error,
+  isVfsReady, // Destructure direct prop
+  isVfsEnabledForItem, // Destructure direct prop
   addAttachedFile,
   removeAttachedFile,
   clearPromptInput,
+  // Destructure bundled props
   bundledProps,
 }) => {
+  // Destructure bundled props needed here or passed down further
   const {
     selectedItemId,
     selectedItemType,
     sidebarItems,
     attachedFiles,
     selectedVfsPaths,
-    isVfsEnabledForItem,
+    // isVfsEnabledForItem, // REMOVED from bundle
     regenerateMessage,
     handleSubmitCore,
     handleImageGenerationCore,
@@ -62,7 +69,7 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
     globalSystemPrompt,
     activeConversationData,
     updateConversationSystemPrompt,
-    isVfsReady,
+    // isVfsReady, // REMOVED from bundle
     isVfsLoading,
     vfsError,
     vfsKey,
@@ -96,24 +103,27 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
       />
       <ChatContent
         className="flex-grow h-0"
-        messages={messages}
-        isLoadingMessages={isLoadingMessages}
-        isStreaming={isStreaming}
+        messages={messages} // Pass direct prop
+        isLoadingMessages={isLoadingMessages} // Pass direct prop
+        isStreaming={isStreaming} // Pass direct prop
         regenerateMessage={regenerateMessage}
         getContextSnapshotForMod={getContextSnapshotForMod}
         modMessageActions={modMessageActions}
       />
+      {/* Pass direct props down to PromptWrapper */}
       <PromptWrapper
-        error={error}
-        isStreaming={isStreaming}
-        promptInputValue={promptInputValue}
-        setPromptInputValue={setPromptInputValue}
-        addAttachedFile={addAttachedFile}
-        removeAttachedFile={removeAttachedFile}
-        clearPromptInput={clearPromptInput}
+        error={error} // Pass direct prop
+        isStreaming={isStreaming} // Pass direct prop
+        promptInputValue={promptInputValue} // Pass direct prop
+        setPromptInputValue={setPromptInputValue} // Pass direct prop
+        addAttachedFile={addAttachedFile} // Pass direct prop
+        removeAttachedFile={removeAttachedFile} // Pass direct prop
+        clearPromptInput={clearPromptInput} // Pass direct prop
+        isVfsReady={isVfsReady} // Pass direct prop
+        isVfsEnabledForItem={isVfsEnabledForItem} // Pass direct prop
+        // Pass bundled props down
         attachedFiles={attachedFiles}
         selectedVfsPaths={selectedVfsPaths}
-        isVfsEnabledForItem={isVfsEnabledForItem}
         handleSubmitCore={handleSubmitCore}
         handleImageGenerationCore={handleImageGenerationCore}
         clearSelectedVfsPaths={clearSelectedVfsPaths}
@@ -131,7 +141,6 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
         selectedItemType={selectedItemType}
         setError={setError}
         removeSelectedVfsPath={removeSelectedVfsPath}
-        isVfsReady={isVfsReady}
         toggleVfsEnabledAction={toggleVfsEnabledAction}
         enableAdvancedSettings={enableAdvancedSettings}
         temperature={temperature}

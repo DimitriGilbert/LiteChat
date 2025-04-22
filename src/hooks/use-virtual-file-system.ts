@@ -1,171 +1,232 @@
 // src/hooks/use-virtual-file-system.ts
 import { useEffect, useRef } from "react";
-// Import fs directly for type usage and configureSingle
-import { configureSingle } from "@zenfs/core";
+import { configureSingle, fs } from "@zenfs/core";
 import { IndexedDB } from "@zenfs/dom";
-// Import the Zustand store
 import { useVfsStore } from "@/store/vfs.store";
+import { toast } from "sonner";
 
 /**
- * Hook to manage the lifecycle of the ZenFS filesystem instance based on
- * the state derived from the selected sidebar item (managed in useVfsStore).
- * It configures/reconfigures the global `fs` object from '@zenfs/core'.
- * It updates the operational state (ready, loading, error) in the Zustand store.
- * It does NOT perform file operations directly; those are handled by actions
- * in useVfsStore which call functions from vfs-operations.ts.
+ * Hook to manage the lifecycle of the ZenFS filesystem instance.
+ * Receives key state values as arguments to ensure reactivity.
  */
-export function useVirtualFileSystemManager(): void {
-  // Select necessary state and actions from the store
-  const vfsKey = useVfsStore((s) => s.vfsKey);
-  const isEnabled = useVfsStore((s) => s.isVfsEnabledForItem);
-  const globalEnableVfs = useVfsStore((s) => s.enableVfs);
+export function useVirtualFileSystemManager(
+  vfsKey: string | null, // Argument
+  isEnabled: boolean, // Argument (isVfsEnabledForItem)
+  globalEnableVfs: boolean, // Argument
+): void {
+  // Select only actions and state needed *within* the hook's logic
   const setVfsLoading = useVfsStore((s) => s.setVfsLoading);
   const setVfsOperationLoading = useVfsStore((s) => s.setVfsOperationLoading);
   const setVfsError = useVfsStore((s) => s.setVfsError);
   const setVfsReady = useVfsStore((s) => s.setVfsReady);
   const setConfiguredVfsKey = useVfsStore((s) => s.setConfiguredVfsKey);
-  const isReady = useVfsStore((s) => s.isVfsReady); // Needed for checks
-  const currentConfiguredVfsKey = useVfsStore((s) => s.configuredVfsKey); // Needed for checks
+  const _setFsInstance = useVfsStore((s) => s._setFsInstance);
 
   const isMountedRef = useRef(false);
   const configuringForVfsKeyRef = useRef<string | null>(null);
+  const lastPropsRef = useRef({ vfsKey, isEnabled, globalEnableVfs });
+
+  // Force a more verbose logging to debug the issue
+  console.log(
+    `[VFS Manager Hook] RENDER with props: vfsKey=${vfsKey}, isEnabled=${isEnabled}, globalEnableVfs=${globalEnableVfs}`,
+  );
 
   useEffect(() => {
     isMountedRef.current = true;
+
+    // Log changes in props to help debug
+    if (
+      lastPropsRef.current.vfsKey !== vfsKey ||
+      lastPropsRef.current.isEnabled !== isEnabled ||
+      lastPropsRef.current.globalEnableVfs !== globalEnableVfs
+    ) {
+      console.log(
+        `[VFS Manager Hook] PROPS CHANGED:
+        - vfsKey: ${lastPropsRef.current.vfsKey} -> ${vfsKey}
+        - isEnabled: ${lastPropsRef.current.isEnabled} -> ${isEnabled}
+        - globalEnableVfs: ${lastPropsRef.current.globalEnableVfs} -> ${globalEnableVfs}`,
+      );
+      lastPropsRef.current = { vfsKey, isEnabled, globalEnableVfs };
+    }
+
     console.log(
-      `[VFS Manager Hook] Effect triggered. VFS Key: ${vfsKey}, IsEnabledForItem: ${isEnabled}, GlobalEnable: ${globalEnableVfs}`,
+      `[VFS Manager Hook] === Effect Run ===
+` +
+        `  - Target Key (vfsKey): ${vfsKey}
+` +
+        `  - Enabled For Item (isEnabled): ${isEnabled}
+` +
+        `  - Global VFS Enabled (globalEnableVfs): ${globalEnableVfs}
+` +
+        `  - Current Configured Key: ${useVfsStore.getState().configuredVfsKey}
+` +
+        `  - Is Ready: ${useVfsStore.getState().isVfsReady}
+` +
+        `  - Is Loading: ${useVfsStore.getState().isVfsLoading}`,
     );
 
     const configureNewFs = async (key: string) => {
-      if (!isMountedRef.current) return;
+      console.log(
+        `[VFS Manager Hook] configureNewFs called for key: ${key}. Current configuringRef: ${configuringForVfsKeyRef.current}`,
+      );
+
+      if (!isMountedRef.current) {
+        console.log(
+          `[VFS Manager Hook] configureNewFs aborted (unmounted) for key: ${key}`,
+        );
+        return;
+      }
+      if (configuringForVfsKeyRef.current === key) {
+        console.log(
+          `[VFS Manager Hook] configureNewFs skipped (already configuring) for key: ${key}`,
+        );
+        return;
+      }
+      if (configuringForVfsKeyRef.current !== null) {
+        console.log(
+          `[VFS Manager Hook] configureNewFs skipped (another config running: ${configuringForVfsKeyRef.current}) for key: ${key}`,
+        );
+        return;
+      }
 
       console.log(
-        `[VFS Manager Hook] Configuring global fs for VFS key: ${key} using configureSingle`,
+        `[VFS Manager Hook] Starting configuration process for VFS key: ${key}`,
       );
       configuringForVfsKeyRef.current = key;
 
-      // Update store state: Start loading, clear errors/readiness
       setVfsLoading(true);
-      setVfsOperationLoading(false); // Reset operation loading too
+      setVfsOperationLoading(false);
       setVfsError(null);
       setVfsReady(false);
-      setConfiguredVfsKey(null); // Clear configured key until success
+      setConfiguredVfsKey(null);
+      _setFsInstance(null);
 
       try {
         const vfsConf = {
           backend: IndexedDB,
-          name: `litechat_vfs_${key}`, // Unique DB per key
+          name: `litechat_vfs_${key}`,
         };
-        // Configure the *global* fs instance provided by @zenfs/core
+        console.log(
+          `[VFS Manager Hook] Calling configureSingle for key: ${key} with config:`,
+          vfsConf,
+        );
         await configureSingle(vfsConf);
+        console.log(
+          `[VFS Manager Hook] configureSingle SUCCESS for key: ${key}`,
+        );
 
-        // Check if the state is still relevant after async configuration
-        const currentVfsKeyInStore = useVfsStore.getState().vfsKey;
-        if (
-          isMountedRef.current &&
-          configuringForVfsKeyRef.current === key &&
-          currentVfsKeyInStore === key // Ensure the target key hasn't changed again
-        ) {
-          // Update store state: Configuration successful
-          setConfiguredVfsKey(key); // Set the key that was successfully configured
+        // Re-fetch the target key from the store *after* await
+        const currentTargetKey = useVfsStore.getState().vfsKey;
+        console.log(
+          `[VFS Manager Hook] Post-config check for key: ${key}. Mounted: ${isMountedRef.current}, Current Target Key: ${currentTargetKey}`,
+        );
+        if (isMountedRef.current && currentTargetKey === key) {
+          _setFsInstance(fs);
+          setConfiguredVfsKey(key);
+          // Set ready state last to ensure all other state is set first
           setVfsReady(true);
-          setVfsError(null);
           console.log(
-            `[VFS Manager Hook] Global fs configured successfully for ${key}. Store updated.`,
+            `[VFS Manager Hook] State updated for SUCCESS (Ready: true) for key: ${key}`,
           );
         } else {
           console.log(
-            `[VFS Manager Hook] Configuration for ${key} finished, but hook/store state changed (mounted: ${isMountedRef.current}, target: ${currentVfsKeyInStore}, configuredFor: ${configuringForVfsKeyRef.current}). Store state not updated for ready.`,
+            `[VFS Manager Hook] State changed during config for key: ${key}. NOT setting Ready state.`,
           );
-          // If the target key changed, ensure readiness is false
-          if (currentVfsKeyInStore !== key) {
+          if (currentTargetKey !== key) {
             setVfsReady(false);
             setConfiguredVfsKey(null);
+            _setFsInstance(null);
           }
         }
       } catch (err) {
         console.error(
-          `[VFS Manager Hook] Configuration failed for ${key}:`,
+          `[VFS Manager Hook] configureSingle FAILED for key: ${key}:`,
           err,
         );
-        const currentVfsKeyInStore = useVfsStore.getState().vfsKey;
-        // Only update error if the failed key is still the target key
-        if (isMountedRef.current && currentVfsKeyInStore === key) {
+        // Re-fetch the target key from the store *after* await
+        const currentTargetKey = useVfsStore.getState().vfsKey;
+        if (isMountedRef.current && currentTargetKey === key) {
           const errorMsg = `Failed to initialize filesystem: ${err instanceof Error ? err.message : String(err)}`;
           setVfsError(errorMsg);
           setVfsReady(false);
           setConfiguredVfsKey(null);
+          _setFsInstance(null);
+          toast.error(errorMsg);
+          console.log(
+            `[VFS Manager Hook] State updated for FAILURE (Ready: false) for key: ${key}`,
+          );
         }
       } finally {
-        // Only stop loading if this specific configuration attempt is finishing
         if (configuringForVfsKeyRef.current === key) {
           setVfsLoading(false);
           configuringForVfsKeyRef.current = null;
+          console.log(
+            `[VFS Manager Hook] Loading state set to false for key: ${key}`,
+          );
         }
       }
     };
 
-    // Determine if VFS should be active based on global flag and item-specific flag
     const shouldBeActive = globalEnableVfs && isEnabled && vfsKey;
+    console.log(
+      `[VFS Manager Hook] Calculated shouldBeActive: ${shouldBeActive}`,
+    );
 
     if (shouldBeActive) {
-      // If the target key is different from the currently configured one, reconfigure
-      if (vfsKey !== currentConfiguredVfsKey) {
+      console.log(
+        `[VFS Manager Hook] Condition: Should be active. Comparing target key '${vfsKey}' with configured key '${useVfsStore.getState().configuredVfsKey}'.`,
+      );
+      if (vfsKey !== useVfsStore.getState().configuredVfsKey) {
         console.log(
-          `[VFS Manager Hook] Target key '${vfsKey}' differs from configured '${currentConfiguredVfsKey}'. Reconfiguring.`,
+          `[VFS Manager Hook] Keys differ. Checking if already configuring: ${configuringForVfsKeyRef.current}`,
         );
-        configureNewFs(vfsKey);
+        if (configuringForVfsKeyRef.current === null) {
+          configureNewFs(vfsKey);
+        } else {
+          console.log(
+            `[VFS Manager Hook] Delaying config for ${vfsKey} because ${configuringForVfsKeyRef.current} is running.`,
+          );
+        }
       } else {
-        // Already configured for the correct key, ensure state is consistent
         console.log(
-          `[VFS Manager Hook] Already configured for target key '${vfsKey}'. Ensuring store state is ready.`,
+          `[VFS Manager Hook] Keys match ('${vfsKey}'). Ensuring state consistency.`,
         );
-        if (!isReady) setVfsReady(true); // Ensure ready state is true
-        setVfsLoading(false); // Ensure loading is false
-        setVfsError(null); // Ensure no errors
+        // Use direct store reads for latest state within the effect
+        const latestStoreState = useVfsStore.getState();
+        if (!latestStoreState.isVfsReady) setVfsReady(true);
+        if (latestStoreState.isVfsLoading) setVfsLoading(false);
+        if (latestStoreState.vfsError) setVfsError(null);
+        if (!latestStoreState.fs) _setFsInstance(fs);
       }
     } else {
-      // VFS should not be active (disabled globally, disabled for item, or no item selected)
       console.log(
-        `[VFS Manager Hook] VFS should not be active. Clearing ready state and configured key.`,
+        `[VFS Manager Hook] Condition: Should NOT be active. Clearing state.`,
       );
-      if (isReady) setVfsReady(false);
-      if (currentConfiguredVfsKey !== null) setConfiguredVfsKey(null);
-      // Clear other states if they were potentially set
-      setVfsLoading(false);
+      // Use direct store reads for latest state before setting
+      const latestStoreState = useVfsStore.getState();
+      if (latestStoreState.isVfsReady) setVfsReady(false);
+      if (latestStoreState.configuredVfsKey !== null) setConfiguredVfsKey(null);
+      if (latestStoreState.fs) _setFsInstance(null);
+      if (latestStoreState.isVfsLoading) setVfsLoading(false);
       setVfsOperationLoading(false);
       setVfsError(null);
-      // Note: We don't need to explicitly "unmount" or "disconnect" the global fs.
-      // Subsequent calls to configureSingle will handle replacing the backend.
     }
 
-    // Cleanup function
     return () => {
-      console.log("[VFS Manager Hook] Unmounting or dependencies changed.");
+      console.log("[VFS Manager Hook] Cleanup function running.");
       isMountedRef.current = false;
-      // Optional: If a configuration was in progress when unmounting, log it.
-      if (configuringForVfsKeyRef.current) {
-        console.log(
-          `[VFS Manager Hook] Unmounted while configuration for ${configuringForVfsKeyRef.current} might be in progress.`,
-        );
-      }
     };
-    // Dependencies: The hook reacts to changes in the target VFS key,
-    // the item-specific enabled flag, and the global VFS flag.
   }, [
+    // Include the actual props in the dependency array
     vfsKey,
     isEnabled,
     globalEnableVfs,
+    // Include the actions
     setVfsLoading,
     setVfsOperationLoading,
     setVfsError,
     setVfsReady,
     setConfiguredVfsKey,
-    currentConfiguredVfsKey, // Include to detect when config needs changing
-    isReady, // Include to ensure consistency checks run
+    _setFsInstance,
   ]);
-
-  // This hook doesn't return anything as it only manages the FS instance lifecycle
-  // and updates the Zustand store. Components will use useVfsStore directly
-  // to get state and trigger operation actions.
 }

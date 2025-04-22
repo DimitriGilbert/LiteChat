@@ -1,8 +1,7 @@
 // src/components/lite-chat/file-manager.tsx
-import React, { useState, useEffect, useCallback, useRef } from "react";
-// Keep VFS store import for this component
+import React, { useState, useEffect, useCallback, useRef, memo } from "react";
 import { useVfsStore } from "@/store/vfs.store";
-import { useSidebarStore } from "@/store/sidebar.store"; // Keep for selectedItemType
+import { useSidebarStore } from "@/store/sidebar.store";
 import { useGit } from "@/hooks/use-git";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -29,9 +28,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-// REMOVED: import { fs } from "@zenfs/core"; // Keep fs import
 
-// Helper function remains the same
 const getRepoNameFromUrl = (url: string): string => {
   try {
     const cleanUrl = url.endsWith("/") ? url.slice(0, -1) : url;
@@ -43,56 +40,89 @@ const getRepoNameFromUrl = (url: string): string => {
   }
 };
 
-// FileManager continues to use useVfsStore directly
-export const FileManager: React.FC<{ className?: string }> = ({
+const FileManagerComponent: React.FC<{ className?: string }> = ({
   className,
 }) => {
-  // Get state/actions from VFS store
-  const {
-    vfsKey,
-    isVfsReady,
-    isVfsLoading,
-    isVfsOperationLoading,
-    vfsError,
-    selectedVfsPaths,
-    addSelectedVfsPath,
-    removeSelectedVfsPath,
-    listFiles,
-    deleteVfsItem,
-    downloadAllAsZip,
-    downloadFile,
-    uploadFiles,
-    uploadAndExtractZip,
-    renameVfsItem,
-    createDirectory,
-    fs: fsInstance, // Get the fs instance from the store
-  } = useVfsStore((s) => ({
-    vfsKey: s.vfsKey,
-    isVfsReady: s.isVfsReady,
-    isVfsLoading: s.isVfsLoading,
-    isVfsOperationLoading: s.isVfsOperationLoading,
-    vfsError: s.vfsError,
-    selectedVfsPaths: s.selectedVfsPaths,
-    addSelectedVfsPath: s.addSelectedVfsPath,
-    removeSelectedVfsPath: s.removeSelectedVfsPath,
-    listFiles: s.listFiles,
-    deleteVfsItem: s.deleteVfsItem,
-    downloadAllAsZip: s.downloadAllAsZip,
-    downloadFile: s.downloadFile,
-    uploadFiles: s.uploadFiles,
-    uploadAndExtractZip: s.uploadAndExtractZip,
-    renameVfsItem: s.renameVfsItem,
-    createDirectory: s.createDirectory,
-    fs: s.fs, // Get fs instance
-  }));
+  const vfsKey = useVfsStore((s) => s.vfsKey);
+  const isVfsReady = useVfsStore((s) => s.isVfsReady);
+  const isVfsLoading = useVfsStore((s) => s.isVfsLoading);
+  const isVfsOperationLoading = useVfsStore((s) => s.isVfsOperationLoading);
+  const vfsError = useVfsStore((s) => s.vfsError);
+  const selectedVfsPaths = useVfsStore((s) => s.selectedVfsPaths);
+  const addSelectedVfsPath = useVfsStore((s) => s.addSelectedVfsPath);
+  const removeSelectedVfsPath = useVfsStore((s) => s.removeSelectedVfsPath);
+  const listFiles = useVfsStore((s) => s.listFiles);
+  const deleteVfsItem = useVfsStore((s) => s.deleteVfsItem);
+  const downloadAllAsZip = useVfsStore((s) => s.downloadAllAsZip);
+  const downloadFile = useVfsStore((s) => s.downloadFile);
+  const uploadFiles = useVfsStore((s) => s.uploadFiles);
+  const uploadAndExtractZip = useVfsStore((s) => s.uploadAndExtractZip);
+  const renameVfsItem = useVfsStore((s) => s.renameVfsItem);
+  const createDirectory = useVfsStore((s) => s.createDirectory);
+  const fsInstance = useVfsStore((s) => s.fs);
 
-  // Get selected item type from sidebar store
   const selectedItemType = useSidebarStore((s) => s.selectedItemType);
+  const isVfsEnabledForItem = useVfsStore((s) => s.isVfsEnabledForItem);
 
-  // Use Git hook, passing the fs instance from the store
-  const git = useGit(fsInstance); // Pass fsInstance
+  useEffect(() => {
+    // Store the effect cleanup status
+    let isMounted = true;
+    console.log(
+      `[FileManager] Effect triggered. isVfsReady: ${isVfsReady}, vfsKey: ${vfsKey}`,
+    );
 
-  // Local UI state remains
+    const loadInitialData = async () => {
+      if (!isVfsReady) return;
+      if (!isMounted) return;
+
+      try {
+        console.log(`[FileManager] Loading entries for root path`);
+        // Force loading from root directory
+        const normalizedPath = "/";
+        const fetchedEntries = await listFiles(normalizedPath);
+
+        if (!isMounted) return;
+
+        fetchedEntries.sort((a: FileSystemEntry, b: FileSystemEntry) => {
+          if (a.isDirectory !== b.isDirectory) {
+            return a.isDirectory ? -1 : 1;
+          }
+          return a.name.localeCompare(b.name);
+        });
+
+        setEntries(fetchedEntries);
+        setCurrentPath(normalizedPath);
+        console.log(
+          `[FileManager] Loaded ${fetchedEntries.length} entries for root`,
+        );
+      } catch (error) {
+        console.error(`[FileManager] Initial load error:`, error);
+        if (isMounted) {
+          setEntries([]);
+        }
+      }
+    };
+
+    if (isVfsReady) {
+      loadInitialData();
+    } else {
+      setEntries([]);
+      setGitRepoStatus({});
+      setEditingPath(null);
+      setCreatingFolder(false);
+      setCurrentPath("/");
+      console.log("[FileManager] VFS not ready, resetting state.");
+    }
+
+    return () => {
+      isMounted = false;
+    };
+
+    // Only run when these specific props change
+  }, [isVfsReady, vfsKey, listFiles]);
+
+  const git = useGit(fsInstance);
+
   const [currentPath, setCurrentPath] = useState("/");
   const [entries, setEntries] = useState<FileSystemEntry[]>([]);
   const [editingPath, setEditingPath] = useState<string | null>(null);
@@ -120,18 +150,15 @@ export const FileManager: React.FC<{ className?: string }> = ({
   const renameInputRef = useRef<HTMLInputElement>(null);
   const newFolderInputRef = useRef<HTMLInputElement>(null);
 
-  // Combine loading states from store
   const isConfigLoading = isVfsLoading;
-  const isCombinedOperationLoading = isVfsOperationLoading || git.loading; // Combine VFS and Git loading
+  const isCombinedOperationLoading = isVfsOperationLoading || git.loading;
   const configError = vfsError;
   const isAnyLoading = isConfigLoading || isCombinedOperationLoading;
 
-  // Sync local checkedPaths with store state
   useEffect(() => {
     setCheckedPaths(new Set(selectedVfsPaths));
   }, [selectedVfsPaths]);
 
-  // checkGitStatusForEntries remains the same, uses git hook
   const checkGitStatusForEntries = useCallback(
     async (currentEntries: FileSystemEntry[]) => {
       if (!git.initialized) return;
@@ -156,69 +183,81 @@ export const FileManager: React.FC<{ className?: string }> = ({
     [git],
   );
 
-  // loadEntries now uses listFiles action from store
+  // Replace the loadEntries function with this version that has safeguards
   const loadEntries = useCallback(
     async (path: string) => {
-      if (!isVfsReady || isAnyLoading) {
+      if (!isVfsReady || isCombinedOperationLoading) {
+        console.log(
+          `[FileManager] loadEntries skipped. isVfsReady: ${isVfsReady}, isAnyLoading: ${isCombinedOperationLoading}`,
+        );
         return;
       }
+
+      // Skip if already showing this path
+      if (path === currentPath) {
+        console.log(`[FileManager] Already showing path: ${path}`);
+        return;
+      }
+
       try {
+        console.log(`[FileManager] Loading entries for path: ${path}`);
         const normalizedPath = normalizePath(path);
-        const fetchedEntries = await listFiles(normalizedPath); // Use store action
+        const fetchedEntries = await listFiles(normalizedPath);
+
         fetchedEntries.sort((a: FileSystemEntry, b: FileSystemEntry) => {
           if (a.isDirectory !== b.isDirectory) {
             return a.isDirectory ? -1 : 1;
           }
           return a.name.localeCompare(b.name);
         });
+
         setEntries(fetchedEntries);
         setCurrentPath(normalizedPath);
         await checkGitStatusForEntries(fetchedEntries);
+        console.log(
+          `[FileManager] Loaded ${fetchedEntries.length} entries for ${normalizedPath}`,
+        );
       } catch (error) {
-        console.error("FileManager List Error (handled by store):", error);
+        console.error(`[FileManager] List Error for path ${path}:`, error);
         setEntries([]);
       }
     },
-    [isVfsReady, isAnyLoading, listFiles, checkGitStatusForEntries], // Use store state/actions
+    [
+      isVfsReady,
+      isCombinedOperationLoading,
+      currentPath,
+      listFiles,
+      checkGitStatusForEntries,
+    ],
   );
 
-  // Effect to load entries based on store readiness and vfsKey changes
-  useEffect(() => {
-    if (isVfsReady) {
-      loadEntries(currentPath); // Load current path on ready
-    } else {
-      setEntries([]);
-      setGitRepoStatus({});
-      setEditingPath(null);
-      setCreatingFolder(false);
-      setCurrentPath("/"); // Reset path if VFS becomes not ready
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isVfsReady, vfsKey]); // Reload if readiness or the key itself changes
+  const handleNavigate = useCallback(
+    (entry: FileSystemEntry) => {
+      if (isAnyLoading || editingPath) return;
+      if (entry.isDirectory) {
+        loadEntries(entry.path);
+      }
+    },
+    [isAnyLoading, editingPath, loadEntries],
+  );
 
-  // Navigation handlers remain mostly the same, call loadEntries
-  const handleNavigate = (entry: FileSystemEntry) => {
-    if (isAnyLoading || editingPath) return;
-    if (entry.isDirectory) {
-      loadEntries(entry.path);
-    }
-  };
-  const handleNavigateUp = () => {
+  const handleNavigateUp = useCallback(() => {
     if (isAnyLoading) return;
     if (currentPath !== "/") {
       loadEntries(dirname(currentPath));
     }
-  };
-  const handleNavigateHome = () => {
+  }, [isAnyLoading, currentPath, loadEntries]);
+
+  const handleNavigateHome = useCallback(() => {
     if (isAnyLoading) return;
     loadEntries("/");
-  };
-  const handleRefresh = () => {
+  }, [isAnyLoading, loadEntries]);
+
+  const handleRefresh = useCallback(() => {
     if (isAnyLoading) return;
     loadEntries(currentPath);
-  };
+  }, [isAnyLoading, currentPath, loadEntries]);
 
-  // Checkbox handler uses store actions
   const handleCheckboxChange = useCallback(
     (checked: boolean, path: string) => {
       if (isCombinedOperationLoading) return;
@@ -226,10 +265,10 @@ export const FileManager: React.FC<{ className?: string }> = ({
         const next = new Set(prev);
         if (checked) {
           next.add(path);
-          addSelectedVfsPath(path); // Store action
+          addSelectedVfsPath(path);
         } else {
           next.delete(path);
-          removeSelectedVfsPath(path); // Store action
+          removeSelectedVfsPath(path);
         }
         return next;
       });
@@ -237,120 +276,127 @@ export const FileManager: React.FC<{ className?: string }> = ({
     [addSelectedVfsPath, removeSelectedVfsPath, isCombinedOperationLoading],
   );
 
-  // Delete handler uses store action
-  const handleDelete = async (entry: FileSystemEntry) => {
-    if (isAnyLoading) return;
-    if (!isVfsReady) {
-      toast.error("Filesystem not ready.");
-      return;
-    }
-    const itemType = entry.isDirectory ? "folder" : "file";
-    const confirmation = window.confirm(
-      `Delete ${itemType} "${entry.name}"?${
-        entry.isDirectory
-          ? `
+  const handleDelete = useCallback(
+    async (entry: FileSystemEntry) => {
+      if (isAnyLoading) return;
+      if (!isVfsReady) {
+        toast.error("Filesystem not ready.");
+        return;
+      }
+      const itemType = entry.isDirectory ? "folder" : "file";
+      const confirmation = window.confirm(
+        `Delete ${itemType} "${entry.name}"?${
+          entry.isDirectory
+            ? `
 
 WARNING: This will delete all contents inside!`
-          : ""
-      }`,
-    );
-    if (confirmation) {
-      try {
-        await deleteVfsItem(entry.path, entry.isDirectory); // Use store action
-        // No need to update local checkedPaths, useEffect handles sync
-        loadEntries(currentPath); // Refresh view
-      } catch (error) {
-        console.error("FileManager Delete Error (handled by store):", error);
-      }
-    }
-  };
-
-  // Download handler uses store actions
-  const handleDownload = async (entry: FileSystemEntry) => {
-    if (isAnyLoading) return;
-    if (!isVfsReady) {
-      toast.error("Filesystem not ready.");
-      return;
-    }
-    try {
-      if (entry.isDirectory) {
-        const filename = `vfs_${entry.name}.zip`;
-        await downloadAllAsZip(filename, entry.path); // Use store action
-      } else {
-        await downloadFile(entry.path, entry.name); // Use store action
-      }
-    } catch (error) {
-      console.error("FileManager Download Error (handled by store):", error);
-    }
-  };
-
-  // Upload click handlers remain the same
-  const handleUploadClick = () => {
-    if (isAnyLoading) return;
-    fileInputRef.current?.click();
-  };
-  const handleFolderUploadClick = () => {
-    if (isAnyLoading) return;
-    folderInputRef.current?.click();
-  };
-  const handleArchiveUploadClick = () => {
-    if (isAnyLoading) return;
-    archiveInputRef.current?.click();
-  };
-
-  // File change handlers use store actions
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (isAnyLoading) {
-      e.target.value = "";
-      return;
-    }
-    if (!isVfsReady) {
-      toast.error("Filesystem not ready for upload.");
-      e.target.value = "";
-      return;
-    }
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      try {
-        await uploadFiles(Array.from(files), currentPath); // Use store action
-        loadEntries(currentPath);
-      } catch (error) {
-        console.error("FileManager Upload Error (handled by store):", error);
-      }
-    }
-    e.target.value = "";
-  };
-
-  const handleArchiveChange = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    if (isAnyLoading) {
-      e.target.value = "";
-      return;
-    }
-    if (!isVfsReady) {
-      toast.error("Filesystem not ready for archive extraction.");
-      e.target.value = "";
-      return;
-    }
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.name.toLowerCase().endsWith(".zip")) {
+            : ""
+        }`,
+      );
+      if (confirmation) {
         try {
-          await uploadAndExtractZip(file, currentPath); // Use store action
+          await deleteVfsItem(entry.path, entry.isDirectory);
           loadEntries(currentPath);
         } catch (error) {
-          console.error("FileManager Extract Error (handled by store):", error);
+          console.error("FileManager Delete Error (handled by store):", error);
         }
-      } else {
-        toast.error("Only ZIP archive extraction is currently supported.");
       }
-    }
-    e.target.value = "";
-  };
+    },
+    [isAnyLoading, isVfsReady, loadEntries, currentPath, deleteVfsItem],
+  );
 
-  // Download all handler uses store action
-  const handleDownloadAll = async () => {
+  const handleDownload = useCallback(
+    async (entry: FileSystemEntry) => {
+      if (isAnyLoading) return;
+      if (!isVfsReady) {
+        toast.error("Filesystem not ready.");
+        return;
+      }
+      try {
+        if (entry.isDirectory) {
+          const filename = `vfs_${entry.name}.zip`;
+          await downloadAllAsZip(filename, entry.path);
+        } else {
+          await downloadFile(entry.path, entry.name);
+        }
+      } catch (error) {
+        console.error("FileManager Download Error (handled by store):", error);
+      }
+    },
+    [isAnyLoading, isVfsReady, downloadAllAsZip, downloadFile],
+  );
+
+  const handleUploadClick = useCallback(() => {
+    if (isAnyLoading) return;
+    fileInputRef.current?.click();
+  }, [isAnyLoading]);
+  const handleFolderUploadClick = useCallback(() => {
+    if (isAnyLoading) return;
+    folderInputRef.current?.click();
+  }, [isAnyLoading]);
+  const handleArchiveUploadClick = useCallback(() => {
+    if (isAnyLoading) return;
+    archiveInputRef.current?.click();
+  }, [isAnyLoading]);
+
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (isAnyLoading) {
+        e.target.value = "";
+        return;
+      }
+      if (!isVfsReady) {
+        toast.error("Filesystem not ready for upload.");
+        e.target.value = "";
+        return;
+      }
+      const files = e.target.files;
+      if (files && files.length > 0) {
+        try {
+          await uploadFiles(Array.from(files), currentPath);
+          loadEntries(currentPath);
+        } catch (error) {
+          console.error("FileManager Upload Error (handled by store):", error);
+        }
+      }
+      e.target.value = "";
+    },
+    [isAnyLoading, isVfsReady, uploadFiles, loadEntries, currentPath],
+  );
+
+  const handleArchiveChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (isAnyLoading) {
+        e.target.value = "";
+        return;
+      }
+      if (!isVfsReady) {
+        toast.error("Filesystem not ready for archive extraction.");
+        e.target.value = "";
+        return;
+      }
+      const file = e.target.files?.[0];
+      if (file) {
+        if (file.name.toLowerCase().endsWith(".zip")) {
+          try {
+            await uploadAndExtractZip(file, currentPath);
+            loadEntries(currentPath);
+          } catch (error) {
+            console.error(
+              "FileManager Extract Error (handled by store):",
+              error,
+            );
+          }
+        } else {
+          toast.error("Only ZIP archive extraction is currently supported.");
+        }
+      }
+      e.target.value = "";
+    },
+    [isAnyLoading, isVfsReady, loadEntries, currentPath, uploadAndExtractZip],
+  );
+
+  const handleDownloadAll = useCallback(async () => {
     if (isAnyLoading) return;
     if (!isVfsReady) {
       toast.error("Filesystem not ready for export.");
@@ -358,25 +404,28 @@ WARNING: This will delete all contents inside!`
     }
     try {
       const filename = `vfs_${basename(currentPath) || "root"}_export.zip`;
-      await downloadAllAsZip(filename, currentPath); // Use store action
+      await downloadAllAsZip(filename, currentPath);
     } catch (error) {
       console.error("FileManager Export Error (handled by store):", error);
     }
-  };
+  }, [isAnyLoading, isVfsReady, currentPath, downloadAllAsZip]);
 
-  // Editing/Creating state management remains local UI state
-  const startEditing = (entry: FileSystemEntry) => {
-    if (isAnyLoading || creatingFolder) return;
-    setEditingPath(entry.path);
-    setNewName(entry.name);
-    setCreatingFolder(false);
-  };
-  const cancelEditing = () => {
+  const startEditing = useCallback(
+    (entry: FileSystemEntry) => {
+      if (isAnyLoading || creatingFolder) return;
+      setEditingPath(entry.path);
+      setNewName(entry.name);
+      setCreatingFolder(false);
+    },
+    [isAnyLoading, creatingFolder],
+  );
+
+  const cancelEditing = useCallback(() => {
     setEditingPath(null);
     setNewName("");
-  };
-  // Rename handler uses store action
-  const handleRename = async () => {
+  }, []);
+
+  const handleRename = useCallback(async () => {
     if (isCombinedOperationLoading) return;
     if (!isVfsReady) {
       toast.error("Filesystem not ready for rename.");
@@ -395,14 +444,23 @@ WARNING: This will delete all contents inside!`
     }
     const newPath = joinPath(dirname(editingPath), trimmedNewName);
     try {
-      await renameVfsItem(editingPath, newPath); // Use store action
-      // No need to update local checked state, useEffect handles sync
+      await renameVfsItem(editingPath, newPath);
       cancelEditing();
-      loadEntries(currentPath); // Refresh view
+      loadEntries(currentPath);
     } catch (error) {
       console.error("FileManager Rename Error (handled by store):", error);
     }
-  };
+  }, [
+    isCombinedOperationLoading,
+    isVfsReady,
+    editingPath,
+    newName,
+    currentPath,
+    cancelEditing,
+    loadEntries,
+    renameVfsItem,
+  ]);
+
   useEffect(() => {
     if (editingPath) {
       renameInputRef.current?.focus();
@@ -420,7 +478,6 @@ WARNING: This will delete all contents inside!`
     setCreatingFolder(false);
     setNewFolderName("");
   };
-  // Create folder handler uses store action
   const handleCreateFolder = async () => {
     if (isCombinedOperationLoading) return;
     if (!isVfsReady) {
@@ -435,10 +492,10 @@ WARNING: This will delete all contents inside!`
     }
     const newPath = joinPath(currentPath, trimmedName);
     try {
-      await createDirectory(newPath); // Use store action
+      await createDirectory(newPath);
       toast.success(`Folder "${trimmedName}" created.`);
       cancelCreatingFolder();
-      loadEntries(currentPath); // Refresh view
+      loadEntries(currentPath);
     } catch (error) {
       console.error(
         "FileManager Create Folder Error (handled by store):",
@@ -452,7 +509,6 @@ WARNING: This will delete all contents inside!`
     }
   }, [creatingFolder]);
 
-  // Git handlers remain the same, use git hook instance
   const handleGitInit = useCallback(
     async (path: string) => {
       if (!git.initialized) {
@@ -568,9 +624,9 @@ WARNING: This will delete all contents inside!`
     setIsCloning(true);
 
     try {
-      const currentEntriesInPath = await listFiles(currentPath); // Use store action
+      const currentEntriesInPath = await listFiles(currentPath);
       const conflict = currentEntriesInPath.find(
-        (entry) => entry.name === repoName,
+        (entry: FileSystemEntry) => entry.name === repoName,
       );
 
       if (conflict) {
@@ -587,7 +643,7 @@ WARNING: This will delete all contents inside!`
 
       if (result.success) {
         setIsCloneDialogOpen(false);
-        loadEntries(currentPath); // Refresh view
+        loadEntries(currentPath);
       }
     } catch (listError) {
       console.error("Error checking for existing directory:", listError);
@@ -597,7 +653,6 @@ WARNING: This will delete all contents inside!`
     }
   };
 
-  // --- Render Logic ---
   if (isConfigLoading) {
     return (
       <div className={cn("p-4 space-y-2", className)}>
@@ -617,9 +672,21 @@ WARNING: This will delete all contents inside!`
     );
   }
   if (!isVfsReady) {
+    console.log(
+      `[FileManager] Not ready. isVfsReady=${isVfsReady}, isVfsLoading=${isVfsLoading}, vfsError=${vfsError}`,
+    );
     return (
       <div className="p-4 text-center text-sm text-gray-500">
-        Virtual Filesystem not available or not enabled for this item.
+        {isVfsLoading ? (
+          <div className="flex items-center justify-center gap-2">
+            <Loader2Icon className="h-4 w-4 animate-spin" />
+            <span>Initializing Virtual Filesystem...</span>
+          </div>
+        ) : (
+          <span>
+            Virtual Filesystem not available or not enabled for this item.
+          </span>
+        )}
       </div>
     );
   }
@@ -630,7 +697,7 @@ WARNING: This will delete all contents inside!`
       <FileManagerToolbar
         currentPath={currentPath}
         isAnyLoading={isAnyLoading}
-        isOperationLoading={isCombinedOperationLoading} // Use combined loading state
+        isOperationLoading={isCombinedOperationLoading}
         entries={entries}
         editingPath={editingPath}
         creatingFolder={creatingFolder}
@@ -649,36 +716,44 @@ WARNING: This will delete all contents inside!`
         handleFileChange={handleFileChange}
         handleArchiveChange={handleArchiveChange}
       />
-      <FileManagerTable
-        entries={entries}
-        editingPath={editingPath}
-        newName={newName}
-        creatingFolder={creatingFolder}
-        newFolderName={newFolderName}
-        checkedPaths={checkedPaths}
-        isOperationLoading={isCombinedOperationLoading} // Use combined loading state
-        handleNavigate={handleNavigate}
-        handleCheckboxChange={handleCheckboxChange}
-        startEditing={startEditing}
-        cancelEditing={cancelEditing}
-        handleRename={handleRename}
-        cancelCreatingFolder={cancelCreatingFolder}
-        handleCreateFolder={handleCreateFolder}
-        handleDownload={handleDownload}
-        handleDelete={handleDelete}
-        setNewName={setNewName}
-        setNewFolderName={setNewFolderName}
-        renameInputRef={renameInputRef}
-        newFolderInputRef={newFolderInputRef}
-        gitRepoStatus={gitRepoStatus}
-        handleGitInit={handleGitInit}
-        handleGitPull={handleGitPull}
-        handleGitCommit={handleGitCommit}
-        handleGitPush={handleGitPush}
-        handleGitStatus={handleGitStatus}
-      />
+      {isCombinedOperationLoading ? (
+        // Use a simple loading indicator during operations
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2Icon className="h-5 w-5 mr-2 animate-spin" />
+          <span>Loading files...</span>
+        </div>
+      ) : (
+        // Only render the table when not loading
+        <FileManagerTable
+          entries={entries}
+          editingPath={editingPath}
+          newName={newName}
+          creatingFolder={creatingFolder}
+          newFolderName={newFolderName}
+          checkedPaths={checkedPaths}
+          isOperationLoading={false} // IMPORTANT: force this to false to prevent ScrollArea issues
+          handleNavigate={handleNavigate}
+          handleCheckboxChange={handleCheckboxChange}
+          startEditing={startEditing}
+          cancelEditing={cancelEditing}
+          handleRename={handleRename}
+          cancelCreatingFolder={cancelCreatingFolder}
+          handleCreateFolder={handleCreateFolder}
+          handleDownload={handleDownload}
+          handleDelete={handleDelete}
+          setNewName={setNewName}
+          setNewFolderName={setNewFolderName}
+          renameInputRef={renameInputRef}
+          newFolderInputRef={newFolderInputRef}
+          gitRepoStatus={gitRepoStatus}
+          handleGitInit={handleGitInit}
+          handleGitPull={handleGitPull}
+          handleGitCommit={handleGitCommit}
+          handleGitPush={handleGitPush}
+          handleGitStatus={handleGitStatus}
+        />
+      )}
 
-      {/* Commit Dialog */}
       <Dialog
         open={isCommitDialogOpen}
         onOpenChange={(open) => {
@@ -737,7 +812,6 @@ WARNING: This will delete all contents inside!`
         </DialogContent>
       </Dialog>
 
-      {/* Clone Dialog */}
       <Dialog
         open={isCloneDialogOpen}
         onOpenChange={(open) => {
@@ -809,3 +883,4 @@ WARNING: This will delete all contents inside!`
     </div>
   );
 };
+export const FileManager = memo(FileManagerComponent);
