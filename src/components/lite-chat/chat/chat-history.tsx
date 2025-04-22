@@ -37,6 +37,8 @@ interface HistoryItemProps {
     type: SidebarItemType,
   ) => Promise<void>;
   exportConversation: (conversationId: string) => Promise<void>;
+  // Add startRename prop
+  startRename: (id: string, currentName: string) => void;
 }
 
 const HistoryItem: React.FC<HistoryItemProps> = React.memo(
@@ -49,6 +51,7 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
     deleteItem,
     renameItem,
     exportConversation,
+    startRename, // Destructure startRename
   }) => {
     const [isEditing, setIsEditing] = useState(startInEditMode);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -141,9 +144,8 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
     const handleEditClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       const currentName = item.type === "project" ? item.name : item.title;
-      nameBeforeEdit.current = currentName;
-      setEditedName(currentName);
-      setIsEditing(true);
+      // Use startRename prop instead of setting state directly
+      startRename(item.id, currentName);
     };
 
     const handleClick = () => {
@@ -341,7 +343,8 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
 );
 HistoryItem.displayName = "HistoryItem";
 
-interface ChatHistoryProps {
+// Add startRename prop to ChatHistoryProps
+export interface ChatHistoryProps {
   className?: string;
   sidebarItems: SidebarItem[];
   editingItemId: string | null;
@@ -355,6 +358,7 @@ interface ChatHistoryProps {
     type: SidebarItemType,
   ) => Promise<void>;
   exportConversation: (conversationId: string) => Promise<void>;
+  startRename: (id: string, currentName: string) => void; // Add prop definition
 }
 
 const ChatHistoryComponent: React.FC<ChatHistoryProps> = ({
@@ -367,6 +371,7 @@ const ChatHistoryComponent: React.FC<ChatHistoryProps> = ({
   deleteItem,
   renameItem,
   exportConversation,
+  startRename, // Destructure startRename
 }) => {
   const itemsToDisplay = sidebarItems;
 
@@ -389,6 +394,7 @@ const ChatHistoryComponent: React.FC<ChatHistoryProps> = ({
             deleteItem={deleteItem}
             renameItem={renameItem}
             exportConversation={exportConversation}
+            startRename={startRename} // Pass startRename down
           />
         ))}
       </div>

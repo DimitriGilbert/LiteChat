@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
-// Import the bundled props type
+// Import the bundled props type from chat.tsx
 import type { SettingsModalTabProps } from "../chat";
 
 // Update component props to expect the bundled object
@@ -49,7 +49,7 @@ const SettingsGeneralComponent: React.FC<SettingsGeneralComponentProps> = ({
     } finally {
       setIsSaving(false);
     }
-  }, [rootGitEnabled, rootGitRepoUrl, rootGitRepoBranch /*, updateDbMod */]); // Add prop action to deps
+  }, [rootGitEnabled, rootGitRepoUrl]);
 
   const handleSliderChange = useCallback(
     (value: number[]) => {

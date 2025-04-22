@@ -11,6 +11,7 @@ import type {
   Workflow,
   AiModelConfig,
   AiProviderConfig,
+  DbProviderConfig, // Added DbProviderConfig
 } from "@/lib/types";
 import { convertDbMessagesToCoreMessages } from "@/utils/chat-utils";
 import {
@@ -19,6 +20,9 @@ import {
 } from "@/services/workflow-execution-service"; // Import service
 import { workflowEvents, WorkflowEvent } from "@/services/workflow-events"; // Import events
 import Dexie from "dexie";
+// Import necessary store hooks
+import { useProviderStore } from "./provider.store";
+import { useSettingsStore } from "./settings.store";
 
 // Helper function (consider moving to utils)
 const findMessageAndParent = (
@@ -51,7 +55,7 @@ interface CoreChatState {
 }
 
 export interface CoreChatActions {
-  loadMessages: (conversationId: string) => Promise<void>;
+  loadMessages: (conversationId: string | null) => Promise<void>; // Allow null
   setMessages: (messages: Message[]) => void;
   addMessage: (message: Message) => void;
   updateMessage: (id: string, updates: Partial<Message>) => void;
@@ -102,6 +106,10 @@ export const useCoreChatStore = create(
     activeWorkflows: new Map(),
 
     loadMessages: async (conversationId) => {
+      if (!conversationId) {
+        set({ messages: [], isLoadingMessages: false, error: null });
+        return;
+      }
       set({ isLoadingMessages: true, messages: [], error: null });
       try {
         const dbMessages = await db.messages
@@ -210,8 +218,12 @@ export const useCoreChatStore = create(
     },
 
     addDbMessage: async (messageData) => {
-      // This remains largely the same, handling single message saves
+      // Ensure conversationId exists before proceeding
       if (!messageData.conversationId) {
+        console.error(
+          "addDbMessage error: conversationId is missing.",
+          messageData,
+        );
         throw new Error("Cannot add message without a conversationId");
       }
       const newMessage: DbMessage = {
@@ -219,16 +231,16 @@ export const useCoreChatStore = create(
         createdAt: messageData.createdAt ?? new Date(),
         role: messageData.role,
         content: messageData.content,
-        conversationId: messageData.conversationId,
-        vfsContextPaths: messageData.vfsContextPaths,
-        tool_calls: messageData.tool_calls,
-        tool_call_id: messageData.tool_call_id,
-        children: messageData.children, // Save children
-        workflow: messageData.workflow, // Save workflow
-        providerId: messageData.providerId,
-        modelId: messageData.modelId,
-        tokensInput: messageData.tokensInput,
-        tokensOutput: messageData.tokensOutput,
+        conversationId: messageData.conversationId, // Now guaranteed to be string
+        vfsContextPaths: messageData.vfsContextPaths ?? undefined,
+        tool_calls: messageData.tool_calls ?? undefined,
+        tool_call_id: messageData.tool_call_id ?? undefined,
+        children: messageData.children ?? undefined,
+        workflow: messageData.workflow ?? undefined,
+        providerId: messageData.providerId ?? undefined,
+        modelId: messageData.modelId ?? undefined,
+        tokensInput: messageData.tokensInput ?? undefined,
+        tokensOutput: messageData.tokensOutput ?? undefined,
       };
       await db.messages.add(newMessage);
       await db.conversations.update(messageData.conversationId, {
@@ -275,7 +287,14 @@ export const useCoreChatStore = create(
       };
       get().addMessage(userMessage); // Add to UI immediately
       try {
-        await get().addDbMessage(userMessage); // Save to DB
+        // Ensure conversationId is present before calling addDbMessage
+        if (!userMessage.conversationId) {
+          throw new Error("Conversation ID missing for user message.");
+        }
+        await get().addDbMessage({
+          ...userMessage,
+          conversationId: userMessage.conversationId, // Explicitly pass string
+        });
         console.log("User message saved:", userMessage.id);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
@@ -298,7 +317,14 @@ export const useCoreChatStore = create(
       };
       get().addMessage(userMessage); // Add to UI immediately
       try {
-        await get().addDbMessage(userMessage); // Save to DB
+        // Ensure conversationId is present before calling addDbMessage
+        if (!userMessage.conversationId) {
+          throw new Error("Conversation ID missing for image prompt message.");
+        }
+        await get().addDbMessage({
+          ...userMessage,
+          conversationId: userMessage.conversationId, // Explicitly pass string
+        });
         console.log("User image prompt message saved:", userMessage.id);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
@@ -483,7 +509,14 @@ export const useCoreChatStore = create(
 
       get().addMessage(parentMessage); // Add parent to UI
       try {
-        await get().addDbMessage(parentMessage); // Save parent to DB
+        // Ensure conversationId is present before calling addDbMessage
+        if (!parentMessage.conversationId) {
+          throw new Error("Conversation ID missing for workflow parent.");
+        }
+        await get().addDbMessage({
+          ...parentMessage,
+          conversationId: parentMessage.conversationId, // Explicitly pass string
+        });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         get().setError(`Failed to save workflow trigger: ${message}`);
@@ -506,17 +539,19 @@ export const useCoreChatStore = create(
         // A more robust approach would involve specifying provider/model pairs in the command.
         let taskProvider: AiProviderConfig | undefined;
         let taskModel: AiModelConfig | undefined;
+        // FIX: Import and use useProviderStore
         const providers = Object.values(
           useProviderStore.getState().dbProviderConfigs,
         ); // Get providers from provider store
 
         for (const pConfig of providers) {
-          const modelInfo = pConfig.fetchedModels?.find(
-            (m) => m.id === modelId,
+          // FIX: Add type annotation for pConfig
+          const modelInfo = (pConfig as DbProviderConfig).fetchedModels?.find(
+            (m: { id: string }) => m.id === modelId, // FIX: Add type annotation for m
           );
           if (modelInfo) {
-            taskProvider = getProvider(pConfig.id); // Use passed getter
-            taskModel = getModel(pConfig.id, modelId); // Use passed getter
+            taskProvider = getProvider((pConfig as DbProviderConfig).id); // Use passed getter
+            taskModel = getModel((pConfig as DbProviderConfig).id, modelId); // Use passed getter
             break;
           }
         }
@@ -536,6 +571,7 @@ export const useCoreChatStore = create(
             provider: taskProvider,
             messages: [...coreHistory, { role: "user", content: promptText }], // Use prompt for this task
             // Add other parameters (temp, etc.) if needed, maybe from global settings?
+            // FIX: Import and use useSettingsStore
             temperature: useSettingsStore.getState().temperature,
             maxTokens: useSettingsStore.getState().maxTokens,
           },
@@ -586,11 +622,11 @@ export const useCoreChatStore = create(
 
         // Start execution (don't await here, let it run in background)
         workflowService
-          .startWorkflow(parentMessageId, workflowType, tasks)
+          .startWorkflow(parentMessageId, workflowType!, tasks) // Add non-null assertion for workflowType
           .catch((err) => {
             // Handle potential errors during workflow setup/execution not caught by task errors
             console.error(`Workflow ${parentMessageId} failed globally:`, err);
-            const message = err instanceof Error ? err.message : String(err);
+            // const message = err instanceof Error ? err.message : String(err); // Unused variable
             // Update parent status if not already errored
             set((s) => {
               const pIdx = s.messages.findIndex(

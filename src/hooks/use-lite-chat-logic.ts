@@ -27,15 +27,14 @@ import {
   type InputState,
   type InputActions,
 } from "@/store/input.store";
-// Removed useChatInput import
 import type {
   SidebarItemType,
   DbConversation,
   AiProviderConfig,
   AiModelConfig,
-  DbProviderConfig,
+  // DbProviderConfig, // Removed unused import
   Message,
-  MessageContent,
+  // MessageContent, // Removed unused import
 } from "@/lib/types";
 import type { ReadonlyChatContextSnapshot } from "@/mods/api";
 import { db } from "@/lib/db";
@@ -46,7 +45,8 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createOllama } from "ollama-ai-provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { WorkflowExecutionService } from "@/services/workflow-execution-service";
+// Removed unused import
+// import { WorkflowExecutionService } from "@/services/workflow-execution-service";
 
 interface UseLiteChatLogicProps {
   editingItemId: string | null;
@@ -601,8 +601,8 @@ Really delete everything? Consider exporting first.`,
   const handleFormSubmit = useCallback(
     async (
       promptValue: string,
-      files: File[],
-      vfsPaths: string[],
+      _files: File[], // _files is unused
+      _vfsPaths: string[], // _vfsPaths is unused
       context: any,
     ) => {
       const commandMatch = promptValue.match(/^\/(\w+)\s*(.*)/s);

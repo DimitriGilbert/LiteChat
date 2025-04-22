@@ -1,8 +1,7 @@
 // src/hooks/ai-interaction/stream-handler.ts
-import { nanoid } from "nanoid";
-import { Message } from "@/lib/types"; // Ensure Message type is imported
+import { Message } from "@/lib/types";
 import { throttle } from "@/lib/throttle";
-import { modEvents, ModEvent } from "@/mods/events";
+import { nanoid } from "nanoid";
 
 /**
  * Creates an assistant message placeholder for streaming

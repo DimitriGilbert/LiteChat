@@ -16,7 +16,6 @@ import { SettingsApiKeys } from "./settings-api-keys";
 import { SettingsDataManagement } from "./settings-data-management";
 import { SettingsMods } from "./settings-mods";
 import { SettingsProviders } from "./settings-providers";
-// REMOVED store imports
 import type { CustomSettingTab } from "@/lib/types";
 // Import the bundled props type from chat.tsx
 import type { SettingsModalTabProps } from "../chat";
@@ -34,8 +33,6 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
   onClose,
   settingsProps, // Destructure the bundled props object itself
 }) => {
-  // REMOVED store access
-
   // Handle modal open/close via props/callback
   const handleOpenChange = (open: boolean) => {
     if (!open) {

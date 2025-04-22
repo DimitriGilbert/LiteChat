@@ -22,12 +22,12 @@ import type {
 } from "@/lib/types";
 import { FileHandlingService } from "@/services/file-handling-service";
 import type { SubmitPromptPayload } from "@/mods/types";
-// Removed CoreChatActions import
-import { createOpenAI } from "@ai-sdk/openai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { createOllama } from "ollama-ai-provider";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+// Removed unused imports
+// import { createOpenAI } from "@ai-sdk/openai";
+// import { createGoogleGenerativeAI } from "@ai-sdk/google";
+// import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+// import { createOllama } from "ollama-ai-provider";
+// import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 interface PromptFormProps {
   className?: string;
@@ -36,8 +36,8 @@ interface PromptFormProps {
   setPromptInputValue: (value: string) => void;
   addAttachedFile: (file: File) => void;
   removeAttachedFile: (fileName: string) => void;
-  clearPromptInput: () => void;
-  clearAttachedFiles: () => void;
+  // clearPromptInput: () => void; // Removed unused prop
+  // clearAttachedFiles: () => void; // Removed unused prop
   // Direct Core State (Volatile)
   isStreaming: boolean;
   isVfsReady: boolean;
@@ -99,8 +99,8 @@ interface PromptFormProps {
   vfsKey: string | null;
   stopStreaming: (parentMessageId?: string | null) => void;
   removeSelectedVfsPath: (path: string) => void;
-  getApiKeyForProvider: (providerId: string) => string | undefined;
-  selectedProvider: AiProviderConfigType | undefined;
+  // getApiKeyForProvider: (providerId: string) => string | undefined; // Removed unused prop
+  // selectedProvider: AiProviderConfigType | undefined; // Removed unused prop
 }
 
 const PromptFormComponent: React.FC<PromptFormProps> = ({
@@ -110,8 +110,8 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   setPromptInputValue,
   addAttachedFile,
   removeAttachedFile,
-  clearPromptInput,
-  clearAttachedFiles,
+  // clearPromptInput, // Removed unused prop
+  // clearAttachedFiles, // Removed unused prop
   isStreaming,
   isVfsReady,
   isVfsEnabledForItem,
@@ -156,12 +156,13 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   vfsKey,
   stopStreaming,
   removeSelectedVfsPath,
-  getApiKeyForProvider,
-  selectedProvider,
+  // getApiKeyForProvider, // Removed unused prop
+  // selectedProvider, // Removed unused prop
 }) => {
   // Placeholder for middleware - replace if actual middleware is used
   const runMiddlewarePlaceholder = useCallback(
-    async (hookName: any, payload: any) => {
+    async (_hookName: any, payload: any) => {
+      // _hookName is unused
       return payload; // Pass through
     },
     [],
@@ -240,17 +241,17 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       finalContent.push(...imageParts);
       let combinedText = "";
       if (vfsText) combinedText += vfsText;
-      if (userText) combinedText += (combinedText ? "\n\n" : "") + userText;
+      if (userText) combinedText += (combinedText ? `\n\n` : "") + userText;
       textPartsFromFiles.forEach((part) => {
-        combinedText += (combinedText ? "\n\n" : "") + part.text;
+        combinedText += (combinedText ? `\n\n` : "") + part.text;
       });
       if (combinedText) finalContent.push({ type: "text", text: combinedText });
     } else {
       let combinedText = "";
       if (vfsText) combinedText += vfsText;
-      if (userText) combinedText += (combinedText ? "\n\n" : "") + userText;
+      if (userText) combinedText += (combinedText ? `\n\n` : "") + userText;
       textPartsFromFiles.forEach((part) => {
-        combinedText += (combinedText ? "\n\n" : "") + part.text;
+        combinedText += (combinedText ? `\n\n` : "") + part.text;
       });
       finalContent = combinedText;
     }

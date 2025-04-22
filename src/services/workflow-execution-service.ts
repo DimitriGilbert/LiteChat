@@ -1,6 +1,6 @@
 // src/services/workflow-execution-service.ts
+// import { nanoid } from "nanoid"; // Removed unused import
 import { streamText, StreamTextResult, TextStreamPart } from "ai";
-import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { workflowEvents, WorkflowEvent } from "./workflow-events";
 import type {
@@ -11,7 +11,7 @@ import type {
   Workflow,
 } from "@/lib/types";
 import { getStreamHeaders } from "@/hooks/ai-interaction/stream-handler"; // Reuse helper
-import { mapToCoreMessages } from "@/hooks/ai-interaction/message-mapper"; // Reuse helper
+// import { mapToCoreMessages } from "@/hooks/ai-interaction/message-mapper"; // Removed unused import
 
 // Define a more specific task configuration
 // This remains suitable as each task needs its own context/model etc.

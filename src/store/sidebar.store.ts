@@ -222,13 +222,8 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             .equals(id)
             .count();
           if (childProjectsCount > 0 || childConvosCount > 0) {
-            toast.success(
-              `${type === "project" ? "Project" : "Chat"} "${
-                type === "project"
-                  ? (itemToDelete as DbProject).name
-                  : (itemToDelete as DbConversation).title
-              }" deleted.`,
-            );
+            // FIX: Show error toast, not success
+            toast.error("Cannot delete project with items inside.");
             return;
           }
         } catch (countErr) {

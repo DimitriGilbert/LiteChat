@@ -13,16 +13,66 @@ import type {
   SidebarItem,
   DbProject,
   DbConversation,
-  DbProviderConfig,
-  DbApiKey,
-  CustomSettingTab,
-  DbMod,
-  ModInstance,
+  // DbProviderConfig, // Removed unused import
+  // DbApiKey, // Removed unused import
+  // CustomSettingTab, // Removed unused import
+  // DbMod, // Removed unused import
+  // ModInstance, // Removed unused import
+  DbProviderConfig as ProviderConfigType, // Keep for SettingsModalTabProps
+  DbApiKey as ApiKeyType, // Keep for SettingsModalTabProps
+  CustomSettingTab as SettingTabType, // Keep for SettingsModalTabProps
+  DbMod as ModType, // Keep for SettingsModalTabProps
+  ModInstance as ModInstanceType, // Keep for SettingsModalTabProps
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { MenuIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ComponentType } from "react";
+
+// Define the bundled props type here
+export interface SettingsModalTabProps {
+  theme: "light" | "dark" | "system";
+  setTheme: (theme: "light" | "dark" | "system") => void;
+  dbProviderConfigs: ProviderConfigType[];
+  apiKeys: ApiKeyType[];
+  addDbProviderConfig: (
+    config: Omit<ProviderConfigType, "id" | "createdAt" | "updatedAt">,
+  ) => Promise<string>;
+  updateDbProviderConfig: (
+    id: string,
+    changes: Partial<ProviderConfigType>,
+  ) => Promise<void>;
+  deleteDbProviderConfig: (id: string) => Promise<void>;
+  fetchModels: (providerConfigId: string) => Promise<void>;
+  providerFetchStatus: Record<
+    string,
+    "idle" | "fetching" | "error" | "success"
+  >;
+  getAllAvailableModelDefs: (
+    providerConfigId: string,
+  ) => { id: string; name: string }[];
+  globalSystemPrompt: string | null;
+  setGlobalSystemPrompt: (prompt: string | null) => void;
+  addApiKey: (
+    name: string,
+    providerId: string,
+    value: string,
+  ) => Promise<string>;
+  deleteApiKey: (id: string) => Promise<void>;
+  importConversation: (file: File, parentId: string | null) => Promise<void>;
+  exportAllConversations: () => Promise<void>;
+  clearAllData: () => Promise<void>;
+  dbMods: ModType[];
+  loadedMods: ModInstanceType[];
+  addDbMod: (modData: Omit<ModType, "id" | "createdAt">) => Promise<string>;
+  updateDbMod: (id: string, changes: Partial<ModType>) => Promise<void>;
+  deleteDbMod: (id: string) => Promise<void>;
+  enableAdvancedSettings: boolean;
+  enableApiKeyManagement: boolean;
+  customSettingsTabs: SettingTabType[];
+  streamingRefreshRateMs: number;
+  setStreamingRefreshRateMs: (rate: number) => void;
+}
 
 interface LiteChatProps {
   config?: LiteChatConfig;
@@ -138,7 +188,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     clearAllData,
     getAllAvailableModelDefs,
     handleFormSubmit,
-    handleImageGenerationWrapper,
+    // handleImageGenerationWrapper, // Removed unused variable
     stopStreaming,
     regenerateMessage,
     getContextSnapshotForMod,
@@ -192,7 +242,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
   const enableSidebar = enableSidebarFromHook ?? enableSidebarConfig;
 
   // Prepare props for Settings Modal
-  const settingsModalProps = useMemo(
+  const settingsModalProps: SettingsModalTabProps = useMemo(
     () => ({
       theme: settingsState.theme,
       setTheme: settingsActions.setTheme,
