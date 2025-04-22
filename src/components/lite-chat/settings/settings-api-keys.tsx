@@ -26,7 +26,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { DbProviderConfig, DbApiKey } from "@/lib/types"; // Added DbProviderConfig, DbApiKey
+import type { DbProviderConfig, DbApiKey } from "@/lib/types";
 
 // Define props based on what SettingsModal passes down
 interface SettingsApiKeysProps {
@@ -41,7 +41,6 @@ interface SettingsApiKeysProps {
   enableApiKeyManagement: boolean;
 }
 
-// Wrap component logic in a named function for React.memo
 const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
   apiKeys, // Use prop
   addApiKey, // Use prop action
@@ -57,9 +56,6 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
   const [showValues, setShowValues] = useState<Record<string, boolean>>({});
 
-  // --- Hooks moved before early return ---
-
-  // Handlers use prop actions
   const handleAddKey = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -78,14 +74,13 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
         setNewKeyValue("");
         setNewKeyProviderType("");
       } catch (error: unknown) {
-        // Error toast handled by store action or caught here
         console.error("Failed to add API key (from component):", error);
       } finally {
         setIsAdding(false);
       }
     },
     [addApiKey, newKeyName, newKeyValue, newKeyProviderType],
-  ); // Depend on prop action and local state
+  );
 
   const handleDeleteKey = useCallback(
     async (id: string, name: string) => {
@@ -103,7 +98,6 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
             return next;
           });
         } catch (error: unknown) {
-          // Error toast handled by store action or caught here
           console.error("Failed to delete API key (from component):", error);
         } finally {
           setIsDeleting((prev) => ({ ...prev, [id]: false }));
@@ -111,9 +105,8 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
       }
     },
     [deleteApiKey],
-  ); // Depend on prop action
+  );
 
-  // Memoize derived data using props
   const linkedProviderNames = useMemo(() => {
     const map = new Map<string, string>();
     apiKeys.forEach((key) => {
@@ -128,11 +121,8 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
       );
     });
     return map;
-  }, [apiKeys, dbProviderConfigs]); // Depend on props
+  }, [apiKeys, dbProviderConfigs]);
 
-  // --- End of moved hooks ---
-
-  // Use props for conditional rendering and actions
   if (!enableApiKeyManagement) {
     return (
       <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2 bg-gray-800/30 rounded-md border border-dashed border-gray-700 min-h-[200px]">
@@ -142,12 +132,10 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
     );
   }
 
-  // Local UI logic remains
   const toggleShowValue = (id: string) => {
     setShowValues((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Helper function remains the same
   const getKeyTypeLabel = (providerIdOrType: string): string => {
     const knownTypes = [
       "openai",
@@ -163,7 +151,6 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
 
   return (
     <div className="space-y-6 p-1">
-      {/* Add New Key Form */}
       <form onSubmit={handleAddKey} className="space-y-4">
         <h3 className="text-lg font-medium mb-2">Add New API Key</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -199,7 +186,6 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
                 <SelectItem value="openai-compatible">
                   OpenAI-Compatible
                 </SelectItem>
-                {/* Add other relevant types if needed */}
               </SelectContent>
             </Select>
           </div>
@@ -223,10 +209,8 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
         </Button>
       </form>
 
-      {/* Existing Keys List */}
       <div>
         <h3 className="text-lg font-medium mb-2">Stored API Keys</h3>
-        {/* Use apiKeys prop */}
         {apiKeys.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">
             No API keys stored yet. Add one above. Link keys to providers in the
@@ -245,7 +229,6 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* Use apiKeys prop */}
                 {apiKeys.map((key) => {
                   const isKeyDeleting = isDeleting[key.id];
                   return (
@@ -308,5 +291,4 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
   );
 };
 
-// Export the memoized component
 export const SettingsApiKeys = React.memo(SettingsApiKeysComponent);

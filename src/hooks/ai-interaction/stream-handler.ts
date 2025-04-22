@@ -1,5 +1,6 @@
 // src/hooks/ai-interaction/stream-handler.ts
 import { Message } from "@/lib/types";
+import { ModEvent, modEvents } from "@/mods/events";
 import { throttle } from "@/lib/throttle";
 import { nanoid } from "nanoid";
 
@@ -86,12 +87,11 @@ export function getStreamHeaders(
  * It finds the message by ID and updates its properties.
  */
 export function finalizeStreamedMessageUI(
-  messageId: string,
+  messageId: string, // messageId is available here
   finalContent: string,
   streamError: Error | null,
   usage: { promptTokens: number; completionTokens: number } | undefined,
   startTime: number,
-  // Use updateMessage action instead of setLocalMessages
   updateMessage: (id: string, updates: Partial<Message>) => void,
 ): void {
   const endTime = Date.now();
@@ -117,19 +117,9 @@ export function finalizeStreamedMessageUI(
   // Call updateMessage with the final updates
   updateMessage(messageId, finalUpdates);
 
-  console.log(
-    `[finalizeStreamedMessageUI] Successfully finalized UI for message ${messageId}.`,
-  );
-
   // Emit event only if the message was successfully finalized without error
   if (!streamError) {
-    // We need the full message object to emit, but updateMessage doesn't return it.
-    // The event emission might need to be moved or adapted.
-    // For now, we can't easily emit the final object here.
-    // Consider emitting just the ID and letting listeners fetch the final state.
-    // modEvents.emit(ModEvent.RESPONSE_DONE, { message: finalMessageObject });
-    console.warn(
-      "[finalizeStreamedMessageUI] Cannot emit RESPONSE_DONE event with full message object after refactor.",
-    );
+    // Emit the event with just the message ID
+    modEvents.emit(ModEvent.RESPONSE_DONE, { message: { id: messageId } }); // Pass only messageId
   }
 }

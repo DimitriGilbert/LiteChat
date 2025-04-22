@@ -1,6 +1,8 @@
 // src/hooks/ai-interaction/error-handler.ts
 import { toast } from "sonner";
 import type { AiModelConfig, AiProviderConfig } from "@/lib/types";
+// Import the helper function
+import { requiresApiKey as checkRequiresApiKey } from "@/lib/litechat";
 
 /**
  * Validates essential parameters before making an AI call.
@@ -31,10 +33,13 @@ export function validateAiParameters(
     toast.error(msg);
     return new Error(msg);
   }
-  // Check API key requirement based on provider type
-  const requiresApiKey = !["ollama"].includes(provider.type); // Ollama typically doesn't need a key via API
+
+  // Use the imported helper function for the check
+  const requiresApiKey = checkRequiresApiKey(provider.type);
+
   if (requiresApiKey && !apiKey) {
-    const msg = `API key required for ${provider.name} but not found. Please add it in Settings > Providers.`;
+    // Updated error message to be more specific
+    const msg = `API key required for ${provider.name} (${provider.type}) but not found or not linked. Please add/link it in Settings > Providers.`;
     setError(msg);
     toast.error(msg);
     return new Error(msg);

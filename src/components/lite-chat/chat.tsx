@@ -13,66 +13,17 @@ import type {
   SidebarItem,
   DbProject,
   DbConversation,
-  // DbProviderConfig, // Removed unused import
-  // DbApiKey, // Removed unused import
-  // CustomSettingTab, // Removed unused import
-  // DbMod, // Removed unused import
-  // ModInstance, // Removed unused import
-  DbProviderConfig as ProviderConfigType, // Keep for SettingsModalTabProps
-  DbApiKey as ApiKeyType, // Keep for SettingsModalTabProps
-  CustomSettingTab as SettingTabType, // Keep for SettingsModalTabProps
-  DbMod as ModType, // Keep for SettingsModalTabProps
-  ModInstance as ModInstanceType, // Keep for SettingsModalTabProps
+  // DbProviderConfig,
+  // DbApiKey,
+  // CustomSettingTab,
+  // DbMod,
+  // ModInstance,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { MenuIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ComponentType } from "react";
-
-// Define the bundled props type here
-export interface SettingsModalTabProps {
-  theme: "light" | "dark" | "system";
-  setTheme: (theme: "light" | "dark" | "system") => void;
-  dbProviderConfigs: ProviderConfigType[];
-  apiKeys: ApiKeyType[];
-  addDbProviderConfig: (
-    config: Omit<ProviderConfigType, "id" | "createdAt" | "updatedAt">,
-  ) => Promise<string>;
-  updateDbProviderConfig: (
-    id: string,
-    changes: Partial<ProviderConfigType>,
-  ) => Promise<void>;
-  deleteDbProviderConfig: (id: string) => Promise<void>;
-  fetchModels: (providerConfigId: string) => Promise<void>;
-  providerFetchStatus: Record<
-    string,
-    "idle" | "fetching" | "error" | "success"
-  >;
-  getAllAvailableModelDefs: (
-    providerConfigId: string,
-  ) => { id: string; name: string }[];
-  globalSystemPrompt: string | null;
-  setGlobalSystemPrompt: (prompt: string | null) => void;
-  addApiKey: (
-    name: string,
-    providerId: string,
-    value: string,
-  ) => Promise<string>;
-  deleteApiKey: (id: string) => Promise<void>;
-  importConversation: (file: File, parentId: string | null) => Promise<void>;
-  exportAllConversations: () => Promise<void>;
-  clearAllData: () => Promise<void>;
-  dbMods: ModType[];
-  loadedMods: ModInstanceType[];
-  addDbMod: (modData: Omit<ModType, "id" | "createdAt">) => Promise<string>;
-  updateDbMod: (id: string, changes: Partial<ModType>) => Promise<void>;
-  deleteDbMod: (id: string) => Promise<void>;
-  enableAdvancedSettings: boolean;
-  enableApiKeyManagement: boolean;
-  customSettingsTabs: SettingTabType[];
-  streamingRefreshRateMs: number;
-  setStreamingRefreshRateMs: (rate: number) => void;
-}
+// REMOVED: SettingsModalTabProps import
 
 interface LiteChatProps {
   config?: LiteChatConfig;
@@ -154,9 +105,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     dbConversations,
   });
 
-  // Destructure all necessary parts from the logic hook return value
   const {
-    // Input State/Actions
     promptInputValue,
     setPromptInputValue,
     attachedFiles,
@@ -164,31 +113,23 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     removeAttachedFile,
     clearAttachedFiles,
     selectedVfsPaths,
-    // addSelectedVfsPath, // Not directly used here
     removeSelectedVfsPath,
     clearSelectedVfsPaths,
-    clearAllInput, // Destructure the correct function name
-    // Store State/Actions
+    clearAllInput,
     sidebarActions,
     coreChatActions,
-    // vfsActions, // Not directly used here
     providerActions,
     settingsActions,
     modActions,
-    // Selection State
     selectedItemId,
     selectedItemType,
     enableSidebar: enableSidebarFromHook,
-    // Other Store States
-    // vfsState, // Pass specific parts below
     providerState,
     settingsState,
     modState,
-    // Callbacks & Derived Data
     clearAllData,
     getAllAvailableModelDefs,
     handleFormSubmit,
-    // handleImageGenerationWrapper, // Removed unused variable
     stopStreaming,
     regenerateMessage,
     getContextSnapshotForMod,
@@ -198,7 +139,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     getApiKeyForProvider,
   } = logic;
 
-  // Select volatile state directly from stores
   const { messages, isLoadingMessages, isStreaming, error } = useCoreChatStore(
     useShallow((state) => ({
       messages: state.messages,
@@ -219,7 +159,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       })),
     );
 
-  // Derive sidebarItems using live data
   const sidebarItems = useMemo(() => {
     const allProjects: DbProject[] = dbProjects || [];
     const allConversations: DbConversation[] = dbConversations || [];
@@ -241,67 +180,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
 
   const enableSidebar = enableSidebarFromHook ?? enableSidebarConfig;
 
-  // Prepare props for Settings Modal
-  const settingsModalProps: SettingsModalTabProps = useMemo(
-    () => ({
-      theme: settingsState.theme,
-      setTheme: settingsActions.setTheme,
-      dbProviderConfigs: providerState.dbProviderConfigs,
-      apiKeys: providerState.apiKeys,
-      addDbProviderConfig: providerActions.addDbProviderConfig,
-      updateDbProviderConfig: providerActions.updateDbProviderConfig,
-      deleteDbProviderConfig: providerActions.deleteDbProviderConfig,
-      fetchModels: providerActions.fetchModels,
-      providerFetchStatus: providerState.providerFetchStatus,
-      getAllAvailableModelDefs,
-      globalSystemPrompt: settingsState.globalSystemPrompt,
-      setGlobalSystemPrompt: settingsActions.setGlobalSystemPrompt,
-      addApiKey: providerActions.addApiKey,
-      deleteApiKey: providerActions.deleteApiKey,
-      importConversation: sidebarActions.importConversation,
-      exportAllConversations: sidebarActions.exportAllConversations,
-      clearAllData,
-      dbMods: modState.dbMods,
-      loadedMods: modState.loadedMods,
-      addDbMod: modActions.addDbMod,
-      updateDbMod: modActions.updateDbMod,
-      deleteDbMod: modActions.deleteDbMod,
-      enableAdvancedSettings: settingsState.enableAdvancedSettings,
-      enableApiKeyManagement: providerState.enableApiKeyManagement,
-      customSettingsTabs: modState.modSettingsTabs,
-      streamingRefreshRateMs: settingsState.streamingRefreshRateMs,
-      setStreamingRefreshRateMs: settingsActions.setStreamingRefreshRateMs,
-    }),
-    [
-      settingsState.theme,
-      settingsActions.setTheme,
-      providerState.dbProviderConfigs,
-      providerState.apiKeys,
-      providerActions.addDbProviderConfig,
-      providerActions.updateDbProviderConfig,
-      providerActions.deleteDbProviderConfig,
-      providerActions.fetchModels,
-      providerState.providerFetchStatus,
-      getAllAvailableModelDefs,
-      settingsState.globalSystemPrompt,
-      settingsActions.setGlobalSystemPrompt,
-      providerActions.addApiKey,
-      providerActions.deleteApiKey,
-      sidebarActions.importConversation,
-      sidebarActions.exportAllConversations,
-      clearAllData,
-      modState.dbMods,
-      modState.loadedMods,
-      modActions.addDbMod,
-      modActions.updateDbMod,
-      modActions.deleteDbMod,
-      settingsState.enableAdvancedSettings,
-      providerState.enableApiKeyManagement,
-      modState.modSettingsTabs,
-      settingsState.streamingRefreshRateMs,
-      settingsActions.setStreamingRefreshRateMs,
-    ],
-  );
+  // REMOVED: settingsModalProps memoization
 
   return (
     <div
@@ -320,7 +199,35 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
           selectedItemType={selectedItemType}
           isSettingsModalOpen={settingsState.isSettingsModalOpen}
           setIsSettingsModalOpen={settingsActions.setIsSettingsModalOpen}
-          settingsProps={settingsModalProps}
+          // Pass individual props needed by SettingsModal via ChatSide
+          theme={settingsState.theme}
+          setTheme={settingsActions.setTheme}
+          streamingRefreshRateMs={settingsState.streamingRefreshRateMs}
+          setStreamingRefreshRateMs={settingsActions.setStreamingRefreshRateMs}
+          dbProviderConfigs={providerState.dbProviderConfigs}
+          apiKeys={providerState.apiKeys}
+          addDbProviderConfig={providerActions.addDbProviderConfig}
+          updateDbProviderConfig={providerActions.updateDbProviderConfig}
+          deleteDbProviderConfig={providerActions.deleteDbProviderConfig}
+          fetchModels={providerActions.fetchModels}
+          providerFetchStatus={providerState.providerFetchStatus}
+          getAllAvailableModelDefs={getAllAvailableModelDefs}
+          globalSystemPrompt={settingsState.globalSystemPrompt}
+          setGlobalSystemPrompt={settingsActions.setGlobalSystemPrompt}
+          addApiKey={providerActions.addApiKey}
+          deleteApiKey={providerActions.deleteApiKey}
+          importConversation={sidebarActions.importConversation}
+          exportAllConversations={sidebarActions.exportAllConversations}
+          clearAllData={clearAllData}
+          dbMods={modState.dbMods}
+          loadedMods={modState.loadedMods}
+          addDbMod={modActions.addDbMod}
+          updateDbMod={modActions.updateDbMod}
+          deleteDbMod={modActions.deleteDbMod}
+          enableAdvancedSettings={settingsState.enableAdvancedSettings}
+          enableApiKeyManagement={providerState.enableApiKeyManagement}
+          customSettingsTabs={modState.modSettingsTabs}
+          // Pass other props needed by ChatSide
           onEditComplete={onEditComplete}
           setEditingItemId={setEditingItemId}
           selectItem={sidebarActions.selectItem}
@@ -329,7 +236,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
           exportConversation={sidebarActions.exportConversation}
           createConversation={sidebarActions.createConversation}
           createProject={sidebarActions.createProject}
-          importConversation={sidebarActions.importConversation}
         />
       )}
 
@@ -353,36 +259,28 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
         )}
         <WrapperComponent
           className="h-full"
-          // Pass all necessary props explicitly
-          // Volatile State
           messages={messages}
           isStreaming={isStreaming}
           isLoadingMessages={isLoadingMessages}
           error={error}
           isVfsReady={isVfsReady}
           isVfsEnabledForItem={isVfsEnabledForItem}
-          // Input State/Actions (from InputStore via logic hook)
           promptInputValue={promptInputValue}
           setPromptInputValue={setPromptInputValue}
           addAttachedFile={addAttachedFile}
           removeAttachedFile={removeAttachedFile}
           clearAttachedFiles={clearAttachedFiles}
-          clearPromptInput={clearAllInput} // Pass the correct function
+          clearPromptInput={clearAllInput}
           attachedFiles={attachedFiles}
           selectedVfsPaths={selectedVfsPaths}
           removeSelectedVfsPath={removeSelectedVfsPath}
           clearSelectedVfsPaths={clearSelectedVfsPaths}
-          // Selection State
           selectedItemId={selectedItemId}
           selectedItemType={selectedItemType}
-          // Core Actions
           regenerateMessage={regenerateMessage}
           stopStreaming={stopStreaming}
           setError={coreChatActions.setError}
-          // Form Submission Wrapper (from logic hook)
           handleFormSubmit={handleFormSubmit}
-          // handleImageGenerationWrapper={handleImageGenerationWrapper} // Removed
-          // Provider/Model State & Actions
           selectedProviderId={providerState.selectedProviderId}
           selectedModelId={providerState.selectedModelId}
           selectedModel={selectedModel}
@@ -393,7 +291,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
           setSelectedModelId={providerActions.setSelectedModelId}
           updateDbProviderConfig={providerActions.updateDbProviderConfig}
           getApiKeyForProvider={getApiKeyForProvider}
-          // Settings State & Actions
           temperature={settingsState.temperature}
           setTemperature={settingsActions.setTemperature}
           topP={settingsState.topP}
@@ -409,26 +306,18 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
           globalSystemPrompt={settingsState.globalSystemPrompt}
           enableAdvancedSettings={settingsState.enableAdvancedSettings}
           enableApiKeyManagement={providerState.enableApiKeyManagement}
-          // VFS State & Actions
           isVfsLoading={isVfsLoading}
           vfsError={vfsError}
           vfsKey={vfsKey}
           toggleVfsEnabledAction={sidebarActions.toggleVfsEnabled}
-          // Conversation/Item State & Actions
           activeConversationData={activeConversationData}
           updateConversationSystemPrompt={
             sidebarActions.updateConversationSystemPrompt
           }
           createConversation={sidebarActions.createConversation}
-          // Mod/Extensibility Props
           customPromptActions={modState.modPromptActions}
           customMessageActions={modState.modMessageActions}
           getContextSnapshotForMod={getContextSnapshotForMod}
-          // Pass core actions needed by PromptForm (via PromptWrapper)
-          // handleSubmitCore={coreChatActions.handleSubmitCore} // Removed
-          // handleImageGenerationCore={coreChatActions.handleImageGenerationCore} // Removed
-          // startWorkflowCore={coreChatActions.startWorkflowCore} // Removed
-          // Pass props needed by ChatHeader
           sidebarItems={sidebarItems}
           searchTerm={settingsState.searchTerm}
           setSearchTerm={settingsActions.setSearchTerm}

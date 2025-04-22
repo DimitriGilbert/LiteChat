@@ -1,4 +1,5 @@
 // src/store/core-chat.store.ts
+
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { nanoid } from "nanoid";
@@ -11,20 +12,19 @@ import type {
   Workflow,
   AiModelConfig,
   AiProviderConfig,
-  DbProviderConfig, // Added DbProviderConfig
+  DbProviderConfig, // Keep this import
 } from "@/lib/types";
 import { convertDbMessagesToCoreMessages } from "@/utils/chat-utils";
 import {
   WorkflowExecutionService,
   WorkflowTask,
-} from "@/services/workflow-execution-service"; // Import service
-import { workflowEvents, WorkflowEvent } from "@/services/workflow-events"; // Import events
+} from "@/services/workflow-execution-service";
+import { workflowEvents, WorkflowEvent } from "@/services/workflow-events";
 import Dexie from "dexie";
-// Import necessary store hooks
-import { useProviderStore } from "./provider.store";
+// Removed useProviderStore import from here, it's not needed directly in this file anymore for dbProviderConfigs
 import { useSettingsStore } from "./settings.store";
 
-// Helper function (consider moving to utils)
+// Helper function remains the same
 const findMessageAndParent = (
   messages: Message[],
   messageId: string,
@@ -38,7 +38,6 @@ const findMessageAndParent = (
         if (child.id === messageId) {
           return { message: child, parent: msg };
         }
-        // Recursive search if needed, but workflows are currently 1 level deep
       }
     }
   }
@@ -48,14 +47,13 @@ const findMessageAndParent = (
 interface CoreChatState {
   messages: Message[];
   isLoadingMessages: boolean;
-  isStreaming: boolean; // Represents if *any* stream (single or workflow task) is active
+  isStreaming: boolean;
   error: string | null;
-  // Store active workflow services, keyed by parent message ID
   activeWorkflows: Map<string, WorkflowExecutionService>;
 }
 
 export interface CoreChatActions {
-  loadMessages: (conversationId: string | null) => Promise<void>; // Allow null
+  loadMessages: (conversationId: string | null) => Promise<void>;
   setMessages: (messages: Message[]) => void;
   addMessage: (message: Message) => void;
   updateMessage: (id: string, updates: Partial<Message>) => void;
@@ -70,23 +68,24 @@ export interface CoreChatActions {
     currentConversationId: string,
     contentToSendToAI: MessageContent,
     vfsContextPaths?: string[],
-  ) => Promise<void>; // Returns void, AI call triggered separately
+  ) => Promise<void>;
   handleImageGenerationCore: (
     currentConversationId: string,
     prompt: string,
-  ) => Promise<void>; // Returns void, AI call triggered separately
-  stopStreamingCore: (parentMessageId?: string | null) => void; // Accept optional parent ID
+  ) => Promise<void>;
+  stopStreamingCore: (parentMessageId?: string | null) => void;
   regenerateMessageCore: (messageId: string) => Promise<void>;
-  // New Workflow Actions
+  // Modified signature: Added dbProviderConfigs parameter
   startWorkflowCore: (
     conversationId: string,
-    command: string, // e.g., "/race model1,model2 The prompt"
+    command: string,
     getApiKey: (providerId: string) => string | undefined,
     getProvider: (id: string) => AiProviderConfig | undefined,
     getModel: (
       providerId: string,
       modelId: string,
     ) => AiModelConfig | undefined,
+    dbProviderConfigs: DbProviderConfig[], // Added parameter
   ) => Promise<void>;
   finalizeWorkflowTask: (
     parentMessageId: string,
@@ -94,7 +93,7 @@ export interface CoreChatActions {
     finalChildMessage: Message,
     error?: Error | string | null,
   ) => void;
-  _subscribeToWorkflowEvents: () => () => void; // Internal subscription management
+  _subscribeToWorkflowEvents: () => () => void;
 }
 
 export const useCoreChatStore = create(
@@ -120,7 +119,6 @@ export const useCoreChatStore = create(
           )
           .sortBy("createdAt");
 
-        // Basic mapping, assuming children are stored correctly
         const uiMessages = dbMessages.map(
           (dbMsg): Message => ({
             id: dbMsg.id,
@@ -131,13 +129,13 @@ export const useCoreChatStore = create(
             vfsContextPaths: dbMsg.vfsContextPaths,
             tool_calls: dbMsg.tool_calls,
             tool_call_id: dbMsg.tool_call_id,
-            children: dbMsg.children, // Map children
-            workflow: dbMsg.workflow, // Map workflow
+            children: dbMsg.children,
+            workflow: dbMsg.workflow,
             providerId: dbMsg.providerId,
             modelId: dbMsg.modelId,
             tokensInput: dbMsg.tokensInput,
             tokensOutput: dbMsg.tokensOutput,
-            isStreaming: false, // Assume not streaming on load
+            isStreaming: false,
             error: null,
           }),
         );
@@ -159,7 +157,6 @@ export const useCoreChatStore = create(
 
     addMessage: (message) => {
       set((state) => {
-        // Prevent duplicates
         if (!state.messages.some((m) => m.id === message.id)) {
           state.messages.push(message);
         } else {
@@ -170,18 +167,20 @@ export const useCoreChatStore = create(
 
     updateMessage: (id, updates) => {
       set((state) => {
+        let messageUpdated = false;
         const messageIndex = state.messages.findIndex((m) => m.id === id);
+
         if (messageIndex !== -1) {
           Object.assign(state.messages[messageIndex], updates);
-          // If updating children, ensure they are also updated if needed
+          messageUpdated = true;
         } else {
-          // Check if it's a child message
+          // Check children
           for (const parent of state.messages) {
             if (parent.children) {
               const childIndex = parent.children.findIndex((c) => c.id === id);
               if (childIndex !== -1) {
                 Object.assign(parent.children[childIndex], updates);
-                // If the child is no longer streaming, check parent status
+                messageUpdated = true;
                 if (updates.isStreaming === false && parent.workflow) {
                   const allChildrenDone = parent.children.every(
                     (c) => !c.isStreaming,
@@ -190,27 +189,34 @@ export const useCoreChatStore = create(
                     parent.workflow.status = updates.error
                       ? "error"
                       : "completed";
-                    // Check if overall streaming state needs update
-                    const anyStreaming = state.messages.some(
-                      (m) =>
-                        m.isStreaming || m.children?.some((c) => c.isStreaming),
-                    );
-                    if (!anyStreaming) {
-                      state.isStreaming = false;
-                    }
                   }
                 }
-                return; // Exit after updating child
+                break;
               }
             }
           }
+        }
+
+        if (!messageUpdated) {
           console.warn(`Message with ID ${id} not found for update.`);
+        }
+
+        // Recalculate global streaming state
+        const anyStreaming = state.messages.some(
+          (m) => m.isStreaming || m.children?.some((c) => c.isStreaming),
+        );
+        if (state.isStreaming !== anyStreaming) {
+          state.isStreaming = anyStreaming;
         }
       });
     },
 
     setIsStreaming: (isStreaming) => {
-      set({ isStreaming });
+      set((state) => {
+        if (state.isStreaming !== isStreaming) {
+          state.isStreaming = isStreaming;
+        }
+      });
     },
 
     setError: (error) => {
@@ -218,7 +224,6 @@ export const useCoreChatStore = create(
     },
 
     addDbMessage: async (messageData) => {
-      // Ensure conversationId exists before proceeding
       if (!messageData.conversationId) {
         console.error(
           "addDbMessage error: conversationId is missing.",
@@ -231,7 +236,7 @@ export const useCoreChatStore = create(
         createdAt: messageData.createdAt ?? new Date(),
         role: messageData.role,
         content: messageData.content,
-        conversationId: messageData.conversationId, // Now guaranteed to be string
+        conversationId: messageData.conversationId,
         vfsContextPaths: messageData.vfsContextPaths ?? undefined,
         tool_calls: messageData.tool_calls ?? undefined,
         tool_call_id: messageData.tool_call_id ?? undefined,
@@ -250,7 +255,6 @@ export const useCoreChatStore = create(
     },
 
     bulkAddMessages: async (messages) => {
-      // This remains largely the same
       if (messages.length === 0) return;
       const latestMessage = messages.reduce((latest, current) =>
         latest.createdAt > current.createdAt ? latest : current,
@@ -266,12 +270,10 @@ export const useCoreChatStore = create(
           await db.conversations.update(conversationId, {
             updatedAt: new Date(),
           });
-          // Update project timestamp if needed
         },
       );
     },
 
-    // Core submission for *single* user messages (text or image prompt)
     handleSubmitCore: async (
       currentConversationId,
       contentToSendToAI,
@@ -285,45 +287,41 @@ export const useCoreChatStore = create(
         conversationId: currentConversationId,
         vfsContextPaths: vfsContextPaths,
       };
-      get().addMessage(userMessage); // Add to UI immediately
+      get().addMessage(userMessage);
       try {
-        // Ensure conversationId is present before calling addDbMessage
         if (!userMessage.conversationId) {
           throw new Error("Conversation ID missing for user message.");
         }
         await get().addDbMessage({
           ...userMessage,
-          conversationId: userMessage.conversationId, // Explicitly pass string
+          conversationId: userMessage.conversationId,
         });
         console.log("User message saved:", userMessage.id);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         get().setError(`Failed to save user message: ${message}`);
         toast.error(`Failed to save user message: ${message}`);
-        // Remove the message from UI if save failed? Or mark with error?
         get().updateMessage(userMessage.id, { error: "Save failed" });
-        throw err; // Re-throw so the caller knows submission failed
+        throw err;
       }
-      // IMPORTANT: The actual AI call (performAiStream) is now triggered *after* this function completes successfully in useLiteChatLogic.
     },
 
     handleImageGenerationCore: async (currentConversationId, prompt) => {
       const userMessage: Message = {
         id: nanoid(),
         role: "user",
-        content: `/imagine ${prompt}`, // Store the command
+        content: `/imagine ${prompt}`,
         createdAt: new Date(),
         conversationId: currentConversationId,
       };
-      get().addMessage(userMessage); // Add to UI immediately
+      get().addMessage(userMessage);
       try {
-        // Ensure conversationId is present before calling addDbMessage
         if (!userMessage.conversationId) {
           throw new Error("Conversation ID missing for image prompt message.");
         }
         await get().addDbMessage({
           ...userMessage,
-          conversationId: userMessage.conversationId, // Explicitly pass string
+          conversationId: userMessage.conversationId,
         });
         console.log("User image prompt message saved:", userMessage.id);
       } catch (err) {
@@ -331,59 +329,61 @@ export const useCoreChatStore = create(
         get().setError(`Failed to save image prompt: ${message}`);
         toast.error(`Failed to save image prompt: ${message}`);
         get().updateMessage(userMessage.id, { error: "Save failed" });
-        throw err; // Re-throw
+        throw err;
       }
-      // IMPORTANT: The actual AI call (performImageGeneration) is now triggered *after* this function completes successfully in useLiteChatLogic.
     },
 
     stopStreamingCore: (parentMessageId = null) => {
       set((state) => {
+        let stoppedSomething = false;
+
         if (parentMessageId) {
-          // Cancel a specific workflow
           const service = state.activeWorkflows.get(parentMessageId);
           if (service) {
             service.cancelWorkflow(parentMessageId);
-            state.activeWorkflows.delete(parentMessageId); // Remove from active map
-            // Update parent message status in UI if needed
+            state.activeWorkflows.delete(parentMessageId);
             const parentIndex = state.messages.findIndex(
               (m) => m.id === parentMessageId,
             );
             if (parentIndex !== -1 && state.messages[parentIndex].workflow) {
-              state.messages[parentIndex].workflow!.status = "error"; // Or 'cancelled' if distinct status needed
-              // Ensure children are marked as not streaming
+              state.messages[parentIndex].workflow!.status = "error";
               state.messages[parentIndex].children?.forEach((child) => {
-                child.isStreaming = false;
-                child.error = child.error || "Cancelled by user";
+                if (child.isStreaming) {
+                  child.isStreaming = false;
+                  child.error = child.error || "Cancelled by user";
+                  stoppedSomething = true;
+                }
               });
             }
           }
         } else {
-          // Cancel the *last* single streaming message (non-workflow)
-          const streamingMessage = state.messages.find(
-            (m) => m.isStreaming && !m.workflow,
-          );
-          if (streamingMessage) {
-            state.updateMessage(streamingMessage.id, {
-              isStreaming: false,
-              error: "Cancelled by user",
-              streamedContent: undefined, // Clear partial content
-            });
+          for (let i = state.messages.length - 1; i >= 0; i--) {
+            const msg = state.messages[i];
+            if (msg.isStreaming && !msg.workflow) {
+              console.log(
+                `[CoreStore StopStreaming] Stopping single message: ${msg.id}`,
+              );
+              get().updateMessage(msg.id, {
+                isStreaming: false,
+                error: "Cancelled by user",
+                streamedContent: undefined,
+              });
+              stoppedSomething = true;
+              break;
+            }
           }
-          // Also cancel any remaining active workflows if stopping globally?
-          // state.activeWorkflows.forEach(service => service.cancelWorkflow());
-          // state.activeWorkflows.clear();
         }
 
-        // Recalculate global streaming state
-        const anyStreaming = state.messages.some(
-          (m) => m.isStreaming || m.children?.some((c) => c.isStreaming),
-        );
-        state.isStreaming = anyStreaming;
-        if (!anyStreaming) {
-          // If nothing is streaming, clear the global abort controller ref if it exists
-          // This needs access to the ref, which is tricky from the store.
-          // The hook (`useLiteChatLogic`) should handle clearing the ref.
-          console.log("CoreStore: All streaming stopped.");
+        if (stoppedSomething) {
+          const anyStreaming = state.messages.some(
+            (m) => m.isStreaming || m.children?.some((c) => c.isStreaming),
+          );
+          if (state.isStreaming !== anyStreaming) {
+            state.isStreaming = anyStreaming;
+            console.log(
+              `[CoreStore StopStreaming] Global isStreaming set to: ${anyStreaming}`,
+            );
+          }
         }
       });
     },
@@ -407,18 +407,14 @@ export const useCoreChatStore = create(
         }
 
         if (parent && parent.workflow) {
-          // Regenerating a child of a workflow
           isWorkflowChild = true;
           parentWorkflowMessage = parent;
-          messageToDeleteId = messageId; // Delete the specific child
-          // Remove the child from the parent's children array
+          messageToDeleteId = messageId;
           parent.children = parent.children?.filter((c) => c.id !== messageId);
         } else if (message.workflow) {
-          // Regenerating a workflow parent
           isWorkflowParent = true;
-          messageToDeleteId = messageId; // Delete the parent and its children implicitly
+          messageToDeleteId = messageId;
         } else if (message.role === "assistant") {
-          // Regenerating a regular assistant message
           messageToDeleteId = messageId;
         } else {
           console.error(
@@ -429,47 +425,36 @@ export const useCoreChatStore = create(
           return;
         }
 
-        // Delete the target message(s) from UI state
         if (messageToDeleteId) {
           state.messages = state.messages.filter(
             (m) => m.id !== messageToDeleteId,
           );
         }
 
-        // Stop any related streaming
         if (isWorkflowParent && messageToDeleteId) {
           get().stopStreamingCore(messageToDeleteId);
         } else if (isWorkflowChild && parentWorkflowMessage) {
-          // Stop potentially just the single task? Or the whole workflow?
-          // For simplicity, let's stop the whole workflow if a child is regenerated.
           get().stopStreamingCore(parentWorkflowMessage.id);
         } else {
-          get().stopStreamingCore(); // Stop any single stream
+          get().stopStreamingCore();
         }
       });
-
-      // Delete from DB after UI update
-      // This part needs careful implementation based on the message type
-      // For now, we assume the caller (`useLiteChatLogic`) handles the DB deletion
-      // and re-triggering logic based on the message type.
-      // await db.messages.delete(messageToDeleteId); // Be careful with cascade deletes if needed
       console.log(
         `Regenerate: UI state prepared for message ${messageId}. DB deletion and re-triggering handled by caller.`,
       );
     },
 
-    // --- New Workflow Actions ---
-
+    // Modified: Accept dbProviderConfigs as parameter
     startWorkflowCore: async (
       conversationId,
       command,
       getApiKey,
       getProvider,
       getModel,
+      dbProviderConfigs, // Added parameter
     ) => {
-      set({ error: null }); // Clear previous errors
+      set({ error: null });
 
-      // 1. Parse Command (Simple Example: /race model1,model2 Prompt)
       const raceMatch = command.match(/^\/race\s+([\w.,-]+)\s+(.*)/s);
       let workflowType: Workflow["type"] | null = null;
       let modelIds: string[] = [];
@@ -491,67 +476,57 @@ export const useCoreChatStore = create(
         return;
       }
 
-      // 2. Create Parent User Message
       const parentMessageId = nanoid();
       const parentMessage: Message = {
         id: parentMessageId,
-        role: "user", // Or a dedicated 'workflow-trigger' role?
-        content: command, // Store the original command
+        role: "user",
+        content: command,
         createdAt: new Date(),
         conversationId: conversationId,
         workflow: {
           type: workflowType,
           status: "pending",
-          childIds: [], // Will be populated as tasks start/finish
+          childIds: [],
         },
-        children: [], // Initialize empty children array
+        children: [],
       };
 
-      get().addMessage(parentMessage); // Add parent to UI
+      get().addMessage(parentMessage);
       try {
-        // Ensure conversationId is present before calling addDbMessage
         if (!parentMessage.conversationId) {
           throw new Error("Conversation ID missing for workflow parent.");
         }
         await get().addDbMessage({
           ...parentMessage,
-          conversationId: parentMessage.conversationId, // Explicitly pass string
+          conversationId: parentMessage.conversationId,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         get().setError(`Failed to save workflow trigger: ${message}`);
         toast.error(`Failed to save workflow trigger: ${message}`);
         get().updateMessage(parentMessage.id, { error: "Save failed" });
-        return; // Stop if parent save fails
+        return;
       }
 
-      // 3. Prepare Tasks
       const tasks: WorkflowTask[] = [];
       const childPlaceholders: Message[] = [];
       const now = new Date();
-
-      // Get message history *before* the parent message
       const history = get().messages.filter((m) => m.id !== parentMessageId);
       const coreHistory = convertDbMessagesToCoreMessages(history);
 
       for (const modelId of modelIds) {
-        // Find the provider for this model (assuming models are unique across enabled providers for now)
-        // A more robust approach would involve specifying provider/model pairs in the command.
         let taskProvider: AiProviderConfig | undefined;
         let taskModel: AiModelConfig | undefined;
-        // FIX: Import and use useProviderStore
-        const providers = Object.values(
-          useProviderStore.getState().dbProviderConfigs,
-        ); // Get providers from provider store
+        // Use the passed dbProviderConfigs instead of store state
+        const providers = dbProviderConfigs;
 
         for (const pConfig of providers) {
-          // FIX: Add type annotation for pConfig
-          const modelInfo = (pConfig as DbProviderConfig).fetchedModels?.find(
-            (m: { id: string }) => m.id === modelId, // FIX: Add type annotation for m
+          const modelInfo = pConfig.fetchedModels?.find(
+            (m) => m.id === modelId,
           );
           if (modelInfo) {
-            taskProvider = getProvider((pConfig as DbProviderConfig).id); // Use passed getter
-            taskModel = getModel((pConfig as DbProviderConfig).id, modelId); // Use passed getter
+            taskProvider = getProvider(pConfig.id);
+            taskModel = getModel(pConfig.id, modelId);
             break;
           }
         }
@@ -559,8 +534,7 @@ export const useCoreChatStore = create(
         if (!taskProvider || !taskModel || !taskModel.instance) {
           toast.error(`Could not find or instantiate model: ${modelId}`);
           get().setError(`Could not find or instantiate model: ${modelId}`);
-          // TODO: How to handle partial failure? Cancel workflow?
-          continue; // Skip this model
+          continue;
         }
 
         const taskId = nanoid();
@@ -569,21 +543,18 @@ export const useCoreChatStore = create(
           config: {
             model: taskModel,
             provider: taskProvider,
-            messages: [...coreHistory, { role: "user", content: promptText }], // Use prompt for this task
-            // Add other parameters (temp, etc.) if needed, maybe from global settings?
-            // FIX: Import and use useSettingsStore
+            messages: [...coreHistory, { role: "user", content: promptText }],
             temperature: useSettingsStore.getState().temperature,
             maxTokens: useSettingsStore.getState().maxTokens,
           },
         });
 
-        // Create placeholder child message for UI
         childPlaceholders.push({
           id: taskId,
           role: "assistant",
           content: "",
           streamedContent: "",
-          isStreaming: true, // Mark as streaming initially
+          isStreaming: true,
           createdAt: now,
           conversationId: conversationId,
           providerId: taskProvider.id,
@@ -595,14 +566,12 @@ export const useCoreChatStore = create(
       if (tasks.length === 0) {
         toast.error("No valid models found for the workflow.");
         get().setError("No valid models found for the workflow.");
-        // Update parent message status?
         get().updateMessage(parentMessageId, {
           workflow: { ...parentMessage.workflow!, status: "error" },
         });
         return;
       }
 
-      // 4. Update Parent Message with Placeholders and Start Workflow
       set((state) => {
         const parentIndex = state.messages.findIndex(
           (m) => m.id === parentMessageId,
@@ -614,20 +583,15 @@ export const useCoreChatStore = create(
             (t) => t.taskId,
           );
         }
-        state.isStreaming = true; // Set global streaming state
+        state.isStreaming = true;
 
-        // Instantiate and store the service
         const workflowService = new WorkflowExecutionService({ getApiKey });
         state.activeWorkflows.set(parentMessageId, workflowService);
 
-        // Start execution (don't await here, let it run in background)
         workflowService
-          .startWorkflow(parentMessageId, workflowType!, tasks) // Add non-null assertion for workflowType
+          .startWorkflow(parentMessageId, workflowType!, tasks)
           .catch((err) => {
-            // Handle potential errors during workflow setup/execution not caught by task errors
             console.error(`Workflow ${parentMessageId} failed globally:`, err);
-            // const message = err instanceof Error ? err.message : String(err); // Unused variable
-            // Update parent status if not already errored
             set((s) => {
               const pIdx = s.messages.findIndex(
                 (m) => m.id === parentMessageId,
@@ -638,7 +602,6 @@ export const useCoreChatStore = create(
               ) {
                 s.messages[pIdx].workflow!.status = "error";
               }
-              // Ensure global streaming state is updated if this was the last one
               const anyStreaming = s.messages.some(
                 (m) => m.isStreaming || m.children?.some((c) => c.isStreaming),
               );
@@ -646,10 +609,8 @@ export const useCoreChatStore = create(
             });
           })
           .finally(() => {
-            // Clean up service instance from map once workflow is fully done/errored
             set((s) => {
               s.activeWorkflows.delete(parentMessageId);
-              // Check global streaming state again after cleanup
               const anyStreaming = s.messages.some(
                 (m) => m.isStreaming || m.children?.some((c) => c.isStreaming),
               );
@@ -665,72 +626,30 @@ export const useCoreChatStore = create(
       finalChildMessage,
       error = null,
     ) => {
-      set((state) => {
-        const parentIndex = state.messages.findIndex(
-          (m) => m.id === parentMessageId,
-        );
-        if (parentIndex === -1 || !state.messages[parentIndex].children) {
-          console.warn(
-            `Parent message ${parentMessageId} or its children not found for finalizing task ${taskId}`,
-          );
-          return;
-        }
-
-        const parent = state.messages[parentIndex];
-        const childIndex = parent.children!.findIndex((c) => c.id === taskId);
-
-        if (childIndex !== -1) {
-          // Update the existing placeholder child
-          Object.assign(parent.children![childIndex], {
-            ...finalChildMessage, // Apply final data
-            isStreaming: false,
-            streamedContent: undefined,
-            error: error instanceof Error ? error.message : error,
-          });
-        } else {
-          // Should not happen if placeholders were added correctly
-          console.error(
-            `Child placeholder ${taskId} not found in parent ${parentMessageId}. Adding final message directly.`,
-          );
-          parent.children!.push({
-            ...finalChildMessage,
-            isStreaming: false,
-            streamedContent: undefined,
-            error: error instanceof Error ? error.message : error,
-          });
-        }
-
-        // Update parent workflow status if all children are done
-        const allChildrenDone = parent.children!.every((c) => !c.isStreaming);
-        if (allChildrenDone && parent.workflow) {
-          const hasError = parent.children!.some((c) => c.error);
-          parent.workflow.status = hasError ? "error" : "completed";
-
-          // Save the updated parent message with completed children to DB
-          // Debounce this? Or save only once when workflow completes?
-          // For simplicity, save on each task completion for now.
-          db.messages
-            .update(parentMessageId, {
-              children: parent.children, // Save final children state
-              workflow: parent.workflow, // Save final workflow state
-            })
-            .catch((dbErr) =>
-              console.error(
-                `Failed to update parent message ${parentMessageId} in DB after task ${taskId} completion:`,
-                dbErr,
-              ),
-            );
-        }
-
-        // Recalculate global streaming state
-        const anyStreaming = state.messages.some(
-          (m) => m.isStreaming || m.children?.some((c) => c.isStreaming),
-        );
-        state.isStreaming = anyStreaming;
+      get().updateMessage(taskId, {
+        ...finalChildMessage,
+        isStreaming: false,
+        streamedContent: undefined,
+        error: error instanceof Error ? error.message : error,
       });
+
+      db.messages
+        .put({
+          id: taskId,
+          conversationId: parentMessageId,
+          role: "assistant",
+          content: finalChildMessage.content,
+          createdAt: finalChildMessage.createdAt ?? new Date(),
+          providerId: finalChildMessage.providerId,
+          modelId: finalChildMessage.modelId,
+          tokensInput: finalChildMessage.tokensInput,
+          tokensOutput: finalChildMessage.tokensOutput,
+        })
+        .catch((dbErr) =>
+          console.error(`Failed to save child message ${taskId} to DB:`, dbErr),
+        );
     },
 
-    // Internal function to set up listeners
     _subscribeToWorkflowEvents: () => {
       const handleTaskFinish = ({
         parentMessageId,
@@ -753,11 +672,10 @@ export const useCoreChatStore = create(
         taskId: string;
         error: Error | string;
       }) => {
-        // Create a dummy message object representing the error state
         const errorChildMessage: Message = {
           id: taskId,
           role: "assistant",
-          content: "", // No content on error
+          content: "",
           createdAt: new Date(),
           conversationId: parentMessageId,
           isStreaming: false,
@@ -771,11 +689,9 @@ export const useCoreChatStore = create(
         );
       };
 
-      // Subscribe
       workflowEvents.on(WorkflowEvent.TASK_FINISH, handleTaskFinish);
       workflowEvents.on(WorkflowEvent.TASK_ERROR, handleTaskError);
 
-      // Return unsubscribe function
       return () => {
         workflowEvents.off(WorkflowEvent.TASK_FINISH, handleTaskFinish);
         workflowEvents.off(WorkflowEvent.TASK_ERROR, handleTaskError);
@@ -784,10 +700,6 @@ export const useCoreChatStore = create(
   })),
 );
 
-// --- Initialize Event Subscription ---
-// Call the internal subscription function once when the store is created.
-// The unsubscribe function is returned but might not be needed unless the app unmounts entirely.
 export const unsubscribeWorkflowEvents = useCoreChatStore
   .getState()
   ._subscribeToWorkflowEvents();
-// You might want to store `unsubscribeWorkflowEvents` somewhere if you need to call it later.

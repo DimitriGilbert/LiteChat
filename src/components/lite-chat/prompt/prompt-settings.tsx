@@ -29,23 +29,18 @@ import { requiresApiKey } from "@/lib/litechat";
 
 interface PromptSettingsProps {
   className?: string;
-  // Provider/Model related
   selectedProviderId: string | null;
   selectedModelId: string | null;
   dbProviderConfigs: DbProviderConfig[];
   apiKeys: DbApiKey[];
   enableApiKeyManagement: boolean;
-  // VFS related
   enableVfs: boolean;
-  isVfsEnabledForItem: boolean; // Direct prop
-  isVfsReady: boolean; // Direct prop
-  // Item related
+  isVfsEnabledForItem: boolean;
+  isVfsReady: boolean;
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
   toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>;
-  // Advanced Settings related
   enableAdvancedSettings: boolean;
-  // Props needed for PromptSettingsAdvanced
   temperature: number;
   setTemperature: (temp: number) => void;
   topP: number | null;
@@ -68,14 +63,11 @@ interface PromptSettingsProps {
     id: string,
     changes: Partial<DbProviderConfig>,
   ) => Promise<void>;
-  // Provider/Model setters
   setSelectedProviderId: (id: string | null) => void;
   setSelectedModelId: (id: string | null) => void;
-  // VFS State for PromptSettingsAdvanced
   isVfsLoading: boolean;
   vfsError: string | null;
   vfsKey: string | null;
-  // Add stopStreaming prop
   stopStreaming: () => void;
 }
 
@@ -87,8 +79,8 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
   apiKeys,
   enableApiKeyManagement,
   enableVfs,
-  isVfsEnabledForItem, // Use direct prop
-  isVfsReady, // Use direct prop
+  isVfsEnabledForItem,
+  isVfsReady,
   selectedItemId,
   selectedItemType,
   toggleVfsEnabledAction,
@@ -114,7 +106,7 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
   isVfsLoading,
   vfsError,
   vfsKey,
-  stopStreaming, // Destructure stopStreaming
+  // stopStreaming, // Removed stopStreaming from destructuring
 }) => {
   const [isAdvancedPanelOpen, setIsAdvancedPanelOpen] = useState(false);
   const [advancedInitialTab, setAdvancedInitialTab] =
@@ -382,7 +374,7 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
           dbProviderConfigs={dbProviderConfigs}
           apiKeys={apiKeys}
           updateDbProviderConfig={updateDbProviderConfig}
-          stopStreaming={stopStreaming} // Pass stopStreaming down
+          // Removed stopStreaming prop
         />
       )}
     </div>

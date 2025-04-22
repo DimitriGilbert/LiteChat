@@ -1,6 +1,7 @@
 // src/services/model-fetcher.ts
 import type { DbProviderConfig } from "@/lib/types";
 import { toast } from "sonner";
+import { ensureV1Path } from "@/utils/chat-utils";
 
 interface FetchedModel {
   id: string;
@@ -32,35 +33,47 @@ export async function fetchModelsForProvider(
       headers["Authorization"] = `Bearer ${apiKey}`;
     }
 
-    // Determine URL and potentially add specific headers
-    switch (config.type) {
-      case "openai":
-        url = "https://api.openai.com/v1/models";
-        break;
-      case "openrouter":
-        url = "https://openrouter.ai/api/v1/models";
-        // OpenRouter requires these headers even without API key for listing
-        headers["HTTP-Referer"] =
-          globalThis.location?.origin || "http://localhost"; // Use actual origin
-        headers["X-Title"] = "LiteChat"; // Your app name
-        break;
-      case "ollama":
-        if (!config.baseURL) throw new Error("Base URL required for Ollama");
-        // Ollama uses /api/tags
-        url = new URL("/api/tags", config.baseURL).toString();
-        break;
-      case "openai-compatible":
-        if (!config.baseURL)
-          throw new Error("Base URL required for OpenAI-Compatible");
-        // Standard path is /v1/models
-        url = new URL("/v1/models", config.baseURL).toString();
-        break;
-      case "google": // Google GenAI SDK doesn't have a standard /models endpoint
-      default:
-        console.warn(
-          `[ModelFetcher] Model fetching not supported for type: ${config.type}`,
-        );
-        return []; // Return empty, rely on defaults/enabledModels
+    try {
+      switch (config.type) {
+        case "openai":
+          url = "https://api.openai.com/v1/models";
+          break;
+        case "openrouter":
+          url = "https://openrouter.ai/api/v1/models";
+          headers["HTTP-Referer"] =
+            globalThis.location?.origin || "http://localhost";
+          headers["X-Title"] = "LiteChat";
+          break;
+        case "ollama":
+          if (!config.baseURL) throw new Error("Base URL required for Ollama");
+          // Ollama uses /api/tags, no /v1 needed
+          url = new URL("/api/tags", config.baseURL).toString();
+          break;
+        case "openai-compatible":
+          if (!config.baseURL)
+            throw new Error("Base URL required for OpenAI-Compatible");
+          // 1. Ensure base URL has the /v1 path correctly using the user's exact logic
+          const baseUrlWithV1 = ensureV1Path(config.baseURL);
+          // 2. Construct the final URL for the /models endpoint
+          //    Ensure the base path has a trailing slash for correct relative resolution.
+          url = new URL("models", baseUrlWithV1 + "/").toString();
+          break;
+        case "google":
+        default:
+          console.warn(
+            `[ModelFetcher] Model fetching not supported for type: ${config.type}`,
+          );
+          return [];
+      }
+    } catch (urlError) {
+      console.error(
+        `[ModelFetcher] Error constructing URL for ${config.name}:`,
+        urlError,
+      );
+      toast.error(
+        `Invalid Base URL for ${config.name}: ${urlError instanceof Error ? urlError.message : String(urlError)}`,
+      );
+      return []; // Return empty array if URL construction fails
     }
 
     console.log(
@@ -70,39 +83,42 @@ export async function fetchModelsForProvider(
       const response = await fetch(url, { headers });
 
       if (!response.ok) {
-        let errorBody = "Unknown error";
+        let errorBody = `(${response.status} ${response.statusText})`;
         try {
-          errorBody = await response.text();
+          const textBody = await response.text();
+          try {
+            const jsonBody = JSON.parse(textBody);
+            errorBody =
+              jsonBody?.error?.message ||
+              jsonBody?.message ||
+              textBody ||
+              errorBody;
+          } catch {
+            errorBody = textBody || errorBody;
+          }
         } catch (e) {
-          console.error(`Failed to parse error body: ${e}`);
+          console.error("Failed to read error response body:", e);
         }
-        throw new Error(
-          `Failed to fetch models (${response.status}): ${errorBody}`,
-        );
+        throw new Error(`Failed to fetch models: ${errorBody}`);
       }
 
       const data = await response.json();
 
-      // Parse response based on provider type
       let models: FetchedModel[] = [];
       if (config.type === "ollama") {
-        // Ollama /api/tags response: { models: [{ name: "model:tag", ... }] }
         if (data.models && Array.isArray(data.models)) {
           models = data.models.map((m: any) => ({
-            id: m.name, // Ollama uses the full tag as ID
-            name: m.name, // Use the tag as name too
+            id: m.name,
+            name: m.name,
           }));
         }
       } else {
-        // OpenAI / OpenRouter / Compatible /v1/models response: { data: [{ id: "...", ... }] }
         if (data.data && Array.isArray(data.data)) {
           models = data.data.map((m: any) => ({
             id: m.id,
-            // Attempt to find a user-friendly name, fallback to ID
             name: m.name || m.id,
           }));
         } else if (Array.isArray(data)) {
-          // Some compatible servers might return just an array
           models = data.map((m: any) => ({
             id: m.id,
             name: m.name || m.id,
@@ -110,7 +126,6 @@ export async function fetchModelsForProvider(
         }
       }
 
-      // Sort models alphabetically by name/ID for consistency
       models.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
 
       console.log(
@@ -125,13 +140,12 @@ export async function fetchModelsForProvider(
       toast.error(
         `Failed to fetch models for ${config.name}: ${error instanceof Error ? error.message : String(error)}`,
       );
-      fetchCache.delete(cacheKey); // Remove failed attempt from cache
-      throw error; // Re-throw to handle upstream
+      fetchCache.delete(cacheKey);
+      throw error;
     }
   })();
 
   fetchCache.set(cacheKey, fetchPromise);
-  // Set timeout to clear cache entry
   setTimeout(() => {
     fetchCache.delete(cacheKey);
   }, CACHE_DURATION_MS);

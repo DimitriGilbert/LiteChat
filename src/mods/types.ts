@@ -71,7 +71,7 @@ export interface ResponseChunkPayload {
   conversationId: string;
 }
 export interface ResponseDonePayload {
-  message: Message; // Use the Message type from lib/types
+  message: Partial<Message>; // Use the Message type from lib/types
 }
 export interface VfsFileOpPayload {
   path: string;

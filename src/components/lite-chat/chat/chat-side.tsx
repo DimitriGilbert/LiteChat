@@ -6,24 +6,14 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import {
-  ChatHistory,
-  //ChatHistoryProps
-} from "./chat-history"; // Import ChatHistoryProps
+import { ChatHistory } from "./chat-history";
 import { SettingsModal } from "@/components/lite-chat/settings/settings-modal";
 import { Button } from "@/components/ui/button";
 import {
   SettingsIcon,
   PlusIcon,
   FolderPlusIcon,
-  // DownloadIcon,
   ImportIcon,
-  // FileTextIcon,
-  // FolderIcon,
-  // Trash2Icon,
-  // Edit2Icon,
-  // CheckIcon,
-  // XIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -34,18 +24,13 @@ import type {
   ProjectSidebarItem,
   ConversationSidebarItem,
   SidebarItemType,
+  DbProviderConfig,
+  DbApiKey,
+  CustomSettingTab,
+  DbMod,
+  ModInstance,
 } from "@/lib/types";
-// Import the bundled props type from chat.tsx
-import type { SettingsModalTabProps } from "../chat";
-// import { Input } from "@/components/ui/input";
-// import {
-//   Tooltip,
-//   TooltipContent,
-//   TooltipProvider,
-//   TooltipTrigger,
-// } from "@/components/ui/tooltip";
 
-// Define props locally for ChatSide component
 export interface ChatSideProps {
   className?: string;
   dbProjects: DbProject[];
@@ -55,7 +40,47 @@ export interface ChatSideProps {
   selectedItemType: SidebarItemType | null;
   isSettingsModalOpen: boolean;
   setIsSettingsModalOpen: (isOpen: boolean) => void;
-  settingsProps: SettingsModalTabProps; // Use the imported type
+  theme: "light" | "dark" | "system";
+  setTheme: (theme: "light" | "dark" | "system") => void;
+  streamingRefreshRateMs: number;
+  setStreamingRefreshRateMs: (rate: number) => void;
+  dbProviderConfigs: DbProviderConfig[];
+  apiKeys: DbApiKey[];
+  addDbProviderConfig: (
+    config: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
+  ) => Promise<string>;
+  updateDbProviderConfig: (
+    id: string,
+    changes: Partial<DbProviderConfig>,
+  ) => Promise<void>;
+  deleteDbProviderConfig: (id: string) => Promise<void>;
+  fetchModels: (providerConfigId: string) => Promise<void>;
+  providerFetchStatus: Record<
+    string,
+    "idle" | "fetching" | "error" | "success"
+  >;
+  getAllAvailableModelDefs: (
+    providerConfigId: string,
+  ) => { id: string; name: string }[];
+  globalSystemPrompt: string | null;
+  setGlobalSystemPrompt: (prompt: string | null) => void;
+  addApiKey: (
+    name: string,
+    providerId: string,
+    value: string,
+  ) => Promise<string>;
+  deleteApiKey: (id: string) => Promise<void>;
+  importConversation: (file: File, parentId: string | null) => Promise<void>;
+  exportAllConversations: () => Promise<void>;
+  clearAllData: () => Promise<void>;
+  dbMods: DbMod[];
+  loadedMods: ModInstance[];
+  addDbMod: (modData: Omit<DbMod, "id" | "createdAt">) => Promise<string>;
+  updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>;
+  deleteDbMod: (id: string) => Promise<void>;
+  enableAdvancedSettings: boolean;
+  enableApiKeyManagement: boolean;
+  customSettingsTabs: CustomSettingTab[];
   onEditComplete: (id: string) => void;
   setEditingItemId: (id: string | null) => void;
   selectItem: (
@@ -77,7 +102,6 @@ export interface ChatSideProps {
     parentId: string | null,
     name?: string,
   ) => Promise<{ id: string; name: string }>;
-  importConversation: (file: File, parentId: string | null) => Promise<void>;
 }
 
 const ChatSideComponent: React.FC<ChatSideProps> = ({
@@ -98,13 +122,38 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   importConversation,
   isSettingsModalOpen,
   setIsSettingsModalOpen,
-  settingsProps,
+  theme,
+  setTheme,
+  streamingRefreshRateMs,
+  setStreamingRefreshRateMs,
+  dbProviderConfigs,
+  apiKeys,
+  addDbProviderConfig,
+  updateDbProviderConfig,
+  deleteDbProviderConfig,
+  fetchModels,
+  providerFetchStatus,
+  getAllAvailableModelDefs,
+  globalSystemPrompt,
+  setGlobalSystemPrompt,
+  addApiKey,
+  deleteApiKey,
+  exportAllConversations,
+  clearAllData,
+  dbMods,
+  loadedMods,
+  addDbMod,
+  updateDbMod,
+  deleteDbMod,
+  enableAdvancedSettings,
+  enableApiKeyManagement,
+  customSettingsTabs,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parentIdForNewItem, setParentIdForNewItem] = useState<string | null>(
     null,
   );
-  const [renameValue, setRenameValue] = useState("");
+  // Removed unused renameValue state
 
   const sidebarItems = useMemo<SidebarItem[]>(() => {
     const allProjects: DbProject[] = dbProjects || [];
@@ -173,29 +222,12 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
     setIsSettingsModalOpen(true);
   }, [setIsSettingsModalOpen]);
 
-  // Rename handlers
-  const handleRename = (id: string, type: SidebarItemType) => {
-    if (renameValue.trim()) {
-      renameItem(id, renameValue.trim(), type);
-      onEditComplete(id);
-      setRenameValue("");
-    } else {
-      // If rename value is empty, cancel edit
-      handleCancelRename(id);
-    }
-  };
+  // Removed unused handleCancelRename function
 
-  const handleCancelRename = (id: string) => {
-    onEditComplete(id);
-    setRenameValue("");
-  };
-
-  const startRename = (id: string, currentName: string) => {
+  const startRename = (id: string) => {
     setEditingItemId(id);
-    setRenameValue(currentName);
+    // Removed setting renameValue as it's unused
   };
-
-  // Removed unused renderItem function
 
   return (
     <aside
@@ -226,7 +258,6 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
       </div>
 
       <div className="flex-grow overflow-hidden flex flex-col">
-        {/* Pass startRename prop to ChatHistory */}
         <ChatHistory
           className="flex-grow"
           sidebarItems={sidebarItems}
@@ -255,7 +286,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
           className="w-full justify-start gap-2 text-sm h-9 border-border text-card-foreground hover:bg-muted hover:text-foreground transition-colors"
           onClick={handleImportClick}
         >
-          <ImportIcon className="h-4 w-4" /> {/* Use ImportIcon */}
+          <ImportIcon className="h-4 w-4" />
           Import Chat (.json)
         </Button>
 
@@ -271,11 +302,34 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
 
       <SettingsModal
         isOpen={isSettingsModalOpen}
-        // Pass onClose directly if SettingsModal expects it
         onClose={() => setIsSettingsModalOpen(false)}
-        // Or pass onOpenChange if it expects that pattern
-        // onOpenChange={setIsSettingsModalOpen}
-        settingsProps={settingsProps}
+        theme={theme}
+        setTheme={setTheme}
+        streamingRefreshRateMs={streamingRefreshRateMs}
+        setStreamingRefreshRateMs={setStreamingRefreshRateMs}
+        dbProviderConfigs={dbProviderConfigs}
+        apiKeys={apiKeys}
+        addDbProviderConfig={addDbProviderConfig}
+        updateDbProviderConfig={updateDbProviderConfig}
+        deleteDbProviderConfig={deleteDbProviderConfig}
+        fetchModels={fetchModels}
+        providerFetchStatus={providerFetchStatus}
+        getAllAvailableModelDefs={getAllAvailableModelDefs}
+        globalSystemPrompt={globalSystemPrompt}
+        setGlobalSystemPrompt={setGlobalSystemPrompt}
+        addApiKey={addApiKey}
+        deleteApiKey={deleteApiKey}
+        importConversation={importConversation}
+        exportAllConversations={exportAllConversations}
+        clearAllData={clearAllData}
+        dbMods={dbMods}
+        loadedMods={loadedMods}
+        addDbMod={addDbMod}
+        updateDbMod={updateDbMod}
+        deleteDbMod={deleteDbMod}
+        enableAdvancedSettings={enableAdvancedSettings}
+        enableApiKeyManagement={enableApiKeyManagement}
+        customSettingsTabs={customSettingsTabs}
       />
     </aside>
   );

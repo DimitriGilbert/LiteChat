@@ -1,4 +1,5 @@
 // src/hooks/use-lite-chat-logic.ts
+
 import { useMemo, useCallback, useRef, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
@@ -21,7 +22,6 @@ import {
 } from "@/store/settings.store";
 import { useVfsStore, type VfsState, type VfsActions } from "@/store/vfs.store";
 import { useModStore, type ModState, type ModActions } from "@/store/mod.store";
-// Import useInputStore
 import {
   useInputStore,
   type InputState,
@@ -32,9 +32,10 @@ import type {
   DbConversation,
   AiProviderConfig,
   AiModelConfig,
-  // DbProviderConfig, // Removed unused import
   Message,
-  // MessageContent, // Removed unused import
+  // MessageContent,
+  DbProviderConfig, // Keep this import
+  DbApiKey,
 } from "@/lib/types";
 import type { ReadonlyChatContextSnapshot } from "@/mods/api";
 import { db } from "@/lib/db";
@@ -45,8 +46,8 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createOllama } from "ollama-ai-provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-// Removed unused import
-// import { WorkflowExecutionService } from "@/services/workflow-execution-service";
+import { useChatStorage } from "./use-chat-storage";
+import { ensureV1Path } from "@/utils/chat-utils";
 
 interface UseLiteChatLogicProps {
   editingItemId: string | null;
@@ -55,7 +56,6 @@ interface UseLiteChatLogicProps {
   dbConversations: DbConversation[];
 }
 
-// Define the return type, including input actions
 interface UseLiteChatLogicReturn {
   // Input State & Actions (from InputStore)
   promptInputValue: InputState["promptInputValue"];
@@ -143,15 +143,11 @@ interface UseLiteChatLogicReturn {
     | "vfsError"
     | "vfsKey"
   >;
-  providerState: Pick<
-    ProviderState,
-    | "selectedProviderId"
-    | "selectedModelId"
-    | "dbProviderConfigs"
-    | "apiKeys"
-    | "enableApiKeyManagement"
-    | "providerFetchStatus"
-  >;
+  // Provider state now includes live data passed in
+  providerState: ProviderState & {
+    dbProviderConfigs: DbProviderConfig[];
+    apiKeys: DbApiKey[];
+  };
   settingsState: Pick<
     SettingsState,
     | "searchTerm"
@@ -201,6 +197,7 @@ export function useLiteChatLogic(
   props: UseLiteChatLogicProps,
 ): UseLiteChatLogicReturn {
   const { dbConversations } = props;
+  const storage = useChatStorage();
 
   // --- Get Input State/Actions from Store ---
   const {
@@ -254,37 +251,23 @@ export function useLiteChatLogic(
     })),
   );
 
-  const {
-    setMessages: setCoreMessages,
-    addMessage: coreAddMessage,
-    updateMessage: coreUpdateMessage,
-    setIsStreaming: setCoreIsStreaming,
-    setError: setCoreError,
-    addDbMessage: addCoreDbMessage,
-    bulkAddMessages: bulkCoreAddMessages,
-    handleSubmitCore: coreHandleSubmitCore,
-    handleImageGenerationCore: coreHandleImageGenerationCore,
-    stopStreamingCore: coreStopStreamingCore,
-    regenerateMessageCore: coreRegenerateMessageCore,
-    startWorkflowCore: coreStartWorkflowCore,
-    finalizeWorkflowTask: coreFinalizeWorkflowTask,
-  } = useCoreChatStore();
-
-  const coreChatActions: UseLiteChatLogicReturn["coreChatActions"] = {
-    setMessages: setCoreMessages,
-    addMessage: coreAddMessage,
-    updateMessage: coreUpdateMessage,
-    setIsStreaming: setCoreIsStreaming,
-    setError: setCoreError,
-    addDbMessage: addCoreDbMessage,
-    bulkAddMessages: bulkCoreAddMessages,
-    handleSubmitCore: coreHandleSubmitCore,
-    handleImageGenerationCore: coreHandleImageGenerationCore,
-    stopStreamingCore: coreStopStreamingCore,
-    regenerateMessageCore: coreRegenerateMessageCore,
-    startWorkflowCore: coreStartWorkflowCore,
-    finalizeWorkflowTask: coreFinalizeWorkflowTask,
-  };
+  const coreChatActions = useCoreChatStore(
+    useShallow((state): UseLiteChatLogicReturn["coreChatActions"] => ({
+      setMessages: state.setMessages,
+      addMessage: state.addMessage,
+      updateMessage: state.updateMessage,
+      setIsStreaming: state.setIsStreaming,
+      setError: state.setError,
+      addDbMessage: state.addDbMessage,
+      bulkAddMessages: state.bulkAddMessages,
+      handleSubmitCore: state.handleSubmitCore,
+      handleImageGenerationCore: state.handleImageGenerationCore,
+      stopStreamingCore: state.stopStreamingCore,
+      regenerateMessageCore: state.regenerateMessageCore,
+      startWorkflowCore: state.startWorkflowCore,
+      finalizeWorkflowTask: state.finalizeWorkflowTask,
+    })),
+  );
 
   const vfsActions = useVfsStore(
     useShallow((state): UseLiteChatLogicReturn["vfsActions"] => ({
@@ -302,27 +285,69 @@ export function useLiteChatLogic(
     })),
   );
 
-  const providerActions = useProviderStore(
-    useShallow((state): UseLiteChatLogicReturn["providerActions"] => ({
-      setSelectedProviderId: state.setSelectedProviderId,
-      setSelectedModelId: state.setSelectedModelId,
-      addDbProviderConfig: state.addDbProviderConfig,
-      updateDbProviderConfig: state.updateDbProviderConfig,
-      deleteDbProviderConfig: state.deleteDbProviderConfig,
-      fetchModels: state.fetchModels,
-      addApiKey: state.addApiKey,
-      deleteApiKey: state.deleteApiKey,
-    })),
+  const {
+    setSelectedProviderId: storeSetSelectedProviderId,
+    setSelectedModelId: storeSetSelectedModelId,
+    addDbProviderConfig: storeAddDbProviderConfig,
+    updateDbProviderConfig: storeUpdateDbProviderConfig,
+    deleteDbProviderConfig: storeDeleteDbProviderConfig,
+    fetchModels: storeFetchModels,
+    addApiKey: storeAddApiKey,
+    deleteApiKey: storeDeleteApiKey,
+  } = useProviderStore();
+
+  const providerStateFromStore = useProviderStore(
+    useShallow(
+      (
+        state,
+      ): Omit<
+        UseLiteChatLogicReturn["providerState"],
+        "dbProviderConfigs" | "apiKeys"
+      > => ({
+        selectedProviderId: state.selectedProviderId,
+        selectedModelId: state.selectedModelId,
+        enableApiKeyManagement: state.enableApiKeyManagement,
+        providerFetchStatus: state.providerFetchStatus,
+      }),
+    ),
   );
-  const providerState = useProviderStore(
-    useShallow((state): UseLiteChatLogicReturn["providerState"] => ({
-      selectedProviderId: state.selectedProviderId,
-      selectedModelId: state.selectedModelId,
-      dbProviderConfigs: state.dbProviderConfigs,
-      apiKeys: state.apiKeys,
-      enableApiKeyManagement: state.enableApiKeyManagement,
-      providerFetchStatus: state.providerFetchStatus,
-    })),
+
+  const dbProviderConfigs = storage.providerConfigs || [];
+  const apiKeys = storage.apiKeys || [];
+
+  const providerState: UseLiteChatLogicReturn["providerState"] = useMemo(
+    () => ({
+      ...providerStateFromStore,
+      dbProviderConfigs,
+      apiKeys,
+    }),
+    [providerStateFromStore, dbProviderConfigs, apiKeys],
+  );
+
+  const providerActions: UseLiteChatLogicReturn["providerActions"] = useMemo(
+    () => ({
+      setSelectedProviderId: (id) =>
+        storeSetSelectedProviderId(id, dbProviderConfigs),
+      setSelectedModelId: storeSetSelectedModelId,
+      addDbProviderConfig: storeAddDbProviderConfig,
+      updateDbProviderConfig: storeUpdateDbProviderConfig,
+      deleteDbProviderConfig: storeDeleteDbProviderConfig,
+      fetchModels: (id) => storeFetchModels(id, dbProviderConfigs, apiKeys),
+      addApiKey: storeAddApiKey,
+      deleteApiKey: storeDeleteApiKey,
+    }),
+    [
+      storeSetSelectedProviderId,
+      storeSetSelectedModelId,
+      storeAddDbProviderConfig,
+      storeUpdateDbProviderConfig,
+      storeDeleteDbProviderConfig,
+      storeFetchModels,
+      storeAddApiKey,
+      storeDeleteApiKey,
+      dbProviderConfigs,
+      apiKeys,
+    ],
   );
 
   const settingsActions = useSettingsStore(
@@ -398,6 +423,7 @@ Really delete everything? Consider exporting first.`,
             db.apiKeys.clear(),
             db.mods.clear(),
             db.providerConfigs.clear(),
+            db.appState.clear(),
           ]);
           toast.success("All local data cleared. Reloading the application...");
           setTimeout(() => window.location.reload(), 1500);
@@ -413,28 +439,24 @@ Really delete everything? Consider exporting first.`,
 
   const getAllAvailableModelDefs = useCallback(
     (providerConfigId: string) => {
-      const config = providerState.dbProviderConfigs.find(
-        (p) => p.id === providerConfigId,
-      );
+      const config = dbProviderConfigs.find((p) => p.id === providerConfigId);
       return config?.fetchedModels || [];
     },
-    [providerState.dbProviderConfigs],
+    [dbProviderConfigs],
   );
 
   // --- Derived State ---
   const getApiKeyForProvider = useCallback(
     (providerId: string): string | undefined => {
-      const config = providerState.dbProviderConfigs.find(
-        (p) => p.id === providerId,
-      );
+      const config = dbProviderConfigs.find((p) => p.id === providerId);
       if (!config || !config.apiKeyId) return undefined;
-      return providerState.apiKeys.find((k) => k.id === config.apiKeyId)?.value;
+      return apiKeys.find((k) => k.id === config.apiKeyId)?.value;
     },
-    [providerState.dbProviderConfigs, providerState.apiKeys],
+    [dbProviderConfigs, apiKeys],
   );
 
   const selectedProvider = useMemo((): AiProviderConfig | undefined => {
-    const config = providerState.dbProviderConfigs.find(
+    const config = dbProviderConfigs.find(
       (p) => p.id === providerState.selectedProviderId,
     );
     if (!config) return undefined;
@@ -445,12 +467,12 @@ Really delete everything? Consider exporting first.`,
       models: [],
       allAvailableModels: config.fetchedModels || [],
     };
-  }, [providerState.selectedProviderId, providerState.dbProviderConfigs]);
+  }, [providerState.selectedProviderId, dbProviderConfigs]);
 
   const selectedModel = useMemo((): AiModelConfig | undefined => {
     if (!providerState.selectedProviderId || !providerState.selectedModelId)
       return undefined;
-    const config = providerState.dbProviderConfigs.find(
+    const config = dbProviderConfigs.find(
       (p) => p.id === providerState.selectedProviderId,
     );
     if (!config) return undefined;
@@ -487,7 +509,7 @@ Really delete everything? Consider exporting first.`,
             throw new Error("Base URL required for openai-compatible");
           }
           modelInstance = createOpenAICompatible({
-            baseURL: config.baseURL,
+            baseURL: ensureV1Path(config.baseURL),
             apiKey: currentApiKey,
             name: config.name || "Custom API",
           })(modelInfo.id);
@@ -517,7 +539,7 @@ Really delete everything? Consider exporting first.`,
   }, [
     providerState.selectedProviderId,
     providerState.selectedModelId,
-    providerState.dbProviderConfigs,
+    dbProviderConfigs,
     getApiKeyForProvider,
   ]);
 
@@ -530,7 +552,9 @@ Really delete everything? Consider exporting first.`,
       const currentSelectedItemType =
         useSidebarStore.getState().selectedItemType;
       const currentVfs = useVfsStore.getState();
-      const currentProvider = useProviderStore.getState();
+      const currentProviderState = useProviderStore.getState();
+      const currentDbConfigs = dbProviderConfigs;
+      const currentApiKeys = apiKeys;
 
       let activeSystemPrompt: string | null = null;
       if (currentSettings.enableAdvancedSettings) {
@@ -552,12 +576,9 @@ Really delete everything? Consider exporting first.`,
       }
 
       const getApiKeyFunc = (id: string): string | undefined => {
-        const config = currentProvider.dbProviderConfigs.find(
-          (p) => p.id === id,
-        );
+        const config = currentDbConfigs.find((p) => p.id === id);
         if (!config || !config.apiKeyId) return undefined;
-        return currentProvider.apiKeys.find((k) => k.id === config.apiKeyId)
-          ?.value;
+        return currentApiKeys.find((k) => k.id === config.apiKeyId)?.value;
       };
 
       return Object.freeze({
@@ -565,8 +586,8 @@ Really delete everything? Consider exporting first.`,
         selectedItemType: currentSelectedItemType,
         messages: currentCore.messages,
         isStreaming: currentCore.isStreaming,
-        selectedProviderId: currentProvider.selectedProviderId,
-        selectedModelId: currentProvider.selectedModelId,
+        selectedProviderId: currentProviderState.selectedProviderId,
+        selectedModelId: currentProviderState.selectedModelId,
         activeSystemPrompt: activeSystemPrompt,
         temperature: currentSettings.temperature,
         maxTokens: currentSettings.maxTokens,
@@ -574,12 +595,13 @@ Really delete everything? Consider exporting first.`,
         isVfsEnabledForItem: currentVfs.isVfsEnabledForItem,
         getApiKeyForProvider: getApiKeyFunc,
       });
-    }, [dbConversations]);
+    }, [dbConversations, dbProviderConfigs, apiKeys]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // --- AI Interaction Hook ---
-  const { performAiStream, performImageGeneration } = useAiInteraction({
+  // const { performAiStream, performImageGeneration } = useAiInteraction({
+  const { performAiStream } = useAiInteraction({
     selectedModel,
     selectedProvider,
     getApiKeyForProvider: useCallback(
@@ -587,22 +609,22 @@ Really delete everything? Consider exporting first.`,
       [getApiKeyForProvider, providerState.selectedProviderId],
     ),
     streamingRefreshRateMs: settingsState.streamingRefreshRateMs,
-    addMessage: coreAddMessage,
-    updateMessage: coreUpdateMessage,
-    setIsAiStreaming: setCoreIsStreaming,
-    setError: setCoreError,
-    addDbMessage: addCoreDbMessage,
+    addMessage: coreChatActions.addMessage,
+    updateMessage: coreChatActions.updateMessage,
+    setIsAiStreaming: coreChatActions.setIsStreaming,
+    setError: coreChatActions.setError,
+    addDbMessage: coreChatActions.addDbMessage,
     abortControllerRef,
     getContextSnapshotForMod,
-    bulkAddMessages: bulkCoreAddMessages,
+    bulkAddMessages: coreChatActions.bulkAddMessages,
   });
 
   // --- Interaction Handlers ---
   const handleFormSubmit = useCallback(
     async (
       promptValue: string,
-      _files: File[], // _files is unused
-      _vfsPaths: string[], // _vfsPaths is unused
+      _files: File[],
+      _vfsPaths: string[],
       context: any,
     ) => {
       const commandMatch = promptValue.match(/^\/(\w+)\s*(.*)/s);
@@ -618,20 +640,11 @@ Really delete everything? Consider exporting first.`,
           return;
         }
         try {
-          const getApiKeyFunc = (id: string): string | undefined => {
-            const config = providerState.dbProviderConfigs.find(
-              (p) => p.id === id,
-            );
-            if (!config || !config.apiKeyId) return undefined;
-            return providerState.apiKeys.find((k) => k.id === config.apiKeyId)
-              ?.value;
-          };
+          const getApiKeyFunc = getApiKeyForProvider;
           const getProviderFunc = (
             id: string,
           ): AiProviderConfig | undefined => {
-            const config = providerState.dbProviderConfigs.find(
-              (p) => p.id === id,
-            );
+            const config = dbProviderConfigs.find((p) => p.id === id);
             if (!config) return undefined;
             return {
               id: config.id,
@@ -645,9 +658,7 @@ Really delete everything? Consider exporting first.`,
             provId: string,
             modId: string,
           ): AiModelConfig | undefined => {
-            const config = providerState.dbProviderConfigs.find(
-              (p) => p.id === provId,
-            );
+            const config = dbProviderConfigs.find((p) => p.id === provId);
             if (!config) return undefined;
             const modelInfo = (config.fetchedModels ?? []).find(
               (m: { id: string }) => m.id === modId,
@@ -680,7 +691,7 @@ Really delete everything? Consider exporting first.`,
                 case "openai-compatible":
                   if (!config.baseURL) throw new Error("Base URL required");
                   modelInstance = createOpenAICompatible({
-                    baseURL: config.baseURL,
+                    baseURL: ensureV1Path(config.baseURL),
                     apiKey: currentApiKey,
                     name: config.name || "Custom API",
                   })(modelInfo.id);
@@ -703,14 +714,16 @@ Really delete everything? Consider exporting first.`,
               supportsToolCalling: supportsTools,
             };
           };
-          await coreStartWorkflowCore(
+          // Pass dbProviderConfigs to startWorkflowCore
+          await coreChatActions.startWorkflowCore(
             context.selectedItemId,
             fullCommand,
             getApiKeyFunc,
             getProviderFunc,
             getModelFunc,
+            dbProviderConfigs, // Pass the live data
           );
-          clearAllInput(); // Clear input state after starting workflow
+          clearAllInput();
         } catch (err) {
           console.error("Error starting workflow:", err);
         }
@@ -719,21 +732,17 @@ Really delete everything? Consider exporting first.`,
           const imagePrompt = context.contentToSendToAI
             .substring("/imagine ".length)
             .trim();
-          await coreHandleImageGenerationCore(
+          await coreChatActions.handleImageGenerationCore(
             context.selectedItemId!,
             imagePrompt,
           );
-          await performImageGeneration({
-            conversationIdToUse: context.selectedItemId!,
-            prompt: imagePrompt,
-          });
-          clearAllInput(); // Clear input state after image generation
+          clearAllInput();
         } catch (err) {
           console.error("Error in image generation flow:", err);
         }
       } else {
         try {
-          await coreHandleSubmitCore(
+          await coreChatActions.handleSubmitCore(
             context.selectedItemId!,
             context.contentToSendToAI,
             context.vfsContextPaths,
@@ -755,22 +764,22 @@ Really delete everything? Consider exporting first.`,
             currentFrequencyPenalty: settings.frequencyPenalty,
             systemPromptToUse: activeSystemPrompt,
           });
-          clearAllInput(); // Clear input state after regular submission
+          clearAllInput();
         } catch (err) {
           console.error("Error during form submission flow:", err);
         }
       }
     },
     [
-      coreHandleSubmitCore,
+      coreChatActions.handleSubmitCore,
+      coreChatActions.startWorkflowCore,
+      coreChatActions.handleImageGenerationCore,
       performAiStream,
       getContextSnapshotForMod,
-      coreStartWorkflowCore,
-      coreHandleImageGenerationCore,
-      performImageGeneration,
-      providerState.dbProviderConfigs,
-      providerState.apiKeys,
-      clearAllInput, // Use the action from input store
+      getApiKeyForProvider,
+      dbProviderConfigs, // Add dependency
+      apiKeys,
+      clearAllInput,
     ],
   );
 
@@ -788,31 +797,20 @@ Really delete everything? Consider exporting first.`,
         return;
       }
       try {
-        await coreHandleImageGenerationCore(currentSelectedItemId, promptValue);
-        await performImageGeneration({
-          conversationIdToUse: currentSelectedItemId,
-          prompt: promptValue,
-        });
-        // clearAllInput(); // Optionally clear input here too
+        await coreChatActions.handleImageGenerationCore(
+          currentSelectedItemId,
+          promptValue,
+        );
       } catch (err) {
         console.error("Error in handleImageGenerationWrapper:", err);
       }
     },
-    [coreHandleImageGenerationCore, performImageGeneration /*, clearAllInput*/],
+    [coreChatActions.handleImageGenerationCore],
   );
 
   const stopStreaming = useCallback(
     (parentMessageId: string | null = null) => {
-      const activeWorkflows = useCoreChatStore.getState().activeWorkflows;
-      const targetParentId =
-        parentMessageId ?? [...activeWorkflows.keys()].pop();
-
-      if (targetParentId && activeWorkflows.has(targetParentId)) {
-        coreStopStreamingCore(targetParentId);
-      } else {
-        coreStopStreamingCore();
-      }
-
+      coreChatActions.stopStreamingCore(parentMessageId);
       setTimeout(() => {
         if (
           !useCoreChatStore.getState().isStreaming &&
@@ -823,7 +821,7 @@ Really delete everything? Consider exporting first.`,
         }
       }, 0);
     },
-    [coreStopStreamingCore],
+    [coreChatActions.stopStreamingCore],
   );
 
   const regenerateMessage = useCallback(
@@ -836,20 +834,17 @@ Really delete everything? Consider exporting first.`,
         }
         const conversationId = originalMessage.conversationId;
 
-        await coreRegenerateMessageCore(messageId);
+        await coreChatActions.regenerateMessageCore(messageId);
         const currentMessages = useCoreChatStore.getState().messages;
 
         if (originalMessage.workflow) {
           toast.info("Re-running workflow...");
           const originalCommand = originalMessage.content as string;
-          const getApiKeyFunc = (id: string): string | undefined =>
-            getApiKeyForProvider(id);
+          const getApiKeyFunc = getApiKeyForProvider;
           const getProviderFunc = (
             id: string,
           ): AiProviderConfig | undefined => {
-            const config = providerState.dbProviderConfigs.find(
-              (p) => p.id === id,
-            );
+            const config = dbProviderConfigs.find((p) => p.id === id);
             if (!config) return undefined;
             return {
               id: config.id,
@@ -863,9 +858,7 @@ Really delete everything? Consider exporting first.`,
             provId: string,
             modId: string,
           ): AiModelConfig | undefined => {
-            const config = providerState.dbProviderConfigs.find(
-              (p) => p.id === provId,
-            );
+            const config = dbProviderConfigs.find((p) => p.id === provId);
             if (!config) return undefined;
             const modelInfo = (config.fetchedModels ?? []).find(
               (m: { id: string }) => m.id === modId,
@@ -898,7 +891,7 @@ Really delete everything? Consider exporting first.`,
                 case "openai-compatible":
                   if (!config.baseURL) throw new Error("Base URL required");
                   modelInstance = createOpenAICompatible({
-                    baseURL: config.baseURL,
+                    baseURL: ensureV1Path(config.baseURL),
                     apiKey: currentApiKey,
                     name: config.name || "Custom API",
                   })(modelInfo.id);
@@ -921,12 +914,14 @@ Really delete everything? Consider exporting first.`,
               supportsToolCalling: supportsTools,
             };
           };
-          await coreStartWorkflowCore(
+          // Pass dbProviderConfigs to startWorkflowCore
+          await coreChatActions.startWorkflowCore(
             conversationId,
             originalCommand,
             getApiKeyFunc,
             getProviderFunc,
             getModelFunc,
+            dbProviderConfigs, // Pass the live data
           );
         } else if (
           originalMessage.role === "user" &&
@@ -947,6 +942,7 @@ Really delete everything? Consider exporting first.`,
               break;
             }
           }
+
           if (
             precedingUserMessage &&
             typeof precedingUserMessage.content === "string" &&
@@ -955,10 +951,7 @@ Really delete everything? Consider exporting first.`,
             const imagePrompt = precedingUserMessage.content
               .substring("/imagine ".length)
               .trim();
-            await performImageGeneration({
-              conversationIdToUse: conversationId,
-              prompt: imagePrompt,
-            });
+            await handleImageGenerationWrapper(imagePrompt);
           } else {
             const historyForApi =
               convertDbMessagesToCoreMessages(currentMessages);
@@ -985,14 +978,14 @@ Really delete everything? Consider exporting first.`,
       }
     },
     [
-      coreRegenerateMessageCore,
-      coreStartWorkflowCore,
+      coreChatActions.regenerateMessageCore,
+      coreChatActions.startWorkflowCore,
       performAiStream,
-      performImageGeneration,
+      handleImageGenerationWrapper,
       getContextSnapshotForMod,
       getApiKeyForProvider,
-      providerState.dbProviderConfigs,
-      providerState.apiKeys,
+      dbProviderConfigs,
+      apiKeys,
     ],
   );
 
@@ -1028,7 +1021,7 @@ Really delete everything? Consider exporting first.`,
 
   // --- Return all state, actions, derived data, and callbacks ---
   return {
-    // Input State/Actions from useInputStore
+    // Input State/Actions
     promptInputValue,
     setPromptInputValue,
     attachedFiles,
@@ -1041,7 +1034,7 @@ Really delete everything? Consider exporting first.`,
     clearSelectedVfsPaths,
     clearAllInput,
 
-    // Store State & Actions
+    // Store Actions (wrapped or direct)
     sidebarActions,
     coreChatActions,
     vfsActions,

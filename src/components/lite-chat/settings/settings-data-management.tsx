@@ -1,6 +1,5 @@
 // src/components/lite-chat/settings/settings-data-management.tsx
 import React, { useRef, useState, useCallback } from "react";
-// REMOVED store imports
 import { Button } from "@/components/ui/button";
 import { UploadIcon, DownloadIcon, Trash2Icon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -12,7 +11,6 @@ interface SettingsDataManagementProps {
   clearAllData: () => Promise<void>; // Action to clear all data
 }
 
-// Wrap component logic in a named function for React.memo
 const SettingsDataManagementComponent: React.FC<
   SettingsDataManagementProps
 > = ({
@@ -20,8 +18,6 @@ const SettingsDataManagementComponent: React.FC<
   exportAllConversations, // Use prop action
   clearAllData, // Use prop action
 }) => {
-  // REMOVED store access
-
   // Local UI state remains
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -42,7 +38,6 @@ const SettingsDataManagementComponent: React.FC<
           await importConversation(file, null); // Use prop action
         } catch (error) {
           console.error("Import failed (from component):", error);
-          // Error toast likely handled by the action itself
         } finally {
           if (fileInputRef.current) {
             fileInputRef.current.value = "";
@@ -52,7 +47,7 @@ const SettingsDataManagementComponent: React.FC<
       }
     },
     [importConversation],
-  ); // Depend on prop action
+  );
 
   const handleExportAllClick = useCallback(async () => {
     setIsExporting(true);
@@ -60,21 +55,24 @@ const SettingsDataManagementComponent: React.FC<
       await exportAllConversations(); // Use prop action
     } catch (error) {
       console.error("Export all failed (from component):", error);
-      // Error toast likely handled by the action itself
     } finally {
       setIsExporting(false);
     }
-  }, [exportAllConversations]); // Depend on prop action
+  }, [exportAllConversations]);
 
   const handleClearAllDataClick = useCallback(async () => {
     if (
       window.confirm(
-        "🚨 ARE YOU ABSOLUTELY SURE? 🚨\n\nThis will permanently delete ALL conversations, messages, and stored API keys from your browser. This action cannot be undone.",
+        `🚨 ARE YOU ABSOLUTELY SURE? 🚨
+
+This will permanently delete ALL conversations, messages, and stored API keys from your browser. This action cannot be undone.`,
       )
     ) {
       if (
         window.confirm(
-          "SECOND CONFIRMATION:\n\nReally delete everything? Consider exporting first.",
+          `SECOND CONFIRMATION:
+
+Really delete everything? Consider exporting first.`,
         )
       ) {
         setIsClearing(true);
@@ -87,15 +85,14 @@ const SettingsDataManagementComponent: React.FC<
           const message =
             error instanceof Error ? error.message : "Unknown error";
           toast.error(`Failed to clear data: ${message}`);
-          setIsClearing(false); // Only reset state on error, as success reloads
+          setIsClearing(false);
         }
       }
     }
-  }, [clearAllData]); // Depend on prop action
+  }, [clearAllData]);
 
   return (
     <div className="space-y-6 p-1">
-      {/* Import Section */}
       <div>
         <h3 className="text-lg font-medium mb-2">Import Conversation</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
@@ -125,7 +122,6 @@ const SettingsDataManagementComponent: React.FC<
         </Button>
       </div>
 
-      {/* Export Section */}
       <div>
         <h3 className="text-lg font-medium mb-2">Export Data</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
@@ -145,7 +141,6 @@ const SettingsDataManagementComponent: React.FC<
         </Button>
       </div>
 
-      {/* Danger Zone */}
       <div className="border-t pt-6 border-destructive/50">
         <h3 className="text-lg font-medium text-destructive mb-2">
           Danger Zone
@@ -172,7 +167,6 @@ const SettingsDataManagementComponent: React.FC<
   );
 };
 
-// Export the memoized component
 export const SettingsDataManagement = React.memo(
   SettingsDataManagementComponent,
 );

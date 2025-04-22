@@ -18,7 +18,7 @@ import type {
   ReadonlyChatContextSnapshot,
   TextPart,
   ImagePart,
-  AiProviderConfig as AiProviderConfigType,
+  // AiProviderConfig as AiProviderConfigType,
 } from "@/lib/types";
 import { FileHandlingService } from "@/services/file-handling-service";
 import type { SubmitPromptPayload } from "@/mods/types";

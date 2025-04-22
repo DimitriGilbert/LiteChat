@@ -1,4 +1,4 @@
-// src/components/lite-chat/message-metadata-display.tsx
+// src/components/lite-chat/message/message-metadata-display.tsx
 import React from "react";
 import type { Message } from "@/lib/types";
 
@@ -14,9 +14,15 @@ export const MessageMetadataDisplay: React.FC<MessageMetadataDisplayProps> =
     }
 
     const showProvider = message.providerId && message.modelId;
-    const showTokens =
-      message.tokensInput !== undefined || message.tokensOutput !== undefined;
-    const showSpeed = message.tokensPerSecond !== undefined;
+    // Check if tokens are valid numbers before deciding to show
+    const tokensInputValid =
+      typeof message.tokensInput === "number" && !isNaN(message.tokensInput);
+    const tokensOutputValid =
+      typeof message.tokensOutput === "number" && !isNaN(message.tokensOutput);
+    const showTokens = tokensInputValid || tokensOutputValid;
+    const showSpeed =
+      typeof message.tokensPerSecond === "number" &&
+      !isNaN(message.tokensPerSecond);
 
     if (!showProvider && !showTokens && !showSpeed) {
       return null;
@@ -35,14 +41,14 @@ export const MessageMetadataDisplay: React.FC<MessageMetadataDisplayProps> =
         {showTokens && (
           <span>
             Tokens:
-            {message.tokensInput !== undefined && (
+            {tokensInputValid && (
               <>
                 {" "}
                 In{" "}
                 <strong className="text-gray-400">{message.tokensInput}</strong>
               </>
             )}
-            {message.tokensOutput !== undefined && (
+            {tokensOutputValid && (
               <>
                 , Out{" "}
                 <strong className="text-gray-400">

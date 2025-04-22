@@ -12,8 +12,7 @@ import type {
   ModEventPayloadMap, // Import ModEventPayloadMap
 } from "@/mods/types";
 import { loadMods } from "@/mods/loader";
-import { modEvents } from "@/mods/events";
-import { ModEvent } from "@/mods/events";
+import { modEvents, ModEvent } from "@/mods/events";
 import type {
   LiteChatModApi,
   ModMiddlewareHookName,

@@ -16,37 +16,138 @@ import { SettingsApiKeys } from "./settings-api-keys";
 import { SettingsDataManagement } from "./settings-data-management";
 import { SettingsMods } from "./settings-mods";
 import { SettingsProviders } from "./settings-providers";
-import type { CustomSettingTab } from "@/lib/types";
-// Import the bundled props type from chat.tsx
-import type { SettingsModalTabProps } from "../chat";
+import type {
+  CustomSettingTab,
+  DbProviderConfig,
+  DbApiKey,
+  DbMod,
+  ModInstance,
+} from "@/lib/types";
+// REMOVED: import type { SettingsModalTabProps } from "../chat";
 
-// Define props based on what ChatSide passes down
+// Define individual props based on SettingsModalTabProps
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  settingsProps: SettingsModalTabProps; // Receive the bundled props
+  // General Settings Props
+  theme: "light" | "dark" | "system";
+  setTheme: (theme: "light" | "dark" | "system") => void;
+  streamingRefreshRateMs: number;
+  setStreamingRefreshRateMs: (rate: number) => void;
+  // Provider Settings Props
+  dbProviderConfigs: DbProviderConfig[];
+  apiKeys: DbApiKey[];
+  addDbProviderConfig: (
+    config: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
+  ) => Promise<string>;
+  updateDbProviderConfig: (
+    id: string,
+    changes: Partial<DbProviderConfig>,
+  ) => Promise<void>;
+  deleteDbProviderConfig: (id: string) => Promise<void>;
+  fetchModels: (providerConfigId: string) => Promise<void>;
+  providerFetchStatus: Record<
+    string,
+    "idle" | "fetching" | "error" | "success"
+  >;
+  getAllAvailableModelDefs: (
+    providerConfigId: string,
+  ) => { id: string; name: string }[];
+  // Assistant Settings Props
+  globalSystemPrompt: string | null;
+  setGlobalSystemPrompt: (prompt: string | null) => void;
+  // API Key Settings Props
+  addApiKey: (
+    name: string,
+    providerId: string,
+    value: string,
+  ) => Promise<string>;
+  deleteApiKey: (id: string) => Promise<void>;
+  // Data Management Props
+  importConversation: (file: File, parentId: string | null) => Promise<void>;
+  exportAllConversations: () => Promise<void>;
+  clearAllData: () => Promise<void>;
+  // Mod Settings Props
+  dbMods: DbMod[];
+  loadedMods: ModInstance[];
+  addDbMod: (modData: Omit<DbMod, "id" | "createdAt">) => Promise<string>;
+  updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>;
+  deleteDbMod: (id: string) => Promise<void>;
+  // Feature Flags
+  enableAdvancedSettings: boolean;
+  enableApiKeyManagement: boolean;
+  // Custom Tabs
+  customSettingsTabs: CustomSettingTab[];
 }
 
-// Wrap component logic in a named function for React.memo
 const SettingsModalComponent: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
-  settingsProps, // Destructure the bundled props object itself
+  // Destructure all individual props
+  theme,
+  setTheme,
+  streamingRefreshRateMs,
+  setStreamingRefreshRateMs,
+  dbProviderConfigs,
+  apiKeys,
+  addDbProviderConfig,
+  updateDbProviderConfig,
+  deleteDbProviderConfig,
+  fetchModels,
+  providerFetchStatus,
+  getAllAvailableModelDefs,
+  globalSystemPrompt,
+  setGlobalSystemPrompt,
+  addApiKey,
+  deleteApiKey,
+  importConversation,
+  exportAllConversations,
+  clearAllData,
+  dbMods,
+  loadedMods,
+  addDbMod,
+  updateDbMod,
+  deleteDbMod,
+  enableAdvancedSettings,
+  enableApiKeyManagement,
+  customSettingsTabs,
 }) => {
-  // Handle modal open/close via props/callback
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       onClose();
     }
   };
 
-  // Destructure only flags needed for conditional rendering here
-  const {
+  // Create the context object needed for custom tabs dynamically
+  const customTabContext = {
+    theme,
+    setTheme,
+    dbProviderConfigs,
+    apiKeys,
+    addDbProviderConfig,
+    updateDbProviderConfig,
+    deleteDbProviderConfig,
+    fetchModels,
+    providerFetchStatus,
+    getAllAvailableModelDefs,
+    globalSystemPrompt,
+    setGlobalSystemPrompt,
+    addApiKey,
+    deleteApiKey,
+    importConversation,
+    exportAllConversations,
+    clearAllData,
+    dbMods,
+    loadedMods,
+    addDbMod,
+    updateDbMod,
+    deleteDbMod,
     enableAdvancedSettings,
     enableApiKeyManagement,
     customSettingsTabs,
-    // Pass the rest of settingsProps down directly where needed
-  } = settingsProps;
+    streamingRefreshRateMs,
+    setStreamingRefreshRateMs,
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -72,7 +173,6 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
               )}
               <TabsTrigger value="data">Data</TabsTrigger>
               <TabsTrigger value="mods">Mods</TabsTrigger>
-              {/* Use customSettingsTabs from props */}
               {customSettingsTabs.map((tab: CustomSettingTab) => (
                 <TabsTrigger key={tab.id} value={tab.id}>
                   {tab.title}
@@ -81,67 +181,72 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
             </TabsList>
 
             <div>
-              {/* Pass the entire settingsProps bundle down */}
               <TabsContent value="general">
-                <SettingsGeneral settingsProps={settingsProps} />
+                {/* Pass individual props */}
+                <SettingsGeneral
+                  theme={theme}
+                  setTheme={setTheme}
+                  streamingRefreshRateMs={streamingRefreshRateMs}
+                  setStreamingRefreshRateMs={setStreamingRefreshRateMs}
+                  // Pass other general props if SettingsGeneral needs them
+                />
               </TabsContent>
               <TabsContent value="providers">
-                {/* SettingsProviders needs specific props, keep destructuring */}
+                {/* Pass individual props */}
                 <SettingsProviders
-                  dbProviderConfigs={settingsProps.dbProviderConfigs}
-                  apiKeys={settingsProps.apiKeys}
-                  addDbProviderConfig={settingsProps.addDbProviderConfig}
-                  updateDbProviderConfig={settingsProps.updateDbProviderConfig}
-                  deleteDbProviderConfig={settingsProps.deleteDbProviderConfig}
-                  fetchModels={settingsProps.fetchModels}
-                  providerFetchStatus={settingsProps.providerFetchStatus}
-                  getAllAvailableModelDefs={
-                    settingsProps.getAllAvailableModelDefs
-                  }
+                  dbProviderConfigs={dbProviderConfigs}
+                  apiKeys={apiKeys}
+                  addDbProviderConfig={addDbProviderConfig}
+                  updateDbProviderConfig={updateDbProviderConfig}
+                  deleteDbProviderConfig={deleteDbProviderConfig}
+                  fetchModels={fetchModels}
+                  providerFetchStatus={providerFetchStatus}
+                  getAllAvailableModelDefs={getAllAvailableModelDefs}
                 />
               </TabsContent>
               {enableAdvancedSettings && (
                 <TabsContent value="assistant">
+                  {/* Pass individual props */}
                   <SettingsAssistant
-                    globalSystemPrompt={settingsProps.globalSystemPrompt}
-                    setGlobalSystemPrompt={settingsProps.setGlobalSystemPrompt}
+                    globalSystemPrompt={globalSystemPrompt}
+                    setGlobalSystemPrompt={setGlobalSystemPrompt}
                   />
                 </TabsContent>
               )}
               {enableApiKeyManagement && (
                 <TabsContent value="apiKeys">
+                  {/* Pass individual props */}
                   <SettingsApiKeys
-                    apiKeys={settingsProps.apiKeys}
-                    addApiKey={settingsProps.addApiKey}
-                    deleteApiKey={settingsProps.deleteApiKey}
-                    dbProviderConfigs={settingsProps.dbProviderConfigs}
-                    enableApiKeyManagement={
-                      settingsProps.enableApiKeyManagement
-                    }
+                    apiKeys={apiKeys}
+                    addApiKey={addApiKey}
+                    deleteApiKey={deleteApiKey}
+                    dbProviderConfigs={dbProviderConfigs}
+                    enableApiKeyManagement={enableApiKeyManagement}
                   />
                 </TabsContent>
               )}
               <TabsContent value="data">
+                {/* Pass individual props */}
                 <SettingsDataManagement
-                  importConversation={settingsProps.importConversation}
-                  exportAllConversations={settingsProps.exportAllConversations}
-                  clearAllData={settingsProps.clearAllData}
+                  importConversation={importConversation}
+                  exportAllConversations={exportAllConversations}
+                  clearAllData={clearAllData}
                 />
               </TabsContent>
               <TabsContent value="mods">
+                {/* Pass individual props */}
                 <SettingsMods
-                  dbMods={settingsProps.dbMods}
-                  loadedMods={settingsProps.loadedMods}
-                  addDbMod={settingsProps.addDbMod}
-                  updateDbMod={settingsProps.updateDbMod}
-                  deleteDbMod={settingsProps.deleteDbMod}
+                  dbMods={dbMods}
+                  loadedMods={loadedMods}
+                  addDbMod={addDbMod}
+                  updateDbMod={updateDbMod}
+                  deleteDbMod={deleteDbMod}
                 />
               </TabsContent>
-              {/* Render custom tabs from props */}
               {customSettingsTabs.map((tab: CustomSettingTab) => (
                 <TabsContent key={tab.id} value={tab.id}>
-                  {/* Pass the context object to custom tabs */}
-                  <tab.component context={settingsProps as any} />
+                  {/* Pass the dynamically created context object */}
+                  <tab.component context={customTabContext as any} />
                 </TabsContent>
               ))}
             </div>
@@ -158,5 +263,4 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
   );
 };
 
-// Export the memoized component
 export const SettingsModal = React.memo(SettingsModalComponent);

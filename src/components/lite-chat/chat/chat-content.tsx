@@ -103,18 +103,25 @@ const ChatContentComponent: React.FC<ChatContentProps> = ({
     }
   }, [getViewport]);
 
-  const throttledCheckScrollPosition = throttle(checkScrollPosition, 150);
+  const { throttled: throttledCheckScrollPosition, cancel: cancelThrottle } =
+    throttle(checkScrollPosition, 150);
 
   useEffect(() => {
     const viewport = getViewport();
     if (viewport) {
       viewport.addEventListener("scroll", throttledCheckScrollPosition);
-      checkScrollPosition();
+      checkScrollPosition(); // Initial check
       return () => {
         viewport.removeEventListener("scroll", throttledCheckScrollPosition);
+        cancelThrottle(); // Cancel any pending throttled calls on cleanup
       };
     }
-  }, [getViewport, throttledCheckScrollPosition, checkScrollPosition]);
+  }, [
+    getViewport,
+    throttledCheckScrollPosition,
+    checkScrollPosition,
+    cancelThrottle,
+  ]);
 
   const messagesLength = messages.length;
   useLayoutEffect(() => {

@@ -9,22 +9,24 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
-// Import the bundled props type from chat.tsx
-import type { SettingsModalTabProps } from "../chat";
+// REMOVED: SettingsModalTabProps import
 
-// Update component props to expect the bundled object
-interface SettingsGeneralComponentProps {
-  settingsProps: SettingsModalTabProps;
+// Update component props to expect individual props
+interface SettingsGeneralProps {
+  theme: "light" | "dark" | "system";
+  setTheme: (theme: "light" | "dark" | "system") => void;
+  streamingRefreshRateMs: number;
+  setStreamingRefreshRateMs: (rate: number) => void;
+  // Add other props if needed for Git config later
 }
 
-// Wrap component logic in a named function for React.memo
-const SettingsGeneralComponent: React.FC<SettingsGeneralComponentProps> = ({
-  settingsProps, // Receive the bundled props
+const SettingsGeneralComponent: React.FC<SettingsGeneralProps> = ({
+  // Destructure individual props
+  theme,
+  setTheme,
+  streamingRefreshRateMs,
+  setStreamingRefreshRateMs,
 }) => {
-  // Destructure needed state and actions from the bundled props *inside* the component
-  const { theme, setTheme, streamingRefreshRateMs, setStreamingRefreshRateMs } =
-    settingsProps;
-
   // Local UI state for git config (if managed here)
   const [rootGitEnabled, setRootGitEnabled] = useState(false);
   const [rootGitRepoUrl, setRootGitRepoUrl] = useState("");
@@ -39,8 +41,6 @@ const SettingsGeneralComponent: React.FC<SettingsGeneralComponentProps> = ({
     }
     setIsSaving(true);
     try {
-      // Example: Call prop action to save config (e.g., via a mod)
-      // await updateDbMod("root-git-config", { /* ... data ... */ });
       console.warn("Root Git Config saving not fully implemented via props.");
       toast.info("Git repository configuration saving needs implementation.");
     } catch (error) {
@@ -192,5 +192,4 @@ const SettingsGeneralComponent: React.FC<SettingsGeneralComponentProps> = ({
   );
 };
 
-// Export the memoized component
 export const SettingsGeneral = React.memo(SettingsGeneralComponent);

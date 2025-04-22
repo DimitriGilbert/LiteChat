@@ -1,6 +1,5 @@
 // src/components/lite-chat/settings/settings-assistant.tsx
 import React from "react";
-// REMOVED store imports
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -10,13 +9,10 @@ interface SettingsAssistantProps {
   setGlobalSystemPrompt: (prompt: string | null) => void;
 }
 
-// Wrap component logic in a named function for React.memo
 const SettingsAssistantComponent: React.FC<SettingsAssistantProps> = ({
   globalSystemPrompt, // Use prop
   setGlobalSystemPrompt, // Use prop action
 }) => {
-  // REMOVED store access
-
   return (
     <div className="space-y-6 p-1">
       <div>
@@ -39,5 +35,4 @@ const SettingsAssistantComponent: React.FC<SettingsAssistantProps> = ({
   );
 };
 
-// Export the memoized component
 export const SettingsAssistant = React.memo(SettingsAssistantComponent);

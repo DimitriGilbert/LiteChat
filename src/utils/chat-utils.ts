@@ -104,3 +104,26 @@ export const EMPTY_CUSTOM_SETTINGS_TABS: CustomSettingTab[] = [];
 export const EMPTY_CUSTOM_PROMPT_ACTIONS: CustomPromptAction[] = [];
 export const EMPTY_CUSTOM_MESSAGE_ACTIONS: CustomMessageAction[] = [];
 export const EMPTY_DB_PROVIDER_CONFIGS: DbProviderConfig[] = [];
+
+// Helper to ensure base URL ends correctly with /v1 following user's EXACT logic
+export const ensureV1Path = (baseUrl: string): string => {
+  try {
+    // Trim trailing slashes ONLY for the final return value if needed,
+    // but perform checks on the original or slightly modified string.
+    const trimmedForV1Check = baseUrl.replace(/\/+$/, ""); // Trim only for the /v1 check
+
+    if (trimmedForV1Check.endsWith("/v1")) {
+      return trimmedForV1Check; // Return the version ending in /v1 (already trimmed)
+    } else if (baseUrl.endsWith("/")) {
+      // Ends with '/', append 'v1'
+      return baseUrl + "v1";
+    } else {
+      // Doesn't end with '/' or '/v1', append '/v1'
+      return baseUrl + "/v1";
+    }
+  } catch (e) {
+    console.error("Error processing base URL for /v1 path:", baseUrl, e);
+    // Fallback: return original URL trimmed of trailing slashes
+    return baseUrl.replace(/\/+$/, "");
+  }
+};

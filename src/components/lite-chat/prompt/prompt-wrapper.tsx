@@ -14,31 +14,25 @@ import type {
   AiModelConfig,
   AiProviderConfig as AiProviderConfigType,
 } from "@/lib/types";
-// Removed CoreChatActions import
 
-// Update props
 interface PromptWrapperProps {
   className?: string;
-  // Direct volatile state
   error: string | null;
   isStreaming: boolean;
   isVfsReady: boolean;
   isVfsEnabledForItem: boolean;
-  // Direct Input State/Actions
   promptInputValue: string;
   setPromptInputValue: (value: string) => void;
   addAttachedFile: (file: File) => void;
   removeAttachedFile: (fileName: string) => void;
   clearPromptInput: () => void;
   clearAttachedFiles: () => void;
-  // Form Submission Wrapper
   onFormSubmit: (
     prompt: string,
     files: File[],
     vfsPaths: string[],
     context: any,
-  ) => Promise<void>; // Renamed prop
-  // Other props passed down to PromptForm
+  ) => Promise<void>;
   attachedFiles: File[];
   selectedVfsPaths: string[];
   clearSelectedVfsPaths: () => void;
@@ -97,9 +91,8 @@ const PromptWrapperComponent: React.FC<PromptWrapperProps> = ({
   error,
   isStreaming,
   stopStreaming,
-  clearAttachedFiles,
-  onFormSubmit, // Receive the wrapper function
-  // Pass all other props down to PromptForm using rest operator
+  // clearAttachedFiles, // Removed unused prop
+  onFormSubmit,
   ...promptFormProps
 }) => {
   return (
@@ -127,11 +120,11 @@ const PromptWrapperComponent: React.FC<PromptWrapperProps> = ({
       )}
 
       <PromptForm
-        {...promptFormProps} // Pass remaining props
+        {...promptFormProps}
         isStreaming={isStreaming}
         stopStreaming={stopStreaming}
-        clearAttachedFiles={clearAttachedFiles}
-        onFormSubmit={onFormSubmit} // Pass the wrapper function down
+        // Removed clearAttachedFiles prop
+        onFormSubmit={onFormSubmit}
         getContextSnapshot={promptFormProps.getContextSnapshotForMod}
       />
     </div>

@@ -1,6 +1,5 @@
 // src/components/lite-chat/settings/settings-mods.tsx
 import React, { useState, useCallback } from "react";
-// REMOVED store imports
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { AlertTriangle, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import type { DbMod, ModInstance } from "@/mods/types"; // Keep types
+import type { DbMod, ModInstance } from "@/mods/types";
 import {
   Tooltip,
   TooltipContent,
@@ -34,7 +33,6 @@ interface SettingsModsProps {
   deleteDbMod: (id: string) => Promise<void>;
 }
 
-// Wrap component logic in a named function for React.memo
 const SettingsModsComponent: React.FC<SettingsModsProps> = ({
   dbMods, // Use prop
   loadedMods, // Use prop
@@ -42,8 +40,6 @@ const SettingsModsComponent: React.FC<SettingsModsProps> = ({
   updateDbMod, // Use prop action
   deleteDbMod, // Use prop action
 }) => {
-  // REMOVED store access
-
   // Local UI state remains
   const [modName, setModName] = useState("");
   const [modUrl, setModUrl] = useState("");
@@ -52,7 +48,6 @@ const SettingsModsComponent: React.FC<SettingsModsProps> = ({
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
 
-  // Handlers use prop actions
   const handleAddMod = useCallback(async () => {
     if (!modName.trim()) {
       toast.error("Mod name cannot be empty.");
@@ -74,37 +69,35 @@ const SettingsModsComponent: React.FC<SettingsModsProps> = ({
         sourceUrl: modUrl.trim() || null,
         scriptContent: modScript.trim() || null,
         enabled: true,
-        loadOrder: (dbMods.length + 1) * 10, // Use prop for length
+        loadOrder: (dbMods.length + 1) * 10,
       };
-      await addDbMod(modData); // Use prop action
+      await addDbMod(modData);
       setModName("");
       setModUrl("");
       setModScript("");
     } catch (error) {
-      // Error toast handled by store action or caught here
       console.error("Failed to add mod (from component):", error);
     } finally {
       setIsAdding(false);
     }
-  }, [modName, modUrl, modScript, addDbMod, dbMods.length]); // Depend on props
+  }, [modName, modUrl, modScript, addDbMod, dbMods.length]);
 
   const handleToggleEnable = useCallback(
     async (mod: DbMod) => {
       setIsUpdating((prev) => ({ ...prev, [mod.id]: true }));
       try {
-        await updateDbMod(mod.id, { enabled: !mod.enabled }); // Use prop action
+        await updateDbMod(mod.id, { enabled: !mod.enabled });
         toast.info(
           `Mod "${mod.name}" ${!mod.enabled ? "enabled" : "disabled"}. Reload required for changes to take effect.`,
         );
       } catch (error) {
-        // Error toast handled by store action or caught here
         console.error("Failed to update mod (from component):", error);
       } finally {
         setIsUpdating((prev) => ({ ...prev, [mod.id]: false }));
       }
     },
     [updateDbMod],
-  ); // Depend on prop action
+  );
 
   const handleDeleteMod = useCallback(
     async (mod: DbMod) => {
@@ -117,23 +110,21 @@ const SettingsModsComponent: React.FC<SettingsModsProps> = ({
       }
       setIsDeleting((prev) => ({ ...prev, [mod.id]: true }));
       try {
-        await deleteDbMod(mod.id); // Use prop action
+        await deleteDbMod(mod.id);
       } catch (error) {
-        // Error toast handled by store action or caught here
         console.error("Failed to delete mod (from component):", error);
       } finally {
         setIsDeleting((prev) => ({ ...prev, [mod.id]: false }));
       }
     },
     [deleteDbMod],
-  ); // Depend on prop action
+  );
 
-  // getModStatus remains the same, uses props passed in
   const getModStatus = useCallback(
     (
       modId: string,
     ): { status: string; error?: string | Error; tooltip?: string } => {
-      const loaded = loadedMods.find((m) => m.id === modId); // Use prop
+      const loaded = loadedMods.find((m) => m.id === modId);
       if (loaded) {
         if (loaded.error) {
           const errorMessage =
@@ -149,7 +140,7 @@ const SettingsModsComponent: React.FC<SettingsModsProps> = ({
           return { status: "Loaded" };
         }
       }
-      const dbMod = dbMods.find((m) => m.id === modId); // Use prop
+      const dbMod = dbMods.find((m) => m.id === modId);
       if (!dbMod) {
         return { status: "Unknown" };
       }
@@ -157,7 +148,7 @@ const SettingsModsComponent: React.FC<SettingsModsProps> = ({
         ? { status: "Load Pending" }
         : { status: "Disabled" };
     },
-    [loadedMods, dbMods], // Depend on props
+    [loadedMods, dbMods],
   );
 
   return (
@@ -233,7 +224,6 @@ const SettingsModsComponent: React.FC<SettingsModsProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* Use dbMods prop */}
                 {dbMods.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center">
@@ -241,7 +231,6 @@ const SettingsModsComponent: React.FC<SettingsModsProps> = ({
                     </TableCell>
                   </TableRow>
                 )}
-                {/* Use dbMods prop */}
                 {dbMods.map((mod) => {
                   const { status, error, tooltip } = getModStatus(mod.id);
                   const sourceDisplay = mod.sourceUrl
@@ -324,5 +313,4 @@ const SettingsModsComponent: React.FC<SettingsModsProps> = ({
   );
 };
 
-// Export the memoized component
 export const SettingsMods = React.memo(SettingsModsComponent);

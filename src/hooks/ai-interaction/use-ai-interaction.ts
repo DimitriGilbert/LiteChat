@@ -16,7 +16,7 @@ import {
   PerformImageGenerationParams,
   PerformImageGenerationResult,
   UseAiInteractionReturn,
-  UseAiInteractionProps, // Import the new props interface
+  UseAiInteractionProps,
 } from "./types";
 import {
   DbMessage,
@@ -33,34 +33,28 @@ import { validateAiParameters } from "./error-handler";
 import {
   getStreamHeaders,
   createAssistantPlaceholder,
-  createStreamUpdater,
+  // createStreamUpdater, // Keep this import
   finalizeStreamedMessageUI,
 } from "./stream-handler";
 import { mapToCoreMessages } from "./message-mapper";
 import { createSdkTools } from "./tool-handler";
-import { performImageGeneration as performImageGenerationFunc } from "./image-generator"; // Rename imported function
+import { performImageGeneration as performImageGenerationFunc } from "./image-generator";
+import { throttle } from "@/lib/throttle"; // Import throttle directly
 
-/**
- * Hook for handling AI interactions with streaming, image generation, and tool calling capabilities.
- * Receives necessary state and actions as arguments.
- */
 export function useAiInteraction({
-  // Destructure props defined in UseAiInteractionProps
   selectedModel,
   selectedProvider,
   getApiKeyForProvider,
-  streamingRefreshRateMs, // Use the new prop name
-  // Destructure addMessage and updateMessage instead of setLocalMessages
+  streamingRefreshRateMs,
   addMessage,
   updateMessage,
-  setIsAiStreaming, // This is the function passed from the store action
+  setIsAiStreaming,
   setError,
   addDbMessage,
   abortControllerRef,
   getContextSnapshotForMod,
   bulkAddMessages,
 }: UseAiInteractionProps): UseAiInteractionReturn {
-  // --- Refs ---
   const contentRef = useRef<string>("");
   const placeholderRef = useRef<{
     id: string;
@@ -70,14 +64,11 @@ export function useAiInteraction({
     conversationId: string;
   } | null>(null);
 
-  // --- SDK Tools ---
   const sdkTools = useMemo(() => {
-    // Placeholder: Access modTools differently or pass them as a prop
-    const modToolsFromContext = new Map(); // Replace with actual access method
+    const modToolsFromContext = new Map();
     return createSdkTools(modToolsFromContext, getContextSnapshotForMod);
-  }, [getContextSnapshotForMod /*, modTools */]); // Add modTools dependency if passed
+  }, [getContextSnapshotForMod]);
 
-  // --- AI Stream Logic ---
   const performAiStream = useCallback(
     async ({
       conversationIdToUse,
@@ -120,7 +111,6 @@ export function useAiInteraction({
         throw toolError;
       }
 
-      // Directly use the passed setIsAiStreaming function
       setIsAiStreaming(true);
       setError(null);
       contentRef.current = "";
@@ -145,16 +135,17 @@ export function useAiInteraction({
         modelId: currentSelectedModel.id,
         conversationId: conversationIdToUse,
       };
-      // Use addMessage for the placeholder
       addMessage(assistantPlaceholder);
 
-      const throttledUpdate = createStreamUpdater(
-        assistantMessageId,
-        contentRef,
-        // Pass updateMessage to the updater
-        updateMessage,
-        streamingRefreshRateMs, // Use the new prop name
-      );
+      // Use the imported throttle function directly
+      const { throttled: throttledUpdate, cancel: cancelThrottledUpdate } =
+        throttle(() => {
+          const currentAccumulatedContent = contentRef.current;
+          updateMessage(assistantMessageId, {
+            streamedContent: currentAccumulatedContent,
+            isStreaming: true,
+          });
+        }, streamingRefreshRateMs);
 
       const messagesForApi = mapToCoreMessages(
         messagesToSend as unknown as Message[],
@@ -243,7 +234,7 @@ export function useAiInteraction({
                 toolCallId: toolResult.toolCallId,
                 toolName: toolResult.toolName,
                 result: toolResult.result,
-                isError: false, // Assuming success for now
+                isError: false,
               };
               const toolResultMessage: Message = {
                 id: nanoid(),
@@ -268,7 +259,6 @@ export function useAiInteraction({
               });
             });
 
-            // Add tool result messages to UI
             toolResultMessages.forEach(addMessage);
 
             try {
@@ -281,7 +271,6 @@ export function useAiInteraction({
               console.error("Failed to save tool result messages:", dbErr);
               toast.error("Failed to save tool results.");
               const errorMsg = `DB save failed: ${dbErr instanceof Error ? dbErr.message : "Unknown"}`;
-              // Update UI messages with error
               toolResultMessages.forEach((trm) =>
                 updateMessage(trm.id, { error: errorMsg }),
               );
@@ -311,8 +300,9 @@ export function useAiInteraction({
         if (abortControllerRef.current === currentAbortController) {
           abortControllerRef.current = null;
         }
-        // Directly use the passed setIsAiStreaming function
-        setIsAiStreaming(false);
+
+        // Cancel any pending throttled UI update *before* finalizing
+        cancelThrottledUpdate();
 
         finalizeStreamedMessageUI(
           assistantMessageId,
@@ -320,7 +310,6 @@ export function useAiInteraction({
           streamError,
           finalUsage,
           startTime,
-          // Pass updateMessage to finalize UI
           updateMessage,
         );
 
@@ -368,7 +357,7 @@ export function useAiInteraction({
                 : undefined,
             tokensInput: finalUsage?.promptTokens,
             tokensOutput: finalUsage?.completionTokens,
-            providerId: placeholderData.providerId, // Save provider/model if schema allows
+            providerId: placeholderData.providerId,
             modelId: placeholderData.modelId,
           };
 
@@ -383,7 +372,6 @@ export function useAiInteraction({
             console.error("Failed to save final assistant message:", dbErr);
             setError(`Error saving response: ${dbErrorMessage}`);
             toast.error(`Failed to save response: ${dbErrorMessage}`);
-            // Update UI message with error
             updateMessage(placeholderData.id, { error: dbErrorMessage });
           }
         } else if (streamError) {
@@ -404,21 +392,19 @@ export function useAiInteraction({
       selectedModel,
       selectedProvider,
       getApiKeyForProvider,
-      streamingRefreshRateMs, // Use the new prop name
-      // Use addMessage and updateMessage instead of setLocalMessages
+      streamingRefreshRateMs,
       addMessage,
       updateMessage,
       setIsAiStreaming,
       setError,
       addDbMessage,
       abortControllerRef,
-      getContextSnapshotForMod,
+      // getContextSnapshotForMod,
       bulkAddMessages,
       sdkTools,
     ],
   );
 
-  // --- Image Generation ---
   const performImageGenerationCallback = useCallback(
     async (
       params: Omit<
@@ -426,9 +412,8 @@ export function useAiInteraction({
         | "selectedModel"
         | "selectedProvider"
         | "getApiKeyForProvider"
-        // | "setLocalMessages" // Removed
-        | "addMessage" // Added
-        | "updateMessage" // Added
+        | "addMessage"
+        | "updateMessage"
         | "setIsAiStreaming"
         | "setError"
         | "addDbMessage"
@@ -444,10 +429,9 @@ export function useAiInteraction({
         selectedModel: currentSelectedModel,
         selectedProvider: currentSelectedProvider,
         getApiKeyForProvider: apiKeyGetter,
-        // Pass addMessage and updateMessage
         addMessage: addMessage,
         updateMessage: updateMessage,
-        setIsAiStreaming: setIsAiStreaming, // Pass the function directly
+        setIsAiStreaming: setIsAiStreaming,
         setError: setError,
         addDbMessage: addDbMessage,
         abortControllerRef,
@@ -457,10 +441,9 @@ export function useAiInteraction({
       selectedModel,
       selectedProvider,
       getApiKeyForProvider,
-      // Add addMessage and updateMessage as dependencies
       addMessage,
       updateMessage,
-      setIsAiStreaming, // Add as dependency
+      setIsAiStreaming,
       setError,
       addDbMessage,
       abortControllerRef,
