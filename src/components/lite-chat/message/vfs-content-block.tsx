@@ -13,7 +13,6 @@ interface VfsContentBlockProps {
 
 export const VfsContentBlock: React.FC<VfsContentBlockProps> = ({
   path,
-  content,
   extension,
   className,
 }) => {
