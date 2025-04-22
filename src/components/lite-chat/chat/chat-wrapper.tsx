@@ -4,88 +4,180 @@ import { ChatContent } from "./chat-content";
 import { PromptWrapper } from "@/components/lite-chat/prompt/prompt-wrapper";
 import { ChatHeader } from "./chat-header";
 import { cn } from "@/lib/utils";
-// Import the updated prop types from chat.tsx
-import type { ChatWrapperDirectProps, ChatWrapperBundledProps } from "../chat";
+import type {
+  Message,
+  SidebarItemType,
+  DbConversation,
+  AiModelConfig,
+  CustomPromptAction,
+  CustomMessageAction,
+  ReadonlyChatContextSnapshot,
+  DbProviderConfig,
+  DbApiKey,
+  AiProviderConfig as AiProviderConfigType,
+  SidebarItem,
+} from "@/lib/types";
+// Removed CoreChatActions import as specific core actions are no longer passed down
 
-// Use the updated ChatWrapperProps type
-type ChatWrapperProps = ChatWrapperDirectProps & {
-  bundledProps: ChatWrapperBundledProps;
-};
+// Define the props expected by ChatWrapper based on LiteChatInner
+export interface ChatWrapperProps {
+  className?: string;
+  // Volatile State
+  messages: Message[];
+  isStreaming: boolean;
+  isLoadingMessages: boolean;
+  error: string | null;
+  isVfsReady: boolean;
+  isVfsEnabledForItem: boolean;
+  // Input State/Actions
+  promptInputValue: string;
+  setPromptInputValue: (value: string) => void;
+  addAttachedFile: (file: File) => void;
+  removeAttachedFile: (fileName: string) => void;
+  clearAttachedFiles: () => void;
+  clearPromptInput: () => void;
+  attachedFiles: File[];
+  selectedVfsPaths: string[];
+  removeSelectedVfsPath: (path: string) => void;
+  clearSelectedVfsPaths: () => void;
+  // Selection State
+  selectedItemId: string | null;
+  selectedItemType: SidebarItemType | null;
+  // Core Actions (passed down to children if needed)
+  regenerateMessage: (messageId: string) => Promise<void>;
+  stopStreaming: (parentMessageId?: string | null) => void;
+  setError: (error: string | null) => void;
+  // Form Submission Wrapper (from logic hook)
+  handleFormSubmit: (
+    prompt: string,
+    files: File[],
+    vfsPaths: string[],
+    context: any, // Context built within PromptForm's internal handler
+  ) => Promise<void>;
+  // Provider/Model State & Actions
+  selectedProviderId: string | null;
+  selectedModelId: string | null;
+  selectedModel: AiModelConfig | undefined;
+  selectedProvider: AiProviderConfigType | undefined;
+  dbProviderConfigs: DbProviderConfig[];
+  apiKeys: DbApiKey[];
+  setSelectedProviderId: (id: string | null) => void;
+  setSelectedModelId: (id: string | null) => void;
+  updateDbProviderConfig: (
+    id: string,
+    changes: Partial<DbProviderConfig>,
+  ) => Promise<void>;
+  getApiKeyForProvider: (providerId: string) => string | undefined;
+  // Settings State & Actions
+  temperature: number;
+  setTemperature: (temp: number) => void;
+  topP: number | null;
+  setTopP: (topP: number | null) => void;
+  maxTokens: number | null;
+  setMaxTokens: (tokens: number | null) => void;
+  topK: number | null;
+  setTopK: (topK: number | null) => void;
+  presencePenalty: number | null;
+  setPresencePenalty: (penalty: number | null) => void;
+  frequencyPenalty: number | null;
+  setFrequencyPenalty: (penalty: number | null) => void;
+  globalSystemPrompt: string | null;
+  enableAdvancedSettings: boolean;
+  enableApiKeyManagement: boolean;
+  // VFS State & Actions
+  isVfsLoading: boolean;
+  vfsError: string | null;
+  vfsKey: string | null;
+  toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>;
+  // Conversation/Item State & Actions
+  activeConversationData: DbConversation | null;
+  updateConversationSystemPrompt: (
+    id: string,
+    systemPrompt: string | null,
+  ) => Promise<void>;
+  createConversation: (
+    parentId: string | null,
+    title?: string,
+  ) => Promise<string>;
+  // Mod/Extensibility Props
+  customPromptActions: CustomPromptAction[];
+  customMessageActions: CustomMessageAction[];
+  getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
+  // Props needed by ChatHeader
+  sidebarItems: SidebarItem[];
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  exportConversation: (conversationId: string | null) => Promise<void>;
+}
 
 const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
   className,
-  // Destructure direct props
-  promptInputValue,
-  setPromptInputValue,
+  // Destructure all props defined in the interface
   messages,
   isStreaming,
   isLoadingMessages,
   error,
-  isVfsReady, // Destructure direct prop
-  isVfsEnabledForItem, // Destructure direct prop
+  isVfsReady,
+  isVfsEnabledForItem,
+  promptInputValue,
+  setPromptInputValue,
   addAttachedFile,
   removeAttachedFile,
+  clearAttachedFiles,
   clearPromptInput,
-  // Destructure bundled props
-  bundledProps,
+  attachedFiles,
+  selectedVfsPaths,
+  removeSelectedVfsPath,
+  clearSelectedVfsPaths,
+  selectedItemId,
+  selectedItemType,
+  regenerateMessage,
+  stopStreaming,
+  setError,
+  handleFormSubmit, // Use the wrapper from logic hook
+  // handleImageGenerationWrapper, // This wrapper is now part of handleFormSubmit
+  selectedProviderId,
+  selectedModelId,
+  selectedModel,
+  selectedProvider,
+  dbProviderConfigs,
+  apiKeys,
+  setSelectedProviderId,
+  setSelectedModelId,
+  updateDbProviderConfig,
+  getApiKeyForProvider,
+  temperature,
+  setTemperature,
+  topP,
+  setTopP,
+  maxTokens,
+  setMaxTokens,
+  topK,
+  setTopK,
+  presencePenalty,
+  setPresencePenalty,
+  frequencyPenalty,
+  setFrequencyPenalty,
+  globalSystemPrompt,
+  enableAdvancedSettings,
+  enableApiKeyManagement,
+  isVfsLoading,
+  vfsError,
+  vfsKey,
+  toggleVfsEnabledAction,
+  activeConversationData,
+  updateConversationSystemPrompt,
+  createConversation,
+  customPromptActions,
+  customMessageActions,
+  getContextSnapshotForMod,
+  // Destructure props for ChatHeader
+  sidebarItems,
+  searchTerm,
+  setSearchTerm,
+  exportConversation,
+  // Core actions are no longer passed directly here
 }) => {
-  // Destructure bundled props needed here or passed down further
-  const {
-    selectedItemId,
-    selectedItemType,
-    sidebarItems,
-    attachedFiles,
-    selectedVfsPaths,
-    // isVfsEnabledForItem, // REMOVED from bundle
-    regenerateMessage,
-    handleSubmitCore,
-    handleImageGenerationCore,
-    clearSelectedVfsPaths,
-    selectedProviderId,
-    selectedModelId,
-    dbProviderConfigs,
-    apiKeys,
-    enableApiKeyManagement,
-    dbConversations,
-    createConversation,
-    selectItem,
-    deleteItem,
-    updateDbProviderConfig,
-    searchTerm,
-    setSearchTerm,
-    exportConversation,
-    temperature,
-    setTemperature,
-    topP,
-    setTopP,
-    maxTokens,
-    setMaxTokens,
-    topK,
-    setTopK,
-    presencePenalty,
-    setPresencePenalty,
-    frequencyPenalty,
-    setFrequencyPenalty,
-    globalSystemPrompt,
-    activeConversationData,
-    updateConversationSystemPrompt,
-    // isVfsReady, // REMOVED from bundle
-    isVfsLoading,
-    vfsError,
-    vfsKey,
-    enableAdvancedSettings,
-    setSelectedProviderId,
-    setSelectedModelId,
-    toggleVfsEnabledAction,
-    stopStreaming,
-    customPromptActions,
-    getContextSnapshotForMod,
-    selectedModel,
-    setError,
-    removeSelectedVfsPath,
-    modMessageActions,
-  } = bundledProps;
-
   return (
     <main
       className={cn(
@@ -96,6 +188,7 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
       <ChatHeader
         selectedItemId={selectedItemId}
         selectedItemType={selectedItemType}
+        activeConversationData={activeConversationData}
         sidebarItems={sidebarItems}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
@@ -103,39 +196,38 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
       />
       <ChatContent
         className="flex-grow h-0"
-        messages={messages} // Pass direct prop
-        isLoadingMessages={isLoadingMessages} // Pass direct prop
-        isStreaming={isStreaming} // Pass direct prop
+        messages={messages}
+        isLoadingMessages={isLoadingMessages}
+        isStreaming={isStreaming}
         regenerateMessage={regenerateMessage}
         getContextSnapshotForMod={getContextSnapshotForMod}
-        modMessageActions={modMessageActions}
+        modMessageActions={customMessageActions}
       />
-      {/* Pass direct props down to PromptWrapper */}
       <PromptWrapper
-        error={error} // Pass direct prop
-        isStreaming={isStreaming} // Pass direct prop
-        promptInputValue={promptInputValue} // Pass direct prop
-        setPromptInputValue={setPromptInputValue} // Pass direct prop
-        addAttachedFile={addAttachedFile} // Pass direct prop
-        removeAttachedFile={removeAttachedFile} // Pass direct prop
-        clearPromptInput={clearPromptInput} // Pass direct prop
-        isVfsReady={isVfsReady} // Pass direct prop
-        isVfsEnabledForItem={isVfsEnabledForItem} // Pass direct prop
-        // Pass bundled props down
+        // Pass volatile state
+        error={error}
+        isStreaming={isStreaming}
+        isVfsReady={isVfsReady}
+        isVfsEnabledForItem={isVfsEnabledForItem}
+        // Pass input state/actions
+        promptInputValue={promptInputValue}
+        setPromptInputValue={setPromptInputValue}
+        addAttachedFile={addAttachedFile}
+        removeAttachedFile={removeAttachedFile}
+        clearAttachedFiles={clearAttachedFiles}
+        clearPromptInput={clearPromptInput}
+        // Pass the form submit wrapper
+        onFormSubmit={handleFormSubmit} // Pass the wrapper function
+        // Pass other necessary props down
         attachedFiles={attachedFiles}
         selectedVfsPaths={selectedVfsPaths}
-        handleSubmitCore={handleSubmitCore}
-        handleImageGenerationCore={handleImageGenerationCore}
         clearSelectedVfsPaths={clearSelectedVfsPaths}
         selectedProviderId={selectedProviderId}
         selectedModelId={selectedModelId}
         dbProviderConfigs={dbProviderConfigs}
         apiKeys={apiKeys}
         enableApiKeyManagement={enableApiKeyManagement}
-        dbConversations={dbConversations}
         createConversation={createConversation}
-        selectItem={selectItem}
-        deleteItem={deleteItem}
         updateDbProviderConfig={updateDbProviderConfig}
         selectedItemId={selectedItemId}
         selectedItemType={selectedItemType}
@@ -167,6 +259,8 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
         isVfsLoading={isVfsLoading}
         vfsError={vfsError}
         vfsKey={vfsKey}
+        getApiKeyForProvider={getApiKeyForProvider}
+        selectedProvider={selectedProvider}
       />
     </main>
   );

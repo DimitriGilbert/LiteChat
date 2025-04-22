@@ -21,13 +21,21 @@ import {
 } from "@/store/settings.store";
 import { useVfsStore, type VfsState, type VfsActions } from "@/store/vfs.store";
 import { useModStore, type ModState, type ModActions } from "@/store/mod.store";
-// REMOVED: useChatStorage import (Live data selected directly in LiteChatInner)
+// Import useInputStore
+import {
+  useInputStore,
+  type InputState,
+  type InputActions,
+} from "@/store/input.store";
+// Removed useChatInput import
 import type {
   SidebarItemType,
-  // REMOVED: DbProject import
   DbConversation,
   AiProviderConfig,
   AiModelConfig,
+  DbProviderConfig,
+  Message,
+  MessageContent,
 } from "@/lib/types";
 import type { ReadonlyChatContextSnapshot } from "@/mods/api";
 import { db } from "@/lib/db";
@@ -38,17 +46,30 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createOllama } from "ollama-ai-provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { WorkflowExecutionService } from "@/services/workflow-execution-service";
 
 interface UseLiteChatLogicProps {
   editingItemId: string | null;
   setEditingItemId: (id: string | null) => void;
   onEditComplete: (id: string) => void;
-  // Pass live data needed for derivations
   dbConversations: DbConversation[];
 }
 
-// Define the return type, excluding live data and volatile core state
+// Define the return type, including input actions
 interface UseLiteChatLogicReturn {
+  // Input State & Actions (from InputStore)
+  promptInputValue: InputState["promptInputValue"];
+  setPromptInputValue: InputActions["setPromptInputValue"];
+  attachedFiles: InputState["attachedFiles"];
+  addAttachedFile: InputActions["addAttachedFile"];
+  removeAttachedFile: InputActions["removeAttachedFile"];
+  clearAttachedFiles: InputActions["clearAttachedFiles"];
+  selectedVfsPaths: InputState["selectedVfsPaths"];
+  addSelectedVfsPath: InputActions["addSelectedVfsPath"];
+  removeSelectedVfsPath: InputActions["removeSelectedVfsPath"];
+  clearSelectedVfsPaths: InputActions["clearSelectedVfsPaths"];
+  clearAllInput: InputActions["clearAllInput"];
+
   // State and Actions from Stores
   sidebarActions: Pick<
     SidebarActions,
@@ -66,8 +87,8 @@ interface UseLiteChatLogicReturn {
   coreChatActions: Pick<
     CoreChatActions,
     | "setMessages"
-    | "addMessage" // Ensure addMessage is picked
-    | "updateMessage" // Ensure updateMessage is picked
+    | "addMessage"
+    | "updateMessage"
     | "setIsStreaming"
     | "setError"
     | "addDbMessage"
@@ -76,6 +97,8 @@ interface UseLiteChatLogicReturn {
     | "handleImageGenerationCore"
     | "stopStreamingCore"
     | "regenerateMessageCore"
+    | "startWorkflowCore"
+    | "finalizeWorkflowTask"
   >;
   vfsActions: Pick<
     VfsActions,
@@ -104,7 +127,7 @@ interface UseLiteChatLogicReturn {
     | "setPresencePenalty"
     | "setFrequencyPenalty"
     | "setGlobalSystemPrompt"
-    | "setStreamingRefreshRateMs" // Added
+    | "setStreamingRefreshRateMs"
   >;
   modActions: Pick<ModActions, "addDbMod" | "updateDbMod" | "deleteDbMod">;
   // Selection State (Stable)
@@ -114,7 +137,6 @@ interface UseLiteChatLogicReturn {
   // Other store states (non-volatile)
   vfsState: Pick<
     VfsState,
-    | "selectedVfsPaths"
     | "isVfsEnabledForItem"
     | "isVfsReady"
     | "isVfsLoading"
@@ -142,7 +164,7 @@ interface UseLiteChatLogicReturn {
     | "presencePenalty"
     | "frequencyPenalty"
     | "globalSystemPrompt"
-    | "streamingRefreshRateMs" // Changed from streamingThrottleRate
+    | "streamingRefreshRateMs"
     | "isSettingsModalOpen"
   >;
   modState: Pick<
@@ -165,7 +187,7 @@ interface UseLiteChatLogicReturn {
     context: any,
   ) => Promise<void>;
   handleImageGenerationWrapper: (prompt: string) => Promise<void>;
-  stopStreaming: () => void; // Ensure stopStreaming is included
+  stopStreaming: (parentMessageId?: string | null) => void;
   regenerateMessage: (messageId: string) => Promise<void>;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   // Derived State
@@ -175,17 +197,41 @@ interface UseLiteChatLogicReturn {
   getApiKeyForProvider: (providerId: string) => string | undefined;
 }
 
-// Apply the explicit return type here
 export function useLiteChatLogic(
   props: UseLiteChatLogicProps,
 ): UseLiteChatLogicReturn {
+  const { dbConversations } = props;
+
+  // --- Get Input State/Actions from Store ---
   const {
-    dbConversations, // Receive live conversations needed for derivation
-  } = props;
+    promptInputValue,
+    setPromptInputValue,
+    attachedFiles,
+    addAttachedFile,
+    removeAttachedFile,
+    clearAttachedFiles,
+    selectedVfsPaths,
+    addSelectedVfsPath,
+    removeSelectedVfsPath,
+    clearSelectedVfsPaths,
+    clearAllInput,
+  } = useInputStore(
+    useShallow((state) => ({
+      promptInputValue: state.promptInputValue,
+      setPromptInputValue: state.setPromptInputValue,
+      attachedFiles: state.attachedFiles,
+      addAttachedFile: state.addAttachedFile,
+      removeAttachedFile: state.removeAttachedFile,
+      clearAttachedFiles: state.clearAttachedFiles,
+      selectedVfsPaths: state.selectedVfsPaths,
+      addSelectedVfsPath: state.addSelectedVfsPath,
+      removeSelectedVfsPath: state.removeSelectedVfsPath,
+      clearSelectedVfsPaths: state.clearSelectedVfsPaths,
+      clearAllInput: state.clearAllInput,
+    })),
+  );
 
-  // --- Select State/Actions from Stores ---
-
-  // Sidebar state and actions (generally stable or less frequent updates)
+  // --- Select State/Actions from Other Stores ---
   const sidebarActions = useSidebarStore(
     useShallow((state): UseLiteChatLogicReturn["sidebarActions"] => ({
       selectItem: state.selectItem,
@@ -208,11 +254,10 @@ export function useLiteChatLogic(
     })),
   );
 
-  // Core Chat Actions (stable references)
   const {
     setMessages: setCoreMessages,
-    addMessage: coreAddMessage, // Get addMessage
-    updateMessage: coreUpdateMessage, // Get updateMessage
+    addMessage: coreAddMessage,
+    updateMessage: coreUpdateMessage,
     setIsStreaming: setCoreIsStreaming,
     setError: setCoreError,
     addDbMessage: addCoreDbMessage,
@@ -221,13 +266,14 @@ export function useLiteChatLogic(
     handleImageGenerationCore: coreHandleImageGenerationCore,
     stopStreamingCore: coreStopStreamingCore,
     regenerateMessageCore: coreRegenerateMessageCore,
+    startWorkflowCore: coreStartWorkflowCore,
+    finalizeWorkflowTask: coreFinalizeWorkflowTask,
   } = useCoreChatStore();
 
-  // Pick the necessary actions for the return type
   const coreChatActions: UseLiteChatLogicReturn["coreChatActions"] = {
     setMessages: setCoreMessages,
-    addMessage: coreAddMessage, // Include addMessage
-    updateMessage: coreUpdateMessage, // Include updateMessage
+    addMessage: coreAddMessage,
+    updateMessage: coreUpdateMessage,
     setIsStreaming: setCoreIsStreaming,
     setError: setCoreError,
     addDbMessage: addCoreDbMessage,
@@ -236,9 +282,10 @@ export function useLiteChatLogic(
     handleImageGenerationCore: coreHandleImageGenerationCore,
     stopStreamingCore: coreStopStreamingCore,
     regenerateMessageCore: coreRegenerateMessageCore,
+    startWorkflowCore: coreStartWorkflowCore,
+    finalizeWorkflowTask: coreFinalizeWorkflowTask,
   };
 
-  // VFS state and actions (less frequent updates)
   const vfsActions = useVfsStore(
     useShallow((state): UseLiteChatLogicReturn["vfsActions"] => ({
       clearSelectedVfsPaths: state.clearSelectedVfsPaths,
@@ -247,7 +294,6 @@ export function useLiteChatLogic(
   );
   const vfsState = useVfsStore(
     useShallow((state): UseLiteChatLogicReturn["vfsState"] => ({
-      selectedVfsPaths: state.selectedVfsPaths,
       isVfsEnabledForItem: state.isVfsEnabledForItem,
       isVfsReady: state.isVfsReady,
       isVfsLoading: state.isVfsLoading,
@@ -256,7 +302,6 @@ export function useLiteChatLogic(
     })),
   );
 
-  // Provider state and actions (less frequent updates)
   const providerActions = useProviderStore(
     useShallow((state): UseLiteChatLogicReturn["providerActions"] => ({
       setSelectedProviderId: state.setSelectedProviderId,
@@ -280,7 +325,6 @@ export function useLiteChatLogic(
     })),
   );
 
-  // Settings state and actions (less frequent updates)
   const settingsActions = useSettingsStore(
     useShallow((state): UseLiteChatLogicReturn["settingsActions"] => ({
       setIsSettingsModalOpen: state.setIsSettingsModalOpen,
@@ -293,7 +337,7 @@ export function useLiteChatLogic(
       setPresencePenalty: state.setPresencePenalty,
       setFrequencyPenalty: state.setFrequencyPenalty,
       setGlobalSystemPrompt: state.setGlobalSystemPrompt,
-      setStreamingRefreshRateMs: state.setStreamingRefreshRateMs, // Added
+      setStreamingRefreshRateMs: state.setStreamingRefreshRateMs,
     })),
   );
   const settingsState = useSettingsStore(
@@ -308,12 +352,11 @@ export function useLiteChatLogic(
       presencePenalty: state.presencePenalty,
       frequencyPenalty: state.frequencyPenalty,
       globalSystemPrompt: state.globalSystemPrompt,
-      streamingRefreshRateMs: state.streamingRefreshRateMs, // Changed
+      streamingRefreshRateMs: state.streamingRefreshRateMs,
       isSettingsModalOpen: state.isSettingsModalOpen,
     })),
   );
 
-  // Mod state and actions (less frequent updates)
   const modActions = useModStore(
     useShallow((state): UseLiteChatLogicReturn["modActions"] => ({
       addDbMod: state.addDbMod,
@@ -480,10 +523,8 @@ Really delete everything? Consider exporting first.`,
 
   const getContextSnapshotForMod =
     useCallback((): ReadonlyChatContextSnapshot => {
-      // Select volatile state directly here for the snapshot
       const currentCore = useCoreChatStore.getState();
       const currentSettings = useSettingsStore.getState();
-      // Use live data passed into the hook for snapshot consistency
       const currentDbConversations = dbConversations;
       const currentSelectedItemId = useSidebarStore.getState().selectedItemId;
       const currentSelectedItemType =
@@ -522,8 +563,8 @@ Really delete everything? Consider exporting first.`,
       return Object.freeze({
         selectedItemId: currentSelectedItemId,
         selectedItemType: currentSelectedItemType,
-        messages: currentCore.messages, // Include volatile state in snapshot
-        isStreaming: currentCore.isStreaming, // Include volatile state in snapshot
+        messages: currentCore.messages,
+        isStreaming: currentCore.isStreaming,
         selectedProviderId: currentProvider.selectedProviderId,
         selectedModelId: currentProvider.selectedModelId,
         activeSystemPrompt: activeSystemPrompt,
@@ -533,11 +574,11 @@ Really delete everything? Consider exporting first.`,
         isVfsEnabledForItem: currentVfs.isVfsEnabledForItem,
         getApiKeyForProvider: getApiKeyFunc,
       });
-    }, [dbConversations]); // Depend on live data passed in
+    }, [dbConversations]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Pass the correct actions to useAiInteraction
+  // --- AI Interaction Hook ---
   const { performAiStream, performImageGeneration } = useAiInteraction({
     selectedModel,
     selectedProvider,
@@ -546,10 +587,8 @@ Really delete everything? Consider exporting first.`,
       [getApiKeyForProvider, providerState.selectedProviderId],
     ),
     streamingRefreshRateMs: settingsState.streamingRefreshRateMs,
-    // Pass addMessage and updateMessage from the store actions
     addMessage: coreAddMessage,
     updateMessage: coreUpdateMessage,
-    // REMOVED: setLocalMessages: setCoreMessages, // This was the error source
     setIsAiStreaming: setCoreIsStreaming,
     setError: setCoreError,
     addDbMessage: addCoreDbMessage,
@@ -561,47 +600,182 @@ Really delete everything? Consider exporting first.`,
   // --- Interaction Handlers ---
   const handleFormSubmit = useCallback(
     async (
-      _prompt: string,
-      _files: File[],
-      _vfsPaths: string[],
+      promptValue: string,
+      files: File[],
+      vfsPaths: string[],
       context: any,
     ) => {
-      try {
-        // Call the core action to save the user message first
-        await coreHandleSubmitCore(
-          context.selectedItemId!,
-          context.contentToSendToAI,
-          context.vfsContextPaths,
-        );
-        // Now, trigger the AI interaction using the hook's function
-        const settings = useSettingsStore.getState();
-        const activeSystemPrompt =
-          getContextSnapshotForMod().activeSystemPrompt;
-        // Get the *current* messages from the store *after* user message was added
-        const messagesForApi = convertDbMessagesToCoreMessages(
-          useCoreChatStore.getState().messages,
-        );
-        await performAiStream({
-          conversationIdToUse: context.selectedItemId!,
-          messagesToSend: messagesForApi,
-          currentTemperature: settings.temperature,
-          currentMaxTokens: settings.maxTokens,
-          currentTopP: settings.topP,
-          currentTopK: settings.topK,
-          currentPresencePenalty: settings.presencePenalty,
-          currentFrequencyPenalty: settings.frequencyPenalty,
-          systemPromptToUse: activeSystemPrompt,
-        });
-      } catch (err) {
-        // Error handling is done within coreHandleSubmitCore and performAiStream
-        console.error("Error during form submission flow:", err);
+      const commandMatch = promptValue.match(/^\/(\w+)\s*(.*)/s);
+      const isWorkflowCommand =
+        commandMatch &&
+        ["race", "sequence", "parallel"].includes(commandMatch[1]);
+      const isImageCommand = promptValue.startsWith("/imagine ");
+
+      if (isWorkflowCommand) {
+        const fullCommand = promptValue;
+        if (!context.selectedItemId) {
+          toast.error("Cannot start workflow: No conversation selected.");
+          return;
+        }
+        try {
+          const getApiKeyFunc = (id: string): string | undefined => {
+            const config = providerState.dbProviderConfigs.find(
+              (p) => p.id === id,
+            );
+            if (!config || !config.apiKeyId) return undefined;
+            return providerState.apiKeys.find((k) => k.id === config.apiKeyId)
+              ?.value;
+          };
+          const getProviderFunc = (
+            id: string,
+          ): AiProviderConfig | undefined => {
+            const config = providerState.dbProviderConfigs.find(
+              (p) => p.id === id,
+            );
+            if (!config) return undefined;
+            return {
+              id: config.id,
+              name: config.name,
+              type: config.type,
+              models: [],
+              allAvailableModels: config.fetchedModels || [],
+            };
+          };
+          const getModelFunc = (
+            provId: string,
+            modId: string,
+          ): AiModelConfig | undefined => {
+            const config = providerState.dbProviderConfigs.find(
+              (p) => p.id === provId,
+            );
+            if (!config) return undefined;
+            const modelInfo = (config.fetchedModels ?? []).find(
+              (m: { id: string }) => m.id === modId,
+            );
+            if (!modelInfo) return undefined;
+            let modelInstance: any = null;
+            const currentApiKey = getApiKeyFunc(config.id);
+            try {
+              switch (config.type) {
+                case "openai":
+                  modelInstance = createOpenAI({ apiKey: currentApiKey })(
+                    modelInfo.id,
+                  );
+                  break;
+                case "google":
+                  modelInstance = createGoogleGenerativeAI({
+                    apiKey: currentApiKey,
+                  })(modelInfo.id);
+                  break;
+                case "openrouter":
+                  modelInstance = createOpenRouter({ apiKey: currentApiKey })(
+                    modelInfo.id,
+                  );
+                  break;
+                case "ollama":
+                  modelInstance = createOllama({
+                    baseURL: config.baseURL ?? undefined,
+                  })(modelInfo.id);
+                  break;
+                case "openai-compatible":
+                  if (!config.baseURL) throw new Error("Base URL required");
+                  modelInstance = createOpenAICompatible({
+                    baseURL: config.baseURL,
+                    apiKey: currentApiKey,
+                    name: config.name || "Custom API",
+                  })(modelInfo.id);
+                  break;
+                default:
+                  throw new Error(`Unsupported provider type: ${config.type}`);
+              }
+            } catch (e) {
+              console.error(`Failed to instantiate model ${modelInfo.id}:`, e);
+            }
+            const supportsImageGen = config.type === "openai";
+            const supportsTools = ["openai", "google", "openrouter"].includes(
+              config.type,
+            );
+            return {
+              id: modelInfo.id,
+              name: modelInfo.name,
+              instance: modelInstance,
+              supportsImageGeneration: supportsImageGen,
+              supportsToolCalling: supportsTools,
+            };
+          };
+          await coreStartWorkflowCore(
+            context.selectedItemId,
+            fullCommand,
+            getApiKeyFunc,
+            getProviderFunc,
+            getModelFunc,
+          );
+          clearAllInput(); // Clear input state after starting workflow
+        } catch (err) {
+          console.error("Error starting workflow:", err);
+        }
+      } else if (isImageCommand) {
+        try {
+          const imagePrompt = context.contentToSendToAI
+            .substring("/imagine ".length)
+            .trim();
+          await coreHandleImageGenerationCore(
+            context.selectedItemId!,
+            imagePrompt,
+          );
+          await performImageGeneration({
+            conversationIdToUse: context.selectedItemId!,
+            prompt: imagePrompt,
+          });
+          clearAllInput(); // Clear input state after image generation
+        } catch (err) {
+          console.error("Error in image generation flow:", err);
+        }
+      } else {
+        try {
+          await coreHandleSubmitCore(
+            context.selectedItemId!,
+            context.contentToSendToAI,
+            context.vfsContextPaths,
+          );
+          const settings = useSettingsStore.getState();
+          const activeSystemPrompt =
+            getContextSnapshotForMod().activeSystemPrompt;
+          const messagesForApi = convertDbMessagesToCoreMessages(
+            useCoreChatStore.getState().messages,
+          );
+          await performAiStream({
+            conversationIdToUse: context.selectedItemId!,
+            messagesToSend: messagesForApi,
+            currentTemperature: settings.temperature,
+            currentMaxTokens: settings.maxTokens,
+            currentTopP: settings.topP,
+            currentTopK: settings.topK,
+            currentPresencePenalty: settings.presencePenalty,
+            currentFrequencyPenalty: settings.frequencyPenalty,
+            systemPromptToUse: activeSystemPrompt,
+          });
+          clearAllInput(); // Clear input state after regular submission
+        } catch (err) {
+          console.error("Error during form submission flow:", err);
+        }
       }
     },
-    [coreHandleSubmitCore, performAiStream, getContextSnapshotForMod],
+    [
+      coreHandleSubmitCore,
+      performAiStream,
+      getContextSnapshotForMod,
+      coreStartWorkflowCore,
+      coreHandleImageGenerationCore,
+      performImageGeneration,
+      providerState.dbProviderConfigs,
+      providerState.apiKeys,
+      clearAllInput, // Use the action from input store
+    ],
   );
 
   const handleImageGenerationWrapper = useCallback(
-    async (prompt: string) => {
+    async (promptValue: string) => {
       const currentSelectedItemId = useSidebarStore.getState().selectedItemId;
       const currentSelectedItemType =
         useSidebarStore.getState().selectedItemType;
@@ -614,108 +788,214 @@ Really delete everything? Consider exporting first.`,
         return;
       }
       try {
-        // Call core action to save user message
-        await coreHandleImageGenerationCore(currentSelectedItemId, prompt);
-        // Trigger AI interaction
+        await coreHandleImageGenerationCore(currentSelectedItemId, promptValue);
         await performImageGeneration({
           conversationIdToUse: currentSelectedItemId,
-          prompt: prompt,
+          prompt: promptValue,
         });
+        // clearAllInput(); // Optionally clear input here too
       } catch (err) {
-        // Error handling within core action and performImageGeneration
         console.error("Error in handleImageGenerationWrapper:", err);
       }
     },
-    [coreHandleImageGenerationCore, performImageGeneration],
+    [coreHandleImageGenerationCore, performImageGeneration /*, clearAllInput*/],
   );
 
-  const stopStreaming = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    // Call the core action to update state
-    coreStopStreamingCore();
-  }, [coreStopStreamingCore]);
+  const stopStreaming = useCallback(
+    (parentMessageId: string | null = null) => {
+      const activeWorkflows = useCoreChatStore.getState().activeWorkflows;
+      const targetParentId =
+        parentMessageId ?? [...activeWorkflows.keys()].pop();
+
+      if (targetParentId && activeWorkflows.has(targetParentId)) {
+        coreStopStreamingCore(targetParentId);
+      } else {
+        coreStopStreamingCore();
+      }
+
+      setTimeout(() => {
+        if (
+          !useCoreChatStore.getState().isStreaming &&
+          abortControllerRef.current
+        ) {
+          console.log("[useLiteChatLogic] Clearing global abort ref.");
+          abortControllerRef.current = null;
+        }
+      }, 0);
+    },
+    [coreStopStreamingCore],
+  );
 
   const regenerateMessage = useCallback(
     async (messageId: string) => {
       try {
-        // Call core action to prepare state (delete old message)
-        await coreRegenerateMessageCore(messageId);
-
-        // Get necessary info AFTER core action has updated the state
-        const originalMessages = useCoreChatStore.getState().messages; // Get current messages
-        const messageIndex = originalMessages.length; // The index where the new message will go
-        if (messageIndex <= 0) return; // Should not happen if coreRegenerateMessageCore worked
-
-        let precedingUserMessageIndex = -1;
-        for (let i = messageIndex - 1; i >= 0; i--) {
-          if (originalMessages[i].role === "user") {
-            precedingUserMessageIndex = i;
-            break;
-          }
+        const originalMessage = await db.messages.get(messageId);
+        if (!originalMessage) {
+          toast.error("Cannot regenerate: Original message not found in DB.");
+          return;
         }
-        if (precedingUserMessageIndex === -1) return;
+        const conversationId = originalMessage.conversationId;
 
-        const precedingUserMessage =
-          originalMessages[precedingUserMessageIndex];
-        const conversationId = precedingUserMessage.conversationId;
-        if (!conversationId) return;
+        await coreRegenerateMessageCore(messageId);
+        const currentMessages = useCoreChatStore.getState().messages;
 
-        // Determine if it was an image or text generation
-        if (
-          typeof precedingUserMessage.content === "string" &&
-          precedingUserMessage.content.startsWith("/imagine ")
+        if (originalMessage.workflow) {
+          toast.info("Re-running workflow...");
+          const originalCommand = originalMessage.content as string;
+          const getApiKeyFunc = (id: string): string | undefined =>
+            getApiKeyForProvider(id);
+          const getProviderFunc = (
+            id: string,
+          ): AiProviderConfig | undefined => {
+            const config = providerState.dbProviderConfigs.find(
+              (p) => p.id === id,
+            );
+            if (!config) return undefined;
+            return {
+              id: config.id,
+              name: config.name,
+              type: config.type,
+              models: [],
+              allAvailableModels: config.fetchedModels || [],
+            };
+          };
+          const getModelFunc = (
+            provId: string,
+            modId: string,
+          ): AiModelConfig | undefined => {
+            const config = providerState.dbProviderConfigs.find(
+              (p) => p.id === provId,
+            );
+            if (!config) return undefined;
+            const modelInfo = (config.fetchedModels ?? []).find(
+              (m: { id: string }) => m.id === modId,
+            );
+            if (!modelInfo) return undefined;
+            let modelInstance: any = null;
+            const currentApiKey = getApiKeyFunc(config.id);
+            try {
+              switch (config.type) {
+                case "openai":
+                  modelInstance = createOpenAI({ apiKey: currentApiKey })(
+                    modelInfo.id,
+                  );
+                  break;
+                case "google":
+                  modelInstance = createGoogleGenerativeAI({
+                    apiKey: currentApiKey,
+                  })(modelInfo.id);
+                  break;
+                case "openrouter":
+                  modelInstance = createOpenRouter({ apiKey: currentApiKey })(
+                    modelInfo.id,
+                  );
+                  break;
+                case "ollama":
+                  modelInstance = createOllama({
+                    baseURL: config.baseURL ?? undefined,
+                  })(modelInfo.id);
+                  break;
+                case "openai-compatible":
+                  if (!config.baseURL) throw new Error("Base URL required");
+                  modelInstance = createOpenAICompatible({
+                    baseURL: config.baseURL,
+                    apiKey: currentApiKey,
+                    name: config.name || "Custom API",
+                  })(modelInfo.id);
+                  break;
+                default:
+                  throw new Error(`Unsupported provider type: ${config.type}`);
+              }
+            } catch (e) {
+              console.error(`Failed to instantiate model ${modelInfo.id}:`, e);
+            }
+            const supportsImageGen = config.type === "openai";
+            const supportsTools = ["openai", "google", "openrouter"].includes(
+              config.type,
+            );
+            return {
+              id: modelInfo.id,
+              name: modelInfo.name,
+              instance: modelInstance,
+              supportsImageGeneration: supportsImageGen,
+              supportsToolCalling: supportsTools,
+            };
+          };
+          await coreStartWorkflowCore(
+            conversationId,
+            originalCommand,
+            getApiKeyFunc,
+            getProviderFunc,
+            getModelFunc,
+          );
+        } else if (
+          originalMessage.role === "user" &&
+          typeof originalMessage.content === "string" &&
+          originalMessage.content.startsWith("/imagine ")
         ) {
-          const imagePrompt = precedingUserMessage.content
-            .substring("/imagine ".length)
-            .trim();
-          if (imagePrompt) {
+          toast.warning(
+            "Regenerating user image prompts not typical. Regenerate the assistant response instead.",
+          );
+        } else if (originalMessage.role === "assistant") {
+          let precedingUserMessage: Message | undefined;
+          const msgIndex = currentMessages.findIndex(
+            (m) => m.createdAt! < originalMessage.createdAt!,
+          );
+          for (let i = msgIndex; i >= 0; i--) {
+            if (currentMessages[i]?.role === "user") {
+              precedingUserMessage = currentMessages[i];
+              break;
+            }
+          }
+          if (
+            precedingUserMessage &&
+            typeof precedingUserMessage.content === "string" &&
+            precedingUserMessage.content.startsWith("/imagine ")
+          ) {
+            const imagePrompt = precedingUserMessage.content
+              .substring("/imagine ".length)
+              .trim();
             await performImageGeneration({
               conversationIdToUse: conversationId,
               prompt: imagePrompt,
             });
           } else {
-            setCoreError("Cannot regenerate: Invalid image prompt found.");
-            toast.error("Cannot regenerate: Invalid image prompt found.");
+            const historyForApi =
+              convertDbMessagesToCoreMessages(currentMessages);
+            const settings = useSettingsStore.getState();
+            const activeSystemPrompt =
+              getContextSnapshotForMod().activeSystemPrompt;
+            await performAiStream({
+              conversationIdToUse: conversationId,
+              messagesToSend: historyForApi,
+              currentTemperature: settings.temperature,
+              currentMaxTokens: settings.maxTokens,
+              currentTopP: settings.topP,
+              currentTopK: settings.topK,
+              currentPresencePenalty: settings.presencePenalty,
+              currentFrequencyPenalty: settings.frequencyPenalty,
+              systemPromptToUse: activeSystemPrompt,
+            });
           }
         } else {
-          // Text generation
-          const historyForApi = convertDbMessagesToCoreMessages(
-            originalMessages.slice(0, precedingUserMessageIndex + 1),
-          );
-          const settings = useSettingsStore.getState();
-          const activeSystemPrompt =
-            getContextSnapshotForMod().activeSystemPrompt;
-          await performAiStream({
-            conversationIdToUse: conversationId,
-            messagesToSend: historyForApi,
-            currentTemperature: settings.temperature,
-            currentMaxTokens: settings.maxTokens,
-            currentTopP: settings.topP,
-            currentTopK: settings.topK,
-            currentPresencePenalty: settings.presencePenalty,
-            currentFrequencyPenalty: settings.frequencyPenalty,
-            systemPromptToUse: activeSystemPrompt,
-          });
+          toast.error("Cannot regenerate this message type.");
         }
       } catch (err) {
-        // Errors handled within core action and perform* functions
         console.error("Error during regeneration flow:", err);
       }
     },
     [
       coreRegenerateMessageCore,
-      setCoreError, // Keep direct access to setError if needed
+      coreStartWorkflowCore,
       performAiStream,
       performImageGeneration,
       getContextSnapshotForMod,
+      getApiKeyForProvider,
+      providerState.dbProviderConfigs,
+      providerState.apiKeys,
     ],
   );
 
-  // --- Derived State (Active Conversation Data) ---
-  // Use the dbConversations passed into the hook
   const activeConversationData = useMemo(() => {
     if (selectedItemType === "conversation" && selectedItemId) {
       return (
@@ -724,9 +1004,8 @@ Really delete everything? Consider exporting first.`,
       );
     }
     return null;
-  }, [selectedItemId, selectedItemType, dbConversations]); // Depend on live data passed in
+  }, [selectedItemId, selectedItemType, dbConversations]);
 
-  // --- Apply Theme Effect ---
   useEffect(() => {
     if (typeof window === "undefined" || !window.document?.documentElement) {
       return;
@@ -748,11 +1027,23 @@ Really delete everything? Consider exporting first.`,
   }, [settingsState.theme]);
 
   // --- Return all state, actions, derived data, and callbacks ---
-  // Exclude live data from the return object
   return {
-    // State & Actions
+    // Input State/Actions from useInputStore
+    promptInputValue,
+    setPromptInputValue,
+    attachedFiles,
+    addAttachedFile,
+    removeAttachedFile,
+    clearAttachedFiles,
+    selectedVfsPaths,
+    addSelectedVfsPath,
+    removeSelectedVfsPath,
+    clearSelectedVfsPaths,
+    clearAllInput,
+
+    // Store State & Actions
     sidebarActions,
-    coreChatActions, // Includes addMessage and updateMessage now
+    coreChatActions,
     vfsActions,
     providerActions,
     settingsActions,
@@ -761,7 +1052,7 @@ Really delete everything? Consider exporting first.`,
     selectedItemId,
     selectedItemType,
     enableSidebar,
-    // Other store states (non-volatile)
+    // Other store states
     vfsState,
     providerState,
     settingsState,
@@ -771,7 +1062,7 @@ Really delete everything? Consider exporting first.`,
     getAllAvailableModelDefs,
     handleFormSubmit,
     handleImageGenerationWrapper,
-    stopStreaming, // Include stopStreaming here
+    stopStreaming,
     regenerateMessage,
     getContextSnapshotForMod,
     // Derived State

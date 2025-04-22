@@ -1,8 +1,8 @@
 // src/components/lite-chat/prompt/prompt-wrapper.tsx
 import React from "react";
 import { PromptForm } from "./prompt-form";
-import { AlertCircle, StopCircleIcon } from "lucide-react"; // Added StopCircleIcon
-import { Button } from "@/components/ui/button"; // Added Button
+import { AlertCircle, StopCircleIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type {
   DbProviderConfig,
@@ -12,51 +12,45 @@ import type {
   CustomPromptAction,
   ReadonlyChatContextSnapshot,
   AiModelConfig,
+  AiProviderConfig as AiProviderConfigType,
 } from "@/lib/types";
+// Removed CoreChatActions import
 
-// Update props to receive volatile state directly
+// Update props
 interface PromptWrapperProps {
   className?: string;
   // Direct volatile state
   error: string | null;
   isStreaming: boolean;
-  isVfsReady: boolean; // Add direct prop
-  isVfsEnabledForItem: boolean; // Add direct prop
+  isVfsReady: boolean;
+  isVfsEnabledForItem: boolean;
   // Direct Input State/Actions
   promptInputValue: string;
   setPromptInputValue: (value: string) => void;
   addAttachedFile: (file: File) => void;
   removeAttachedFile: (fileName: string) => void;
   clearPromptInput: () => void;
-  // Bundled Props (less frequently changing / stable) - Passed down to PromptForm
-  attachedFiles: File[];
-  selectedVfsPaths: string[];
-  handleSubmitCore: (
+  clearAttachedFiles: () => void;
+  // Form Submission Wrapper
+  onFormSubmit: (
     prompt: string,
     files: File[],
     vfsPaths: string[],
     context: any,
-  ) => Promise<void>;
-  handleImageGenerationCore: (
-    currentConversationId: string,
-    prompt: string,
-  ) => Promise<void>;
+  ) => Promise<void>; // Renamed prop
+  // Other props passed down to PromptForm
+  attachedFiles: File[];
+  selectedVfsPaths: string[];
   clearSelectedVfsPaths: () => void;
   selectedProviderId: string | null;
   selectedModelId: string | null;
   dbProviderConfigs: DbProviderConfig[];
   apiKeys: DbApiKey[];
   enableApiKeyManagement: boolean;
-  dbConversations: DbConversation[];
   createConversation: (
     parentId: string | null,
     title?: string,
   ) => Promise<string>;
-  selectItem: (
-    id: string | null,
-    type: SidebarItemType | null,
-  ) => Promise<void>;
-  deleteItem: (id: string, type: SidebarItemType) => Promise<void>;
   updateDbProviderConfig: (
     id: string,
     changes: Partial<DbProviderConfig>,
@@ -90,23 +84,26 @@ interface PromptWrapperProps {
   customPromptActions: CustomPromptAction[];
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   selectedModel: AiModelConfig | undefined;
-  stopStreaming: () => void; // Add stopStreaming prop
+  stopStreaming: (parentMessageId?: string | null) => void;
   isVfsLoading: boolean;
   vfsError: string | null;
   vfsKey: string | null;
+  getApiKeyForProvider: (providerId: string) => string | undefined;
+  selectedProvider: AiProviderConfigType | undefined;
 }
 
 const PromptWrapperComponent: React.FC<PromptWrapperProps> = ({
   className,
-  error, // Direct prop
-  isStreaming, // Direct prop needed here for the button
-  stopStreaming, // Direct prop needed here
-  // Pass all other props down to PromptForm
-  ...promptFormProps // Includes isStreaming, promptInputValue, isVfsReady etc.
+  error,
+  isStreaming,
+  stopStreaming,
+  clearAttachedFiles,
+  onFormSubmit, // Receive the wrapper function
+  // Pass all other props down to PromptForm using rest operator
+  ...promptFormProps
 }) => {
   return (
     <div className={cn("flex-shrink-0 relative", className)}>
-      {/* Error Display */}
       {error && (
         <div className="flex items-center gap-2 p-3 text-sm text-red-400 bg-red-900/20 border-t border-red-800/30">
           <AlertCircle className="h-5 w-5 flex-shrink-0" />
@@ -114,13 +111,12 @@ const PromptWrapperComponent: React.FC<PromptWrapperProps> = ({
         </div>
       )}
 
-      {/* Abort Button - Rendered above the form */}
       {isStreaming && (
         <div className="absolute top-[-40px] left-1/2 transform -translate-x-1/2 z-10">
           <Button
             variant="destructive"
             size="sm"
-            onClick={stopStreaming}
+            onClick={() => stopStreaming()}
             className="h-8 px-3 shadow-lg"
             aria-label="Stop generating response"
           >
@@ -130,11 +126,12 @@ const PromptWrapperComponent: React.FC<PromptWrapperProps> = ({
         </div>
       )}
 
-      {/* Prompt Form */}
       <PromptForm
-        {...promptFormProps}
-        isStreaming={isStreaming} // Pass isStreaming down
-        stopStreaming={stopStreaming} // Pass stopStreaming down
+        {...promptFormProps} // Pass remaining props
+        isStreaming={isStreaming}
+        stopStreaming={stopStreaming}
+        clearAttachedFiles={clearAttachedFiles}
+        onFormSubmit={onFormSubmit} // Pass the wrapper function down
         getContextSnapshot={promptFormProps.getContextSnapshotForMod}
       />
     </div>

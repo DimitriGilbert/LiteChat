@@ -1,4 +1,4 @@
-// src/components/lite-chat/prompt-form.tsx
+// src/components/lite-chat/prompt/prompt-form.tsx
 import React, { useEffect, useCallback } from "react";
 import { PromptInput } from "./prompt-input";
 import { PromptSettings } from "./prompt-settings";
@@ -18,12 +18,17 @@ import type {
   ReadonlyChatContextSnapshot,
   TextPart,
   ImagePart,
+  AiProviderConfig as AiProviderConfigType,
 } from "@/lib/types";
 import { FileHandlingService } from "@/services/file-handling-service";
-import { ModMiddlewareHook } from "@/mods/api";
 import type { SubmitPromptPayload } from "@/mods/types";
+// Removed CoreChatActions import
+import { createOpenAI } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createOllama } from "ollama-ai-provider";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
-// Update props to receive volatile state directly
 interface PromptFormProps {
   className?: string;
   // Direct Input State/Actions
@@ -32,27 +37,21 @@ interface PromptFormProps {
   addAttachedFile: (file: File) => void;
   removeAttachedFile: (fileName: string) => void;
   clearPromptInput: () => void;
+  clearAttachedFiles: () => void;
   // Direct Core State (Volatile)
   isStreaming: boolean;
-  isVfsReady: boolean; // Add direct prop
-  isVfsEnabledForItem: boolean; // Add direct prop
-  // Bundled Props (less frequently changing / stable)
-  attachedFiles: File[];
-  selectedVfsPaths: string[];
-  handleSubmitCore: (
+  isVfsReady: boolean;
+  isVfsEnabledForItem: boolean;
+  // Form Submission Wrapper
+  onFormSubmit: (
     prompt: string,
     files: File[],
     vfsPaths: string[],
-    context: {
-      selectedItemId: string;
-      contentToSendToAI: MessageContent;
-      vfsContextPaths?: string[];
-    },
-  ) => Promise<void>;
-  handleImageGenerationCore: (
-    currentConversationId: string,
-    prompt: string,
-  ) => Promise<void>;
+    context: any,
+  ) => Promise<void>; // Added prop
+  // Other props
+  attachedFiles: File[];
+  selectedVfsPaths: string[];
   setError: (error: string | null) => void;
   clearSelectedVfsPaths: () => void;
   toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>;
@@ -98,26 +97,27 @@ interface PromptFormProps {
   isVfsLoading: boolean;
   vfsError: string | null;
   vfsKey: string | null;
-  stopStreaming: () => void; // Add stopStreaming prop
+  stopStreaming: (parentMessageId?: string | null) => void;
   removeSelectedVfsPath: (path: string) => void;
+  getApiKeyForProvider: (providerId: string) => string | undefined;
+  selectedProvider: AiProviderConfigType | undefined;
 }
 
 const PromptFormComponent: React.FC<PromptFormProps> = ({
   className,
-  // Destructure direct props
+  // Destructure all props
   promptInputValue,
   setPromptInputValue,
   addAttachedFile,
   removeAttachedFile,
   clearPromptInput,
+  clearAttachedFiles,
   isStreaming,
-  isVfsReady, // Destructure direct prop
-  isVfsEnabledForItem, // Destructure direct prop
-  // Destructure bundled props
+  isVfsReady,
+  isVfsEnabledForItem,
+  onFormSubmit, // Destructure the wrapper function
   attachedFiles,
   selectedVfsPaths,
-  handleSubmitCore,
-  handleImageGenerationCore,
   setError,
   clearSelectedVfsPaths,
   toggleVfsEnabledAction,
@@ -154,20 +154,24 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   isVfsLoading,
   vfsError,
   vfsKey,
-  stopStreaming, // Destructure stopStreaming
+  stopStreaming,
   removeSelectedVfsPath,
+  getApiKeyForProvider,
+  selectedProvider,
 }) => {
+  // Placeholder for middleware - replace if actual middleware is used
   const runMiddlewarePlaceholder = useCallback(
     async (hookName: any, payload: any) => {
-      console.warn(`Placeholder runMiddleware called for ${hookName}`, payload);
-      return payload;
+      return payload; // Pass through
     },
     [],
   );
 
-  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  // Renamed internal handler
+  const internalHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    // --- Validations (remain the same) ---
     if (isStreaming) {
       toast.warning("Please wait for the current response to finish.");
       return;
@@ -186,9 +190,9 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       return;
     }
 
+    // --- Get Conversation ID (remains the same) ---
     let currentConversationId =
       selectedItemType === "conversation" ? selectedItemId : null;
-
     if (!currentConversationId) {
       try {
         const parentId = selectedItemType === "project" ? selectedItemId : null;
@@ -202,165 +206,92 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
         return;
       }
     }
-
     if (!currentConversationId) {
       setError("Failed to determine active conversation.");
       toast.error("Could not determine active conversation.");
       return;
     }
 
-    const imageGenCommand = "/imagine ";
-    if (
-      promptInputValue.startsWith(imageGenCommand) &&
-      selectedModel.supportsImageGeneration
-    ) {
-      const imagePrompt = promptInputValue
-        .substring(imageGenCommand.length)
-        .trim();
-      if (!imagePrompt) {
-        toast.info("Please enter a prompt after /imagine.");
-        return;
-      }
-      try {
-        await handleImageGenerationCore(currentConversationId, imagePrompt);
-        clearPromptInput();
-        clearSelectedVfsPaths();
-      } catch (err) {
-        // Error handled by core function
-      }
-      return;
-    } else if (
-      promptInputValue.startsWith(imageGenCommand) &&
-      !selectedModel.supportsImageGeneration
-    ) {
-      toast.error(
-        `Model '${selectedModel.name}' does not support image generation.`,
-      );
-      setError(
-        `Model '${selectedModel.name}' does not support image generation.`,
-      );
-      return;
-    }
-
-    // Get the current VFS context state
+    // --- Prepare Content (remains the same) ---
     const vfsContext = {
       isVfsReady,
       isVfsEnabledForItem,
-      enableVfs: true, // Assuming global VFS is enabled
+      enableVfs: true,
       vfsKey,
     };
+    const vfsContextResult =
+      await FileHandlingService.processVfsFilesWithContext(
+        selectedVfsPaths,
+        vfsContext,
+      );
+    const attachedFileParts =
+      await FileHandlingService.processAttachedFiles(attachedFiles);
+    let finalContent: MessageContent;
+    const vfsText = vfsContextResult.contextPrefix.trim();
+    const userText = promptInputValue.trim();
+    const imageParts = attachedFileParts.filter(
+      (p): p is ImagePart => p.type === "image",
+    );
+    const textPartsFromFiles = attachedFileParts.filter(
+      (p): p is TextPart => p.type === "text",
+    );
+    if (imageParts.length > 0) {
+      finalContent = [];
+      finalContent.push(...imageParts);
+      let combinedText = "";
+      if (vfsText) combinedText += vfsText;
+      if (userText) combinedText += (combinedText ? "\n\n" : "") + userText;
+      textPartsFromFiles.forEach((part) => {
+        combinedText += (combinedText ? "\n\n" : "") + part.text;
+      });
+      if (combinedText) finalContent.push({ type: "text", text: combinedText });
+    } else {
+      let combinedText = "";
+      if (vfsText) combinedText += vfsText;
+      if (userText) combinedText += (combinedText ? "\n\n" : "") + userText;
+      textPartsFromFiles.forEach((part) => {
+        combinedText += (combinedText ? "\n\n" : "") + part.text;
+      });
+      finalContent = combinedText;
+    }
 
+    // --- Middleware (remains the same, placeholder) ---
+    const middlewarePayload: SubmitPromptPayload = {
+      prompt: finalContent,
+      conversationId: currentConversationId,
+      vfsPaths: vfsContextResult.pathsIncludedInContext,
+    };
+    const middlewareResult = await runMiddlewarePlaceholder(
+      "SUBMIT_PROMPT",
+      middlewarePayload,
+    );
+    if (middlewareResult === false) {
+      toast.info("Submission cancelled by a mod.");
+      return;
+    }
+    const contentToSubmit = middlewareResult.prompt;
+    const vfsPathsToSave = middlewareResult.vfsPaths;
+
+    // --- Call the passed onFormSubmit wrapper ---
     try {
-      // Process VFS files to include their content
-      const vfsContextResult =
-        await FileHandlingService.processVfsFilesWithContext(
-          selectedVfsPaths,
-          vfsContext,
-        );
-
-      let finalContent: MessageContent;
-      const attachedFileParts =
-        await FileHandlingService.processAttachedFiles(attachedFiles);
-
-      const vfsText = vfsContextResult.contextPrefix.trim();
-      const userText = promptInputValue.trim();
-
-      const imageParts = attachedFileParts.filter(
-        (p): p is ImagePart => p.type === "image",
-      );
-      const textPartsFromFiles = attachedFileParts.filter(
-        (p): p is TextPart => p.type === "text",
-      );
-
-      if (imageParts.length > 0) {
-        finalContent = [];
-        finalContent.push(...imageParts);
-        let combinedText = "";
-        if (vfsText) combinedText += vfsText;
-        if (userText)
-          combinedText +=
-            (combinedText
-              ? `
-
-`
-              : "") + userText;
-        textPartsFromFiles.forEach((part) => {
-          combinedText +=
-            (combinedText
-              ? `
-
-`
-              : "") + part.text;
-        });
-        if (combinedText) {
-          finalContent.push({ type: "text", text: combinedText });
-        }
-      } else {
-        let combinedText = "";
-        if (vfsText) combinedText += vfsText;
-        if (userText)
-          combinedText +=
-            (combinedText
-              ? `
-
-`
-              : "") + userText;
-        textPartsFromFiles.forEach((part) => {
-          combinedText +=
-            (combinedText
-              ? `
-
-`
-              : "") + part.text;
-        });
-        finalContent = combinedText;
-      }
-
-      const middlewarePayload: SubmitPromptPayload = {
-        prompt: finalContent,
-        conversationId: currentConversationId,
-        vfsPaths: vfsContextResult.pathsIncludedInContext,
-      };
-
-      const middlewareResult = await runMiddlewarePlaceholder(
-        ModMiddlewareHook.SUBMIT_PROMPT,
-        middlewarePayload,
-      );
-
-      if (middlewareResult === false) {
-        toast.info("Submission cancelled by a mod.");
-        return;
-      }
-
-      const contentToSubmit = middlewareResult.prompt;
-      const vfsPathsToSave = middlewareResult.vfsPaths;
-
-      console.log("Submitting with VFS paths:", vfsPathsToSave);
-      console.log("Content to submit:", contentToSubmit);
-
-      await handleSubmitCore(
-        promptInputValue, // This seems incorrect, should likely be currentConversationId
-        attachedFiles, // This seems incorrect, should likely be contentToSubmit
-        selectedVfsPaths, // This seems incorrect, should likely be vfsPathsToSave
+      await onFormSubmit(
+        promptInputValue, // Pass original prompt value
+        attachedFiles, // Pass original files
+        selectedVfsPaths, // Pass original VFS paths
         {
           selectedItemId: currentConversationId,
-          contentToSendToAI: contentToSubmit,
-          vfsContextPaths: vfsPathsToSave,
+          contentToSendToAI: contentToSubmit, // Pass processed content
+          vfsContextPaths: vfsPathsToSave, // Pass processed VFS paths
         },
       );
-      clearPromptInput();
-      clearSelectedVfsPaths();
+      // Input clearing is now handled within the onFormSubmit wrapper in useLiteChatLogic
     } catch (error) {
-      console.error("Error during chat submission:", error);
-      toast.error(
-        `Submission failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-      setError(
-        `Submission failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
+      // Error handling is done within the onFormSubmit wrapper
+      console.error("Error during form submission prop call:", error);
     }
   };
 
+  // Effect for VFS path clearing (remains the same)
   useEffect(() => {
     if (!isVfsEnabledForItem && selectedVfsPaths.length > 0) {
       clearSelectedVfsPaths();
@@ -368,8 +299,9 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   }, [isVfsEnabledForItem, selectedVfsPaths, clearSelectedVfsPaths]);
 
   return (
+    // Use the internal handler for the form's onSubmit
     <form
-      onSubmit={handleFormSubmit}
+      onSubmit={internalHandleSubmit}
       className={cn("flex flex-col", className)}
     >
       <PromptFiles
@@ -379,8 +311,8 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       <SelectedVfsFilesDisplay
         selectedVfsPaths={selectedVfsPaths}
         removeSelectedVfsPath={removeSelectedVfsPath}
-        isVfsEnabledForItem={isVfsEnabledForItem} // Pass direct prop
-        isVfsReady={isVfsReady} // Pass direct prop
+        isVfsEnabledForItem={isVfsEnabledForItem}
+        isVfsReady={isVfsReady}
       />
 
       <div className="flex items-end p-3 md:p-4">
@@ -402,7 +334,6 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       </div>
 
       <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
-        {/* Pass direct props down to PromptSettings */}
         <PromptSettings
           selectedProviderId={selectedProviderId}
           dbProviderConfigs={dbProviderConfigs}
@@ -411,8 +342,8 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
           selectedModelId={selectedModelId}
           setSelectedProviderId={setSelectedProviderId}
           setSelectedModelId={setSelectedModelId}
-          enableVfs={true} // Assuming global VFS is enabled if this renders
-          isVfsEnabledForItem={isVfsEnabledForItem} // Pass direct prop
+          enableVfs={true}
+          isVfsEnabledForItem={isVfsEnabledForItem}
           selectedItemId={selectedItemId}
           selectedItemType={selectedItemType}
           toggleVfsEnabledAction={toggleVfsEnabledAction}
@@ -433,11 +364,11 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
           activeConversationData={activeConversationData}
           updateConversationSystemPrompt={updateConversationSystemPrompt}
           updateDbProviderConfig={updateDbProviderConfig}
-          isVfsReady={isVfsReady} // Pass direct prop
+          isVfsReady={isVfsReady}
           isVfsLoading={isVfsLoading}
           vfsError={vfsError}
           vfsKey={vfsKey}
-          stopStreaming={stopStreaming} // Pass stopStreaming down
+          stopStreaming={stopStreaming}
         />
       </div>
     </form>

@@ -28,6 +28,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+// Import useInputStore to access VFS path actions
+import { useInputStore } from "@/store/input.store";
+// Import useShallow
+import { useShallow } from "zustand/react/shallow";
 
 const getRepoNameFromUrl = (url: string): string => {
   try {
@@ -48,9 +52,6 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
   const isVfsLoading = useVfsStore((s) => s.isVfsLoading);
   const isVfsOperationLoading = useVfsStore((s) => s.isVfsOperationLoading);
   const vfsError = useVfsStore((s) => s.vfsError);
-  const selectedVfsPaths = useVfsStore((s) => s.selectedVfsPaths);
-  const addSelectedVfsPath = useVfsStore((s) => s.addSelectedVfsPath);
-  const removeSelectedVfsPath = useVfsStore((s) => s.removeSelectedVfsPath);
   const listFiles = useVfsStore((s) => s.listFiles);
   const deleteVfsItem = useVfsStore((s) => s.deleteVfsItem);
   const downloadAllAsZip = useVfsStore((s) => s.downloadAllAsZip);
@@ -61,10 +62,19 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
   const createDirectory = useVfsStore((s) => s.createDirectory);
   const fsInstance = useVfsStore((s) => s.fs);
 
+  // Get actions from InputStore using useShallow
+  const { selectedVfsPaths, addSelectedVfsPath, removeSelectedVfsPath } =
+    useInputStore(
+      useShallow((state) => ({
+        selectedVfsPaths: state.selectedVfsPaths,
+        addSelectedVfsPath: state.addSelectedVfsPath,
+        removeSelectedVfsPath: state.removeSelectedVfsPath,
+      })),
+    );
+
   const selectedItemType = useSidebarStore((s) => s.selectedItemType);
 
   useEffect(() => {
-    // Store the effect cleanup status
     let isMounted = true;
     console.log(
       `[FileManager] Effect triggered. isVfsReady: ${isVfsReady}, vfsKey: ${vfsKey}`,
@@ -76,7 +86,6 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
 
       try {
         console.log(`[FileManager] Loading entries for root path`);
-        // Force loading from root directory
         const normalizedPath = "/";
         const fetchedEntries = await listFiles(normalizedPath);
 
@@ -116,8 +125,6 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
     return () => {
       isMounted = false;
     };
-
-    // Only run when these specific props change
   }, [isVfsReady, vfsKey, listFiles]);
 
   const git = useGit(fsInstance);
@@ -182,7 +189,6 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
     [git],
   );
 
-  // Replace the loadEntries function with this version that has safeguards
   const loadEntries = useCallback(
     async (path: string, forceRefresh = false) => {
       if (!isVfsReady || isCombinedOperationLoading) {
@@ -191,25 +197,20 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
         );
         return;
       }
-
-      // Skip if already showing this path AND not forcing a refresh
       if (path === currentPath && !forceRefresh) {
         console.log(`[FileManager] Already showing path: ${path}`);
         return;
       }
-
       try {
         console.log(`[FileManager] Loading entries for path: ${path}`);
         const normalizedPath = normalizePath(path);
         const fetchedEntries = await listFiles(normalizedPath);
-
         fetchedEntries.sort((a: FileSystemEntry, b: FileSystemEntry) => {
           if (a.isDirectory !== b.isDirectory) {
             return a.isDirectory ? -1 : 1;
           }
           return a.name.localeCompare(b.name);
         });
-
         setEntries(fetchedEntries);
         setCurrentPath(normalizedPath);
         await checkGitStatusForEntries(fetchedEntries);
@@ -235,9 +236,24 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
       if (isAnyLoading || editingPath) return;
       if (entry.isDirectory) {
         loadEntries(entry.path);
+      } else {
+        if (checkedPaths.has(entry.path)) {
+          removeSelectedVfsPath(entry.path);
+          toast.info(`Removed "${entry.name}" from context.`);
+        } else {
+          addSelectedVfsPath(entry.path);
+          toast.success(`Added "${entry.name}" to context.`);
+        }
       }
     },
-    [isAnyLoading, editingPath, loadEntries],
+    [
+      isAnyLoading,
+      editingPath,
+      loadEntries,
+      checkedPaths,
+      addSelectedVfsPath,
+      removeSelectedVfsPath,
+    ],
   );
 
   const handleNavigateUp = useCallback(() => {
@@ -254,23 +270,17 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
 
   const handleRefresh = useCallback(() => {
     if (isAnyLoading) return;
-    loadEntries(currentPath);
+    loadEntries(currentPath, true);
   }, [isAnyLoading, currentPath, loadEntries]);
 
   const handleCheckboxChange = useCallback(
     (checked: boolean, path: string) => {
       if (isCombinedOperationLoading) return;
-      setCheckedPaths((prev) => {
-        const next = new Set(prev);
-        if (checked) {
-          next.add(path);
-          addSelectedVfsPath(path);
-        } else {
-          next.delete(path);
-          removeSelectedVfsPath(path);
-        }
-        return next;
-      });
+      if (checked) {
+        addSelectedVfsPath(path);
+      } else {
+        removeSelectedVfsPath(path);
+      }
     },
     [addSelectedVfsPath, removeSelectedVfsPath, isCombinedOperationLoading],
   );
@@ -295,13 +305,21 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
       if (confirmation) {
         try {
           await deleteVfsItem(entry.path, entry.isDirectory);
-          loadEntries(currentPath, true); // Force refresh
+          removeSelectedVfsPath(entry.path);
+          loadEntries(currentPath, true);
         } catch (error) {
           console.error("FileManager Delete Error (handled by store):", error);
         }
       }
     },
-    [isAnyLoading, isVfsReady, loadEntries, currentPath, deleteVfsItem],
+    [
+      isAnyLoading,
+      isVfsReady,
+      loadEntries,
+      currentPath,
+      deleteVfsItem,
+      removeSelectedVfsPath,
+    ],
   );
 
   const handleDownload = useCallback(
@@ -353,7 +371,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
       if (files && files.length > 0) {
         try {
           await uploadFiles(Array.from(files), currentPath);
-          loadEntries(currentPath, true); // Force refresh
+          loadEntries(currentPath, true);
         } catch (error) {
           console.error("FileManager Upload Error (handled by store):", error);
         }
@@ -379,7 +397,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
         if (file.name.toLowerCase().endsWith(".zip")) {
           try {
             await uploadAndExtractZip(file, currentPath);
-            loadEntries(currentPath, true); // Force refresh
+            loadEntries(currentPath, true);
           } catch (error) {
             console.error(
               "FileManager Extract Error (handled by store):",
@@ -445,7 +463,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
     try {
       await renameVfsItem(editingPath, newPath);
       cancelEditing();
-      loadEntries(currentPath, true); // Force refresh
+      loadEntries(currentPath, true);
     } catch (error) {
       console.error("FileManager Rename Error (handled by store):", error);
     }
@@ -494,7 +512,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
       await createDirectory(newPath);
       toast.success(`Folder "${trimmedName}" created.`);
       cancelCreatingFolder();
-      loadEntries(currentPath, true); // Force refresh even though we're on the same path
+      loadEntries(currentPath, true);
     } catch (error) {
       console.error(
         "FileManager Create Folder Error (handled by store):",
@@ -530,7 +548,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
       }
       const result = await git.pullChanges(path);
       if (result.success) {
-        loadEntries(currentPath);
+        loadEntries(currentPath, true);
       }
     },
     [git, loadEntries, currentPath],
@@ -642,7 +660,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
 
       if (result.success) {
         setIsCloneDialogOpen(false);
-        loadEntries(currentPath);
+        loadEntries(currentPath, true);
       }
     } catch (listError) {
       console.error("Error checking for existing directory:", listError);
@@ -715,14 +733,12 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
         handleFileChange={handleFileChange}
         handleArchiveChange={handleArchiveChange}
       />
-      {isCombinedOperationLoading ? (
-        // Use a simple loading indicator during operations
+      {isCombinedOperationLoading && !isConfigLoading ? (
         <div className="flex-1 flex items-center justify-center">
           <Loader2Icon className="h-5 w-5 mr-2 animate-spin" />
-          <span>Loading files...</span>
+          <span>Processing...</span>
         </div>
       ) : (
-        // Only render the table when not loading
         <FileManagerTable
           entries={entries}
           editingPath={editingPath}
@@ -730,7 +746,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
           creatingFolder={creatingFolder}
           newFolderName={newFolderName}
           checkedPaths={checkedPaths}
-          isOperationLoading={false} // IMPORTANT: force this to false to prevent ScrollArea issues
+          isOperationLoading={isCombinedOperationLoading}
           handleNavigate={handleNavigate}
           handleCheckboxChange={handleCheckboxChange}
           startEditing={startEditing}
