@@ -12,7 +12,7 @@ import type {
   Workflow,
   AiModelConfig,
   AiProviderConfig,
-  DbProviderConfig, // Keep this import
+  DbProviderConfig,
 } from "@/lib/types";
 import { convertDbMessagesToCoreMessages } from "@/utils/chat-utils";
 import {
@@ -21,7 +21,6 @@ import {
 } from "@/services/workflow-execution-service";
 import { workflowEvents, WorkflowEvent } from "@/services/workflow-events";
 import Dexie from "dexie";
-// Removed useProviderStore import from here, it's not needed directly in this file anymore for dbProviderConfigs
 import { useSettingsStore } from "./settings.store";
 
 // Helper function remains the same
@@ -50,6 +49,7 @@ interface CoreChatState {
   isStreaming: boolean;
   error: string | null;
   activeWorkflows: Map<string, WorkflowExecutionService>;
+  abortController: AbortController | null; // Added
 }
 
 export interface CoreChatActions {
@@ -75,7 +75,6 @@ export interface CoreChatActions {
   ) => Promise<void>;
   stopStreamingCore: (parentMessageId?: string | null) => void;
   regenerateMessageCore: (messageId: string) => Promise<void>;
-  // Modified signature: Added dbProviderConfigs parameter
   startWorkflowCore: (
     conversationId: string,
     command: string,
@@ -85,7 +84,7 @@ export interface CoreChatActions {
       providerId: string,
       modelId: string,
     ) => AiModelConfig | undefined,
-    dbProviderConfigs: DbProviderConfig[], // Added parameter
+    dbProviderConfigs: DbProviderConfig[],
   ) => Promise<void>;
   finalizeWorkflowTask: (
     parentMessageId: string,
@@ -94,6 +93,7 @@ export interface CoreChatActions {
     error?: Error | string | null,
   ) => void;
   _subscribeToWorkflowEvents: () => () => void;
+  setAbortController: (controller: AbortController | null) => void; // Added
 }
 
 export const useCoreChatStore = create(
@@ -103,6 +103,7 @@ export const useCoreChatStore = create(
     isStreaming: false,
     error: null,
     activeWorkflows: new Map(),
+    abortController: null, // Initial state
 
     loadMessages: async (conversationId) => {
       if (!conversationId) {
@@ -334,46 +335,55 @@ export const useCoreChatStore = create(
     },
 
     stopStreamingCore: (parentMessageId = null) => {
-      set((state) => {
-        let stoppedSomething = false;
+      let stoppedSomething = false;
+      const currentAbortController = get().abortController; // Get controller from state
 
+      set((state) => {
         if (parentMessageId) {
+          // Workflow cancellation logic
           const service = state.activeWorkflows.get(parentMessageId);
           if (service) {
+            console.log(
+              `[CoreStore StopStreaming] Stopping workflow: ${parentMessageId}`,
+            );
             service.cancelWorkflow(parentMessageId);
-            state.activeWorkflows.delete(parentMessageId);
+            // Let the service finish cleanup, don't delete map entry here
             const parentIndex = state.messages.findIndex(
               (m) => m.id === parentMessageId,
             );
             if (parentIndex !== -1 && state.messages[parentIndex].workflow) {
-              state.messages[parentIndex].workflow!.status = "error";
+              state.messages[parentIndex].workflow!.status = "error"; // Mark as error on cancel
               state.messages[parentIndex].children?.forEach((child) => {
                 if (child.isStreaming) {
                   child.isStreaming = false;
                   child.error = child.error || "Cancelled by user";
-                  stoppedSomething = true;
                 }
               });
+              stoppedSomething = true;
             }
           }
-        } else {
+        } else if (currentAbortController) {
+          // Non-workflow stream cancellation
+          console.log("[CoreStore StopStreaming] Aborting non-workflow stream");
+          currentAbortController.abort(); // Abort the active stream
+          state.abortController = null; // Clear the controller from state
+          // Find the message that was streaming and update its UI state
           for (let i = state.messages.length - 1; i >= 0; i--) {
             const msg = state.messages[i];
             if (msg.isStreaming && !msg.workflow) {
               console.log(
-                `[CoreStore StopStreaming] Stopping single message: ${msg.id}`,
+                `[CoreStore StopStreaming] Updating UI for stopped message: ${msg.id}`,
               );
-              get().updateMessage(msg.id, {
-                isStreaming: false,
-                error: "Cancelled by user",
-                streamedContent: undefined,
-              });
+              msg.isStreaming = false;
+              msg.error = "Cancelled by user";
+              msg.streamedContent = undefined;
               stoppedSomething = true;
-              break;
+              break; // Assume only one non-workflow stream is active
             }
           }
         }
 
+        // Update global streaming state if something was stopped
         if (stoppedSomething) {
           const anyStreaming = state.messages.some(
             (m) => m.isStreaming || m.children?.some((c) => c.isStreaming),
@@ -383,6 +393,14 @@ export const useCoreChatStore = create(
             console.log(
               `[CoreStore StopStreaming] Global isStreaming set to: ${anyStreaming}`,
             );
+          }
+        } else {
+          console.log(
+            "[CoreStore StopStreaming] No active stream or workflow found to stop.",
+          );
+          // Ensure global streaming is false if nothing was stopped
+          if (state.isStreaming) {
+            state.isStreaming = false;
           }
         }
       });
@@ -431,12 +449,13 @@ export const useCoreChatStore = create(
           );
         }
 
+        // Stop relevant stream(s)
         if (isWorkflowParent && messageToDeleteId) {
           get().stopStreamingCore(messageToDeleteId);
         } else if (isWorkflowChild && parentWorkflowMessage) {
           get().stopStreamingCore(parentWorkflowMessage.id);
         } else {
-          get().stopStreamingCore();
+          get().stopStreamingCore(); // Stop potential single stream
         }
       });
       console.log(
@@ -444,7 +463,6 @@ export const useCoreChatStore = create(
       );
     },
 
-    // Modified: Accept dbProviderConfigs as parameter
     startWorkflowCore: async (
       conversationId,
       command,
@@ -517,8 +535,7 @@ export const useCoreChatStore = create(
       for (const modelId of modelIds) {
         let taskProvider: AiProviderConfig | undefined;
         let taskModel: AiModelConfig | undefined;
-        // Use the passed dbProviderConfigs instead of store state
-        const providers = dbProviderConfigs;
+        const providers = dbProviderConfigs; // Use passed parameter
 
         for (const pConfig of providers) {
           const modelInfo = pConfig.fetchedModels?.find(
@@ -696,6 +713,10 @@ export const useCoreChatStore = create(
         workflowEvents.off(WorkflowEvent.TASK_FINISH, handleTaskFinish);
         workflowEvents.off(WorkflowEvent.TASK_ERROR, handleTaskError);
       };
+    },
+
+    setAbortController: (controller) => {
+      set({ abortController: controller });
     },
   })),
 );

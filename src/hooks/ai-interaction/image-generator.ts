@@ -5,7 +5,6 @@ import {
   experimental_generateImage as generateImage,
   ImageModelCallWarning,
 } from "ai";
-// Import specific part types and MessageContent
 import {
   Message,
   DbMessage,
@@ -21,10 +20,6 @@ import {
   PerformImageGenerationResult,
 } from "./types";
 
-/**
- * Handles image generation using AI models
- */
-// FIX: Update the signature to match PerformImageGenerationParams from types.ts
 export async function performImageGeneration({
   conversationIdToUse,
   prompt,
@@ -34,15 +29,13 @@ export async function performImageGeneration({
   selectedModel,
   selectedProvider,
   getApiKeyForProvider,
-  // Use addMessage and updateMessage instead of setLocalMessages
   addMessage,
   updateMessage,
-  setIsAiStreaming, // Type now matches Zustand setter: (isStreaming: boolean) => void
+  setIsAiStreaming,
   setError,
   addDbMessage,
-  abortControllerRef,
+  abortControllerRef, // This is the ref passed specifically for this call
 }: PerformImageGenerationParams): Promise<PerformImageGenerationResult> {
-  // Use the defined type
   const apiKey = getApiKeyForProvider();
   const validationError = validateAiParameters(
     conversationIdToUse,
@@ -55,7 +48,6 @@ export async function performImageGeneration({
 
   if (validationError) return { error: validationError.message };
 
-  // Ensure provider and model are valid before proceeding
   if (!selectedProvider || !selectedModel) {
     const errorMsg = "Provider or Model is not selected.";
     setError(errorMsg);
@@ -73,10 +65,15 @@ export async function performImageGeneration({
     return { error: errorMsg };
   }
 
-  setIsAiStreaming(true); // Call the Zustand setter
+  setIsAiStreaming(true);
   setError(null);
-  const currentAbortController = new AbortController();
-  abortControllerRef.current = currentAbortController;
+  // Use the passed AbortController ref
+  const currentAbortController =
+    abortControllerRef.current ?? new AbortController();
+  if (!abortControllerRef.current) {
+    abortControllerRef.current = currentAbortController; // Ensure ref is set if it was null
+  }
+
   const placeholderId = nanoid();
   const placeholderTimestamp = new Date();
 
@@ -91,7 +88,6 @@ export async function performImageGeneration({
     modelId: modelId,
   };
 
-  // Add the placeholder message using the store action
   addMessage(placeholderMessage);
 
   try {
@@ -101,8 +97,8 @@ export async function performImageGeneration({
       n: n,
       size: size as `${number}x${number}`,
       aspectRatio: aspectRatio as `${number}:${number}`,
-      headers: getStreamHeaders(selectedProvider.type, apiKey), // Use selectedProvider.type
-      abortSignal: currentAbortController.signal,
+      headers: getStreamHeaders(selectedProvider.type, apiKey),
+      abortSignal: currentAbortController.signal, // Use the signal from the controller
     });
 
     if (warnings && warnings.length > 0)
@@ -110,14 +106,12 @@ export async function performImageGeneration({
         toast.warning(`Image generation warning: ${JSON.stringify(warning)}`),
       );
 
-    // Explicitly type imageParts as ImagePart[]
     const imageParts: ImagePart[] = images.map((img) => ({
       type: "image",
       image: `data:${img.mimeType ?? "image/png"};base64,${img.base64}`,
       mediaType: img.mimeType ?? "image/png",
     }));
 
-    // Prepare the final message data (used for both UI update and DB save)
     const finalImageMessageData: Message = {
       id: placeholderId,
       role: "assistant" as Role,
@@ -130,12 +124,10 @@ export async function performImageGeneration({
       modelId: modelId,
     };
 
-    // Update the placeholder message in the UI using the store action
     updateMessage(placeholderId, {
       content: finalImageMessageData.content,
       isStreaming: false,
       error: null,
-      // Keep other fields like providerId, modelId if needed
     });
 
     try {
@@ -145,13 +137,12 @@ export async function performImageGeneration({
         role: finalImageMessageData.role,
         content: finalImageMessageData.content as MessageContent,
         createdAt: placeholderTimestamp,
-        providerId: providerId, // Save provider/model if schema allows
+        providerId: providerId,
         modelId: modelId,
       };
 
       await addDbMessage(dbMessageToSave as DbMessage);
       console.log("Saved image generation message to DB:", placeholderId);
-      // Emit event with the final data
       modEvents.emit(ModEvent.RESPONSE_DONE, {
         message: finalImageMessageData,
       });
@@ -160,7 +151,6 @@ export async function performImageGeneration({
       console.error("Failed to save image generation message:", dbErr);
       setError(`Error saving image: ${dbErrorMessage}`);
       toast.error(`Failed to save image: ${dbErrorMessage}`);
-      // Update the UI message with the error
       updateMessage(placeholderId, {
         error: dbErrorMessage,
         isStreaming: false,
@@ -171,13 +161,20 @@ export async function performImageGeneration({
     return { images: imageParts, warnings };
   } catch (err: unknown) {
     let errorMessage: string;
-    let finalContent: string = ""; // Keep content empty on error
+    let finalContent: string = "";
 
-    if ((err as any)?.name === "AbortError") {
+    // Check if the error is due to the abort signal from the passed controller
+    if (currentAbortController.signal.aborted) {
       errorMessage = "Cancelled by user.";
       finalContent = "Image generation cancelled.";
       console.log("Image generation aborted.");
       toast.info("Image generation stopped.");
+    } else if ((err as any)?.name === "AbortError") {
+      // Handle other potential AbortErrors not triggered by our controller
+      errorMessage = "Image generation aborted (external).";
+      finalContent = "Image generation aborted.";
+      console.log("Image generation aborted (external source).");
+      toast.warning("Image generation aborted.");
     } else {
       const error = err instanceof Error ? err : new Error(String(err));
       errorMessage = `Image generation failed: ${error.message}`;
@@ -185,17 +182,18 @@ export async function performImageGeneration({
       toast.error(errorMessage);
     }
 
-    // Update the UI message with the error
     updateMessage(placeholderId, {
-      content: finalContent, // Update content for cancellation case
+      content: finalContent,
       error: errorMessage,
       isStreaming: false,
     });
     return { error: errorMessage };
   } finally {
-    if (abortControllerRef.current === currentAbortController)
+    // Clear the ref *if* it's the controller we were using
+    if (abortControllerRef.current === currentAbortController) {
       abortControllerRef.current = null;
-    setIsAiStreaming(false); // Call the Zustand setter
+    }
+    setIsAiStreaming(false);
     // Ensure streaming is false even if update didn't happen before finally
     updateMessage(placeholderId, { isStreaming: false });
   }

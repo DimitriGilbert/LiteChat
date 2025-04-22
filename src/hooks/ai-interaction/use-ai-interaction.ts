@@ -33,13 +33,13 @@ import { validateAiParameters } from "./error-handler";
 import {
   getStreamHeaders,
   createAssistantPlaceholder,
-  // createStreamUpdater, // Keep this import
   finalizeStreamedMessageUI,
 } from "./stream-handler";
 import { mapToCoreMessages } from "./message-mapper";
 import { createSdkTools } from "./tool-handler";
 import { performImageGeneration as performImageGenerationFunc } from "./image-generator";
-import { throttle } from "@/lib/throttle"; // Import throttle directly
+import { throttle } from "@/lib/throttle";
+import { useCoreChatStore } from "@/store/core-chat.store"; // Import store
 
 export function useAiInteraction({
   selectedModel,
@@ -51,10 +51,14 @@ export function useAiInteraction({
   setIsAiStreaming,
   setError,
   addDbMessage,
-  abortControllerRef,
+  // abortControllerRef removed from props
   getContextSnapshotForMod,
   bulkAddMessages,
-}: UseAiInteractionProps): UseAiInteractionReturn {
+}: Omit<UseAiInteractionProps, "abortControllerRef">): UseAiInteractionReturn {
+  // Get the action from the store
+  const setAbortController = useCoreChatStore(
+    (state) => state.setAbortController,
+  );
   const contentRef = useRef<string>("");
   const placeholderRef = useRef<{
     id: string;
@@ -65,7 +69,7 @@ export function useAiInteraction({
   } | null>(null);
 
   const sdkTools = useMemo(() => {
-    const modToolsFromContext = new Map();
+    const modToolsFromContext = new Map(); // Placeholder for actual mod tools
     return createSdkTools(modToolsFromContext, getContextSnapshotForMod);
   }, [getContextSnapshotForMod]);
 
@@ -116,8 +120,9 @@ export function useAiInteraction({
       contentRef.current = "";
       placeholderRef.current = null;
 
+      // Create and set the controller in the store
       const currentAbortController = new AbortController();
-      abortControllerRef.current = currentAbortController;
+      setAbortController(currentAbortController);
 
       const {
         id: assistantMessageId,
@@ -137,7 +142,6 @@ export function useAiInteraction({
       };
       addMessage(assistantPlaceholder);
 
-      // Use the imported throttle function directly
       const { throttled: throttledUpdate, cancel: cancelThrottledUpdate } =
         throttle(() => {
           const currentAccumulatedContent = contentRef.current;
@@ -177,15 +181,14 @@ export function useAiInteraction({
           presencePenalty: currentPresencePenalty ?? undefined,
           frequencyPenalty: currentFrequencyPenalty ?? undefined,
           headers,
-          abortSignal: currentAbortController.signal,
+          abortSignal: currentAbortController.signal, // Use the controller from store
         });
 
         for await (const part of result.fullStream as AsyncIterable<
           TextStreamPart<any>
         >) {
           if (currentAbortController.signal.aborted) {
-            streamError = new Error("Stream aborted by user.");
-            toast.info("AI response stopped.");
+            // Error is set by stopStreamingCore, no need to set streamError here
             break;
           }
 
@@ -282,26 +285,30 @@ export function useAiInteraction({
         if (!finalFinishReason) finalFinishReason = await result.finishReason;
       } catch (err: unknown) {
         if ((err as any)?.name === "AbortError") {
-          streamError = new Error("Stream aborted by user.");
-          console.log("Stream aborted.");
+          // Check if the abort came from our controller (button press)
+          if (!currentAbortController.signal.aborted) {
+            // Abort likely came from outside (e.g., network timeout)
+            streamError = new Error("Stream aborted.");
+            console.log("Stream aborted (external source).");
+          } else {
+            // Abort came from button press, handled by store action
+            console.log("Stream aborted by user action (handled by store).");
+          }
         } else {
           streamError = err instanceof Error ? err : new Error(String(err));
           console.error("Error during streamText processing:", streamError);
-          if (
-            streamError &&
-            !streamError.message.startsWith("Streaming error:")
-          ) {
-            setError(`Error: ${streamError.message}`);
-            toast.error(`Error: ${streamError.message}`);
-          }
+          setError(`Error: ${streamError.message}`);
+          toast.error(`Error: ${streamError.message}`);
         }
       } finally {
         console.log("Stream finally block executing.");
-        if (abortControllerRef.current === currentAbortController) {
-          abortControllerRef.current = null;
+        // Clear the controller from the store only if it's the one we set
+        if (
+          useCoreChatStore.getState().abortController === currentAbortController
+        ) {
+          setAbortController(null);
         }
 
-        // Cancel any pending throttled UI update *before* finalizing
         cancelThrottledUpdate();
 
         finalizeStreamedMessageUI(
@@ -398,10 +405,10 @@ export function useAiInteraction({
       setIsAiStreaming,
       setError,
       addDbMessage,
-      abortControllerRef,
-      // getContextSnapshotForMod,
+      getContextSnapshotForMod,
       bulkAddMessages,
       sdkTools,
+      setAbortController, // Added store action dependency
     ],
   );
 
@@ -417,25 +424,40 @@ export function useAiInteraction({
         | "setIsAiStreaming"
         | "setError"
         | "addDbMessage"
-        | "abortControllerRef"
+        | "abortControllerRef" // Removed from Omit
       >,
     ): Promise<PerformImageGenerationResult> => {
       const currentSelectedModel = selectedModel;
       const currentSelectedProvider = selectedProvider;
       const apiKeyGetter = getApiKeyForProvider;
 
-      return performImageGenerationFunc({
-        ...params,
-        selectedModel: currentSelectedModel,
-        selectedProvider: currentSelectedProvider,
-        getApiKeyForProvider: apiKeyGetter,
-        addMessage: addMessage,
-        updateMessage: updateMessage,
-        setIsAiStreaming: setIsAiStreaming,
-        setError: setError,
-        addDbMessage: addDbMessage,
-        abortControllerRef,
-      });
+      const imageAbortController = new AbortController();
+      const abortControllerRefForImage = { current: imageAbortController };
+
+      // TODO: Integrate image generation cancellation with the global stop button/store controller if desired.
+
+      try {
+        const result = await performImageGenerationFunc({
+          ...params,
+          selectedModel: currentSelectedModel,
+          selectedProvider: currentSelectedProvider,
+          getApiKeyForProvider: apiKeyGetter,
+          addMessage: addMessage,
+          updateMessage: updateMessage,
+          setIsAiStreaming: setIsAiStreaming,
+          setError: setError,
+          addDbMessage: addDbMessage,
+          abortControllerRef: abortControllerRefForImage, // Pass the local ref
+        });
+        return result;
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unknown image generation error";
+        setError(message);
+        return { error: message };
+      }
     },
     [
       selectedModel,
@@ -446,7 +468,7 @@ export function useAiInteraction({
       setIsAiStreaming,
       setError,
       addDbMessage,
-      abortControllerRef,
+      // No dependency on the store's abortController here yet
     ],
   );
 
