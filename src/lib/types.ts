@@ -86,6 +86,13 @@ export interface DbConversation extends DbBase {
   gitRepoEnabled?: boolean;
 }
 
+// Define the Workflow type
+export interface Workflow {
+  type: "race" | "sequence" | "parallel";
+  status: "pending" | "running" | "completed" | "error";
+  childIds: string[];
+}
+
 export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {
   conversationId: string;
   role: Role; // Updated Role type
@@ -104,6 +111,10 @@ export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {
   // Add optional token fields
   tokensInput?: number;
   tokensOutput?: number;
+  /** Optional array to store child messages for workflows/alternatives */
+  children?: Message[]; // Added for sub-messages
+  /** Optional field to describe and track a workflow */
+  workflow?: Workflow; // Added workflow field
 }
 
 export interface DbApiKey extends Pick<DbBase, "id" | "createdAt"> {
@@ -163,6 +174,10 @@ export interface Message {
   }>;
   /** Present on tool messages to link them to the corresponding tool call */
   tool_call_id?: string; // Matches toolCallId in ToolResultPart
+  /** Optional array to store child messages for workflows/alternatives */
+  children?: Message[]; // Added for sub-messages
+  /** Optional field to describe and track a workflow */
+  workflow?: Workflow; // Added workflow field
 }
 
 export interface SidebarItemBase extends DbBase {

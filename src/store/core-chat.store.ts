@@ -1,11 +1,18 @@
 // src/store/core-chat.store.ts
 import { create } from "zustand";
-import type { Message, MessageContent, DbMessage } from "@/lib/types";
-import { nanoid } from "nanoid";
+import { immer } from "zustand/middleware/immer";
 import { toast } from "sonner";
-import { modEvents, ModEvent } from "@/mods/events";
+import { nanoid } from "nanoid";
+import {
+  Message,
+  DbMessage,
+  MessageContent,
+  Role,
+  Workflow, // Import Workflow type
+} from "@/lib/types";
 import { db } from "@/lib/db";
-import { Dexie } from "dexie";
+import { convertDbMessagesToCoreMessages } from "@/utils/chat-utils";
+import Dexie from "dexie";
 
 export interface CoreChatState {
   messages: Message[];
@@ -15,14 +22,21 @@ export interface CoreChatState {
 }
 
 export interface CoreChatActions {
-  setMessages: (messages: Message[] | ((prev: Message[]) => Message[])) => void; // Allow functional updates
+  setMessages: (messages: Message[]) => void;
   addMessage: (message: Message) => void;
-  updateMessage: (messageId: string, updates: Partial<Message>) => void;
-  removeMessage: (messageId: string) => void;
+  updateMessage: (id: string, updates: Partial<Message>) => void;
+  removeMessage: (id: string) => void;
   setIsLoadingMessages: (isLoading: boolean) => void;
   setIsStreaming: (isStreaming: boolean) => void;
   setError: (error: string | null) => void;
-  loadMessages: (conversationId: string | null) => Promise<void>;
+  loadMessages: (conversationId: string) => Promise<void>;
+  // DB interaction wrappers (can be moved to a dedicated storage store later)
+  addDbMessage: (
+    messageData: Omit<DbMessage, "id" | "createdAt"> &
+      Partial<Pick<DbMessage, "id" | "createdAt">>,
+  ) => Promise<string>;
+  bulkAddMessages: (messages: DbMessage[]) => Promise<unknown>;
+  // Core interaction logic placeholders (implementation in useAiInteraction/logic hook)
   handleSubmitCore: (
     currentConversationId: string,
     contentToSendToAI: MessageContent,
@@ -34,57 +48,81 @@ export interface CoreChatActions {
   ) => Promise<void>;
   stopStreamingCore: () => void;
   regenerateMessageCore: (messageId: string) => Promise<void>;
-  // Add missing actions
-  addDbMessage: (
-    messageData: Omit<DbMessage, "id" | "createdAt"> &
-      Partial<Pick<DbMessage, "id" | "createdAt">>,
-  ) => Promise<string>;
-  bulkAddMessages: (messages: DbMessage[]) => Promise<unknown>;
-  deleteDbMessage: (messageId: string) => Promise<void>; // Add deleteDbMessage
 }
 
-export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
-  (set, get) => ({
-    // Initial State
+export const useCoreChatStore = create(
+  immer<CoreChatState & CoreChatActions>((set, get) => ({
     messages: [],
     isLoadingMessages: false,
     isStreaming: false,
     error: null,
 
-    // --- Simple Setters ---
-    // Allow functional updates for setMessages
-    setMessages: (messagesOrUpdater) =>
-      set((state) => ({
-        messages:
-          typeof messagesOrUpdater === "function"
-            ? messagesOrUpdater(state.messages)
-            : messagesOrUpdater,
-      })),
-    addMessage: (message) =>
-      set((state) => ({ messages: [...state.messages, message] })),
-    updateMessage: (messageId, updates) =>
-      set((state) => ({
-        messages: state.messages.map((msg) =>
-          msg.id === messageId ? { ...msg, ...updates } : msg,
-        ),
-      })),
-    removeMessage: (messageId) =>
-      set((state) => ({
-        messages: state.messages.filter((msg) => msg.id !== messageId),
-      })),
-    setIsLoadingMessages: (isLoadingMessages) => set({ isLoadingMessages }),
-    setIsStreaming: (isStreaming) => set({ isStreaming }),
-    setError: (error) => set({ error }),
+    setMessages: (messages) => {
+      set((state) => {
+        state.messages = messages;
+      });
+    },
 
-    // --- Complex Actions ---
+    addMessage: (message) => {
+      set((state) => {
+        // Ensure message has an ID
+        if (!message.id) {
+          message.id = nanoid();
+        }
+        // Ensure createdAt is set
+        if (!message.createdAt) {
+          message.createdAt = new Date();
+        }
+        state.messages.push(message);
+      });
+    },
+
+    updateMessage: (id, updates) => {
+      set((state) => {
+        const messageIndex = state.messages.findIndex((m) => m.id === id);
+        if (messageIndex !== -1) {
+          // Merge updates into the existing message object
+          state.messages[messageIndex] = {
+            ...state.messages[messageIndex],
+            ...updates,
+          };
+        } else {
+          console.warn(`[CoreChatStore] Message with ID ${id} not found.`);
+        }
+      });
+    },
+
+    removeMessage: (id) => {
+      set((state) => {
+        state.messages = state.messages.filter((m) => m.id !== id);
+      });
+    },
+
+    setIsLoadingMessages: (isLoading) => {
+      set((state) => {
+        state.isLoadingMessages = isLoading;
+      });
+    },
+
+    setIsStreaming: (isStreaming) => {
+      set((state) => {
+        state.isStreaming = isStreaming;
+      });
+    },
+
+    setError: (error) => {
+      set((state) => {
+        state.error = error;
+      });
+    },
+
     loadMessages: async (conversationId) => {
-      if (!conversationId) {
-        set({ messages: [], error: null, isLoadingMessages: false });
-        return;
-      }
-      set({ isLoadingMessages: true, error: null });
+      set((state) => {
+        state.isLoadingMessages = true;
+        state.messages = []; // Clear existing messages
+        state.error = null;
+      });
       try {
-        // Use Dexie directly
         const dbMessages = await db.messages
           .where("[conversationId+createdAt]")
           .between(
@@ -93,164 +131,186 @@ export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
           )
           .sortBy("createdAt");
 
-        // Explicitly type dbMsg here
-        const uiMessages: Message[] = dbMessages.map((dbMsg: DbMessage) => ({
+        // Map DbMessage to Message, including children and workflow
+        const uiMessages: Message[] = dbMessages.map((dbMsg) => ({
           id: dbMsg.id,
-          conversationId: dbMsg.conversationId,
           role: dbMsg.role,
           content: dbMsg.content,
+          conversationId: dbMsg.conversationId,
           createdAt: dbMsg.createdAt,
           vfsContextPaths: dbMsg.vfsContextPaths,
           tool_calls: dbMsg.tool_calls,
           tool_call_id: dbMsg.tool_call_id,
+          tokensInput: dbMsg.tokensInput,
+          tokensOutput: dbMsg.tokensOutput,
+          children: dbMsg.children, // Map children
+          workflow: dbMsg.workflow, // Map workflow
+          // Initialize UI-only fields
+          isStreaming: false,
+          error: null,
         }));
-        set({ messages: uiMessages, isLoadingMessages: false });
-      } catch (err) {
-        console.error("Failed to load messages:", err);
+
+        set((state) => {
+          state.messages = uiMessages;
+          state.isLoadingMessages = false;
+        });
+      } catch (error) {
+        console.error("Failed to load messages:", error);
         const message =
-          err instanceof Error ? err.message : "Unknown loading error";
-        set({
-          error: `Failed to load messages: ${message}`,
-          messages: [],
-          isLoadingMessages: false,
+          error instanceof Error ? error.message : "Unknown error";
+        set((state) => {
+          state.error = `Failed to load messages: ${message}`;
+          state.isLoadingMessages = false;
         });
         toast.error(`Failed to load messages: ${message}`);
       }
     },
 
-    stopStreamingCore: () => {
-      // This action needs access to the abortControllerRef, which is managed externally (e.g., in LiteChatInner)
-      // The external component should call this action AND manage the ref.
-      // For now, just update the state.
-      console.warn(
-        "stopStreamingCore called, but AbortController management is external.",
-      );
-      if (get().isStreaming) {
-        set({ isStreaming: false });
-        // Update any message that was actively streaming
-        set((state) => ({
-          messages: state.messages.map((msg) =>
-            msg.isStreaming ? { ...msg, isStreaming: false } : msg,
-          ),
-        }));
-        toast.info("Processing stopped.");
-      }
+    // --- DB Wrappers ---
+    addDbMessage: async (messageData) => {
+      // This function now primarily relies on the useChatStorage hook's implementation
+      // but we keep it here as an action for consistency if needed elsewhere.
+      // The actual saving logic is in useChatStorage.
+      // We just need to ensure the workflow field is passed through if present.
+      const newMessage: DbMessage = {
+        id: messageData.id ?? nanoid(),
+        createdAt: messageData.createdAt ?? new Date(),
+        role: messageData.role,
+        content: messageData.content,
+        conversationId: messageData.conversationId!,
+        vfsContextPaths: messageData.vfsContextPaths,
+        tool_calls: messageData.tool_calls,
+        tool_call_id: messageData.tool_call_id,
+        children: messageData.children,
+        workflow: messageData.workflow, // Pass workflow field
+      };
+      await db.messages.add(newMessage);
+      await db.conversations.update(newMessage.conversationId, {
+        updatedAt: new Date(),
+      });
+      return newMessage.id;
     },
+
+    bulkAddMessages: async (messages) => {
+      // Similar to addDbMessage, relies on useChatStorage implementation.
+      // Ensures workflow field is handled by Dexie during bulkAdd.
+      if (messages.length === 0) return;
+      const latestMessage = messages.reduce((latest, current) =>
+        latest.createdAt > current.createdAt ? latest : current,
+      );
+      const conversationId = latestMessage.conversationId;
+      await db.transaction(
+        "rw",
+        db.messages,
+        db.conversations,
+        db.projects,
+        async () => {
+          await db.messages.bulkAdd(messages);
+          await db.conversations.update(conversationId, {
+            updatedAt: new Date(),
+          });
+          // Optionally update project timestamp if needed
+        },
+      );
+    },
+
+    // --- Core Interaction Logic ---
+    // These functions save the *user's* message and prepare for AI interaction.
+    // The actual AI call is handled by useAiInteraction hook triggered by the logic hook.
 
     handleSubmitCore: async (
       currentConversationId,
       contentToSendToAI,
       vfsContextPaths,
     ) => {
-      // This action depends on external AI interaction logic and settings.
-      // It should primarily handle saving the user message and triggering the external AI call.
-      // The external AI call handler (useAiInteraction) will then update state via store actions.
-      console.warn(
-        "handleSubmitCore called - relies on external AI interaction hook.",
-      );
-
-      const userMessageId = nanoid();
-      const userMessageTimestamp = new Date();
       const userMessage: Message = {
-        id: userMessageId,
-        conversationId: currentConversationId,
-        role: "user",
+        id: nanoid(),
+        role: "user" as Role,
         content: contentToSendToAI,
-        createdAt: userMessageTimestamp,
+        createdAt: new Date(),
+        conversationId: currentConversationId,
         vfsContextPaths: vfsContextPaths,
       };
 
+      // Add user message to UI immediately
       get().addMessage(userMessage);
-      set({ error: null });
 
+      // Save user message to DB
       try {
         await get().addDbMessage({
-          id: userMessageId,
+          id: userMessage.id,
           conversationId: currentConversationId,
-          role: "user",
-          content: contentToSendToAI,
-          createdAt: userMessageTimestamp,
-          vfsContextPaths: vfsContextPaths,
+          role: userMessage.role,
+          content: userMessage.content,
+          createdAt: userMessage.createdAt,
+          vfsContextPaths: userMessage.vfsContextPaths,
         });
-        modEvents.emit(ModEvent.MESSAGE_SUBMITTED, { message: userMessage });
-        // Triggering the actual AI call is now the responsibility of the component using this store (e.g., LiteChatInner via useAiInteraction)
-      } catch (err) {
-        console.error("Failed to save user message:", err);
-        set({ error: "Failed to save your message." });
-        toast.error("Failed to save your message.");
-        get().removeMessage(userMessageId);
-        throw err; // Re-throw to indicate failure
+      } catch (dbErr) {
+        const errorMsg = `Failed to save your message: ${dbErr instanceof Error ? dbErr.message : "Unknown DB error"}`;
+        get().setError(errorMsg);
+        toast.error(errorMsg);
+        // Optionally remove the message from UI if save fails critically
+        get().removeMessage(userMessage.id);
+        throw dbErr; // Re-throw to stop further processing
       }
     },
 
     handleImageGenerationCore: async (currentConversationId, prompt) => {
-      // Similar to handleSubmitCore, this triggers the external AI call.
-      console.warn(
-        "handleImageGenerationCore called - relies on external AI interaction hook.",
-      );
-
-      const userMessageId = nanoid();
-      const userMessageTimestamp = new Date();
-      const userMessageContent = `/imagine ${prompt}`;
       const userMessage: Message = {
-        id: userMessageId,
+        id: nanoid(),
+        role: "user" as Role,
+        content: `/imagine ${prompt}`, // Store the command
+        createdAt: new Date(),
         conversationId: currentConversationId,
-        role: "user",
-        content: userMessageContent,
-        createdAt: userMessageTimestamp,
       };
 
       get().addMessage(userMessage);
-      set({ error: null });
 
       try {
         await get().addDbMessage({
-          id: userMessageId,
+          id: userMessage.id,
           conversationId: currentConversationId,
-          role: "user",
-          content: userMessageContent,
-          createdAt: userMessageTimestamp,
+          role: userMessage.role,
+          content: userMessage.content,
+          createdAt: userMessage.createdAt,
         });
-        modEvents.emit(ModEvent.MESSAGE_SUBMITTED, { message: userMessage });
-        // Triggering the actual AI call is external
-      } catch (err) {
-        console.error("Failed to save user image prompt message:", err);
-        set({ error: "Failed to save your image prompt." });
-        toast.error("Failed to save your image prompt.");
-        get().removeMessage(userMessageId);
-        throw err; // Re-throw
+      } catch (dbErr) {
+        const errorMsg = `Failed to save your image prompt: ${dbErr instanceof Error ? dbErr.message : "Unknown DB error"}`;
+        get().setError(errorMsg);
+        toast.error(errorMsg);
+        get().removeMessage(userMessage.id);
+        throw dbErr;
       }
     },
 
-    regenerateMessageCore: async (messageId) => {
-      // This action also relies on external AI interaction logic.
-      // It should handle deleting the old message and preparing for the external call.
-      console.warn(
-        "regenerateMessageCore called - relies on external AI interaction hook.",
-      );
+    stopStreamingCore: () => {
+      set((state) => {
+        if (state.isStreaming) {
+          state.isStreaming = false;
+          // Find the last streaming message and mark it as finished (potentially with error state)
+          const lastMsgIndex = state.messages.length - 1;
+          if (lastMsgIndex >= 0 && state.messages[lastMsgIndex].isStreaming) {
+            state.messages[lastMsgIndex].isStreaming = false;
+            state.messages[lastMsgIndex].error = "Cancelled by user.";
+            state.messages[lastMsgIndex].content =
+              state.messages[lastMsgIndex].streamedContent || ""; // Use streamed content if available
+            state.messages[lastMsgIndex].streamedContent = undefined;
+          }
+          toast.info("AI response stopped.");
+        }
+      });
+    },
 
+    regenerateMessageCore: async (messageId) => {
       const messages = get().messages;
       const messageIndex = messages.findIndex((m) => m.id === messageId);
 
-      if (messageIndex === -1 || messages[messageIndex].role !== "assistant") {
-        toast.error("Cannot regenerate this message.");
-        return;
+      if (messageIndex === -1) {
+        toast.error("Original message not found for regeneration.");
+        throw new Error("Original message not found");
       }
 
-      const conversationId = messages[messageIndex].conversationId;
-      if (!conversationId) {
-        toast.error("Cannot regenerate message: Missing conversation ID.");
-        return;
-      }
-
-      if (get().isStreaming) {
-        toast.warning("Please wait for the current response to finish.");
-        return;
-      }
-
-      set({ error: null });
-
-      // Find the preceding user message
+      // Find the preceding user message to determine context
       let precedingUserMessageIndex = -1;
       for (let i = messageIndex - 1; i >= 0; i--) {
         if (messages[i].role === "user") {
@@ -260,101 +320,43 @@ export const useCoreChatStore = create<CoreChatState & CoreChatActions>()(
       }
 
       if (precedingUserMessageIndex === -1) {
-        toast.error("Cannot regenerate: Preceding user message not found.");
-        return;
+        toast.error("Could not find preceding user message for context.");
+        throw new Error("Could not find preceding user message");
       }
 
-      // Delete the old assistant message (DB and State)
-      try {
-        await get().deleteDbMessage(messageId); // Use store action
-      } catch (err) {
-        console.error("Failed to delete old assistant message from DB:", err);
-        toast.warning("Could not delete previous message from database.");
+      const conversationId = messages[messageIndex].conversationId;
+      if (!conversationId) {
+        toast.error("Conversation ID missing from message.");
+        throw new Error("Conversation ID missing");
       }
-      const messagesToKeep = messages.slice(0, messageIndex);
-      set({ messages: messagesToKeep });
 
-      // The component calling this (e.g., LiteChatInner) will now
-      // determine whether to call performAiStream or performImageGeneration
-      // based on the precedingUserMessage.
-    },
+      // Messages to keep (up to and including the preceding user message)
+      const messagesToKeep = messages.slice(0, precedingUserMessageIndex + 1);
+      const messageIdsToDelete = messages
+        .slice(precedingUserMessageIndex + 1)
+        .map((m) => m.id);
 
-    // Implement DB actions using Dexie
-    addDbMessage: async (messageData) => {
+      // Update UI state first
+      set((state) => {
+        state.messages = messagesToKeep;
+        state.error = null; // Clear previous errors
+        state.isStreaming = false; // Ensure not stuck in streaming state
+      });
+
+      // Delete subsequent messages from DB
       try {
-        const newMessage: DbMessage = {
-          id: messageData.id ?? nanoid(),
-          createdAt: messageData.createdAt ?? new Date(),
-          role: messageData.role,
-          content: messageData.content,
-          conversationId: messageData.conversationId,
-          vfsContextPaths: messageData.vfsContextPaths ?? undefined,
-          tool_calls: messageData.tool_calls ?? undefined,
-          tool_call_id: messageData.tool_call_id ?? undefined,
-        };
-        await db.messages.add(newMessage);
-        const conversation = await db.conversations.get(
-          messageData.conversationId,
-        );
-        const now = new Date();
-        await db.conversations.update(messageData.conversationId, {
-          updatedAt: now,
+        await db.messages.bulkDelete(messageIdsToDelete);
+        // Update conversation timestamp
+        await db.conversations.update(conversationId, {
+          updatedAt: new Date(),
         });
-        if (conversation?.parentId) {
-          await db.projects.update(conversation.parentId, { updatedAt: now });
-        }
-        return newMessage.id;
-      } catch (error) {
-        console.error("Failed to add DB message:", error);
-        toast.error(
-          `Failed to save message: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        throw error;
+      } catch (dbErr) {
+        console.error("Failed to delete messages during regeneration:", dbErr);
+        toast.error("Failed to prepare for regeneration.");
+        // Attempt to reload messages to restore state
+        await get().loadMessages(conversationId);
+        throw dbErr; // Re-throw
       }
     },
-    bulkAddMessages: async (messages) => {
-      if (messages.length === 0) return;
-      try {
-        const latestMessage = messages.reduce((latest, current) =>
-          latest.createdAt > current.createdAt ? latest : current,
-        );
-        const conversationId = latestMessage.conversationId;
-        const conversation = await db.conversations.get(conversationId);
-        const now = new Date();
-
-        await db.transaction(
-          "rw",
-          db.messages,
-          db.conversations,
-          db.projects,
-          async () => {
-            await db.messages.bulkAdd(messages);
-            await db.conversations.update(conversationId, { updatedAt: now });
-            if (conversation?.parentId) {
-              await db.projects.update(conversation.parentId, {
-                updatedAt: now,
-              });
-            }
-          },
-        );
-      } catch (error) {
-        console.error("Failed to bulk add DB messages:", error);
-        toast.error(
-          `Failed to save messages: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        throw error;
-      }
-    },
-    deleteDbMessage: async (messageId) => {
-      try {
-        await db.messages.delete(messageId);
-      } catch (error) {
-        console.error("Failed to delete DB message:", error);
-        toast.error(
-          `Failed to delete message: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        throw error;
-      }
-    },
-  }),
+  })),
 );

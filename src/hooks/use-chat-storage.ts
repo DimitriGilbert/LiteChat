@@ -8,7 +8,8 @@ import type {
   DbProject,
   SidebarItemType,
   DbProviderConfig,
-  MessageContent, // Import the multi-modal content type
+  MessageContent,
+  Workflow, // Import Workflow type
 } from "@/lib/types";
 import type { DbMod } from "@/mods/types";
 import { nanoid } from "nanoid";
@@ -228,7 +229,7 @@ export function useChatStorage() {
   const addDbMessage = useCallback(
     async (
       // Accept the potentially complex MessageContent type for 'content'
-      // and new optional fields like tool_call_id, tool_calls
+      // and new optional fields like tool_call_id, tool_calls, children, workflow
       messageData: Omit<DbMessage, "id" | "createdAt"> &
         Partial<Pick<DbMessage, "id" | "createdAt">>,
     ): Promise<string> => {
@@ -245,11 +246,15 @@ export function useChatStorage() {
         // Include optional tool fields if provided
         tool_calls: messageData.tool_calls ?? undefined,
         tool_call_id: messageData.tool_call_id ?? undefined,
+        // Include children if provided
+        children: messageData.children ?? undefined,
+        // Include workflow if provided
+        workflow: messageData.workflow ?? undefined,
       };
       const conversation = await db.conversations.get(
         messageData.conversationId,
       );
-      // Dexie handles storing the object/array structure
+      // Dexie handles storing the object/array structure, including children and workflow
       await db.messages.add(newMessage);
       const now = new Date();
       await db.conversations.update(messageData.conversationId, {
@@ -268,6 +273,14 @@ export function useChatStorage() {
     async (messageId: string, newContent: MessageContent): Promise<void> => {
       // Dexie handles updating the object/array structure
       await db.messages.update(messageId, { content: newContent });
+    },
+    [],
+  );
+
+  // Add a function to update the workflow status of a message
+  const updateDbMessageWorkflow = useCallback(
+    async (messageId: string, workflow: Workflow | null): Promise<void> => {
+      await db.messages.update(messageId, { workflow: workflow ?? undefined });
     },
     [],
   );
@@ -300,7 +313,7 @@ export function useChatStorage() {
   const bulkAddMessages = useCallback(
     async (messages: DbMessage[]): Promise<unknown> => {
       if (messages.length === 0) return;
-      // Dexie handles bulk adding objects with complex fields
+      // Dexie handles bulk adding objects with complex fields, including children and workflow
       // Ensure conversation timestamp is updated based on the latest message
       const latestMessage = messages.reduce((latest, current) =>
         latest.createdAt > current.createdAt ? latest : current,
@@ -449,6 +462,7 @@ export function useChatStorage() {
       db.apiKeys.clear(),
       db.mods.clear(),
       db.providerConfigs.clear(),
+      db.appState.clear(), // Clear app state as well
     ]);
   }, []);
 
@@ -476,6 +490,7 @@ export function useChatStorage() {
     getMessagesForConversation,
     addDbMessage, // Handles new fields implicitly
     updateDbMessageContent,
+    updateDbMessageWorkflow, // Added workflow update function
     deleteDbMessage,
     getDbMessagesUpTo,
     bulkAddMessages, // Handles new fields implicitly
