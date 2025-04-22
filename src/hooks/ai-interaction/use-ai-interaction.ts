@@ -405,10 +405,9 @@ export function useAiInteraction({
       setIsAiStreaming,
       setError,
       addDbMessage,
-      getContextSnapshotForMod,
       bulkAddMessages,
       sdkTools,
-      setAbortController, // Added store action dependency
+      setAbortController,
     ],
   );
 

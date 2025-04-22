@@ -1,6 +1,6 @@
 // src/hooks/use-lite-chat-logic.ts
 
-import { useMemo, useCallback, useRef, useEffect } from "react";
+import { useMemo, useCallback, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
 
@@ -33,8 +33,8 @@ import type {
   AiProviderConfig,
   AiModelConfig,
   Message,
-  // MessageContent,
-  DbProviderConfig, // Keep this import
+  // MessageContent, // Removed unused import
+  DbProviderConfig,
   DbApiKey,
 } from "@/lib/types";
 import type { ReadonlyChatContextSnapshot } from "@/mods/api";
@@ -312,31 +312,38 @@ export function useLiteChatLogic(
     ),
   );
 
-  const dbProviderConfigs = storage.providerConfigs || [];
-  const apiKeys = storage.apiKeys || [];
+  // Memoize the results from the storage hook to satisfy eslint rule
+  const dbProviderConfigs = useMemo(
+    () => storage.providerConfigs || [],
+    [storage.providerConfigs],
+  );
+  const apiKeys = useMemo(() => storage.apiKeys || [], [storage.apiKeys]);
 
   const providerState: UseLiteChatLogicReturn["providerState"] = useMemo(
     () => ({
       ...providerStateFromStore,
-      dbProviderConfigs,
-      apiKeys,
+      dbProviderConfigs, // Use memoized version
+      apiKeys, // Use memoized version
     }),
     [providerStateFromStore, dbProviderConfigs, apiKeys],
   );
 
   const providerActions: UseLiteChatLogicReturn["providerActions"] = useMemo(
     () => ({
+      // Pass dbProviderConfigs as the second argument
       setSelectedProviderId: (id) =>
         storeSetSelectedProviderId(id, dbProviderConfigs),
       setSelectedModelId: storeSetSelectedModelId,
       addDbProviderConfig: storeAddDbProviderConfig,
       updateDbProviderConfig: storeUpdateDbProviderConfig,
       deleteDbProviderConfig: storeDeleteDbProviderConfig,
+      // Pass dbProviderConfigs and apiKeys as second and third arguments
       fetchModels: (id) => storeFetchModels(id, dbProviderConfigs, apiKeys),
       addApiKey: storeAddApiKey,
       deleteApiKey: storeDeleteApiKey,
     }),
     [
+      // Ensure all dependencies are correctly listed
       storeSetSelectedProviderId,
       storeSetSelectedModelId,
       storeAddDbProviderConfig,
@@ -345,8 +352,8 @@ export function useLiteChatLogic(
       storeFetchModels,
       storeAddApiKey,
       storeDeleteApiKey,
-      dbProviderConfigs,
-      apiKeys,
+      dbProviderConfigs, // Add dbProviderConfigs dependency
+      apiKeys, // Add apiKeys dependency
     ],
   );
 
@@ -597,10 +604,7 @@ Really delete everything? Consider exporting first.`,
       });
     }, [dbConversations, dbProviderConfigs, apiKeys]);
 
-  const abortControllerRef = useRef<AbortController | null>(null);
-
   // --- AI Interaction Hook ---
-  // const { performAiStream, performImageGeneration } = useAiInteraction({
   const { performAiStream } = useAiInteraction({
     selectedModel,
     selectedProvider,
@@ -614,7 +618,6 @@ Really delete everything? Consider exporting first.`,
     setIsAiStreaming: coreChatActions.setIsStreaming,
     setError: coreChatActions.setError,
     addDbMessage: coreChatActions.addDbMessage,
-    // abortControllerRef,
     getContextSnapshotForMod,
     bulkAddMessages: coreChatActions.bulkAddMessages,
   });
@@ -771,14 +774,12 @@ Really delete everything? Consider exporting first.`,
       }
     },
     [
-      coreChatActions.handleSubmitCore,
-      coreChatActions.startWorkflowCore,
-      coreChatActions.handleImageGenerationCore,
+      coreChatActions, // Added dependency
       performAiStream,
       getContextSnapshotForMod,
       getApiKeyForProvider,
-      dbProviderConfigs, // Add dependency
-      apiKeys,
+      dbProviderConfigs,
+      // apiKeys,
       clearAllInput,
     ],
   );
@@ -805,23 +806,15 @@ Really delete everything? Consider exporting first.`,
         console.error("Error in handleImageGenerationWrapper:", err);
       }
     },
-    [coreChatActions.handleImageGenerationCore],
+    [coreChatActions], // Added dependency
   );
 
   const stopStreaming = useCallback(
     (parentMessageId: string | null = null) => {
       coreChatActions.stopStreamingCore(parentMessageId);
-      setTimeout(() => {
-        if (
-          !useCoreChatStore.getState().isStreaming &&
-          abortControllerRef.current
-        ) {
-          console.log("[useLiteChatLogic] Clearing global abort ref.");
-          abortControllerRef.current = null;
-        }
-      }, 0);
+      // The abortControllerRef is now managed internally by the store/hook
     },
-    [coreChatActions.stopStreamingCore],
+    [coreChatActions], // Added dependency
   );
 
   const regenerateMessage = useCallback(
@@ -978,14 +971,13 @@ Really delete everything? Consider exporting first.`,
       }
     },
     [
-      coreChatActions.regenerateMessageCore,
-      coreChatActions.startWorkflowCore,
+      coreChatActions, // Added dependency
       performAiStream,
       handleImageGenerationWrapper,
       getContextSnapshotForMod,
       getApiKeyForProvider,
       dbProviderConfigs,
-      apiKeys,
+      // apiKeys,
     ],
   );
 
