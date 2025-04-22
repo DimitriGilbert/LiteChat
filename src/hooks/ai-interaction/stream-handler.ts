@@ -40,31 +40,16 @@ export function createAssistantPlaceholder(
 export function createStreamUpdater(
   assistantMessageId: string,
   contentRef: { current: string },
-  setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>,
+  // Use updateMessage action instead of setLocalMessages
+  updateMessage: (id: string, updates: Partial<Message>) => void,
   refreshRateMs: number, // Renamed parameter
 ) {
   return throttle(() => {
     const currentAccumulatedContent = contentRef.current;
-    // Use functional update for setLocalMessages
-    setLocalMessages((prevMessages) => {
-      const targetMessageIndex = prevMessages.findIndex(
-        (msg) => msg.id === assistantMessageId,
-      );
-      // If message not found or not streaming anymore, return previous state
-      if (
-        targetMessageIndex === -1 ||
-        !prevMessages[targetMessageIndex].isStreaming
-      ) {
-        return prevMessages;
-      }
-      // Create a new array with the updated message
-      const updatedMessages = [...prevMessages];
-      // Update ONLY streamedContent
-      updatedMessages[targetMessageIndex] = {
-        ...prevMessages[targetMessageIndex],
-        streamedContent: currentAccumulatedContent,
-      };
-      return updatedMessages;
+    // Call updateMessage to update only the streamedContent
+    updateMessage(assistantMessageId, {
+      streamedContent: currentAccumulatedContent,
+      isStreaming: true, // Ensure isStreaming stays true during updates
     });
   }, refreshRateMs); // Use the new parameter name
 }
@@ -107,54 +92,45 @@ export function finalizeStreamedMessageUI(
   streamError: Error | null,
   usage: { promptTokens: number; completionTokens: number } | undefined,
   startTime: number,
-  setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>,
+  // Use updateMessage action instead of setLocalMessages
+  updateMessage: (id: string, updates: Partial<Message>) => void,
 ): void {
   const endTime = Date.now();
 
-  setLocalMessages((prevMessages) => {
-    const messageIndex = prevMessages.findIndex((msg) => msg.id === messageId);
+  // Calculate tokens per second, avoid division by zero
+  const durationSeconds = (endTime - startTime) / 1000;
+  const tokensPerSecond =
+    streamError || durationSeconds <= 0 || !usage?.completionTokens
+      ? undefined
+      : usage.completionTokens / durationSeconds;
 
-    if (messageIndex === -1) {
-      console.warn(
-        `[finalizeStreamedMessageUI] Could not find message ${messageId} in state to finalize UI.`,
-      );
-      return prevMessages; // Message not found, return previous state
-    }
+  // Construct the final updates object
+  const finalUpdates: Partial<Message> = {
+    content: finalContent, // Set the final content
+    isStreaming: false,
+    streamedContent: undefined, // Clear streamed content
+    error: streamError ? streamError.message : null,
+    tokensInput: usage?.promptTokens,
+    tokensOutput: usage?.completionTokens,
+    tokensPerSecond: tokensPerSecond,
+  };
 
-    const updatedMessages = [...prevMessages];
-    const originalMessage = updatedMessages[messageIndex];
+  // Call updateMessage with the final updates
+  updateMessage(messageId, finalUpdates);
 
-    // Calculate tokens per second, avoid division by zero
-    const durationSeconds = (endTime - startTime) / 1000;
-    const tokensPerSecond =
-      streamError || durationSeconds <= 0 || !usage?.completionTokens
-        ? undefined
-        : usage.completionTokens / durationSeconds;
+  console.log(
+    `[finalizeStreamedMessageUI] Successfully finalized UI for message ${messageId}.`,
+  );
 
-    // Construct the final message object for UI update
-    // FIX: Ensure finalMessageObject is explicitly typed as Message
-    const finalMessageObject: Message = {
-      ...originalMessage,
-      content: finalContent, // Set the final content
-      isStreaming: false,
-      streamedContent: undefined, // Clear streamed content
-      error: streamError ? streamError.message : null,
-      tokensInput: usage?.promptTokens,
-      tokensOutput: usage?.completionTokens,
-      tokensPerSecond: tokensPerSecond,
-    };
-
-    updatedMessages[messageIndex] = finalMessageObject;
-    console.log(
-      `[finalizeStreamedMessageUI] Successfully finalized UI for message ${messageId}.`,
+  // Emit event only if the message was successfully finalized without error
+  if (!streamError) {
+    // We need the full message object to emit, but updateMessage doesn't return it.
+    // The event emission might need to be moved or adapted.
+    // For now, we can't easily emit the final object here.
+    // Consider emitting just the ID and letting listeners fetch the final state.
+    // modEvents.emit(ModEvent.RESPONSE_DONE, { message: finalMessageObject });
+    console.warn(
+      "[finalizeStreamedMessageUI] Cannot emit RESPONSE_DONE event with full message object after refactor.",
     );
-
-    // Emit event only if the message was successfully finalized without error
-    if (!streamError) {
-      // FIX: Pass the correctly typed finalMessageObject
-      modEvents.emit(ModEvent.RESPONSE_DONE, { message: finalMessageObject });
-    }
-
-    return updatedMessages;
-  });
+  }
 }

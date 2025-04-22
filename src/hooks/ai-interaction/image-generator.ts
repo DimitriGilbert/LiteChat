@@ -34,7 +34,9 @@ export async function performImageGeneration({
   selectedModel,
   selectedProvider,
   getApiKeyForProvider,
-  setLocalMessages, // This should ideally be replaced by store actions if possible
+  // Use addMessage and updateMessage instead of setLocalMessages
+  addMessage,
+  updateMessage,
   setIsAiStreaming, // Type now matches Zustand setter: (isStreaming: boolean) => void
   setError,
   addDbMessage,
@@ -89,8 +91,8 @@ export async function performImageGeneration({
     modelId: modelId,
   };
 
-  // TODO: Replace setLocalMessages with store action if possible
-  setLocalMessages((prev) => [...prev, placeholderMessage]);
+  // Add the placeholder message using the store action
+  addMessage(placeholderMessage);
 
   try {
     const { images, warnings } = await generateImage({
@@ -115,10 +117,10 @@ export async function performImageGeneration({
       mediaType: img.mimeType ?? "image/png",
     }));
 
+    // Prepare the final message data (used for both UI update and DB save)
     const finalImageMessageData: Message = {
       id: placeholderId,
       role: "assistant" as Role,
-      // Assign the correctly typed imageParts array
       content: imageParts,
       createdAt: placeholderTimestamp,
       conversationId: conversationIdToUse,
@@ -128,25 +130,28 @@ export async function performImageGeneration({
       modelId: modelId,
     };
 
-    // TODO: Replace setLocalMessages with store action if possible
-    setLocalMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === placeholderId ? finalImageMessageData : msg,
-      ),
-    );
+    // Update the placeholder message in the UI using the store action
+    updateMessage(placeholderId, {
+      content: finalImageMessageData.content,
+      isStreaming: false,
+      error: null,
+      // Keep other fields like providerId, modelId if needed
+    });
 
     try {
       const dbMessageToSave: DbMessage = {
         id: finalImageMessageData.id,
         conversationId: finalImageMessageData.conversationId as string,
         role: finalImageMessageData.role,
-        // Assign the correctly typed imageParts array
         content: finalImageMessageData.content as MessageContent,
         createdAt: placeholderTimestamp,
+        providerId: providerId, // Save provider/model if schema allows
+        modelId: modelId,
       };
 
       await addDbMessage(dbMessageToSave as DbMessage);
       console.log("Saved image generation message to DB:", placeholderId);
+      // Emit event with the final data
       modEvents.emit(ModEvent.RESPONSE_DONE, {
         message: finalImageMessageData,
       });
@@ -155,67 +160,43 @@ export async function performImageGeneration({
       console.error("Failed to save image generation message:", dbErr);
       setError(`Error saving image: ${dbErrorMessage}`);
       toast.error(`Failed to save image: ${dbErrorMessage}`);
-      // TODO: Replace setLocalMessages with store action if possible
-      setLocalMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === placeholderId
-            ? { ...msg, error: dbErrorMessage, isStreaming: false }
-            : msg,
-        ),
-      );
+      // Update the UI message with the error
+      updateMessage(placeholderId, {
+        error: dbErrorMessage,
+        isStreaming: false,
+      });
       return { error: dbErrorMessage, warnings };
     }
 
     return { images: imageParts, warnings };
   } catch (err: unknown) {
+    let errorMessage: string;
+    let finalContent: string = ""; // Keep content empty on error
+
     if ((err as any)?.name === "AbortError") {
+      errorMessage = "Cancelled by user.";
+      finalContent = "Image generation cancelled.";
       console.log("Image generation aborted.");
       toast.info("Image generation stopped.");
-      // TODO: Replace setLocalMessages with store action if possible
-      setLocalMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === placeholderId
-            ? {
-                ...msg,
-                content: "Image generation cancelled.",
-                isStreaming: false,
-                error: "Cancelled by user.",
-              }
-            : msg,
-        ),
-      );
-      return { error: "Cancelled by user." };
     } else {
       const error = err instanceof Error ? err : new Error(String(err));
-      const errorMessage = `Image generation failed: ${error.message}`;
+      errorMessage = `Image generation failed: ${error.message}`;
       setError(errorMessage);
       toast.error(errorMessage);
-      // TODO: Replace setLocalMessages with store action if possible
-      setLocalMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === placeholderId
-            ? {
-                ...msg,
-                error: errorMessage,
-                isStreaming: false,
-                content: "", // Keep content empty on error
-              }
-            : msg,
-        ),
-      );
-      return { error: errorMessage };
     }
+
+    // Update the UI message with the error
+    updateMessage(placeholderId, {
+      content: finalContent, // Update content for cancellation case
+      error: errorMessage,
+      isStreaming: false,
+    });
+    return { error: errorMessage };
   } finally {
     if (abortControllerRef.current === currentAbortController)
       abortControllerRef.current = null;
     setIsAiStreaming(false); // Call the Zustand setter
-    // TODO: Replace setLocalMessages with store action if possible
-    setLocalMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === placeholderId && msg.isStreaming
-          ? { ...msg, isStreaming: false }
-          : msg,
-      ),
-    );
+    // Ensure streaming is false even if update didn't happen before finally
+    updateMessage(placeholderId, { isStreaming: false });
   }
 }

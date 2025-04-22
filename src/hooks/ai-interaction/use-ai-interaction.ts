@@ -50,7 +50,9 @@ export function useAiInteraction({
   selectedProvider,
   getApiKeyForProvider,
   streamingRefreshRateMs, // Use the new prop name
-  setLocalMessages,
+  // Destructure addMessage and updateMessage instead of setLocalMessages
+  addMessage,
+  updateMessage,
   setIsAiStreaming, // This is the function passed from the store action
   setError,
   addDbMessage,
@@ -143,12 +145,14 @@ export function useAiInteraction({
         modelId: currentSelectedModel.id,
         conversationId: conversationIdToUse,
       };
-      setLocalMessages((prev) => [...prev, assistantPlaceholder]);
+      // Use addMessage for the placeholder
+      addMessage(assistantPlaceholder);
 
       const throttledUpdate = createStreamUpdater(
         assistantMessageId,
         contentRef,
-        setLocalMessages,
+        // Pass updateMessage to the updater
+        updateMessage,
         streamingRefreshRateMs, // Use the new prop name
       );
 
@@ -239,7 +243,7 @@ export function useAiInteraction({
                 toolCallId: toolResult.toolCallId,
                 toolName: toolResult.toolName,
                 result: toolResult.result,
-                isError: false,
+                isError: false, // Assuming success for now
               };
               const toolResultMessage: Message = {
                 id: nanoid(),
@@ -264,7 +268,8 @@ export function useAiInteraction({
               });
             });
 
-            setLocalMessages((prev) => [...prev, ...toolResultMessages]);
+            // Add tool result messages to UI
+            toolResultMessages.forEach(addMessage);
 
             try {
               await bulkAddMessages(toolResultDbMessages);
@@ -276,12 +281,9 @@ export function useAiInteraction({
               console.error("Failed to save tool result messages:", dbErr);
               toast.error("Failed to save tool results.");
               const errorMsg = `DB save failed: ${dbErr instanceof Error ? dbErr.message : "Unknown"}`;
-              setLocalMessages((prev) =>
-                prev.map((msg) =>
-                  toolResultMessages.find((trm) => trm.id === msg.id)
-                    ? { ...msg, error: errorMsg }
-                    : msg,
-                ),
+              // Update UI messages with error
+              toolResultMessages.forEach((trm) =>
+                updateMessage(trm.id, { error: errorMsg }),
               );
             }
           }
@@ -318,7 +320,8 @@ export function useAiInteraction({
           streamError,
           finalUsage,
           startTime,
-          setLocalMessages,
+          // Pass updateMessage to finalize UI
+          updateMessage,
         );
 
         const placeholderData = placeholderRef.current;
@@ -365,6 +368,8 @@ export function useAiInteraction({
                 : undefined,
             tokensInput: finalUsage?.promptTokens,
             tokensOutput: finalUsage?.completionTokens,
+            providerId: placeholderData.providerId, // Save provider/model if schema allows
+            modelId: placeholderData.modelId,
           };
 
           try {
@@ -378,13 +383,8 @@ export function useAiInteraction({
             console.error("Failed to save final assistant message:", dbErr);
             setError(`Error saving response: ${dbErrorMessage}`);
             toast.error(`Failed to save response: ${dbErrorMessage}`);
-            setLocalMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === placeholderData.id
-                  ? { ...msg, error: dbErrorMessage }
-                  : msg,
-              ),
-            );
+            // Update UI message with error
+            updateMessage(placeholderData.id, { error: dbErrorMessage });
           }
         } else if (streamError) {
           console.log(
@@ -405,12 +405,14 @@ export function useAiInteraction({
       selectedProvider,
       getApiKeyForProvider,
       streamingRefreshRateMs, // Use the new prop name
-      setLocalMessages,
+      // Use addMessage and updateMessage instead of setLocalMessages
+      addMessage,
+      updateMessage,
       setIsAiStreaming,
       setError,
       addDbMessage,
       abortControllerRef,
-      // getContextSnapshotForMod,
+      getContextSnapshotForMod,
       bulkAddMessages,
       sdkTools,
     ],
@@ -424,7 +426,9 @@ export function useAiInteraction({
         | "selectedModel"
         | "selectedProvider"
         | "getApiKeyForProvider"
-        | "setLocalMessages"
+        // | "setLocalMessages" // Removed
+        | "addMessage" // Added
+        | "updateMessage" // Added
         | "setIsAiStreaming"
         | "setError"
         | "addDbMessage"
@@ -440,7 +444,9 @@ export function useAiInteraction({
         selectedModel: currentSelectedModel,
         selectedProvider: currentSelectedProvider,
         getApiKeyForProvider: apiKeyGetter,
-        setLocalMessages: setLocalMessages,
+        // Pass addMessage and updateMessage
+        addMessage: addMessage,
+        updateMessage: updateMessage,
         setIsAiStreaming: setIsAiStreaming, // Pass the function directly
         setError: setError,
         addDbMessage: addDbMessage,
@@ -451,7 +457,9 @@ export function useAiInteraction({
       selectedModel,
       selectedProvider,
       getApiKeyForProvider,
-      setLocalMessages,
+      // Add addMessage and updateMessage as dependencies
+      addMessage,
+      updateMessage,
       setIsAiStreaming, // Add as dependency
       setError,
       addDbMessage,

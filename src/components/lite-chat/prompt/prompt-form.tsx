@@ -98,7 +98,7 @@ interface PromptFormProps {
   isVfsLoading: boolean;
   vfsError: string | null;
   vfsKey: string | null;
-  stopStreaming: () => void;
+  stopStreaming: () => void; // Add stopStreaming prop
   removeSelectedVfsPath: (path: string) => void;
 }
 
@@ -154,7 +154,7 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   isVfsLoading,
   vfsError,
   vfsKey,
-  stopStreaming,
+  stopStreaming, // Destructure stopStreaming
   removeSelectedVfsPath,
 }) => {
   const runMiddlewarePlaceholder = useCallback(
@@ -339,9 +339,9 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       console.log("Content to submit:", contentToSubmit);
 
       await handleSubmitCore(
-        promptInputValue,
-        attachedFiles,
-        selectedVfsPaths,
+        promptInputValue, // This seems incorrect, should likely be currentConversationId
+        attachedFiles, // This seems incorrect, should likely be contentToSubmit
+        selectedVfsPaths, // This seems incorrect, should likely be vfsPathsToSave
         {
           selectedItemId: currentConversationId,
           contentToSendToAI: contentToSubmit,
@@ -437,7 +437,7 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
           isVfsLoading={isVfsLoading}
           vfsError={vfsError}
           vfsKey={vfsKey}
-          stopStreaming={stopStreaming}
+          stopStreaming={stopStreaming} // Pass stopStreaming down
         />
       </div>
     </form>

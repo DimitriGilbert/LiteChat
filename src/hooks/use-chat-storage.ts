@@ -229,7 +229,7 @@ export function useChatStorage() {
   const addDbMessage = useCallback(
     async (
       // Accept the potentially complex MessageContent type for 'content'
-      // and new optional fields like tool_call_id, tool_calls, children, workflow
+      // and new optional fields like tool_call_id, tool_calls, children, workflow, providerId, modelId
       messageData: Omit<DbMessage, "id" | "createdAt"> &
         Partial<Pick<DbMessage, "id" | "createdAt">>,
     ): Promise<string> => {
@@ -250,11 +250,17 @@ export function useChatStorage() {
         children: messageData.children ?? undefined,
         // Include workflow if provided
         workflow: messageData.workflow ?? undefined,
+        // Include provider/model if provided
+        providerId: messageData.providerId ?? undefined,
+        modelId: messageData.modelId ?? undefined,
+        // Include tokens if provided
+        tokensInput: messageData.tokensInput ?? undefined,
+        tokensOutput: messageData.tokensOutput ?? undefined,
       };
       const conversation = await db.conversations.get(
         messageData.conversationId,
       );
-      // Dexie handles storing the object/array structure, including children and workflow
+      // Dexie handles storing the object/array structure
       await db.messages.add(newMessage);
       const now = new Date();
       await db.conversations.update(messageData.conversationId, {
@@ -313,7 +319,7 @@ export function useChatStorage() {
   const bulkAddMessages = useCallback(
     async (messages: DbMessage[]): Promise<unknown> => {
       if (messages.length === 0) return;
-      // Dexie handles bulk adding objects with complex fields, including children and workflow
+      // Dexie handles bulk adding objects with complex fields
       // Ensure conversation timestamp is updated based on the latest message
       const latestMessage = messages.reduce((latest, current) =>
         latest.createdAt > current.createdAt ? latest : current,

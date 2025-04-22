@@ -68,7 +68,7 @@ interface PromptSettingsAdvancedProps {
     id: string,
     changes: Partial<DbProviderConfig>,
   ) => Promise<void>;
-  stopStreaming: () => void;
+  stopStreaming: () => void; // Add stopStreaming prop
 }
 
 const PromptSettingsAdvancedComponent: React.FC<
@@ -105,6 +105,7 @@ const PromptSettingsAdvancedComponent: React.FC<
   dbProviderConfigs,
   apiKeys,
   updateDbProviderConfig,
+  stopStreaming, // Destructure stopStreaming (currently unused in this component)
 }) => {
   const [localConvoSystemPrompt, setLocalConvoSystemPrompt] = useState<
     string | null

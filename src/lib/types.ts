@@ -115,6 +115,10 @@ export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {
   children?: Message[]; // Added for sub-messages
   /** Optional field to describe and track a workflow */
   workflow?: Workflow; // Added workflow field
+  /** Optional: ID of the provider used for this message */
+  providerId?: string | null; // Added providerId
+  /** Optional: ID of the model used for this message */
+  modelId?: string | null; // Added modelId
 }
 
 export interface DbApiKey extends Pick<DbBase, "id" | "createdAt"> {
@@ -160,8 +164,8 @@ export interface Message {
   streamedContent?: string;
   error?: string | null;
   vfsContextPaths?: string[];
-  providerId?: string | null;
-  modelId?: string | null;
+  providerId?: string | null; // Already present in UI type
+  modelId?: string | null; // Already present in UI type
   tokensInput?: number;
   tokensOutput?: number;
   tokensPerSecond?: number;

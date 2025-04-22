@@ -27,30 +27,43 @@ export class ChatDatabase extends Dexie {
 
   constructor() {
     super("LiteChatDatabase");
-    // Increment version number for the schema change (adding 'workflow' to messages)
-    this.version(11).stores({
+    // Increment version number for the schema change (adding providerId, modelId to messages)
+    this.version(12).stores({
       // Keep previous definitions
       providerConfigs:
         "++id, &name, type, apiKeyId, isEnabled, autoFetchModels, modelsLastFetchedAt, createdAt, updatedAt",
       mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
       projects: "++id, name, parentId, createdAt, updatedAt",
       conversations: "id, parentId, createdAt, updatedAt",
-      // Add 'workflow' to the messages schema string. It's not indexed.
+      // Add 'providerId', 'modelId' to the messages schema string. They are not indexed.
+      messages:
+        "id, conversationId, createdAt, role, tool_call_id, children, workflow, providerId, modelId, [conversationId+createdAt]",
+      apiKeys: "id, name, providerId, createdAt",
+      appState: "&key",
+    });
+    // No upgrade needed for v11 -> v12 as we are just adding non-indexed fields
+
+    // --- Keep previous version definitions ---
+    this.version(11).stores({
+      providerConfigs:
+        "++id, &name, type, apiKeyId, isEnabled, autoFetchModels, modelsLastFetchedAt, createdAt, updatedAt",
+      mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
+      projects: "++id, name, parentId, createdAt, updatedAt",
+      conversations: "id, parentId, createdAt, updatedAt",
+      // Schema for v11 (with 'children', 'workflow', without provider/model)
       messages:
         "id, conversationId, createdAt, role, tool_call_id, children, workflow, [conversationId+createdAt]",
       apiKeys: "id, name, providerId, createdAt",
       appState: "&key",
     });
-    // No upgrade needed for v10 -> v11 as we are just adding a non-indexed field ('workflow')
 
-    // --- Keep previous version definitions ---
     this.version(10).stores({
       providerConfigs:
         "++id, &name, type, apiKeyId, isEnabled, autoFetchModels, modelsLastFetchedAt, createdAt, updatedAt",
       mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
       projects: "++id, name, parentId, createdAt, updatedAt",
       conversations: "id, parentId, createdAt, updatedAt",
-      // Schema for v10 (with 'children', without 'workflow')
+      // Schema for v10 (with 'children', without 'workflow', provider/model)
       messages:
         "id, conversationId, createdAt, role, tool_call_id, children, [conversationId+createdAt]",
       apiKeys: "id, name, providerId, createdAt",
@@ -63,7 +76,7 @@ export class ChatDatabase extends Dexie {
       mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
       projects: "++id, name, parentId, createdAt, updatedAt",
       conversations: "id, parentId, createdAt, updatedAt",
-      // Schema for v9 (without 'children', without 'workflow')
+      // Schema for v9 (without 'children', 'workflow', provider/model)
       messages:
         "id, conversationId, createdAt, role, tool_call_id, [conversationId+createdAt]",
       apiKeys: "id, name, providerId, createdAt",

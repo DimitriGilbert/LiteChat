@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
+import { Dexie } from "dexie"; // Import Dexie
 import {
   Message,
   DbMessage,
@@ -12,7 +13,6 @@ import {
 } from "@/lib/types";
 import { db } from "@/lib/db";
 import { convertDbMessagesToCoreMessages } from "@/utils/chat-utils";
-import Dexie from "dexie";
 
 export interface CoreChatState {
   messages: Message[];
@@ -131,7 +131,7 @@ export const useCoreChatStore = create(
           )
           .sortBy("createdAt");
 
-        // Map DbMessage to Message, including children and workflow
+        // Map DbMessage to Message, including children, workflow, providerId, modelId
         const uiMessages: Message[] = dbMessages.map((dbMsg) => ({
           id: dbMsg.id,
           role: dbMsg.role,
@@ -145,6 +145,8 @@ export const useCoreChatStore = create(
           tokensOutput: dbMsg.tokensOutput,
           children: dbMsg.children, // Map children
           workflow: dbMsg.workflow, // Map workflow
+          providerId: dbMsg.providerId, // Map providerId
+          modelId: dbMsg.modelId, // Map modelId
           // Initialize UI-only fields
           isStreaming: false,
           error: null,
@@ -171,7 +173,7 @@ export const useCoreChatStore = create(
       // This function now primarily relies on the useChatStorage hook's implementation
       // but we keep it here as an action for consistency if needed elsewhere.
       // The actual saving logic is in useChatStorage.
-      // We just need to ensure the workflow field is passed through if present.
+      // We just need to ensure the new fields are passed through if present.
       const newMessage: DbMessage = {
         id: messageData.id ?? nanoid(),
         createdAt: messageData.createdAt ?? new Date(),
@@ -182,7 +184,11 @@ export const useCoreChatStore = create(
         tool_calls: messageData.tool_calls,
         tool_call_id: messageData.tool_call_id,
         children: messageData.children,
-        workflow: messageData.workflow, // Pass workflow field
+        workflow: messageData.workflow,
+        providerId: messageData.providerId, // Pass providerId
+        modelId: messageData.modelId, // Pass modelId
+        tokensInput: messageData.tokensInput,
+        tokensOutput: messageData.tokensOutput,
       };
       await db.messages.add(newMessage);
       await db.conversations.update(newMessage.conversationId, {
@@ -193,7 +199,7 @@ export const useCoreChatStore = create(
 
     bulkAddMessages: async (messages) => {
       // Similar to addDbMessage, relies on useChatStorage implementation.
-      // Ensures workflow field is handled by Dexie during bulkAdd.
+      // Ensures new fields are handled by Dexie during bulkAdd.
       if (messages.length === 0) return;
       const latestMessage = messages.reduce((latest, current) =>
         latest.createdAt > current.createdAt ? latest : current,
@@ -244,6 +250,7 @@ export const useCoreChatStore = create(
           content: userMessage.content,
           createdAt: userMessage.createdAt,
           vfsContextPaths: userMessage.vfsContextPaths,
+          // User messages don't have provider/model directly
         });
       } catch (dbErr) {
         const errorMsg = `Failed to save your message: ${dbErr instanceof Error ? dbErr.message : "Unknown DB error"}`;

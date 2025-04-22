@@ -114,7 +114,7 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
   isVfsLoading,
   vfsError,
   vfsKey,
-  stopStreaming,
+  stopStreaming, // Destructure stopStreaming
 }) => {
   const [isAdvancedPanelOpen, setIsAdvancedPanelOpen] = useState(false);
   const [advancedInitialTab, setAdvancedInitialTab] =
@@ -382,7 +382,7 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
           dbProviderConfigs={dbProviderConfigs}
           apiKeys={apiKeys}
           updateDbProviderConfig={updateDbProviderConfig}
-          stopStreaming={stopStreaming}
+          stopStreaming={stopStreaming} // Pass stopStreaming down
         />
       )}
     </div>

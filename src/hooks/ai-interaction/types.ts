@@ -17,7 +17,9 @@ export interface UseAiInteractionProps {
   getApiKeyForProvider: () => string | undefined;
   /** Refresh rate for UI updates during AI response streaming (in milliseconds). */
   streamingRefreshRateMs: number;
-  setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  // REMOVED: setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  addMessage: (message: Message) => void; // Added
+  updateMessage: (id: string, updates: Partial<Message>) => void; // Added
   setIsAiStreaming: (isStreaming: boolean) => void;
   setError: (error: string | null) => void;
   // DB function passed directly
@@ -54,7 +56,9 @@ export interface PerformImageGenerationParams {
   selectedModel: AiModelConfig | undefined; // Pass the model object
   selectedProvider: AiProviderConfig | undefined; // Pass the provider object
   getApiKeyForProvider: () => string | undefined;
-  setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  // REMOVED: setLocalMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  addMessage: (message: Message) => void; // Added
+  updateMessage: (id: string, updates: Partial<Message>) => void; // Added
   // FIX: Ensure type matches Zustand setter signature
   setIsAiStreaming: (isStreaming: boolean) => void;
   setError: (error: string | null) => void;
@@ -77,7 +81,9 @@ export interface UseAiInteractionReturn {
       | "selectedModel"
       | "selectedProvider"
       | "getApiKeyForProvider"
-      | "setLocalMessages"
+      // | "setLocalMessages" // Removed
+      | "addMessage" // Added
+      | "updateMessage" // Added
       | "setIsAiStreaming"
       | "setError"
       | "addDbMessage"

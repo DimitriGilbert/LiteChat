@@ -66,6 +66,8 @@ interface UseLiteChatLogicReturn {
   coreChatActions: Pick<
     CoreChatActions,
     | "setMessages"
+    | "addMessage" // Ensure addMessage is picked
+    | "updateMessage" // Ensure updateMessage is picked
     | "setIsStreaming"
     | "setError"
     | "addDbMessage"
@@ -163,7 +165,7 @@ interface UseLiteChatLogicReturn {
     context: any,
   ) => Promise<void>;
   handleImageGenerationWrapper: (prompt: string) => Promise<void>;
-  stopStreaming: () => void;
+  stopStreaming: () => void; // Ensure stopStreaming is included
   regenerateMessage: (messageId: string) => Promise<void>;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   // Derived State
@@ -209,6 +211,8 @@ export function useLiteChatLogic(
   // Core Chat Actions (stable references)
   const {
     setMessages: setCoreMessages,
+    addMessage: coreAddMessage, // Get addMessage
+    updateMessage: coreUpdateMessage, // Get updateMessage
     setIsStreaming: setCoreIsStreaming,
     setError: setCoreError,
     addDbMessage: addCoreDbMessage,
@@ -219,8 +223,11 @@ export function useLiteChatLogic(
     regenerateMessageCore: coreRegenerateMessageCore,
   } = useCoreChatStore();
 
+  // Pick the necessary actions for the return type
   const coreChatActions: UseLiteChatLogicReturn["coreChatActions"] = {
     setMessages: setCoreMessages,
+    addMessage: coreAddMessage, // Include addMessage
+    updateMessage: coreUpdateMessage, // Include updateMessage
     setIsStreaming: setCoreIsStreaming,
     setError: setCoreError,
     addDbMessage: addCoreDbMessage,
@@ -530,6 +537,7 @@ Really delete everything? Consider exporting first.`,
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Pass the correct actions to useAiInteraction
   const { performAiStream, performImageGeneration } = useAiInteraction({
     selectedModel,
     selectedProvider,
@@ -537,8 +545,11 @@ Really delete everything? Consider exporting first.`,
       () => getApiKeyForProvider(providerState.selectedProviderId!),
       [getApiKeyForProvider, providerState.selectedProviderId],
     ),
-    streamingRefreshRateMs: settingsState.streamingRefreshRateMs, // Pass the new prop
-    setLocalMessages: setCoreMessages,
+    streamingRefreshRateMs: settingsState.streamingRefreshRateMs,
+    // Pass addMessage and updateMessage from the store actions
+    addMessage: coreAddMessage,
+    updateMessage: coreUpdateMessage,
+    // REMOVED: setLocalMessages: setCoreMessages, // This was the error source
     setIsAiStreaming: setCoreIsStreaming,
     setError: setCoreError,
     addDbMessage: addCoreDbMessage,
@@ -741,7 +752,7 @@ Really delete everything? Consider exporting first.`,
   return {
     // State & Actions
     sidebarActions,
-    coreChatActions,
+    coreChatActions, // Includes addMessage and updateMessage now
     vfsActions,
     providerActions,
     settingsActions,
@@ -760,7 +771,7 @@ Really delete everything? Consider exporting first.`,
     getAllAvailableModelDefs,
     handleFormSubmit,
     handleImageGenerationWrapper,
-    stopStreaming,
+    stopStreaming, // Include stopStreaming here
     regenerateMessage,
     getContextSnapshotForMod,
     // Derived State
