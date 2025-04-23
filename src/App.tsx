@@ -1,7 +1,6 @@
 // src/App.tsx
 import { LiteChat } from "./components/lite-chat/chat";
 import { Toaster } from "@/components/ui/sonner";
-
 import ErrorBoundary from "./components/error-boundary";
 
 function App() {

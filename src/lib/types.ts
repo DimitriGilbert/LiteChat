@@ -267,11 +267,13 @@ export interface LiteChatConfig {
   initialSelectedItemId?: string | null;
   initialSelectedItemType?: SidebarItemType | null;
   streamingRefreshRateMs?: number;
-  streamingThrottleRate?: number;
+  streamingThrottleRate?: number; // Note: This seems unused, consider removing later
   defaultSidebarOpen?: boolean;
   customPromptActions?: CustomPromptAction[];
   customMessageActions?: CustomMessageAction[];
   customSettingsTabs?: CustomSettingTab[];
+  /** ID of the DOM element to portal streaming content into. */
+  // streamingPortalId?: string; // Added
 }
 
 // --- Chat Context ---

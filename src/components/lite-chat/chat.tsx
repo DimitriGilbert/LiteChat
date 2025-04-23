@@ -1,6 +1,4 @@
 // src/components/lite-chat/chat.tsx
-// line 1
-
 import React, { useState, useMemo, useCallback, useEffect } from "react"; // Ensure useEffect is imported
 import ChatProviderInner from "@/context/chat-provider-inner";
 import { ChatSide } from "./chat/chat-side";
@@ -92,6 +90,8 @@ export const LiteChat: React.FC<LiteChatProps> = ({
         editingItemId={editingItemId}
         setEditingItemId={handleSetEditingItemId}
         onEditComplete={handleEditComplete}
+        // Pass portal ID from config
+        // streamingPortalId={config.streamingPortalId}
       />
     </ChatProviderInner>
   );
@@ -107,6 +107,7 @@ interface LiteChatInnerProps {
   editingItemId: string | null;
   setEditingItemId: (id: string | null) => void;
   onEditComplete: (id: string) => void;
+  // streamingPortalId?: string; // Added prop
 }
 
 const LiteChatInner: React.FC<LiteChatInnerProps> = ({
@@ -119,6 +120,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
   editingItemId,
   setEditingItemId,
   onEditComplete,
+  // streamingPortalId, // Added prop
 }) => {
   const { projects: dbProjects, conversations: dbConversations } =
     useChatStorage();
@@ -305,7 +307,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
           topK={settingsState.topK}
           presencePenalty={settingsState.presencePenalty}
           frequencyPenalty={settingsState.frequencyPenalty}
-          enableStreamingMarkdown={settingsState.enableStreamingMarkdown} // Added
+          enableStreamingMarkdown={settingsState.enableStreamingMarkdown}
           // Pass other necessary actions/data
           sidebarItems={sidebarItems} // Needed for ChatHeader
           searchTerm={settingsState.searchTerm} // Needed for ChatHeader
@@ -330,6 +332,8 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
           // Pass down necessary provider/api key data for PromptForm/Settings
           dbProviderConfigs={providerState.dbProviderConfigs}
           apiKeys={providerState.apiKeys}
+          // Pass portal ID down
+          // streamingPortalId={streamingPortalId}
         />
       </div>
     </div>

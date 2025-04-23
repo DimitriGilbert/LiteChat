@@ -3,13 +3,15 @@ import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
-import type { Message } from "@/lib/types";
-import { CodeBlock } from "@/components/lite-chat/code-block";
+import type { Message, ImagePart } from "@/lib/types"; // Added TextPart, ImagePart
 import { FileContextBlock } from "./file-context-block";
+// Import shared utils
+import { markdownComponents } from "./message-content-utils";
 
 interface MessageContentRendererProps {
   message: Message;
-  enableStreamingMarkdown: boolean; // Added
+  enableStreamingMarkdown: boolean;
+  // REMOVED: portalTargetId?: string;
 }
 
 const decodeXml = (encoded: string): string => {
@@ -26,91 +28,29 @@ const decodeXml = (encoded: string): string => {
   }
 };
 
-// Custom component renderer for paragraphs to handle potential block children
-const ParagraphRenderer = ({ children, ...props }: any) => {
-  // Check if children contain elements that shouldn't be nested in <p>
-  // This is a basic check; more complex checks might be needed for other block elements
-  const containsBlockElement = React.Children.toArray(children).some(
-    (child: any) =>
-      React.isValidElement(child) &&
-      (child.type === CodeBlock ||
-        child.type === FileContextBlock ||
-        child.type === "div"),
-  );
-
-  if (containsBlockElement) {
-    // Render as a div if it contains block-level elements
-    return (
-      <div {...props} className="my-3 leading-relaxed text-[15px]">
-        {children}
-      </div>
-    );
-  }
-
-  // Render as a p otherwise
-  return (
-    <p {...props} className="my-3 leading-relaxed text-[15px]">
-      {children}
-    </p>
-  );
-};
-
-// Define common markdown components
-const markdownComponents = {
-  code: CodeBlock,
-  p: ParagraphRenderer,
-  ul: ({ children, ...props }: any) => (
-    <ul {...props} className="my-3 list-disc list-inside pl-4">
-      {children}
-    </ul>
-  ),
-  ol: ({ children, ...props }: any) => (
-    <ol {...props} className="my-3 list-decimal list-inside pl-4">
-      {children}
-    </ol>
-  ),
-  li: ({ children, ...props }: any) => (
-    <li {...props} className="my-1">
-      {children}
-    </li>
-  ),
-};
+// REMOVED: Portal logic (useEffect, useState for portalNode)
+// REMOVED: StreamingContent component
 
 export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
   React.memo(({ message, enableStreamingMarkdown }) => {
-    const streamedContent = message.streamedContent ?? "";
-    const finalContent = message.content;
+    // Use streamedContent if streaming, otherwise final content
+    const contentToRender = message.isStreaming
+      ? (message.streamedContent ?? "")
+      : message.content;
+    const finalContent = message.content; // Keep reference to final content for type checks
 
-    if (message.isStreaming) {
-      return (
-        <div
-          className={cn(
-            "text-gray-200 text-sm whitespace-pre-wrap break-words",
-            // Apply prose styles only if markdown is enabled
-            enableStreamingMarkdown &&
-              "prose prose-sm prose-invert max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:mt-4 prose-headings:mb-2 prose-code:before:content-none prose-code:after:content-none prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-0",
-          )}
-        >
-          {enableStreamingMarkdown ? (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={markdownComponents} // Use common components
-            >
-              {streamedContent}
-            </ReactMarkdown>
-          ) : (
-            // Render as plain text within pre/code for whitespace preservation
-            <pre className="font-sans text-sm">
-              <code>{streamedContent}</code>
-            </pre>
-          )}
-          <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"></span>
-        </div>
-      );
-    }
+    // --- Render Logic (Handles both streaming and final) ---
 
-    if (message.role === "system" && !finalContent) {
+    // Handle empty content cases
+    if (message.role === "system" && !contentToRender) {
       return null;
+    }
+    // Render placeholder or nothing if streaming but no content yet
+    if (message.isStreaming && !contentToRender) {
+      // Render only the pulse indicator if streaming hasn't produced text yet
+      return (
+        <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"></span>
+      );
     }
 
     const extractFileContextBlocks = (content: string) => {
@@ -164,26 +104,12 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
     };
 
     const renderContent = () => {
-      if (typeof finalContent === "string") {
+      // Handle string content (potentially streaming or final)
+      if (typeof contentToRender === "string") {
         const { fileBlocks, contentParts } =
-          extractFileContextBlocks(finalContent);
+          extractFileContextBlocks(contentToRender);
 
-        if (
-          fileBlocks.length === 0 &&
-          contentParts.length === 1 &&
-          typeof contentParts[0] === "string"
-        ) {
-          return (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={markdownComponents} // Use common components
-            >
-              {contentParts[0]}
-            </ReactMarkdown>
-          );
-        }
-
-        return contentParts.map((part, index) => {
+        const elements = contentParts.map((part, index) => {
           if (typeof part === "number") {
             const block = fileBlocks[part];
             if (!block) return null;
@@ -201,40 +127,44 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
               />
             );
           } else {
-            return (
+            // Render markdown only if enabled OR if it's the final render
+            const shouldRenderMarkdown =
+              enableStreamingMarkdown || !message.isStreaming;
+            return shouldRenderMarkdown ? (
               <ReactMarkdown
                 key={`text-part-${index}`}
                 remarkPlugins={[remarkGfm]}
-                components={markdownComponents} // Use common components
+                components={markdownComponents}
               >
                 {part}
               </ReactMarkdown>
+            ) : (
+              <pre key={`text-part-${index}`} className="font-sans text-sm">
+                <code>{part}</code>
+              </pre>
             );
           }
         });
-      } else if (Array.isArray(finalContent)) {
-        return finalContent.map((part, index) => {
+
+        // Add pulse indicator if streaming
+        if (message.isStreaming) {
+          elements.push(
+            <span
+              key="pulse"
+              className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"
+            ></span>,
+          );
+        }
+        return elements;
+      }
+      // Handle array content (final render only, streaming uses streamedContent string)
+      else if (Array.isArray(contentToRender)) {
+        return contentToRender.map((part, index) => {
           if (part.type === "text") {
+            // Always render final text parts as markdown
             const { fileBlocks, contentParts } = extractFileContextBlocks(
               part.text,
             );
-
-            if (
-              fileBlocks.length === 0 &&
-              contentParts.length === 1 &&
-              typeof contentParts[0] === "string"
-            ) {
-              return (
-                <ReactMarkdown
-                  key={`text-part-${index}`}
-                  remarkPlugins={[remarkGfm]}
-                  components={markdownComponents} // Use common components
-                >
-                  {contentParts[0]}
-                </ReactMarkdown>
-              );
-            }
-
             return contentParts.map((subPart, subIndex) => {
               if (typeof subPart === "number") {
                 const block = fileBlocks[subPart];
@@ -257,7 +187,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                   <ReactMarkdown
                     key={`text-part-${index}-${subIndex}`}
                     remarkPlugins={[remarkGfm]}
-                    components={markdownComponents} // Use common components
+                    components={markdownComponents}
                   >
                     {subPart}
                   </ReactMarkdown>
@@ -313,22 +243,24 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
       return null;
     };
 
+    // Use finalContent (the original message.content) for the type check
     const isPurelyImages =
       Array.isArray(finalContent) &&
       finalContent.length > 0 &&
-      finalContent.every((part) => part.type === "image");
+      // Correctly check if every part is an ImagePart
+      finalContent.every((part): part is ImagePart => part.type === "image");
 
     return (
       <div
         className={cn(
-          "prose prose-sm prose-invert max-w-none",
-          "prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1",
-          "prose-headings:mt-4 prose-headings:mb-2",
-          "prose-code:before:content-none prose-code:after:content-none",
-          "prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-0",
+          // Apply prose styles only if markdown is enabled OR it's the final render
+          (enableStreamingMarkdown || !message.isStreaming) &&
+            "prose prose-sm prose-invert max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:mt-4 prose-headings:mb-2 prose-code:before:content-none prose-code:after:content-none prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-0",
+          // Base text styles apply always
+          "text-gray-200 text-sm whitespace-pre-wrap break-words",
           !isPurelyImages && "[&_img]:my-3",
-          isPurelyImages && "grid grid-cols-2 gap-2 not-prose",
-          "py-2",
+          isPurelyImages && "grid grid-cols-2 gap-2 not-prose", // Keep grid for final image rendering
+          "py-2", // Keep padding consistent
         )}
       >
         {renderContent()}

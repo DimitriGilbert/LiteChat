@@ -13,8 +13,8 @@ interface MessageBubbleProps {
   className?: string;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   modMessageActions: CustomMessageAction[];
-  level?: number; // Added level prop
-  enableStreamingMarkdown: boolean; // Added
+  level?: number;
+  enableStreamingMarkdown: boolean;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -23,8 +23,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   className,
   getContextSnapshotForMod,
   modMessageActions,
-  level = 0, // Default level to 0
-  enableStreamingMarkdown, // Added
+  level = 0,
+  enableStreamingMarkdown,
 }) => {
   const initialFoldState = message.role === "system" ? true : false;
   const [isMessageFolded, setIsMessageFolded] = useState(initialFoldState);
@@ -40,6 +40,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   // Calculate indentation based on level
   const indentationClass = `ml-${level * 4}`; // Example: ml-0, ml-4, ml-8 etc.
+
+  // Generate a unique ID for the portal target within this bubble
+  // This ID is now only used internally by MessageBody and MessageContentRenderer
+  const portalTargetId = `streaming-portal-${message.id}`;
 
   return (
     <div
@@ -68,7 +72,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         onRegenerate={onRegenerate} // Pass regenerate down if needed by children
         getContextSnapshotForMod={getContextSnapshotForMod} // Pass context snapshot down
         modMessageActions={modMessageActions} // Pass actions down
-        enableStreamingMarkdown={enableStreamingMarkdown} // Added
+        enableStreamingMarkdown={enableStreamingMarkdown}
+        portalTargetId={portalTargetId} // Pass the unique ID for the portal target
       />
       <MessageActionsContainer
         message={message}
@@ -80,6 +85,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   );
 };
 
+// Update the equality check to remove the portal ID comparison
 const messagesAreEqual = (
   prevProps: MessageBubbleProps,
   nextProps: MessageBubbleProps,
@@ -92,6 +98,7 @@ const messagesAreEqual = (
   // Check enableStreamingMarkdown prop
   if (prevProps.enableStreamingMarkdown !== nextProps.enableStreamingMarkdown)
     return false;
+  // REMOVED: Check streamingPortalId prop
 
   if (prevMsg === nextMsg) return true;
 
@@ -119,14 +126,18 @@ const messagesAreEqual = (
     }
   }
 
-  if (nextMsg.isStreaming) {
+  // Only compare streamedContent if the message IS streaming
+  if (nextMsg.isStreaming && prevMsg.isStreaming) {
     if (prevMsg.streamedContent !== nextMsg.streamedContent) {
       return false;
     }
-  } else {
+  }
+  // Compare final content only if NOT streaming
+  else if (!nextMsg.isStreaming && !prevMsg.isStreaming) {
     if (JSON.stringify(prevMsg.content) !== JSON.stringify(nextMsg.content)) {
       return false;
     }
+    // Compare other non-streaming fields
     if (
       JSON.stringify(prevMsg.tool_calls) !==
         JSON.stringify(nextMsg.tool_calls) ||
@@ -141,6 +152,9 @@ const messagesAreEqual = (
     ) {
       return false;
     }
+  } else {
+    // If one is streaming and the other isn't, they are different
+    return false;
   }
 
   if (
