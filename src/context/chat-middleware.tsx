@@ -1,5 +1,4 @@
-
-import { useCallback, useRef } from "react"; // Removed useState import
+import { useCallback, useRef } from "react";
 import { toast } from "sonner";
 import type { z } from "zod";
 import type {
@@ -9,7 +8,7 @@ import type {
   ModMiddlewareReturnMap,
   Tool,
   ToolImplementation,
-  ModEventPayloadMap, // Import ModEventPayloadMap
+  ModEventPayloadMap,
 } from "@/mods/types";
 import { loadMods } from "@/mods/loader";
 import { modEvents, ModEvent } from "@/mods/events";
@@ -25,8 +24,6 @@ import type {
 } from "@/lib/types";
 import { useModContext } from "./mod-context";
 
-
-
 interface RegistrationCallbacks {
   registerPromptAction: (action: CustomPromptAction) => () => void;
   registerMessageAction: (action: CustomMessageAction) => () => void;
@@ -36,15 +33,14 @@ interface RegistrationCallbacks {
     definition: Tool<PARAMETERS>,
     implementation?: ToolImplementation<PARAMETERS>,
   ) => () => void;
-  registerEventListener: <E extends keyof ModEventPayloadMap>( // Use imported ModEventPayloadMap
+  registerEventListener: <E extends keyof ModEventPayloadMap>(
     eventName: E,
-    callback: (payload: ModEventPayloadMap[E]) => void, // Use imported ModEventPayloadMap
+    callback: (payload: ModEventPayloadMap[E]) => void,
   ) => () => void;
-  // Update signature to include modId
   registerMiddleware: <H extends ModMiddlewareHookName>(
     hookName: H,
-    callback: MiddlewareCallback<H>, // Callback type remains the same
-    modId: string, // Add modId parameter
+    callback: MiddlewareCallback<H>,
+    modId: string,
   ) => () => void;
 }
 
@@ -68,9 +64,9 @@ export function useChatMiddleware(setError: (error: string | null) => void) {
   const modApiInstances = useRef<Map<string, LiteChatModApi>>(new Map());
 
   const registerEventListener = useCallback(
-    <E extends keyof ModEventPayloadMap>( // Use imported ModEventPayloadMap
+    <E extends keyof ModEventPayloadMap>(
       eventName: E,
-      callback: (payload: ModEventPayloadMap[E]) => void, // Use imported ModEventPayloadMap
+      callback: (payload: ModEventPayloadMap[E]) => void,
     ): (() => void) => {
       if (!eventListeners.current.has(eventName)) {
         eventListeners.current.set(eventName, new Set());
@@ -102,45 +98,36 @@ export function useChatMiddleware(setError: (error: string | null) => void) {
     ): Promise<ModInstance[]> => {
       clearModReferences();
 
-      // This definition now matches the updated interface in loader.ts
       const registrationCallbacks: RegistrationCallbacks = {
         registerPromptAction: modContext._registerModPromptAction,
         registerMessageAction: modContext._registerModMessageAction,
         registerSettingsTab: modContext._registerModSettingsTab,
         registerTool: modContext._registerModTool,
         registerEventListener: registerEventListener,
-        // This function is passed to createApiForMod in loader.ts
-        // It expects hookName, callback, and modId
         registerMiddleware: <H extends ModMiddlewareHookName>(
           hookName: H,
           callback: MiddlewareCallback<H>,
-          modId: string, // modId is now an expected parameter
+          modId: string,
         ) => {
           if (!middlewareRegistry.current[hookName]) {
-            // No assertion needed if MiddlewareRegistry type is correct
             middlewareRegistry.current[hookName] = [];
           }
-          // No assertion needed if MiddlewareRegistry type is correct
           const middlewareList = middlewareRegistry.current[hookName]!;
 
           const registration = { modId, callback };
           middlewareList.push(registration);
 
-          // Return the unsubscribe function
           return () => {
-            const list = middlewareRegistry.current[hookName];
-            if (list) {
-              // No assertion needed if MiddlewareRegistry type is correct
-              // @ts-expect-error we might need a fix for that, or not, I do not know
-              middlewareRegistry.current[hookName] = list.filter(
-                (reg) => reg !== registration,
-              );
+            const currentList = middlewareRegistry.current[hookName];
+            if (currentList) {
+              middlewareRegistry.current[hookName] = currentList.filter(
+                (reg) => reg.callback !== callback || reg.modId !== modId,
+              ) as any;
             }
           };
         },
       };
 
-      // FIX: No TS error here now as the types match
       const instances = await loadMods(
         dbMods,
         registrationCallbacks,
@@ -153,7 +140,6 @@ export function useChatMiddleware(setError: (error: string | null) => void) {
         }
       });
 
-      // Ensure APP_LOADED listeners are correctly handled
       const appLoadedListeners =
         eventListeners.current.get(ModEvent.APP_LOADED) ?? new Set();
       modEvents.on(ModEvent.APP_LOADED, () => {
@@ -171,7 +157,7 @@ export function useChatMiddleware(setError: (error: string | null) => void) {
       modContext._registerModSettingsTab,
       modContext._registerModTool,
       registerEventListener,
-    ], // Added missing dependencies from registrationCallbacks
+    ],
   );
 
   const runMiddleware = useCallback(
@@ -179,62 +165,38 @@ export function useChatMiddleware(setError: (error: string | null) => void) {
       hookName: H,
       initialPayload: ModMiddlewarePayloadMap[H],
     ): Promise<ModMiddlewareReturnMap[H]> => {
-      const callbacks = middlewareRegistry.current[hookName];
-      if (!callbacks || callbacks.length === 0) {
-        // FIX: Use 'as unknown as' for safer type assertion
-        // If no middleware runs, the initial payload is the result.
-        // The return type allows the payload type.
-        return initialPayload as unknown as ModMiddlewareReturnMap[H];
+      const callbacks = (middlewareRegistry.current[hookName] ?? []) as Array<{
+        modId: string;
+        callback: MiddlewareCallback<H>;
+      }>;
+
+      if (callbacks.length === 0) {
+        return initialPayload as any;
       }
 
       let currentPayload = initialPayload;
 
-      console.log(
-        `[Middleware] Running ${callbacks.length} middleware for hook ${hookName}`,
-      );
-
       for (const { modId, callback } of callbacks) {
         try {
-          console.log(`[Middleware] Executing ${hookName} for mod ${modId}`);
-          const result: ModMiddlewareReturnMap[H] =
-            await callback(currentPayload);
+          const result = await callback(currentPayload);
 
-          // Check for explicit cancellation first
           if (result === false) {
-            console.log(
-              `[Middleware] Mod ${modId} cancelled action for hook ${hookName}`,
-            );
-            // Return type allows boolean, so direct return is fine
-            return false;
+            return false as any;
           } else if (result === undefined || result === null) {
             // No change, continue with the current payload
-            console.warn(
-              `[Middleware] Mod ${modId} returned undefined/null for hook ${hookName}. Assuming no change.`,
-            );
           } else {
-            // FIX: Use 'as unknown as' for safer type assertion
-            // If not false/null/undefined, assume it's the modified payload
-            currentPayload = result as unknown as ModMiddlewarePayloadMap[H];
+            currentPayload = result as any;
           }
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          console.error(
-            `[Middleware] Error in mod ${modId} for hook ${hookName}:`,
-            error,
-          );
           toast.error(`Middleware error in mod ${modId}: ${errorMessage}`);
           setError(`Middleware error in mod ${modId}: ${errorMessage}`);
-          // Return false to indicate cancellation due to error
-          // Return type allows boolean, so direct return is fine
-          return false;
+          return false as any;
         }
       }
 
-      console.log(`[Middleware] Finished hook ${hookName}`);
-      // FIX: Use 'as unknown as' for safer type assertion
-      // The final payload is the result. Return type allows the payload type.
-      return currentPayload as unknown as ModMiddlewareReturnMap[H];
+      return currentPayload as any;
     },
     [setError],
   );

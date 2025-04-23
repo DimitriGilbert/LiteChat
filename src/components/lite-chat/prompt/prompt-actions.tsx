@@ -1,4 +1,3 @@
-
 import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { SendHorizonalIcon, PaperclipIcon, ImageIcon } from "lucide-react";
@@ -9,7 +8,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { AiModelConfig, CustomPromptAction } from "@/lib/types";
+import type {
+  AiModelConfig,
+  CustomPromptAction,
+  ReadonlyChatContextSnapshot,
+} from "@/lib/types";
 
 interface PromptActionsProps {
   className?: string;
@@ -19,7 +22,7 @@ interface PromptActionsProps {
   setPrompt: (value: string) => void;
   selectedModel: AiModelConfig | undefined;
   customPromptActions: CustomPromptAction[];
-  getContextSnapshot: () => any;
+  getContextSnapshot: () => ReadonlyChatContextSnapshot;
 }
 
 const PromptActionsComponent: React.FC<PromptActionsProps> = ({

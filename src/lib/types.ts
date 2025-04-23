@@ -1,3 +1,4 @@
+// src/lib/types.ts
 import React from "react";
 
 import type {
@@ -188,7 +189,7 @@ export type SidebarItem = ProjectSidebarItem | ConversationSidebarItem;
 export interface AiModelConfig {
   id: string;
   name: string;
-  instance: any;
+  instance: any; // Keeping 'any' for flexibility with different SDK provider instances
   contextWindow?: number;
   // Add flag to indicate image generation capability
   supportsImageGeneration?: boolean;
@@ -222,21 +223,29 @@ export interface CustomActionBase {
 }
 
 export interface CustomPromptAction extends CustomActionBase {
-  onClick: (context: ChatContextProps) => void;
+  // onClick should accept the Readonly Snapshot, not the full context
+  onClick: (context: ReadonlyChatContextSnapshot) => void;
 }
 
 export interface CustomMessageAction extends CustomActionBase {
-  onClick: (message: Message, context: ChatContextProps) => void;
-  isVisible?: (message: Message, context: ChatContextProps) => boolean;
+  // onClick should accept the Readonly Snapshot
+  onClick: (message: Message, context: ReadonlyChatContextSnapshot) => void;
+  // isVisible should also accept the Readonly Snapshot
+  isVisible?: (
+    message: Message,
+    context: ReadonlyChatContextSnapshot,
+  ) => boolean;
 }
 
+// Remove the context prop from CustomSettingTabProps
 export interface CustomSettingTabProps {
-  context: ChatContextProps;
+  // No context prop needed here anymore
 }
 
 export interface CustomSettingTab {
   id: string;
   title: string;
+  // The component should use hooks internally, not receive context via props
   component: React.ComponentType<CustomSettingTabProps>;
 }
 
@@ -303,6 +312,8 @@ export interface VfsContextObject {
 
 export type ReadonlyChatContextSnapshot = ModApiSnapshot;
 
+// This full context type might become less relevant as components
+// increasingly rely on specific hooks/stores, but keep it for now.
 export interface ChatContextProps {
   // --- Feature Flags (from Settings/ProviderMgmt) ---
   enableApiKeyManagement: boolean;
@@ -369,7 +380,7 @@ export interface ChatContextProps {
 
   // --- Messages & Streaming (from CoreChatContext) ---
   messages: Message[];
-  isLoading: boolean;
+  isLoading: boolean; // Combined loading state?
   isStreaming: boolean;
   error: string | null;
   setError: (error: string | null) => void;
@@ -407,9 +418,11 @@ export interface ChatContextProps {
   setFrequencyPenalty: React.Dispatch<React.SetStateAction<number | null>>;
   theme: "light" | "dark" | "system";
   setTheme: React.Dispatch<React.SetStateAction<"light" | "dark" | "system">>;
-  streamingThrottleRate: number;
+  streamingThrottleRate: number; // Renamed from streamingThrottleRateMs for consistency
   searchTerm: string;
   setSearchTerm: React.Dispatch<React.SetStateAction<string>>;
+  enableStreamingMarkdown: boolean; // Added
+  setEnableStreamingMarkdown: (enabled: boolean) => void; // Added
 
   // --- Import/Export & Data Management (from SidebarContext/Storage) ---
   exportConversation: (conversationId: string | null) => Promise<void>;
@@ -419,7 +432,7 @@ export interface ChatContextProps {
 
   // --- Virtual File System (from VfsContext) ---
   isVfsEnabledForItem: boolean;
-  toggleVfsEnabled: () => Promise<void>;
+  toggleVfsEnabled: () => Promise<void>; // Simplified signature if context knows selected item
   vfs: VfsContextObject;
 
   // --- DB Accessors (from Storage hook) ---
