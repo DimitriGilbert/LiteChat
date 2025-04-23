@@ -14,6 +14,7 @@ interface MessageBubbleProps {
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   modMessageActions: CustomMessageAction[];
   level?: number; // Added level prop
+  enableStreamingMarkdown: boolean; // Added
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -23,6 +24,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   getContextSnapshotForMod,
   modMessageActions,
   level = 0, // Default level to 0
+  enableStreamingMarkdown, // Added
 }) => {
   const initialFoldState = message.role === "system" ? true : false;
   const [isMessageFolded, setIsMessageFolded] = useState(initialFoldState);
@@ -66,6 +68,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         onRegenerate={onRegenerate} // Pass regenerate down if needed by children
         getContextSnapshotForMod={getContextSnapshotForMod} // Pass context snapshot down
         modMessageActions={modMessageActions} // Pass actions down
+        enableStreamingMarkdown={enableStreamingMarkdown} // Added
       />
       <MessageActionsContainer
         message={message}
@@ -86,6 +89,9 @@ const messagesAreEqual = (
 
   // Check level prop
   if (prevProps.level !== nextProps.level) return false;
+  // Check enableStreamingMarkdown prop
+  if (prevProps.enableStreamingMarkdown !== nextProps.enableStreamingMarkdown)
+    return false;
 
   if (prevMsg === nextMsg) return true;
 

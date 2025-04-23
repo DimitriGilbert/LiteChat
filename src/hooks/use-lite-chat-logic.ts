@@ -126,6 +126,7 @@ interface UseLiteChatLogicReturn {
     | "setFrequencyPenalty"
     | "setGlobalSystemPrompt"
     | "setStreamingRefreshRateMs"
+    | "setEnableStreamingMarkdown" // Added
   >;
   modActions: Pick<ModActions, "addDbMod" | "updateDbMod" | "deleteDbMod">;
   // Selection State
@@ -159,6 +160,7 @@ interface UseLiteChatLogicReturn {
     | "globalSystemPrompt"
     | "streamingRefreshRateMs"
     | "isSettingsModalOpen"
+    | "enableStreamingMarkdown" // Added
   >;
   modState: Pick<
     ModState,
@@ -364,6 +366,7 @@ export function useLiteChatLogic(
       setFrequencyPenalty: state.setFrequencyPenalty,
       setGlobalSystemPrompt: state.setGlobalSystemPrompt,
       setStreamingRefreshRateMs: state.setStreamingRefreshRateMs,
+      setEnableStreamingMarkdown: state.setEnableStreamingMarkdown, // Added
     })),
   );
   const settingsState = useSettingsStore(
@@ -380,6 +383,7 @@ export function useLiteChatLogic(
       globalSystemPrompt: state.globalSystemPrompt,
       streamingRefreshRateMs: state.streamingRefreshRateMs,
       isSettingsModalOpen: state.isSettingsModalOpen,
+      enableStreamingMarkdown: state.enableStreamingMarkdown, // Added
     })),
   );
 

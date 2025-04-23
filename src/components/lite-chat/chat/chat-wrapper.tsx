@@ -75,6 +75,7 @@ export interface ChatWrapperProps {
   topK: number | null;
   presencePenalty: number | null;
   frequencyPenalty: number | null;
+  enableStreamingMarkdown: boolean; // Added
   // Actions needed by children (Passed Down)
   // sidebarItems: SidebarItem[]; // Removed - Header fetches its own
   searchTerm: string; // For Header
@@ -150,6 +151,7 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
   topK,
   presencePenalty,
   frequencyPenalty,
+  enableStreamingMarkdown, // Added
   // sidebarItems, // Removed
   searchTerm,
   setSearchTerm,
@@ -194,6 +196,7 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
         regenerateMessage={regenerateMessage}
         getContextSnapshotForMod={getContextSnapshotForMod}
         modMessageActions={customMessageActions}
+        enableStreamingMarkdown={enableStreamingMarkdown} // Added
       />
       <PromptWrapper
         // Pass all remaining props down to PromptWrapper/PromptForm

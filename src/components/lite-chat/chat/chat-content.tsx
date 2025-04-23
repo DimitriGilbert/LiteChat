@@ -28,6 +28,7 @@ interface ChatContentProps {
   regenerateMessage: (messageId: string) => void;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   modMessageActions: CustomMessageAction[];
+  enableStreamingMarkdown: boolean; // Added
 }
 
 const SCROLL_THRESHOLD = 50;
@@ -40,6 +41,7 @@ const ChatContentComponent: React.FC<ChatContentProps> = ({
   regenerateMessage,
   getContextSnapshotForMod,
   modMessageActions,
+  enableStreamingMarkdown, // Added
 }) => {
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -381,6 +383,7 @@ const ChatContentComponent: React.FC<ChatContentProps> = ({
                   }
                   getContextSnapshotForMod={getContextSnapshotForMod}
                   modMessageActions={modMessageActions}
+                  enableStreamingMarkdown={enableStreamingMarkdown} // Added
                 />
                 {message.error && (
                   <div className="flex items-center gap-2 text-xs text-destructive ml-12 -mt-2 mb-2">

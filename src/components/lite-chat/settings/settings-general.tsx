@@ -15,15 +15,23 @@ import { useSettingsStore } from "@/store/settings.store";
 
 const SettingsGeneralComponent: React.FC = () => {
   // --- Fetch state/actions from store ---
-  const { theme, setTheme, streamingRefreshRateMs, setStreamingRefreshRateMs } =
-    useSettingsStore(
-      useShallow((state) => ({
-        theme: state.theme,
-        setTheme: state.setTheme,
-        streamingRefreshRateMs: state.streamingRefreshRateMs,
-        setStreamingRefreshRateMs: state.setStreamingRefreshRateMs,
-      })),
-    );
+  const {
+    theme,
+    setTheme,
+    streamingRefreshRateMs,
+    setStreamingRefreshRateMs,
+    enableStreamingMarkdown, // Added
+    setEnableStreamingMarkdown, // Added
+  } = useSettingsStore(
+    useShallow((state) => ({
+      theme: state.theme,
+      setTheme: state.setTheme,
+      streamingRefreshRateMs: state.streamingRefreshRateMs,
+      setStreamingRefreshRateMs: state.setStreamingRefreshRateMs,
+      enableStreamingMarkdown: state.enableStreamingMarkdown, // Added
+      setEnableStreamingMarkdown: state.setEnableStreamingMarkdown, // Added
+    })),
+  );
 
   // Local UI state for git config (if managed here)
   const [rootGitEnabled, setRootGitEnabled] = useState(false);
@@ -98,10 +106,10 @@ const SettingsGeneralComponent: React.FC = () => {
 
       <Separator />
 
-      {/* Streaming Refresh Rate - Uses store state/actions */}
+      {/* Streaming Settings */}
       <div>
-        <h3 className="text-lg font-medium mb-2">Performance</h3>
-        <div className="space-y-1.5">
+        <h3 className="text-lg font-medium mb-2">Performance & Streaming</h3>
+        <div className="space-y-1.5 mb-4">
           <Label htmlFor="streaming-refresh-rate" className="text-sm">
             Streaming Refresh Rate ({streamingRefreshRateMs}ms ≈ {fps} FPS)
           </Label>
@@ -119,6 +127,21 @@ const SettingsGeneralComponent: React.FC = () => {
             less smooth. Default: 33ms (~30 FPS).
           </p>
         </div>
+        {/* Added Streaming Markdown Toggle */}
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="streaming-markdown"
+            checked={enableStreamingMarkdown}
+            onCheckedChange={setEnableStreamingMarkdown}
+          />
+          <Label htmlFor="streaming-markdown">
+            Enable Markdown Parsing During Streaming
+          </Label>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-8">
+          Disable this for slightly better performance on complex responses, but
+          the text will appear unformatted until the stream finishes.
+        </p>
       </div>
 
       <Separator />

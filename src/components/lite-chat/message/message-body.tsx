@@ -17,6 +17,7 @@ interface MessageBodyProps {
   onRegenerate?: (messageId: string) => void;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   modMessageActions: CustomMessageAction[];
+  enableStreamingMarkdown: boolean; // Added
 }
 
 export const MessageBody: React.FC<MessageBodyProps> = React.memo(
@@ -27,6 +28,7 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
     onRegenerate,
     getContextSnapshotForMod,
     modMessageActions,
+    enableStreamingMarkdown, // Added
   }) => {
     const [isChildrenCollapsed, setIsChildrenCollapsed] = useState(true);
 
@@ -54,7 +56,10 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
 
         {!isFolded ? (
           <>
-            <MessageContentRenderer message={message} />
+            <MessageContentRenderer
+              message={message}
+              enableStreamingMarkdown={enableStreamingMarkdown} // Added
+            />
             <MessageMetadataDisplay message={message} />
             <MessageErrorDisplay error={message.error} />
 
@@ -84,6 +89,7 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
                       onRegenerate={onRegenerate}
                       getContextSnapshotForMod={getContextSnapshotForMod}
                       modMessageActions={modMessageActions}
+                      enableStreamingMarkdown={enableStreamingMarkdown} // Added
                     />
                   </div>
                 ))}

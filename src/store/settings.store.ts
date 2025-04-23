@@ -19,6 +19,8 @@ export interface SettingsState {
   // Other Config
   /** Refresh rate for UI updates during AI response streaming (in milliseconds). */
   streamingRefreshRateMs: number;
+  /** Enable markdown parsing during streaming */
+  enableStreamingMarkdown: boolean; // Added
 }
 
 export interface SettingsActions {
@@ -35,6 +37,8 @@ export interface SettingsActions {
   setFrequencyPenalty: (penalty: number | null) => void;
   /** Sets the UI refresh rate during streaming (in milliseconds). */
   setStreamingRefreshRateMs: (rate: number) => void;
+  /** Sets whether markdown should be parsed during streaming */
+  setEnableStreamingMarkdown: (enabled: boolean) => void; // Added
   // Derived data (activeSystemPrompt) should be handled by selectors outside the store
 }
 
@@ -63,6 +67,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     presencePenalty: null,
     frequencyPenalty: null,
     streamingRefreshRateMs: 33, // Default ~30 FPS (1000ms / 30)
+    enableStreamingMarkdown: true, // Added default
 
     // Actions
     setEnableAdvancedSettings: (enableAdvancedSettings) =>
@@ -90,5 +95,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     setFrequencyPenalty: (frequencyPenalty) => set({ frequencyPenalty }),
     setStreamingRefreshRateMs: (streamingRefreshRateMs) =>
       set({ streamingRefreshRateMs }),
+    setEnableStreamingMarkdown: (enableStreamingMarkdown) =>
+      set({ enableStreamingMarkdown }), // Added action
   }),
 );

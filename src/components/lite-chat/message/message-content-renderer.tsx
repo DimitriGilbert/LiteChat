@@ -9,6 +9,7 @@ import { FileContextBlock } from "./file-context-block";
 
 interface MessageContentRendererProps {
   message: Message;
+  enableStreamingMarkdown: boolean; // Added
 }
 
 const decodeXml = (encoded: string): string => {
@@ -54,20 +55,55 @@ const ParagraphRenderer = ({ children, ...props }: any) => {
   );
 };
 
+// Define common markdown components
+const markdownComponents = {
+  code: CodeBlock,
+  p: ParagraphRenderer,
+  ul: ({ children, ...props }: any) => (
+    <ul {...props} className="my-3 list-disc list-inside pl-4">
+      {children}
+    </ul>
+  ),
+  ol: ({ children, ...props }: any) => (
+    <ol {...props} className="my-3 list-decimal list-inside pl-4">
+      {children}
+    </ol>
+  ),
+  li: ({ children, ...props }: any) => (
+    <li {...props} className="my-1">
+      {children}
+    </li>
+  ),
+};
+
 export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
-  React.memo(({ message }) => {
+  React.memo(({ message, enableStreamingMarkdown }) => {
     const streamedContent = message.streamedContent ?? "";
     const finalContent = message.content;
 
     if (message.isStreaming) {
       return (
-        <div className="text-gray-200 text-sm whitespace-pre-wrap break-words">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{ code: CodeBlock, p: ParagraphRenderer }} // Use custom p renderer
-          >
-            {streamedContent}
-          </ReactMarkdown>
+        <div
+          className={cn(
+            "text-gray-200 text-sm whitespace-pre-wrap break-words",
+            // Apply prose styles only if markdown is enabled
+            enableStreamingMarkdown &&
+              "prose prose-sm prose-invert max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:mt-4 prose-headings:mb-2 prose-code:before:content-none prose-code:after:content-none prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-0",
+          )}
+        >
+          {enableStreamingMarkdown ? (
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={markdownComponents} // Use common components
+            >
+              {streamedContent}
+            </ReactMarkdown>
+          ) : (
+            // Render as plain text within pre/code for whitespace preservation
+            <pre className="font-sans text-sm">
+              <code>{streamedContent}</code>
+            </pre>
+          )}
           <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"></span>
         </div>
       );
@@ -140,25 +176,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
           return (
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
-              components={{
-                code: CodeBlock,
-                p: ParagraphRenderer, // Use custom p renderer
-                ul: ({ children, ...props }) => (
-                  <ul {...props} className="my-3 list-disc list-inside pl-4">
-                    {children}
-                  </ul>
-                ),
-                ol: ({ children, ...props }) => (
-                  <ol {...props} className="my-3 list-decimal list-inside pl-4">
-                    {children}
-                  </ol>
-                ),
-                li: ({ children, ...props }) => (
-                  <li {...props} className="my-1">
-                    {children}
-                  </li>
-                ),
-              }}
+              components={markdownComponents} // Use common components
             >
               {contentParts[0]}
             </ReactMarkdown>
@@ -187,28 +205,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
               <ReactMarkdown
                 key={`text-part-${index}`}
                 remarkPlugins={[remarkGfm]}
-                components={{
-                  code: CodeBlock,
-                  p: ParagraphRenderer, // Use custom p renderer
-                  ul: ({ children, ...props }) => (
-                    <ul {...props} className="my-3 list-disc list-inside pl-4">
-                      {children}
-                    </ul>
-                  ),
-                  ol: ({ children, ...props }) => (
-                    <ol
-                      {...props}
-                      className="my-3 list-decimal list-inside pl-4"
-                    >
-                      {children}
-                    </ol>
-                  ),
-                  li: ({ children, ...props }) => (
-                    <li {...props} className="my-1">
-                      {children}
-                    </li>
-                  ),
-                }}
+                components={markdownComponents} // Use common components
               >
                 {part}
               </ReactMarkdown>
@@ -231,31 +228,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                 <ReactMarkdown
                   key={`text-part-${index}`}
                   remarkPlugins={[remarkGfm]}
-                  components={{
-                    code: CodeBlock,
-                    p: ParagraphRenderer, // Use custom p renderer
-                    ul: ({ children, ...props }) => (
-                      <ul
-                        {...props}
-                        className="my-3 list-disc list-inside pl-4"
-                      >
-                        {children}
-                      </ul>
-                    ),
-                    ol: ({ children, ...props }) => (
-                      <ol
-                        {...props}
-                        className="my-3 list-decimal list-inside pl-4"
-                      >
-                        {children}
-                      </ol>
-                    ),
-                    li: ({ children, ...props }) => (
-                      <li {...props} className="my-1">
-                        {children}
-                      </li>
-                    ),
-                  }}
+                  components={markdownComponents} // Use common components
                 >
                   {contentParts[0]}
                 </ReactMarkdown>
@@ -284,31 +257,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                   <ReactMarkdown
                     key={`text-part-${index}-${subIndex}`}
                     remarkPlugins={[remarkGfm]}
-                    components={{
-                      code: CodeBlock,
-                      p: ParagraphRenderer, // Use custom p renderer
-                      ul: ({ children, ...props }) => (
-                        <ul
-                          {...props}
-                          className="my-3 list-disc list-inside pl-4"
-                        >
-                          {children}
-                        </ul>
-                      ),
-                      ol: ({ children, ...props }) => (
-                        <ol
-                          {...props}
-                          className="my-3 list-decimal list-inside pl-4"
-                        >
-                          {children}
-                        </ol>
-                      ),
-                      li: ({ children, ...props }) => (
-                        <li {...props} className="my-1">
-                          {children}
-                        </li>
-                      ),
-                    }}
+                    components={markdownComponents} // Use common components
                   >
                     {subPart}
                   </ReactMarkdown>

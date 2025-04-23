@@ -1,4 +1,6 @@
 // src/components/lite-chat/chat.tsx
+// line 1
+
 import React, { useState, useMemo, useCallback, useEffect } from "react"; // Ensure useEffect is imported
 import ChatProviderInner from "@/context/chat-provider-inner";
 import { ChatSide } from "./chat/chat-side";
@@ -125,8 +127,8 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     editingItemId,
     setEditingItemId,
     onEditComplete,
-    dbConversations,
-    dbProjects,
+    dbConversations: dbConversations || [], // Pass empty array if null/undefined
+    dbProjects: dbProjects || [], // Pass empty array if null/undefined
   });
 
   // Destructure only what's needed directly or for high-frequency prop drilling
@@ -303,6 +305,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
           topK={settingsState.topK}
           presencePenalty={settingsState.presencePenalty}
           frequencyPenalty={settingsState.frequencyPenalty}
+          enableStreamingMarkdown={settingsState.enableStreamingMarkdown} // Added
           // Pass other necessary actions/data
           sidebarItems={sidebarItems} // Needed for ChatHeader
           searchTerm={settingsState.searchTerm} // Needed for ChatHeader
