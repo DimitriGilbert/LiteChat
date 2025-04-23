@@ -181,8 +181,13 @@ export const useCoreChatStore = create(
         const messageIndex = state.messages.findIndex((m) => m.id === id);
 
         if (messageIndex !== -1) {
-          // Ensure we don't accidentally add streamedContent back
-          const { streamedContent, ...validUpdates } = updates;
+          const {
+            // Ensure we don't accidentally add streamedContent back
+            // @ts-expect-error what ever
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            streamedContent,
+            ...validUpdates
+          } = updates;
           Object.assign(state.messages[messageIndex], validUpdates);
           messageUpdated = true;
         } else {
@@ -191,8 +196,13 @@ export const useCoreChatStore = create(
             if (parent.children) {
               const childIndex = parent.children.findIndex((c) => c.id === id);
               if (childIndex !== -1) {
-                // Ensure we don't accidentally add streamedContent back
-                const { streamedContent, ...validUpdates } = updates;
+                const {
+                  // Ensure we don't accidentally add streamedContent back
+                  // @ts-expect-error what ever
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                  streamedContent,
+                  ...validUpdates
+                } = updates;
                 Object.assign(parent.children[childIndex], validUpdates);
                 messageUpdated = true;
                 if (updates.isStreaming === false && parent.workflow) {
