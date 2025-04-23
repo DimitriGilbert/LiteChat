@@ -15,6 +15,7 @@ import type {
   AiProviderConfig as AiProviderConfigType,
 } from "@/lib/types";
 
+// Props remain largely the same as passed down from ChatWrapper
 interface PromptWrapperProps {
   className?: string;
   error: string | null;
@@ -91,8 +92,8 @@ const PromptWrapperComponent: React.FC<PromptWrapperProps> = ({
   error,
   isStreaming,
   stopStreaming,
-  // clearAttachedFiles, // Removed unused prop
   onFormSubmit,
+  // Pass all other props down to PromptForm
   ...promptFormProps
 }) => {
   return (
@@ -120,12 +121,11 @@ const PromptWrapperComponent: React.FC<PromptWrapperProps> = ({
       )}
 
       <PromptForm
-        {...promptFormProps}
+        {...promptFormProps} // Pass the rest of the props
         isStreaming={isStreaming}
         stopStreaming={stopStreaming}
-        // Removed clearAttachedFiles prop
         onFormSubmit={onFormSubmit}
-        getContextSnapshot={promptFormProps.getContextSnapshotForMod}
+        getContextSnapshot={promptFormProps.getContextSnapshotForMod} // Rename prop for clarity
       />
     </div>
   );

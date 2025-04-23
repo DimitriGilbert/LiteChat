@@ -1,5 +1,11 @@
 // src/components/lite-chat/chat/chat-history.tsx
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,6 +29,10 @@ import { cn } from "@/lib/utils";
 import type { SidebarItem, SidebarItemType } from "@/lib/types";
 import { toast } from "sonner";
 import { ProjectSettingsModal } from "@/components/lite-chat/project/project-settings-modal";
+// Import store hooks
+// import { useShallow } from "zustand/react/shallow";
+// import { useSidebarStore } from "@/store/sidebar.store";
+import { useChatStorage } from "@/hooks/use-chat-storage"; // To get items
 
 interface HistoryItemProps {
   item: SidebarItem;
@@ -37,7 +47,6 @@ interface HistoryItemProps {
     type: SidebarItemType,
   ) => Promise<void>;
   exportConversation: (conversationId: string) => Promise<void>;
-  // Add startRename prop
   startRename: (id: string, currentName: string) => void;
 }
 
@@ -51,7 +60,7 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
     deleteItem,
     renameItem,
     exportConversation,
-    startRename, // Destructure startRename
+    startRename,
   }) => {
     const [isEditing, setIsEditing] = useState(startInEditMode);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -144,7 +153,6 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
     const handleEditClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       const currentName = item.type === "project" ? item.name : item.title;
-      // Use startRename prop instead of setting state directly
       startRename(item.id, currentName);
     };
 
@@ -343,10 +351,9 @@ const HistoryItem: React.FC<HistoryItemProps> = React.memo(
 );
 HistoryItem.displayName = "HistoryItem";
 
-// Add startRename prop to ChatHistoryProps
 export interface ChatHistoryProps {
   className?: string;
-  sidebarItems: SidebarItem[];
+  // Remove sidebarItems prop
   editingItemId: string | null;
   selectedItemId: string | null;
   onEditComplete: (id: string) => void;
@@ -358,12 +365,12 @@ export interface ChatHistoryProps {
     type: SidebarItemType,
   ) => Promise<void>;
   exportConversation: (conversationId: string) => Promise<void>;
-  startRename: (id: string, currentName: string) => void; // Add prop definition
+  startRename: (id: string, currentName: string) => void;
 }
 
 const ChatHistoryComponent: React.FC<ChatHistoryProps> = ({
   className,
-  sidebarItems,
+  // Remove sidebarItems prop
   editingItemId,
   selectedItemId,
   onEditComplete,
@@ -371,8 +378,27 @@ const ChatHistoryComponent: React.FC<ChatHistoryProps> = ({
   deleteItem,
   renameItem,
   exportConversation,
-  startRename, // Destructure startRename
+  startRename,
 }) => {
+  // --- Fetch items from storage ---
+  const { projects, conversations } = useChatStorage();
+  const sidebarItems = useMemo<SidebarItem[]>(() => {
+    const allProjects = projects || [];
+    const allConversations = conversations || [];
+    const combinedItems: SidebarItem[] = [
+      ...allProjects.map((p) => ({ ...p, type: "project" as const })),
+      ...allConversations.map((c) => ({
+        ...c,
+        type: "conversation" as const,
+      })),
+    ];
+    combinedItems.sort(
+      (a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
+    );
+    return combinedItems;
+  }, [projects, conversations]);
+  // --- End fetch items ---
+
   const itemsToDisplay = sidebarItems;
 
   return (
@@ -394,7 +420,7 @@ const ChatHistoryComponent: React.FC<ChatHistoryProps> = ({
             deleteItem={deleteItem}
             renameItem={renameItem}
             exportConversation={exportConversation}
-            startRename={startRename} // Pass startRename down
+            startRename={startRename}
           />
         ))}
       </div>

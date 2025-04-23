@@ -36,7 +36,8 @@ export async function performImageGeneration({
   addDbMessage,
   abortControllerRef, // This is the ref passed specifically for this call
 }: PerformImageGenerationParams): Promise<PerformImageGenerationResult> {
-  const apiKey = getApiKeyForProvider();
+  // Pass provider ID to getApiKeyForProvider
+  const apiKey = getApiKeyForProvider(selectedProvider?.id || "");
   const validationError = validateAiParameters(
     conversationIdToUse,
     selectedModel,

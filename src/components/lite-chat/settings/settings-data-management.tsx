@@ -3,28 +3,28 @@ import React, { useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { UploadIcon, DownloadIcon, Trash2Icon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+// Import store hooks
+import { useShallow } from "zustand/react/shallow";
+import { useSidebarStore } from "@/store/sidebar.store";
+import { useChatStorage } from "@/hooks/use-chat-storage"; // For clearAllData
 
-// Define props based on what SettingsModal passes down
-interface SettingsDataManagementProps {
-  importConversation: (file: File, parentId: string | null) => Promise<void>;
-  exportAllConversations: () => Promise<void>;
-  clearAllData: () => Promise<void>; // Action to clear all data
-}
+const SettingsDataManagementComponent: React.FC = () => {
+  // --- Fetch actions from stores ---
+  const { importConversation, exportAllConversations } = useSidebarStore(
+    useShallow((state) => ({
+      importConversation: state.importConversation,
+      exportAllConversations: state.exportAllConversations,
+    })),
+  );
+  const { clearAllData } = useChatStorage(); // Get clearAllData from storage hook
 
-const SettingsDataManagementComponent: React.FC<
-  SettingsDataManagementProps
-> = ({
-  importConversation, // Use prop action
-  exportAllConversations, // Use prop action
-  clearAllData, // Use prop action
-}) => {
   // Local UI state remains
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
-  // Handlers use prop actions
+  // Handlers use store actions
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
@@ -35,7 +35,7 @@ const SettingsDataManagementComponent: React.FC<
       if (file) {
         setIsImporting(true);
         try {
-          await importConversation(file, null); // Use prop action
+          await importConversation(file, null);
         } catch (error) {
           console.error("Import failed (from component):", error);
         } finally {
@@ -52,7 +52,7 @@ const SettingsDataManagementComponent: React.FC<
   const handleExportAllClick = useCallback(async () => {
     setIsExporting(true);
     try {
-      await exportAllConversations(); // Use prop action
+      await exportAllConversations();
     } catch (error) {
       console.error("Export all failed (from component):", error);
     } finally {
@@ -77,7 +77,7 @@ Really delete everything? Consider exporting first.`,
       ) {
         setIsClearing(true);
         try {
-          await clearAllData(); // Use prop action
+          await clearAllData();
           toast.success("All local data cleared. Reloading the application...");
           setTimeout(() => window.location.reload(), 1500);
         } catch (error: unknown) {

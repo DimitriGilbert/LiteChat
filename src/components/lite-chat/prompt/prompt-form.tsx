@@ -9,160 +9,102 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type {
   AiModelConfig,
-  DbProviderConfig,
-  DbApiKey,
-  DbConversation,
+  // DbProviderConfig, // Removed - Fetched from store
+  // DbApiKey, // Removed - Fetched from store
+  // DbConversation,
   MessageContent,
-  SidebarItemType,
+  // SidebarItemType,
   CustomPromptAction,
   ReadonlyChatContextSnapshot,
   TextPart,
   ImagePart,
-  // AiProviderConfig as AiProviderConfigType,
 } from "@/lib/types";
 import { FileHandlingService } from "@/services/file-handling-service";
 import type { SubmitPromptPayload } from "@/mods/types";
-// Removed unused imports
-// import { createOpenAI } from "@ai-sdk/openai";
-// import { createGoogleGenerativeAI } from "@ai-sdk/google";
-// import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-// import { createOllama } from "ollama-ai-provider";
-// import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+// Import necessary store hooks
+import { useShallow } from "zustand/react/shallow";
+// import { useInputStore } from "@/store/input.store";
+import { useVfsStore } from "@/store/vfs.store";
+import { useSidebarStore } from "@/store/sidebar.store";
+import { useProviderStore } from "@/store/provider.store";
+import { useCoreChatStore } from "@/store/core-chat.store";
+// import { useSettingsStore } from "@/store/settings.store";
 
 interface PromptFormProps {
   className?: string;
-  // Direct Input State/Actions
+  // Direct Input State/Actions (High Frequency - Passed Down)
   promptInputValue: string;
   setPromptInputValue: (value: string) => void;
   addAttachedFile: (file: File) => void;
   removeAttachedFile: (fileName: string) => void;
-  // clearPromptInput: () => void; // Removed unused prop
-  // clearAttachedFiles: () => void; // Removed unused prop
-  // Direct Core State (Volatile)
+  // Direct Core State (Volatile - Passed Down)
   isStreaming: boolean;
-  isVfsReady: boolean;
-  isVfsEnabledForItem: boolean;
-  // Form Submission Wrapper
+  // Form Submission Wrapper (Passed Down)
   onFormSubmit: (
     prompt: string,
     files: File[],
     vfsPaths: string[],
     context: any,
-  ) => Promise<void>; // Added prop
-  // Other props
+  ) => Promise<void>;
+  // Other props passed down
   attachedFiles: File[];
   selectedVfsPaths: string[];
-  setError: (error: string | null) => void;
   clearSelectedVfsPaths: () => void;
-  toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>;
-  selectedProviderId: string | null;
-  selectedModelId: string | null;
-  dbProviderConfigs: DbProviderConfig[];
-  apiKeys: DbApiKey[];
-  enableApiKeyManagement: boolean;
-  updateDbProviderConfig: (
-    id: string,
-    changes: Partial<DbProviderConfig>,
-  ) => Promise<void>;
-  setSelectedProviderId: (id: string | null) => void;
-  setSelectedModelId: (id: string | null) => void;
-  selectedItemId: string | null;
-  selectedItemType: SidebarItemType | null;
-  createConversation: (
-    parentId: string | null,
-    title?: string,
-  ) => Promise<string>;
-  enableAdvancedSettings: boolean;
-  temperature: number;
-  setTemperature: (temp: number) => void;
-  topP: number | null;
-  setTopP: (topP: number | null) => void;
-  maxTokens: number | null;
-  setMaxTokens: (tokens: number | null) => void;
-  topK: number | null;
-  setTopK: (topK: number | null) => void;
-  presencePenalty: number | null;
-  setPresencePenalty: (penalty: number | null) => void;
-  frequencyPenalty: number | null;
-  setFrequencyPenalty: (penalty: number | null) => void;
-  globalSystemPrompt: string | null;
-  activeConversationData: DbConversation | null;
-  updateConversationSystemPrompt: (
-    id: string,
-    systemPrompt: string | null,
-  ) => Promise<void>;
   customPromptActions: CustomPromptAction[];
-  getContextSnapshot: () => ReadonlyChatContextSnapshot;
-  selectedModel: AiModelConfig | undefined;
-  isVfsLoading: boolean;
-  vfsError: string | null;
-  vfsKey: string | null;
+  getContextSnapshot: () => ReadonlyChatContextSnapshot; // Renamed prop
+  selectedModel: AiModelConfig | undefined; // Keep selectedModel for PromptActions
   stopStreaming: (parentMessageId?: string | null) => void;
   removeSelectedVfsPath: (path: string) => void;
-  // getApiKeyForProvider: (providerId: string) => string | undefined; // Removed unused prop
-  // selectedProvider: AiProviderConfigType | undefined; // Removed unused prop
 }
 
 const PromptFormComponent: React.FC<PromptFormProps> = ({
   className,
-  // Destructure all props
+  // Destructure passed props
   promptInputValue,
   setPromptInputValue,
   addAttachedFile,
   removeAttachedFile,
-  // clearPromptInput, // Removed unused prop
-  // clearAttachedFiles, // Removed unused prop
   isStreaming,
-  isVfsReady,
-  isVfsEnabledForItem,
-  onFormSubmit, // Destructure the wrapper function
+  onFormSubmit,
   attachedFiles,
   selectedVfsPaths,
-  setError,
   clearSelectedVfsPaths,
-  toggleVfsEnabledAction,
-  selectedProviderId,
-  selectedModelId,
-  dbProviderConfigs,
-  apiKeys,
-  enableApiKeyManagement,
-  updateDbProviderConfig,
-  setSelectedProviderId,
-  setSelectedModelId,
-  selectedItemId,
-  selectedItemType,
-  createConversation,
-  enableAdvancedSettings,
-  temperature,
-  setTemperature,
-  topP,
-  setTopP,
-  maxTokens,
-  setMaxTokens,
-  topK,
-  setTopK,
-  presencePenalty,
-  setPresencePenalty,
-  frequencyPenalty,
-  setFrequencyPenalty,
-  globalSystemPrompt,
-  activeConversationData,
-  updateConversationSystemPrompt,
   customPromptActions,
   getContextSnapshot,
   selectedModel,
-  isVfsLoading,
-  vfsError,
-  vfsKey,
-  stopStreaming,
+  // stopStreaming,
   removeSelectedVfsPath,
-  // getApiKeyForProvider, // Removed unused prop
-  // selectedProvider, // Removed unused prop
 }) => {
+  // --- Fetch state/actions from stores ---
+  const { selectedItemId, selectedItemType, createConversation } =
+    useSidebarStore(
+      useShallow((state) => ({
+        selectedItemId: state.selectedItemId,
+        selectedItemType: state.selectedItemType,
+        createConversation: state.createConversation,
+      })),
+    );
+
+  const { isVfsReady, isVfsEnabledForItem, vfsKey, enableVfs } = useVfsStore(
+    useShallow((state) => ({
+      isVfsReady: state.isVfsReady,
+      isVfsEnabledForItem: state.isVfsEnabledForItem,
+      vfsKey: state.vfsKey,
+      enableVfs: state.enableVfs,
+    })),
+  );
+
+  const { selectedProviderId } = useProviderStore(
+    useShallow((state) => ({
+      selectedProviderId: state.selectedProviderId,
+    })),
+  );
+
+  const setError = useCoreChatStore((state) => state.setError);
+
   // Placeholder for middleware - replace if actual middleware is used
   const runMiddlewarePlaceholder = useCallback(
     async (_hookName: any, payload: any) => {
-      // _hookName is unused
       return payload; // Pass through
     },
     [],
@@ -172,7 +114,7 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   const internalHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    // --- Validations (remain the same) ---
+    // --- Validations ---
     if (isStreaming) {
       toast.warning("Please wait for the current response to finish.");
       return;
@@ -191,7 +133,7 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       return;
     }
 
-    // --- Get Conversation ID (remains the same) ---
+    // --- Get Conversation ID ---
     let currentConversationId =
       selectedItemType === "conversation" ? selectedItemId : null;
     if (!currentConversationId) {
@@ -199,7 +141,7 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
         const parentId = selectedItemType === "project" ? selectedItemId : null;
         const newConvId = await createConversation(parentId, "New Chat");
         currentConversationId = newConvId;
-        toast.success("Started new conversation.");
+        // Selection is handled by createConversation action
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         setError(`Failed to create conversation: ${message}`);
@@ -213,11 +155,11 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       return;
     }
 
-    // --- Prepare Content (remains the same) ---
+    // --- Prepare Content ---
     const vfsContext = {
       isVfsReady,
       isVfsEnabledForItem,
-      enableVfs: true,
+      enableVfs: enableVfs,
       vfsKey,
     };
     const vfsContextResult =
@@ -241,22 +183,44 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       finalContent.push(...imageParts);
       let combinedText = "";
       if (vfsText) combinedText += vfsText;
-      if (userText) combinedText += (combinedText ? `\n\n` : "") + userText;
+      if (userText)
+        combinedText +=
+          (combinedText
+            ? `
+
+`
+            : "") + userText;
       textPartsFromFiles.forEach((part) => {
-        combinedText += (combinedText ? `\n\n` : "") + part.text;
+        combinedText +=
+          (combinedText
+            ? `
+
+`
+            : "") + part.text;
       });
       if (combinedText) finalContent.push({ type: "text", text: combinedText });
     } else {
       let combinedText = "";
       if (vfsText) combinedText += vfsText;
-      if (userText) combinedText += (combinedText ? `\n\n` : "") + userText;
+      if (userText)
+        combinedText +=
+          (combinedText
+            ? `
+
+`
+            : "") + userText;
       textPartsFromFiles.forEach((part) => {
-        combinedText += (combinedText ? `\n\n` : "") + part.text;
+        combinedText +=
+          (combinedText
+            ? `
+
+`
+            : "") + part.text;
       });
       finalContent = combinedText;
     }
 
-    // --- Middleware (remains the same, placeholder) ---
+    // --- Middleware ---
     const middlewarePayload: SubmitPromptPayload = {
       prompt: finalContent,
       conversationId: currentConversationId,
@@ -275,24 +239,17 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
 
     // --- Call the passed onFormSubmit wrapper ---
     try {
-      await onFormSubmit(
-        promptInputValue, // Pass original prompt value
-        attachedFiles, // Pass original files
-        selectedVfsPaths, // Pass original VFS paths
-        {
-          selectedItemId: currentConversationId,
-          contentToSendToAI: contentToSubmit, // Pass processed content
-          vfsContextPaths: vfsPathsToSave, // Pass processed VFS paths
-        },
-      );
-      // Input clearing is now handled within the onFormSubmit wrapper in useLiteChatLogic
+      await onFormSubmit(promptInputValue, attachedFiles, selectedVfsPaths, {
+        selectedItemId: currentConversationId,
+        contentToSendToAI: contentToSubmit,
+        vfsContextPaths: vfsPathsToSave,
+      });
     } catch (error) {
-      // Error handling is done within the onFormSubmit wrapper
       console.error("Error during form submission prop call:", error);
     }
   };
 
-  // Effect for VFS path clearing (remains the same)
+  // Effect for VFS path clearing
   useEffect(() => {
     if (!isVfsEnabledForItem && selectedVfsPaths.length > 0) {
       clearSelectedVfsPaths();
@@ -300,7 +257,6 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   }, [isVfsEnabledForItem, selectedVfsPaths, clearSelectedVfsPaths]);
 
   return (
-    // Use the internal handler for the form's onSubmit
     <form
       onSubmit={internalHandleSubmit}
       className={cn("flex flex-col", className)}
@@ -335,42 +291,9 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       </div>
 
       <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
-        <PromptSettings
-          selectedProviderId={selectedProviderId}
-          dbProviderConfigs={dbProviderConfigs}
-          apiKeys={apiKeys}
-          enableApiKeyManagement={enableApiKeyManagement}
-          selectedModelId={selectedModelId}
-          setSelectedProviderId={setSelectedProviderId}
-          setSelectedModelId={setSelectedModelId}
-          enableVfs={true}
-          isVfsEnabledForItem={isVfsEnabledForItem}
-          selectedItemId={selectedItemId}
-          selectedItemType={selectedItemType}
-          toggleVfsEnabledAction={toggleVfsEnabledAction}
-          enableAdvancedSettings={enableAdvancedSettings}
-          temperature={temperature}
-          setTemperature={setTemperature}
-          topP={topP}
-          setTopP={setTopP}
-          maxTokens={maxTokens}
-          setMaxTokens={setMaxTokens}
-          topK={topK}
-          setTopK={setTopK}
-          presencePenalty={presencePenalty}
-          setPresencePenalty={setPresencePenalty}
-          frequencyPenalty={frequencyPenalty}
-          setFrequencyPenalty={setFrequencyPenalty}
-          globalSystemPrompt={globalSystemPrompt}
-          activeConversationData={activeConversationData}
-          updateConversationSystemPrompt={updateConversationSystemPrompt}
-          updateDbProviderConfig={updateDbProviderConfig}
-          isVfsReady={isVfsReady}
-          isVfsLoading={isVfsLoading}
-          vfsError={vfsError}
-          vfsKey={vfsKey}
-          stopStreaming={stopStreaming}
-        />
+        {/* PromptSettings will fetch its own data */}
+        {/* Remove stopStreaming prop */}
+        <PromptSettings />
       </div>
     </form>
   );

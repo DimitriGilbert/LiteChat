@@ -16,30 +16,30 @@ import {
 } from "@/components/ui/table";
 import { AlertTriangle, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import type { DbMod, ModInstance } from "@/mods/types";
+import type { DbMod } from "@/mods/types";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+// Import store hooks
+import { useShallow } from "zustand/react/shallow";
+import { useModStore } from "@/store/mod.store";
 
-// Define props based on what SettingsModal passes down
-interface SettingsModsProps {
-  dbMods: DbMod[];
-  loadedMods: ModInstance[];
-  addDbMod: (modData: Omit<DbMod, "id" | "createdAt">) => Promise<string>;
-  updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>;
-  deleteDbMod: (id: string) => Promise<void>;
-}
+const SettingsModsComponent: React.FC = () => {
+  // --- Fetch state/actions from store ---
+  const { dbMods, loadedMods, addDbMod, updateDbMod, deleteDbMod } =
+    useModStore(
+      useShallow((state) => ({
+        dbMods: state.dbMods,
+        loadedMods: state.loadedMods,
+        addDbMod: state.addDbMod,
+        updateDbMod: state.updateDbMod,
+        deleteDbMod: state.deleteDbMod,
+      })),
+    );
 
-const SettingsModsComponent: React.FC<SettingsModsProps> = ({
-  dbMods, // Use prop
-  loadedMods, // Use prop
-  addDbMod, // Use prop action
-  updateDbMod, // Use prop action
-  deleteDbMod, // Use prop action
-}) => {
   // Local UI state remains
   const [modName, setModName] = useState("");
   const [modUrl, setModUrl] = useState("");
@@ -277,7 +277,7 @@ const SettingsModsComponent: React.FC<SettingsModsProps> = ({
                       <TableCell className="text-center">
                         <Switch
                           checked={mod.enabled}
-                          onCheckedChange={() => handleToggleEnable(mod)} // Use callback
+                          onCheckedChange={() => handleToggleEnable(mod)}
                           disabled={isDisabled}
                           aria-label={`Enable ${mod.name}`}
                         />
@@ -289,7 +289,7 @@ const SettingsModsComponent: React.FC<SettingsModsProps> = ({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeleteMod(mod)} // Use callback
+                          onClick={() => handleDeleteMod(mod)}
                           disabled={isDisabled}
                           aria-label={`Delete ${mod.name}`}
                           className="text-destructive hover:text-destructive/80"

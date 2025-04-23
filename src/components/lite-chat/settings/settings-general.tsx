@@ -9,24 +9,22 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
-// REMOVED: SettingsModalTabProps import
+// Import store hooks
+import { useShallow } from "zustand/react/shallow";
+import { useSettingsStore } from "@/store/settings.store";
 
-// Update component props to expect individual props
-interface SettingsGeneralProps {
-  theme: "light" | "dark" | "system";
-  setTheme: (theme: "light" | "dark" | "system") => void;
-  streamingRefreshRateMs: number;
-  setStreamingRefreshRateMs: (rate: number) => void;
-  // Add other props if needed for Git config later
-}
+const SettingsGeneralComponent: React.FC = () => {
+  // --- Fetch state/actions from store ---
+  const { theme, setTheme, streamingRefreshRateMs, setStreamingRefreshRateMs } =
+    useSettingsStore(
+      useShallow((state) => ({
+        theme: state.theme,
+        setTheme: state.setTheme,
+        streamingRefreshRateMs: state.streamingRefreshRateMs,
+        setStreamingRefreshRateMs: state.setStreamingRefreshRateMs,
+      })),
+    );
 
-const SettingsGeneralComponent: React.FC<SettingsGeneralProps> = ({
-  // Destructure individual props
-  theme,
-  setTheme,
-  streamingRefreshRateMs,
-  setStreamingRefreshRateMs,
-}) => {
   // Local UI state for git config (if managed here)
   const [rootGitEnabled, setRootGitEnabled] = useState(false);
   const [rootGitRepoUrl, setRootGitRepoUrl] = useState("");
@@ -53,23 +51,22 @@ const SettingsGeneralComponent: React.FC<SettingsGeneralProps> = ({
 
   const handleSliderChange = useCallback(
     (value: number[]) => {
-      // Use the destructured action function
-      setStreamingRefreshRateMs(value[0]);
+      setStreamingRefreshRateMs(value[0]); // Use store action
     },
-    [setStreamingRefreshRateMs], // Depend on the destructured action function
+    [setStreamingRefreshRateMs],
   );
 
   const fps = Math.round(1000 / streamingRefreshRateMs);
 
   return (
     <div className="space-y-6 p-1">
-      {/* Theme Selection - Uses destructured props */}
+      {/* Theme Selection - Uses store state/actions */}
       <div>
         <h3 className="text-lg font-medium mb-2">Appearance</h3>
         <Label className="text-sm mb-3 block">Theme</Label>
         <RadioGroup
-          value={theme} // Use destructured prop
-          onValueChange={setTheme} // Use destructured prop action
+          value={theme}
+          onValueChange={setTheme}
           className="flex flex-col sm:flex-row gap-4"
         >
           <Label
@@ -101,7 +98,7 @@ const SettingsGeneralComponent: React.FC<SettingsGeneralProps> = ({
 
       <Separator />
 
-      {/* Streaming Refresh Rate - Uses destructured props */}
+      {/* Streaming Refresh Rate - Uses store state/actions */}
       <div>
         <h3 className="text-lg font-medium mb-2">Performance</h3>
         <div className="space-y-1.5">
@@ -113,8 +110,8 @@ const SettingsGeneralComponent: React.FC<SettingsGeneralProps> = ({
             min={16} // ~60 FPS
             max={1000} // 1 FPS
             step={1}
-            value={[streamingRefreshRateMs]} // Use destructured state
-            onValueChange={handleSliderChange} // Use callback with destructured action
+            value={[streamingRefreshRateMs]}
+            onValueChange={handleSliderChange}
           />
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Lower values (e.g., 16ms) update faster but use more resources.

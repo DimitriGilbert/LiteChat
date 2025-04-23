@@ -4,7 +4,7 @@ import React, {
   useEffect,
   useState,
   useCallback,
-  useMemo,
+  // useMemo, // Removed unused import
 } from "react";
 import { ChatHistory } from "./chat-history";
 import { SettingsModal } from "@/components/lite-chat/settings/settings-modal";
@@ -19,165 +19,87 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type {
   DbConversation,
-  SidebarItem,
-  DbProject,
-  ProjectSidebarItem,
-  ConversationSidebarItem,
-  SidebarItemType,
-  DbProviderConfig,
-  DbApiKey,
-  CustomSettingTab,
-  DbMod,
-  ModInstance,
+  // SidebarItem, // Removed unused import
+  // DbProject,
+  // ProjectSidebarItem, // Removed unused import
+  // ConversationSidebarItem, // Removed unused import
+  // SidebarItemType,
 } from "@/lib/types";
+// Import store hooks
+import { useShallow } from "zustand/react/shallow";
+import { useChatStorage } from "@/hooks/use-chat-storage";
+import { useSidebarStore } from "@/store/sidebar.store";
+import { useSettingsStore } from "@/store/settings.store";
 
 export interface ChatSideProps {
   className?: string;
-  dbProjects: DbProject[];
-  dbConversations: DbConversation[];
+  // Keep local UI state props
   editingItemId: string | null;
-  selectedItemId: string | null;
-  selectedItemType: SidebarItemType | null;
-  isSettingsModalOpen: boolean;
-  setIsSettingsModalOpen: (isOpen: boolean) => void;
-  theme: "light" | "dark" | "system";
-  setTheme: (theme: "light" | "dark" | "system") => void;
-  streamingRefreshRateMs: number;
-  setStreamingRefreshRateMs: (rate: number) => void;
-  dbProviderConfigs: DbProviderConfig[];
-  apiKeys: DbApiKey[];
-  addDbProviderConfig: (
-    config: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
-  ) => Promise<string>;
-  updateDbProviderConfig: (
-    id: string,
-    changes: Partial<DbProviderConfig>,
-  ) => Promise<void>;
-  deleteDbProviderConfig: (id: string) => Promise<void>;
-  fetchModels: (providerConfigId: string) => Promise<void>;
-  providerFetchStatus: Record<
-    string,
-    "idle" | "fetching" | "error" | "success"
-  >;
-  getAllAvailableModelDefs: (
-    providerConfigId: string,
-  ) => { id: string; name: string }[];
-  globalSystemPrompt: string | null;
-  setGlobalSystemPrompt: (prompt: string | null) => void;
-  addApiKey: (
-    name: string,
-    providerId: string,
-    value: string,
-  ) => Promise<string>;
-  deleteApiKey: (id: string) => Promise<void>;
-  importConversation: (file: File, parentId: string | null) => Promise<void>;
-  exportAllConversations: () => Promise<void>;
-  clearAllData: () => Promise<void>;
-  dbMods: DbMod[];
-  loadedMods: ModInstance[];
-  addDbMod: (modData: Omit<DbMod, "id" | "createdAt">) => Promise<string>;
-  updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>;
-  deleteDbMod: (id: string) => Promise<void>;
-  enableAdvancedSettings: boolean;
-  enableApiKeyManagement: boolean;
-  customSettingsTabs: CustomSettingTab[];
   onEditComplete: (id: string) => void;
   setEditingItemId: (id: string | null) => void;
-  selectItem: (
-    id: string | null,
-    type: SidebarItemType | null,
-  ) => Promise<void>;
-  deleteItem: (id: string, type: SidebarItemType) => Promise<void>;
-  renameItem: (
-    id: string,
-    newName: string,
-    type: SidebarItemType,
-  ) => Promise<void>;
-  exportConversation: (conversationId: string | null) => Promise<void>;
-  createConversation: (
-    parentId: string | null,
-    title?: string,
-  ) => Promise<string>;
-  createProject: (
-    parentId: string | null,
-    name?: string,
-  ) => Promise<{ id: string; name: string }>;
+  // Remove props that will be fetched from stores
 }
 
 const ChatSideComponent: React.FC<ChatSideProps> = ({
   className,
-  dbProjects,
-  dbConversations,
   editingItemId,
-  selectedItemId,
-  selectedItemType,
   onEditComplete,
   setEditingItemId,
-  selectItem,
-  deleteItem,
-  renameItem,
-  exportConversation,
-  createConversation,
-  createProject,
-  importConversation,
-  isSettingsModalOpen,
-  setIsSettingsModalOpen,
-  theme,
-  setTheme,
-  streamingRefreshRateMs,
-  setStreamingRefreshRateMs,
-  dbProviderConfigs,
-  apiKeys,
-  addDbProviderConfig,
-  updateDbProviderConfig,
-  deleteDbProviderConfig,
-  fetchModels,
-  providerFetchStatus,
-  getAllAvailableModelDefs,
-  globalSystemPrompt,
-  setGlobalSystemPrompt,
-  addApiKey,
-  deleteApiKey,
-  exportAllConversations,
-  clearAllData,
-  dbMods,
-  loadedMods,
-  addDbMod,
-  updateDbMod,
-  deleteDbMod,
-  enableAdvancedSettings,
-  enableApiKeyManagement,
-  customSettingsTabs,
 }) => {
+  // --- Fetch state from stores ---
+  // Destructure 'projects' and 'conversations' instead of 'dbProjects'/'dbConversations'
+  const { conversations } = useChatStorage();
+
+  const {
+    selectedItemId,
+    selectedItemType,
+    selectItem,
+    deleteItem,
+    renameItem,
+    exportConversation,
+    createConversation,
+    createProject,
+    importConversation,
+  } = useSidebarStore(
+    useShallow((state) => ({
+      selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType,
+      selectItem: state.selectItem,
+      deleteItem: state.deleteItem,
+      renameItem: state.renameItem,
+      exportConversation: state.exportConversation,
+      createConversation: state.createConversation,
+      createProject: state.createProject,
+      importConversation: state.importConversation,
+    })),
+  );
+
+  const { isSettingsModalOpen, setIsSettingsModalOpen } = useSettingsStore(
+    useShallow((state) => ({
+      isSettingsModalOpen: state.isSettingsModalOpen,
+      setIsSettingsModalOpen: state.setIsSettingsModalOpen,
+    })),
+  );
+
+  // --- Local UI State ---
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parentIdForNewItem, setParentIdForNewItem] = useState<string | null>(
     null,
   );
-  // Removed unused renameValue state
 
-  const sidebarItems = useMemo<SidebarItem[]>(() => {
-    const allProjects: DbProject[] = dbProjects || [];
-    const allConversations: DbConversation[] = dbConversations || [];
-    const combinedItems: SidebarItem[] = [
-      ...allProjects.map(
-        (p): ProjectSidebarItem => ({ ...p, type: "project" }),
-      ),
-      ...allConversations.map(
-        (c): ConversationSidebarItem => ({ ...c, type: "conversation" }),
-      ),
-    ];
-    combinedItems.sort(
-      (a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
-    );
-    return combinedItems;
-  }, [dbProjects, dbConversations]);
+  // --- Derived State ---
+  // Removed unused sidebarItems derivation
 
+  // --- Effects ---
   useEffect(() => {
     let determinedParentId: string | null = null;
     if (selectedItemType === "project") {
       determinedParentId = selectedItemId;
     } else if (selectedItemType === "conversation" && selectedItemId) {
-      const convo = dbConversations.find((item) => item.id === selectedItemId);
+      // Use 'conversations' here and add type annotation
+      const convo = (conversations || []).find(
+        (item: DbConversation) => item.id === selectedItemId,
+      );
       determinedParentId = convo?.parentId ?? null;
     } else {
       determinedParentId = null;
@@ -188,8 +110,9 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
       }
       return prev;
     });
-  }, [selectedItemId, selectedItemType, dbConversations]);
+  }, [selectedItemId, selectedItemType, conversations]); // Use 'conversations' dependency
 
+  // --- Callbacks ---
   const handleCreateChat = useCallback(async () => {
     await createConversation(parentIdForNewItem);
   }, [createConversation, parentIdForNewItem]);
@@ -211,7 +134,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      importConversation(file, null);
+      importConversation(file, null); // Use store action
     }
     if (event.target) {
       event.target.value = "";
@@ -219,14 +142,11 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   };
 
   const handleOpenSettingsModal = useCallback(() => {
-    setIsSettingsModalOpen(true);
+    setIsSettingsModalOpen(true); // Use store action
   }, [setIsSettingsModalOpen]);
-
-  // Removed unused handleCancelRename function
 
   const startRename = (id: string) => {
     setEditingItemId(id);
-    // Removed setting renameValue as it's unused
   };
 
   return (
@@ -260,7 +180,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
       <div className="flex-grow overflow-hidden flex flex-col">
         <ChatHistory
           className="flex-grow"
-          sidebarItems={sidebarItems}
+          // Pass necessary props to ChatHistory
           editingItemId={editingItemId}
           selectedItemId={selectedItemId}
           onEditComplete={onEditComplete}
@@ -269,6 +189,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
           renameItem={renameItem}
           exportConversation={exportConversation}
           startRename={startRename}
+          // ChatHistory will fetch sidebarItems from store
         />
       </div>
 
@@ -300,36 +221,10 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
         </Button>
       </div>
 
+      {/* SettingsModal will fetch its own data from stores */}
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
-        theme={theme}
-        setTheme={setTheme}
-        streamingRefreshRateMs={streamingRefreshRateMs}
-        setStreamingRefreshRateMs={setStreamingRefreshRateMs}
-        dbProviderConfigs={dbProviderConfigs}
-        apiKeys={apiKeys}
-        addDbProviderConfig={addDbProviderConfig}
-        updateDbProviderConfig={updateDbProviderConfig}
-        deleteDbProviderConfig={deleteDbProviderConfig}
-        fetchModels={fetchModels}
-        providerFetchStatus={providerFetchStatus}
-        getAllAvailableModelDefs={getAllAvailableModelDefs}
-        globalSystemPrompt={globalSystemPrompt}
-        setGlobalSystemPrompt={setGlobalSystemPrompt}
-        addApiKey={addApiKey}
-        deleteApiKey={deleteApiKey}
-        importConversation={importConversation}
-        exportAllConversations={exportAllConversations}
-        clearAllData={clearAllData}
-        dbMods={dbMods}
-        loadedMods={loadedMods}
-        addDbMod={addDbMod}
-        updateDbMod={updateDbMod}
-        deleteDbMod={deleteDbMod}
-        enableAdvancedSettings={enableAdvancedSettings}
-        enableApiKeyManagement={enableApiKeyManagement}
-        customSettingsTabs={customSettingsTabs}
       />
     </aside>
   );

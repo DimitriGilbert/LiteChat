@@ -2,17 +2,19 @@
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+// Import store hooks
+import { useShallow } from "zustand/react/shallow";
+import { useSettingsStore } from "@/store/settings.store";
 
-// Define props based on what SettingsModal passes down
-interface SettingsAssistantProps {
-  globalSystemPrompt: string | null;
-  setGlobalSystemPrompt: (prompt: string | null) => void;
-}
+const SettingsAssistantComponent: React.FC = () => {
+  // --- Fetch state/actions from store ---
+  const { globalSystemPrompt, setGlobalSystemPrompt } = useSettingsStore(
+    useShallow((state) => ({
+      globalSystemPrompt: state.globalSystemPrompt,
+      setGlobalSystemPrompt: state.setGlobalSystemPrompt,
+    })),
+  );
 
-const SettingsAssistantComponent: React.FC<SettingsAssistantProps> = ({
-  globalSystemPrompt, // Use prop
-  setGlobalSystemPrompt, // Use prop action
-}) => {
   return (
     <div className="space-y-6 p-1">
       <div>
@@ -26,8 +28,8 @@ const SettingsAssistantComponent: React.FC<SettingsAssistantProps> = ({
         <Textarea
           id="assistant-global-system-prompt"
           placeholder="Enter default system instructions for the assistant..."
-          value={globalSystemPrompt ?? ""} // Use prop
-          onChange={(e) => setGlobalSystemPrompt(e.target.value)} // Use prop action
+          value={globalSystemPrompt ?? ""}
+          onChange={(e) => setGlobalSystemPrompt(e.target.value)}
           rows={4}
         />
       </div>

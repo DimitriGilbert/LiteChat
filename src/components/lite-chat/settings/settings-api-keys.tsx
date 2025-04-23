@@ -27,27 +27,33 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { DbProviderConfig, DbApiKey } from "@/lib/types";
+// Import store hooks
+import { useShallow } from "zustand/react/shallow";
+import { useProviderStore } from "@/store/provider.store";
+// Import useChatStorage
+import { useChatStorage } from "@/hooks/use-chat-storage";
 
-// Define props based on what SettingsModal passes down
-interface SettingsApiKeysProps {
-  apiKeys: DbApiKey[];
-  addApiKey: (
-    name: string,
-    providerId: string,
-    value: string,
-  ) => Promise<string>;
-  deleteApiKey: (id: string) => Promise<void>;
-  dbProviderConfigs: DbProviderConfig[];
-  enableApiKeyManagement: boolean;
-}
+const SettingsApiKeysComponent: React.FC = () => {
+  // --- Fetch state/actions from store ---
+  const {
+    // apiKeys, // Fetched below
+    addApiKey,
+    deleteApiKey,
+    // dbProviderConfigs, // Fetched below
+    enableApiKeyManagement,
+  } = useProviderStore(
+    useShallow((state) => ({
+      // apiKeys: state.apiKeys,
+      addApiKey: state.addApiKey,
+      deleteApiKey: state.deleteApiKey,
+      // dbProviderConfigs: state.dbProviderConfigs,
+      enableApiKeyManagement: state.enableApiKeyManagement,
+    })),
+  );
 
-const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
-  apiKeys, // Use prop
-  addApiKey, // Use prop action
-  deleteApiKey, // Use prop action
-  dbProviderConfigs, // Use prop
-  enableApiKeyManagement, // Use prop
-}) => {
+  // Fetch from storage
+  const { apiKeys, providerConfigs: dbProviderConfigs } = useChatStorage();
+
   // Local UI state remains
   const [newKeyName, setNewKeyName] = useState("");
   const [newKeyValue, setNewKeyValue] = useState("");
@@ -91,7 +97,7 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
       ) {
         setIsDeleting((prev) => ({ ...prev, [id]: true }));
         try {
-          await deleteApiKey(id); // Use prop action
+          await deleteApiKey(id);
           setShowValues((prev) => {
             const next = { ...prev };
             delete next[id];
@@ -109,15 +115,15 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
 
   const linkedProviderNames = useMemo(() => {
     const map = new Map<string, string>();
-    apiKeys.forEach((key) => {
-      const linkedConfigs = dbProviderConfigs.filter(
+    (apiKeys || []).forEach((key: DbApiKey) => {
+      const linkedConfigs = (dbProviderConfigs || []).filter(
         (config: DbProviderConfig) => config.apiKeyId === key.id,
       );
       map.set(
         key.id,
         linkedConfigs.length === 0
           ? "Not linked"
-          : linkedConfigs.map((c) => c.name).join(", "),
+          : linkedConfigs.map((c: DbProviderConfig) => c.name).join(", "),
       );
     });
     return map;
@@ -211,7 +217,7 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
 
       <div>
         <h3 className="text-lg font-medium mb-2">Stored API Keys</h3>
-        {apiKeys.length === 0 ? (
+        {(apiKeys || []).length === 0 ? ( // Add null check
           <p className="text-sm text-gray-500 dark:text-gray-400">
             No API keys stored yet. Add one above. Link keys to providers in the
             'Providers' tab.
@@ -229,7 +235,8 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {apiKeys.map((key) => {
+                {(apiKeys || []).map((key: DbApiKey) => {
+                  // Add null check
                   const isKeyDeleting = isDeleting[key.id];
                   return (
                     <TableRow key={key.id}>
@@ -267,7 +274,7 @@ const SettingsApiKeysComponent: React.FC<SettingsApiKeysProps> = ({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeleteKey(key.id, key.name)} // Use callback
+                          onClick={() => handleDeleteKey(key.id, key.name)}
                           className="text-red-600 hover:text-red-700 h-8 w-8"
                           aria-label={`Delete key ${key.name}`}
                           disabled={isKeyDeleting}

@@ -20,122 +20,99 @@ import {
 import { cn } from "@/lib/utils";
 import type {
   DbProviderConfig,
-  DbApiKey,
-  SidebarItemType,
-  DbConversation,
+  // DbApiKey, // Removed
+  // SidebarItemType,
+  // DbConversation, // Removed
 } from "@/lib/types";
 import { toast } from "sonner";
 import { requiresApiKey } from "@/lib/litechat";
+// Import store hooks
+import { useShallow } from "zustand/react/shallow";
+import { useProviderStore } from "@/store/provider.store";
+import { useSettingsStore } from "@/store/settings.store";
+import { useVfsStore } from "@/store/vfs.store";
+import { useSidebarStore } from "@/store/sidebar.store";
+import { useChatStorage } from "@/hooks/use-chat-storage";
 
-interface PromptSettingsProps {
-  className?: string;
-  selectedProviderId: string | null;
-  selectedModelId: string | null;
-  dbProviderConfigs: DbProviderConfig[];
-  apiKeys: DbApiKey[];
-  enableApiKeyManagement: boolean;
-  enableVfs: boolean;
-  isVfsEnabledForItem: boolean;
-  isVfsReady: boolean;
-  selectedItemId: string | null;
-  selectedItemType: SidebarItemType | null;
-  toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>;
-  enableAdvancedSettings: boolean;
-  temperature: number;
-  setTemperature: (temp: number) => void;
-  topP: number | null;
-  setTopP: (topP: number | null) => void;
-  maxTokens: number | null;
-  setMaxTokens: (tokens: number | null) => void;
-  topK: number | null;
-  setTopK: (topK: number | null) => void;
-  presencePenalty: number | null;
-  setPresencePenalty: (penalty: number | null) => void;
-  frequencyPenalty: number | null;
-  setFrequencyPenalty: (penalty: number | null) => void;
-  globalSystemPrompt: string | null;
-  activeConversationData: DbConversation | null;
-  updateConversationSystemPrompt: (
-    id: string,
-    systemPrompt: string | null,
-  ) => Promise<void>;
-  updateDbProviderConfig: (
-    id: string,
-    changes: Partial<DbProviderConfig>,
-  ) => Promise<void>;
-  setSelectedProviderId: (id: string | null) => void;
-  setSelectedModelId: (id: string | null) => void;
-  isVfsLoading: boolean;
-  vfsError: string | null;
-  vfsKey: string | null;
-  stopStreaming: () => void;
-}
-
-const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
+const PromptSettingsComponent: React.FC<{ className?: string }> = ({
   className,
-  selectedProviderId,
-  selectedModelId,
-  dbProviderConfigs,
-  apiKeys,
-  enableApiKeyManagement,
-  enableVfs,
-  isVfsEnabledForItem,
-  isVfsReady,
-  selectedItemId,
-  selectedItemType,
-  toggleVfsEnabledAction,
-  enableAdvancedSettings,
-  setSelectedProviderId,
-  setSelectedModelId,
-  temperature,
-  setTemperature,
-  topP,
-  setTopP,
-  maxTokens,
-  setMaxTokens,
-  topK,
-  setTopK,
-  presencePenalty,
-  setPresencePenalty,
-  frequencyPenalty,
-  setFrequencyPenalty,
-  globalSystemPrompt,
-  activeConversationData,
-  updateConversationSystemPrompt,
-  updateDbProviderConfig,
-  isVfsLoading,
-  vfsError,
-  vfsKey,
-  // stopStreaming, // Removed stopStreaming from destructuring
 }) => {
+  // --- Fetch state/actions from stores ---
+  const {
+    selectedProviderId,
+    // selectedModelId, // Removed - Unused
+    // dbProviderConfigs, // Fetched below
+    // apiKeys, // Fetched below
+    enableApiKeyManagement,
+    // getApiKeyForProvider, // Removed - Unused
+  } = useProviderStore(
+    useShallow((state) => ({
+      selectedProviderId: state.selectedProviderId,
+      // selectedModelId: state.selectedModelId,
+      // dbProviderConfigs: state.dbProviderConfigs,
+      // apiKeys: state.apiKeys,
+      enableApiKeyManagement: state.enableApiKeyManagement,
+      // getApiKeyForProvider: state.getApiKeyForProvider,
+    })),
+  );
+
+  // Fetch from storage
+  const { providerConfigs: dbProviderConfigs, apiKeys } = useChatStorage();
+
+  const { enableAdvancedSettings } = useSettingsStore(
+    useShallow((state) => ({
+      enableAdvancedSettings: state.enableAdvancedSettings,
+    })),
+  );
+
+  const {
+    enableVfs,
+    isVfsEnabledForItem,
+    // isVfsReady,
+  } = useVfsStore(
+    useShallow((state) => ({
+      enableVfs: state.enableVfs,
+      isVfsEnabledForItem: state.isVfsEnabledForItem,
+      isVfsReady: state.isVfsReady,
+    })),
+  );
+
+  const { selectedItemId, selectedItemType, toggleVfsEnabled } =
+    useSidebarStore(
+      useShallow((state) => ({
+        selectedItemId: state.selectedItemId,
+        selectedItemType: state.selectedItemType,
+        toggleVfsEnabled: state.toggleVfsEnabled,
+      })),
+    );
+
+  // --- Local UI State ---
   const [isAdvancedPanelOpen, setIsAdvancedPanelOpen] = useState(false);
   const [advancedInitialTab, setAdvancedInitialTab] =
     useState<string>("parameters");
 
-  const getApiKeyForProvider = useCallback(
-    (providerId: string): string | undefined => {
-      const config = dbProviderConfigs.find((p) => p.id === providerId);
-      if (!config || !config.apiKeyId) return undefined;
-      return apiKeys.find((k) => k.id === config.apiKeyId)?.value;
-    },
-    [dbProviderConfigs, apiKeys],
-  );
-
+  // --- Derived State ---
   const selectedDbProviderConfig = useMemo(
-    () => dbProviderConfigs.find((p) => p.id === selectedProviderId),
+    () =>
+      (dbProviderConfigs || []).find(
+        (p: DbProviderConfig) => p.id === selectedProviderId,
+      ),
     [dbProviderConfigs, selectedProviderId],
   );
 
   const needsKey = requiresApiKey(selectedDbProviderConfig?.type ?? null);
   const keyIsLinked = !!selectedDbProviderConfig?.apiKeyId;
+  // Use fetched apiKeys here
   const keyIsAvailable =
-    keyIsLinked && !!getApiKeyForProvider(selectedProviderId!);
+    keyIsLinked &&
+    !!(apiKeys || []).find((k) => k.id === selectedDbProviderConfig.apiKeyId);
 
   const showKeyRequiredWarning = needsKey && (!keyIsLinked || !keyIsAvailable);
   const showKeyProvidedIndicator = needsKey && keyIsLinked && keyIsAvailable;
 
   const isItemSelected = !!selectedItemId;
 
+  // --- Callbacks ---
   const openAdvancedPanel = useCallback((tabId: string = "parameters") => {
     setAdvancedInitialTab(tabId);
     setIsAdvancedPanelOpen(true);
@@ -178,33 +155,24 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
 
   const handleVfsSwitchChange = useCallback(() => {
     if (selectedItemId && selectedItemType) {
-      toggleVfsEnabledAction(selectedItemId, selectedItemType);
+      toggleVfsEnabled(selectedItemId, selectedItemType); // Use store action
     } else {
       console.error(
         "[PromptSettings] Cannot toggle VFS: selectedItemId/Type is null",
       );
       toast.error("No item selected to toggle VFS.");
     }
-  }, [selectedItemId, selectedItemType, toggleVfsEnabledAction]);
+  }, [selectedItemId, selectedItemType, toggleVfsEnabled]);
 
   return (
     <div className={cn("bg-card text-card-foreground", className)}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
         <div className="flex items-center gap-x-2 flex-shrink min-w-0 flex-grow sm:flex-grow-0">
-          <ProviderSelector
-            className="flex-shrink-0"
-            selectedProviderId={selectedProviderId}
-            setSelectedProviderId={setSelectedProviderId}
-            setSelectedModelId={setSelectedModelId}
-            dbProviderConfigs={dbProviderConfigs}
-          />
+          {/* ProviderSelector will fetch its own data */}
+          <ProviderSelector className="flex-shrink-0" />
           <div className="flex-grow min-w-[150px]">
-            <ModelSelector
-              selectedProviderId={selectedProviderId}
-              selectedModelId={selectedModelId}
-              setSelectedModelId={setSelectedModelId}
-              dbProviderConfigs={dbProviderConfigs}
-            />
+            {/* ModelSelector will fetch its own data */}
+            <ModelSelector />
           </div>
         </div>
 
@@ -343,38 +311,10 @@ const PromptSettingsComponent: React.FC<PromptSettingsProps> = ({
       </div>
 
       {enableAdvancedSettings && isAdvancedPanelOpen && (
+        // PromptSettingsAdvanced will fetch its own data
         <PromptSettingsAdvanced
           className="border-t border-border animate-slideInFromTop"
           initialTab={advancedInitialTab}
-          enableAdvancedSettings={enableAdvancedSettings}
-          temperature={temperature}
-          setTemperature={setTemperature}
-          topP={topP}
-          setTopP={setTopP}
-          maxTokens={maxTokens}
-          setMaxTokens={setMaxTokens}
-          topK={topK}
-          setTopK={setTopK}
-          presencePenalty={presencePenalty}
-          setPresencePenalty={setPresencePenalty}
-          frequencyPenalty={frequencyPenalty}
-          setFrequencyPenalty={setFrequencyPenalty}
-          globalSystemPrompt={globalSystemPrompt}
-          selectedItemId={selectedItemId}
-          selectedItemType={selectedItemType}
-          updateConversationSystemPrompt={updateConversationSystemPrompt}
-          activeConversationData={activeConversationData}
-          isVfsEnabledForItem={isVfsEnabledForItem}
-          isVfsReady={isVfsReady}
-          isVfsLoading={isVfsLoading}
-          vfsError={vfsError}
-          vfsKey={vfsKey}
-          enableApiKeyManagement={enableApiKeyManagement}
-          selectedProviderId={selectedProviderId}
-          dbProviderConfigs={dbProviderConfigs}
-          apiKeys={apiKeys}
-          updateDbProviderConfig={updateDbProviderConfig}
-          // Removed stopStreaming prop
         />
       )}
     </div>

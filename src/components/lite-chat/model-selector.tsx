@@ -1,38 +1,58 @@
 // src/components/lite-chat/model-selector.tsx
 import React, { useMemo } from "react";
-// REMOVED store imports
+// Import store hooks
+import { useShallow } from "zustand/react/shallow";
+import { useProviderStore } from "@/store/provider.store";
 import { Combobox } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
 import type {
   AiProviderConfig,
-  DbProviderConfig,
-  // AiModelConfig, // REMOVED
+  DbProviderConfig, // Keep DbProviderConfig type
+  // AiModelConfig, // Removed
 } from "@/lib/types";
+// Import useChatStorage
+import { useChatStorage } from "@/hooks/use-chat-storage";
 
-// Define props based on what PromptSettings passes down
-interface ModelSelectorProps {
-  selectedProviderId: string | null;
-  selectedModelId: string | null;
-  setSelectedModelId: (id: string | null) => void;
-  dbProviderConfigs: DbProviderConfig[]; // Needed to derive models for selected provider
-}
+// Helper function remains the same
+// const deriveAiProviderConfig = (
+//   config: DbProviderConfig | undefined, // Use correct type
+// ): AiProviderConfig | undefined => {
+//   if (!config) return undefined;
+//   return {
+//     id: config.id,
+//     name: config.name,
+//     type: config.type,
+//     models: [], // Placeholder
+//     allAvailableModels: config.fetchedModels || [],
+//   };
+// };
 
 // Wrap component logic in a named function for React.memo
-const ModelSelectorComponent: React.FC<ModelSelectorProps> = ({
-  selectedProviderId, // Use prop
-  selectedModelId, // Use prop
-  setSelectedModelId, // Use prop action
-  dbProviderConfigs, // Use prop
-}) => {
-  // REMOVED store access
+const ModelSelectorComponent: React.FC = () => {
+  // --- Fetch state/actions from store ---
+  const { selectedProviderId, selectedModelId, setSelectedModelId } =
+    useProviderStore(
+      useShallow((state) => ({
+        selectedProviderId: state.selectedProviderId,
+        selectedModelId: state.selectedModelId,
+        setSelectedModelId: state.setSelectedModelId,
+        // dbProviderConfigs fetched below
+      })),
+    );
 
-  // Derive selectedDbProviderConfig using props
+  // Fetch providerConfigs from storage
+  const { providerConfigs: dbProviderConfigs } = useChatStorage();
+
+  // Derive selectedDbProviderConfig using store state and fetched data
   const selectedDbProviderConfig = useMemo(
-    () => dbProviderConfigs.find((p) => p.id === selectedProviderId),
+    () =>
+      (dbProviderConfigs || []).find(
+        (p: DbProviderConfig) => p.id === selectedProviderId,
+      ), // Add type annotation
     [dbProviderConfigs, selectedProviderId],
   );
 
-  // Derive selectedProvider (for model list) using props
+  // Derive selectedProvider (for model list) using derived config
   const selectedProvider = useMemo((): AiProviderConfig | undefined => {
     if (!selectedDbProviderConfig) return undefined;
     const allModels = selectedDbProviderConfig.fetchedModels || [];
@@ -42,7 +62,6 @@ const ModelSelectorComponent: React.FC<ModelSelectorProps> = ({
         ? allModels.filter((m) => enabledIds.has(m.id))
         : allModels;
 
-    // Apply sorting based on modelSortOrder
     const sortOrder = selectedDbProviderConfig.modelSortOrder ?? [];
     if (sortOrder.length > 0 && displayModels.length > 0) {
       const orderedList: { id: string; name: string }[] = [];
@@ -71,11 +90,11 @@ const ModelSelectorComponent: React.FC<ModelSelectorProps> = ({
       models: displayModels.map((m) => ({
         id: m.id,
         name: m.name,
-        instance: null, // Instance not needed here
+        instance: null,
       })),
       allAvailableModels: allModels,
     };
-  }, [selectedDbProviderConfig]); // Depend on derived config
+  }, [selectedDbProviderConfig]);
 
   // Derive model options using derived selectedProvider
   const modelOptions = useMemo(() => {
@@ -94,7 +113,7 @@ const ModelSelectorComponent: React.FC<ModelSelectorProps> = ({
     }));
   }, [selectedProvider?.allAvailableModels]);
 
-  // Use prop action
+  // Use store action
   const handleModelChange = (value: string | null) => {
     setSelectedModelId(value);
   };
@@ -114,6 +133,8 @@ const ModelSelectorComponent: React.FC<ModelSelectorProps> = ({
         onChange={() => {}}
         placeholder="Select Provider First"
         disabled={true}
+        triggerClassName="text-xs h-9" // Ensure consistent styling
+        contentClassName="text-xs" // Ensure consistent styling
       />
     );
   }
@@ -128,6 +149,8 @@ const ModelSelectorComponent: React.FC<ModelSelectorProps> = ({
         searchPlaceholder="No models found..."
         emptyText="No models found for this provider."
         disabled={true}
+        triggerClassName="text-xs h-9" // Ensure consistent styling
+        contentClassName="text-xs" // Ensure consistent styling
       />
     );
   }
@@ -136,7 +159,7 @@ const ModelSelectorComponent: React.FC<ModelSelectorProps> = ({
     return (
       <Combobox
         options={allModelOptions}
-        value={selectedModelId} // Use prop
+        value={selectedModelId}
         onChange={handleModelChange}
         placeholder="No models enabled (Search all)"
         searchPlaceholder={`Search ${allModelOptions.length} models...`}
@@ -150,7 +173,7 @@ const ModelSelectorComponent: React.FC<ModelSelectorProps> = ({
   return (
     <Combobox
       options={modelOptions}
-      value={selectedModelId} // Use prop
+      value={selectedModelId}
       onChange={handleModelChange}
       placeholder="Select model..."
       searchPlaceholder={`Search ${modelOptions.length} enabled models...`}

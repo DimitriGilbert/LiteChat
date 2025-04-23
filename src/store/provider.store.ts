@@ -1,5 +1,4 @@
 // src/store/provider.store.ts
-
 import { create } from "zustand";
 import type { DbApiKey, DbProviderConfig, DbProviderType } from "@/lib/types";
 import { toast } from "sonner";
@@ -33,13 +32,16 @@ export interface ProviderState {
   selectedProviderId: string | null;
   selectedModelId: string | null;
   providerFetchStatus: Record<string, FetchStatus>;
+  // Add dbProviderConfigs and apiKeys to the state
+  dbProviderConfigs: DbProviderConfig[];
+  apiKeys: DbApiKey[];
 }
 
 export interface ProviderActions {
   setEnableApiKeyManagement: (enabled: boolean) => void;
   setSelectedProviderId: (
     id: string | null,
-    currentConfigs: DbProviderConfig[],
+    currentConfigs: DbProviderConfig[], // Keep this parameter
   ) => void;
   setSelectedModelId: (id: string | null) => void;
   addApiKey: (
@@ -58,11 +60,16 @@ export interface ProviderActions {
   deleteDbProviderConfig: (id: string) => Promise<void>;
   fetchModels: (
     providerConfigId: string,
-    currentConfigs: DbProviderConfig[],
-    currentApiKeys: DbApiKey[],
+    currentConfigs: DbProviderConfig[], // Keep this parameter
+    currentApiKeys: DbApiKey[], // Keep this parameter
   ) => Promise<void>;
   setProviderFetchStatus: (providerId: string, status: FetchStatus) => void;
   initializeFromDb: (currentConfigs: DbProviderConfig[]) => Promise<void>;
+  // Add internal actions to update state from storage
+  _setDbProviderConfigs: (configs: DbProviderConfig[]) => void;
+  _setApiKeys: (keys: DbApiKey[]) => void;
+  // Add getter for API key (useful for components)
+  getApiKeyForProvider: (providerId: string) => string | undefined;
 }
 
 // Helper function to save selection
@@ -87,8 +94,13 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
     selectedProviderId: null,
     selectedModelId: null,
     providerFetchStatus: {},
+    dbProviderConfigs: [], // Initialize as empty
+    apiKeys: [], // Initialize as empty
 
     // Actions
+    _setDbProviderConfigs: (dbProviderConfigs) => set({ dbProviderConfigs }),
+    _setApiKeys: (apiKeys) => set({ apiKeys }),
+
     setEnableApiKeyManagement: (enableApiKeyManagement) =>
       set({ enableApiKeyManagement }),
 
@@ -164,6 +176,9 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           createdAt: new Date(),
         };
         await db.apiKeys.add(newKey);
+        // Update state after DB operation
+        const updatedKeys = await db.apiKeys.toArray();
+        set({ apiKeys: updatedKeys });
         toast.success(`API Key "${name}" added.`);
         return newId;
       } catch (error) {
@@ -195,6 +210,9 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
             await Promise.all(updates);
           }
         });
+        // Update state after DB operation
+        const updatedKeys = await db.apiKeys.toArray();
+        set({ apiKeys: updatedKeys });
         toast.success(`API Key "${keyToDelete.name}" deleted.`);
       } catch (error) {
         console.error("Failed to delete API key:", error);
@@ -216,6 +234,9 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           updatedAt: now,
         };
         await db.providerConfigs.add(newConfig);
+        // Update state after DB operation
+        const updatedConfigs = await db.providerConfigs.toArray();
+        set({ dbProviderConfigs: updatedConfigs });
         toast.success(`Provider "${config.name}" added.`);
         return newId;
       } catch (error) {
@@ -233,6 +254,9 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           ...changes,
           updatedAt: new Date(),
         });
+        // Update state after DB operation
+        const updatedConfigs = await db.providerConfigs.toArray();
+        set({ dbProviderConfigs: updatedConfigs });
       } catch (error) {
         console.error("Failed to update provider config:", error);
         toast.error(
@@ -256,6 +280,9 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
 
       try {
         await db.providerConfigs.delete(id);
+        // Update state after DB operation
+        const updatedConfigs = await db.providerConfigs.toArray();
+        set({ dbProviderConfigs: updatedConfigs });
         toast.success(`Provider "${configToDelete.name}" deleted.`);
       } catch (error) {
         console.error("Failed to delete provider config:", error);
@@ -285,6 +312,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
         const apiKey = currentApiKeys.find((k) => k.id === apiKeyId)?.value;
         const fetched = await fetchModelsForProvider(config, apiKey);
 
+        // Use updateDbProviderConfig to update Dexie and trigger state update
         await get().updateDbProviderConfig(providerConfigId, {
           fetchedModels: fetched,
           modelsLastFetchedAt: new Date(),
@@ -314,13 +342,22 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
 
     initializeFromDb: async (currentConfigs) => {
       try {
-        // 1. Load last selection from DB
-        const lastSelectionState = await db.appState.get(LAST_SELECTION_KEY);
+        // Load initial data from DB
+        const [initialApiKeys, lastSelectionState] = await Promise.all([
+          db.apiKeys.toArray(),
+          db.appState.get(LAST_SELECTION_KEY),
+        ]);
+
+        // Set initial DB data into state
+        set({
+          dbProviderConfigs: currentConfigs,
+          apiKeys: initialApiKeys,
+        });
 
         let initialProviderId: string | null = null;
         let initialModelId: string | null = null;
 
-        // 2. Validate loaded selection
+        // Validate loaded selection
         if (lastSelectionState?.value) {
           const loadedProviderId = lastSelectionState.value.providerId ?? null;
           const loadedModelId = lastSelectionState.value.modelId ?? null;
@@ -344,7 +381,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           }
         }
 
-        // 3. Fallback logic if no valid selection loaded
+        // Fallback logic if no valid selection loaded
         if (!initialProviderId) {
           const firstEnabled = currentConfigs.find((c) => c.isEnabled);
           if (firstEnabled) {
@@ -352,7 +389,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           }
         }
 
-        // 4. Determine default model if needed
+        // Determine default model if needed
         if (initialProviderId && !initialModelId) {
           const providerConfig = currentConfigs.find(
             (p) => p.id === initialProviderId,
@@ -401,7 +438,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           }
         }
 
-        // 5. Set the final state
+        // Set the final state
         set({
           selectedProviderId: initialProviderId,
           selectedModelId: initialModelId,
@@ -422,6 +459,13 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           set({ selectedProviderId: null, selectedModelId: null });
         }
       }
+    },
+
+    // Getter for API key
+    getApiKeyForProvider: (providerId) => {
+      const config = get().dbProviderConfigs.find((p) => p.id === providerId);
+      if (!config || !config.apiKeyId) return undefined;
+      return get().apiKeys.find((k) => k.id === config.apiKeyId)?.value;
     },
   }),
 );

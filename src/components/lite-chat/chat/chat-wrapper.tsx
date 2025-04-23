@@ -15,21 +15,18 @@ import type {
   DbProviderConfig,
   DbApiKey,
   AiProviderConfig as AiProviderConfigType,
-  SidebarItem,
+  // SidebarItem, // Removed unused import
 } from "@/lib/types";
-// Removed CoreChatActions import as specific core actions are no longer passed down
 
 // Define the props expected by ChatWrapper based on LiteChatInner
 export interface ChatWrapperProps {
   className?: string;
-  // Volatile State
+  // Volatile State (High Frequency)
   messages: Message[];
   isStreaming: boolean;
   isLoadingMessages: boolean;
   error: string | null;
-  isVfsReady: boolean;
-  isVfsEnabledForItem: boolean;
-  // Input State/Actions
+  // Input State/Actions (High Frequency)
   promptInputValue: string;
   setPromptInputValue: (value: string) => void;
   addAttachedFile: (file: File) => void;
@@ -40,74 +37,74 @@ export interface ChatWrapperProps {
   selectedVfsPaths: string[];
   removeSelectedVfsPath: (path: string) => void;
   clearSelectedVfsPaths: () => void;
-  // Selection State
-  selectedItemId: string | null;
-  selectedItemType: SidebarItemType | null;
-  // Core Actions (passed down to children if needed)
+  // Core Actions (High Frequency)
   regenerateMessage: (messageId: string) => Promise<void>;
   stopStreaming: (parentMessageId?: string | null) => void;
-  setError: (error: string | null) => void;
-  // Form Submission Wrapper (from logic hook)
+  // Form Submission Wrapper (High Frequency)
   handleFormSubmit: (
     prompt: string,
     files: File[],
     vfsPaths: string[],
-    context: any, // Context built within PromptForm's internal handler
+    context: any,
   ) => Promise<void>;
-  // Provider/Model State & Actions
-  selectedProviderId: string | null;
-  selectedModelId: string | null;
-  selectedModel: AiModelConfig | undefined;
+  // Selection State (Passed Down)
+  selectedItemId: string | null;
+  selectedItemType: SidebarItemType | null;
+  // Derived State (Passed Down)
+  activeConversationData: DbConversation | null;
   selectedProvider: AiProviderConfigType | undefined;
-  dbProviderConfigs: DbProviderConfig[];
-  apiKeys: DbApiKey[];
-  setSelectedProviderId: (id: string | null) => void;
-  setSelectedModelId: (id: string | null) => void;
-  updateDbProviderConfig: (
-    id: string,
-    changes: Partial<DbProviderConfig>,
-  ) => Promise<void>;
+  selectedModel: AiModelConfig | undefined;
   getApiKeyForProvider: (providerId: string) => string | undefined;
-  // Settings State & Actions
-  temperature: number;
-  setTemperature: (temp: number) => void;
-  topP: number | null;
-  setTopP: (topP: number | null) => void;
-  maxTokens: number | null;
-  setMaxTokens: (tokens: number | null) => void;
-  topK: number | null;
-  setTopK: (topK: number | null) => void;
-  presencePenalty: number | null;
-  setPresencePenalty: (penalty: number | null) => void;
-  frequencyPenalty: number | null;
-  setFrequencyPenalty: (penalty: number | null) => void;
-  globalSystemPrompt: string | null;
-  enableAdvancedSettings: boolean;
-  enableApiKeyManagement: boolean;
-  // VFS State & Actions
+  // VFS State (Passed Down)
+  isVfsReady: boolean;
+  isVfsEnabledForItem: boolean;
   isVfsLoading: boolean;
   vfsError: string | null;
   vfsKey: string | null;
-  toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>;
-  // Conversation/Item State & Actions
-  activeConversationData: DbConversation | null;
-  updateConversationSystemPrompt: (
-    id: string,
-    systemPrompt: string | null,
-  ) => Promise<void>;
-  createConversation: (
-    parentId: string | null,
-    title?: string,
-  ) => Promise<string>;
-  // Mod/Extensibility Props
+  // Mod/Extensibility Props (Passed Down)
   customPromptActions: CustomPromptAction[];
   customMessageActions: CustomMessageAction[];
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
-  // Props needed by ChatHeader
-  sidebarItems: SidebarItem[];
-  searchTerm: string;
-  setSearchTerm: (term: string) => void;
-  exportConversation: (conversationId: string | null) => Promise<void>;
+  // Settings State (Passed Down)
+  enableAdvancedSettings: boolean;
+  enableApiKeyManagement: boolean;
+  globalSystemPrompt: string | null;
+  temperature: number;
+  topP: number | null;
+  maxTokens: number | null;
+  topK: number | null;
+  presencePenalty: number | null;
+  frequencyPenalty: number | null;
+  // Actions needed by children (Passed Down)
+  // sidebarItems: SidebarItem[]; // Removed - Header fetches its own
+  searchTerm: string; // For Header
+  setSearchTerm: (term: string) => void; // For Header
+  exportConversation: (conversationId: string | null) => Promise<void>; // For Header
+  createConversation: (
+    parentId: string | null,
+    title?: string,
+  ) => Promise<string>; // For PromptForm
+  updateDbProviderConfig: (
+    id: string,
+    changes: Partial<DbProviderConfig>,
+  ) => Promise<void>; // For PromptForm/Settings
+  setSelectedProviderId: (id: string | null) => void; // For PromptForm/Settings
+  setSelectedModelId: (id: string | null) => void; // For PromptForm/Settings
+  toggleVfsEnabledAction: (id: string, type: SidebarItemType) => Promise<void>; // For PromptForm/Settings
+  setTemperature: (temp: number) => void; // For PromptForm/Settings
+  setTopP: (topP: number | null) => void; // For PromptForm/Settings
+  setMaxTokens: (tokens: number | null) => void; // For PromptForm/Settings
+  setTopK: (topK: number | null) => void; // For PromptForm/Settings
+  setPresencePenalty: (penalty: number | null) => void; // For PromptForm/Settings
+  setFrequencyPenalty: (penalty: number | null) => void; // For PromptForm/Settings
+  updateConversationSystemPrompt: (
+    id: string,
+    systemPrompt: string | null,
+  ) => Promise<void>; // For PromptForm/Settings
+  setError: (error: string | null) => void; // For PromptForm
+  // Provider/API Key Data (Passed Down)
+  dbProviderConfigs: DbProviderConfig[];
+  apiKeys: DbApiKey[];
 }
 
 const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
@@ -117,8 +114,6 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
   isStreaming,
   isLoadingMessages,
   error,
-  isVfsReady,
-  isVfsEnabledForItem,
   promptInputValue,
   setPromptInputValue,
   addAttachedFile,
@@ -129,54 +124,51 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
   selectedVfsPaths,
   removeSelectedVfsPath,
   clearSelectedVfsPaths,
-  selectedItemId,
-  selectedItemType,
   regenerateMessage,
   stopStreaming,
-  setError,
-  handleFormSubmit, // Use the wrapper from logic hook
-  // handleImageGenerationWrapper, // This wrapper is now part of handleFormSubmit
-  selectedProviderId,
-  selectedModelId,
-  selectedModel,
+  handleFormSubmit,
+  selectedItemId,
+  selectedItemType,
+  activeConversationData,
   selectedProvider,
-  dbProviderConfigs,
-  apiKeys,
-  setSelectedProviderId,
-  setSelectedModelId,
-  updateDbProviderConfig,
+  selectedModel,
   getApiKeyForProvider,
-  temperature,
-  setTemperature,
-  topP,
-  setTopP,
-  maxTokens,
-  setMaxTokens,
-  topK,
-  setTopK,
-  presencePenalty,
-  setPresencePenalty,
-  frequencyPenalty,
-  setFrequencyPenalty,
-  globalSystemPrompt,
-  enableAdvancedSettings,
-  enableApiKeyManagement,
+  isVfsReady,
+  isVfsEnabledForItem,
   isVfsLoading,
   vfsError,
   vfsKey,
-  toggleVfsEnabledAction,
-  activeConversationData,
-  updateConversationSystemPrompt,
-  createConversation,
   customPromptActions,
   customMessageActions,
   getContextSnapshotForMod,
-  // Destructure props for ChatHeader
-  sidebarItems,
+  enableAdvancedSettings,
+  enableApiKeyManagement,
+  globalSystemPrompt,
+  temperature,
+  topP,
+  maxTokens,
+  topK,
+  presencePenalty,
+  frequencyPenalty,
+  // sidebarItems, // Removed
   searchTerm,
   setSearchTerm,
   exportConversation,
-  // Core actions are no longer passed directly here
+  createConversation,
+  updateDbProviderConfig,
+  setSelectedProviderId,
+  setSelectedModelId,
+  toggleVfsEnabledAction,
+  setTemperature,
+  setTopP,
+  setMaxTokens,
+  setTopK,
+  setPresencePenalty,
+  setFrequencyPenalty,
+  updateConversationSystemPrompt,
+  setError,
+  dbProviderConfigs,
+  apiKeys,
 }) => {
   return (
     <main
@@ -186,16 +178,16 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
       )}
     >
       <ChatHeader
-        selectedItemId={selectedItemId}
-        selectedItemType={selectedItemType}
-        activeConversationData={activeConversationData}
-        sidebarItems={sidebarItems}
+        className={cn(
+          "flex-shrink-0", // Add flex-shrink-0 if needed
+        )}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         exportConversation={exportConversation}
       />
       <ChatContent
         className="flex-grow h-0"
+        // Pass necessary display props + regenerate callback
         messages={messages}
         isLoadingMessages={isLoadingMessages}
         isStreaming={isStreaming}
@@ -204,26 +196,23 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
         modMessageActions={customMessageActions}
       />
       <PromptWrapper
-        // Pass volatile state
+        // Pass all remaining props down to PromptWrapper/PromptForm
         error={error}
         isStreaming={isStreaming}
         isVfsReady={isVfsReady}
         isVfsEnabledForItem={isVfsEnabledForItem}
-        // Pass input state/actions
         promptInputValue={promptInputValue}
         setPromptInputValue={setPromptInputValue}
         addAttachedFile={addAttachedFile}
         removeAttachedFile={removeAttachedFile}
         clearAttachedFiles={clearAttachedFiles}
         clearPromptInput={clearPromptInput}
-        // Pass the form submit wrapper
-        onFormSubmit={handleFormSubmit} // Pass the wrapper function
-        // Pass other necessary props down
+        onFormSubmit={handleFormSubmit}
         attachedFiles={attachedFiles}
         selectedVfsPaths={selectedVfsPaths}
         clearSelectedVfsPaths={clearSelectedVfsPaths}
-        selectedProviderId={selectedProviderId}
-        selectedModelId={selectedModelId}
+        selectedProviderId={selectedProvider?.id ?? null} // Pass ID derived from provider object
+        selectedModelId={selectedModel?.id ?? null} // Pass ID derived from model object
         dbProviderConfigs={dbProviderConfigs}
         apiKeys={apiKeys}
         enableApiKeyManagement={enableApiKeyManagement}

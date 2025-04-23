@@ -18,100 +18,129 @@ import {
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import type {
-  DbConversation,
-  SidebarItemType,
   DbProviderConfig,
-  DbApiKey,
+  // DbConversation, // Keep DbConversation
+  // SidebarItemType,
+  // DbApiKey, // Removed
 } from "@/lib/types";
+// Import store hooks
+import { useShallow } from "zustand/react/shallow";
+import { useSettingsStore } from "@/store/settings.store";
+import { useProviderStore } from "@/store/provider.store";
+import { useSidebarStore } from "@/store/sidebar.store";
 import { useVfsStore } from "@/store/vfs.store";
+// Import useChatStorage
+import { useChatStorage } from "@/hooks/use-chat-storage";
 
-interface PromptSettingsAdvancedProps {
+const PromptSettingsAdvancedComponent: React.FC<{
   className?: string;
   initialTab?: string;
-  // Feature Flags
-  enableAdvancedSettings: boolean;
-  enableApiKeyManagement: boolean;
-  // AI Parameters State/Setters
-  temperature: number;
-  setTemperature: (temp: number) => void;
-  topP: number | null;
-  setTopP: (topP: number | null) => void;
-  maxTokens: number | null;
-  setMaxTokens: (tokens: number | null) => void;
-  topK: number | null;
-  setTopK: (topK: number | null) => void;
-  presencePenalty: number | null;
-  setPresencePenalty: (penalty: number | null) => void;
-  frequencyPenalty: number | null;
-  setFrequencyPenalty: (penalty: number | null) => void;
-  // System Prompt State/Actions
-  globalSystemPrompt: string | null;
-  selectedItemId: string | null;
-  selectedItemType: SidebarItemType | null;
-  activeConversationData: DbConversation | null;
-  updateConversationSystemPrompt: (
-    id: string,
-    systemPrompt: string | null,
-  ) => Promise<void>;
-  // VFS State (Passed directly)
-  isVfsEnabledForItem: boolean;
-  isVfsReady: boolean;
-  // VFS State (Bundled)
-  isVfsLoading: boolean;
-  vfsError: string | null;
-  vfsKey: string | null;
-  // API Key Management State/Actions
-  selectedProviderId: string | null;
-  dbProviderConfigs: DbProviderConfig[];
-  apiKeys: DbApiKey[];
-  updateDbProviderConfig: (
-    id: string,
-    changes: Partial<DbProviderConfig>,
-  ) => Promise<void>;
-  // stopStreaming: () => void; // Removed unused prop
-}
+}> = ({ className, initialTab = "parameters" }) => {
+  // --- Fetch state/actions from stores ---
+  const {
+    enableAdvancedSettings,
+    temperature,
+    setTemperature,
+    topP,
+    setTopP,
+    maxTokens,
+    setMaxTokens,
+    topK,
+    setTopK,
+    presencePenalty,
+    setPresencePenalty,
+    frequencyPenalty,
+    setFrequencyPenalty,
+    globalSystemPrompt,
+  } = useSettingsStore(
+    useShallow((state) => ({
+      enableAdvancedSettings: state.enableAdvancedSettings,
+      temperature: state.temperature,
+      setTemperature: state.setTemperature,
+      topP: state.topP,
+      setTopP: state.setTopP,
+      maxTokens: state.maxTokens,
+      setMaxTokens: state.setMaxTokens,
+      topK: state.topK,
+      setTopK: state.setTopK,
+      presencePenalty: state.presencePenalty,
+      setPresencePenalty: state.setPresencePenalty,
+      frequencyPenalty: state.frequencyPenalty,
+      setFrequencyPenalty: state.setFrequencyPenalty,
+      globalSystemPrompt: state.globalSystemPrompt,
+    })),
+  );
 
-const PromptSettingsAdvancedComponent: React.FC<
-  PromptSettingsAdvancedProps
-> = ({
-  className,
-  initialTab = "parameters",
-  // Destructure all props
-  enableAdvancedSettings,
-  enableApiKeyManagement,
-  temperature,
-  setTemperature,
-  topP,
-  setTopP,
-  maxTokens,
-  setMaxTokens,
-  topK,
-  setTopK,
-  presencePenalty,
-  setPresencePenalty,
-  frequencyPenalty,
-  setFrequencyPenalty,
-  globalSystemPrompt,
-  selectedItemId,
-  selectedItemType,
-  activeConversationData,
-  updateConversationSystemPrompt,
-  isVfsEnabledForItem,
-  isVfsReady,
-  isVfsLoading,
-  vfsError,
-  vfsKey,
-  selectedProviderId,
-  dbProviderConfigs,
-  apiKeys,
-  updateDbProviderConfig,
-  // stopStreaming, // Removed unused prop
-}) => {
+  const {
+    selectedProviderId,
+    // dbProviderConfigs, // Fetched below
+    // apiKeys, // Fetched below
+    enableApiKeyManagement,
+    updateDbProviderConfig,
+  } = useProviderStore(
+    useShallow((state) => ({
+      selectedProviderId: state.selectedProviderId,
+      // dbProviderConfigs: state.dbProviderConfigs,
+      // apiKeys: state.apiKeys,
+      enableApiKeyManagement: state.enableApiKeyManagement,
+      updateDbProviderConfig: state.updateDbProviderConfig,
+    })),
+  );
+
+  // Fetch from storage
+  const {
+    providerConfigs: dbProviderConfigs,
+    apiKeys,
+    conversations,
+  } = useChatStorage();
+
+  const {
+    selectedItemId,
+    selectedItemType,
+    // activeConversationData, // Derived below
+    updateConversationSystemPrompt,
+  } = useSidebarStore(
+    useShallow((state) => ({
+      selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType,
+      // activeConversationData: state.activeConversationData,
+      updateConversationSystemPrompt: state.updateConversationSystemPrompt,
+    })),
+  );
+
+  // Derive activeConversationData locally
+  const activeConversationData = useMemo(() => {
+    if (selectedItemType === "conversation" && selectedItemId) {
+      return (conversations || []).find((c) => c.id === selectedItemId);
+    }
+    return null;
+  }, [selectedItemId, selectedItemType, conversations]);
+
+  const {
+    isVfsEnabledForItem,
+    isVfsReady,
+    isVfsLoading,
+    vfsError,
+    vfsKey,
+    initializeVfs, // Get initialize action
+  } = useVfsStore(
+    useShallow((state) => ({
+      isVfsEnabledForItem: state.isVfsEnabledForItem,
+      isVfsReady: state.isVfsReady,
+      isVfsLoading: state.isVfsLoading,
+      vfsError: state.vfsError,
+      vfsKey: state.vfsKey,
+      initializeVfs: state.initializeVfs,
+    })),
+  );
+
+  // --- Local UI State ---
   const [localConvoSystemPrompt, setLocalConvoSystemPrompt] = useState<
     string | null
   >(null);
   const [isConvoPromptDirty, setIsConvoPromptDirty] = useState(false);
 
+  // --- Derived State ---
   const conversationId = useMemo(() => {
     return selectedItemType === "conversation" ? selectedItemId : null;
   }, [selectedItemId, selectedItemType]);
@@ -132,17 +161,15 @@ const PromptSettingsAdvancedComponent: React.FC<
     return null;
   }, [enableAdvancedSettings, activeConversationData, globalSystemPrompt]);
 
+  // --- Effects ---
   useEffect(() => {
-    // If VFS is enabled but not ready, try to initialize it
     if (isVfsEnabledForItem && !isVfsReady && !isVfsLoading && vfsKey) {
       console.log(
         "[PromptSettingsAdvanced] VFS enabled but not ready, triggering initialization",
       );
-      const vfsStore = useVfsStore.getState();
-      vfsStore.initializeVfs();
+      initializeVfs(); // Call store action
     }
-    // Only run when these specific dependencies change
-  }, [isVfsEnabledForItem, isVfsReady, isVfsLoading, vfsKey]);
+  }, [isVfsEnabledForItem, isVfsReady, isVfsLoading, vfsKey, initializeVfs]);
 
   useEffect(() => {
     if (enableAdvancedSettings && conversationId) {
@@ -157,6 +184,7 @@ const PromptSettingsAdvancedComponent: React.FC<
     }
   }, [conversationId, enableAdvancedSettings, activeConversationData]);
 
+  // --- Callbacks ---
   const handleConvoSystemPromptChange = (
     e: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
@@ -168,7 +196,7 @@ const PromptSettingsAdvancedComponent: React.FC<
     if (enableAdvancedSettings && conversationId && isConvoPromptDirty) {
       const promptToSave =
         localConvoSystemPrompt?.trim() === "" ? null : localConvoSystemPrompt;
-      updateConversationSystemPrompt(conversationId, promptToSave)
+      updateConversationSystemPrompt(conversationId, promptToSave) // Use store action
         .then(() => {
           setIsConvoPromptDirty(false);
           toast.success("Conversation system prompt saved.");
@@ -205,13 +233,16 @@ const PromptSettingsAdvancedComponent: React.FC<
   );
 
   const selectedDbProviderConfig = useMemo(() => {
-    return dbProviderConfigs.find((p) => p.id === selectedProviderId);
+    return (dbProviderConfigs || []).find(
+      (p: DbProviderConfig) => p.id === selectedProviderId,
+    );
   }, [dbProviderConfigs, selectedProviderId]);
 
   const handleApiKeySelectionChange = useCallback(
     (keyId: string | null) => {
       if (selectedDbProviderConfig) {
         updateDbProviderConfig(selectedDbProviderConfig.id, {
+          // Use store action
           apiKeyId: keyId,
         })
           .then(() => {
@@ -272,7 +303,7 @@ const PromptSettingsAdvancedComponent: React.FC<
                 max={1}
                 step={0.01}
                 value={[temperature]}
-                onValueChange={(value) => setTemperature(value[0])}
+                onValueChange={(value) => setTemperature(value[0])} // Use store action
               />
             </div>
             <div className="space-y-1.5">
@@ -285,7 +316,7 @@ const PromptSettingsAdvancedComponent: React.FC<
                 max={1}
                 step={0.01}
                 value={[topP ?? 1.0]}
-                onValueChange={(value) => handleSliderChange(setTopP, value)}
+                onValueChange={(value) => handleSliderChange(setTopP, value)} // Use store action
               />
             </div>
           </div>
@@ -299,7 +330,7 @@ const PromptSettingsAdvancedComponent: React.FC<
                 type="number"
                 placeholder="Default"
                 value={maxTokens ?? ""}
-                onChange={(e) => handleNumberInputChange(setMaxTokens, e)}
+                onChange={(e) => handleNumberInputChange(setMaxTokens, e)} // Use store action
                 min="1"
                 className="h-8 text-xs"
               />
@@ -313,7 +344,7 @@ const PromptSettingsAdvancedComponent: React.FC<
                 type="number"
                 placeholder="Default"
                 value={topK ?? ""}
-                onChange={(e) => handleNumberInputChange(setTopK, e)}
+                onChange={(e) => handleNumberInputChange(setTopK, e)} // Use store action
                 min="1"
                 className="h-8 text-xs"
               />
@@ -332,7 +363,7 @@ const PromptSettingsAdvancedComponent: React.FC<
                 value={[presencePenalty ?? 0.0]}
                 onValueChange={(value) =>
                   handleSliderChange(setPresencePenalty, value)
-                }
+                } // Use store action
               />
             </div>
             <div className="space-y-1.5">
@@ -347,7 +378,7 @@ const PromptSettingsAdvancedComponent: React.FC<
                 value={[frequencyPenalty ?? 0.0]}
                 onValueChange={(value) =>
                   handleSliderChange(setFrequencyPenalty, value)
-                }
+                } // Use store action
               />
             </div>
           </div>
@@ -451,7 +482,7 @@ const PromptSettingsAdvancedComponent: React.FC<
               <ApiKeySelector
                 selectedKeyId={selectedDbProviderConfig.apiKeyId ?? null}
                 onKeySelected={handleApiKeySelectionChange}
-                apiKeys={apiKeys}
+                apiKeys={apiKeys || []} // Use fetched apiKeys
                 disabled={!selectedDbProviderConfig}
               />
             ) : (

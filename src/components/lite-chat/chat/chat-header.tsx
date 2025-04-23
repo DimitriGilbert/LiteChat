@@ -2,59 +2,72 @@
 import React, { useMemo } from "react";
 import { ChatHeaderActions } from "./chat-header-actions";
 import { cn } from "@/lib/utils";
-import type {
-  SidebarItem,
-  SidebarItemType,
-  DbConversation, // Added DbConversation import
-} from "@/lib/types";
+// import type {
+//   // SidebarItem, // Removed - Fetched from store
+//   SidebarItemType,
+//   DbConversation,
+//   DbProject, // Added DbProject import
+// } from "@/lib/types";
+// Import store hooks
+import { useShallow } from "zustand/react/shallow";
+import { useSidebarStore } from "@/store/sidebar.store";
+import { useChatStorage } from "@/hooks/use-chat-storage"; // To get items
 
 interface ChatHeaderProps {
   className?: string;
-  selectedItemId: string | null;
-  selectedItemType: SidebarItemType | null;
-  // Make sidebarItems optional to handle potential initial undefined state
-  sidebarItems?: SidebarItem[];
-  activeConversationData: DbConversation | null; // Added activeConversationData prop
-  searchTerm?: string; // Make optional
-  setSearchTerm?: (term: string) => void; // Make optional
-  exportConversation?: (conversationId: string | null) => Promise<void>; // Make optional
+  // Remove props fetched from store
+  searchTerm?: string;
+  setSearchTerm?: (term: string) => void;
+  exportConversation?: (conversationId: string | null) => Promise<void>;
 }
 
 const ChatHeaderComponent: React.FC<ChatHeaderProps> = ({
   className,
-  selectedItemId,
-  selectedItemType,
-  sidebarItems, // Receive as potentially optional
-  activeConversationData, // Receive activeConversationData
-  searchTerm = "", // Default optional props
-  setSearchTerm = () => {}, // Default optional props
-  exportConversation = async () => {}, // Default optional props
+  searchTerm = "",
+  setSearchTerm = () => {},
+  exportConversation = async () => {},
 }) => {
+  // --- Fetch state from stores ---
+  const { selectedItemId, selectedItemType } = useSidebarStore(
+    useShallow((state) => ({
+      selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType,
+      // activeConversationData is derived below
+    })),
+  );
+
+  // Fetch items from storage for title fallback and active data
+  const { projects, conversations } = useChatStorage();
+
+  // Derive activeConversationData locally
+  const activeConversationData = useMemo(() => {
+    if (selectedItemType === "conversation" && selectedItemId) {
+      return (conversations || []).find((c) => c.id === selectedItemId);
+    }
+    return null;
+  }, [selectedItemId, selectedItemType, conversations]);
+
   const title = useMemo(() => {
-    // Use activeConversationData directly if available and it's a conversation
     if (selectedItemType === "conversation" && activeConversationData) {
       return activeConversationData.title;
     }
-    // Fallback to finding in sidebarItems if activeConversationData is not passed or not a convo
-    if (selectedItemId && selectedItemType && sidebarItems) {
-      // Check if sidebarItems exists
-      const selectedItem = sidebarItems.find(
-        (item) => item.id === selectedItemId && item.type === selectedItemType, // Ensure type matches too
-      );
-      if (selectedItem) {
-        if (selectedItem.type === "conversation") {
-          return selectedItem.title;
-        } else if (selectedItem.type === "project") {
-          return selectedItem.name;
-        }
-      } else {
-        console.warn(
-          `ChatHeader: Selected item ${selectedItemId} (${selectedItemType}) not found in sidebarItems.`,
-        );
+    if (selectedItemId && selectedItemType) {
+      if (selectedItemType === "conversation") {
+        const item = (conversations || []).find((c) => c.id === selectedItemId);
+        return item?.title;
+      } else if (selectedItemType === "project") {
+        const item = (projects || []).find((p) => p.id === selectedItemId);
+        return item?.name;
       }
     }
     return "LiteChat"; // Default title
-  }, [selectedItemId, selectedItemType, sidebarItems, activeConversationData]); // Add activeConversationData dependency
+  }, [
+    selectedItemId,
+    selectedItemType,
+    activeConversationData,
+    conversations,
+    projects,
+  ]);
 
   const conversationId =
     selectedItemType === "conversation" ? selectedItemId : null;

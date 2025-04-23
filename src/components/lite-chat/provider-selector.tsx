@@ -7,26 +7,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-// REMOVED store imports
+// Import store hooks
+import { useShallow } from "zustand/react/shallow";
+import { useProviderStore } from "@/store/provider.store";
 import { cn } from "@/lib/utils";
 import type {
   AiProviderConfig,
-  DbProviderConfig,
-  // DbProviderType, // REMOVED
+  DbProviderConfig, // Keep type
 } from "@/lib/types";
+// Import useChatStorage
+import { useChatStorage } from "@/hooks/use-chat-storage";
 
-// Define props based on what PromptSettings passes down
-interface ProviderSelectorProps {
-  className?: string;
-  selectedProviderId: string | null;
-  setSelectedProviderId: (id: string | null) => void;
-  setSelectedModelId: (id: string | null) => void; // Needed to reset model on provider change
-  dbProviderConfigs: DbProviderConfig[]; // Needed to derive active providers
-}
-
-// Helper function (can be moved to utils)
+// Helper function remains the same
 const deriveAiProviderConfig = (
-  config: DbProviderConfig | undefined,
+  config: DbProviderConfig | undefined, // Use correct type
 ): AiProviderConfig | undefined => {
   if (!config) return undefined;
   return {
@@ -39,26 +33,34 @@ const deriveAiProviderConfig = (
 };
 
 // Wrap component logic in a named function for React.memo
-const ProviderSelectorComponent: React.FC<ProviderSelectorProps> = ({
+const ProviderSelectorComponent: React.FC<{ className?: string }> = ({
   className,
-  selectedProviderId, // Use prop
-  setSelectedProviderId, // Use prop action
-  setSelectedModelId, // Use prop action
-  dbProviderConfigs, // Use prop
 }) => {
-  // REMOVED store access
+  // --- Fetch state/actions from store ---
+  const { selectedProviderId, setSelectedProviderId, setSelectedModelId } =
+    useProviderStore(
+      useShallow((state) => ({
+        selectedProviderId: state.selectedProviderId,
+        setSelectedProviderId: state.setSelectedProviderId,
+        setSelectedModelId: state.setSelectedModelId,
+        // dbProviderConfigs fetched below
+      })),
+    );
 
-  // Derive activeProviders using props
+  // Fetch providerConfigs from storage
+  const { providerConfigs: dbProviderConfigs } = useChatStorage();
+
+  // Derive activeProviders using store state and fetched data
   const activeProviders = useMemo((): AiProviderConfig[] => {
-    return dbProviderConfigs
-      .filter((c) => c.isEnabled)
-      .map((c) => deriveAiProviderConfig(c))
-      .filter((p): p is AiProviderConfig => !!p);
-  }, [dbProviderConfigs]); // Depend on prop
+    return (dbProviderConfigs || []) // Add null check
+      .filter((c: DbProviderConfig) => c.isEnabled)
+      .map((c: DbProviderConfig) => deriveAiProviderConfig(c))
+      .filter((p: any): p is AiProviderConfig => !!p);
+  }, [dbProviderConfigs]);
 
-  // Use prop actions
+  // Use store actions
   const handleValueChange = (value: string) => {
-    setSelectedProviderId(value);
+    setSelectedProviderId(value, dbProviderConfigs || []); // Pass current configs
     setSelectedModelId(null); // Reset model
   };
 
@@ -66,20 +68,22 @@ const ProviderSelectorComponent: React.FC<ProviderSelectorProps> = ({
 
   return (
     <Select
-      value={selectedProviderId ?? ""} // Use prop
+      value={selectedProviderId ?? ""}
       onValueChange={handleValueChange}
       disabled={isDisabled}
     >
       <SelectTrigger
         className={cn(
-          "w-[180px] h-9 text-sm bg-gray-700 border-gray-600 text-gray-200",
+          "w-[180px] h-9 text-sm bg-background border-border text-foreground", // Updated styles
           className,
         )}
         aria-label="Select AI provider"
       >
         <SelectValue placeholder="Select Provider" />
       </SelectTrigger>
-      <SelectContent className="bg-gray-700 border-gray-600 text-gray-200">
+      <SelectContent className="bg-popover border-border text-popover-foreground">
+        {" "}
+        {/* Updated styles */}
         {activeProviders.map((provider: AiProviderConfig) => (
           <SelectItem key={provider.id} value={provider.id}>
             {provider.name}

@@ -129,8 +129,9 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     dbProjects,
   });
 
-  // Destructure state and actions from the logic hook
+  // Destructure only what's needed directly or for high-frequency prop drilling
   const {
+    // Input State/Actions (High Frequency - Pass to Wrapper)
     promptInputValue,
     setPromptInputValue,
     attachedFiles,
@@ -138,40 +139,42 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     removeAttachedFile,
     clearAttachedFiles,
     selectedVfsPaths,
-    // addSelectedVfsPath,
     removeSelectedVfsPath,
     clearSelectedVfsPaths,
     clearAllInput,
-    sidebarActions,
-    coreChatActions,
-    providerActions,
-    settingsActions,
-    modActions,
-    selectedItemId,
-    selectedItemType,
-    enableSidebar: enableSidebarFromHook,
-    // vfsState,
-    providerState,
-    settingsState,
-    modState,
-    clearAllData,
-    getAllAvailableModelDefs,
-    handleFormSubmit,
-    // handleImageGenerationWrapper,
+    // Core Actions (High Frequency - Pass to Wrapper)
     stopStreaming,
     regenerateMessage,
-    getContextSnapshotForMod,
+    // Interaction Handlers (High Frequency - Pass to Wrapper)
+    handleFormSubmit,
+    // Selection State (Needed for Wrapper/Header)
+    selectedItemId,
+    selectedItemType,
+    // Sidebar Actions (Needed for Side)
+    sidebarActions,
+    // Settings State (Needed for Wrapper/Header)
+    settingsState,
+    // Mod State (Needed for Wrapper/Side)
+    modState,
+    // Derived State (Needed for Wrapper)
     activeConversationData,
     selectedProvider,
     selectedModel,
     getApiKeyForProvider,
+    // Utility Callbacks (Needed for Side)
+    // clearAllData,
+    // getAllAvailableModelDefs,
+    getContextSnapshotForMod,
+    // Provider State/Actions (Needed for Side)
+    providerState,
+    providerActions,
   } = logic;
 
   // --- Apply theme effect using state from logic hook ---
   useThemeEffect(settingsState.theme);
   // --- End theme effect application ---
 
-  // Core chat volatile state
+  // Core chat volatile state (High Frequency - Pass to Wrapper)
   const { messages, isLoadingMessages, isStreaming, error } = useCoreChatStore(
     useShallow((state) => ({
       messages: state.messages,
@@ -181,7 +184,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     })),
   );
 
-  // VFS volatile state
+  // VFS volatile state (Needed for Wrapper)
   const { isVfsReady, isVfsEnabledForItem, isVfsLoading, vfsError, vfsKey } =
     useVfsStore(
       useShallow((state) => ({
@@ -193,7 +196,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       })),
     );
 
-  // Derive sidebar items
+  // Derive sidebar items (Needed for Wrapper/Header)
   const sidebarItems = useMemo(() => {
     const allProjects: DbProject[] = dbProjects || [];
     const allConversations: DbConversation[] = dbConversations || [];
@@ -213,7 +216,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     return combinedItems;
   }, [dbProjects, dbConversations]);
 
-  const enableSidebar = enableSidebarFromHook ?? enableSidebarConfig;
+  const enableSidebar = enableSidebarConfig; // Use config prop directly
 
   return (
     <div
@@ -225,48 +228,11 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       {enableSidebar && sidebarOpen && (
         <SideComponent
           className={cn("w-72 flex-shrink-0", "hidden md:flex")}
-          dbProjects={dbProjects}
-          dbConversations={dbConversations}
+          // Pass only essential callbacks/local state
           editingItemId={editingItemId}
-          selectedItemId={selectedItemId}
-          selectedItemType={selectedItemType}
-          isSettingsModalOpen={settingsState.isSettingsModalOpen}
-          setIsSettingsModalOpen={settingsActions.setIsSettingsModalOpen}
-          theme={settingsState.theme}
-          setTheme={settingsActions.setTheme}
-          streamingRefreshRateMs={settingsState.streamingRefreshRateMs}
-          setStreamingRefreshRateMs={settingsActions.setStreamingRefreshRateMs}
-          dbProviderConfigs={providerState.dbProviderConfigs}
-          apiKeys={providerState.apiKeys}
-          addDbProviderConfig={providerActions.addDbProviderConfig}
-          updateDbProviderConfig={providerActions.updateDbProviderConfig}
-          deleteDbProviderConfig={providerActions.deleteDbProviderConfig}
-          fetchModels={providerActions.fetchModels}
-          providerFetchStatus={providerState.providerFetchStatus}
-          getAllAvailableModelDefs={getAllAvailableModelDefs}
-          globalSystemPrompt={settingsState.globalSystemPrompt}
-          setGlobalSystemPrompt={settingsActions.setGlobalSystemPrompt}
-          addApiKey={providerActions.addApiKey}
-          deleteApiKey={providerActions.deleteApiKey}
-          importConversation={sidebarActions.importConversation}
-          exportAllConversations={sidebarActions.exportAllConversations}
-          clearAllData={clearAllData}
-          dbMods={modState.dbMods}
-          loadedMods={modState.loadedMods}
-          addDbMod={modActions.addDbMod}
-          updateDbMod={modActions.updateDbMod}
-          deleteDbMod={modActions.deleteDbMod}
-          enableAdvancedSettings={settingsState.enableAdvancedSettings}
-          enableApiKeyManagement={providerState.enableApiKeyManagement}
-          customSettingsTabs={modState.modSettingsTabs}
           onEditComplete={onEditComplete}
           setEditingItemId={setEditingItemId}
-          selectItem={sidebarActions.selectItem}
-          deleteItem={sidebarActions.deleteItem}
-          renameItem={sidebarActions.renameItem}
-          exportConversation={sidebarActions.exportConversation}
-          createConversation={sidebarActions.createConversation}
-          createProject={sidebarActions.createProject}
+          // Side component will fetch most data from stores
         />
       )}
 
@@ -290,69 +256,77 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
         )}
         <WrapperComponent
           className="h-full"
+          // Pass High-Frequency State/Actions
           messages={messages}
           isStreaming={isStreaming}
           isLoadingMessages={isLoadingMessages}
           error={error}
-          isVfsReady={isVfsReady}
-          isVfsEnabledForItem={isVfsEnabledForItem}
           promptInputValue={promptInputValue}
           setPromptInputValue={setPromptInputValue}
+          attachedFiles={attachedFiles}
           addAttachedFile={addAttachedFile}
           removeAttachedFile={removeAttachedFile}
           clearAttachedFiles={clearAttachedFiles}
-          clearPromptInput={clearAllInput}
-          attachedFiles={attachedFiles}
           selectedVfsPaths={selectedVfsPaths}
           removeSelectedVfsPath={removeSelectedVfsPath}
           clearSelectedVfsPaths={clearSelectedVfsPaths}
-          selectedItemId={selectedItemId}
-          selectedItemType={selectedItemType}
+          clearPromptInput={clearAllInput}
           regenerateMessage={regenerateMessage}
           stopStreaming={stopStreaming}
-          setError={coreChatActions.setError}
           handleFormSubmit={handleFormSubmit}
-          selectedProviderId={providerState.selectedProviderId}
-          selectedModelId={providerState.selectedModelId}
-          selectedModel={selectedModel}
+          // Pass Selection State
+          selectedItemId={selectedItemId}
+          selectedItemType={selectedItemType}
+          // Pass Derived State needed by Wrapper/Children
+          activeConversationData={activeConversationData}
           selectedProvider={selectedProvider}
-          dbProviderConfigs={providerState.dbProviderConfigs}
-          apiKeys={providerState.apiKeys}
-          setSelectedProviderId={providerActions.setSelectedProviderId}
-          setSelectedModelId={providerActions.setSelectedModelId}
-          updateDbProviderConfig={providerActions.updateDbProviderConfig}
+          selectedModel={selectedModel}
           getApiKeyForProvider={getApiKeyForProvider}
-          temperature={settingsState.temperature}
-          setTemperature={settingsActions.setTemperature}
-          topP={settingsState.topP}
-          setTopP={settingsActions.setTopP}
-          maxTokens={settingsState.maxTokens}
-          setMaxTokens={settingsActions.setMaxTokens}
-          topK={settingsState.topK}
-          setTopK={settingsActions.setTopK}
-          presencePenalty={settingsState.presencePenalty}
-          setPresencePenalty={settingsActions.setPresencePenalty}
-          frequencyPenalty={settingsState.frequencyPenalty}
-          setFrequencyPenalty={settingsActions.setFrequencyPenalty}
-          globalSystemPrompt={settingsState.globalSystemPrompt}
-          enableAdvancedSettings={settingsState.enableAdvancedSettings}
-          enableApiKeyManagement={providerState.enableApiKeyManagement}
+          // Pass VFS State needed by Wrapper/Children
+          isVfsReady={isVfsReady}
+          isVfsEnabledForItem={isVfsEnabledForItem}
           isVfsLoading={isVfsLoading}
           vfsError={vfsError}
           vfsKey={vfsKey}
-          toggleVfsEnabledAction={sidebarActions.toggleVfsEnabled}
-          activeConversationData={activeConversationData}
-          updateConversationSystemPrompt={
-            sidebarActions.updateConversationSystemPrompt
-          }
-          createConversation={sidebarActions.createConversation}
+          // Pass Mod State/Actions needed by Wrapper/Children
           customPromptActions={modState.modPromptActions}
           customMessageActions={modState.modMessageActions}
           getContextSnapshotForMod={getContextSnapshotForMod}
-          sidebarItems={sidebarItems}
-          searchTerm={settingsState.searchTerm}
-          setSearchTerm={settingsActions.setSearchTerm}
-          exportConversation={sidebarActions.exportConversation}
+          // Pass Settings State needed by Wrapper/Children
+
+          enableAdvancedSettings={settingsState.enableAdvancedSettings}
+          enableApiKeyManagement={providerState.enableApiKeyManagement}
+          globalSystemPrompt={settingsState.globalSystemPrompt}
+          temperature={settingsState.temperature}
+          topP={settingsState.topP}
+          maxTokens={settingsState.maxTokens}
+          topK={settingsState.topK}
+          presencePenalty={settingsState.presencePenalty}
+          frequencyPenalty={settingsState.frequencyPenalty}
+          // Pass other necessary actions/data
+          sidebarItems={sidebarItems} // Needed for ChatHeader
+          searchTerm={settingsState.searchTerm} // Needed for ChatHeader
+          setSearchTerm={logic.settingsActions.setSearchTerm} // Use logic.settingsActions
+          exportConversation={sidebarActions.exportConversation} // Needed for ChatHeader
+          // Pass actions needed by PromptWrapper/PromptForm
+          createConversation={sidebarActions.createConversation}
+          updateDbProviderConfig={providerActions.updateDbProviderConfig}
+          setSelectedProviderId={providerActions.setSelectedProviderId}
+          setSelectedModelId={providerActions.setSelectedModelId}
+          toggleVfsEnabledAction={sidebarActions.toggleVfsEnabled}
+          setTemperature={logic.settingsActions.setTemperature} // Use logic.settingsActions
+          setTopP={logic.settingsActions.setTopP} // Use logic.settingsActions
+          setMaxTokens={logic.settingsActions.setMaxTokens} // Use logic.settingsActions
+          setTopK={logic.settingsActions.setTopK} // Use logic.settingsActions
+          setPresencePenalty={logic.settingsActions.setPresencePenalty} // Use logic.settingsActions
+          setFrequencyPenalty={logic.settingsActions.setFrequencyPenalty} // Use logic.settingsActions
+          updateConversationSystemPrompt={
+            sidebarActions.updateConversationSystemPrompt
+          }
+          setError={logic.coreChatActions.setError} // Use logic.coreChatActions
+          // Pass down necessary provider/api key data for PromptForm/Settings
+          dbProviderConfigs={providerState.dbProviderConfigs}
+          apiKeys={providerState.apiKeys}
         />
       </div>
     </div>
