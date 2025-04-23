@@ -1,4 +1,4 @@
-
+// src/store/mod.store.ts
 import { create } from "zustand";
 import type {
   CustomPromptAction,
@@ -20,30 +20,27 @@ import type {
   VfsWriteReturn,
 } from "@/mods/types";
 
-import type { RegisteredToolEntry } from "@/context/mod-context";
+import type { RegisteredToolEntry } from "@/context/mod-context"; // Keep this type
 import { nanoid } from "nanoid";
-import { z } from "zod"; // Import Zod
-import { toast } from "sonner"; // Import toast for feedback
-import { db } from "@/lib/db"; // Import Dexie instance
-
-
+import { z } from "zod";
+import { toast } from "sonner";
+import { db } from "@/lib/db";
 
 export interface ModState {
-  dbMods: DbMod[];
+  // REMOVED: dbMods: DbMod[]; // Data comes from useChatStorage
   loadedMods: ModInstance[];
   modPromptActions: CustomPromptAction[];
   modMessageActions: CustomMessageAction[];
   modSettingsTabs: CustomSettingTab[];
-  modTools: Map<string, RegisteredToolEntry>; // Use Map for mutability within Zustand
+  modTools: Map<string, RegisteredToolEntry>;
 }
 
 export interface ModActions {
-  setDbMods: (mods: DbMod[]) => void; // Needed if fetched async
-  addDbMod: (modData: Omit<DbMod, "id" | "createdAt">) => Promise<string>; // Needs storage access
-  updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>; // Needs storage access
-  deleteDbMod: (id: string) => Promise<void>; // Needs storage access
-  setLoadedMods: (mods: ModInstance[]) => void; // Set by the mod loading service
-  // Registration functions called by mods via API
+  // REMOVED: setDbMods
+  addDbMod: (modData: Omit<DbMod, "id" | "createdAt">) => Promise<string>;
+  updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>;
+  deleteDbMod: (id: string) => Promise<void>;
+  setLoadedMods: (mods: ModInstance[]) => void;
   _registerModPromptAction: (action: CustomPromptAction) => () => void;
   _registerModMessageAction: (action: CustomMessageAction) => () => void;
   _registerModSettingsTab: (tab: CustomSettingTab) => () => void;
@@ -52,9 +49,9 @@ export interface ModActions {
     definition: Tool<PARAMETERS>,
     implementation?: ToolImplementation<PARAMETERS>,
   ) => () => void;
-  _clearRegisteredModItems: () => void; // Called when mods are reloaded
-  _clearRegisteredModTools: () => void; // Called when mods are reloaded
-  // Middleware hooks (called by core services)
+  _clearRegisteredModItems: () => void;
+  _clearRegisteredModTools: () => void;
+  // Middleware hooks (placeholders - implementation needed elsewhere)
   applySubmitPromptMiddleware: (
     payload: SubmitPromptPayload,
   ) => Promise<SubmitPromptReturn>;
@@ -67,12 +64,12 @@ export interface ModActions {
   applyVfsWriteMiddleware: (
     payload: VfsWritePayload,
   ) => Promise<VfsWriteReturn>;
-  initializeFromDb: () => Promise<void>; // Action to load initial data
+  // REMOVED: initializeFromDb
 }
 
-export const useModStore = create<ModState & ModActions>()((set, get) => ({
+export const useModStore = create<ModState & ModActions>()((set) => ({
   // Initial State
-  dbMods: [],
+  // REMOVED: dbMods: [],
   loadedMods: [],
   modPromptActions: [],
   modMessageActions: [],
@@ -80,22 +77,8 @@ export const useModStore = create<ModState & ModActions>()((set, get) => ({
   modTools: new Map(),
 
   // Actions
-  setDbMods: (dbMods) => set({ dbMods }), // Used to load initial mods from storage
-
-  initializeFromDb: async () => {
-    try {
-      const mods = await db.mods.orderBy("loadOrder").toArray(); // Use Dexie
-      set({ dbMods: mods });
-      console.log("[ModStore] Initialized from DB.");
-    } catch (error) {
-      console.error("[ModStore] Failed to initialize from DB:", error);
-      toast.error("Failed to load mod data.");
-    }
-  },
-
   addDbMod: async (modData) => {
     try {
-      // FIX: Use db.mods.add
       const newId = nanoid();
       const newMod: DbMod = {
         id: newId,
@@ -104,7 +87,7 @@ export const useModStore = create<ModState & ModActions>()((set, get) => ({
         loadOrder: modData.loadOrder ?? Date.now(),
       };
       await db.mods.add(newMod);
-      // State update via live query
+      // No state update here - useChatStorage handles it
       toast.success(`Mod "${modData.name}" added.`);
       return newId;
     } catch (error) {
@@ -118,9 +101,8 @@ export const useModStore = create<ModState & ModActions>()((set, get) => ({
 
   updateDbMod: async (id, changes) => {
     try {
-      // FIX: Use db.mods.update
       await db.mods.update(id, changes);
-      // State update via live query
+      // No state update here - useChatStorage handles it
     } catch (error) {
       console.error("Failed to update mod:", error);
       toast.error(
@@ -131,11 +113,10 @@ export const useModStore = create<ModState & ModActions>()((set, get) => ({
   },
 
   deleteDbMod: async (id) => {
-    const modToDelete = get().dbMods.find((m) => m.id === id); // Get name before delete
+    const modToDelete = await db.mods.get(id); // Get name before delete
     try {
-      // FIX: Use db.mods.delete
       await db.mods.delete(id);
-      // State update via live query
+      // No state update here - useChatStorage handles it
       if (modToDelete) {
         toast.success(`Mod "${modToDelete.name}" deleted.`);
       }
@@ -156,7 +137,6 @@ export const useModStore = create<ModState & ModActions>()((set, get) => ({
     set((state) => ({
       modPromptActions: [...state.modPromptActions, actionWithId],
     }));
-    // Return unregister function
     return () => {
       set((state) => ({
         modPromptActions: state.modPromptActions.filter(
@@ -172,7 +152,6 @@ export const useModStore = create<ModState & ModActions>()((set, get) => ({
     set((state) => ({
       modMessageActions: [...state.modMessageActions, actionWithId],
     }));
-    // Return unregister function
     return () => {
       set((state) => ({
         modMessageActions: state.modMessageActions.filter(
@@ -188,7 +167,6 @@ export const useModStore = create<ModState & ModActions>()((set, get) => ({
     set((state) => ({
       modSettingsTabs: [...state.modSettingsTabs, tabWithId],
     }));
-    // Return unregister function
     return () => {
       set((state) => ({
         modSettingsTabs: state.modSettingsTabs.filter((t) => t.id !== tabId),
@@ -207,7 +185,6 @@ export const useModStore = create<ModState & ModActions>()((set, get) => ({
       newMap.set(toolName, { definition, implementation });
       return { modTools: newMap };
     });
-    // Return unregister function
     return () => {
       set((state) => {
         const newMap = new Map(state.modTools);

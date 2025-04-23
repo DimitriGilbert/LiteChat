@@ -1,5 +1,6 @@
+// src/hooks/use-lite-chat-logic.ts
 import { useCallback } from "react";
-import { useShallow } from "zustand/react/shallow"; // Keep for existing usage if any
+import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
 
 // Import necessary stores and types
@@ -18,28 +19,19 @@ import type {
 import type { ReadonlyChatContextSnapshot } from "@/mods/api";
 
 import { useAiInteraction } from "@/hooks/ai-interaction";
-import { useChatStorage } from "./use-chat-storage";
+import { useChatStorage } from "./use-chat-storage"; // Import storage hook
 import { useDerivedChatState } from "./use-derived-chat-state";
 
-// Props might change slightly
 interface UseLiteChatLogicProps {
   editingItemId: string | null;
   setEditingItemId: (id: string | null) => void;
   onEditComplete: (id: string) => void;
-  // Pass DB data needed for derivations if not directly from stores
+  // Pass DB data needed for derivations
   dbConversations: DbConversation[];
   dbProjects: DbProject[];
-  // REMOVED: dbProviderConfigs: DbProviderConfig[];
-  // REMOVED: apiKeys: DbApiKey[];
 }
 
-// Return type will be reduced
 interface UseLiteChatLogicReturn {
-  // REMOVED Input State & Actions (Components use useInputStore)
-  // REMOVED Simple Store Actions (Components use store hooks)
-  // REMOVED Simple Store State (Components use store hooks)
-
-  // Keep Interaction Handlers (from useAiInteraction)
   handleFormSubmit: (
     prompt: string,
     files: File[],
@@ -48,36 +40,30 @@ interface UseLiteChatLogicReturn {
   ) => Promise<void>;
   stopStreaming: (parentMessageId?: string | null) => void;
   regenerateMessage: (messageId: string) => Promise<void>;
-
-  // Keep Utility Callbacks
   clearAllData: () => Promise<void>;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
-
-  // Keep Derived State (Components can use useDerivedChatState directly if preferred later)
   activeConversationData: DbConversation | null;
   selectedProvider: AiProviderConfig | undefined;
   selectedModel: AiModelConfig | undefined;
-  getApiKeyForProvider: (providerId: string) => string | undefined;
-
-  // Keep complex actions if they coordinate multiple stores/logic
-  // Example: Maybe renameItem needs to stay if it does more than just DB update
-  sidebarActions: Pick<SidebarActions, "renameItem">; // Example: Keep only complex ones
-  settingsActions: Pick<SettingsActions, "setSearchTerm">; // Example: Keep only complex ones
-  providerActions: Pick<ProviderActions, "updateDbProviderConfig">; // Example
+  getApiKeyForProvider: (providerId: string) => string | undefined; // Keep getter signature
+  // Pass through complex actions if needed
+  sidebarActions: Pick<SidebarActions, "renameItem">;
+  settingsActions: Pick<SettingsActions, "setSearchTerm">;
+  providerActions: Pick<ProviderActions, "updateDbProviderConfig">;
 }
 
 export function useLiteChatLogic(
   props: UseLiteChatLogicProps,
 ): UseLiteChatLogicReturn {
   const { dbConversations, dbProjects } = props;
-  const storage = useChatStorage();
+  const storage = useChatStorage(); // Use storage hook for live data
 
-  // --- Get necessary state/actions from stores ONLY for logic within this hook ---
+  // --- Get necessary state/actions from stores ---
   const { selectedItemId, selectedItemType, renameItem } = useSidebarStore(
     useShallow((state) => ({
       selectedItemId: state.selectedItemId,
       selectedItemType: state.selectedItemType,
-      renameItem: state.renameItem, // Keep if complex
+      renameItem: state.renameItem,
     })),
   );
   const {
@@ -110,30 +96,29 @@ export function useLiteChatLogic(
   const { clearAllInput } = useInputStore(
     useShallow((state) => ({ clearAllInput: state.clearAllInput })),
   );
-  // Fetch provider data needed for derivations/interactions
+  // Fetch provider state needed for derivations/interactions
   const {
     selectedProviderId,
     selectedModelId,
-    getApiKeyForProvider,
-    dbProviderConfigs, // Get from store now
-    apiKeys, // Get from store now
-    updateDbProviderConfig, // Keep if complex
+    updateDbProviderConfig, // Keep action if complex
+    getApiKeyForProvider: getApiKeyFromStore, // Get the store's getter
   } = useProviderStore(
     useShallow((state) => ({
       selectedProviderId: state.selectedProviderId,
       selectedModelId: state.selectedModelId,
-      getApiKeyForProvider: state.getApiKeyForProvider,
-      dbProviderConfigs: state.dbProviderConfigs, // Fetch from store
-      apiKeys: state.apiKeys, // Fetch from store
-      updateDbProviderConfig: state.updateDbProviderConfig, // Keep if complex
+      updateDbProviderConfig: state.updateDbProviderConfig,
+      getApiKeyForProvider: state.getApiKeyForProvider, // Get store getter
     })),
   );
   const { streamingRefreshRateMs, setSearchTerm } = useSettingsStore(
     useShallow((state) => ({
       streamingRefreshRateMs: state.streamingRefreshRateMs,
-      setSearchTerm: state.setSearchTerm, // Keep if complex
+      setSearchTerm: state.setSearchTerm,
     })),
   );
+
+  // Get live DB data from storage hook
+  const { providerConfigs: dbProviderConfigs, apiKeys } = useChatStorage();
 
   // --- Context Snapshot ---
   const getContextSnapshotForMod =
@@ -143,7 +128,9 @@ export function useLiteChatLogic(
       const providerState = useProviderStore.getState();
       const settingsState = useSettingsStore.getState();
       const vfsState = useVfsStore.getState();
-      const currentDbConversations = dbConversations;
+      const currentDbConversations = dbConversations; // Use prop data
+      const currentApiKeys = apiKeys || []; // Use live data
+      const currentDbProviderConfigs = dbProviderConfigs || []; // Use live data
 
       let activeSystemPrompt: string | null = null;
       if (settingsState.enableAdvancedSettings) {
@@ -164,7 +151,13 @@ export function useLiteChatLogic(
         }
       }
 
-      const getApiKeyFunc = providerState.getApiKeyForProvider;
+      // Use the store's getter, passing the live data
+      const getApiKeyFunc = (providerId: string) =>
+        providerState.getApiKeyForProvider(
+          providerId,
+          currentApiKeys,
+          currentDbProviderConfigs,
+        );
 
       return Object.freeze({
         selectedItemId: sidebarState.selectedItemId,
@@ -180,30 +173,38 @@ export function useLiteChatLogic(
         isVfsEnabledForItem: vfsState.isVfsEnabledForItem,
         getApiKeyForProvider: getApiKeyFunc,
       });
-    }, [dbConversations]);
+    }, [dbConversations, apiKeys, dbProviderConfigs]); // Depend on live data
 
-  // --- Use Derived State Hook ---
+  // --- Use Derived State Hook (pass live data) ---
   const { activeConversationData, selectedProvider, selectedModel } =
     useDerivedChatState({
       selectedItemId,
       selectedItemType,
-      dbConversations,
-      dbProjects,
-      dbProviderConfigs,
-      apiKeys,
+      dbConversations, // Pass prop data
+      dbProjects, // Pass prop data
+      dbProviderConfigs: dbProviderConfigs || [], // Pass live data
+      apiKeys: apiKeys || [], // Pass live data
       selectedProviderId,
       selectedModelId,
     });
+
+  // --- API Key Getter for AI Interaction ---
+  // This function needs to capture the live apiKeys and dbProviderConfigs
+  const getApiKeyForInteraction = useCallback(
+    (providerId: string): string | undefined => {
+      const currentApiKeys = storage.apiKeys || [];
+      const currentDbConfigs = storage.providerConfigs || [];
+      return getApiKeyFromStore(providerId, currentApiKeys, currentDbConfigs);
+    },
+    [storage.apiKeys, storage.providerConfigs, getApiKeyFromStore],
+  );
 
   // --- Use AI Interaction Hook ---
   const { handleFormSubmit, stopStreaming, regenerateMessage } =
     useAiInteraction({
       selectedModel,
       selectedProvider,
-      getApiKeyForProvider: useCallback(
-        () => getApiKeyForProvider(selectedProviderId!),
-        [getApiKeyForProvider, selectedProviderId],
-      ),
+      getApiKeyForProvider: getApiKeyForInteraction, // Use the memoized getter with live data
       streamingRefreshRateMs,
       addMessage,
       updateMessage,
@@ -214,9 +215,9 @@ export function useLiteChatLogic(
       bulkAddMessages,
       selectedItemId,
       selectedItemType,
-      dbProviderConfigs,
-      dbConversations,
-      dbProjects,
+      dbProviderConfigs: dbProviderConfigs || [], // Pass live data
+      dbConversations, // Pass prop data
+      dbProjects, // Pass prop data
       inputActions: { clearAllInput },
       handleSubmitCore,
       handleImageGenerationCore,
@@ -227,7 +228,6 @@ export function useLiteChatLogic(
 
   // --- Utility Callbacks ---
   const clearAllData = useCallback(async () => {
-    // (Keep existing implementation using storage.clearAllData or db)
     if (
       window.confirm(
         `🚨 ARE YOU ABSOLUTELY SURE? 🚨
@@ -243,7 +243,7 @@ Really delete everything? Consider exporting first.`,
         )
       ) {
         try {
-          await storage.clearAllData();
+          await storage.clearAllData(); // Use storage hook action
           toast.success("All local data cleared. Reloading the application...");
           setTimeout(() => window.location.reload(), 1500);
         } catch (error: unknown) {
@@ -258,19 +258,15 @@ Really delete everything? Consider exporting first.`,
 
   // --- Return Structure ---
   return {
-    // Interaction Handlers
     handleFormSubmit,
     stopStreaming,
     regenerateMessage,
-    // Utilities
     clearAllData,
     getContextSnapshotForMod,
-    // Derived State (pass through)
     activeConversationData,
     selectedProvider,
     selectedModel,
-    getApiKeyForProvider, // Pass through the store's getter
-    // Pass through complex actions kept in this hook
+    getApiKeyForProvider: getApiKeyForInteraction, // Return the correct getter
     sidebarActions: { renameItem },
     settingsActions: { setSearchTerm },
     providerActions: { updateDbProviderConfig },

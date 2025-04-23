@@ -1,3 +1,4 @@
+// src/components/lite-chat/prompt/prompt-settings.tsx
 import React, { useState, useCallback, useMemo } from "react";
 import { ProviderSelector } from "@/components/lite-chat/provider-selector";
 import { ModelSelector } from "@/components/lite-chat/model-selector";
@@ -20,17 +21,17 @@ import { cn } from "@/lib/utils";
 import type { DbProviderConfig } from "@/lib/types";
 import { toast } from "sonner";
 import { requiresApiKey } from "@/lib/litechat";
-
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { useVfsStore } from "@/store/vfs.store";
 import { useSidebarStore } from "@/store/sidebar.store";
-import { useChatStorage } from "@/hooks/use-chat-storage";
+import { useChatStorage } from "@/hooks/use-chat-storage"; // Import storage hook
 
 const PromptSettingsComponent: React.FC<{ className?: string }> = ({
   className,
 }) => {
+  // Fetch state/actions from stores
   const { selectedProviderId, enableApiKeyManagement } = useProviderStore(
     useShallow((state) => ({
       selectedProviderId: state.selectedProviderId,
@@ -38,8 +39,8 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
     })),
   );
 
-  // Fetch from storage
-  const { providerConfigs: dbProviderConfigs, apiKeys } = useChatStorage();
+  // Fetch live data from storage
+  const { providerConfigs: dbProviderConfigs, apiKeys } = useChatStorage(); // Use storage hook
 
   const { enableAdvancedSettings } = useSettingsStore(
     useShallow((state) => ({
@@ -50,7 +51,7 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
   const {
     enableVfs,
     isVfsEnabledForItem,
-    // isVfsReady,
+    // isVfsReady, // Not directly needed here
   } = useVfsStore(
     useShallow((state) => ({
       enableVfs: state.enableVfs,
@@ -64,7 +65,7 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
       useShallow((state) => ({
         selectedItemId: state.selectedItemId,
         selectedItemType: state.selectedItemType,
-        toggleVfsEnabled: state.toggleVfsEnabled,
+        toggleVfsEnabled: state.toggleVfsEnabled, // Keep action
       })),
     );
 
@@ -73,21 +74,20 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
   const [advancedInitialTab, setAdvancedInitialTab] =
     useState<string>("parameters");
 
-  // --- Derived State ---
+  // --- Derived State (using live data) ---
   const selectedDbProviderConfig = useMemo(
     () =>
       (dbProviderConfigs || []).find(
         (p: DbProviderConfig) => p.id === selectedProviderId,
       ),
-    [dbProviderConfigs, selectedProviderId],
+    [dbProviderConfigs, selectedProviderId], // Depend on live data
   );
 
   const needsKey = requiresApiKey(selectedDbProviderConfig?.type ?? null);
   const keyIsLinked = !!selectedDbProviderConfig?.apiKeyId;
-  // Use fetched apiKeys here
   const keyIsAvailable =
     keyIsLinked &&
-    !!(apiKeys || []).find((k) => k.id === selectedDbProviderConfig.apiKeyId);
+    !!(apiKeys || []).find((k) => k.id === selectedDbProviderConfig.apiKeyId); // Use live data
 
   const showKeyRequiredWarning = needsKey && (!keyIsLinked || !keyIsAvailable);
   const showKeyProvidedIndicator = needsKey && keyIsLinked && keyIsAvailable;
@@ -103,7 +103,7 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
   const handleToggleAdvancedClick = useCallback(() => {
     setIsAdvancedPanelOpen((prev) => !prev);
     if (!isAdvancedPanelOpen) {
-      setAdvancedInitialTab("parameters");
+      setAdvancedInitialTab("parameters"); // Reset tab when closing
     }
   }, [isAdvancedPanelOpen]);
 
@@ -117,6 +117,7 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
 
   const handleVfsContainerClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+      // Prevent click from triggering when clicking the switch itself
       if ((e.target as HTMLElement).closest('[role="switch"]')) {
         return;
       }
@@ -137,7 +138,8 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
 
   const handleVfsSwitchChange = useCallback(() => {
     if (selectedItemId && selectedItemType) {
-      toggleVfsEnabled(selectedItemId, selectedItemType); // Use store action
+      // Call store action
+      toggleVfsEnabled(selectedItemId, selectedItemType);
     } else {
       console.error(
         "[PromptSettings] Cannot toggle VFS: selectedItemId/Type is null",
@@ -149,18 +151,19 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
   return (
     <div className={cn("bg-card text-card-foreground", className)}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
+        {/* Provider/Model Selectors (fetch their own data) */}
         <div className="flex items-center gap-x-2 flex-shrink min-w-0 flex-grow sm:flex-grow-0">
-          {/* ProviderSelector will fetch its own data */}
           <ProviderSelector className="flex-shrink-0" />
           <div className="flex-grow min-w-[150px]">
-            {/* ModelSelector will fetch its own data */}
             <ModelSelector />
           </div>
         </div>
 
         <div className="flex-grow hidden sm:block" />
 
+        {/* Indicators/Toggles */}
         <div className="flex items-center gap-x-1 flex-shrink-0">
+          {/* API Key Indicator */}
           <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -199,6 +202,7 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
             </Tooltip>
           </TooltipProvider>
 
+          {/* VFS Toggle */}
           {enableVfs && (
             <TooltipProvider delayDuration={100}>
               <Tooltip>
@@ -245,7 +249,7 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
                       onCheckedChange={handleVfsSwitchChange}
                       disabled={!isItemSelected}
                       aria-label="Toggle Virtual Filesystem"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()} // Prevent container click
                       className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground scale-75"
                     />
                   </div>
@@ -263,6 +267,7 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
             </TooltipProvider>
           )}
 
+          {/* Advanced Settings Toggle */}
           {enableAdvancedSettings && (
             <TooltipProvider delayDuration={100}>
               <Tooltip>
@@ -292,8 +297,9 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
         </div>
       </div>
 
+      {/* Advanced Settings Panel */}
       {enableAdvancedSettings && isAdvancedPanelOpen && (
-        // PromptSettingsAdvanced will fetch its own data
+        // PromptSettingsAdvanced fetches its own data
         <PromptSettingsAdvanced
           className="border-t border-border animate-slideInFromTop"
           initialTab={advancedInitialTab}

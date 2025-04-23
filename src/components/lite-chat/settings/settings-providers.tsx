@@ -1,6 +1,5 @@
-
+// src/components/lite-chat/settings/settings-providers.tsx
 import React, { useState, useCallback } from "react";
-
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
 import type { DbProviderConfig, DbProviderType } from "@/lib/types";
@@ -26,47 +25,73 @@ import {
   requiresBaseURL,
   PROVIDER_TYPES,
 } from "@/lib/litechat";
-
-import { useChatStorage } from "@/hooks/use-chat-storage";
-
+import { useChatStorage } from "@/hooks/use-chat-storage"; // Import storage hook
 
 const SettingsProvidersComponent: React.FC = () => {
-  // --- Fetch state/actions from store ---
+  // --- Fetch actions and status from store ---
   const {
-    // dbProviderConfigs, // Fetched below
-    // apiKeys, // Fetched below
     addDbProviderConfig,
     updateDbProviderConfig,
     deleteDbProviderConfig,
     fetchModels,
     providerFetchStatus,
-    // getAllAvailableModelDefs, // Defined locally below
   } = useProviderStore(
     useShallow((state) => ({
-      // dbProviderConfigs: state.dbProviderConfigs,
-      // apiKeys: state.apiKeys,
       addDbProviderConfig: state.addDbProviderConfig,
       updateDbProviderConfig: state.updateDbProviderConfig,
       deleteDbProviderConfig: state.deleteDbProviderConfig,
       fetchModels: state.fetchModels,
       providerFetchStatus: state.providerFetchStatus,
-      // getAllAvailableModelDefs: state.getAllAvailableModelDefs,
     })),
   );
 
-  // Fetch from storage
-  const { providerConfigs: dbProviderConfigs, apiKeys } = useChatStorage();
+  // Fetch live data from storage
+  const { providerConfigs: dbProviderConfigs, apiKeys } = useChatStorage(); // Use storage hook
 
-  // Define getAllAvailableModelDefs locally
+  // Define getAllAvailableModelDefs locally using live data
   const getAllAvailableModelDefs = useCallback(
     (providerConfigId: string): { id: string; name: string }[] => {
       const config = (dbProviderConfigs || []).find(
         (p) => p.id === providerConfigId,
       );
       // Add default models logic if needed, similar to provider.store.ts
-      return config?.fetchedModels || [];
+      const getDefaultModels = (
+        type: DbProviderType,
+      ): { id: string; name: string }[] => {
+        const defaults: Record<DbProviderType, { id: string; name: string }[]> =
+          {
+            openai: [{ id: "gpt-4o", name: "GPT-4o" }],
+            google: [
+              {
+                id: "gemini-2.5-pro-exp-03-25",
+                name: "Gemini 2.5 Pro exp (Free)",
+              },
+              {
+                id: "gemini-2.0-flash-thinking-exp-01-21",
+                name: "Gemini 2.0 Flash exp (Free)",
+              },
+              { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+              {
+                id: "emini-2.5-pro-preview-03-25",
+                name: "Gemini 2.5 Pro Preview",
+              },
+              {
+                id: "gemini-2.5-flash-preview-04-17",
+                name: "Gemini 2.5 Flash Preview",
+              },
+            ],
+            openrouter: [],
+            ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }],
+            "openai-compatible": [],
+          };
+        return defaults[type] || [];
+      };
+      if (!config) return [];
+      return config.fetchedModels && config.fetchedModels.length > 0
+        ? config.fetchedModels
+        : getDefaultModels(config.type);
     },
-    [dbProviderConfigs],
+    [dbProviderConfigs], // Depend on live data
   );
 
   // Local UI state remains
@@ -91,7 +116,9 @@ const SettingsProvidersComponent: React.FC = () => {
   const handleAddNew = () => {
     setIsAdding(true);
   };
-  const handleCancelNew = () => {
+
+  // Wrap handleCancelNew in useCallback
+  const handleCancelNew = useCallback(() => {
     setIsAdding(false);
     setIsSavingNew(false);
     setNewProviderData({
@@ -106,7 +133,8 @@ const SettingsProvidersComponent: React.FC = () => {
       modelsLastFetchedAt: null,
       modelSortOrder: null,
     });
-  };
+  }, []); // Empty dependency array as it only uses setters
+
   const handleSaveNew = useCallback(async () => {
     if (!newProviderData.name || !newProviderData.type) {
       toast.error("Provider Name and Type are required.");
@@ -117,24 +145,27 @@ const SettingsProvidersComponent: React.FC = () => {
       const type = newProviderData.type!;
       const autoFetch =
         newProviderData.autoFetchModels ?? supportsModelFetching(type);
+      // Call store action which now only interacts with DB
       await addDbProviderConfig({
         name: newProviderData.name,
         type: type,
         isEnabled: newProviderData.isEnabled ?? true,
         apiKeyId: newProviderData.apiKeyId ?? null,
         baseURL: newProviderData.baseURL ?? null,
-        enabledModels: null,
+        enabledModels: null, // Initial state
         autoFetchModels: autoFetch,
         fetchedModels: null,
         modelsLastFetchedAt: null,
         modelSortOrder: null,
       });
-      handleCancelNew();
+      handleCancelNew(); // Reset form on success
     } catch (error) {
+      // Error toast handled by the action
       console.error("Failed to add provider (from component):", error);
+    } finally {
       setIsSavingNew(false);
     }
-  }, [addDbProviderConfig, newProviderData, handleCancelNew]);
+  }, [addDbProviderConfig, newProviderData, handleCancelNew]); // handleCancelNew is now stable
 
   const handleNewChange = (
     field: keyof DbProviderConfig,
@@ -142,6 +173,7 @@ const SettingsProvidersComponent: React.FC = () => {
   ) => {
     setNewProviderData((prev) => {
       const updated = { ...prev, [field]: value };
+      // Reset dependent fields when type changes
       if (field === "type") {
         const newType = value as DbProviderType;
         updated.apiKeyId = null;
@@ -169,6 +201,7 @@ const SettingsProvidersComponent: React.FC = () => {
         </p>
       </div>
 
+      {/* Add Provider Button */}
       <div className="mt-auto pt-4 flex-shrink-0">
         {!isAdding && (
           <Button onClick={handleAddNew} className="w-full">
@@ -176,9 +209,12 @@ const SettingsProvidersComponent: React.FC = () => {
           </Button>
         )}
       </div>
+
+      {/* Add Provider Form */}
       {isAdding && (
         <div className="border border-blue-500 rounded-md p-4 space-y-3 bg-gray-800 shadow-lg flex-shrink-0">
           <h4 className="font-semibold text-white">Add New Provider</h4>
+          {/* Form fields remain the same */}
           <div className="flex items-center space-x-2">
             <Input
               value={newProviderData.name || ""}
@@ -224,7 +260,7 @@ const SettingsProvidersComponent: React.FC = () => {
                   label="API Key:"
                   selectedKeyId={newProviderData.apiKeyId ?? null}
                   onKeySelected={(keyId) => handleNewChange("apiKeyId", keyId)}
-                  apiKeys={apiKeys || []} // Use fetched data
+                  apiKeys={apiKeys || []} // Use live data
                   className="flex-grow"
                   disabled={isSavingNew}
                 />
@@ -283,38 +319,30 @@ const SettingsProvidersComponent: React.FC = () => {
         </div>
       )}
 
+      {/* Provider List */}
       <ScrollArea className="flex-grow pr-3 -mr-3">
         <div className="space-y-2">
-          {(dbProviderConfigs || []).map(
-            (
-              provider: DbProviderConfig, // Add null check
-            ) => (
-              <ProviderRow
-                key={provider.id}
-                provider={provider}
-                apiKeys={apiKeys || []} // Use fetched data
-                onUpdate={updateDbProviderConfig}
-                onDelete={deleteDbProviderConfig}
-                // Pass dbProviderConfigs and apiKeys to fetchModels call
-                onFetchModels={() =>
-                  fetchModels(
-                    provider.id,
-                    dbProviderConfigs || [],
-                    apiKeys || [],
-                  )
-                }
-                fetchStatus={providerFetchStatus[provider.id] || "idle"}
-                getAllAvailableModelDefs={() =>
-                  getAllAvailableModelDefs(provider.id)
-                }
-              />
-            ),
-          )}
+          {(dbProviderConfigs || []).map((provider: DbProviderConfig) => (
+            <ProviderRow
+              key={provider.id}
+              provider={provider}
+              apiKeys={apiKeys || []} // Pass live data
+              onUpdate={updateDbProviderConfig} // Pass store action
+              onDelete={deleteDbProviderConfig} // Pass store action
+              // Pass fetchModels action with current data from storage
+              onFetchModels={() =>
+                fetchModels(provider.id, dbProviderConfigs || [], apiKeys || [])
+              }
+              fetchStatus={providerFetchStatus[provider.id] || "idle"}
+              getAllAvailableModelDefs={() =>
+                getAllAvailableModelDefs(provider.id)
+              } // Pass local getter
+            />
+          ))}
         </div>
       </ScrollArea>
     </div>
   );
 };
-
 
 export const SettingsProviders = React.memo(SettingsProvidersComponent);

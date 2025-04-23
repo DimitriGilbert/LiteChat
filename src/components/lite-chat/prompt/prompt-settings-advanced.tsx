@@ -1,4 +1,4 @@
-
+// src/components/lite-chat/prompt/prompt-settings-advanced.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -17,20 +17,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import type {
-  DbProviderConfig,
-  // DbConversation, // Keep DbConversation
-  // SidebarItemType,
-  // DbApiKey, // Removed
-} from "@/lib/types";
-
+import type { DbProviderConfig } from "@/lib/types"; // Removed unused types
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useSidebarStore } from "@/store/sidebar.store";
 import { useVfsStore } from "@/store/vfs.store";
-
-import { useChatStorage } from "@/hooks/use-chat-storage";
+import { useChatStorage } from "@/hooks/use-chat-storage"; // Import storage hook
 
 const PromptSettingsAdvancedComponent: React.FC<{
   className?: string;
@@ -73,48 +66,42 @@ const PromptSettingsAdvancedComponent: React.FC<{
 
   const {
     selectedProviderId,
-    // dbProviderConfigs, // Fetched below
-    // apiKeys, // Fetched below
     enableApiKeyManagement,
-    updateDbProviderConfig,
+    updateDbProviderConfig, // Keep action
   } = useProviderStore(
     useShallow((state) => ({
       selectedProviderId: state.selectedProviderId,
-      // dbProviderConfigs: state.dbProviderConfigs,
-      // apiKeys: state.apiKeys,
       enableApiKeyManagement: state.enableApiKeyManagement,
-      updateDbProviderConfig: state.updateDbProviderConfig,
+      updateDbProviderConfig: state.updateDbProviderConfig, // Keep action
     })),
   );
 
-  // Fetch from storage
+  // Fetch live data from storage
   const {
     providerConfigs: dbProviderConfigs,
     apiKeys,
     conversations,
-  } = useChatStorage();
+  } = useChatStorage(); // Use storage hook
 
   const {
     selectedItemId,
     selectedItemType,
-    // activeConversationData, // Derived below
-    updateConversationSystemPrompt,
+    updateConversationSystemPrompt, // Keep action
   } = useSidebarStore(
     useShallow((state) => ({
       selectedItemId: state.selectedItemId,
       selectedItemType: state.selectedItemType,
-      // activeConversationData: state.activeConversationData,
-      updateConversationSystemPrompt: state.updateConversationSystemPrompt,
+      updateConversationSystemPrompt: state.updateConversationSystemPrompt, // Keep action
     })),
   );
 
-  // Derive activeConversationData locally
+  // Derive activeConversationData locally using live data
   const activeConversationData = useMemo(() => {
     if (selectedItemType === "conversation" && selectedItemId) {
       return (conversations || []).find((c) => c.id === selectedItemId);
     }
     return null;
-  }, [selectedItemId, selectedItemType, conversations]);
+  }, [selectedItemId, selectedItemType, conversations]); // Depend on live data
 
   const {
     isVfsEnabledForItem,
@@ -122,7 +109,7 @@ const PromptSettingsAdvancedComponent: React.FC<{
     isVfsLoading,
     vfsError,
     vfsKey,
-    initializeVfs, // Get initialize action
+    initializeVfs,
   } = useVfsStore(
     useShallow((state) => ({
       isVfsEnabledForItem: state.isVfsEnabledForItem,
@@ -167,7 +154,7 @@ const PromptSettingsAdvancedComponent: React.FC<{
       console.log(
         "[PromptSettingsAdvanced] VFS enabled but not ready, triggering initialization",
       );
-      initializeVfs(); // Call store action
+      initializeVfs();
     }
   }, [isVfsEnabledForItem, isVfsReady, isVfsLoading, vfsKey, initializeVfs]);
 
@@ -196,7 +183,8 @@ const PromptSettingsAdvancedComponent: React.FC<{
     if (enableAdvancedSettings && conversationId && isConvoPromptDirty) {
       const promptToSave =
         localConvoSystemPrompt?.trim() === "" ? null : localConvoSystemPrompt;
-      updateConversationSystemPrompt(conversationId, promptToSave) // Use store action
+      // Use store action
+      updateConversationSystemPrompt(conversationId, promptToSave)
         .then(() => {
           setIsConvoPromptDirty(false);
           toast.success("Conversation system prompt saved.");
@@ -232,17 +220,18 @@ const PromptSettingsAdvancedComponent: React.FC<{
     [],
   );
 
+  // Derive selectedDbProviderConfig using live data
   const selectedDbProviderConfig = useMemo(() => {
     return (dbProviderConfigs || []).find(
       (p: DbProviderConfig) => p.id === selectedProviderId,
     );
-  }, [dbProviderConfigs, selectedProviderId]);
+  }, [dbProviderConfigs, selectedProviderId]); // Depend on live data
 
   const handleApiKeySelectionChange = useCallback(
     (keyId: string | null) => {
       if (selectedDbProviderConfig) {
+        // Use store action
         updateDbProviderConfig(selectedDbProviderConfig.id, {
-          // Use store action
           apiKeyId: keyId,
         })
           .then(() => {
@@ -291,6 +280,7 @@ const PromptSettingsAdvancedComponent: React.FC<{
           </TabsTrigger>
         </TabsList>
 
+        {/* Parameters Tab */}
         <TabsContent value="parameters" className="space-y-4 mt-0">
           <div className="grid grid-cols-2 gap-4 items-end">
             <div className="space-y-1.5">
@@ -303,7 +293,7 @@ const PromptSettingsAdvancedComponent: React.FC<{
                 max={1}
                 step={0.01}
                 value={[temperature]}
-                onValueChange={(value) => setTemperature(value[0])} // Use store action
+                onValueChange={(value) => setTemperature(value[0])}
               />
             </div>
             <div className="space-y-1.5">
@@ -316,7 +306,7 @@ const PromptSettingsAdvancedComponent: React.FC<{
                 max={1}
                 step={0.01}
                 value={[topP ?? 1.0]}
-                onValueChange={(value) => handleSliderChange(setTopP, value)} // Use store action
+                onValueChange={(value) => handleSliderChange(setTopP, value)}
               />
             </div>
           </div>
@@ -330,7 +320,7 @@ const PromptSettingsAdvancedComponent: React.FC<{
                 type="number"
                 placeholder="Default"
                 value={maxTokens ?? ""}
-                onChange={(e) => handleNumberInputChange(setMaxTokens, e)} // Use store action
+                onChange={(e) => handleNumberInputChange(setMaxTokens, e)}
                 min="1"
                 className="h-8 text-xs"
               />
@@ -344,7 +334,7 @@ const PromptSettingsAdvancedComponent: React.FC<{
                 type="number"
                 placeholder="Default"
                 value={topK ?? ""}
-                onChange={(e) => handleNumberInputChange(setTopK, e)} // Use store action
+                onChange={(e) => handleNumberInputChange(setTopK, e)}
                 min="1"
                 className="h-8 text-xs"
               />
@@ -363,7 +353,7 @@ const PromptSettingsAdvancedComponent: React.FC<{
                 value={[presencePenalty ?? 0.0]}
                 onValueChange={(value) =>
                   handleSliderChange(setPresencePenalty, value)
-                } // Use store action
+                }
               />
             </div>
             <div className="space-y-1.5">
@@ -378,12 +368,13 @@ const PromptSettingsAdvancedComponent: React.FC<{
                 value={[frequencyPenalty ?? 0.0]}
                 onValueChange={(value) =>
                   handleSliderChange(setFrequencyPenalty, value)
-                } // Use store action
+                }
               />
             </div>
           </div>
         </TabsContent>
 
+        {/* System Prompt Tab */}
         <TabsContent value="system_prompt" className="space-y-3 mt-0">
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
@@ -476,13 +467,14 @@ const PromptSettingsAdvancedComponent: React.FC<{
           </div>
         </TabsContent>
 
+        {/* API Keys Tab */}
         {enableApiKeyManagement && (
           <TabsContent value="api_keys" className="mt-0">
             {selectedDbProviderConfig ? (
               <ApiKeySelector
                 selectedKeyId={selectedDbProviderConfig.apiKeyId ?? null}
                 onKeySelected={handleApiKeySelectionChange}
-                apiKeys={apiKeys || []} // Use fetched apiKeys
+                apiKeys={apiKeys || []} // Use live data
                 disabled={!selectedDbProviderConfig}
               />
             ) : (
@@ -495,6 +487,7 @@ const PromptSettingsAdvancedComponent: React.FC<{
           </TabsContent>
         )}
 
+        {/* Files Tab */}
         <TabsContent value="files" className="mt-0">
           {showFileManager ? (
             <FileManager key={vfsKey} />

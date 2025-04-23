@@ -74,29 +74,31 @@ const ChatWrapperComponent: React.FC<ChatWrapperProps> = ({
     })),
   );
 
-  const { selectedProviderId, selectedModelId, dbProviderConfigs, apiKeys } =
-    useProviderStore(
-      useShallow((state) => ({
-        selectedProviderId: state.selectedProviderId,
-        selectedModelId: state.selectedModelId,
-        dbProviderConfigs: state.dbProviderConfigs,
-        apiKeys: state.apiKeys,
-      })),
-    );
+  const { selectedProviderId, selectedModelId } = useProviderStore(
+    useShallow((state) => ({
+      selectedProviderId: state.selectedProviderId,
+      selectedModelId: state.selectedModelId,
+    })),
+  );
 
-  // Fetch DB data needed for derived state
-  const { conversations: dbConversations, projects: dbProjects } =
-    useChatStorage();
+  // Fetch DB data needed for derived state (This part is correct)
+  const {
+    conversations: dbConversations,
+    projects: dbProjects,
+    providerConfigs: dbProviderConfigs,
+    apiKeys,
+  } = useChatStorage();
 
   // --- Use derived state hook ---
+  // Pass the fetched data here
   const { activeConversationData, selectedProvider, selectedModel } =
     useDerivedChatState({
       selectedItemId,
       selectedItemType,
       dbConversations: dbConversations || [],
       dbProjects: dbProjects || [],
-      dbProviderConfigs,
-      apiKeys,
+      dbProviderConfigs: dbProviderConfigs || [],
+      apiKeys: apiKeys || [],
       selectedProviderId,
       selectedModelId,
     });

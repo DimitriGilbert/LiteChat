@@ -1,4 +1,4 @@
-
+// src/components/lite-chat/settings/settings-api-keys.tsx
 import React, { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,32 +27,22 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { DbProviderConfig, DbApiKey } from "@/lib/types";
-
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
-
-import { useChatStorage } from "@/hooks/use-chat-storage";
+import { useChatStorage } from "@/hooks/use-chat-storage"; // Import storage hook
 
 const SettingsApiKeysComponent: React.FC = () => {
-  // --- Fetch state/actions from store ---
-  const {
-    // apiKeys, // Fetched below
-    addApiKey,
-    deleteApiKey,
-    // dbProviderConfigs, // Fetched below
-    enableApiKeyManagement,
-  } = useProviderStore(
+  // --- Fetch actions and flag from store ---
+  const { addApiKey, deleteApiKey, enableApiKeyManagement } = useProviderStore(
     useShallow((state) => ({
-      // apiKeys: state.apiKeys,
-      addApiKey: state.addApiKey,
-      deleteApiKey: state.deleteApiKey,
-      // dbProviderConfigs: state.dbProviderConfigs,
+      addApiKey: state.addApiKey, // Action remains
+      deleteApiKey: state.deleteApiKey, // Action remains
       enableApiKeyManagement: state.enableApiKeyManagement,
     })),
   );
 
-  // Fetch from storage
-  const { apiKeys, providerConfigs: dbProviderConfigs } = useChatStorage();
+  // Fetch live data from storage
+  const { apiKeys, providerConfigs: dbProviderConfigs } = useChatStorage(); // Use storage hook
 
   // Local UI state remains
   const [newKeyName, setNewKeyName] = useState("");
@@ -71,6 +61,7 @@ const SettingsApiKeysComponent: React.FC = () => {
       }
       setIsAdding(true);
       try {
+        // Call store action which now only interacts with DB
         await addApiKey(
           newKeyName.trim(),
           newKeyProviderType,
@@ -80,6 +71,7 @@ const SettingsApiKeysComponent: React.FC = () => {
         setNewKeyValue("");
         setNewKeyProviderType("");
       } catch (error: unknown) {
+        // Error toast handled by action
         console.error("Failed to add API key (from component):", error);
       } finally {
         setIsAdding(false);
@@ -97,6 +89,7 @@ const SettingsApiKeysComponent: React.FC = () => {
       ) {
         setIsDeleting((prev) => ({ ...prev, [id]: true }));
         try {
+          // Call store action which now only interacts with DB
           await deleteApiKey(id);
           setShowValues((prev) => {
             const next = { ...prev };
@@ -104,8 +97,10 @@ const SettingsApiKeysComponent: React.FC = () => {
             return next;
           });
         } catch (error: unknown) {
+          // Error toast handled by action
           console.error("Failed to delete API key (from component):", error);
         } finally {
+          // Ensure loading state is reset even if delete fails
           setIsDeleting((prev) => ({ ...prev, [id]: false }));
         }
       }
@@ -113,6 +108,7 @@ const SettingsApiKeysComponent: React.FC = () => {
     [deleteApiKey],
   );
 
+  // Derivations use live data from storage
   const linkedProviderNames = useMemo(() => {
     const map = new Map<string, string>();
     (apiKeys || []).forEach((key: DbApiKey) => {
@@ -127,7 +123,7 @@ const SettingsApiKeysComponent: React.FC = () => {
       );
     });
     return map;
-  }, [apiKeys, dbProviderConfigs]);
+  }, [apiKeys, dbProviderConfigs]); // Depend on live data
 
   if (!enableApiKeyManagement) {
     return (
@@ -157,6 +153,7 @@ const SettingsApiKeysComponent: React.FC = () => {
 
   return (
     <div className="space-y-6 p-1">
+      {/* Add Key Form */}
       <form onSubmit={handleAddKey} className="space-y-4">
         <h3 className="text-lg font-medium mb-2">Add New API Key</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -215,9 +212,10 @@ const SettingsApiKeysComponent: React.FC = () => {
         </Button>
       </form>
 
+      {/* Stored Keys Table */}
       <div>
         <h3 className="text-lg font-medium mb-2">Stored API Keys</h3>
-        {(apiKeys || []).length === 0 ? ( // Add null check
+        {(apiKeys || []).length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">
             No API keys stored yet. Add one above. Link keys to providers in the
             'Providers' tab.
@@ -236,7 +234,6 @@ const SettingsApiKeysComponent: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {(apiKeys || []).map((key: DbApiKey) => {
-                  // Add null check
                   const isKeyDeleting = isDeleting[key.id];
                   return (
                     <TableRow key={key.id}>

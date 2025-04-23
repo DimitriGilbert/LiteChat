@@ -1,4 +1,4 @@
-
+// src/components/lite-chat/settings/settings-mods.tsx
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { AlertTriangle, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import type { DbMod } from "@/mods/types";
+import type { DbMod, ModInstance } from "@/mods/types";
 import {
   Tooltip,
   TooltipContent,
@@ -26,21 +26,23 @@ import {
 
 import { useShallow } from "zustand/react/shallow";
 import { useModStore } from "@/store/mod.store";
+import { useChatStorage } from "@/hooks/use-chat-storage";
 
 const SettingsModsComponent: React.FC = () => {
   // --- Fetch state/actions from store ---
-  const { dbMods, loadedMods, addDbMod, updateDbMod, deleteDbMod } =
-    useModStore(
-      useShallow((state) => ({
-        dbMods: state.dbMods,
-        loadedMods: state.loadedMods,
-        addDbMod: state.addDbMod,
-        updateDbMod: state.updateDbMod,
-        deleteDbMod: state.deleteDbMod,
-      })),
-    );
+  const { loadedMods, addDbMod, updateDbMod, deleteDbMod } = useModStore(
+    useShallow((state) => ({
+      loadedMods: state.loadedMods,
+      addDbMod: state.addDbMod,
+      updateDbMod: state.updateDbMod,
+      deleteDbMod: state.deleteDbMod,
+    })),
+  );
 
-  // Local UI state remains
+  // Fetch live data from storage
+  const { mods: dbMods } = useChatStorage();
+
+  // Local UI state
   const [modName, setModName] = useState("");
   const [modUrl, setModUrl] = useState("");
   const [modScript, setModScript] = useState("");
@@ -124,7 +126,7 @@ const SettingsModsComponent: React.FC = () => {
     (
       modId: string,
     ): { status: string; error?: string | Error; tooltip?: string } => {
-      const loaded = loadedMods.find((m) => m.id === modId);
+      const loaded = loadedMods.find((m: ModInstance) => m.id === modId);
       if (loaded) {
         if (loaded.error) {
           const errorMessage =
@@ -140,7 +142,7 @@ const SettingsModsComponent: React.FC = () => {
           return { status: "Loaded" };
         }
       }
-      const dbMod = dbMods.find((m) => m.id === modId);
+      const dbMod = (dbMods || []).find((m: DbMod) => m.id === modId);
       if (!dbMod) {
         return { status: "Unknown" };
       }
@@ -231,7 +233,7 @@ const SettingsModsComponent: React.FC = () => {
                     </TableCell>
                   </TableRow>
                 )}
-                {dbMods.map((mod) => {
+                {dbMods.map((mod: DbMod) => {
                   const { status, error, tooltip } = getModStatus(mod.id);
                   const sourceDisplay = mod.sourceUrl
                     ? new URL(mod.sourceUrl).hostname

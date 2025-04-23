@@ -1,16 +1,16 @@
+// src/components/lite-chat/model-selector.tsx
 import React, { useMemo } from "react";
-
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
 import { Combobox } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
 import type {
   AiProviderConfig,
-  DbProviderConfig, // Keep DbProviderConfig type
-  // AiModelConfig, // Removed
+  DbProviderConfig,
+  DbProviderType,
+  // AiModelConfig, // Removed - not needed directly
 } from "@/lib/types";
-
-import { useChatStorage } from "@/hooks/use-chat-storage";
+import { useChatStorage } from "@/hooks/use-chat-storage"; // Import storage hook
 
 const ModelSelectorComponent: React.FC = () => {
   // --- Fetch state/actions from store ---
@@ -20,26 +20,61 @@ const ModelSelectorComponent: React.FC = () => {
         selectedProviderId: state.selectedProviderId,
         selectedModelId: state.selectedModelId,
         setSelectedModelId: state.setSelectedModelId,
-        // dbProviderConfigs fetched below
       })),
     );
 
   // Fetch providerConfigs from storage
-  const { providerConfigs: dbProviderConfigs } = useChatStorage();
+  const { providerConfigs: dbProviderConfigs } = useChatStorage(); // Use storage hook
 
   // Derive selectedDbProviderConfig using store state and fetched data
   const selectedDbProviderConfig = useMemo(
     () =>
       (dbProviderConfigs || []).find(
         (p: DbProviderConfig) => p.id === selectedProviderId,
-      ), // Add type annotation
+      ),
     [dbProviderConfigs, selectedProviderId],
   );
 
   // Derive selectedProvider (for model list) using derived config
   const selectedProvider = useMemo((): AiProviderConfig | undefined => {
     if (!selectedDbProviderConfig) return undefined;
-    const allModels = selectedDbProviderConfig.fetchedModels || [];
+    // Use helper function or inline logic to get default models
+    const getDefaultModels = (
+      type: DbProviderType,
+    ): { id: string; name: string }[] => {
+      const defaults: Record<DbProviderType, { id: string; name: string }[]> = {
+        openai: [{ id: "gpt-4o", name: "GPT-4o" }],
+        google: [
+          {
+            id: "gemini-2.5-pro-exp-03-25",
+            name: "Gemini 2.5 Pro exp (Free)",
+          },
+          {
+            id: "gemini-2.0-flash-thinking-exp-01-21",
+            name: "Gemini 2.0 Flash exp (Free)",
+          },
+          { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+          {
+            id: "emini-2.5-pro-preview-03-25",
+            name: "Gemini 2.5 Pro Preview",
+          },
+          {
+            id: "gemini-2.5-flash-preview-04-17",
+            name: "Gemini 2.5 Flash Preview",
+          },
+        ],
+        openrouter: [],
+        ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }],
+        "openai-compatible": [],
+      };
+      return defaults[type] || [];
+    };
+    const allModels =
+      selectedDbProviderConfig.fetchedModels &&
+      selectedDbProviderConfig.fetchedModels.length > 0
+        ? selectedDbProviderConfig.fetchedModels
+        : getDefaultModels(selectedDbProviderConfig.type);
+
     const enabledIds = new Set(selectedDbProviderConfig.enabledModels ?? []);
     let displayModels =
       enabledIds.size > 0
@@ -74,7 +109,7 @@ const ModelSelectorComponent: React.FC = () => {
       models: displayModels.map((m) => ({
         id: m.id,
         name: m.name,
-        instance: null,
+        instance: null, // Instance not needed here
       })),
       allAvailableModels: allModels,
     };
@@ -103,7 +138,7 @@ const ModelSelectorComponent: React.FC = () => {
   };
 
   // Loading/disabled states based on derived data
-  const isLoading = false; // Loading state might need to be passed if relevant
+  const isLoading = !dbProviderConfigs; // Basic loading state
 
   if (isLoading) {
     return <Skeleton className="h-9" />;
@@ -117,8 +152,8 @@ const ModelSelectorComponent: React.FC = () => {
         onChange={() => {}}
         placeholder="Select Provider First"
         disabled={true}
-        triggerClassName="text-xs h-9" // Ensure consistent styling
-        contentClassName="text-xs" // Ensure consistent styling
+        triggerClassName="text-xs h-9"
+        contentClassName="text-xs"
       />
     );
   }
@@ -133,8 +168,8 @@ const ModelSelectorComponent: React.FC = () => {
         searchPlaceholder="No models found..."
         emptyText="No models found for this provider."
         disabled={true}
-        triggerClassName="text-xs h-9" // Ensure consistent styling
-        contentClassName="text-xs" // Ensure consistent styling
+        triggerClassName="text-xs h-9"
+        contentClassName="text-xs"
       />
     );
   }
@@ -142,7 +177,7 @@ const ModelSelectorComponent: React.FC = () => {
   if (modelOptions.length === 0) {
     return (
       <Combobox
-        options={allModelOptions}
+        options={allModelOptions} // Show all if none are enabled
         value={selectedModelId}
         onChange={handleModelChange}
         placeholder="No models enabled (Search all)"

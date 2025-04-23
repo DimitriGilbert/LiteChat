@@ -1,4 +1,4 @@
-
+// src/hooks/use-derived-chat-state.ts
 import { useMemo } from "react";
 import type {
   DbConversation,
@@ -8,6 +8,7 @@ import type {
   SidebarItemType,
   AiProviderConfig,
   AiModelConfig,
+  DbProviderType, // Added
 } from "@/lib/types";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -20,9 +21,9 @@ interface UseDerivedChatStateProps {
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
   dbConversations: DbConversation[];
-  dbProjects: DbProject[]; // Needed to find parent project for VFS key inheritance
-  dbProviderConfigs: DbProviderConfig[];
-  apiKeys: DbApiKey[];
+  dbProjects: DbProject[];
+  dbProviderConfigs: DbProviderConfig[]; // Now passed directly
+  apiKeys: DbApiKey[]; // Now passed directly
   selectedProviderId: string | null;
   selectedModelId: string | null;
 }
@@ -35,16 +36,43 @@ interface UseDerivedChatStateReturn {
   getApiKeyForProvider: (providerId: string) => string | undefined;
 }
 
+// Helper to get default models (copied from provider store)
+const getDefaultModels = (
+  type: DbProviderType,
+): { id: string; name: string }[] => {
+  const defaults: Record<DbProviderType, { id: string; name: string }[]> = {
+    openai: [{ id: "gpt-4o", name: "GPT-4o" }],
+    google: [
+      { id: "gemini-2.5-pro-exp-03-25", name: "Gemini 2.5 Pro exp (Free)" },
+      {
+        id: "gemini-2.0-flash-thinking-exp-01-21",
+        name: "Gemini 2.0 Flash exp (Free)",
+      },
+      { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+      { id: "emini-2.5-pro-preview-03-25", name: "Gemini 2.5 Pro Preview" },
+      {
+        id: "gemini-2.5-flash-preview-04-17",
+        name: "Gemini 2.5 Flash Preview",
+      },
+    ],
+    openrouter: [],
+    ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }],
+    "openai-compatible": [],
+  };
+  return defaults[type] || [];
+};
+
 export function useDerivedChatState({
   selectedItemId,
   selectedItemType,
   dbConversations,
-  dbProjects, // Destructure
-  dbProviderConfigs,
-  apiKeys,
+  dbProjects,
+  dbProviderConfigs, // Use passed prop
+  apiKeys, // Use passed prop
   selectedProviderId,
   selectedModelId,
 }: UseDerivedChatStateProps): UseDerivedChatStateReturn {
+  // Derivations for active item remain the same
   const activeItemData = useMemo(() => {
     if (!selectedItemId || !selectedItemType) return null;
     if (selectedItemType === "conversation") {
@@ -60,39 +88,48 @@ export function useDerivedChatState({
       : null;
   }, [selectedItemType, activeItemData]);
 
+  // API Key getter uses passed props
   const getApiKeyForProvider = useMemo(() => {
-    // Memoize the function itself
     return (providerId: string): string | undefined => {
       const config = dbProviderConfigs.find((p) => p.id === providerId);
       if (!config || !config.apiKeyId) return undefined;
       return apiKeys.find((k) => k.id === config.apiKeyId)?.value;
     };
-  }, [dbProviderConfigs, apiKeys]);
+  }, [dbProviderConfigs, apiKeys]); // Depend on passed props
 
+  // Selected Provider derivation uses passed props
   const selectedProvider = useMemo((): AiProviderConfig | undefined => {
     const config = dbProviderConfigs.find((p) => p.id === selectedProviderId);
     if (!config) return undefined;
-    // Note: Models array is empty here, as instances are created in selectedModel
+    const allAvailable =
+      config.fetchedModels && config.fetchedModels.length > 0
+        ? config.fetchedModels
+        : getDefaultModels(config.type);
     return {
       id: config.id,
       name: config.name,
       type: config.type,
-      models: [],
-      allAvailableModels: config.fetchedModels || [],
+      models: [], // Instances created in selectedModel
+      allAvailableModels: allAvailable,
     };
-  }, [selectedProviderId, dbProviderConfigs]);
+  }, [selectedProviderId, dbProviderConfigs]); // Depend on passed props
 
+  // Selected Model derivation uses passed props and local getter
   const selectedModel = useMemo((): AiModelConfig | undefined => {
     if (!selectedProviderId || !selectedModelId) return undefined;
     const config = dbProviderConfigs.find((p) => p.id === selectedProviderId);
     if (!config) return undefined;
-    const modelInfo = (config.fetchedModels ?? []).find(
-      (m: { id: string }) => m.id === selectedModelId,
-    );
+
+    const allAvailable =
+      config.fetchedModels && config.fetchedModels.length > 0
+        ? config.fetchedModels
+        : getDefaultModels(config.type);
+
+    const modelInfo = allAvailable.find((m) => m.id === selectedModelId);
     if (!modelInfo) return undefined;
 
     let modelInstance: any = null;
-    const currentApiKey = getApiKeyForProvider(config.id);
+    const currentApiKey = getApiKeyForProvider(config.id); // Use local getter
 
     try {
       switch (config.type) {
@@ -134,11 +171,10 @@ export function useDerivedChatState({
       );
     }
 
-    // Determine capabilities (basic example)
-    const supportsImageGen = config.type === "openai"; // Simplified
+    const supportsImageGen = config.type === "openai";
     const supportsTools = ["openai", "google", "openrouter"].includes(
       config.type,
-    ); // Simplified
+    );
 
     return {
       id: modelInfo.id,
@@ -150,8 +186,8 @@ export function useDerivedChatState({
   }, [
     selectedProviderId,
     selectedModelId,
-    dbProviderConfigs,
-    getApiKeyForProvider,
+    dbProviderConfigs, // Depend on passed prop
+    getApiKeyForProvider, // Depend on local getter
   ]);
 
   return {
@@ -159,6 +195,6 @@ export function useDerivedChatState({
     activeItemData,
     selectedProvider,
     selectedModel,
-    getApiKeyForProvider,
+    getApiKeyForProvider, // Return the local getter
   };
 }
