@@ -10,7 +10,7 @@ import { ChildrenToggleButton } from "./children-toggle-button";
 import type { ReadonlyChatContextSnapshot } from "@/mods/api";
 import { cn } from "@/lib/utils";
 import { StreamingPortal } from "./streaming-portal";
-import { useCoreChatStore } from "@/store/core-chat.store"; // Import store
+import { useCoreChatStore } from "@/store/core-chat.store";
 
 interface MessageBodyProps {
   message: Message;
@@ -18,7 +18,7 @@ interface MessageBodyProps {
   onRegenerate?: (messageId: string) => void;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   modMessageActions: CustomMessageAction[];
-  enableStreamingMarkdown: boolean; // Keep for final render
+  enableStreamingMarkdown: boolean;
   portalTargetId: string;
 }
 
@@ -33,7 +33,6 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
     portalTargetId,
   }) => {
     const [isChildrenCollapsed, setIsChildrenCollapsed] = useState(true);
-    // Get activeStreamId to determine if this message is the one streaming
     const activeStreamId = useCoreChatStore((state) => state.activeStreamId);
 
     const toggleChildrenCollapse = () => {
@@ -54,7 +53,6 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
       return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
     })();
 
-    // Determine if this specific message is the one actively streaming
     const isThisMessageStreaming = activeStreamId === message.id;
 
     return (
@@ -63,32 +61,39 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
 
         {!isFolded ? (
           <>
-            {/* Container for main content (final or portal target) */}
-            <div id={portalTargetId} className="message-content-area">
-              {/* Render final content if NOT the actively streaming message */}
+            {/* Apply consistent prose styling to the container */}
+            <div
+              id={portalTargetId}
+              className={cn(
+                "message-content-area", // Keep for potential targeting
+                // Apply base prose styles here
+                "prose prose-sm prose-invert max-w-none",
+                "prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1",
+                "prose-headings:mt-4 prose-headings:mb-2",
+                "prose-code:before:content-none prose-code:after:content-none",
+                "prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-0",
+                "[&_img]:my-3", // Apply image margin consistently
+                "py-2", // Keep padding consistent
+              )}
+            >
               {!isThisMessageStreaming && (
                 <MessageContentRenderer
                   message={message}
                   enableStreamingMarkdown={enableStreamingMarkdown}
                 />
               )}
-              {/* Portal is rendered conditionally below, it targets this div */}
             </div>
 
-            {/* Render the StreamingPortal ONLY if this message IS streaming */}
             {isThisMessageStreaming && (
               <StreamingPortal
                 messageId={message.id}
                 portalTargetId={portalTargetId}
-                // Content and markdown setting are now read from store inside Portal
               />
             )}
 
-            {/* Metadata and Error always render inline */}
             <MessageMetadataDisplay message={message} />
             <MessageErrorDisplay error={message.error} />
 
-            {/* Children rendering logic remains the same */}
             {hasChildren && (
               <div className="mt-2">
                 <ChildrenToggleButton

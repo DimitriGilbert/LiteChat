@@ -1,5 +1,5 @@
 // src/components/lite-chat/message/streaming-portal.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -19,6 +19,10 @@ export const StreamingPortal: React.FC<StreamingPortalProps> = ({
   portalTargetId,
 }) => {
   const [portalNode, setPortalNode] = useState<Element | null>(null);
+  const [displayedContent, setDisplayedContent] = useState<string>("");
+  const lastRenderTimeRef = useRef<number>(0);
+  const animationFrameRef = useRef<number | null>(null);
+  const accumulatedContentRef = useRef<string>("");
 
   const { activeStreamId, activeStreamContent } = useCoreChatStore(
     useShallow((state) => ({
@@ -27,8 +31,11 @@ export const StreamingPortal: React.FC<StreamingPortalProps> = ({
     })),
   );
 
-  const enableMarkdown = useSettingsStore(
-    (state) => state.enableStreamingMarkdown,
+  const { enableMarkdown, streamingRefreshRateMs } = useSettingsStore(
+    useShallow((state) => ({
+      enableMarkdown: state.enableStreamingMarkdown,
+      streamingRefreshRateMs: state.streamingRefreshRateMs,
+    })),
   );
 
   useEffect(() => {
@@ -40,39 +47,79 @@ export const StreamingPortal: React.FC<StreamingPortalProps> = ({
         `Streaming portal target element with ID "${portalTargetId}" not found.`,
       );
     }
-  }, [portalTargetId]);
+    if (activeStreamId === messageId) {
+      setDisplayedContent("");
+      accumulatedContentRef.current = "";
+      lastRenderTimeRef.current = 0;
+    }
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [portalTargetId, messageId, activeStreamId]);
+
+  useEffect(() => {
+    if (activeStreamId !== messageId || !portalNode) {
+      return;
+    }
+
+    accumulatedContentRef.current = activeStreamContent;
+
+    const updateDisplay = () => {
+      const now = Date.now();
+      if (now - lastRenderTimeRef.current >= streamingRefreshRateMs) {
+        setDisplayedContent(accumulatedContentRef.current);
+        lastRenderTimeRef.current = now;
+      }
+      animationFrameRef.current = requestAnimationFrame(updateDisplay);
+    };
+
+    if (!animationFrameRef.current) {
+      animationFrameRef.current = requestAnimationFrame(updateDisplay);
+    }
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      if (activeStreamId !== messageId) {
+        setDisplayedContent(accumulatedContentRef.current);
+      }
+    };
+  }, [
+    activeStreamContent,
+    streamingRefreshRateMs,
+    activeStreamId,
+    messageId,
+    portalNode,
+  ]);
+
+  useEffect(() => {
+    if (activeStreamId !== messageId && portalNode) {
+      setDisplayedContent(accumulatedContentRef.current);
+    }
+  }, [activeStreamId, messageId, portalNode]);
 
   if (portalNode && activeStreamId === messageId) {
     return createPortal(
-      // Re-apply the necessary styling classes here for the streaming content
-      <div
-        className={cn(
-          // Base text styles
-          "text-gray-200 text-sm whitespace-pre-wrap break-words",
-          // Apply prose styles conditionally for markdown
-          enableMarkdown && [
-            "prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1",
-            "prose-headings:mt-4 prose-headings:mb-2",
-            "prose-code:before:content-none prose-code:after:content-none",
-            "prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-0",
-          ],
-          "py-2",
-        )}
-      >
+      <>
         {enableMarkdown ? (
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={markdownComponents}
           >
-            {activeStreamContent}
+            {displayedContent}
           </ReactMarkdown>
         ) : (
           <pre className="font-sans text-sm">
-            <code>{activeStreamContent}</code>
+            <code>{displayedContent}</code>
           </pre>
         )}
         <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"></span>
-      </div>,
+      </>,
       portalNode,
     );
   }
