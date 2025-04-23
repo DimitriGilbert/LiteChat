@@ -50,9 +50,12 @@ export const StreamingPortal: React.FC<StreamingPortalProps> = ({
           // Base text styles
           "text-gray-200 text-sm whitespace-pre-wrap break-words",
           // Apply prose styles conditionally for markdown
-          enableMarkdown &&
-            "prose prose-sm prose-invert max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:mt-4 prose-headings:mb-2 prose-code:before:content-none prose-code:after:content-none prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-0",
-          // Consistent padding
+          enableMarkdown && [
+            "prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1",
+            "prose-headings:mt-4 prose-headings:mb-2",
+            "prose-code:before:content-none prose-code:after:content-none",
+            "prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-0",
+          ],
           "py-2",
         )}
       >

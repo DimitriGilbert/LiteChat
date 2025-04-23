@@ -80,10 +80,6 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     },
     setSearchTerm: (searchTerm) => set({ searchTerm }),
     setIsSettingsModalOpen: (isOpen) => {
-      console.log(
-        `[SettingsStore] setIsSettingsModalOpen called with: ${isOpen}`,
-        new Error().stack, // Log stack trace
-      );
       set({ isSettingsModalOpen: isOpen });
     },
     setTemperature: (temperature) => set({ temperature }),
