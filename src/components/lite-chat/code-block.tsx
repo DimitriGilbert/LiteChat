@@ -1,4 +1,3 @@
-// src/components/lite-chat/code-block.tsx
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -97,14 +96,11 @@ export const CodeBlock: React.FC<{
             style={vscDarkPlus}
             language={language}
             PreTag="div"
-            className={cn(
-              "!py-3 !px-0 !m-0 !bg-transparent",
-              "overflow-x-auto",
-            )}
+            className={cn("!py-3 !px-0 !m-0 !bg-transparent")}
             customStyle={{
               maxWidth: "100%",
-              width: "fit-content",
-              minWidth: "100%",
+              width: "100%",
+              overflowX: "auto",
             }}
             codeTagProps={{
               style: {
@@ -114,8 +110,10 @@ export const CodeBlock: React.FC<{
                 display: "block",
                 paddingLeft: "1rem",
                 paddingRight: "1rem",
-                whiteSpace: "pre",
                 maxWidth: "100%",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                overflowWrap: "break-word",
               },
             }}
             showLineNumbers
@@ -130,7 +128,8 @@ export const CodeBlock: React.FC<{
               background: "inherit",
               zIndex: 1,
             }}
-            wrapLines={false}
+            wrapLines={true}
+            wrapLongLines={true}
             {...props}
           >
             {codeContent}
