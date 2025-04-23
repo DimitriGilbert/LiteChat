@@ -1,4 +1,4 @@
-// src/components/utils/file-manager-utils.ts
+
 /**
  * Formats bytes into a human-readable string (KB, MB, GB, etc.).
  * @param bytes - The number of bytes.

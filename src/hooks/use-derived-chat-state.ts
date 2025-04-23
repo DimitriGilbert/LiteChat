@@ -1,4 +1,4 @@
-// src/hooks/use-derived-chat-state.ts
+
 import { useMemo } from "react";
 import type {
   DbConversation,

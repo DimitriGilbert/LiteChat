@@ -1,4 +1,4 @@
-// src/components/lite-chat/chat/chat-header.tsx
+
 import React, { useMemo } from "react";
 import { ChatHeaderActions } from "./chat-header-actions";
 import { cn } from "@/lib/utils";

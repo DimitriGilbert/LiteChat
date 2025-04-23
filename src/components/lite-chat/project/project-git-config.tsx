@@ -1,4 +1,4 @@
-// src/components/lite-chat/project/project-git-config.tsx
+
 import React, { useState, useEffect, useCallback } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";

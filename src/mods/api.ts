@@ -1,4 +1,4 @@
-// src/mods/api.ts
+
 import type {
   CustomPromptAction,
   CustomMessageAction,
@@ -12,10 +12,10 @@ import type {
   Tool, // Import Tool type
   ToolImplementation, // Import ToolImplementation type
 } from "./types";
-// Removed unused ModEventName import
 
-// --- Readonly Context Snapshot ---
-// Define a specific type for the read-only snapshot provided to mods
+
+
+
 export type ReadonlyChatContextSnapshot = Readonly<
   Pick<
     ChatContextProps,
@@ -35,7 +35,7 @@ export type ReadonlyChatContextSnapshot = Readonly<
   >
 >;
 
-// --- Middleware Hook Names ---
+
 export const ModMiddlewareHook = {
   SUBMIT_PROMPT: "middleware:submitPrompt",
   PROCESS_RESPONSE_CHUNK: "middleware:processResponseChunk",
@@ -47,7 +47,7 @@ export const ModMiddlewareHook = {
 export type ModMiddlewareHookName =
   (typeof ModMiddlewareHook)[keyof typeof ModMiddlewareHook];
 
-// --- Mod API Interface ---
+
 export interface LiteChatModApi {
   // --- Registration ---
   /** Registers a button to be added to the prompt input area. Returns an unsubscribe function. */

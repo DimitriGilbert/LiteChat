@@ -1,8 +1,8 @@
-// src/services/workflow-events.ts
+
 import mitt from "mitt";
 import type { Message, Workflow } from "@/lib/types"; // Assuming Workflow type is defined in types.ts
 
-// Define event payloads
+
 type WorkflowStartPayload = {
   parentMessageId: string;
   workflowType: Workflow["type"];
@@ -32,7 +32,7 @@ type WorkflowCompletePayload = {
   status: "completed" | "error";
 };
 
-// Define the event map
+
 type WorkflowEvents = {
   WORKFLOW_START: WorkflowStartPayload;
   WORKFLOW_TASK_START: WorkflowTaskStartPayload;
@@ -42,10 +42,10 @@ type WorkflowEvents = {
   WORKFLOW_COMPLETE: WorkflowCompletePayload;
 };
 
-// Create and export the emitter instance
+
 export const workflowEvents = mitt<WorkflowEvents>();
 
-// Export event names as constants for type safety (optional but good practice)
+
 export const WorkflowEvent = {
   START: "WORKFLOW_START",
   TASK_START: "WORKFLOW_TASK_START",

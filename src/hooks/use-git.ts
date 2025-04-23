@@ -1,4 +1,4 @@
-// src/hooks/use-git.ts
+
 import { useState, useCallback, useEffect } from "react";
 import {
   GitUtils,
@@ -14,7 +14,7 @@ import { fs } from "@zenfs/core"; // Import fs type
  *
  * @param fsInstance The configured ZenFS instance (can be null if not ready).
  */
-// Accept fsInstance as a parameter
+
 export function useGit(fsInstance: typeof fs | null) {
   const [loading, setLoading] = useState(false);
   const [gitUtils, setGitUtils] = useState<GitUtils | null>(null);

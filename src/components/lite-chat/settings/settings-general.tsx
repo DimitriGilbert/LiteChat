@@ -1,4 +1,4 @@
-// src/components/lite-chat/settings/settings-general.tsx
+
 import React, { useState, useCallback } from "react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
-// Import store hooks
+
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
 
@@ -147,7 +147,7 @@ const SettingsGeneralComponent: React.FC = () => {
       <Separator />
 
       {/* Git Repository Configuration - Uses local state for now */}
-      {/* TODO: Connect this to actual state management via props */}
+
       <div>
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-lg font-medium">

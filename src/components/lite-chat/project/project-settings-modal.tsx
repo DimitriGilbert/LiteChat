@@ -1,4 +1,4 @@
-// src/components/lite-chat/project/project-settings-modal.tsx
+
 import React, { useState, useEffect } from "react";
 import { ProjectGitConfig } from "./project-git-config";
 import {

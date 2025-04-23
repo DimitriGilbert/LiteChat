@@ -1,4 +1,4 @@
-// src/components/lite-chat/file-manager/file-manager-toolbar.tsx
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import {

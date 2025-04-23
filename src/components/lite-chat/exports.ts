@@ -1,4 +1,4 @@
-// src/components/lite-chat/exports.ts
+
 export { ChatContent } from "@/components/lite-chat/chat/chat-content";
 export { ChatHistory } from "@/components/lite-chat/chat/chat-history";
 export { ChatSide } from "@/components/lite-chat/chat/chat-side";
@@ -16,12 +16,12 @@ export { ProviderSelector } from "@/components/lite-chat/provider-selector";
 export { SettingsModal } from "@/components/lite-chat/settings/settings-modal";
 export { FileManager } from "@/components/lite-chat/file-manager";
 export { GitManager } from "@/components/lite-chat/git-manager";
-// export { FileManagerWithGit } from "@/components/lite-chat/file-manager-with-git";
+
 export { ProjectGitConfig } from "@/components/lite-chat/project/project-git-config";
 export { ProjectSettingsModal } from "@/components/lite-chat/project/project-settings-modal";
-// Removed useChatContext export
+
 export { useGit } from "@/hooks/use-git";
-// Ensure ChatProvider is exported from the correct location
+
 export { ChatProvider } from "@/context/chat-context";
 export type {
   AiProviderConfig,

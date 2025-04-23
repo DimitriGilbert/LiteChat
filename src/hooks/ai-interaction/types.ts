@@ -1,4 +1,4 @@
-// src/hooks/ai-interaction/types.ts
+
 import React from "react";
 import {
   AiModelConfig,
@@ -15,10 +15,10 @@ import {
   DbProviderConfig,
   MessageContent,
 } from "@/lib/types";
-// Import InputActions type
+
 import type { InputActions } from "@/store/input.store";
 
-// --- Interface Definitions ---
+
 export interface UseAiInteractionProps {
   selectedModel: AiModelConfig | undefined;
   selectedProvider: AiProviderConfig | undefined;

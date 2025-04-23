@@ -1,4 +1,4 @@
-// src/components/lite-chat/chat.tsx
+
 import React, { useState, useMemo, useCallback, useEffect } from "react"; // Ensure useEffect is imported
 import ChatProviderInner from "@/context/chat-provider-inner";
 import { ChatSide } from "./chat/chat-side";
@@ -8,7 +8,7 @@ import { useCoreChatStore } from "@/store/core-chat.store";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useShallow } from "zustand/react/shallow";
 import { useVfsStore } from "@/store/vfs.store";
-// No need to import useSettingsStore here for the effect
+
 import type {
   LiteChatConfig,
   SidebarItem,
@@ -20,8 +20,8 @@ import { MenuIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ComponentType } from "react";
 
-// --- Add useThemeEffect Hook Definition ---
-// This hook applies the theme class to the document root.
+
+
 function useThemeEffect(theme: "light" | "dark" | "system") {
   useEffect(() => {
     if (typeof window === "undefined" || !window.document?.documentElement) {
@@ -46,7 +46,7 @@ function useThemeEffect(theme: "light" | "dark" | "system") {
     root.classList.add(effectiveTheme);
   }, [theme]);
 }
-// --- End useThemeEffect Hook Definition ---
+
 
 interface LiteChatProps {
   config?: LiteChatConfig;

@@ -1,10 +1,10 @@
-// src/mods/types.ts
+
 import type { Message, SidebarItemType, MessageContent } from "@/lib/types"; // Import MessageContent
 import type { LiteChatModApi } from "./api";
 import type { Tool, ToolImplementation } from "./tools"; // Import Tool types
 
-// --- Database Schema for Mods ---
-// Ensure this interface is exported
+
+
 export interface DbMod {
   id: string;
   name: string;
@@ -15,8 +15,8 @@ export interface DbMod {
   loadOrder: number;
 }
 
-// --- Loaded Mod Instance ---
-// Ensure this interface is exported
+
+
 export interface ModInstance {
   id: string;
   name: string;
@@ -24,8 +24,8 @@ export interface ModInstance {
   error?: Error | string; // Error during loading/execution
 }
 
-// --- Event Payloads ---
-// Define specific payload types for each event
+
+
 export interface ChatSelectedPayload {
   id: string | null;
   type: SidebarItemType | null;
@@ -39,7 +39,7 @@ export interface ChatDeletedPayload {
   id: string;
   type: SidebarItemType;
 }
-// Added payload types
+
 export interface ChatRenamedPayload {
   id: string;
   type: SidebarItemType;
@@ -54,12 +54,12 @@ export interface ChatVfsToggledPayload {
   type: SidebarItemType;
   enabled: boolean;
 }
-// This event seems deprecated or unused based on ChatSubmissionService logic
-// export interface MessageBeforeSubmitPayload {
-//   prompt: string;
-//   attachedFiles: File[]; // Consider making ReadonlyArray<File>
-//   vfsPaths: string[];
-// }
+
+
+
+
+
+
 export interface MessageSubmittedPayload {
   message: Message; // Use the Message type from lib/types
 }
@@ -93,7 +93,7 @@ export interface AppErrorPayload {
   error?: Error; // Optional original error object
 }
 
-// Map event names (string constants from ModEvent) to their payload types
+
 export interface ModEventPayloadMap {
   "app:loaded": undefined;
   "app:error": AppErrorPayload;
@@ -119,8 +119,8 @@ export interface ModEventPayloadMap {
   // Add other events here...
 }
 
-// --- Middleware Payloads & Returns ---
-// Define specific payload and return types for each middleware hook
+
+
 
 /** Payload for the SUBMIT_PROMPT middleware hook. */
 export interface SubmitPromptPayload {
@@ -152,7 +152,7 @@ export interface VfsWritePayload {
 }
 export type VfsWriteReturn = VfsWritePayload | false;
 
-// Map middleware hook names (string constants from ModMiddlewareHook) to their payload types
+
 export interface ModMiddlewarePayloadMap {
   "middleware:submitPrompt": SubmitPromptPayload;
   "middleware:processResponseChunk": ProcessResponseChunkPayload;
@@ -161,7 +161,7 @@ export interface ModMiddlewarePayloadMap {
   // Add other middleware hooks here...
 }
 
-// Map middleware hook names to their return types
+
 export interface ModMiddlewareReturnMap {
   "middleware:submitPrompt": SubmitPromptReturn;
   "middleware:processResponseChunk": ProcessResponseChunkReturn;
@@ -170,5 +170,5 @@ export interface ModMiddlewareReturnMap {
   // Add other middleware hooks here...
 }
 
-// --- Tool Types Re-export ---
+
 export type { Tool, ToolImplementation };

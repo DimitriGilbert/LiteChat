@@ -1,8 +1,8 @@
-// src/components/lite-chat/settings/settings-assistant.tsx
+
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-// Import store hooks
+
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
 

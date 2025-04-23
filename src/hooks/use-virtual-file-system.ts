@@ -1,4 +1,4 @@
-// src/hooks/use-virtual-file-system.ts
+
 import { useEffect, useRef } from "react";
 import { configureSingle, fs } from "@zenfs/core";
 import { IndexedDB } from "@zenfs/dom";

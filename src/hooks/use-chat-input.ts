@@ -1,4 +1,4 @@
-// src/hooks/use-chat-input.ts
+
 import { useState, useCallback, useMemo } from "react";
 
 interface UseChatInputReturn {

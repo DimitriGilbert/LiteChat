@@ -1,4 +1,4 @@
-// src/components/lite-chat/git-manager.tsx
+
 import React, { useState, useEffect } from "react";
 import { useVfsStore } from "@/store/vfs.store";
 import { useGit } from "@/hooks/use-git";
@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { GitRepoInfoData } from "@/utils/git-utils";
-// REMOVED: import { fs } from "@zenfs/core";
+
 
 export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
   const {

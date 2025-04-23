@@ -1,4 +1,4 @@
-// src/components/lite-chat/settings/settings-provider-row-view.tsx
+
 import React from "react";
 import type { DbProviderConfig, DbApiKey } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import {
   supportsModelFetching,
 } from "@/lib/litechat";
 
-// Define props based on what ProviderRow passes down
+
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 interface ProviderRowViewModeProps {
   provider: DbProviderConfig;
@@ -30,7 +30,7 @@ interface ProviderRowViewModeProps {
   getAllAvailableModelDefs: () => { id: string; name: string }[];
 }
 
-// Wrap component logic in a named function for React.memo
+
 const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   provider, // Use prop
   apiKeys, // Use prop
@@ -192,5 +192,5 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   );
 };
 
-// Export the memoized component
+
 export const ProviderRowViewMode = React.memo(ProviderRowViewModeComponent);

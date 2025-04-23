@@ -1,10 +1,10 @@
-// src/utils/git-utils.ts
+
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import * as git from "isomorphic-git";
 import http from "isomorphic-git/http/web";
-// Removed unused basename import
 
-// Specific type for the data returned by getRepoInfo
+
+
 export interface GitRepoInfoData {
   url: string | null;
   branch: string | null;
@@ -21,7 +21,7 @@ export interface GitRepoInfoData {
   } | null;
 }
 
-// Types for git operations
+
 export interface GitCommitOptions {
   message: string;
   author: {
@@ -30,7 +30,7 @@ export interface GitCommitOptions {
   };
 }
 
-// Corrected Discriminated Union:
+
 export type GitOperationResult<T = void> = T extends void
   ? { success: true; message: string } | { success: false; message: string }
   :

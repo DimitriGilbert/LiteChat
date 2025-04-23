@@ -1,4 +1,4 @@
-// src/components/lite-chat/selected-vfs-files-display.tsx
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { XIcon, FileTextIcon } from "lucide-react";

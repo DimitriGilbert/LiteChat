@@ -1,4 +1,4 @@
-// src/test/hooks/use-chat-input.test.ts
+
 import { describe, it, expect, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useChatInput } from "@/hooks/use-chat-input";

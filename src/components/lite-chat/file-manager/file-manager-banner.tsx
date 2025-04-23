@@ -1,4 +1,4 @@
-// src/components/lite-chat/file-manager/file-manager-banner.tsx
+
 import React from "react";
 import { FolderIcon, UsersIcon } from "lucide-react";
 import type { SidebarItemType } from "@/lib/types";

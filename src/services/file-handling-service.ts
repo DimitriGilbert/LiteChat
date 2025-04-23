@@ -1,11 +1,11 @@
-// src/services/file-handling-service.ts
+
 import { toast } from "sonner";
 import { modEvents, ModEvent } from "@/mods/events";
 import { decodeUint8Array, isCodeFile } from "@/utils/chat-utils";
 import type { TextPart, ImagePart } from "@/lib/types";
 import { useVfsStore } from "@/store/vfs.store";
 
-// Define the ContentPart type based on TextPart and ImagePart
+
 type ContentPart = TextPart | ImagePart;
 
 export interface FileContextResult {
@@ -13,7 +13,7 @@ export interface FileContextResult {
   pathsIncludedInContext: string[];
 }
 
-// Define a simpler context object for the new method
+
 interface VfsSimpleContext {
   isVfsReady: boolean;
   isVfsEnabledForItem: boolean;
@@ -21,7 +21,7 @@ interface VfsSimpleContext {
   vfsKey: string | null;
 }
 
-// Helper function to escape XML characters in content
+
 const escapeXml = (unsafe: string): string => {
   return unsafe.replace(/[<>&'"]/g, (c) => {
     switch (c) {

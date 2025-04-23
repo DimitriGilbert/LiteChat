@@ -1,4 +1,4 @@
-// src/components/lite-chat/message/children-toggle-button.tsx
+
 import React from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";

@@ -1,4 +1,4 @@
-// src/components/lite-chat/prompt/prompt-wrapper.tsx
+
 import React from "react";
 import { PromptForm } from "./prompt-form";
 import { AlertCircle, StopCircleIcon } from "lucide-react";
@@ -15,7 +15,7 @@ import type {
   AiProviderConfig as AiProviderConfigType,
 } from "@/lib/types";
 
-// Props remain largely the same as passed down from ChatWrapper
+
 interface PromptWrapperProps {
   className?: string;
   error: string | null;

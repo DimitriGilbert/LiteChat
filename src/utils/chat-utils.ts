@@ -1,4 +1,4 @@
-// src/utils/chat-utils.ts
+
 import type {
   CustomSettingTab,
   CustomPromptAction,
@@ -12,7 +12,7 @@ import type {
   Role, // Import Role
 } from "@/lib/types";
 
-// Helper functions
+
 export const decodeUint8Array = (arr: Uint8Array): string => {
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(arr);
@@ -99,13 +99,13 @@ export function convertDbMessagesToCoreMessages(
     })) as CoreMessage[]; // Cast the final array to CoreMessage[]
 }
 
-// Constants
+
 export const EMPTY_CUSTOM_SETTINGS_TABS: CustomSettingTab[] = [];
 export const EMPTY_CUSTOM_PROMPT_ACTIONS: CustomPromptAction[] = [];
 export const EMPTY_CUSTOM_MESSAGE_ACTIONS: CustomMessageAction[] = [];
 export const EMPTY_DB_PROVIDER_CONFIGS: DbProviderConfig[] = [];
 
-// Helper to ensure base URL ends correctly with /v1 following user's EXACT logic
+
 export const ensureV1Path = (baseUrl: string): string => {
   try {
     // Trim trailing slashes ONLY for the final return value if needed,

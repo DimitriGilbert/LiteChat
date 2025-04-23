@@ -1,7 +1,7 @@
-// src/hooks/ai-interaction/error-handler.ts
+
 import { toast } from "sonner";
 import type { AiModelConfig, AiProviderConfig } from "@/lib/types";
-// Import the helper function
+
 import { requiresApiKey as checkRequiresApiKey } from "@/lib/litechat";
 
 /**

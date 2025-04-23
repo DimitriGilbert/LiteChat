@@ -1,4 +1,4 @@
-// src/components/lite-chat/message/streaming-portal.tsx
+
 import React, { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";

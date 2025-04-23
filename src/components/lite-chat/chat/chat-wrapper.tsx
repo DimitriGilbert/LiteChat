@@ -1,4 +1,4 @@
-// src/components/lite-chat/chat/chat-wrapper.tsx
+
 import React from "react";
 import { ChatContent } from "./chat-content";
 import { PromptWrapper } from "@/components/lite-chat/prompt/prompt-wrapper";
@@ -18,7 +18,7 @@ import type {
   // SidebarItem, // Removed unused import
 } from "@/lib/types";
 
-// Define the props expected by ChatWrapper based on LiteChatInner
+
 export interface ChatWrapperProps {
   className?: string;
   // Volatile State (High Frequency)

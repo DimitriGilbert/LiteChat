@@ -1,4 +1,4 @@
-// src/components/lite-chat/message/message-body.tsx
+
 import React, { useState } from "react";
 import type { Message, CustomMessageAction } from "@/lib/types";
 import { MessageRoleLabel } from "./message-role-label";

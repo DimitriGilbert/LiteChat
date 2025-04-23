@@ -1,4 +1,4 @@
-// src/hooks/ai-interaction/stream-handler.ts
+
 import { Message, MessageContent } from "@/lib/types";
 import { ModEvent, modEvents } from "@/mods/events";
 import { nanoid } from "nanoid";

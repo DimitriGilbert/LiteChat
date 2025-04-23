@@ -1,9 +1,9 @@
-// src/components/lite-chat/settings/settings-data-management.tsx
+
 import React, { useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { UploadIcon, DownloadIcon, Trash2Icon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-// Import store hooks
+
 import { useShallow } from "zustand/react/shallow";
 import { useSidebarStore } from "@/store/sidebar.store";
 import { useChatStorage } from "@/hooks/use-chat-storage"; // For clearAllData

@@ -1,4 +1,4 @@
-// src/store/sidebar.store.ts
+
 import { create } from "zustand";
 import type {
   SidebarItem,

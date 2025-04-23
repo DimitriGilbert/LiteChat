@@ -1,4 +1,4 @@
-// src/components/lite-chat/chat/chat-content.tsx
+
 import React, {
   useRef,
   useEffect,

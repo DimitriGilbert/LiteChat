@@ -1,4 +1,4 @@
-// src/components/lite-chat/settings/settings-provider-row-edit.tsx
+
 import React from "react";
 import type { DbProviderConfig, DbApiKey, DbProviderType } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,7 @@ import {
 } from "@dnd-kit/sortable";
 import { SortableModelItem } from "@/components/lite-chat/sortable-model-item";
 
-// Define props based on what ProviderRow passes down
+
 interface ProviderRowEditModeProps {
   providerId: string;
   editData: Partial<DbProviderConfig>; // Local edit state from ProviderRow
@@ -58,7 +58,7 @@ interface ProviderRowEditModeProps {
   onDragEnd: (event: DragEndEvent) => void; // Passed down
 }
 
-// Wrap component logic in a named function for React.memo
+
 const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
   providerId,
   editData, // Use prop
@@ -288,5 +288,5 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
   );
 };
 
-// Export the memoized component
+
 export const ProviderRowEditMode = React.memo(ProviderRowEditModeComponent);

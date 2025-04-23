@@ -1,4 +1,4 @@
-// src/store/settings.store.ts
+
 import { create } from "zustand";
 
 export interface SettingsState {
@@ -42,7 +42,7 @@ export interface SettingsActions {
   // Derived data (activeSystemPrompt) should be handled by selectors outside the store
 }
 
-// Default global system prompt (can be moved to constants later)
+
 const defaultGlobalPrompt = `You are a helpful, concise AI assistant designed to provide accurate, relevant answers.
 Follow all instructions exactly, prioritizing clarity, specificity, and relevance.
 Define your role and limitations in context, and adhere strictly to them.

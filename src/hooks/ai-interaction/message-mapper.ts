@@ -1,4 +1,4 @@
-// src/hooks/ai-interaction/message-mapper.ts
+
 import {
   CoreMessage,
   TextPart,
@@ -6,7 +6,7 @@ import {
   ToolCallPart,
   ToolResultPart,
 } from "ai";
-// Import the MessageContent type from our types.ts
+
 import { Message } from "@/lib/types";
 
 type LocalToolCall = {

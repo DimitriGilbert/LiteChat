@@ -1,4 +1,4 @@
-// src/lib/db.ts
+
 import Dexie, { type Table } from "dexie";
 import type {
   DbConversation,
@@ -10,7 +10,7 @@ import type {
 } from "./types";
 import type { DbMod } from "@/mods/types";
 
-// Define interface for the new table
+
 export interface DbAppState {
   key: string; // Primary key (e.g., 'lastSelection')
   value: any; // Store various state values

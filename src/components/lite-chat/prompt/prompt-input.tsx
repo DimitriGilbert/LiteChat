@@ -1,4 +1,4 @@
-// src/components/lite-chat/prompt/prompt-input.tsx
+
 import React, { useRef, useEffect, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";

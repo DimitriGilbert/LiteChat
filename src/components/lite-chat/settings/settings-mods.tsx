@@ -1,4 +1,4 @@
-// src/components/lite-chat/settings/settings-mods.tsx
+
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-// Import store hooks
+
 import { useShallow } from "zustand/react/shallow";
 import { useModStore } from "@/store/mod.store";
 

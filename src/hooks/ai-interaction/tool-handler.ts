@@ -1,4 +1,4 @@
-// src/hooks/ai-interaction/tool-handler.ts
+
 import { tool, Tool as VercelTool, ToolExecutionOptions } from "ai";
 import { RegisteredToolEntry } from "@/context/mod-context";
 

@@ -1,4 +1,4 @@
-// src/store/core-chat.store.ts
+
 
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
@@ -23,7 +23,7 @@ import { workflowEvents, WorkflowEvent } from "@/services/workflow-events";
 import Dexie from "dexie";
 import { useSettingsStore } from "./settings.store";
 
-// Helper function remains the same
+
 const findMessageAndParent = (
   messages: Message[],
   messageId: string,

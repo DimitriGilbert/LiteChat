@@ -1,4 +1,4 @@
-// src/components/lite-chat/chat/chat-history.tsx
+
 import React, {
   useState,
   useRef,
@@ -29,9 +29,9 @@ import { cn } from "@/lib/utils";
 import type { SidebarItem, SidebarItemType } from "@/lib/types";
 import { toast } from "sonner";
 import { ProjectSettingsModal } from "@/components/lite-chat/project/project-settings-modal";
-// Import store hooks
-// import { useShallow } from "zustand/react/shallow";
-// import { useSidebarStore } from "@/store/sidebar.store";
+
+
+
 import { useChatStorage } from "@/hooks/use-chat-storage"; // To get items
 
 interface HistoryItemProps {

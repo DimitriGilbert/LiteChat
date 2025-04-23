@@ -1,8 +1,8 @@
-// src/components/lite-chat/message/message-content-utils.tsx
+
 import React from "react";
 import { CodeBlock } from "@/components/lite-chat/code-block";
 
-// Custom component renderer for paragraphs to handle potential block children
+
 export const ParagraphRenderer = ({ children, ...props }: any) => {
   const containsBlockElement = React.Children.toArray(children).some(
     (child: any) =>
@@ -31,7 +31,7 @@ export const ParagraphRenderer = ({ children, ...props }: any) => {
   );
 };
 
-// Define common markdown components
+
 export const markdownComponents = {
   code: CodeBlock,
   p: ParagraphRenderer,

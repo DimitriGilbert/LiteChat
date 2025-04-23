@@ -1,4 +1,4 @@
-// src/components/lite-chat/message-role-label.tsx
+
 import React from "react";
 import type { Message } from "@/lib/types";
 

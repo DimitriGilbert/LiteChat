@@ -1,4 +1,4 @@
-// src/components/lite-chat/prompt/prompt-form.tsx
+
 import React, { useEffect, useCallback } from "react";
 import { PromptInput } from "./prompt-input";
 import { PromptSettings } from "./prompt-settings";
@@ -21,14 +21,14 @@ import type {
 } from "@/lib/types";
 import { FileHandlingService } from "@/services/file-handling-service";
 import type { SubmitPromptPayload } from "@/mods/types";
-// Import necessary store hooks
+
 import { useShallow } from "zustand/react/shallow";
-// import { useInputStore } from "@/store/input.store";
+
 import { useVfsStore } from "@/store/vfs.store";
 import { useSidebarStore } from "@/store/sidebar.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useCoreChatStore } from "@/store/core-chat.store";
-// import { useSettingsStore } from "@/store/settings.store";
+
 
 interface PromptFormProps {
   className?: string;

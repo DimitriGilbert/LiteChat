@@ -1,4 +1,4 @@
-// src/components/lite-chat/prompt/prompt-files.tsx
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { XIcon, FileIcon } from "lucide-react";

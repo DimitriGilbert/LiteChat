@@ -1,17 +1,17 @@
-// src/lib/types.ts
+
 import React from "react";
-// Ensure DbMod and ModInstance are exported from their definition file
+
 import type {
   DbMod as ModDbType,
   ModInstance as ModInstanceType,
 } from "@/mods/types";
-// Import the global fs object to use its type
+
 import { fs } from "@zenfs/core";
 import type { CoreMessage as AiCoreMessage } from "ai"; // Use alias to avoid naming conflict
-// Import ReadonlyChatContextSnapshot from mods/api
+
 import type { ReadonlyChatContextSnapshot as ModApiSnapshot } from "@/mods/api";
 
-// --- Basic Types ---
+
 export type Role = "user" | "assistant" | "system" | "tool"; // Added 'tool' role
 export type SidebarItemType = "conversation" | "project";
 export type DbProviderType =
@@ -21,7 +21,7 @@ export type DbProviderType =
   | "ollama"
   | "openai-compatible";
 
-// --- AI SDK Core Message Parts (Aligned with reference) ---
+
 export interface TextPart {
   type: "text";
   text: string;
@@ -35,8 +35,8 @@ export interface ImagePart {
   mediaType?: string;
 }
 
-// --- AI SDK Tool Call/Result Parts ---
-// Structure matching the 'tool_calls' property in assistant messages
+
+
 export interface ToolCallPart {
   type: "tool-call";
   toolCallId: string;
@@ -44,7 +44,7 @@ export interface ToolCallPart {
   args: any; // Arguments provided by the model for the tool call
 }
 
-// Structure matching the content of 'tool' role messages
+
 export interface ToolResultPart {
   type: "tool-result";
   toolCallId: string;
@@ -54,13 +54,13 @@ export interface ToolResultPart {
   isError?: boolean;
 }
 
-// Define the multi-modal content type based on AI SDK structure
-// Can be simple text, or an array containing text, image, tool-call, or tool-result parts.
+
+
 export type MessageContent =
   | string
   | Array<TextPart | ImagePart | ToolCallPart | ToolResultPart>;
 
-// --- Database Schemas ---
+
 export interface DbBase {
   id: string;
   createdAt: Date;
@@ -86,7 +86,7 @@ export interface DbConversation extends DbBase {
   gitRepoEnabled?: boolean;
 }
 
-// Define the Workflow type
+
 export interface Workflow {
   type: "race" | "sequence" | "parallel";
   status: "pending" | "running" | "completed" | "error";
@@ -147,11 +147,11 @@ export interface DbProviderConfig extends DbBase {
   modelSortOrder: string[] | null;
 }
 
-// Re-export DbMod and ModInstance from mods/types
+
 export type DbMod = ModDbType;
 export type ModInstance = ModInstanceType;
 
-// --- UI & State Types ---
+
 export interface Message {
   id: string; // Make ID mandatory for UI state consistency
   role: Role; // Updated Role type
@@ -197,7 +197,7 @@ export interface ConversationSidebarItem
 }
 export type SidebarItem = ProjectSidebarItem | ConversationSidebarItem;
 
-// --- AI Configuration ---
+
 export interface AiModelConfig {
   id: string;
   name: string;
@@ -219,7 +219,7 @@ export interface AiProviderConfig {
   allAvailableModels: { id: string; name: string }[];
 }
 
-// --- Virtual File System ---
+
 export interface FileSystemEntry {
   name: string;
   path: string;
@@ -228,7 +228,7 @@ export interface FileSystemEntry {
   lastModified: Date;
 }
 
-// --- Custom Action Definitions ---
+
 export interface CustomActionBase {
   id: string;
   icon: React.ReactNode;
@@ -245,7 +245,7 @@ export interface CustomMessageAction extends CustomActionBase {
   isVisible?: (message: Message, context: ChatContextProps) => boolean;
 }
 
-// --- Custom Settings Definitions ---
+
 export interface CustomSettingTabProps {
   context: ChatContextProps;
 }
@@ -256,7 +256,7 @@ export interface CustomSettingTab {
   component: React.ComponentType<CustomSettingTabProps>;
 }
 
-// --- Chat Configuration ---
+
 export interface LiteChatConfig {
   enableSidebar?: boolean;
   enableVfs?: boolean;
@@ -276,9 +276,9 @@ export interface LiteChatConfig {
   // streamingPortalId?: string; // Added
 }
 
-// --- Chat Context ---
 
-// Core Context Definition
+
+
 export interface CoreChatContextProps {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -303,7 +303,7 @@ export interface CoreChatContextProps {
   abortControllerRef: React.MutableRefObject<AbortController | null>;
 }
 
-// VFS object within the context
+
 export interface VfsContextObject {
   isReady: boolean;
   isLoading: boolean;
@@ -325,12 +325,12 @@ export interface VfsContextObject {
   vfsKey: string | null;
 }
 
-// Export the snapshot type from mods/api
+
 export type ReadonlyChatContextSnapshot = ModApiSnapshot;
 
-// Full Context (Aggregated - Consumers should ideally use specific context hooks)
-// This acts as the central hub providing access to everything if needed,
-// but its direct use should be minimized in favor of specific contexts.
+
+
+
 export interface ChatContextProps {
   // --- Feature Flags (from Settings/ProviderMgmt) ---
   enableApiKeyManagement: boolean;
@@ -473,8 +473,8 @@ export interface ChatContextProps {
   onSettingsModalOpenChange: (open: boolean) => void;
 }
 
-// --- AI SDK CoreMessage Re-export/Alias ---
-// Re-exporting or aliasing the CoreMessage type from 'ai' package
-// This ensures we use the canonical type definition from the SDK
-// Includes 'role', 'content', and optional 'tool_calls' / 'tool_call_id'
+
+
+
+
 export type CoreMessage = AiCoreMessage;

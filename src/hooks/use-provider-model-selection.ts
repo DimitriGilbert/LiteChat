@@ -1,4 +1,4 @@
-// src/hooks/use-provider-model-selection.ts
+
 import { useState, useEffect, useMemo, useCallback } from "react";
 import type { AiProviderConfig, AiModelConfig } from "@/lib/types";
 
@@ -119,7 +119,7 @@ export function useProviderModelSelection({
 
       // If the current model selection is not valid (or no model is selected)...
       if (!currentModelIsValid) {
-        // ...select the first available model for the new provider.
+select the first available model for the new provider.
         const firstModelId = selectedProvider.models[0]?.id ?? null;
         setSelectedModelId(firstModelId);
       }

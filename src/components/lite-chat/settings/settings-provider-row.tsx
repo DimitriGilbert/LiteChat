@@ -1,4 +1,4 @@
-// src/components/lite-chat/settings/settings-provider-row.tsx
+
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import type { DbProviderConfig, DbApiKey } from "@/lib/types";
 import { toast } from "sonner";
@@ -7,7 +7,7 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { ProviderRowViewMode } from "./settings-provider-row-view";
 import { ProviderRowEditMode } from "./settings-provider-row-edit";
 
-// Define props based on what SettingsProviders passes down
+
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 export interface ProviderRowProps {
   provider: DbProviderConfig;
@@ -21,7 +21,7 @@ export interface ProviderRowProps {
   ) => { id: string; name: string }[];
 }
 
-// Wrap component logic in a named function for React.memo
+
 const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   provider, // Use prop
   apiKeys, // Use prop
@@ -269,5 +269,5 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   );
 };
 
-// Export the memoized component
+
 export const ProviderRow = React.memo(ProviderRowComponent);

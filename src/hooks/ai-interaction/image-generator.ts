@@ -1,4 +1,4 @@
-// src/hooks/ai-interaction/image-generator.ts
+
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
 import {

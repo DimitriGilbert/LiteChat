@@ -1,4 +1,4 @@
-// src/store/provider.store.ts
+
 import { create } from "zustand";
 import type { DbApiKey, DbProviderConfig, DbProviderType } from "@/lib/types";
 import { toast } from "sonner";
@@ -6,7 +6,7 @@ import { db } from "@/lib/db"; // Import db
 import { fetchModelsForProvider } from "@/services/model-fetcher";
 import { nanoid } from "nanoid";
 
-// Default models remain the same
+
 const DEFAULT_MODELS: Record<DbProviderType, { id: string; name: string }[]> = {
   openai: [{ id: "gpt-4o", name: "GPT-4o" }],
   google: [
@@ -72,7 +72,7 @@ export interface ProviderActions {
   getApiKeyForProvider: (providerId: string) => string | undefined;
 }
 
-// Helper function to save selection
+
 const saveSelectionToDb = async (
   providerId: string | null,
   modelId: string | null,

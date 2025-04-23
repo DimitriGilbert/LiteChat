@@ -1,4 +1,4 @@
-// src/mods/tools.ts
+
 import { z } from "zod";
 import type { ReadonlyChatContextSnapshot } from "./api";
 

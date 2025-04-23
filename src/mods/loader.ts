@@ -1,4 +1,4 @@
-// src/mods/loader.ts
+
 import type {
   DbMod,
   ModInstance,
@@ -20,7 +20,7 @@ import type {
 import type { ModMiddlewareHookName } from "./api";
 import type { z } from "zod"; // Import z
 
-// Type for the registration callbacks passed from ChatProvider
+
 interface RegistrationCallbacks {
   registerPromptAction: (action: CustomPromptAction) => () => void;
   registerMessageAction: (action: CustomMessageAction) => () => void;
@@ -241,7 +241,7 @@ function createApiForMod(
       console[level](`[Mod: ${modName}]`, ...args);
     },
 
-    // TODO: Implement cleanup logic if needed, e.g., called when mod is disabled/unloaded
+
     // cleanup: () => {
     //   unsubscribeCallbacks.forEach(cb => cb());
     //   unsubscribeCallbacks.clear();

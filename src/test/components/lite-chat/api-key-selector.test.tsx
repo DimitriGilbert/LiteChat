@@ -1,4 +1,4 @@
-// src/test/components/lite-chat/api-key-selector.test.tsx
+
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -7,7 +7,7 @@ import { ChatContext } from "@/hooks/use-chat-context";
 import type { ChatContextProps, DbApiKey, AiProviderConfig } from "@/lib/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-// --- Mocks ---
+
 const mockSetSelectedApiKeyId = vi.fn();
 const mockProviders: AiProviderConfig[] = [
   {
@@ -34,7 +34,7 @@ const mockProviders: AiProviderConfig[] = [
 ];
 let mockApiKeys: DbApiKey[] = []; // Use let for easier reset
 
-// --- Render Helper ---
+
 const renderApiKeySelector = (
   contextOverrides: Partial<ChatContextProps> = {},
 ) => {
@@ -57,7 +57,7 @@ const renderApiKeySelector = (
   );
 };
 
-// --- Test Suite ---
+
 describe.skip("ApiKeySelector", () => {
   beforeEach(() => {
     vi.clearAllMocks();

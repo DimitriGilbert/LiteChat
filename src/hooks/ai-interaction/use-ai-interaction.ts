@@ -1,4 +1,4 @@
-// src/hooks/ai-interaction/use-ai-interaction.ts
+
 import { useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import {
@@ -11,7 +11,7 @@ import {
 import { nanoid } from "nanoid";
 import Dexie from "dexie";
 
-// Type Imports
+
 import {
   PerformAiStreamParams,
   PerformImageGenerationParams,
@@ -33,7 +33,7 @@ import {
 } from "@/lib/types";
 import { modEvents, ModEvent } from "@/mods/events";
 
-// Helper Imports
+
 import { validateAiParameters } from "./error-handler";
 import {
   getStreamHeaders,
@@ -43,12 +43,12 @@ import {
 import { mapToCoreMessages } from "./message-mapper";
 import { createSdkTools } from "./tool-handler";
 import { performImageGeneration as performImageGenerationFunc } from "./image-generator";
-// REMOVED: import { throttle } from "@/lib/throttle";
+
 import { useCoreChatStore } from "@/store/core-chat.store"; // Import store
 import { useSettingsStore } from "@/store/settings.store"; // Import settings store
 import { db } from "@/lib/db"; // Import db
 import { convertDbMessagesToCoreMessages } from "@/utils/chat-utils"; // Import util
-// Import AI SDK factories
+
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";

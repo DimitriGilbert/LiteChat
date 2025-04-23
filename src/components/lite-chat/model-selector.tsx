@@ -1,6 +1,6 @@
-// src/components/lite-chat/model-selector.tsx
+
 import React, { useMemo } from "react";
-// Import store hooks
+
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
 import { Combobox } from "@/components/ui/combobox";
@@ -10,24 +10,24 @@ import type {
   DbProviderConfig, // Keep DbProviderConfig type
   // AiModelConfig, // Removed
 } from "@/lib/types";
-// Import useChatStorage
+
 import { useChatStorage } from "@/hooks/use-chat-storage";
 
-// Helper function remains the same
-// const deriveAiProviderConfig = (
-//   config: DbProviderConfig | undefined, // Use correct type
-// ): AiProviderConfig | undefined => {
-//   if (!config) return undefined;
-//   return {
-//     id: config.id,
-//     name: config.name,
-//     type: config.type,
-//     models: [], // Placeholder
-//     allAvailableModels: config.fetchedModels || [],
-//   };
-// };
 
-// Wrap component logic in a named function for React.memo
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const ModelSelectorComponent: React.FC = () => {
   // --- Fetch state/actions from store ---
   const { selectedProviderId, selectedModelId, setSelectedModelId } =
@@ -184,5 +184,5 @@ const ModelSelectorComponent: React.FC = () => {
   );
 };
 
-// Export the memoized component
+
 export const ModelSelector = React.memo(ModelSelectorComponent);

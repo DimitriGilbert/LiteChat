@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-// Removed useChatContext import
-// Import necessary store hooks
+
+
 import { useVfsStore } from "@/store/vfs.store";
 import { GitSyncManager } from "@/utils/git-sync-manager";
 import { fs } from "@zenfs/core"; // Import fs

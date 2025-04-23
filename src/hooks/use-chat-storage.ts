@@ -1,4 +1,4 @@
-// src/hooks/use-chat-storage.ts
+
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
 import type {

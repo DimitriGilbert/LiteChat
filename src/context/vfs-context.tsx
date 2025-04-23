@@ -1,4 +1,4 @@
-// src/context/vfs-context.tsx
+
 import React, { createContext, useContext, useMemo } from "react";
 import { fs } from "@zenfs/core";
 import { useVfsStore } from "@/store/vfs.store";

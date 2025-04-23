@@ -1,4 +1,4 @@
-// src/test/hooks/use-chat-settings.test.ts
+
 import {
   describe,
   it,
@@ -12,7 +12,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useChatSettings } from "@/hooks/use-chat-settings";
 import type { DbConversation } from "@/lib/types";
 
-// *** ADD THIS BLOCK ***
+
 beforeAll(() => {
   // Attempt to ensure basic DOM structure exists before tests run
   if (typeof document !== "undefined" && !document.body) {
@@ -27,11 +27,11 @@ beforeAll(() => {
     }
   }
 });
-// *** END BLOCK ***
 
-// Mock documentElement for theme changes (Keep this mock)
+
+
 const mockRoot = { classList: { add: vi.fn(), remove: vi.fn() } };
-// Mock only if document exists to avoid errors during setup
+
 if (typeof document !== "undefined") {
   Object.defineProperty(document, "documentElement", {
     value: mockRoot,
@@ -40,7 +40,7 @@ if (typeof document !== "undefined") {
   });
 }
 
-// Mock matchMedia (Keep this mock)
+
 const mockMatchMedia = vi.fn().mockImplementation((query) => ({
   matches: false, // Default light
   media: query,

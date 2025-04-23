@@ -1,4 +1,4 @@
-// src/context/settings-context.tsx
+
 import React, {
   createContext,
   useContext,
@@ -7,7 +7,7 @@ import React, {
   useEffect,
 } from "react";
 import type { DbConversation } from "@/lib/types"; // Removed DbProject import
-// Removed useChatSettings import
+
 
 interface SettingsContextProps {
   enableAdvancedSettings: boolean;
@@ -49,7 +49,7 @@ interface SettingsProviderProps {
   onSettingsModalOpenChange: (open: boolean) => void;
 }
 
-// Default global system prompt (can be moved to constants later)
+
 const defaultGlobalPrompt = `You are a helpful, concise AI assistant designed to provide accurate, relevant answers.
 Follow all instructions exactly, prioritizing clarity, specificity, and relevance.
 Define your role and limitations in context, and adhere strictly to them.
@@ -59,7 +59,7 @@ When reasoning is needed, provide brief chain‑of‑thought steps to improve tr
 Keep responses concise; avoid unnecessary preamble or filler words.
 `;
 
-// Custom hook to apply theme changes to the DOM (copied from useChatSettings)
+
 function useThemeEffect(theme: "light" | "dark" | "system") {
   useEffect(() => {
     // Skip DOM manipulation during server-side rendering or tests

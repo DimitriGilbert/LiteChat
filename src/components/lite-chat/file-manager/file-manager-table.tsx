@@ -1,4 +1,4 @@
-// src/components/lite-chat/file-manager/file-manager-table.tsx
+
 import React, { useMemo } from "react";
 import {
   Table,

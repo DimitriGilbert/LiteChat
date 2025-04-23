@@ -1,4 +1,4 @@
-// src/components/lite-chat/message/message-avatar.tsx
+
 import React from "react";
 import { cn } from "@/lib/utils";
 import { BotIcon, UserIcon } from "lucide-react";

@@ -1,5 +1,5 @@
-// src/services/workflow-execution-service.ts
-// import { nanoid } from "nanoid"; // Removed unused import
+
+
 import { streamText, StreamTextResult, TextStreamPart } from "ai";
 import { toast } from "sonner";
 import { workflowEvents, WorkflowEvent } from "./workflow-events";
@@ -11,10 +11,10 @@ import type {
   Workflow,
 } from "@/lib/types";
 import { getStreamHeaders } from "@/hooks/ai-interaction/stream-handler"; // Reuse helper
-// import { mapToCoreMessages } from "@/hooks/ai-interaction/message-mapper"; // Removed unused import
 
-// Define a more specific task configuration
-// This remains suitable as each task needs its own context/model etc.
+
+
+
 export interface TaskConfig {
   model: AiModelConfig; // Specific model instance for this task
   provider: AiProviderConfig; // Provider info
@@ -25,13 +25,13 @@ export interface TaskConfig {
   // Add other relevant parameters (topP, topK, etc.) as needed
 }
 
-// Options needed by the service
+
 export interface WorkflowExecutionOptions {
   getApiKey: (providerId: string) => string | undefined;
   // Add other shared options if necessary (e.g., access to stores/context)
 }
 
-// Structure defining a task within a workflow
+
 export interface WorkflowTask {
   taskId: string; // Unique ID for this specific task instance within the workflow
   config: TaskConfig; // Configuration for this task

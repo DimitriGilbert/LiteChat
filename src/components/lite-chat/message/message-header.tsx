@@ -1,4 +1,4 @@
-// src/components/lite-chat/message-header.tsx
+
 import React from "react";
 import { MessageAvatar } from "./message-avatar";
 import { MessageFoldButton } from "./message-fold-button";

@@ -1,11 +1,11 @@
-// src/hooks/use-lite-chat-logic.ts
-// line 1
+
+
 
 import { useMemo, useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
 
-// Store Imports and Types
+
 import { useSidebarStore, type SidebarActions } from "@/store/sidebar.store";
 import {
   useCoreChatStore,
@@ -39,12 +39,12 @@ import type {
 } from "@/lib/types";
 import type { ReadonlyChatContextSnapshot } from "@/mods/api";
 import { db } from "@/lib/db";
-// Import the consolidated hook
+
 import { useAiInteraction } from "@/hooks/ai-interaction";
 import { useChatStorage } from "./use-chat-storage";
 import { useDerivedChatState } from "./use-derived-chat-state";
-// Remove the old hook import
-// import { useChatInteractions } from "./use-chat-interactions";
+
+
 
 interface UseLiteChatLogicProps {
   editingItemId: string | null;
@@ -54,7 +54,7 @@ interface UseLiteChatLogicProps {
   dbProjects: DbProject[];
 }
 
-// Keep the return type the same for external compatibility
+
 interface UseLiteChatLogicReturn {
   // Input State & Actions
   promptInputValue: InputState["promptInputValue"];

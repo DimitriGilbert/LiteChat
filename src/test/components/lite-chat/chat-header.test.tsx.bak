@@ -1,4 +1,4 @@
-// src/test/components/lite-chat/chat-header.test.tsx
+
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ChatHeader } from "@/components/lite-chat/chat/chat-header"; // Alias used here
@@ -6,14 +6,14 @@ import { ChatContext } from "@/hooks/use-chat-context"; // Verify path
 import type { ChatContextProps, DbConversation, DbProject } from "@/lib/types"; // Verify path
 import { useLiveQuery } from "dexie-react-hooks";
 
-// Mock useLiveQuery
+
 vi.mock("dexie-react-hooks", () => ({
   useLiveQuery: vi.fn(),
 }));
 const mockedUseLiveQuery = useLiveQuery as vi.Mock;
 
-// Mock ChatHeaderActions using the alias path
-// *** CRITICAL: Ensure your Vitest/Vite config handles the '@' alias correctly! ***
+
+
 vi.mock("@/components/lite-chat/chat-header-actions", () => {
   // <-- Path changed to use alias
   // Keep the console log to check if the mock runs *now*
@@ -44,7 +44,7 @@ const mockProject: DbProject = {
   updatedAt: new Date(),
 };
 
-// Consistent render helper with more robust context
+
 const renderChatHeader = (contextOverrides: Partial<ChatContextProps> = {}) => {
   const baseContext: ChatContextProps = {
     selectedItemId: null,

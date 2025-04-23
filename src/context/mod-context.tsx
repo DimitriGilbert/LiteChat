@@ -1,4 +1,4 @@
-// src/context/mod-context.tsx
+
 import React, {
   createContext,
   useContext,
@@ -20,8 +20,8 @@ import { nanoid } from "nanoid";
 const EMPTY_MOD_INSTANCES: ModInstance[] = [];
 const EMPTY_DB_MODS: DbMod[] = [];
 
-// Define the structure for storing registered tools
-// Use a more generic type for the map value to avoid issues with specific PARAMETERS
+
+
 export interface RegisteredToolEntry {
   definition: Tool<any>; // Use 'any' for the schema here
   implementation?: ToolImplementation<any>; // Use 'any' for the schema here

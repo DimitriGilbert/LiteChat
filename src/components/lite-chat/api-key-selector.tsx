@@ -1,4 +1,4 @@
-// src/components/lite-chat/api-key-selector.tsx
+
 import React from "react";
 import {
   Select,

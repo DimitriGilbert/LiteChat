@@ -1,4 +1,4 @@
-// src/context/chat-middleware.tsx
+
 import { useCallback, useRef } from "react"; // Removed useState import
 import { toast } from "sonner";
 import type { z } from "zod";
@@ -25,8 +25,8 @@ import type {
 } from "@/lib/types";
 import { useModContext } from "./mod-context";
 
-// Define the type for the registration callbacks object
-// Ensure this matches the definition in src/mods/loader.ts
+
+
 interface RegistrationCallbacks {
   registerPromptAction: (action: CustomPromptAction) => () => void;
   registerMessageAction: (action: CustomMessageAction) => () => void;

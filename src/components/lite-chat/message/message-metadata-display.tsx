@@ -1,4 +1,4 @@
-// src/components/lite-chat/message/message-metadata-display.tsx
+
 import React from "react";
 import type { Message } from "@/lib/types";
 

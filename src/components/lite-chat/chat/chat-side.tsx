@@ -1,4 +1,4 @@
-// src/components/lite-chat/chat/chat-side.tsx
+
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { ChatHistory } from "./chat-history";
 import { SettingsModal } from "@/components/lite-chat/settings/settings-modal";

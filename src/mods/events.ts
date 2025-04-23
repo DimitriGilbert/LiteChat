@@ -1,8 +1,8 @@
-// src/mods/events.ts
+
 import mitt from "mitt";
 import type { ModEventPayloadMap } from "./types"; // Import the payload map
 
-// Define event names as constants (enum-like structure)
+
 export const ModEvent = {
   APP_LOADED: "app:loaded",
   APP_ERROR: "app:error",
@@ -28,15 +28,15 @@ export const ModEvent = {
   // Add other event names here...
 } as const; // Use 'as const' for stricter typing
 
-// Infer the event name type from the ModEvent object keys
+
 export type ModEventName = (typeof ModEvent)[keyof typeof ModEvent];
 
-// Create a typed emitter using the event names and payload map
+
 type EmitterEvents = {
   [K in ModEventName]: K extends keyof ModEventPayloadMap
     ? ModEventPayloadMap[K]
     : unknown; // Use 'unknown' for events without defined payloads
 };
 
-// Export a single instance of the typed emitter
+
 export const modEvents = mitt<EmitterEvents>();

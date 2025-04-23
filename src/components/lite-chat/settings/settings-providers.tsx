@@ -1,6 +1,6 @@
-// src/components/lite-chat/settings/settings-providers.tsx
+
 import React, { useState, useCallback } from "react";
-// Import store hooks
+
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
 import type { DbProviderConfig, DbProviderType } from "@/lib/types";
@@ -26,10 +26,10 @@ import {
   requiresBaseURL,
   PROVIDER_TYPES,
 } from "@/lib/litechat";
-// Import useChatStorage
+
 import { useChatStorage } from "@/hooks/use-chat-storage";
 
-// Wrap component logic in a named function for React.memo
+
 const SettingsProvidersComponent: React.FC = () => {
   // --- Fetch state/actions from store ---
   const {
@@ -316,5 +316,5 @@ const SettingsProvidersComponent: React.FC = () => {
   );
 };
 
-// Export the memoized component
+
 export const SettingsProviders = React.memo(SettingsProvidersComponent);

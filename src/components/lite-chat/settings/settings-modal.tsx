@@ -1,4 +1,4 @@
-// src/components/lite-chat/settings/settings-modal.tsx
+
 import React from "react";
 import {
   Dialog,
@@ -24,15 +24,15 @@ import type {
   // DbMod,
   // ModInstance,
 } from "@/lib/types";
-// Import store hooks
+
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
 import { useModStore } from "@/store/mod.store";
-// Import useProviderStore and ProviderState
-import { useProviderStore, type ProviderState } from "@/store/provider.store";
-// Removed unused store imports
 
-// Remove props interface, keep only isOpen and onClose
+import { useProviderStore, type ProviderState } from "@/store/provider.store";
+
+
+
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;

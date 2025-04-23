@@ -1,4 +1,4 @@
-// src/components/lite-chat/provider-selector.tsx
+
 import React, { useMemo } from "react";
 import {
   Select,
@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-// Import store hooks
+
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
 import { cn } from "@/lib/utils";
@@ -15,10 +15,10 @@ import type {
   AiProviderConfig,
   DbProviderConfig, // Keep type
 } from "@/lib/types";
-// Import useChatStorage
+
 import { useChatStorage } from "@/hooks/use-chat-storage";
 
-// Helper function remains the same
+
 const deriveAiProviderConfig = (
   config: DbProviderConfig | undefined, // Use correct type
 ): AiProviderConfig | undefined => {
@@ -32,7 +32,7 @@ const deriveAiProviderConfig = (
   };
 };
 
-// Wrap component logic in a named function for React.memo
+
 const ProviderSelectorComponent: React.FC<{ className?: string }> = ({
   className,
 }) => {
@@ -94,5 +94,5 @@ const ProviderSelectorComponent: React.FC<{ className?: string }> = ({
   );
 };
 
-// Export the memoized component
+
 export const ProviderSelector = React.memo(ProviderSelectorComponent);

@@ -1,4 +1,4 @@
-// src/components/lite-chat/message/message-bubble.tsx
+
 import React, { useState } from "react";
 import type { Message, CustomMessageAction } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -87,7 +87,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   );
 };
 
-// Update the equality check to remove the portal ID comparison
+
 const messagesAreEqual = (
   prevProps: MessageBubbleProps,
   nextProps: MessageBubbleProps,

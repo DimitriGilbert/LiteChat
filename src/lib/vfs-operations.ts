@@ -1,5 +1,5 @@
-// src/lib/vfs-operations.ts
-// Import promise-based functions directly
+
+
 import {
   mkdir,
   readdir,
@@ -10,14 +10,14 @@ import {
   unlink,
   rename,
 } from "@zenfs/core/promises";
-// Import Stats type from @zenfs/core
+
 import { type Stats } from "@zenfs/core";
 import JSZip from "jszip";
 import { toast } from "sonner";
 import type { FileSystemEntry } from "@/lib/types";
 import { modEvents, ModEvent } from "@/mods/events";
 
-// --- Path Utilities (Remain the same) ---
+
 
 const normalizePath = (path: string): string => {
   let p = path.replace(/\/+/g, "/");
@@ -54,8 +54,8 @@ const basename = (path: string): string => {
   return normalized.substring(normalized.lastIndexOf("/") + 1);
 };
 
-// --- Operation Implementations ---
-// Removed fsInstance parameter, using imported promise functions
+
+
 
 const createDirectoryRecursive = async (path: string): Promise<void> => {
   const normalized = normalizePath(path);

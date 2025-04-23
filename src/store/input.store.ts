@@ -1,4 +1,4 @@
-// src/store/input.store.ts
+
 import { create } from "zustand";
 
 export interface InputState {

@@ -1,4 +1,4 @@
-// src/components/lite-chat/file-manager.tsx
+
 import React, { useState, useEffect, useCallback, useRef, memo } from "react";
 import { useVfsStore } from "@/store/vfs.store";
 import { useSidebarStore } from "@/store/sidebar.store";
@@ -28,9 +28,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-// Import useInputStore to access VFS path actions
+
 import { useInputStore } from "@/store/input.store";
-// Import useShallow
+
 import { useShallow } from "zustand/react/shallow";
 
 const getRepoNameFromUrl = (url: string): string => {

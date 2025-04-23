@@ -1,4 +1,4 @@
-// src/components/lite-chat/prompt/prompt-settings-advanced.tsx
+
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -23,13 +23,13 @@ import type {
   // SidebarItemType,
   // DbApiKey, // Removed
 } from "@/lib/types";
-// Import store hooks
+
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useSidebarStore } from "@/store/sidebar.store";
 import { useVfsStore } from "@/store/vfs.store";
-// Import useChatStorage
+
 import { useChatStorage } from "@/hooks/use-chat-storage";
 
 const PromptSettingsAdvancedComponent: React.FC<{

@@ -1,4 +1,4 @@
-// src/components/lite-chat/message-error-display.tsx
+
 import React from "react";
 import { AlertCircle } from "lucide-react";
 

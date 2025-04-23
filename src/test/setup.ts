@@ -1,9 +1,9 @@
-// src/test/setup.ts
+
 import "@testing-library/jest-dom/vitest";
 import { vi, afterEach } from "vitest";
 import { cleanup, configure } from "@testing-library/react";
 
-// Keep this configuration if you want to suppress large DOM output
+
 configure({
   getElementError: (message, container) => {
     const error = new Error(message || "TestingLibraryElementError");
@@ -12,7 +12,7 @@ configure({
   },
 });
 
-// --- PointerEvent Mocks (Keep these) ---
+
 if (typeof window !== "undefined") {
   if (!window.PointerEvent) {
     class MockPointerEvent extends Event {
@@ -41,10 +41,10 @@ if (typeof window !== "undefined") {
     Element.prototype.scrollIntoView = vi.fn();
   }
 }
-// --- End of PointerEvent Mocks ---
 
-// --- Other Mocks (Keep these) ---
-// Mock window.matchMedia
+
+
+
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: vi.fn().mockImplementation((query) => ({
@@ -59,7 +59,7 @@ Object.defineProperty(window, "matchMedia", {
   })),
 });
 
-// Mock localStorage
+
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
@@ -84,7 +84,7 @@ Object.defineProperty(window, "localStorage", {
   writable: true,
 });
 
-// Mock IntersectionObserver
+
 const IntersectionObserverMock = vi.fn(() => ({
   disconnect: vi.fn(),
   observe: vi.fn(),
@@ -93,10 +93,10 @@ const IntersectionObserverMock = vi.fn(() => ({
 }));
 vi.stubGlobal("IntersectionObserver", IntersectionObserverMock);
 
-// Mock window.confirm
+
 window.confirm = vi.fn(() => true);
 
-// Mock navigator.clipboard
+
 vi.stubGlobal("navigator", {
   clipboard: {
     writeText: vi.fn(() => Promise.resolve()),
@@ -104,10 +104,10 @@ vi.stubGlobal("navigator", {
   },
 });
 
-// Mock Dexie (Keep your global mock)
+
 vi.mock("@/lib/db", () => ({
   db: {
-    // ... (your existing detailed mock) ...
+ (your existing detailed mock) ...
     conversations: {
       get: vi.fn().mockResolvedValue(undefined),
       add: vi.fn().mockResolvedValue("mock-convo-id"),
@@ -181,7 +181,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-// Mock sonner
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
@@ -194,13 +194,13 @@ vi.mock("sonner", () => ({
   },
 }));
 
-// Mock nanoid
+
 vi.mock("nanoid", () => ({
   nanoid: vi.fn(() => "mock-nanoid"),
 }));
-// --- End Other Mocks ---
 
-// --- Clean up after each test ---
+
+
 afterEach(() => {
   cleanup(); // Cleans up RTL renders
   vi.clearAllMocks(); // Clears mock call history etc.

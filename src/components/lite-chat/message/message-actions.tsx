@@ -1,4 +1,4 @@
-// src/components/lite-chat/message/message-actions.tsx
+
 import React, { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { CopyIcon, RefreshCwIcon } from "lucide-react";

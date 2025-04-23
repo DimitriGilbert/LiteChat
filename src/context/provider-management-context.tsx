@@ -1,4 +1,4 @@
-// src/context/provider-management-context.tsx
+
 import React, {
   createContext,
   useContext,
@@ -16,7 +16,7 @@ import type {
 } from "@/lib/types";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useProviderModelSelection } from "@/hooks/use-provider-model-selection";
-// Removed useApiKeysManagement import
+
 import { toast } from "sonner";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -25,7 +25,7 @@ import { createOllama } from "ollama-ai-provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
 
-// --- Constants, Helpers, Interfaces ---
+
 const EMPTY_API_KEYS: DbApiKey[] = [];
 const EMPTY_DB_PROVIDER_CONFIGS: DbProviderConfig[] = [];
 const EMPTY_ACTIVE_PROVIDERS: AiProviderConfig[] = [];
@@ -49,7 +49,7 @@ const requiresApiKey = (type: DbProviderType | null): boolean => {
   // OpenAI-Compatible *might* require a key, but it's optional in the SDK call
   return type === "openai" || type === "openrouter" || type === "google";
 };
-// Dummy functions for when API Key Management is disabled
+
 const dummyAddApiKey = async (): Promise<string> => {
   console.warn("API Key Management is disabled.");
   toast.error("API Key Management is disabled in configuration.");
@@ -103,7 +103,7 @@ interface ProviderManagementProviderProps {
   initialModelId?: string | null;
   enableApiKeyManagement?: boolean;
 }
-// --- End Constants, Helpers, Interfaces ---
+
 
 export const ProviderManagementProvider: React.FC<
   ProviderManagementProviderProps
@@ -334,7 +334,7 @@ export const ProviderManagementProvider: React.FC<
                 id: modelDef.id,
                 name: modelDef.name,
                 instance: modelInstance,
-                // TODO: Add supportsImages, supportsToolCalling based on model ID patterns or fetched capabilities
+
               };
             } catch (modelErr) {
               console.error(
@@ -354,7 +354,7 @@ export const ProviderManagementProvider: React.FC<
             type: config.type,
             models: finalModelsForDropdown,
             allAvailableModels: allAvailableModelDefs, // Keep original list for settings UI
-            // TODO: Add provider-level supportsImages, supportsToolCalling based on type/config
+
           });
         } else {
           console.warn(
@@ -470,7 +470,7 @@ export const ProviderManagementProvider: React.FC<
   );
 };
 
-// --- Hook Export ---
+
 export const useProviderManagementContext =
   (): ProviderManagementContextProps => {
     const context = useContext(ProviderManagementContext);

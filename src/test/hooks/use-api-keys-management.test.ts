@@ -1,14 +1,14 @@
-// src/test/hooks/use-api-keys-management.test.ts
+
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useApiKeysManagement } from "@/hooks/use-api-keys-management";
 import type { DbApiKey } from "@/lib/types";
 import type { useChatStorage as UseChatStorageType } from "@/hooks/use-chat-storage";
 
-// --- Mock Setup ---
+
 const mockAddDbApiKey = vi.fn();
 const mockDeleteDbApiKey = vi.fn();
-// Define other mock functions needed for the return object
+
 const mockCreateProject = vi.fn();
 const mockRenameProject = vi.fn();
 const mockDeleteProject = vi.fn();
@@ -23,10 +23,10 @@ const mockUpdateDbMessageContent = vi.fn();
 const mockDeleteDbMessage = vi.fn();
 const mockGetDbMessagesUpTo = vi.fn();
 
-// Use a closure to manage the mock data state across mock calls
+
 let mockApiKeysStore: DbApiKey[] = [];
 
-// Mock the useChatStorage hook
+
 vi.mock("@/hooks/use-chat-storage", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@/hooks/use-chat-storage")>();
@@ -56,13 +56,13 @@ vi.mock("@/hooks/use-chat-storage", async (importOriginal) => {
   };
 });
 
-// Import the hook *after* vi.mock
+
 const { useChatStorage } = await import("@/hooks/use-chat-storage");
 const mockedUseChatStorage = useChatStorage as vi.MockedFunction<
   typeof UseChatStorageType
 >;
 
-// Helper function to create the full mock return object
+
 const createMockStorageReturnValue = (
   currentApiKeys: DbApiKey[],
 ): ReturnType<typeof UseChatStorageType> => ({

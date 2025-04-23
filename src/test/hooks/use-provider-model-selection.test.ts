@@ -3,9 +3,9 @@ import { renderHook, act, waitFor } from "@testing-library/react"; // Import wai
 import { useProviderModelSelection } from "@/hooks/use-provider-model-selection";
 import type { AiProviderConfig } from "@/lib/types";
 
-// Mock Providers (keep as is)
+
 const mockProviders: AiProviderConfig[] = [
-  // ... (providers definition)
+ (providers definition)
   {
     id: "openai",
     name: "OpenAI",

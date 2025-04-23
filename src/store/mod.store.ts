@@ -1,4 +1,4 @@
-// src/store/mod.store.ts
+
 import { create } from "zustand";
 import type {
   CustomPromptAction,
@@ -19,14 +19,14 @@ import type {
   VfsWritePayload,
   VfsWriteReturn,
 } from "@/mods/types";
-// Import from mod-context temporarily, ideally move this type
+
 import type { RegisteredToolEntry } from "@/context/mod-context";
 import { nanoid } from "nanoid";
 import { z } from "zod"; // Import Zod
 import { toast } from "sonner"; // Import toast for feedback
 import { db } from "@/lib/db"; // Import Dexie instance
 
-// --- REMOVE Placeholder Dependencies ---
+
 
 export interface ModState {
   dbMods: DbMod[];

@@ -1,4 +1,4 @@
-// src/context/sidebar-context.tsx
+
 import React, {
   createContext,
   useContext,
@@ -17,7 +17,7 @@ import type {
   // DbMessage, // REMOVED - Unused
 } from "@/lib/types";
 import { useChatStorage } from "@/hooks/use-chat-storage";
-// Removed useSidebarManagement import
+
 import { toast } from "sonner";
 import { z } from "zod"; // Keep for import validation
 import { nanoid } from "nanoid"; // Keep for import message IDs
@@ -25,7 +25,7 @@ import { modEvents, ModEvent } from "@/mods/events"; // Keep for event emission
 
 const EMPTY_SIDEBAR_ITEMS: SidebarItem[] = [];
 
-// Schemas for import validation (copied from useSidebarManagement)
+
 const messageImportSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string(), // Assuming simple string content for import for now
@@ -425,7 +425,7 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
           conversation.id,
         );
         exportPackage.push({
-          // ... conversation details ...
+ conversation details ...
           id: conversation.id,
           title: conversation.title,
           parentId: conversation.parentId,

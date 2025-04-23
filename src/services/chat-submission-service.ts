@@ -1,4 +1,4 @@
-// src/services/chat-submission-service.ts
+
 import { toast } from "sonner";
 import { FileHandlingService } from "./file-handling-service";
 import type {
@@ -18,9 +18,9 @@ import type {
   ModMiddlewareReturnMap,
   SubmitPromptPayload,
 } from "@/mods/types";
-// Removed unused import: PerformImageGenerationResult
 
-// Define the context expected by submitChat
+
+
 interface SubmitChatContext {
   selectedProviderId: string | null;
   selectedProvider: AiProviderConfig | null;
@@ -136,7 +136,7 @@ export class ChatSubmissionService {
         toast.info("Please enter a prompt after /imagine.");
         return;
       }
-      // TODO: Add middleware hook specifically for image generation?
+
       // For now, directly call the core image generation handler
       await handleImageGenerationCore(currentConversationId, imagePrompt);
       return; // Stop further processing for text chat

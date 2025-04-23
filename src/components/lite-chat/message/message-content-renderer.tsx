@@ -1,8 +1,8 @@
-// src/components/lite-chat/message/message-content-renderer.tsx
+
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-// Removed cn import as it's no longer needed here
+
 import type { Message, ImagePart } from "@/lib/types";
 import { FileContextBlock } from "./file-context-block";
 import { markdownComponents } from "./message-content-utils";

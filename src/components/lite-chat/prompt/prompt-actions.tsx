@@ -1,4 +1,4 @@
-// src/components/lite-chat/prompt/prompt-actions.tsx
+
 import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { SendHorizonalIcon, PaperclipIcon, ImageIcon } from "lucide-react";

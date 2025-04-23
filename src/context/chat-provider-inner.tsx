@@ -1,8 +1,8 @@
-// src/context/chat-provider-inner.tsx
+
 import React, { useEffect, useState } from "react"; // Removed useRef
 import { toast } from "sonner";
 
-// Store Imports
+
 import { useCoreChatStore } from "@/store/core-chat.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
@@ -11,7 +11,7 @@ import { useVfsStore } from "@/store/vfs.store";
 import { useModStore } from "@/store/mod.store";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 
-// Type Imports
+
 import type { LiteChatConfig } from "@/lib/types";
 
 interface ChatProviderInnerProps {

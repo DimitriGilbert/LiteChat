@@ -1,4 +1,4 @@
-// src/services/model-fetcher.ts
+
 import type { DbProviderConfig } from "@/lib/types";
 import { toast } from "sonner";
 import { ensureV1Path } from "@/utils/chat-utils";
@@ -8,7 +8,7 @@ interface FetchedModel {
   name: string; // Optional: Some APIs might only return ID
 }
 
-// Simple cache to avoid fetching too often during a session
+
 const fetchCache = new Map<string, Promise<FetchedModel[]>>();
 const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
