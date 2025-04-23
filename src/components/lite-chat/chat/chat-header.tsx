@@ -2,20 +2,12 @@
 import React, { useMemo } from "react";
 import { ChatHeaderActions } from "./chat-header-actions";
 import { cn } from "@/lib/utils";
-// import type {
-//   // SidebarItem, // Removed - Fetched from store
-//   SidebarItemType,
-//   DbConversation,
-//   DbProject, // Added DbProject import
-// } from "@/lib/types";
-// Import store hooks
 import { useShallow } from "zustand/react/shallow";
 import { useSidebarStore } from "@/store/sidebar.store";
-import { useChatStorage } from "@/hooks/use-chat-storage"; // To get items
+import { useChatStorage } from "@/hooks/use-chat-storage";
 
 interface ChatHeaderProps {
   className?: string;
-  // Remove props fetched from store
   searchTerm?: string;
   setSearchTerm?: (term: string) => void;
   exportConversation?: (conversationId: string | null) => Promise<void>;
@@ -27,19 +19,15 @@ const ChatHeaderComponent: React.FC<ChatHeaderProps> = ({
   setSearchTerm = () => {},
   exportConversation = async () => {},
 }) => {
-  // --- Fetch state from stores ---
   const { selectedItemId, selectedItemType } = useSidebarStore(
     useShallow((state) => ({
       selectedItemId: state.selectedItemId,
       selectedItemType: state.selectedItemType,
-      // activeConversationData is derived below
     })),
   );
 
-  // Fetch items from storage for title fallback and active data
   const { projects, conversations } = useChatStorage();
 
-  // Derive activeConversationData locally
   const activeConversationData = useMemo(() => {
     if (selectedItemType === "conversation" && selectedItemId) {
       return (conversations || []).find((c) => c.id === selectedItemId);
@@ -55,12 +43,13 @@ const ChatHeaderComponent: React.FC<ChatHeaderProps> = ({
       if (selectedItemType === "conversation") {
         const item = (conversations || []).find((c) => c.id === selectedItemId);
         return item?.title;
-      } else if (selectedItemType === "project") {
+      }
+      if (selectedItemType === "project") {
         const item = (projects || []).find((p) => p.id === selectedItemId);
         return item?.name;
       }
     }
-    return "LiteChat"; // Default title
+    return "LiteChat";
   }, [
     selectedItemId,
     selectedItemType,

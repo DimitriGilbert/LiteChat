@@ -1,11 +1,5 @@
 // src/components/lite-chat/chat/chat-side.tsx
-import React, {
-  useRef,
-  useEffect,
-  useState,
-  useCallback,
-  // useMemo, // Removed unused import
-} from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import { ChatHistory } from "./chat-history";
 import { SettingsModal } from "@/components/lite-chat/settings/settings-modal";
 import { Button } from "@/components/ui/button";
@@ -17,15 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type {
-  DbConversation,
-  // SidebarItem, // Removed unused import
-  // DbProject,
-  // ProjectSidebarItem, // Removed unused import
-  // ConversationSidebarItem, // Removed unused import
-  // SidebarItemType,
-} from "@/lib/types";
-// Import store hooks
+import type { DbConversation } from "@/lib/types";
 import { useShallow } from "zustand/react/shallow";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useSidebarStore } from "@/store/sidebar.store";
@@ -33,11 +19,9 @@ import { useSettingsStore } from "@/store/settings.store";
 
 export interface ChatSideProps {
   className?: string;
-  // Keep local UI state props
   editingItemId: string | null;
   onEditComplete: (id: string) => void;
   setEditingItemId: (id: string | null) => void;
-  // Remove props that will be fetched from stores
 }
 
 const ChatSideComponent: React.FC<ChatSideProps> = ({
@@ -46,8 +30,6 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   onEditComplete,
   setEditingItemId,
 }) => {
-  // --- Fetch state from stores ---
-  // Destructure 'projects' and 'conversations' instead of 'dbProjects'/'dbConversations'
   const { conversations } = useChatStorage();
 
   const {
@@ -81,22 +63,16 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
     })),
   );
 
-  // --- Local UI State ---
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parentIdForNewItem, setParentIdForNewItem] = useState<string | null>(
     null,
   );
 
-  // --- Derived State ---
-  // Removed unused sidebarItems derivation
-
-  // --- Effects ---
   useEffect(() => {
     let determinedParentId: string | null = null;
     if (selectedItemType === "project") {
       determinedParentId = selectedItemId;
     } else if (selectedItemType === "conversation" && selectedItemId) {
-      // Use 'conversations' here and add type annotation
       const convo = (conversations || []).find(
         (item: DbConversation) => item.id === selectedItemId,
       );
@@ -110,9 +86,8 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
       }
       return prev;
     });
-  }, [selectedItemId, selectedItemType, conversations]); // Use 'conversations' dependency
+  }, [selectedItemId, selectedItemType, conversations]);
 
-  // --- Callbacks ---
   const handleCreateChat = useCallback(async () => {
     await createConversation(parentIdForNewItem);
   }, [createConversation, parentIdForNewItem]);
@@ -134,7 +109,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      importConversation(file, null); // Use store action
+      importConversation(file, null);
     }
     if (event.target) {
       event.target.value = "";
@@ -142,7 +117,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   };
 
   const handleOpenSettingsModal = useCallback(() => {
-    setIsSettingsModalOpen(true); // Use store action
+    setIsSettingsModalOpen(true);
   }, [setIsSettingsModalOpen]);
 
   const startRename = (id: string) => {
@@ -180,7 +155,6 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
       <div className="flex-grow overflow-hidden flex flex-col">
         <ChatHistory
           className="flex-grow"
-          // Pass necessary props to ChatHistory
           editingItemId={editingItemId}
           selectedItemId={selectedItemId}
           onEditComplete={onEditComplete}
@@ -189,7 +163,6 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
           renameItem={renameItem}
           exportConversation={exportConversation}
           startRename={startRename}
-          // ChatHistory will fetch sidebarItems from store
         />
       </div>
 
@@ -221,7 +194,6 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
         </Button>
       </div>
 
-      {/* SettingsModal will fetch its own data from stores */}
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
