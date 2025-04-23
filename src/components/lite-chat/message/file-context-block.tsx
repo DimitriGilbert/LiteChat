@@ -88,7 +88,7 @@ export const FileContextBlock: React.FC<FileContextBlockProps> = ({
 
       {isExpanded && hasContent && (
         <div className="text-sm border-t border-gray-700/70">
-          <div className="bg-gray-900 text-gray-100 rounded-b-md">
+          <div className="bg-gray-900 text-gray-100 rounded-b-md overflow-x-auto">
             {/* Pass content as children, not value */}
             <CodeBlock
               className={extension ? `language-${extension}` : "language-text"}

@@ -1,28 +1,31 @@
 // src/components/lite-chat/message/message-content-utils.tsx
 import React from "react";
 import { CodeBlock } from "@/components/lite-chat/code-block";
-import { FileContextBlock } from "./file-context-block"; // Keep if used by ParagraphRenderer
 
 // Custom component renderer for paragraphs to handle potential block children
 export const ParagraphRenderer = ({ children, ...props }: any) => {
   const containsBlockElement = React.Children.toArray(children).some(
     (child: any) =>
       React.isValidElement(child) &&
-      (child.type === CodeBlock ||
-        child.type === FileContextBlock || // Keep if needed
-        child.type === "div"),
+      (child.type === CodeBlock || child.type === "div"),
   );
 
   if (containsBlockElement) {
     return (
-      <div {...props} className="my-3 leading-relaxed text-[15px]">
+      <div
+        {...props}
+        className="my-3 leading-relaxed text-[15px] max-w-full overflow-x-auto"
+      >
         {children}
       </div>
     );
   }
 
   return (
-    <p {...props} className="my-3 leading-relaxed text-[15px]">
+    <p
+      {...props}
+      className="my-3 leading-relaxed text-[15px] overflow-wrap-break-word"
+    >
       {children}
     </p>
   );
@@ -32,6 +35,11 @@ export const ParagraphRenderer = ({ children, ...props }: any) => {
 export const markdownComponents = {
   code: CodeBlock,
   p: ParagraphRenderer,
+  pre: ({ children, ...props }: any) => (
+    <pre {...props} className="my-3 overflow-x-auto w-full">
+      {children}
+    </pre>
+  ),
   ul: ({ children, ...props }: any) => (
     <ul {...props} className="my-3 list-disc list-inside pl-4">
       {children}

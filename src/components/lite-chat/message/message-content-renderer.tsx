@@ -2,7 +2,7 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { cn } from "@/lib/utils";
+// Removed cn import as it's no longer needed here
 import type { Message, ImagePart } from "@/lib/types";
 import { FileContextBlock } from "./file-context-block";
 import { markdownComponents } from "./message-content-utils";
@@ -88,7 +88,6 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
     };
 
     const renderContent = () => {
-      // Handle final string content
       if (typeof finalContent === "string") {
         const { fileBlocks, contentParts } =
           extractFileContextBlocks(finalContent);
@@ -111,7 +110,6 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
               />
             );
           } else {
-            // Always render final text as markdown
             return (
               <ReactMarkdown
                 key={`text-part-${index}`}
@@ -123,9 +121,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
             );
           }
         });
-      }
-      // Handle final array content
-      else if (Array.isArray(finalContent)) {
+      } else if (Array.isArray(finalContent)) {
         return finalContent.map((part, index) => {
           if (part.type === "text") {
             const { fileBlocks, contentParts } = extractFileContextBlocks(
@@ -214,21 +210,17 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
       finalContent.length > 0 &&
       finalContent.every((part): part is ImagePart => part.type === "image");
 
+    // Remove the wrapping div with prose classes
     return (
-      <div
-        className={cn(
-          "prose prose-sm prose-invert max-w-none",
-          "prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1",
-          "prose-headings:mt-4 prose-headings:mb-2",
-          "prose-code:before:content-none prose-code:after:content-none",
-          "prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-0",
-          !isPurelyImages && "[&_img]:my-3",
-          isPurelyImages && "grid grid-cols-2 gap-2 not-prose",
-          "py-2",
+      <>
+        {isPurelyImages ? (
+          <div className="grid grid-cols-2 gap-2 not-prose max-w-full overflow-hidden">
+            {renderContent()}
+          </div>
+        ) : (
+          <div className="max-w-full overflow-x-auto">{renderContent()}</div>
         )}
-      >
-        {renderContent()}
-      </div>
+      </>
     );
   });
 MessageContentRenderer.displayName = "MessageContentRenderer";

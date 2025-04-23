@@ -56,6 +56,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             : "bg-muted/60",
         !isSystem && "hover:bg-muted/80 transition-all duration-200",
         indentationClass, // Apply indentation class
+        "max-w-full", // Set maximum width
+        "overflow-hidden", // Hide overflowing content
         className,
       )}
     >

@@ -43,7 +43,7 @@ export const CodeBlock: React.FC<{
   }
 
   return (
-    <div className="relative group/codeblock my-3 rounded-md border border-border bg-card dark:bg-card transition-all">
+    <div className="relative group/codeblock my-3 rounded-md border border-border bg-card dark:bg-card transition-all max-w-full">
       <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30 dark:bg-muted/40 border-b border-border">
         <span className="text-xs font-semibold text-muted-foreground select-none">
           {language}
@@ -92,39 +92,50 @@ export const CodeBlock: React.FC<{
         </div>
       </div>
       {!isFolded && (
-        <SyntaxHighlighter
-          style={vscDarkPlus}
-          language={language}
-          PreTag="div"
-          className={cn("!py-3 !px-0 !m-0 !bg-transparent", "overflow-x-auto")}
-          codeTagProps={{
-            style: {
-              fontFamily: "var(--font-mono)",
-              fontSize: "0.875rem",
-              lineHeight: "1.25rem",
-              display: "block",
-              paddingLeft: "1rem",
-              paddingRight: "1rem",
-              whiteSpace: "pre",
-            },
-          }}
-          showLineNumbers
-          lineNumberStyle={{
-            minWidth: "2.25em",
-            paddingRight: "1em",
-            textAlign: "right",
-            color: "#858585",
-            userSelect: "none",
-            position: "sticky",
-            left: 0,
-            background: "inherit",
-            zIndex: 1,
-          }}
-          wrapLines={false}
-          {...props}
-        >
-          {codeContent}
-        </SyntaxHighlighter>
+        <div className="max-w-full overflow-x-auto">
+          <SyntaxHighlighter
+            style={vscDarkPlus}
+            language={language}
+            PreTag="div"
+            className={cn(
+              "!py-3 !px-0 !m-0 !bg-transparent",
+              "overflow-x-auto",
+            )}
+            customStyle={{
+              maxWidth: "100%",
+              width: "fit-content",
+              minWidth: "100%",
+            }}
+            codeTagProps={{
+              style: {
+                fontFamily: "var(--font-mono)",
+                fontSize: "0.875rem",
+                lineHeight: "1.25rem",
+                display: "block",
+                paddingLeft: "1rem",
+                paddingRight: "1rem",
+                whiteSpace: "pre",
+                maxWidth: "100%",
+              },
+            }}
+            showLineNumbers
+            lineNumberStyle={{
+              minWidth: "2.25em",
+              paddingRight: "1em",
+              textAlign: "right",
+              color: "#858585",
+              userSelect: "none",
+              position: "sticky",
+              left: 0,
+              background: "inherit",
+              zIndex: 1,
+            }}
+            wrapLines={false}
+            {...props}
+          >
+            {codeContent}
+          </SyntaxHighlighter>
+        </div>
       )}
     </div>
   );

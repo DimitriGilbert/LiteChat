@@ -56,24 +56,24 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
     const isThisMessageStreaming = activeStreamId === message.id;
 
     return (
+      // Keep min-w-0 here
       <div className="flex-grow min-w-0 pr-12">
         {!isFolded && <MessageRoleLabel role={message.role} />}
 
         {!isFolded ? (
           <>
-            {/* Apply consistent prose styling to the container */}
             <div
               id={portalTargetId}
               className={cn(
-                "message-content-area", // Keep for potential targeting
-                // Apply base prose styles here
+                "message-content-area",
                 "prose prose-sm prose-invert max-w-none",
                 "prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1",
                 "prose-headings:mt-4 prose-headings:mb-2",
                 "prose-code:before:content-none prose-code:after:content-none",
                 "prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-0",
-                "[&_img]:my-3", // Apply image margin consistently
-                "py-2", // Keep padding consistent
+                "[&_img]:my-3",
+                "py-2",
+                "overflow-x-auto w-full", // Only adding these constraints
               )}
             >
               {!isThisMessageStreaming && (
