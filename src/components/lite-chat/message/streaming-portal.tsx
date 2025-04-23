@@ -3,24 +3,34 @@ import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { cn } from "@/lib/utils";
 import { markdownComponents } from "./message-content-utils";
+import { useCoreChatStore } from "@/store/core-chat.store";
+import { useShallow } from "zustand/react/shallow";
+import { useSettingsStore } from "@/store/settings.store";
 
 interface StreamingPortalProps {
   messageId: string;
-  content: string;
-  enableMarkdown: boolean;
   portalTargetId: string;
 }
 
 export const StreamingPortal: React.FC<StreamingPortalProps> = ({
   messageId,
-  content,
-  enableMarkdown,
   portalTargetId,
 }) => {
   const [portalNode, setPortalNode] = useState<Element | null>(null);
 
-  // Find portal node on mount or when ID changes
+  const { activeStreamId, activeStreamContent } = useCoreChatStore(
+    useShallow((state) => ({
+      activeStreamId: state.activeStreamId,
+      activeStreamContent: state.activeStreamContent,
+    })),
+  );
+
+  const enableMarkdown = useSettingsStore(
+    (state) => state.enableStreamingMarkdown,
+  );
+
   useEffect(() => {
     const node = document.getElementById(portalTargetId);
     setPortalNode(node);
@@ -30,32 +40,38 @@ export const StreamingPortal: React.FC<StreamingPortalProps> = ({
         `Streaming portal target element with ID "${portalTargetId}" not found.`,
       );
     }
-    // No cleanup needed here, the portal component will unmount when streaming stops.
-  }, [portalTargetId, messageId]);
+  }, [portalTargetId]);
 
-  // Render content into the portal if the node exists
-  if (portalNode) {
+  if (portalNode && activeStreamId === messageId) {
     return createPortal(
-      // Render only the content and pulse indicator, no bubble structure
-      <>
+      // Re-apply the necessary styling classes here for the streaming content
+      <div
+        className={cn(
+          // Base text styles
+          "text-gray-200 text-sm whitespace-pre-wrap break-words",
+          // Apply prose styles conditionally for markdown
+          enableMarkdown &&
+            "prose prose-sm prose-invert max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:mt-4 prose-headings:mb-2 prose-code:before:content-none prose-code:after:content-none prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-0",
+          // Consistent padding
+          "py-2",
+        )}
+      >
         {enableMarkdown ? (
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
-            components={markdownComponents} // Use components from utils
+            components={markdownComponents}
           >
-            {content}
+            {activeStreamContent}
           </ReactMarkdown>
         ) : (
           <pre className="font-sans text-sm">
-            <code>{content}</code>
+            <code>{activeStreamContent}</code>
           </pre>
         )}
         <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"></span>
-      </>,
+      </div>,
       portalNode,
     );
   }
-
-  // If portal node not found/ready, render nothing
   return null;
 };

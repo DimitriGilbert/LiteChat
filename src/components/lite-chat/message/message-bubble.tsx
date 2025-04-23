@@ -126,18 +126,18 @@ const messagesAreEqual = (
     }
   }
 
-  // Only compare streamedContent if the message IS streaming
-  if (nextMsg.isStreaming && prevMsg.isStreaming) {
-    if (prevMsg.streamedContent !== nextMsg.streamedContent) {
-      return false;
-    }
+  // If the streaming status differs, the messages are different
+  // (This handles the start and end of streaming)
+  if (prevMsg.isStreaming !== nextMsg.isStreaming) {
+    return false;
   }
-  // Compare final content only if NOT streaming
-  else if (!nextMsg.isStreaming && !prevMsg.isStreaming) {
+
+  // If NEITHER message is streaming, compare the final content and metadata
+  if (!prevMsg.isStreaming && !nextMsg.isStreaming) {
     if (JSON.stringify(prevMsg.content) !== JSON.stringify(nextMsg.content)) {
       return false;
     }
-    // Compare other non-streaming fields
+    // Compare other non-streaming fields only when not streaming
     if (
       JSON.stringify(prevMsg.tool_calls) !==
         JSON.stringify(nextMsg.tool_calls) ||
@@ -152,11 +152,12 @@ const messagesAreEqual = (
     ) {
       return false;
     }
-  } else {
-    // If one is streaming and the other isn't, they are different
-    return false;
   }
+  // If messages ARE streaming, we don't compare content here.
+  // The visual update happens via the portal and activeStreamContent state.
+  // The change in isStreaming flag handles the start/end comparison.
 
+  // Compare function references
   if (
     prevProps.getContextSnapshotForMod !== nextProps.getContextSnapshotForMod
   ) {
@@ -167,6 +168,7 @@ const messagesAreEqual = (
     return false;
   }
 
+  // If all checks pass, the messages are considered equal for memoization purposes
   return true;
 };
 

@@ -9,7 +9,8 @@ import { MemoizedMessageBubble } from "./message-bubble";
 import { ChildrenToggleButton } from "./children-toggle-button";
 import type { ReadonlyChatContextSnapshot } from "@/mods/api";
 import { cn } from "@/lib/utils";
-import { StreamingPortal } from "./streaming-portal"; // Import the new component
+import { StreamingPortal } from "./streaming-portal";
+import { useCoreChatStore } from "@/store/core-chat.store"; // Import store
 
 interface MessageBodyProps {
   message: Message;
@@ -17,8 +18,8 @@ interface MessageBodyProps {
   onRegenerate?: (messageId: string) => void;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   modMessageActions: CustomMessageAction[];
-  enableStreamingMarkdown: boolean;
-  portalTargetId: string; // Required ID for the portal target div
+  enableStreamingMarkdown: boolean; // Keep for final render
+  portalTargetId: string;
 }
 
 export const MessageBody: React.FC<MessageBodyProps> = React.memo(
@@ -29,9 +30,11 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
     getContextSnapshotForMod,
     modMessageActions,
     enableStreamingMarkdown,
-    portalTargetId, // Destructure
+    portalTargetId,
   }) => {
     const [isChildrenCollapsed, setIsChildrenCollapsed] = useState(true);
+    // Get activeStreamId to determine if this message is the one streaming
+    const activeStreamId = useCoreChatStore((state) => state.activeStreamId);
 
     const toggleChildrenCollapse = () => {
       setIsChildrenCollapsed((prev) => !prev);
@@ -51,37 +54,35 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
       return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
     })();
 
-    // Determine if content should be rendered via portal
-    const isAssistantStreamingToPortal =
-      message.role === "assistant" && message.isStreaming;
+    // Determine if this specific message is the one actively streaming
+    const isThisMessageStreaming = activeStreamId === message.id;
 
     return (
       <div className="flex-grow min-w-0 pr-12">
-        {/* Always render role label if not folded */}
         {!isFolded && <MessageRoleLabel role={message.role} />}
 
         {!isFolded ? (
           <>
             {/* Container for main content (final or portal target) */}
-            {/* This div will contain either the final content or the streaming portal content */}
             <div id={portalTargetId} className="message-content-area">
-              {/* Render final content directly if NOT streaming */}
-              {!isAssistantStreamingToPortal && (
+              {/* Render final content if NOT the actively streaming message */}
+              {!isThisMessageStreaming && (
                 <MessageContentRenderer
                   message={message}
                   enableStreamingMarkdown={enableStreamingMarkdown}
                 />
               )}
-              {/* Render the StreamingPortal component if assistant is streaming */}
-              {isAssistantStreamingToPortal && (
-                <StreamingPortal
-                  messageId={message.id}
-                  content={message.streamedContent ?? ""}
-                  enableMarkdown={enableStreamingMarkdown}
-                  portalTargetId={portalTargetId} // Target the div rendered above
-                />
-              )}
+              {/* Portal is rendered conditionally below, it targets this div */}
             </div>
+
+            {/* Render the StreamingPortal ONLY if this message IS streaming */}
+            {isThisMessageStreaming && (
+              <StreamingPortal
+                messageId={message.id}
+                portalTargetId={portalTargetId}
+                // Content and markdown setting are now read from store inside Portal
+              />
+            )}
 
             {/* Metadata and Error always render inline */}
             <MessageMetadataDisplay message={message} />
@@ -115,7 +116,6 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
                       getContextSnapshotForMod={getContextSnapshotForMod}
                       modMessageActions={modMessageActions}
                       enableStreamingMarkdown={enableStreamingMarkdown}
-                      // Children don't use the portal target
                     />
                   </div>
                 ))}
@@ -123,7 +123,6 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
             )}
           </>
         ) : (
-          // Folded content logic remains the same
           message.role !== "system" && (
             <div className="text-sm text-gray-500 italic mt-1 select-none">
               Message content hidden...

@@ -161,7 +161,7 @@ export interface Message {
   createdAt?: Date;
   isStreaming?: boolean;
   /** Stores partial streamed text content */
-  streamedContent?: string;
+  // streamedContent?: string;
   error?: string | null;
   vfsContextPaths?: string[];
   providerId?: string | null; // Already present in UI type

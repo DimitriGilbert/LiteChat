@@ -3,15 +3,13 @@ import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
-import type { Message, ImagePart } from "@/lib/types"; // Added TextPart, ImagePart
+import type { Message, ImagePart } from "@/lib/types";
 import { FileContextBlock } from "./file-context-block";
-// Import shared utils
 import { markdownComponents } from "./message-content-utils";
 
 interface MessageContentRendererProps {
   message: Message;
   enableStreamingMarkdown: boolean;
-  // REMOVED: portalTargetId?: string;
 }
 
 const decodeXml = (encoded: string): string => {
@@ -28,29 +26,15 @@ const decodeXml = (encoded: string): string => {
   }
 };
 
-// REMOVED: Portal logic (useEffect, useState for portalNode)
-// REMOVED: StreamingContent component
-
 export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
-  React.memo(({ message, enableStreamingMarkdown }) => {
-    // Use streamedContent if streaming, otherwise final content
-    const contentToRender = message.isStreaming
-      ? (message.streamedContent ?? "")
-      : message.content;
-    const finalContent = message.content; // Keep reference to final content for type checks
+  React.memo(({ message }) => {
+    const finalContent = message.content;
 
-    // --- Render Logic (Handles both streaming and final) ---
-
-    // Handle empty content cases
-    if (message.role === "system" && !contentToRender) {
+    if (message.role === "system" && !finalContent) {
       return null;
     }
-    // Render placeholder or nothing if streaming but no content yet
-    if (message.isStreaming && !contentToRender) {
-      // Render only the pulse indicator if streaming hasn't produced text yet
-      return (
-        <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"></span>
-      );
+    if (!finalContent) {
+      return null;
     }
 
     const extractFileContextBlocks = (content: string) => {
@@ -104,12 +88,12 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
     };
 
     const renderContent = () => {
-      // Handle string content (potentially streaming or final)
-      if (typeof contentToRender === "string") {
+      // Handle final string content
+      if (typeof finalContent === "string") {
         const { fileBlocks, contentParts } =
-          extractFileContextBlocks(contentToRender);
+          extractFileContextBlocks(finalContent);
 
-        const elements = contentParts.map((part, index) => {
+        return contentParts.map((part, index) => {
           if (typeof part === "number") {
             const block = fileBlocks[part];
             if (!block) return null;
@@ -127,10 +111,8 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
               />
             );
           } else {
-            // Render markdown only if enabled OR if it's the final render
-            const shouldRenderMarkdown =
-              enableStreamingMarkdown || !message.isStreaming;
-            return shouldRenderMarkdown ? (
+            // Always render final text as markdown
+            return (
               <ReactMarkdown
                 key={`text-part-${index}`}
                 remarkPlugins={[remarkGfm]}
@@ -138,30 +120,14 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
               >
                 {part}
               </ReactMarkdown>
-            ) : (
-              <pre key={`text-part-${index}`} className="font-sans text-sm">
-                <code>{part}</code>
-              </pre>
             );
           }
         });
-
-        // Add pulse indicator if streaming
-        if (message.isStreaming) {
-          elements.push(
-            <span
-              key="pulse"
-              className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"
-            ></span>,
-          );
-        }
-        return elements;
       }
-      // Handle array content (final render only, streaming uses streamedContent string)
-      else if (Array.isArray(contentToRender)) {
-        return contentToRender.map((part, index) => {
+      // Handle final array content
+      else if (Array.isArray(finalContent)) {
+        return finalContent.map((part, index) => {
           if (part.type === "text") {
-            // Always render final text parts as markdown
             const { fileBlocks, contentParts } = extractFileContextBlocks(
               part.text,
             );
@@ -243,24 +209,17 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
       return null;
     };
 
-    // Use finalContent (the original message.content) for the type check
     const isPurelyImages =
       Array.isArray(finalContent) &&
       finalContent.length > 0 &&
-      // Correctly check if every part is an ImagePart
       finalContent.every((part): part is ImagePart => part.type === "image");
 
     return (
       <div
         className={cn(
-          // Apply prose styles only if markdown is enabled OR it's the final render
-          (enableStreamingMarkdown || !message.isStreaming) &&
-            "prose prose-sm prose-invert max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:mt-4 prose-headings:mb-2 prose-code:before:content-none prose-code:after:content-none prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-0",
-          // Base text styles apply always
           "text-gray-200 text-sm whitespace-pre-wrap break-words",
           !isPurelyImages && "[&_img]:my-3",
-          isPurelyImages && "grid grid-cols-2 gap-2 not-prose", // Keep grid for final image rendering
-          "py-2", // Keep padding consistent
+          isPurelyImages && "grid grid-cols-2 gap-2",
         )}
       >
         {renderContent()}
