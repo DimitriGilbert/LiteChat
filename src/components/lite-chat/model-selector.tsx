@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 
 import { useShallow } from "zustand/react/shallow";
@@ -12,21 +11,6 @@ import type {
 } from "@/lib/types";
 
 import { useChatStorage } from "@/hooks/use-chat-storage";
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const ModelSelectorComponent: React.FC = () => {
   // --- Fetch state/actions from store ---
@@ -183,6 +167,5 @@ const ModelSelectorComponent: React.FC = () => {
     />
   );
 };
-
 
 export const ModelSelector = React.memo(ModelSelectorComponent);

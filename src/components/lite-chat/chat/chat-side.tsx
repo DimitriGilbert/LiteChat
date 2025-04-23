@@ -1,4 +1,4 @@
-
+// src/components/lite-chat/chat/chat-side.tsx
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { ChatHistory } from "./chat-history";
 import { SettingsModal } from "@/components/lite-chat/settings/settings-modal";
@@ -30,6 +30,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   onEditComplete,
   setEditingItemId,
 }) => {
+  // Fetch conversations directly for parentId logic
   const { conversations } = useChatStorage();
 
   const {
@@ -68,6 +69,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
     null,
   );
 
+  // Determine parentId based on current selection
   useEffect(() => {
     let determinedParentId: string | null = null;
     if (selectedItemType === "project") {
@@ -80,6 +82,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
     } else {
       determinedParentId = null;
     }
+    // Only update if the determined parent ID actually changes
     setParentIdForNewItem((prev) => {
       if (prev !== determinedParentId) {
         return determinedParentId;
@@ -95,7 +98,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   const handleCreateProject = useCallback(async () => {
     try {
       const { id: newProjectId } = await createProject(parentIdForNewItem);
-      setEditingItemId(newProjectId);
+      setEditingItemId(newProjectId); // Start editing the new project name
     } catch (error) {
       console.error("Failed to create project:", error);
       toast.error("Failed to create project.");
@@ -109,8 +112,10 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      importConversation(file, null);
+      // Determine parent based on current selection for import
+      importConversation(file, parentIdForNewItem);
     }
+    // Reset file input to allow importing the same file again
     if (event.target) {
       event.target.value = "";
     }
@@ -120,6 +125,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
     setIsSettingsModalOpen(true);
   }, [setIsSettingsModalOpen]);
 
+  // Callback to initiate rename mode in ChatHistory
   const startRename = (id: string) => {
     setEditingItemId(id);
   };
@@ -131,6 +137,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
         className,
       )}
     >
+      {/* Top Action Buttons */}
       <div className="p-3 border-b border-border flex gap-2">
         <Button
           variant="outline"
@@ -152,20 +159,23 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
         </Button>
       </div>
 
+      {/* Chat History Area */}
       <div className="flex-grow overflow-hidden flex flex-col">
         <ChatHistory
           className="flex-grow"
+          // Pass state and actions needed by ChatHistory and HistoryItem
           editingItemId={editingItemId}
-          selectedItemId={selectedItemId}
+          selectedItemId={selectedItemId} // Pass selectedItemId for highlighting
           onEditComplete={onEditComplete}
-          selectItem={selectItem}
-          deleteItem={deleteItem}
-          renameItem={renameItem}
-          exportConversation={exportConversation}
-          startRename={startRename}
+          selectItem={selectItem} // Pass selectItem action
+          deleteItem={deleteItem} // Pass deleteItem action
+          renameItem={renameItem} // Pass renameItem action
+          exportConversation={exportConversation} // Pass export action
+          startRename={startRename} // Pass startRename callback
         />
       </div>
 
+      {/* Hidden File Input for Import */}
       <input
         type="file"
         ref={fileInputRef}
@@ -174,6 +184,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
         style={{ display: "none" }}
       />
 
+      {/* Bottom Action Buttons */}
       <div className="border-t border-border p-3 space-y-2 bg-card">
         <Button
           variant="outline"
@@ -194,6 +205,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
         </Button>
       </div>
 
+      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}

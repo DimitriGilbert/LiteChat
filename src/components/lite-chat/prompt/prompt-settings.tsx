@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo } from "react";
 import { ProviderSelector } from "@/components/lite-chat/provider-selector";
 import { ModelSelector } from "@/components/lite-chat/model-selector";
@@ -18,12 +17,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type {
-  DbProviderConfig,
-  // DbApiKey, // Removed
-  // SidebarItemType,
-  // DbConversation, // Removed
-} from "@/lib/types";
+import type { DbProviderConfig } from "@/lib/types";
 import { toast } from "sonner";
 import { requiresApiKey } from "@/lib/litechat";
 
@@ -37,22 +31,10 @@ import { useChatStorage } from "@/hooks/use-chat-storage";
 const PromptSettingsComponent: React.FC<{ className?: string }> = ({
   className,
 }) => {
-  // --- Fetch state/actions from stores ---
-  const {
-    selectedProviderId,
-    // selectedModelId, // Removed - Unused
-    // dbProviderConfigs, // Fetched below
-    // apiKeys, // Fetched below
-    enableApiKeyManagement,
-    // getApiKeyForProvider, // Removed - Unused
-  } = useProviderStore(
+  const { selectedProviderId, enableApiKeyManagement } = useProviderStore(
     useShallow((state) => ({
       selectedProviderId: state.selectedProviderId,
-      // selectedModelId: state.selectedModelId,
-      // dbProviderConfigs: state.dbProviderConfigs,
-      // apiKeys: state.apiKeys,
       enableApiKeyManagement: state.enableApiKeyManagement,
-      // getApiKeyForProvider: state.getApiKeyForProvider,
     })),
   );
 

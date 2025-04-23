@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import type { Message, CustomMessageAction } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -17,7 +16,7 @@ interface MessageBubbleProps {
   enableStreamingMarkdown: boolean;
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({
+export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   onRegenerate,
   className,
@@ -86,7 +85,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     </div>
   );
 };
-
 
 const messagesAreEqual = (
   prevProps: MessageBubbleProps,

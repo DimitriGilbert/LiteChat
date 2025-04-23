@@ -22,3 +22,9 @@ export const PROVIDER_TYPES: { value: DbProviderType; label: string }[] = [
   { value: "ollama", label: "Ollama" },
   { value: "openai-compatible", label: "OpenAI-Compatible (LMStudio, etc.)" },
 ];
+
+export const REQUIRES_API_KEY_TYPES: DbProviderType[] = [
+  "openai",
+  "openrouter",
+  "google",
+];

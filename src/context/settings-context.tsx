@@ -1,4 +1,3 @@
-
 import React, {
   createContext,
   useContext,
@@ -7,7 +6,6 @@ import React, {
   useEffect,
 } from "react";
 import type { DbConversation } from "@/lib/types"; // Removed DbProject import
-
 
 interface SettingsContextProps {
   enableAdvancedSettings: boolean;
@@ -49,7 +47,6 @@ interface SettingsProviderProps {
   onSettingsModalOpenChange: (open: boolean) => void;
 }
 
-
 const defaultGlobalPrompt = `You are a helpful, concise AI assistant designed to provide accurate, relevant answers.
 Follow all instructions exactly, prioritizing clarity, specificity, and relevance.
 Define your role and limitations in context, and adhere strictly to them.
@@ -59,7 +56,6 @@ When reasoning is needed, provide brief chain‑of‑thought steps to improve tr
 Keep responses concise; avoid unnecessary preamble or filler words.
 `;
 
-
 function useThemeEffect(theme: "light" | "dark" | "system") {
   useEffect(() => {
     // Skip DOM manipulation during server-side rendering or tests
@@ -67,9 +63,9 @@ function useThemeEffect(theme: "light" | "dark" | "system") {
       return;
     }
     // Skip during Vitest runs if needed
-    if (import.meta.env.VITEST) {
-      return;
-    }
+    // if (import.meta.env.VITEST) {
+    //   return;
+    // }
 
     const root = window.document.documentElement;
     root.classList.remove("light", "dark"); // Remove previous theme classes

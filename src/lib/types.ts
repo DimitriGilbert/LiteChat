@@ -1,4 +1,3 @@
-
 import React from "react";
 
 import type {
@@ -7,12 +6,11 @@ import type {
 } from "@/mods/types";
 
 import { fs } from "@zenfs/core";
-import type { CoreMessage as AiCoreMessage } from "ai"; // Use alias to avoid naming conflict
+import type { CoreMessage as AiCoreMessage } from "ai";
 
 import type { ReadonlyChatContextSnapshot as ModApiSnapshot } from "@/mods/api";
 
-
-export type Role = "user" | "assistant" | "system" | "tool"; // Added 'tool' role
+export type Role = "user" | "assistant" | "system" | "tool";
 export type SidebarItemType = "conversation" | "project";
 export type DbProviderType =
   | "openai"
@@ -20,7 +18,6 @@ export type DbProviderType =
   | "openrouter"
   | "ollama"
   | "openai-compatible";
-
 
 export interface TextPart {
   type: "text";
@@ -35,31 +32,25 @@ export interface ImagePart {
   mediaType?: string;
 }
 
-
-
 export interface ToolCallPart {
   type: "tool-call";
   toolCallId: string;
   toolName: string;
-  args: any; // Arguments provided by the model for the tool call
+  args: any;
 }
-
 
 export interface ToolResultPart {
   type: "tool-result";
   toolCallId: string;
   toolName: string;
-  result: any; // The result returned by the tool execution
+  result: any;
   /** Optional: Set to true if the tool execution resulted in an error */
   isError?: boolean;
 }
 
-
-
 export type MessageContent =
   | string
   | Array<TextPart | ImagePart | ToolCallPart | ToolResultPart>;
-
 
 export interface DbBase {
   id: string;
@@ -86,7 +77,6 @@ export interface DbConversation extends DbBase {
   gitRepoEnabled?: boolean;
 }
 
-
 export interface Workflow {
   type: "race" | "sequence" | "parallel";
   status: "pending" | "running" | "completed" | "error";
@@ -95,30 +85,30 @@ export interface Workflow {
 
 export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {
   conversationId: string;
-  role: Role; // Updated Role type
+  role: Role;
   /** Updated content type - can be string or array of parts */
   content: MessageContent;
   vfsContextPaths?: string[];
   // Optional fields matching AI SDK structure for tool interactions
   /** Present on assistant messages that contain tool calls */
   tool_calls?: Array<{
-    id: string; // Matches toolCallId in ToolCallPart
-    type: "function"; // AI SDK uses 'function' here
-    function: { name: string; arguments: string }; // Raw arguments string from AI
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
   }>;
   /** Present on tool messages to link them to the corresponding tool call */
-  tool_call_id?: string; // Matches toolCallId in ToolResultPart
+  tool_call_id?: string;
   // Add optional token fields
   tokensInput?: number;
   tokensOutput?: number;
   /** Optional array to store child messages for workflows/alternatives */
-  children?: Message[]; // Added for sub-messages
+  children?: Message[];
   /** Optional field to describe and track a workflow */
-  workflow?: Workflow; // Added workflow field
+  workflow?: Workflow;
   /** Optional: ID of the provider used for this message */
-  providerId?: string | null; // Added providerId
+  providerId?: string | null;
   /** Optional: ID of the model used for this message */
-  modelId?: string | null; // Added modelId
+  modelId?: string | null;
 }
 
 export interface DbApiKey extends Pick<DbBase, "id" | "createdAt"> {
@@ -128,18 +118,18 @@ export interface DbApiKey extends Pick<DbBase, "id" | "createdAt"> {
 }
 
 export interface DbProviderConfig extends DbBase {
-  name: string; // User-defined name (e.g., "My LMStudio", "Work OpenAI")
+  name: string;
   type: DbProviderType;
   isEnabled: boolean;
-  apiKeyId: string | null; // Link to DbApiKey.id if required
-  baseURL: string | null; // For openai-compatible, ollama
+  apiKeyId: string | null;
+  baseURL: string | null;
   /**
    * IDs of models to show in the primary dropdown list.
    * If null/empty, show all fetched/default models.
    * Search accesses all available models regardless of this setting.
    */
   enabledModels: string[] | null;
-  autoFetchModels: boolean; // Default to true for supported types
+  autoFetchModels: boolean;
   /** Stores the list of models fetched from the /models endpoint. */
   fetchedModels: { id: string; name: string }[] | null;
   /** Timestamp of the last successful model fetch. */
@@ -147,14 +137,12 @@ export interface DbProviderConfig extends DbBase {
   modelSortOrder: string[] | null;
 }
 
-
 export type DbMod = ModDbType;
 export type ModInstance = ModInstanceType;
 
-
 export interface Message {
-  id: string; // Make ID mandatory for UI state consistency
-  role: Role; // Updated Role type
+  id: string;
+  role: Role;
   // Use the MessageContent type directly
   content: MessageContent;
   conversationId?: string;
@@ -164,24 +152,24 @@ export interface Message {
   // streamedContent?: string;
   error?: string | null;
   vfsContextPaths?: string[];
-  providerId?: string | null; // Already present in UI type
-  modelId?: string | null; // Already present in UI type
+  providerId?: string | null;
+  modelId?: string | null;
   tokensInput?: number;
   tokensOutput?: number;
   tokensPerSecond?: number;
   // Optional fields matching AI SDK structure for tool interactions
   /** Present on assistant messages that contain tool calls */
   tool_calls?: Array<{
-    id: string; // Matches toolCallId in ToolCallPart
-    type: "function"; // AI SDK uses 'function' here
-    function: { name: string; arguments: string }; // Raw arguments string from AI
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
   }>;
   /** Present on tool messages to link them to the corresponding tool call */
-  tool_call_id?: string; // Matches toolCallId in ToolResultPart
+  tool_call_id?: string;
   /** Optional array to store child messages for workflows/alternatives */
-  children?: Message[]; // Added for sub-messages
+  children?: Message[];
   /** Optional field to describe and track a workflow */
-  workflow?: Workflow; // Added workflow field
+  workflow?: Workflow;
 }
 
 export interface SidebarItemBase extends DbBase {
@@ -197,11 +185,10 @@ export interface ConversationSidebarItem
 }
 export type SidebarItem = ProjectSidebarItem | ConversationSidebarItem;
 
-
 export interface AiModelConfig {
   id: string;
   name: string;
-  instance: any; // Holds the AI SDK model instance (e.g., from openai('gpt-4'))
+  instance: any;
   contextWindow?: number;
   // Add flag to indicate image generation capability
   supportsImageGeneration?: boolean;
@@ -219,7 +206,6 @@ export interface AiProviderConfig {
   allAvailableModels: { id: string; name: string }[];
 }
 
-
 export interface FileSystemEntry {
   name: string;
   path: string;
@@ -227,7 +213,6 @@ export interface FileSystemEntry {
   size: number;
   lastModified: Date;
 }
-
 
 export interface CustomActionBase {
   id: string;
@@ -245,7 +230,6 @@ export interface CustomMessageAction extends CustomActionBase {
   isVisible?: (message: Message, context: ChatContextProps) => boolean;
 }
 
-
 export interface CustomSettingTabProps {
   context: ChatContextProps;
 }
@@ -255,7 +239,6 @@ export interface CustomSettingTab {
   title: string;
   component: React.ComponentType<CustomSettingTabProps>;
 }
-
 
 export interface LiteChatConfig {
   enableSidebar?: boolean;
@@ -267,30 +250,24 @@ export interface LiteChatConfig {
   initialSelectedItemId?: string | null;
   initialSelectedItemType?: SidebarItemType | null;
   streamingRefreshRateMs?: number;
-  streamingThrottleRate?: number; // Note: This seems unused, consider removing later
   defaultSidebarOpen?: boolean;
   customPromptActions?: CustomPromptAction[];
   customMessageActions?: CustomMessageAction[];
   customSettingsTabs?: CustomSettingTab[];
-  /** ID of the DOM element to portal streaming content into. */
-  // streamingPortalId?: string; // Added
 }
-
-
-
 
 export interface CoreChatContextProps {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   isLoadingMessages: boolean;
   setIsLoadingMessages: React.Dispatch<React.SetStateAction<boolean>>;
-  isStreaming: boolean; // Covers both text and image generation
+  isStreaming: boolean;
   setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>;
   error: string | null;
   setError: (error: string | null) => void;
   handleSubmitCore: (
     currentConversationId: string,
-    contentToSendToAI: MessageContent, // Use the multi-modal type
+    contentToSendToAI: MessageContent,
     vfsContextPaths?: string[],
   ) => Promise<void>;
   // Add image generation core function
@@ -302,7 +279,6 @@ export interface CoreChatContextProps {
   regenerateMessageCore: (messageId: string) => Promise<void>;
   abortControllerRef: React.MutableRefObject<AbortController | null>;
 }
-
 
 export interface VfsContextObject {
   isReady: boolean;
@@ -325,18 +301,14 @@ export interface VfsContextObject {
   vfsKey: string | null;
 }
 
-
 export type ReadonlyChatContextSnapshot = ModApiSnapshot;
-
-
-
 
 export interface ChatContextProps {
   // --- Feature Flags (from Settings/ProviderMgmt) ---
   enableApiKeyManagement: boolean;
   enableAdvancedSettings: boolean;
-  enableSidebar: boolean; // from SidebarContext
-  enableVfs: boolean; // from VfsContext
+  enableSidebar: boolean;
+  enableVfs: boolean;
 
   // --- Provider/Model Selection (from ProviderManagementContext) ---
   activeProviders: AiProviderConfig[];
@@ -397,8 +369,8 @@ export interface ChatContextProps {
 
   // --- Messages & Streaming (from CoreChatContext) ---
   messages: Message[];
-  isLoading: boolean; // Alias for isLoadingMessages
-  isStreaming: boolean; // Covers both text and image generation
+  isLoading: boolean;
+  isStreaming: boolean;
   error: string | null;
   setError: (error: string | null) => void;
 
@@ -435,19 +407,19 @@ export interface ChatContextProps {
   setFrequencyPenalty: React.Dispatch<React.SetStateAction<number | null>>;
   theme: "light" | "dark" | "system";
   setTheme: React.Dispatch<React.SetStateAction<"light" | "dark" | "system">>;
-  streamingThrottleRate: number; // Passed down from config
+  streamingThrottleRate: number;
   searchTerm: string;
   setSearchTerm: React.Dispatch<React.SetStateAction<string>>;
 
   // --- Import/Export & Data Management (from SidebarContext/Storage) ---
   exportConversation: (conversationId: string | null) => Promise<void>;
-  importConversation: (file: File, parentId: string | null) => Promise<void>; // Adjusted signature
+  importConversation: (file: File, parentId: string | null) => Promise<void>;
   exportAllConversations: () => Promise<void>;
-  clearAllData: () => Promise<void>; // From storage hook
+  clearAllData: () => Promise<void>;
 
   // --- Virtual File System (from VfsContext) ---
   isVfsEnabledForItem: boolean;
-  toggleVfsEnabled: () => Promise<void>; // Handler defined in ChatProvider
+  toggleVfsEnabled: () => Promise<void>;
   vfs: VfsContextObject;
 
   // --- DB Accessors (from Storage hook) ---
@@ -465,16 +437,10 @@ export interface ChatContextProps {
   addDbMod: (modData: Omit<DbMod, "id" | "createdAt">) => Promise<string>;
   updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>;
   deleteDbMod: (id: string) => Promise<void>;
-  // Add modTools access if needed directly in context, though usually accessed via ModContext
-  // modTools: ReadonlyMap<string, import('../mods/types').RegisteredTool>;
 
   // --- Settings Modal Control (from SettingsContext) ---
   isSettingsModalOpen: boolean;
   onSettingsModalOpenChange: (open: boolean) => void;
 }
-
-
-
-
 
 export type CoreMessage = AiCoreMessage;

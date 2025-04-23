@@ -1,4 +1,3 @@
-
 import React from "react";
 import type { DbProviderConfig, DbApiKey } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -17,7 +16,6 @@ import {
   supportsModelFetching,
 } from "@/lib/litechat";
 
-
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 interface ProviderRowViewModeProps {
   provider: DbProviderConfig;
@@ -29,7 +27,6 @@ interface ProviderRowViewModeProps {
   isDeleting: boolean;
   getAllAvailableModelDefs: () => { id: string; name: string }[];
 }
-
 
 const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   provider, // Use prop
@@ -191,6 +188,5 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
     </div>
   );
 };
-
 
 export const ProviderRowViewMode = React.memo(ProviderRowViewModeComponent);

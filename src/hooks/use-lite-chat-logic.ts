@@ -1,196 +1,69 @@
-
-
-
-import { useMemo, useCallback } from "react";
-import { useShallow } from "zustand/react/shallow";
+import { useCallback } from "react";
+import { useShallow } from "zustand/react/shallow"; // Keep for existing usage if any
 import { toast } from "sonner";
 
-
+// Import necessary stores and types
 import { useSidebarStore, type SidebarActions } from "@/store/sidebar.store";
-import {
-  useCoreChatStore,
-  type CoreChatActions,
-} from "@/store/core-chat.store";
-import {
-  useProviderStore,
-  type ProviderState,
-  type ProviderActions,
-} from "@/store/provider.store";
-import {
-  useSettingsStore,
-  type SettingsState,
-  type SettingsActions,
-} from "@/store/settings.store";
-import { useVfsStore, type VfsState, type VfsActions } from "@/store/vfs.store";
-import { useModStore, type ModState, type ModActions } from "@/store/mod.store";
-import {
-  useInputStore,
-  type InputState,
-  type InputActions,
-} from "@/store/input.store";
+import { useCoreChatStore } from "@/store/core-chat.store";
+import { useProviderStore, type ProviderActions } from "@/store/provider.store";
+import { useSettingsStore, type SettingsActions } from "@/store/settings.store";
+import { useVfsStore } from "@/store/vfs.store";
+import { useInputStore } from "@/store/input.store";
 import type {
-  SidebarItemType,
   DbConversation,
   AiProviderConfig,
   AiModelConfig,
-  DbProviderConfig,
-  DbApiKey,
   DbProject,
 } from "@/lib/types";
 import type { ReadonlyChatContextSnapshot } from "@/mods/api";
-import { db } from "@/lib/db";
 
 import { useAiInteraction } from "@/hooks/ai-interaction";
 import { useChatStorage } from "./use-chat-storage";
 import { useDerivedChatState } from "./use-derived-chat-state";
 
-
-
+// Props might change slightly
 interface UseLiteChatLogicProps {
   editingItemId: string | null;
   setEditingItemId: (id: string | null) => void;
   onEditComplete: (id: string) => void;
+  // Pass DB data needed for derivations if not directly from stores
   dbConversations: DbConversation[];
   dbProjects: DbProject[];
+  // REMOVED: dbProviderConfigs: DbProviderConfig[];
+  // REMOVED: apiKeys: DbApiKey[];
 }
 
-
+// Return type will be reduced
 interface UseLiteChatLogicReturn {
-  // Input State & Actions
-  promptInputValue: InputState["promptInputValue"];
-  setPromptInputValue: InputActions["setPromptInputValue"];
-  attachedFiles: InputState["attachedFiles"];
-  addAttachedFile: InputActions["addAttachedFile"];
-  removeAttachedFile: InputActions["removeAttachedFile"];
-  clearAttachedFiles: InputActions["clearAttachedFiles"];
-  selectedVfsPaths: InputState["selectedVfsPaths"];
-  addSelectedVfsPath: InputActions["addSelectedVfsPath"];
-  removeSelectedVfsPath: InputActions["removeSelectedVfsPath"];
-  clearSelectedVfsPaths: InputActions["clearSelectedVfsPaths"];
-  clearAllInput: InputActions["clearAllInput"];
-  // State and Actions from Stores (Grouped)
-  sidebarActions: Pick<
-    SidebarActions,
-    | "selectItem"
-    | "createConversation"
-    | "createProject"
-    | "deleteItem"
-    | "renameItem"
-    | "exportConversation"
-    | "importConversation"
-    | "exportAllConversations"
-    | "updateConversationSystemPrompt"
-    | "toggleVfsEnabled"
-  >;
-  coreChatActions: Pick<
-    CoreChatActions,
-    | "setMessages"
-    | "addMessage"
-    | "updateMessage"
-    | "setIsStreaming"
-    | "setError"
-    | "addDbMessage"
-    | "bulkAddMessages"
-    | "handleSubmitCore"
-    | "handleImageGenerationCore"
-    | "stopStreamingCore"
-    | "regenerateMessageCore"
-    | "startWorkflowCore"
-    | "finalizeWorkflowTask"
-  >;
-  vfsActions: Pick<
-    VfsActions,
-    "clearSelectedVfsPaths" | "removeSelectedVfsPath"
-  >;
-  providerActions: Pick<
-    ProviderActions,
-    | "setSelectedProviderId"
-    | "setSelectedModelId"
-    | "addDbProviderConfig"
-    | "updateDbProviderConfig"
-    | "deleteDbProviderConfig"
-    | "fetchModels"
-    | "addApiKey"
-    | "deleteApiKey"
-  >;
-  settingsActions: Pick<
-    SettingsActions,
-    | "setIsSettingsModalOpen"
-    | "setSearchTerm"
-    | "setTheme"
-    | "setTemperature"
-    | "setTopP"
-    | "setMaxTokens"
-    | "setTopK"
-    | "setPresencePenalty"
-    | "setFrequencyPenalty"
-    | "setGlobalSystemPrompt"
-    | "setStreamingRefreshRateMs"
-    | "setEnableStreamingMarkdown" // Added
-  >;
-  modActions: Pick<ModActions, "addDbMod" | "updateDbMod" | "deleteDbMod">;
-  // Selection State
-  selectedItemId: string | null;
-  selectedItemType: SidebarItemType | null;
-  enableSidebar: boolean;
-  // Other store states
-  vfsState: Pick<
-    VfsState,
-    | "isVfsEnabledForItem"
-    | "isVfsReady"
-    | "isVfsLoading"
-    | "vfsError"
-    | "vfsKey"
-  >;
-  providerState: ProviderState & {
-    dbProviderConfigs: DbProviderConfig[];
-    apiKeys: DbApiKey[];
-  };
-  settingsState: Pick<
-    SettingsState,
-    | "searchTerm"
-    | "theme"
-    | "enableAdvancedSettings"
-    | "temperature"
-    | "topP"
-    | "maxTokens"
-    | "topK"
-    | "presencePenalty"
-    | "frequencyPenalty"
-    | "globalSystemPrompt"
-    | "streamingRefreshRateMs"
-    | "isSettingsModalOpen"
-    | "enableStreamingMarkdown" // Added
-  >;
-  modState: Pick<
-    ModState,
-    | "dbMods"
-    | "loadedMods"
-    | "modSettingsTabs"
-    | "modPromptActions"
-    | "modMessageActions"
-  >;
-  // Interaction Handlers (now from useAiInteraction)
+  // REMOVED Input State & Actions (Components use useInputStore)
+  // REMOVED Simple Store Actions (Components use store hooks)
+  // REMOVED Simple Store State (Components use store hooks)
+
+  // Keep Interaction Handlers (from useAiInteraction)
   handleFormSubmit: (
     prompt: string,
     files: File[],
     vfsPaths: string[],
     context: any,
   ) => Promise<void>;
-  // handleImageGenerationWrapper: (prompt: string) => Promise<void>; // This is now part of useAiInteraction's return
   stopStreaming: (parentMessageId?: string | null) => void;
   regenerateMessage: (messageId: string) => Promise<void>;
-  // Utility Callbacks
+
+  // Keep Utility Callbacks
   clearAllData: () => Promise<void>;
-  getAllAvailableModelDefs: (
-    providerConfigId: string,
-  ) => { id: string; name: string }[];
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
-  // Derived State (from useDerivedChatState)
+
+  // Keep Derived State (Components can use useDerivedChatState directly if preferred later)
   activeConversationData: DbConversation | null;
   selectedProvider: AiProviderConfig | undefined;
   selectedModel: AiModelConfig | undefined;
   getApiKeyForProvider: (providerId: string) => string | undefined;
+
+  // Keep complex actions if they coordinate multiple stores/logic
+  // Example: Maybe renameItem needs to stay if it does more than just DB update
+  sidebarActions: Pick<SidebarActions, "renameItem">; // Example: Keep only complex ones
+  settingsActions: Pick<SettingsActions, "setSearchTerm">; // Example: Keep only complex ones
+  providerActions: Pick<ProviderActions, "updateDbProviderConfig">; // Example
 }
 
 export function useLiteChatLogic(
@@ -199,61 +72,28 @@ export function useLiteChatLogic(
   const { dbConversations, dbProjects } = props;
   const storage = useChatStorage();
 
-  // --- Get Input State/Actions ---
-  const {
-    promptInputValue,
-    setPromptInputValue,
-    attachedFiles,
-    addAttachedFile,
-    removeAttachedFile,
-    clearAttachedFiles,
-    selectedVfsPaths,
-    addSelectedVfsPath,
-    removeSelectedVfsPath,
-    clearSelectedVfsPaths,
-    clearAllInput,
-  } = useInputStore(
-    useShallow((state) => ({
-      promptInputValue: state.promptInputValue,
-      setPromptInputValue: state.setPromptInputValue,
-      attachedFiles: state.attachedFiles,
-      addAttachedFile: state.addAttachedFile,
-      removeAttachedFile: state.removeAttachedFile,
-      clearAttachedFiles: state.clearAttachedFiles,
-      selectedVfsPaths: state.selectedVfsPaths,
-      addSelectedVfsPath: state.addSelectedVfsPath,
-      removeSelectedVfsPath: state.removeSelectedVfsPath,
-      clearSelectedVfsPaths: state.clearSelectedVfsPaths,
-      clearAllInput: state.clearAllInput,
-    })),
-  );
-
-  // --- Select State/Actions from Stores ---
-  const sidebarActions = useSidebarStore(
-    useShallow((state): UseLiteChatLogicReturn["sidebarActions"] => ({
-      selectItem: state.selectItem,
-      createConversation: state.createConversation,
-      createProject: state.createProject,
-      deleteItem: state.deleteItem,
-      renameItem: state.renameItem,
-      exportConversation: state.exportConversation,
-      importConversation: state.importConversation,
-      exportAllConversations: state.exportAllConversations,
-      updateConversationSystemPrompt: state.updateConversationSystemPrompt,
-      toggleVfsEnabled: state.toggleVfsEnabled,
-    })),
-  );
-  const { selectedItemId, selectedItemType, enableSidebar } = useSidebarStore(
+  // --- Get necessary state/actions from stores ONLY for logic within this hook ---
+  const { selectedItemId, selectedItemType, renameItem } = useSidebarStore(
     useShallow((state) => ({
       selectedItemId: state.selectedItemId,
       selectedItemType: state.selectedItemType,
-      enableSidebar: state.enableSidebar,
+      renameItem: state.renameItem, // Keep if complex
     })),
   );
-
-  const coreChatActions = useCoreChatStore(
-    useShallow((state): UseLiteChatLogicReturn["coreChatActions"] => ({
-      setMessages: state.setMessages,
+  const {
+    addMessage,
+    updateMessage,
+    setIsStreaming,
+    setError,
+    addDbMessage,
+    bulkAddMessages,
+    handleSubmitCore,
+    handleImageGenerationCore,
+    stopStreamingCore,
+    regenerateMessageCore,
+    startWorkflowCore,
+  } = useCoreChatStore(
+    useShallow((state) => ({
       addMessage: state.addMessage,
       updateMessage: state.updateMessage,
       setIsStreaming: state.setIsStreaming,
@@ -265,162 +105,51 @@ export function useLiteChatLogic(
       stopStreamingCore: state.stopStreamingCore,
       regenerateMessageCore: state.regenerateMessageCore,
       startWorkflowCore: state.startWorkflowCore,
-      finalizeWorkflowTask: state.finalizeWorkflowTask,
     })),
   );
-
-  const vfsActions = useVfsStore(
-    useShallow((state): UseLiteChatLogicReturn["vfsActions"] => ({
-      clearSelectedVfsPaths: state.clearSelectedVfsPaths,
-      removeSelectedVfsPath: state.removeSelectedVfsPath,
-    })),
+  const { clearAllInput } = useInputStore(
+    useShallow((state) => ({ clearAllInput: state.clearAllInput })),
   );
-  const vfsState = useVfsStore(
-    useShallow((state): UseLiteChatLogicReturn["vfsState"] => ({
-      isVfsEnabledForItem: state.isVfsEnabledForItem,
-      isVfsReady: state.isVfsReady,
-      isVfsLoading: state.isVfsLoading,
-      vfsError: state.vfsError,
-      vfsKey: state.vfsKey,
-    })),
-  );
-
+  // Fetch provider data needed for derivations/interactions
   const {
-    setSelectedProviderId: storeSetSelectedProviderId,
-    setSelectedModelId: storeSetSelectedModelId,
-    addDbProviderConfig: storeAddDbProviderConfig,
-    updateDbProviderConfig: storeUpdateDbProviderConfig,
-    deleteDbProviderConfig: storeDeleteDbProviderConfig,
-    fetchModels: storeFetchModels,
-    addApiKey: storeAddApiKey,
-    deleteApiKey: storeDeleteApiKey,
-  } = useProviderStore();
-
-  const providerStateFromStore = useProviderStore(
-    useShallow(
-      (
-        state,
-      ): Omit<
-        UseLiteChatLogicReturn["providerState"],
-        "dbProviderConfigs" | "apiKeys"
-      > => ({
-        selectedProviderId: state.selectedProviderId,
-        selectedModelId: state.selectedModelId,
-        enableApiKeyManagement: state.enableApiKeyManagement,
-        providerFetchStatus: state.providerFetchStatus,
-      }),
-    ),
-  );
-
-  const dbProviderConfigs = useMemo(
-    () => storage.providerConfigs || [],
-    [storage.providerConfigs],
-  );
-  const apiKeys = useMemo(() => storage.apiKeys || [], [storage.apiKeys]);
-
-  const providerState: UseLiteChatLogicReturn["providerState"] = useMemo(
-    () => ({
-      ...providerStateFromStore,
-      dbProviderConfigs,
-      apiKeys,
-    }),
-    [providerStateFromStore, dbProviderConfigs, apiKeys],
-  );
-
-  const providerActions: UseLiteChatLogicReturn["providerActions"] = useMemo(
-    () => ({
-      setSelectedProviderId: (id) =>
-        storeSetSelectedProviderId(id, dbProviderConfigs),
-      setSelectedModelId: storeSetSelectedModelId,
-      addDbProviderConfig: storeAddDbProviderConfig,
-      updateDbProviderConfig: storeUpdateDbProviderConfig,
-      deleteDbProviderConfig: storeDeleteDbProviderConfig,
-      fetchModels: (id) => storeFetchModels(id, dbProviderConfigs, apiKeys),
-      addApiKey: storeAddApiKey,
-      deleteApiKey: storeDeleteApiKey,
-    }),
-    [
-      storeSetSelectedProviderId,
-      storeSetSelectedModelId,
-      storeAddDbProviderConfig,
-      storeUpdateDbProviderConfig,
-      storeDeleteDbProviderConfig,
-      storeFetchModels,
-      storeAddApiKey,
-      storeDeleteApiKey,
-      dbProviderConfigs,
-      apiKeys,
-    ],
-  );
-
-  const settingsActions = useSettingsStore(
-    useShallow((state): UseLiteChatLogicReturn["settingsActions"] => ({
-      setIsSettingsModalOpen: state.setIsSettingsModalOpen,
-      setSearchTerm: state.setSearchTerm,
-      setTheme: state.setTheme,
-      setTemperature: state.setTemperature,
-      setTopP: state.setTopP,
-      setMaxTokens: state.setMaxTokens,
-      setTopK: state.setTopK,
-      setPresencePenalty: state.setPresencePenalty,
-      setFrequencyPenalty: state.setFrequencyPenalty,
-      setGlobalSystemPrompt: state.setGlobalSystemPrompt,
-      setStreamingRefreshRateMs: state.setStreamingRefreshRateMs,
-      setEnableStreamingMarkdown: state.setEnableStreamingMarkdown, // Added
+    selectedProviderId,
+    selectedModelId,
+    getApiKeyForProvider,
+    dbProviderConfigs, // Get from store now
+    apiKeys, // Get from store now
+    updateDbProviderConfig, // Keep if complex
+  } = useProviderStore(
+    useShallow((state) => ({
+      selectedProviderId: state.selectedProviderId,
+      selectedModelId: state.selectedModelId,
+      getApiKeyForProvider: state.getApiKeyForProvider,
+      dbProviderConfigs: state.dbProviderConfigs, // Fetch from store
+      apiKeys: state.apiKeys, // Fetch from store
+      updateDbProviderConfig: state.updateDbProviderConfig, // Keep if complex
     })),
   );
-  const settingsState = useSettingsStore(
-    useShallow((state): UseLiteChatLogicReturn["settingsState"] => ({
-      searchTerm: state.searchTerm,
-      theme: state.theme,
-      enableAdvancedSettings: state.enableAdvancedSettings,
-      temperature: state.temperature,
-      topP: state.topP,
-      maxTokens: state.maxTokens,
-      topK: state.topK,
-      presencePenalty: state.presencePenalty,
-      frequencyPenalty: state.frequencyPenalty,
-      globalSystemPrompt: state.globalSystemPrompt,
+  const { streamingRefreshRateMs, setSearchTerm } = useSettingsStore(
+    useShallow((state) => ({
       streamingRefreshRateMs: state.streamingRefreshRateMs,
-      isSettingsModalOpen: state.isSettingsModalOpen,
-      enableStreamingMarkdown: state.enableStreamingMarkdown, // Added
-    })),
-  );
-
-  const modActions = useModStore(
-    useShallow((state): UseLiteChatLogicReturn["modActions"] => ({
-      addDbMod: state.addDbMod,
-      updateDbMod: state.updateDbMod,
-      deleteDbMod: state.deleteDbMod,
-    })),
-  );
-  const modState = useModStore(
-    useShallow((state): UseLiteChatLogicReturn["modState"] => ({
-      dbMods: state.dbMods,
-      loadedMods: state.loadedMods,
-      modSettingsTabs: state.modSettingsTabs,
-      modPromptActions: state.modPromptActions,
-      modMessageActions: state.modMessageActions,
+      setSearchTerm: state.setSearchTerm, // Keep if complex
     })),
   );
 
   // --- Context Snapshot ---
   const getContextSnapshotForMod =
     useCallback((): ReadonlyChatContextSnapshot => {
-      const currentCore = useCoreChatStore.getState();
-      const currentSettings = useSettingsStore.getState();
-      const currentSidebar = useSidebarStore.getState();
-      const currentVfs = useVfsStore.getState();
-      const currentProviderState = useProviderStore.getState();
+      const coreState = useCoreChatStore.getState();
+      const sidebarState = useSidebarStore.getState();
+      const providerState = useProviderStore.getState();
+      const settingsState = useSettingsStore.getState();
+      const vfsState = useVfsStore.getState();
       const currentDbConversations = dbConversations;
-      const currentDbConfigs = dbProviderConfigs;
-      const currentApiKeys = apiKeys;
 
       let activeSystemPrompt: string | null = null;
-      if (currentSettings.enableAdvancedSettings) {
-        if (currentSidebar.selectedItemType === "conversation") {
+      if (settingsState.enableAdvancedSettings) {
+        if (sidebarState.selectedItemType === "conversation") {
           const convo = currentDbConversations.find(
-            (c: DbConversation) => c.id === currentSidebar.selectedItemId,
+            (c: DbConversation) => c.id === sidebarState.selectedItemId,
           );
           if (convo?.systemPrompt && convo.systemPrompt.trim() !== "") {
             activeSystemPrompt = convo.systemPrompt;
@@ -428,90 +157,77 @@ export function useLiteChatLogic(
         }
         if (
           !activeSystemPrompt &&
-          currentSettings.globalSystemPrompt &&
-          currentSettings.globalSystemPrompt.trim() !== ""
+          settingsState.globalSystemPrompt &&
+          settingsState.globalSystemPrompt.trim() !== ""
         ) {
-          activeSystemPrompt = currentSettings.globalSystemPrompt;
+          activeSystemPrompt = settingsState.globalSystemPrompt;
         }
       }
 
-      const getApiKeyFunc = (id: string): string | undefined => {
-        const config = currentDbConfigs.find((p) => p.id === id);
-        if (!config || !config.apiKeyId) return undefined;
-        return currentApiKeys.find((k) => k.id === config.apiKeyId)?.value;
-      };
+      const getApiKeyFunc = providerState.getApiKeyForProvider;
 
       return Object.freeze({
-        selectedItemId: currentSidebar.selectedItemId,
-        selectedItemType: currentSidebar.selectedItemType,
-        messages: currentCore.messages,
-        isStreaming: currentCore.isStreaming,
-        selectedProviderId: currentProviderState.selectedProviderId,
-        selectedModelId: currentProviderState.selectedModelId,
+        selectedItemId: sidebarState.selectedItemId,
+        selectedItemType: sidebarState.selectedItemType,
+        messages: coreState.messages,
+        isStreaming: coreState.isStreaming,
+        selectedProviderId: providerState.selectedProviderId,
+        selectedModelId: providerState.selectedModelId,
         activeSystemPrompt: activeSystemPrompt,
-        temperature: currentSettings.temperature,
-        maxTokens: currentSettings.maxTokens,
-        theme: currentSettings.theme,
-        isVfsEnabledForItem: currentVfs.isVfsEnabledForItem,
+        temperature: settingsState.temperature,
+        maxTokens: settingsState.maxTokens,
+        theme: settingsState.theme,
+        isVfsEnabledForItem: vfsState.isVfsEnabledForItem,
         getApiKeyForProvider: getApiKeyFunc,
       });
-    }, [dbConversations, dbProviderConfigs, apiKeys]);
+    }, [dbConversations]);
 
   // --- Use Derived State Hook ---
-  const {
-    activeConversationData,
-    selectedProvider,
-    selectedModel,
-    getApiKeyForProvider,
-  } = useDerivedChatState({
-    selectedItemId,
-    selectedItemType,
-    dbConversations,
-    dbProjects,
-    dbProviderConfigs,
-    apiKeys,
-    selectedProviderId: providerState.selectedProviderId,
-    selectedModelId: providerState.selectedModelId,
-  });
+  const { activeConversationData, selectedProvider, selectedModel } =
+    useDerivedChatState({
+      selectedItemId,
+      selectedItemType,
+      dbConversations,
+      dbProjects,
+      dbProviderConfigs,
+      apiKeys,
+      selectedProviderId,
+      selectedModelId,
+    });
 
-  // --- Use AI Interaction Hook (Consolidated) ---
-  const {
-    // performAiStream, // Not directly exposed, used by handlers below
-    // performImageGeneration, // Not directly exposed, used by handlers below
-    handleFormSubmit,
-    stopStreaming,
-    regenerateMessage,
-  } = useAiInteraction({
-    // Pass all necessary props
-    selectedModel,
-    selectedProvider,
-    getApiKeyForProvider: useCallback(
-      () => getApiKeyForProvider(providerState.selectedProviderId!),
-      [getApiKeyForProvider, providerState.selectedProviderId],
-    ),
-    streamingRefreshRateMs: settingsState.streamingRefreshRateMs,
-    addMessage: coreChatActions.addMessage,
-    updateMessage: coreChatActions.updateMessage,
-    setIsAiStreaming: coreChatActions.setIsStreaming,
-    setError: coreChatActions.setError,
-    addDbMessage: coreChatActions.addDbMessage,
-    getContextSnapshotForMod,
-    bulkAddMessages: coreChatActions.bulkAddMessages,
-    selectedItemId,
-    selectedItemType,
-    dbProviderConfigs,
-    dbConversations,
-    dbProjects,
-    inputActions: { clearAllInput },
-    handleSubmitCore: coreChatActions.handleSubmitCore,
-    handleImageGenerationCore: coreChatActions.handleImageGenerationCore,
-    stopStreamingCore: coreChatActions.stopStreamingCore,
-    regenerateMessageCore: coreChatActions.regenerateMessageCore,
-    startWorkflowCore: coreChatActions.startWorkflowCore,
-  });
+  // --- Use AI Interaction Hook ---
+  const { handleFormSubmit, stopStreaming, regenerateMessage } =
+    useAiInteraction({
+      selectedModel,
+      selectedProvider,
+      getApiKeyForProvider: useCallback(
+        () => getApiKeyForProvider(selectedProviderId!),
+        [getApiKeyForProvider, selectedProviderId],
+      ),
+      streamingRefreshRateMs,
+      addMessage,
+      updateMessage,
+      setIsAiStreaming: setIsStreaming,
+      setError,
+      addDbMessage,
+      getContextSnapshotForMod,
+      bulkAddMessages,
+      selectedItemId,
+      selectedItemType,
+      dbProviderConfigs,
+      dbConversations,
+      dbProjects,
+      inputActions: { clearAllInput },
+      handleSubmitCore,
+      handleImageGenerationCore,
+      stopStreamingCore,
+      regenerateMessageCore,
+      startWorkflowCore,
+    });
 
   // --- Utility Callbacks ---
   const clearAllData = useCallback(async () => {
+    // (Keep existing implementation using storage.clearAllData or db)
     if (
       window.confirm(
         `🚨 ARE YOU ABSOLUTELY SURE? 🚨
@@ -527,15 +243,7 @@ Really delete everything? Consider exporting first.`,
         )
       ) {
         try {
-          await Promise.all([
-            db.projects.clear(),
-            db.conversations.clear(),
-            db.messages.clear(),
-            db.apiKeys.clear(),
-            db.mods.clear(),
-            db.providerConfigs.clear(),
-            db.appState.clear(),
-          ]);
+          await storage.clearAllData();
           toast.success("All local data cleared. Reloading the application...");
           setTimeout(() => window.location.reload(), 1500);
         } catch (error: unknown) {
@@ -546,59 +254,25 @@ Really delete everything? Consider exporting first.`,
         }
       }
     }
-  }, []);
-
-  const getAllAvailableModelDefs = useCallback(
-    (providerConfigId: string) => {
-      const config = dbProviderConfigs.find((p) => p.id === providerConfigId);
-      return config?.fetchedModels || [];
-    },
-    [dbProviderConfigs],
-  );
+  }, [storage]);
 
   // --- Return Structure ---
   return {
-    // Input State/Actions
-    promptInputValue,
-    setPromptInputValue,
-    attachedFiles,
-    addAttachedFile,
-    removeAttachedFile,
-    clearAttachedFiles,
-    selectedVfsPaths,
-    addSelectedVfsPath,
-    removeSelectedVfsPath,
-    clearSelectedVfsPaths,
-    clearAllInput,
-    // Store Actions (Grouped)
-    sidebarActions,
-    coreChatActions,
-    vfsActions,
-    providerActions,
-    settingsActions,
-    modActions,
-    // Selection State
-    selectedItemId,
-    selectedItemType,
-    enableSidebar,
-    // Other store states
-    vfsState,
-    providerState,
-    settingsState,
-    modState,
-    // Interaction Handlers (from useAiInteraction)
+    // Interaction Handlers
     handleFormSubmit,
-    // handleImageGenerationWrapper is implicitly handled by handleFormSubmit now
     stopStreaming,
     regenerateMessage,
-    // Utility Callbacks
+    // Utilities
     clearAllData,
-    getAllAvailableModelDefs,
     getContextSnapshotForMod,
-    // Derived State
+    // Derived State (pass through)
     activeConversationData,
     selectedProvider,
     selectedModel,
-    getApiKeyForProvider,
+    getApiKeyForProvider, // Pass through the store's getter
+    // Pass through complex actions kept in this hook
+    sidebarActions: { renameItem },
+    settingsActions: { setSearchTerm },
+    providerActions: { updateDbProviderConfig },
   };
 }

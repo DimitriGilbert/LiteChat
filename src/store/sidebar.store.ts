@@ -1,4 +1,4 @@
-
+// src/store/sidebar.store.ts
 import { create } from "zustand";
 import type {
   SidebarItem,
@@ -12,7 +12,7 @@ import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { z } from "zod";
 import { modEvents, ModEvent } from "@/mods/events";
-import { useCoreChatStore } from "./core-chat.store";
+import { useCoreChatStore } from "./core-chat.store"; // Import Core Chat Store
 import { useVfsStore } from "./vfs.store";
 import { db } from "@/lib/db";
 
@@ -77,21 +77,29 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
       const currentType = get().selectedItemType;
 
       if (currentId === id && currentType === type) {
-        return;
+        return; // No change
       }
 
+      console.log(`[SidebarStore] Selecting item: ${type} - ${id}`);
       set({
         selectedItemId: id,
         selectedItemType: type,
       });
 
+      // --- Trigger message loading ---
       const coreChatActions = useCoreChatStore.getState();
       if (type === "conversation" && id) {
+        console.log(`[SidebarStore] Loading messages for conversation: ${id}`);
         await coreChatActions.loadMessages(id);
       } else {
-        await coreChatActions.loadMessages(null);
+        console.log(
+          "[SidebarStore] Clearing messages (no conversation selected).",
+        );
+        await coreChatActions.loadMessages(null); // Clear messages if no conversation
       }
+      // --- End Trigger message loading ---
 
+      // --- VFS State Update ---
       const vfsActions = useVfsStore.getState();
       let isVfsEnabledForItem = false;
       let vfsKey: string | null = null;
@@ -116,21 +124,22 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         } else if (type === "conversation") {
           const convo = selectedItem as DbConversation | undefined;
           if (convo?.parentId && parentProject) {
-            // If conversation is in a project, inherit VFS key and enabled status from project
             vfsKey = `project-${convo.parentId}`;
-            isVfsEnabledForItem = parentProject.vfsEnabled ?? false; // Inherit enabled status
+            isVfsEnabledForItem = parentProject.vfsEnabled ?? false;
           } else {
-            // Conversation is not in a project (orphan)
             vfsKey = "orphan";
-            isVfsEnabledForItem = convo?.vfsEnabled ?? false; // Use its own enabled status
+            isVfsEnabledForItem = convo?.vfsEnabled ?? false;
           }
         }
       }
 
-      // Update VFS store state
+      console.log(
+        `[SidebarStore] Updating VFS state: key=${vfsKey}, enabled=${isVfsEnabledForItem}`,
+      );
       vfsActions.setVfsKey(vfsKey);
       vfsActions.setIsVfsEnabledForItem(isVfsEnabledForItem);
-      vfsActions.clearSelectedVfsPaths();
+      vfsActions.clearSelectedVfsPaths(); // Clear selected VFS files on item change
+      // --- End VFS State Update ---
 
       modEvents.emit(ModEvent.CHAT_SELECTED, { id, type });
     },
@@ -157,6 +166,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           type: "conversation",
           parentId,
         });
+        // Select the newly created conversation
         await get().selectItem(newId, "conversation");
         return newId;
       } catch (error) {
@@ -189,6 +199,8 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           type: "project",
           parentId,
         });
+        // Optionally select the new project, or let the user do it
+        // await get().selectItem(newProject.id, "project");
         return { id: newProject.id, name: newProject.name };
       } catch (error) {
         console.error("Failed to create project:", error);
@@ -222,7 +234,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             .equals(id)
             .count();
           if (childProjectsCount > 0 || childConvosCount > 0) {
-            // FIX: Show error toast, not success
             toast.error("Cannot delete project with items inside.");
             return;
           }
@@ -249,6 +260,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
               await tx.messages.where("conversationId").equals(id).delete();
               await tx.conversations.delete(id);
             } else if (type === "project") {
+              // Re-verify inside transaction for safety
               const finalChildProjects = await tx.projects
                 .where("parentId")
                 .equals(id)
@@ -265,6 +277,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
                 );
               }
             }
+            // Update parent timestamp if applicable
             if (parentId) {
               await tx.projects.update(parentId, { updatedAt: now });
             }
@@ -280,6 +293,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         );
         modEvents.emit(ModEvent.CHAT_DELETED, { id, type });
 
+        // If the deleted item was selected, select the next most recent item
         if (currentSelectedId === id) {
           const [projects, conversations] = await Promise.all([
             db.projects.orderBy("updatedAt").reverse().toArray(),
@@ -391,7 +405,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           content:
             typeof msg.content === "string"
               ? msg.content
-              : JSON.stringify(msg.content),
+              : JSON.stringify(msg.content), // Handle complex content
           createdAt: msg.createdAt.toISOString(),
         }));
         const jsonString = JSON.stringify(exportData, null, 2);
@@ -424,6 +438,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           const jsonString = event.target?.result as string;
           const parsedData = JSON.parse(jsonString);
 
+          // Validate the structure of the imported data
           const validationResult =
             conversationImportSchema.safeParse(parsedData);
           if (!validationResult.success) {
@@ -435,6 +450,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           }
           const importedMessages = validationResult.data;
 
+          // Create a new conversation for the imported data
           const newConversationTitle = `Imported: ${file.name.replace(/\.json$/i, "").substring(0, 50)}`;
           const newConversationId = nanoid();
           const now = new Date();
@@ -442,10 +458,10 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             id: newConversationId,
             parentId,
             title: newConversationTitle,
-            systemPrompt: null,
+            systemPrompt: null, // Or try to extract from import if available
             createdAt: now,
             updatedAt: now,
-            vfsEnabled: false,
+            vfsEnabled: false, // Default VFS state for imported chats
           };
           await db.conversations.add(newConversation);
           if (parentId) {
@@ -458,16 +474,18 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             parentId,
           });
 
+          // Bulk add the imported messages
           if (importedMessages.length > 0) {
             await db.messages.bulkAdd(
               importedMessages.map((msg) => ({
-                id: nanoid(),
+                id: nanoid(), // Generate new IDs for imported messages
                 role: msg.role,
-                content: msg.content as MessageContent,
+                content: msg.content as MessageContent, // Assume content is string for now
                 createdAt: msg.createdAt,
                 conversationId: newConversationId,
               })),
             );
+            // Update conversation timestamp to the last message's time
             const lastMessageTime =
               importedMessages[importedMessages.length - 1].createdAt;
             await db.conversations.update(newConversationId, {
@@ -479,6 +497,8 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
               });
             }
           }
+
+          // Select the newly imported conversation
           await get().selectItem(newConversationId, "conversation");
           toast.success(
             `Conversation imported successfully as "${newConversationTitle}"!`,
@@ -512,6 +532,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             .equals(conversation.id)
             .sortBy("createdAt");
           exportPackage.push({
+            // Conversation metadata
             id: conversation.id,
             title: conversation.title,
             parentId: conversation.parentId,
@@ -519,12 +540,13 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             createdAt: conversation.createdAt.toISOString(),
             updatedAt: conversation.updatedAt.toISOString(),
             vfsEnabled: conversation.vfsEnabled,
+            // Messages
             messages: messages.map((msg: DbMessage) => ({
               role: msg.role,
               content:
                 typeof msg.content === "string"
                   ? msg.content
-                  : JSON.stringify(msg.content),
+                  : JSON.stringify(msg.content), // Basic serialization for complex content
               createdAt: msg.createdAt.toISOString(),
             })),
           });
@@ -643,6 +665,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             console.log(
               "[SidebarStore] Directly initializing VFS after toggle",
             );
+            // Use setTimeout to ensure state updates propagate before init
             setTimeout(() => {
               vfsStore.initializeVfs();
             }, 0);

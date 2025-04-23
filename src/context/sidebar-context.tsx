@@ -1,4 +1,3 @@
-
 import React, {
   createContext,
   useContext,
@@ -24,7 +23,6 @@ import { nanoid } from "nanoid"; // Keep for import message IDs
 import { modEvents, ModEvent } from "@/mods/events"; // Keep for event emission
 
 const EMPTY_SIDEBAR_ITEMS: SidebarItem[] = [];
-
 
 const messageImportSchema = z.object({
   role: z.enum(["user", "assistant"]),
@@ -424,8 +422,9 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
         const messages = await storage.getMessagesForConversation(
           conversation.id,
         );
+        // Fix: Correct object structure
         exportPackage.push({
- conversation details ...
+          // conversation details ... // This was the invalid line, remove it
           id: conversation.id,
           title: conversation.title,
           parentId: conversation.parentId,

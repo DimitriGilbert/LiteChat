@@ -1,213 +1,160 @@
-
-import React, {
-  useRef,
-  useEffect,
-  useState,
-  useCallback,
-  useLayoutEffect,
-} from "react";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { MemoizedMessageBubble } from "@/components/lite-chat/message/message-bubble";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { AlertCircle, ArrowDownCircle } from "lucide-react";
+// src/components/lite-chat/chat/chat-content.tsx
+import React, { useRef, useState, useEffect, useMemo } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { throttle } from "@/lib/throttle";
-import type { Message, CustomMessageAction } from "@/lib/types";
-import type { ReadonlyChatContextSnapshot } from "@/mods/api";
+// Use MemoizedMessageBubble if that's the intended export, otherwise use MessageBubble
+// Assuming MemoizedMessageBubble is the correct one based on the user's file content
+import { MemoizedMessageBubble } from "../message/message-bubble";
 import { EmptyContent } from "./empty-content";
+import { Skeleton } from "@/components/ui/skeleton";
+import type {
+  Message,
+  CustomMessageAction,
+  ReadonlyChatContextSnapshot,
+} from "@/lib/types";
 
 interface ChatContentProps {
   className?: string;
   messages: Message[];
   isLoadingMessages: boolean;
-  isStreaming: boolean;
-  regenerateMessage: (messageId: string) => void;
+  isStreaming: boolean; // Keep isStreaming prop for logic within ChatContent
+  regenerateMessage: (messageId: string) => Promise<void>;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   modMessageActions: CustomMessageAction[];
   enableStreamingMarkdown: boolean;
-  // REMOVED: streamingPortalId?: string;
 }
-
-const SCROLL_THRESHOLD = 50;
 
 const ChatContentComponent: React.FC<ChatContentProps> = ({
   className,
   messages,
   isLoadingMessages,
-  isStreaming,
+  isStreaming, // Keep isStreaming prop for internal logic if needed
   regenerateMessage,
   getContextSnapshotForMod,
   modMessageActions,
   enableStreamingMarkdown,
-  // REMOVED: streamingPortalId,
 }) => {
-  const scrollAreaRootRef = useRef<HTMLDivElement>(null);
-  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [userScrolledUp, setUserScrolledUp] = useState(false);
 
-  const [showScrollButton, setShowScrollButton] = useState(false);
-  const prevScrollHeightRef = useRef<number | null>(null);
-  const userHasScrolledUpRef = useRef(false);
-  const isAutoScrollingRef = useRef(false);
-
-  const getViewport = useCallback((): HTMLDivElement | null => {
-    if (viewportRef.current) return viewportRef.current;
-    const root = scrollAreaRootRef.current;
-    if (!root) return null;
-    const vp = root.querySelector<HTMLDivElement>(
+  const getViewport = () => {
+    return scrollAreaRef.current?.querySelector<HTMLDivElement>(
       "[data-radix-scroll-area-viewport]",
     );
-    viewportRef.current = vp;
-    return vp;
-  }, []);
-
-  const scrollToBottom = useCallback(
-    (behavior: ScrollBehavior = "smooth", force: boolean = false) => {
-      const viewport = getViewport();
-      if (viewport) {
-        if (force || !userHasScrolledUpRef.current) {
-          isAutoScrollingRef.current = true;
-          viewport.scrollTo({ top: viewport.scrollHeight, behavior });
-          setShowScrollButton((prev) => (prev === false ? prev : false));
-          userHasScrolledUpRef.current = false;
-          setTimeout(
-            () => {
-              isAutoScrollingRef.current = false;
-            },
-            behavior === "smooth" ? 300 : 50,
-          );
-        }
-      }
-    },
-    [getViewport],
-  );
-
-  const checkScrollPosition = useCallback(() => {
-    if (isAutoScrollingRef.current) {
-      return;
-    }
-    const viewport = getViewport();
-    if (viewport) {
-      const { scrollHeight, scrollTop, clientHeight } = viewport;
-      const atBottom =
-        scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
-      const shouldShowButton = !atBottom;
-      setShowScrollButton((prev) =>
-        prev === shouldShowButton ? prev : shouldShowButton,
-      );
-      if (atBottom && userHasScrolledUpRef.current) {
-        userHasScrolledUpRef.current = false;
-      } else if (!atBottom && !userHasScrolledUpRef.current) {
-        userHasScrolledUpRef.current = true;
-      }
-    }
-  }, [getViewport]);
-
-  const { throttled: throttledCheckScrollPosition, cancel: cancelThrottle } =
-    throttle(checkScrollPosition, 150);
+  };
 
   useEffect(() => {
     const viewport = getViewport();
-    if (viewport) {
-      viewport.addEventListener("scroll", throttledCheckScrollPosition);
-      checkScrollPosition(); // Initial check
-      return () => {
-        viewport.removeEventListener("scroll", throttledCheckScrollPosition);
-        cancelThrottle(); // Cancel any pending throttled calls on cleanup
-      };
+    if (viewport && isAtBottom && !userScrolledUp) {
+      viewport.scrollTop = viewport.scrollHeight;
     }
-  }, [
-    getViewport,
-    throttledCheckScrollPosition,
-    checkScrollPosition,
-    cancelThrottle,
-  ]);
+  }, [messages, isStreaming, isAtBottom, userScrolledUp]);
 
-  const messagesLength = messages.length;
-  useLayoutEffect(() => {
+  const handleScroll = () => {
     const viewport = getViewport();
-    if (!viewport) return;
-    const currentScrollHeight = viewport.scrollHeight;
-    const previousScrollHeight = prevScrollHeightRef.current;
-
-    if (
-      !userHasScrolledUpRef.current &&
-      (messagesLength > 0 || isLoadingMessages) &&
-      previousScrollHeight !== null &&
-      currentScrollHeight > previousScrollHeight
-    ) {
-      requestAnimationFrame(() => {
-        scrollToBottom("smooth");
-      });
+    if (viewport) {
+      const threshold = 50;
+      const atBottom =
+        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
+        threshold;
+      setIsAtBottom(atBottom);
+      if (!atBottom && viewport.scrollTop > 0) {
+        setUserScrolledUp(true);
+      } else if (atBottom) {
+        setUserScrolledUp(false);
+      }
     }
-    prevScrollHeightRef.current = currentScrollHeight;
-  }, [
-    messagesLength,
-    isStreaming,
-    isLoadingMessages,
-    getViewport,
-    scrollToBottom,
-  ]);
-
-  const handleRegenerate = (messageId: string) => {
-    regenerateMessage(messageId);
   };
 
+  const scrollToBottom = () => {
+    const viewport = getViewport();
+    if (viewport) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+      setUserScrolledUp(false);
+      setIsAtBottom(true);
+    }
+  };
+
+  const safeMessages = useMemo(
+    () => (Array.isArray(messages) ? messages : []),
+    [messages],
+  );
+  const safeModMessageActions = useMemo(
+    () => (Array.isArray(modMessageActions) ? modMessageActions : []),
+    [modMessageActions],
+  );
+
+  const renderedMessages = useMemo(() => {
+    return safeMessages.map((message, index) => (
+      // Use MemoizedMessageBubble if that's the correct export
+      <MemoizedMessageBubble
+        key={message.id || `msg-${index}`}
+        message={message}
+        // REMOVE isStreaming prop as it's not accepted by MessageBubbleProps
+        // isStreaming={
+        //   isStreaming &&
+        //   index === safeMessages.length - 1 &&
+        //   message.role === "assistant"
+        // }
+        onRegenerate={regenerateMessage} // Pass regenerate as onRegenerate
+        getContextSnapshotForMod={getContextSnapshotForMod}
+        modMessageActions={safeModMessageActions}
+        enableStreamingMarkdown={enableStreamingMarkdown}
+        // level prop is optional in MessageBubble, defaults to 0
+      />
+    ));
+  }, [
+    safeMessages,
+    // isStreaming, // Remove dependency if prop is removed
+    regenerateMessage,
+    getContextSnapshotForMod,
+    safeModMessageActions,
+    enableStreamingMarkdown,
+  ]);
+
   return (
-    <div className={cn("relative flex flex-col", className)}>
+    <div className={cn("relative flex-1 overflow-hidden", className)}>
       <ScrollArea
-        className={cn("flex-grow bg-background", className)}
-        ref={scrollAreaRootRef}
+        className="h-full w-full"
+        ref={scrollAreaRef}
+        onScroll={handleScroll}
       >
-        <div className="py-6 px-4 md:px-6 space-y-6 min-h-full">
-          {isLoadingMessages && (
-            <div className="space-y-4 mt-4">
-              <Skeleton className="h-16 w-3/4 bg-muted" />
-              <Skeleton className="h-20 w-1/2 ml-auto bg-muted" />
-              <Skeleton className="h-16 w-2/3 bg-muted" />
+        <div className="px-4 py-4 md:px-6 md:py-6 space-y-4">
+          {isLoadingMessages ? (
+            <div className="space-y-4">
+              <Skeleton className="h-16 w-3/4" />
+              <Skeleton className="h-16 w-1/2 ml-auto" />
+              <Skeleton className="h-24 w-3/4" />
             </div>
+          ) : safeMessages.length === 0 ? (
+            <EmptyContent />
+          ) : (
+            renderedMessages
           )}
-          {!isLoadingMessages && messages.length === 0 && <EmptyContent />}
-          {!isLoadingMessages &&
-            messages.map((message) => (
-              <div key={message.id} className="animate-fadeIn">
-                <MemoizedMessageBubble
-                  message={message}
-                  onRegenerate={
-                    message.role === "assistant" && !message.isStreaming
-                      ? handleRegenerate
-                      : undefined
-                  }
-                  getContextSnapshotForMod={getContextSnapshotForMod}
-                  modMessageActions={modMessageActions}
-                  enableStreamingMarkdown={enableStreamingMarkdown}
-                  // REMOVED: streamingPortalId={streamingPortalId}
-                />
-                {message.error && (
-                  <div className="flex items-center gap-2 text-xs text-destructive ml-12 -mt-2 mb-2">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>{message.error}</span>
-                  </div>
-                )}
-              </div>
-            ))}
-          <div ref={messagesEndRef} className="h-1" />
+          <div ref={messagesEndRef} />
         </div>
-        <ScrollBar orientation="vertical" />
       </ScrollArea>
-      {showScrollButton && (
-        <div className="absolute bottom-4 right-4 z-10 animate-fadeIn">
-          <Button
-            variant="outline"
-            size="icon"
-            className="rounded-full h-10 w-10 bg-background/80 hover:bg-muted border-border text-foreground backdrop-blur-sm"
-            onClick={() => scrollToBottom("smooth", true)}
-            title="Scroll to bottom"
+      {!isAtBottom && userScrolledUp && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-4 right-4 z-10 bg-primary text-primary-foreground rounded-full p-2 shadow-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-opacity animate-fadeIn"
+          aria-label="Scroll to bottom"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="w-5 h-5"
           >
-            <ArrowDownCircle className="h-5 w-5" />
-          </Button>
-        </div>
+            <path
+              fillRule="evenodd"
+              d="M10 3a.75.75 0 01.75.75v10.532l2.47-2.47a.75.75 0 111.06 1.06l-3.75 3.75a.75.75 0 01-1.06 0l-3.75-3.75a.75.75 0 111.06-1.06l2.47 2.47V3.75A.75.75 0 0110 3z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </button>
       )}
     </div>
   );
