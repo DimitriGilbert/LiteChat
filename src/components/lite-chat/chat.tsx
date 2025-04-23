@@ -1,5 +1,5 @@
 // src/components/lite-chat/chat.tsx
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react"; // Ensure useEffect is imported
 import ChatProviderInner from "@/context/chat-provider-inner";
 import { ChatSide } from "./chat/chat-side";
 import { ChatWrapper } from "./chat/chat-wrapper";
@@ -8,22 +8,45 @@ import { useCoreChatStore } from "@/store/core-chat.store";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useShallow } from "zustand/react/shallow";
 import { useVfsStore } from "@/store/vfs.store";
+// No need to import useSettingsStore here for the effect
 import type {
   LiteChatConfig,
   SidebarItem,
   DbProject,
   DbConversation,
-  // DbProviderConfig,
-  // DbApiKey,
-  // CustomSettingTab,
-  // DbMod,
-  // ModInstance,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { MenuIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ComponentType } from "react";
-// REMOVED: SettingsModalTabProps import
+
+// --- Add useThemeEffect Hook Definition ---
+// This hook applies the theme class to the document root.
+function useThemeEffect(theme: "light" | "dark" | "system") {
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.document?.documentElement) {
+      return;
+    }
+    if (import.meta.env.VITEST) {
+      return;
+    }
+
+    const root = window.document.documentElement;
+    root.classList.remove("light", "dark");
+
+    let effectiveTheme = theme;
+    if (theme === "system") {
+      effectiveTheme =
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+    }
+
+    root.classList.add(effectiveTheme);
+  }, [theme]);
+}
+// --- End useThemeEffect Hook Definition ---
 
 interface LiteChatProps {
   config?: LiteChatConfig;
@@ -103,8 +126,10 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     setEditingItemId,
     onEditComplete,
     dbConversations,
+    dbProjects,
   });
 
+  // Destructure state and actions from the logic hook
   const {
     promptInputValue,
     setPromptInputValue,
@@ -113,6 +138,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     removeAttachedFile,
     clearAttachedFiles,
     selectedVfsPaths,
+    // addSelectedVfsPath,
     removeSelectedVfsPath,
     clearSelectedVfsPaths,
     clearAllInput,
@@ -124,21 +150,28 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     selectedItemId,
     selectedItemType,
     enableSidebar: enableSidebarFromHook,
+    // vfsState,
     providerState,
     settingsState,
     modState,
     clearAllData,
     getAllAvailableModelDefs,
     handleFormSubmit,
+    // handleImageGenerationWrapper,
     stopStreaming,
     regenerateMessage,
     getContextSnapshotForMod,
     activeConversationData,
-    selectedModel,
     selectedProvider,
+    selectedModel,
     getApiKeyForProvider,
   } = logic;
 
+  // --- Apply theme effect using state from logic hook ---
+  useThemeEffect(settingsState.theme);
+  // --- End theme effect application ---
+
+  // Core chat volatile state
   const { messages, isLoadingMessages, isStreaming, error } = useCoreChatStore(
     useShallow((state) => ({
       messages: state.messages,
@@ -148,6 +181,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     })),
   );
 
+  // VFS volatile state
   const { isVfsReady, isVfsEnabledForItem, isVfsLoading, vfsError, vfsKey } =
     useVfsStore(
       useShallow((state) => ({
@@ -159,6 +193,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       })),
     );
 
+  // Derive sidebar items
   const sidebarItems = useMemo(() => {
     const allProjects: DbProject[] = dbProjects || [];
     const allConversations: DbConversation[] = dbConversations || [];
@@ -180,8 +215,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
 
   const enableSidebar = enableSidebarFromHook ?? enableSidebarConfig;
 
-  // REMOVED: settingsModalProps memoization
-
   return (
     <div
       className={cn(
@@ -199,7 +232,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
           selectedItemType={selectedItemType}
           isSettingsModalOpen={settingsState.isSettingsModalOpen}
           setIsSettingsModalOpen={settingsActions.setIsSettingsModalOpen}
-          // Pass individual props needed by SettingsModal via ChatSide
           theme={settingsState.theme}
           setTheme={settingsActions.setTheme}
           streamingRefreshRateMs={settingsState.streamingRefreshRateMs}
@@ -227,7 +259,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
           enableAdvancedSettings={settingsState.enableAdvancedSettings}
           enableApiKeyManagement={providerState.enableApiKeyManagement}
           customSettingsTabs={modState.modSettingsTabs}
-          // Pass other props needed by ChatSide
           onEditComplete={onEditComplete}
           setEditingItemId={setEditingItemId}
           selectItem={sidebarActions.selectItem}
