@@ -1,10 +1,11 @@
 // src/store/provider.store.ts
 import { create } from "zustand";
-import type { DbApiKey, DbProviderConfig, DbProviderType } from "@/lib/types";
+import type { DbApiKey, DbProviderConfig } from "@/lib/types";
 import { toast } from "sonner";
 import { db } from "@/lib/db";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
 import { nanoid } from "nanoid";
+import { DEFAULT_MODELS } from "@/lib/litechat"; // Import DEFAULT_MODELS
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 const LAST_SELECTION_KEY = "lastProviderSelection";
@@ -69,31 +70,7 @@ const saveSelectionToDb = async (
   }
 };
 
-// Helper to get default models (copied from original store)
-const getDefaultModels = (
-  type: DbProviderType,
-): { id: string; name: string }[] => {
-  const defaults: Record<DbProviderType, { id: string; name: string }[]> = {
-    openai: [{ id: "gpt-4o", name: "GPT-4o" }],
-    google: [
-      { id: "gemini-2.5-pro-exp-03-25", name: "Gemini 2.5 Pro exp (Free)" },
-      {
-        id: "gemini-2.0-flash-thinking-exp-01-21",
-        name: "Gemini 2.0 Flash exp (Free)",
-      },
-      { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
-      { id: "emini-2.5-pro-preview-03-25", name: "Gemini 2.5 Pro Preview" },
-      {
-        id: "gemini-2.5-flash-preview-04-17",
-        name: "Gemini 2.5 Flash Preview",
-      },
-    ],
-    openrouter: [],
-    ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }],
-    "openai-compatible": [],
-  };
-  return defaults[type] || [];
-};
+// Helper to get default models (removed - using imported DEFAULT_MODELS)
 
 export const useProviderStore = create<ProviderState & ProviderActions>()(
   (set, get) => ({
@@ -119,7 +96,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           targetProviderConfig.fetchedModels &&
           targetProviderConfig.fetchedModels.length > 0
             ? targetProviderConfig.fetchedModels
-            : getDefaultModels(targetProviderConfig.type); // Use helper
+            : DEFAULT_MODELS[targetProviderConfig.type] || []; // Use imported DEFAULT_MODELS
 
         const enabledModelIds = targetProviderConfig.enabledModels ?? [];
         let potentialModels = availableModels;
@@ -361,7 +338,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
             initialProviderId = loadedProviderId;
             const availableModels =
               providerConfig.fetchedModels ??
-              getDefaultModels(providerConfig.type); // Use helper
+              (DEFAULT_MODELS[providerConfig.type] || []); // Use imported DEFAULT_MODELS
             const modelExists = availableModels.some(
               (m) => m.id === loadedModelId,
             );
@@ -387,7 +364,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           if (providerConfig) {
             const availableModels =
               providerConfig.fetchedModels ??
-              getDefaultModels(providerConfig.type); // Use helper
+              (DEFAULT_MODELS[providerConfig.type] || []); // Use imported DEFAULT_MODELS
             const enabledModelIds = providerConfig.enabledModels ?? [];
             let potentialModels = availableModels;
 

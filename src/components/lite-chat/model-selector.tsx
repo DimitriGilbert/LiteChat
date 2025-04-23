@@ -4,13 +4,9 @@ import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
 import { Combobox } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
-import type {
-  AiProviderConfig,
-  DbProviderConfig,
-  DbProviderType,
-  // AiModelConfig, // Removed - not needed directly
-} from "@/lib/types";
+import type { AiProviderConfig, DbProviderConfig } from "@/lib/types";
 import { useChatStorage } from "@/hooks/use-chat-storage"; // Import storage hook
+import { DEFAULT_MODELS } from "@/lib/litechat"; // Import DEFAULT_MODELS
 
 const ModelSelectorComponent: React.FC = () => {
   // --- Fetch state/actions from store ---
@@ -39,41 +35,11 @@ const ModelSelectorComponent: React.FC = () => {
   const selectedProvider = useMemo((): AiProviderConfig | undefined => {
     if (!selectedDbProviderConfig) return undefined;
     // Use helper function or inline logic to get default models
-    const getDefaultModels = (
-      type: DbProviderType,
-    ): { id: string; name: string }[] => {
-      const defaults: Record<DbProviderType, { id: string; name: string }[]> = {
-        openai: [{ id: "gpt-4o", name: "GPT-4o" }],
-        google: [
-          {
-            id: "gemini-2.5-pro-exp-03-25",
-            name: "Gemini 2.5 Pro exp (Free)",
-          },
-          {
-            id: "gemini-2.0-flash-thinking-exp-01-21",
-            name: "Gemini 2.0 Flash exp (Free)",
-          },
-          { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
-          {
-            id: "emini-2.5-pro-preview-03-25",
-            name: "Gemini 2.5 Pro Preview",
-          },
-          {
-            id: "gemini-2.5-flash-preview-04-17",
-            name: "Gemini 2.5 Flash Preview",
-          },
-        ],
-        openrouter: [],
-        ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }],
-        "openai-compatible": [],
-      };
-      return defaults[type] || [];
-    };
     const allModels =
       selectedDbProviderConfig.fetchedModels &&
       selectedDbProviderConfig.fetchedModels.length > 0
         ? selectedDbProviderConfig.fetchedModels
-        : getDefaultModels(selectedDbProviderConfig.type);
+        : DEFAULT_MODELS[selectedDbProviderConfig.type] || []; // Use imported DEFAULT_MODELS
 
     const enabledIds = new Set(selectedDbProviderConfig.enabledModels ?? []);
     let displayModels =

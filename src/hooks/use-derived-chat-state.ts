@@ -8,7 +8,6 @@ import type {
   SidebarItemType,
   AiProviderConfig,
   AiModelConfig,
-  DbProviderType, // Added
 } from "@/lib/types";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -16,6 +15,7 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createOllama } from "ollama-ai-provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { ensureV1Path } from "@/utils/chat-utils";
+import { DEFAULT_MODELS } from "@/lib/litechat"; // Import DEFAULT_MODELS
 
 interface UseDerivedChatStateProps {
   selectedItemId: string | null;
@@ -36,31 +36,7 @@ interface UseDerivedChatStateReturn {
   getApiKeyForProvider: (providerId: string) => string | undefined;
 }
 
-// Helper to get default models (copied from provider store)
-const getDefaultModels = (
-  type: DbProviderType,
-): { id: string; name: string }[] => {
-  const defaults: Record<DbProviderType, { id: string; name: string }[]> = {
-    openai: [{ id: "gpt-4o", name: "GPT-4o" }],
-    google: [
-      { id: "gemini-2.5-pro-exp-03-25", name: "Gemini 2.5 Pro exp (Free)" },
-      {
-        id: "gemini-2.0-flash-thinking-exp-01-21",
-        name: "Gemini 2.0 Flash exp (Free)",
-      },
-      { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
-      { id: "emini-2.5-pro-preview-03-25", name: "Gemini 2.5 Pro Preview" },
-      {
-        id: "gemini-2.5-flash-preview-04-17",
-        name: "Gemini 2.5 Flash Preview",
-      },
-    ],
-    openrouter: [],
-    ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }],
-    "openai-compatible": [],
-  };
-  return defaults[type] || [];
-};
+// Helper to get default models (removed - using imported DEFAULT_MODELS)
 
 export function useDerivedChatState({
   selectedItemId,
@@ -104,7 +80,7 @@ export function useDerivedChatState({
     const allAvailable =
       config.fetchedModels && config.fetchedModels.length > 0
         ? config.fetchedModels
-        : getDefaultModels(config.type);
+        : DEFAULT_MODELS[config.type] || []; // Use imported DEFAULT_MODELS
     return {
       id: config.id,
       name: config.name,
@@ -123,7 +99,7 @@ export function useDerivedChatState({
     const allAvailable =
       config.fetchedModels && config.fetchedModels.length > 0
         ? config.fetchedModels
-        : getDefaultModels(config.type);
+        : DEFAULT_MODELS[config.type] || []; // Use imported DEFAULT_MODELS
 
     const modelInfo = allAvailable.find((m) => m.id === selectedModelId);
     if (!modelInfo) return undefined;

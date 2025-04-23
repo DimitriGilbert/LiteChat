@@ -1,4 +1,4 @@
-
+// src/context/provider-management-context.tsx
 import React, {
   createContext,
   useContext,
@@ -12,7 +12,6 @@ import type {
   AiModelConfig,
   DbApiKey,
   DbProviderConfig,
-  DbProviderType,
 } from "@/lib/types";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useProviderModelSelection } from "@/hooks/use-provider-model-selection";
@@ -24,31 +23,12 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createOllama } from "ollama-ai-provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
-
+import { DEFAULT_MODELS, requiresApiKey } from "@/lib/litechat";
+import { ensureV1Path } from "@/utils/chat-utils";
 
 const EMPTY_API_KEYS: DbApiKey[] = [];
 const EMPTY_DB_PROVIDER_CONFIGS: DbProviderConfig[] = [];
 const EMPTY_ACTIVE_PROVIDERS: AiProviderConfig[] = [];
-const DEFAULT_MODELS: Record<DbProviderType, { id: string; name: string }[]> = {
-  openai: [{ id: "gpt-4o", name: "GPT-4o" }],
-  google: [
-    { id: "gemini-2.5-pro-exp-03-25", name: "Gemini 2.5 Pro exp (Free)" },
-    {
-      id: "gemini-2.0-flash-thinking-exp-01-21",
-      name: "Gemini 2.0 Flash exp (Free)",
-    },
-    { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
-    { id: "emini-2.5-pro-preview-03-25", name: "Gemini 2.5 Pro Preview" },
-    { id: "gemini-2.5-flash-preview-04-17", name: "Gemini 2.5 Flash Preview" },
-  ],
-  openrouter: [],
-  ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }],
-  "openai-compatible": [],
-};
-const requiresApiKey = (type: DbProviderType | null): boolean => {
-  // OpenAI-Compatible *might* require a key, but it's optional in the SDK call
-  return type === "openai" || type === "openrouter" || type === "google";
-};
 
 const dummyAddApiKey = async (): Promise<string> => {
   console.warn("API Key Management is disabled.");
@@ -103,7 +83,6 @@ interface ProviderManagementProviderProps {
   initialModelId?: string | null;
   enableApiKeyManagement?: boolean;
 }
-
 
 export const ProviderManagementProvider: React.FC<
   ProviderManagementProviderProps
@@ -200,7 +179,7 @@ export const ProviderManagementProvider: React.FC<
       if (config.fetchedModels && config.fetchedModels.length > 0) {
         return config.fetchedModels;
       }
-      return DEFAULT_MODELS[config.type] || [];
+      return DEFAULT_MODELS[config.type] || []; // Use imported DEFAULT_MODELS
     },
     [dbProviderConfigs],
   );
@@ -260,7 +239,7 @@ export const ProviderManagementProvider: React.FC<
             }
             providerInstance = createOpenAICompatible({
               name: config.name ?? "OpenAI-Compatible",
-              baseURL: config.baseURL,
+              baseURL: ensureV1Path(config.baseURL),
               apiKey: currentApiKey,
             });
             break;
@@ -334,7 +313,6 @@ export const ProviderManagementProvider: React.FC<
                 id: modelDef.id,
                 name: modelDef.name,
                 instance: modelInstance,
-
               };
             } catch (modelErr) {
               console.error(
@@ -354,7 +332,6 @@ export const ProviderManagementProvider: React.FC<
             type: config.type,
             models: finalModelsForDropdown,
             allAvailableModels: allAvailableModelDefs, // Keep original list for settings UI
-
           });
         } else {
           console.warn(
@@ -469,7 +446,6 @@ export const ProviderManagementProvider: React.FC<
     </ProviderManagementContext.Provider>
   );
 };
-
 
 export const useProviderManagementContext =
   (): ProviderManagementContextProps => {
