@@ -8,13 +8,21 @@ import {
   CoreMessage,
   ImagePart,
   ReadonlyChatContextSnapshot,
+  // Add necessary types for interaction handlers
+  SidebarItemType,
+  DbConversation,
+  DbProject,
+  DbProviderConfig,
+  MessageContent,
 } from "@/lib/types";
+// Import InputActions type
+import type { InputActions } from "@/store/input.store";
 
 // --- Interface Definitions ---
 export interface UseAiInteractionProps {
   selectedModel: AiModelConfig | undefined;
   selectedProvider: AiProviderConfig | undefined;
-  getApiKeyForProvider: () => string | undefined;
+  getApiKeyForProvider: (providerId: string) => string | undefined;
   /** Refresh rate for UI updates during AI response streaming (in milliseconds). */
   streamingRefreshRateMs: number;
   addMessage: (message: Message) => void;
@@ -25,9 +33,38 @@ export interface UseAiInteractionProps {
     messageData: Omit<DbMessage, "id" | "createdAt"> &
       Partial<Pick<DbMessage, "id" | "createdAt">>,
   ) => Promise<string>;
-  // abortControllerRef removed from props
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   bulkAddMessages: (messages: DbMessage[]) => Promise<unknown>;
+  // --- Add dependencies for interaction handlers ---
+  selectedItemId: string | null;
+  selectedItemType: SidebarItemType | null;
+  dbProviderConfigs: DbProviderConfig[];
+  dbConversations: DbConversation[]; // Needed for context snapshot
+  dbProjects: DbProject[]; // Needed for context snapshot
+  inputActions: Pick<InputActions, "clearAllInput">;
+  // Add core actions needed by interaction handlers
+  handleSubmitCore: (
+    currentConversationId: string,
+    contentToSendToAI: MessageContent,
+    vfsContextPaths?: string[],
+  ) => Promise<void>;
+  handleImageGenerationCore: (
+    currentConversationId: string,
+    prompt: string,
+  ) => Promise<void>;
+  stopStreamingCore: (parentMessageId?: string | null) => void;
+  regenerateMessageCore: (messageId: string) => Promise<void>;
+  startWorkflowCore: (
+    conversationId: string,
+    command: string,
+    getApiKey: (providerId: string) => string | undefined,
+    getProvider: (id: string) => AiProviderConfig | undefined,
+    getModel: (
+      providerId: string,
+      modelId: string,
+    ) => AiModelConfig | undefined,
+    dbProviderConfigs: DbProviderConfig[],
+  ) => Promise<void>;
 }
 
 export interface PerformAiStreamParams {
@@ -50,7 +87,7 @@ export interface PerformImageGenerationParams {
   aspectRatio?: string;
   selectedModel: AiModelConfig | undefined;
   selectedProvider: AiProviderConfig | undefined;
-  getApiKeyForProvider: () => string | undefined;
+  getApiKeyForProvider: (providerId: string) => string | undefined;
   addMessage: (message: Message) => void;
   updateMessage: (id: string, updates: Partial<Message>) => void;
   setIsAiStreaming: (isStreaming: boolean) => void;
@@ -78,7 +115,16 @@ export interface UseAiInteractionReturn {
       | "setIsAiStreaming"
       | "setError"
       | "addDbMessage"
-      | "abortControllerRef" // Removed from Omit
+      | "abortControllerRef"
     >,
   ) => Promise<PerformImageGenerationResult>;
+  // --- Add interaction handlers ---
+  handleFormSubmit: (
+    promptValue: string,
+    files: File[],
+    vfsPaths: string[],
+    context: any,
+  ) => Promise<void>;
+  stopStreaming: (parentMessageId?: string | null) => void;
+  regenerateMessage: (messageId: string) => Promise<void>;
 }

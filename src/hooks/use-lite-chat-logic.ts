@@ -1,4 +1,5 @@
 // src/hooks/use-lite-chat-logic.ts
+// line 1
 
 import { useMemo, useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -34,21 +35,23 @@ import type {
   AiModelConfig,
   DbProviderConfig,
   DbApiKey,
-  DbProject, // Import DbProject
+  DbProject,
 } from "@/lib/types";
 import type { ReadonlyChatContextSnapshot } from "@/mods/api";
 import { db } from "@/lib/db";
+// Import the consolidated hook
 import { useAiInteraction } from "@/hooks/ai-interaction";
 import { useChatStorage } from "./use-chat-storage";
-import { useDerivedChatState } from "./use-derived-chat-state"; // Import new hook
-import { useChatInteractions } from "./use-chat-interactions"; // Import new hook
+import { useDerivedChatState } from "./use-derived-chat-state";
+// Remove the old hook import
+// import { useChatInteractions } from "./use-chat-interactions";
 
 interface UseLiteChatLogicProps {
   editingItemId: string | null;
   setEditingItemId: (id: string | null) => void;
   onEditComplete: (id: string) => void;
   dbConversations: DbConversation[];
-  dbProjects: DbProject[]; // Add dbProjects prop
+  dbProjects: DbProject[];
 }
 
 // Keep the return type the same for external compatibility
@@ -165,14 +168,14 @@ interface UseLiteChatLogicReturn {
     | "modPromptActions"
     | "modMessageActions"
   >;
-  // Interaction Handlers (from useChatInteractions)
+  // Interaction Handlers (now from useAiInteraction)
   handleFormSubmit: (
     prompt: string,
     files: File[],
     vfsPaths: string[],
     context: any,
   ) => Promise<void>;
-  handleImageGenerationWrapper: (prompt: string) => Promise<void>;
+  // handleImageGenerationWrapper: (prompt: string) => Promise<void>; // This is now part of useAiInteraction's return
   stopStreaming: (parentMessageId?: string | null) => void;
   regenerateMessage: (messageId: string) => Promise<void>;
   // Utility Callbacks
@@ -191,7 +194,7 @@ interface UseLiteChatLogicReturn {
 export function useLiteChatLogic(
   props: UseLiteChatLogicProps,
 ): UseLiteChatLogicReturn {
-  const { dbConversations, dbProjects } = props; // Destructure dbProjects
+  const { dbConversations, dbProjects } = props;
   const storage = useChatStorage();
 
   // --- Get Input State/Actions ---
@@ -223,7 +226,7 @@ export function useLiteChatLogic(
     })),
   );
 
-  // --- Select State/Actions from Stores (Keep this aggregation) ---
+  // --- Select State/Actions from Stores ---
   const sidebarActions = useSidebarStore(
     useShallow((state): UseLiteChatLogicReturn["sidebarActions"] => ({
       selectItem: state.selectItem,
@@ -397,16 +400,14 @@ export function useLiteChatLogic(
     })),
   );
 
-  // --- Context Snapshot (Remains Here) ---
+  // --- Context Snapshot ---
   const getContextSnapshotForMod =
     useCallback((): ReadonlyChatContextSnapshot => {
-      // Fetch current state from stores *inside* the callback
       const currentCore = useCoreChatStore.getState();
       const currentSettings = useSettingsStore.getState();
       const currentSidebar = useSidebarStore.getState();
       const currentVfs = useVfsStore.getState();
       const currentProviderState = useProviderStore.getState();
-      // Use the already available db data
       const currentDbConversations = dbConversations;
       const currentDbConfigs = dbProviderConfigs;
       const currentApiKeys = apiKeys;
@@ -450,12 +451,11 @@ export function useLiteChatLogic(
         isVfsEnabledForItem: currentVfs.isVfsEnabledForItem,
         getApiKeyForProvider: getApiKeyFunc,
       });
-    }, [dbConversations, dbProviderConfigs, apiKeys]); // Dependencies are stable or memoized
+    }, [dbConversations, dbProviderConfigs, apiKeys]);
 
   // --- Use Derived State Hook ---
   const {
     activeConversationData,
-    // activeItemData, // Not directly exposed by useLiteChatLogic currently
     selectedProvider,
     selectedModel,
     getApiKeyForProvider,
@@ -463,15 +463,22 @@ export function useLiteChatLogic(
     selectedItemId,
     selectedItemType,
     dbConversations,
-    dbProjects, // Pass dbProjects
+    dbProjects,
     dbProviderConfigs,
     apiKeys,
     selectedProviderId: providerState.selectedProviderId,
     selectedModelId: providerState.selectedModelId,
   });
 
-  // --- Use AI Interaction Hook ---
-  const { performAiStream } = useAiInteraction({
+  // --- Use AI Interaction Hook (Consolidated) ---
+  const {
+    // performAiStream, // Not directly exposed, used by handlers below
+    // performImageGeneration, // Not directly exposed, used by handlers below
+    handleFormSubmit,
+    stopStreaming,
+    regenerateMessage,
+  } = useAiInteraction({
+    // Pass all necessary props
     selectedModel,
     selectedProvider,
     getApiKeyForProvider: useCallback(
@@ -484,30 +491,23 @@ export function useLiteChatLogic(
     setIsAiStreaming: coreChatActions.setIsStreaming,
     setError: coreChatActions.setError,
     addDbMessage: coreChatActions.addDbMessage,
-    getContextSnapshotForMod: getContextSnapshotForMod, // Pass function below
+    getContextSnapshotForMod,
     bulkAddMessages: coreChatActions.bulkAddMessages,
-  });
-
-  // --- Use Chat Interactions Hook ---
-  const {
-    handleFormSubmit,
-    handleImageGenerationWrapper,
-    stopStreaming,
-    regenerateMessage,
-  } = useChatInteractions({
     selectedItemId,
     selectedItemType,
     dbProviderConfigs,
-    coreChatActions,
+    dbConversations,
+    dbProjects,
     inputActions: { clearAllInput },
-    performAiStream,
-    getContextSnapshotForMod: getContextSnapshotForMod, // Pass function below
-    getApiKeyForProvider,
+    handleSubmitCore: coreChatActions.handleSubmitCore,
+    handleImageGenerationCore: coreChatActions.handleImageGenerationCore,
+    stopStreamingCore: coreChatActions.stopStreamingCore,
+    regenerateMessageCore: coreChatActions.regenerateMessageCore,
+    startWorkflowCore: coreChatActions.startWorkflowCore,
   });
 
-  // --- Utility Callbacks (Remain Here) ---
+  // --- Utility Callbacks ---
   const clearAllData = useCallback(async () => {
-    // ... (implementation remains the same)
     if (
       window.confirm(
         `🚨 ARE YOU ABSOLUTELY SURE? 🚨
@@ -552,7 +552,7 @@ Really delete everything? Consider exporting first.`,
     [dbProviderConfigs],
   );
 
-  // --- Return Structure (Matches Original) ---
+  // --- Return Structure ---
   return {
     // Input State/Actions
     promptInputValue,
@@ -582,16 +582,16 @@ Really delete everything? Consider exporting first.`,
     providerState,
     settingsState,
     modState,
-    // Interaction Handlers (from new hook)
+    // Interaction Handlers (from useAiInteraction)
     handleFormSubmit,
-    handleImageGenerationWrapper,
+    // handleImageGenerationWrapper is implicitly handled by handleFormSubmit now
     stopStreaming,
     regenerateMessage,
     // Utility Callbacks
     clearAllData,
     getAllAvailableModelDefs,
     getContextSnapshotForMod,
-    // Derived State (from new hook)
+    // Derived State
     activeConversationData,
     selectedProvider,
     selectedModel,

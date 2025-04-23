@@ -25,6 +25,10 @@ import {
   TextPart as LocalTextPart,
   ToolCallPart as LocalToolCallPartType,
   ToolResultPart as LocalToolResultPartType,
+  // Add types needed by interaction handlers
+  AiModelConfig,
+  AiProviderConfig,
+  // DbProviderConfig,
 } from "@/lib/types";
 import { modEvents, ModEvent } from "@/mods/events";
 
@@ -40,8 +44,19 @@ import { createSdkTools } from "./tool-handler";
 import { performImageGeneration as performImageGenerationFunc } from "./image-generator";
 import { throttle } from "@/lib/throttle";
 import { useCoreChatStore } from "@/store/core-chat.store"; // Import store
+import { useSettingsStore } from "@/store/settings.store"; // Import settings store
+import { db } from "@/lib/db"; // Import db
+import { convertDbMessagesToCoreMessages } from "@/utils/chat-utils"; // Import util
+// Import AI SDK factories
+import { createOpenAI } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createOllama } from "ollama-ai-provider";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { ensureV1Path } from "@/utils/chat-utils";
 
 export function useAiInteraction({
+  // Destructure all props from UseAiInteractionProps
   selectedModel,
   selectedProvider,
   getApiKeyForProvider,
@@ -51,10 +66,20 @@ export function useAiInteraction({
   setIsAiStreaming,
   setError,
   addDbMessage,
-  // abortControllerRef removed from props
   getContextSnapshotForMod,
   bulkAddMessages,
-}: Omit<UseAiInteractionProps, "abortControllerRef">): UseAiInteractionReturn {
+  // selectedItemId,
+  // selectedItemType,
+  dbProviderConfigs,
+  // dbConversations, // Not directly needed, context snapshot handles it
+  // dbProjects, // Not directly needed, context snapshot handles it
+  inputActions,
+  handleSubmitCore,
+  handleImageGenerationCore,
+  stopStreamingCore,
+  regenerateMessageCore,
+  startWorkflowCore,
+}: UseAiInteractionProps): UseAiInteractionReturn {
   // Get the action from the store
   const setAbortController = useCoreChatStore(
     (state) => state.setAbortController,
@@ -87,7 +112,7 @@ export function useAiInteraction({
     }: PerformAiStreamParams) => {
       const currentSelectedModel = selectedModel;
       const currentSelectedProvider = selectedProvider;
-      const apiKey = getApiKeyForProvider();
+      const apiKey = getApiKeyForProvider(currentSelectedProvider?.id || "");
 
       const validationError = validateAiParameters(
         conversationIdToUse,
@@ -423,7 +448,7 @@ export function useAiInteraction({
         | "setIsAiStreaming"
         | "setError"
         | "addDbMessage"
-        | "abortControllerRef" // Removed from Omit
+        | "abortControllerRef"
       >,
     ): Promise<PerformImageGenerationResult> => {
       const currentSelectedModel = selectedModel;
@@ -471,8 +496,355 @@ export function useAiInteraction({
     ],
   );
 
+  // --- Interaction Handlers (Moved from useChatInteractions) ---
+  const handleFormSubmit = useCallback(
+    async (
+      promptValue: string,
+      _files: File[],
+      _vfsPaths: string[],
+      context: {
+        selectedItemId: string | null;
+        contentToSendToAI: MessageContent;
+        vfsContextPaths?: string[];
+      },
+    ) => {
+      if (!context.selectedItemId) {
+        toast.error("Failed to determine active conversation for submission.");
+        setError("Failed to determine active conversation for submission.");
+        return;
+      }
+
+      const conversationId = context.selectedItemId;
+      const commandMatch = promptValue.match(/^\/(\w+)\s*(.*)/s);
+      const isWorkflowCommand =
+        commandMatch &&
+        ["race", "sequence", "parallel"].includes(commandMatch[1]);
+      const isImageCommand = promptValue.startsWith("/imagine ");
+
+      if (isWorkflowCommand) {
+        const fullCommand = promptValue;
+        try {
+          const getProviderFunc = (
+            id: string,
+          ): AiProviderConfig | undefined => {
+            const config = dbProviderConfigs.find((p) => p.id === id);
+            if (!config) return undefined;
+            return {
+              id: config.id,
+              name: config.name,
+              type: config.type,
+              models: [],
+              allAvailableModels: config.fetchedModels || [],
+            };
+          };
+          const getModelFunc = (
+            provId: string,
+            modId: string,
+          ): AiModelConfig | undefined => {
+            const config = dbProviderConfigs.find((p) => p.id === provId);
+            if (!config) return undefined;
+            const modelInfo = (config.fetchedModels ?? []).find(
+              (m: { id: string }) => m.id === modId,
+            );
+            if (!modelInfo) return undefined;
+            let modelInstance: any = null;
+            const currentApiKey = getApiKeyForProvider(config.id);
+            try {
+              switch (config.type) {
+                case "openai":
+                  modelInstance = createOpenAI({ apiKey: currentApiKey })(
+                    modelInfo.id,
+                  );
+                  break;
+                case "google":
+                  modelInstance = createGoogleGenerativeAI({
+                    apiKey: currentApiKey,
+                  })(modelInfo.id);
+                  break;
+                case "openrouter":
+                  modelInstance = createOpenRouter({ apiKey: currentApiKey })(
+                    modelInfo.id,
+                  );
+                  break;
+                case "ollama":
+                  modelInstance = createOllama({
+                    baseURL: config.baseURL ?? undefined,
+                  })(modelInfo.id);
+                  break;
+                case "openai-compatible":
+                  if (!config.baseURL) throw new Error("Base URL required");
+                  modelInstance = createOpenAICompatible({
+                    baseURL: ensureV1Path(config.baseURL),
+                    apiKey: currentApiKey,
+                    name: config.name || "Custom API",
+                  })(modelInfo.id);
+                  break;
+                default:
+                  throw new Error(`Unsupported provider type: ${config.type}`);
+              }
+            } catch (e) {
+              console.error(`Failed to instantiate model ${modelInfo.id}:`, e);
+            }
+            const supportsImageGen = config.type === "openai";
+            const supportsTools = ["openai", "google", "openrouter"].includes(
+              config.type,
+            );
+            return {
+              id: modelInfo.id,
+              name: modelInfo.name,
+              instance: modelInstance,
+              supportsImageGeneration: supportsImageGen,
+              supportsToolCalling: supportsTools,
+            };
+          };
+          await startWorkflowCore(
+            conversationId,
+            fullCommand,
+            getApiKeyForProvider,
+            getProviderFunc,
+            getModelFunc,
+            dbProviderConfigs,
+          );
+          inputActions.clearAllInput();
+        } catch (err) {
+          console.error("Error starting workflow:", err);
+          toast.error(
+            `Error starting workflow: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      } else if (isImageCommand) {
+        try {
+          const imagePrompt = promptValue.substring("/imagine ".length).trim();
+          await handleImageGenerationCore(conversationId, imagePrompt);
+          inputActions.clearAllInput();
+        } catch (err) {
+          console.error("Error in image generation flow:", err);
+          toast.error(
+            `Image generation failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      } else {
+        try {
+          await handleSubmitCore(
+            conversationId,
+            context.contentToSendToAI,
+            context.vfsContextPaths,
+          );
+          const currentMessages = useCoreChatStore.getState().messages;
+          const settings = useSettingsStore.getState();
+          const activeSystemPrompt =
+            getContextSnapshotForMod().activeSystemPrompt;
+          const messagesForApi =
+            convertDbMessagesToCoreMessages(currentMessages);
+
+          await performAiStream({
+            conversationIdToUse: conversationId,
+            messagesToSend: messagesForApi,
+            currentTemperature: settings.temperature,
+            currentMaxTokens: settings.maxTokens,
+            currentTopP: settings.topP,
+            currentTopK: settings.topK,
+            currentPresencePenalty: settings.presencePenalty,
+            currentFrequencyPenalty: settings.frequencyPenalty,
+            systemPromptToUse: activeSystemPrompt,
+          });
+          inputActions.clearAllInput();
+        } catch (err) {
+          console.error("Error during form submission flow:", err);
+        }
+      }
+    },
+    [
+      setError,
+      startWorkflowCore,
+      handleImageGenerationCore,
+      handleSubmitCore,
+      performAiStream,
+      inputActions,
+      dbProviderConfigs,
+      getApiKeyForProvider,
+      getContextSnapshotForMod,
+    ],
+  );
+
+  const stopStreaming = useCallback(
+    (parentMessageId: string | null = null) => {
+      stopStreamingCore(parentMessageId);
+    },
+    [stopStreamingCore],
+  );
+
+  const regenerateMessage = useCallback(
+    async (messageId: string) => {
+      try {
+        const originalMessage = await db.messages.get(messageId);
+        if (!originalMessage) {
+          toast.error("Cannot regenerate: Original message not found in DB.");
+          return;
+        }
+        const conversationId = originalMessage.conversationId;
+
+        await regenerateMessageCore(messageId);
+        const currentMessages = useCoreChatStore.getState().messages;
+
+        if (originalMessage.workflow) {
+          toast.info("Re-running workflow...");
+          const originalCommand = originalMessage.content as string;
+          const getProviderFunc = (
+            id: string,
+          ): AiProviderConfig | undefined => {
+            const config = dbProviderConfigs.find((p) => p.id === id);
+            if (!config) return undefined;
+            return {
+              id: config.id,
+              name: config.name,
+              type: config.type,
+              models: [],
+              allAvailableModels: config.fetchedModels || [],
+            };
+          };
+          const getModelFunc = (
+            provId: string,
+            modId: string,
+          ): AiModelConfig | undefined => {
+            const config = dbProviderConfigs.find((p) => p.id === provId);
+            if (!config) return undefined;
+            const modelInfo = (config.fetchedModels ?? []).find(
+              (m: { id: string }) => m.id === modId,
+            );
+            if (!modelInfo) return undefined;
+            let modelInstance: any = null;
+            const currentApiKey = getApiKeyForProvider(config.id);
+            try {
+              switch (config.type) {
+                case "openai":
+                  modelInstance = createOpenAI({ apiKey: currentApiKey })(
+                    modelInfo.id,
+                  );
+                  break;
+                case "google":
+                  modelInstance = createGoogleGenerativeAI({
+                    apiKey: currentApiKey,
+                  })(modelInfo.id);
+                  break;
+                case "openrouter":
+                  modelInstance = createOpenRouter({ apiKey: currentApiKey })(
+                    modelInfo.id,
+                  );
+                  break;
+                case "ollama":
+                  modelInstance = createOllama({
+                    baseURL: config.baseURL ?? undefined,
+                  })(modelInfo.id);
+                  break;
+                case "openai-compatible":
+                  if (!config.baseURL) throw new Error("Base URL required");
+                  modelInstance = createOpenAICompatible({
+                    baseURL: ensureV1Path(config.baseURL),
+                    apiKey: currentApiKey,
+                    name: config.name || "Custom API",
+                  })(modelInfo.id);
+                  break;
+                default:
+                  throw new Error(`Unsupported provider type: ${config.type}`);
+              }
+            } catch (e) {
+              console.error(`Failed to instantiate model ${modelInfo.id}:`, e);
+            }
+            const supportsImageGen = config.type === "openai";
+            const supportsTools = ["openai", "google", "openrouter"].includes(
+              config.type,
+            );
+            return {
+              id: modelInfo.id,
+              name: modelInfo.name,
+              instance: modelInstance,
+              supportsImageGeneration: supportsImageGen,
+              supportsToolCalling: supportsTools,
+            };
+          };
+          await startWorkflowCore(
+            conversationId,
+            originalCommand,
+            getApiKeyForProvider,
+            getProviderFunc,
+            getModelFunc,
+            dbProviderConfigs,
+          );
+        } else if (
+          originalMessage.role === "user" &&
+          typeof originalMessage.content === "string" &&
+          originalMessage.content.startsWith("/imagine ")
+        ) {
+          toast.warning(
+            "Regenerating user image prompts not typical. Regenerate the assistant response instead.",
+          );
+        } else if (originalMessage.role === "assistant") {
+          let precedingUserMessage: Message | undefined;
+          const msgIndex = currentMessages.findIndex(
+            (m: Message) => m.createdAt! < originalMessage.createdAt!,
+          );
+          for (let i = msgIndex; i >= 0; i--) {
+            if (currentMessages[i]?.role === "user") {
+              precedingUserMessage = currentMessages[i];
+              break;
+            }
+          }
+
+          if (
+            precedingUserMessage &&
+            typeof precedingUserMessage.content === "string" &&
+            precedingUserMessage.content.startsWith("/imagine ")
+          ) {
+            const imagePrompt = precedingUserMessage.content
+              .substring("/imagine ".length)
+              .trim();
+            await handleImageGenerationCore(conversationId, imagePrompt);
+          } else {
+            const historyForApi =
+              convertDbMessagesToCoreMessages(currentMessages);
+            const settings = useSettingsStore.getState();
+            const activeSystemPrompt =
+              getContextSnapshotForMod().activeSystemPrompt;
+            await performAiStream({
+              conversationIdToUse: conversationId,
+              messagesToSend: historyForApi,
+              currentTemperature: settings.temperature,
+              currentMaxTokens: settings.maxTokens,
+              currentTopP: settings.topP,
+              currentTopK: settings.topK,
+              currentPresencePenalty: settings.presencePenalty,
+              currentFrequencyPenalty: settings.frequencyPenalty,
+              systemPromptToUse: activeSystemPrompt,
+            });
+          }
+        } else {
+          toast.error("Cannot regenerate this message type.");
+        }
+      } catch (err) {
+        console.error("Error during regeneration flow:", err);
+        toast.error(
+          `Regeneration failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    },
+    [
+      regenerateMessageCore,
+      startWorkflowCore,
+      handleImageGenerationCore,
+      performAiStream,
+      dbProviderConfigs,
+      getApiKeyForProvider,
+      getContextSnapshotForMod,
+    ],
+  );
+
   return {
     performAiStream,
     performImageGeneration: performImageGenerationCallback,
+    // Add interaction handlers
+    handleFormSubmit,
+    stopStreaming,
+    regenerateMessage,
   };
 }
