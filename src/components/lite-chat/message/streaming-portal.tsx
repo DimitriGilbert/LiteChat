@@ -3,7 +3,6 @@ import React, { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { cn } from "@/lib/utils";
 import { markdownComponents } from "./message-content-utils";
 import { useCoreChatStore } from "@/store/core-chat.store";
 import { useShallow } from "zustand/react/shallow";
