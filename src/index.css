@@ -1,11 +1,12 @@
 /* src/index.css */
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "highlight.js/styles/github-dark.css";
+@import "highlight.js/styles/github-dark.css"; /* Keep for syntax colors */
 
 @custom-variant dark (&:is(.dark *));
 @tailwind utilities;
 
+/* Base Layers (Keep as provided) */
 @layer base {
     :root {
         --background: 0 0% 100%;
@@ -28,6 +29,7 @@
         --input: 200 30% 85%;
         --ring: 160 48% 45%;
         --radius: 0.5rem;
+        --code-bg: 200 30% 15%; /* Light theme code background */
     }
 
     .dark {
@@ -50,6 +52,7 @@
         --border: 200 30% 30%;
         --input: 200 30% 30%;
         --ring: 160 48% 45%;
+        --code-bg: 200 15% 10%; /* Dark theme code background - darker than card */
     }
 }
 
@@ -135,6 +138,7 @@
     --sidebar-accent-foreground: oklch(0.2 0.05 230);
     --sidebar-border: oklch(0.8 0.03 230);
     --sidebar-ring: oklch(0.7 0.2 140);
+    --code-bg: oklch(0.15 0.05 230); /* Light theme code background */
 }
 
 .dark {
@@ -170,6 +174,9 @@
     --sidebar-accent-foreground: oklch(0.15 0.05 230);
     --sidebar-border: oklch(0.3 0.05 230);
     --sidebar-ring: oklch(0.7 0.2 140);
+    --code-bg: oklch(
+        0.1 0.02 230
+    ); /* Dark theme code background - darker than card */
 }
 
 @layer base {
@@ -181,26 +188,26 @@
     }
 }
 
-/* --- NEW/MODIFIED STYLES --- */
+/* --- STYLES FOR MARKDOWN CONTENT --- */
 @layer utilities {
     .markdown-content {
         @apply text-base leading-relaxed; /* Base styles for markdown */
     }
 
     .markdown-content h1 {
-        @apply text-3xl font-bold my-4;
+        @apply text-3xl font-bold my-4 text-foreground;
     }
 
     .markdown-content h2 {
-        @apply text-2xl font-semibold my-3;
+        @apply text-2xl font-semibold my-3 text-foreground;
     }
 
     .markdown-content h3 {
-        @apply text-xl font-semibold my-2;
+        @apply text-xl font-semibold my-2 text-foreground;
     }
 
     .markdown-content p {
-        @apply my-4; /* Adjust spacing as needed */
+        @apply my-4 text-foreground; /* Ensure text is using theme foreground color */
     }
 
     /* Inline code */
@@ -208,17 +215,63 @@
         @apply bg-muted text-muted-foreground px-1.5 py-0.5 rounded text-[0.9em] font-mono;
     }
 
-    /* Code blocks */
-    .markdown-content pre {
-        /* Use muted background, add padding, border, radius */
-        @apply bg-muted/60 dark:bg-muted/30 border border-border rounded-md p-4 my-4 overflow-x-auto;
+    /* Remove default hljs background/color */
+    .hljs {
+        background: none !important;
+        color: inherit !important;
     }
 
-    /* Code within pre - reset some styles and let hljs theme handle colors */
-    .markdown-content pre code {
-        @apply bg-transparent p-0 border-none text-inherit font-mono text-sm leading-relaxed;
-        /* The hljs theme CSS (imported above) will style the tokens inside */
+    /* Style the <pre> tag within markdown content */
+    .markdown-content pre {
+        @apply border border-border rounded-md overflow-x-auto my-4;
+        background-color: hsl(var(--code-bg)); /* Apply code background to pre */
+        padding: 1rem; /* Add padding to pre */
     }
+
+    /* Style the <code> tag within the <pre> tag */
+    .markdown-content pre > code {
+        @apply font-mono text-sm leading-relaxed block;
+        background-color: transparent !important; /* Code tag itself is transparent */
+        color: hsl(var(--foreground)); /* Use theme foreground color */
+        padding: 0 !important; /* Remove padding from code tag */
+    }
+
+    /* Ensure hljs syntax colors are applied */
+    .markdown-content pre > code.hljs .hljs-keyword,
+    .markdown-content pre > code.hljs .hljs-selector-tag,
+    .markdown-content pre > code.hljs .hljs-subst {
+        color: #cc99cd; /* Purple */
+    }
+
+    .markdown-content pre > code.hljs .hljs-string,
+    .markdown-content pre > code.hljs .hljs-regexp,
+    .markdown-content pre > code.hljs .hljs-attribute,
+    .markdown-content pre > code.hljs .hljs-addition {
+        color: #7ec699; /* Green */
+    }
+
+    .markdown-content pre > code.hljs .hljs-title,
+    .markdown-content pre > code.hljs .hljs-type,
+    .markdown-content pre > code.hljs .hljs-symbol,
+    .markdown-content pre > code.hljs .hljs-bullet,
+    .markdown-content pre > code.hljs .hljs-built_in,
+    .markdown-content pre > code.hljs .hljs-builtin-name,
+    .markdown-content pre > code.hljs .hljs-addition {
+        color: #6c9ef8; /* Blue */
+    }
+
+    .markdown-content pre > code.hljs .hljs-comment,
+    .markdown-content pre > code.hljs .hljs-quote,
+    .markdown-content pre > code.hljs .hljs-meta,
+    .markdown-content pre > code.hljs .hljs-deletion {
+        color: #7f848e; /* Gray */
+    }
+
+    .markdown-content pre > code.hljs .hljs-number,
+    .markdown-content pre > code.hljs .hljs-literal {
+        color: #f08d49; /* Orange */
+    }
+    /* Add other hljs selectors as needed */
 
     .markdown-content blockquote {
         @apply border-l-4 border-border pl-4 italic text-muted-foreground my-4;
@@ -251,12 +304,100 @@
         @apply text-primary underline hover:text-primary/80;
     }
 
-    /* Ensure hljs theme background doesn't override Tailwind */
-    .markdown-content.hljs {
-        @apply bg-transparent; /* Override hljs theme background if needed */
+    /* Custom styling for CodeBlock component container */
+    .code-block-container {
+        @apply relative my-4 rounded-md border border-border overflow-hidden;
+        background-color: hsl(var(--code-bg)); /* Apply code background */
     }
-    .markdown-content pre.hljs {
-        /* Let the pre style above handle background */
-        @apply bg-transparent p-0 border-none;
+
+    /* Styling for the header within CodeBlock */
+    .code-block-header {
+        @apply flex items-center justify-between px-3 py-1.5 border-b border-border;
+        /* Use a slightly different background for the header if desired */
+        background-color: hsl(var(--muted) / 0.6);
+        dark:background-color: hsl(var(--muted) / 0.4);
     }
+
+    /* Styling for the code area within CodeBlock */
+    .code-block-content {
+        @apply p-4 overflow-x-auto;
+        color: hsl(var(--foreground)); /* Ensure text color matches theme */
+    }
+
+    /* Ensure hljs colors apply within CodeBlock */
+    .code-block-content .hljs-keyword,
+    .code-block-content .hljs-selector-tag,
+    .code-block-content .hljs-subst {
+        color: #cc99cd; /* Purple */
+    }
+    .code-block-content .hljs-string,
+    .code-block-content .hljs-regexp,
+    .code-block-content .hljs-attribute,
+    .code-block-content .hljs-addition {
+        color: #7ec699; /* Green */
+    }
+    .code-block-content .hljs-title,
+    .code-block-content .hljs-type,
+    .code-block-content .hljs-symbol,
+    .code-block-content .hljs-bullet,
+    .code-block-content .hljs-built_in,
+    .code-block-content .hljs-builtin-name,
+    .code-block-content .hljs-addition {
+        color: #6c9ef8; /* Blue */
+    }
+    .code-block-content .hljs-comment,
+    .code-block-content .hljs-quote,
+    .code-block-content .hljs-meta,
+    .code-block-content .hljs-deletion {
+        color: #7f848e; /* Gray */
+    }
+    .code-block-content .hljs-number,
+    .code-block-content .hljs-literal {
+        color: #f08d49; /* Orange */
+    }
+    /* Add other hljs selectors as needed */
+}
+
+/* Custom scrollbar styles (Keep as provided) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted/30 rounded-full;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/50 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/70;
+}
+
+/* Animations (Keep as provided) */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+@keyframes slideInFromTop {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-slideInFromTop {
+  animation: slideInFromTop 0.3s ease-out forwards;
 }
