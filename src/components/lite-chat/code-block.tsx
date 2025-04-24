@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+// src/components/lite-chat/code-block.tsx
+import React, { useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { CopyIcon, ChevronDown, ChevronUp } from "lucide-react";
+import hljs from "highlight.js";
+import { CopyIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -12,64 +12,51 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export const CodeBlock: React.FC<{
-  inline?: boolean;
+interface CodeBlockProps {
+  /** The code content as a string */
+  code: string;
+  /** Optional language hint (e.g., 'javascript', 'python') */
+  language?: string;
+  /** Optional additional CSS classes for the container */
   className?: string;
-  children?: React.ReactNode;
-}> = React.memo(({ inline, className, children, ...props }) => {
-  const [isFolded, setIsFolded] = useState(false);
-  const match = /language-(\w+)/.exec(className || "");
-  const language = match ? match[1] : "text";
-  const codeContent = String(children).replace(/\n$/, "");
+}
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(codeContent);
-    toast.success("Code copied to clipboard");
-  };
+export const CodeBlock: React.FC<CodeBlockProps> = React.memo(
+  ({ code, language, className }) => {
+    const codeContent = String(code || "").trim(); // Ensure it's a string and trim
 
-  if (inline) {
+    const highlightedHtml = useMemo(() => {
+      try {
+        if (language && hljs.getLanguage(language)) {
+          return hljs.highlight(codeContent, {
+            language: language,
+            ignoreIllegals: true,
+          }).value;
+        }
+        // Fallback to auto-detection if language is not provided or invalid
+        return hljs.highlightAuto(codeContent).value;
+      } catch (error) {
+        console.error("Highlighting failed:", error);
+        // Fallback to plain text if highlighting fails
+        return codeContent.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      }
+    }, [codeContent, language]);
+
+    const handleCopy = () => {
+      navigator.clipboard.writeText(codeContent);
+      toast.success("Code copied to clipboard");
+    };
+
+    const displayLanguage = language || "code";
+
     return (
-      <code
-        className={cn(
-          "font-mono text-sm px-1 py-0.5 rounded-sm bg-muted",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-      </code>
-    );
-  }
-
-  return (
-    <div className="relative group/codeblock my-3 rounded-md border border-border bg-card dark:bg-card transition-all max-w-full">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30 dark:bg-muted/40 border-b border-border">
-        <span className="text-xs font-semibold text-muted-foreground select-none">
-          {language}
-        </span>
-        <div className="flex items-center gap-1">
-          <TooltipProvider delayDuration={100}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  onClick={() => setIsFolded(!isFolded)}
-                  aria-label={isFolded ? "Expand code" : "Collapse code"}
-                >
-                  {isFolded ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronUp className="h-4 w-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p>{isFolded ? "Expand code" : "Collapse code"}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+      // Use the dedicated container class for styling
+      <div className={cn("code-block-container", className)}>
+        {/* Header with language and copy button */}
+        <div className="code-block-header">
+          <span className="text-xs font-semibold text-muted-foreground select-none">
+            {displayLanguage}
+          </span>
           <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -89,54 +76,16 @@ export const CodeBlock: React.FC<{
             </Tooltip>
           </TooltipProvider>
         </div>
+
+        {/* Rendered HTML from highlight.js */}
+        <pre className="code-block-content m-0 p-0 border-0">
+          <code
+            className={cn("p-4 hljs", language ? `language-${language}` : "")}
+            dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+          />
+        </pre>
       </div>
-      {!isFolded && (
-        <div className="max-w-full overflow-x-auto">
-          <SyntaxHighlighter
-            style={vscDarkPlus}
-            language={language}
-            PreTag="div"
-            className={cn("!py-3 !px-0 !m-0 !bg-transparent")}
-            customStyle={{
-              maxWidth: "100%",
-              width: "100%",
-              overflowX: "auto",
-            }}
-            codeTagProps={{
-              style: {
-                fontFamily: "var(--font-mono)",
-                fontSize: "0.875rem",
-                lineHeight: "1.25rem",
-                display: "block",
-                paddingLeft: "1rem",
-                paddingRight: "1rem",
-                maxWidth: "100%",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                overflowWrap: "break-word",
-              },
-            }}
-            showLineNumbers
-            lineNumberStyle={{
-              minWidth: "2.25em",
-              paddingRight: "1em",
-              textAlign: "right",
-              color: "#858585",
-              userSelect: "none",
-              position: "sticky",
-              left: 0,
-              background: "inherit",
-              zIndex: 1,
-            }}
-            wrapLines={true}
-            wrapLongLines={true}
-            {...props}
-          >
-            {codeContent}
-          </SyntaxHighlighter>
-        </div>
-      )}
-    </div>
-  );
-});
+    );
+  },
+);
 CodeBlock.displayName = "CodeBlock";

@@ -1,16 +1,18 @@
-
+// src/components/lite-chat/message/message-content-renderer.tsx
 import React from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+// REMOVED: Remarkable, hljs, ReactDOMServer, CodeBlock imports
+import { sharedMdParser } from "@/lib/markdown-parser"; // Import the shared instance
+import { cn } from "@/lib/utils";
 
 import type { Message, ImagePart } from "@/lib/types";
 import { FileContextBlock } from "./file-context-block";
-import { markdownComponents } from "./message-content-utils";
 
 interface MessageContentRendererProps {
   message: Message;
   enableStreamingMarkdown: boolean;
 }
+
+// REMOVED: Remarkable instance creation and fence rule override here
 
 const decodeXml = (encoded: string): string => {
   if (typeof document === "undefined" || !encoded?.includes("&")) {
@@ -87,12 +89,12 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
       return { fileBlocks, contentParts: finalContentParts };
     };
 
-    const renderContent = () => {
+    const renderStaticContent = () => {
       if (typeof finalContent === "string") {
         const { fileBlocks, contentParts } =
           extractFileContextBlocks(finalContent);
 
-        return contentParts.map((part, index) => {
+        return contentParts.map((part: string | number, index: number) => {
           if (typeof part === "number") {
             const block = fileBlocks[part];
             if (!block) return null;
@@ -110,14 +112,14 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
               />
             );
           } else {
+            // Use the imported shared parser instance
             return (
-              <ReactMarkdown
+              <div
                 key={`text-part-${index}`}
-                remarkPlugins={[remarkGfm]}
-                components={markdownComponents}
-              >
-                {part}
-              </ReactMarkdown>
+                dangerouslySetInnerHTML={{
+                  __html: sharedMdParser.render(part),
+                }}
+              />
             );
           }
         });
@@ -127,35 +129,37 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
             const { fileBlocks, contentParts } = extractFileContextBlocks(
               part.text,
             );
-            return contentParts.map((subPart, subIndex) => {
-              if (typeof subPart === "number") {
-                const block = fileBlocks[subPart];
-                if (!block) return null;
-                return (
-                  <FileContextBlock
-                    key={`file-block-${index}-${subIndex}`}
-                    type={block.attributes.type as "vfs" | "attached"}
-                    pathOrName={
-                      block.attributes.path || block.attributes.name || ""
-                    }
-                    content={block.content}
-                    extension={block.attributes.extension || ""}
-                    error={block.attributes.error}
-                    status={block.attributes.status}
-                  />
-                );
-              } else {
-                return (
-                  <ReactMarkdown
-                    key={`text-part-${index}-${subIndex}`}
-                    remarkPlugins={[remarkGfm]}
-                    components={markdownComponents}
-                  >
-                    {subPart}
-                  </ReactMarkdown>
-                );
-              }
-            });
+            return contentParts.map(
+              (subPart: string | number, subIndex: number) => {
+                if (typeof subPart === "number") {
+                  const block = fileBlocks[subPart];
+                  if (!block) return null;
+                  return (
+                    <FileContextBlock
+                      key={`file-block-${index}-${subIndex}`}
+                      type={block.attributes.type as "vfs" | "attached"}
+                      pathOrName={
+                        block.attributes.path || block.attributes.name || ""
+                      }
+                      content={block.content}
+                      extension={block.attributes.extension || ""}
+                      error={block.attributes.error}
+                      status={block.attributes.status}
+                    />
+                  );
+                } else {
+                  // Use the imported shared parser instance
+                  return (
+                    <div
+                      key={`text-part-${index}-${subIndex}`}
+                      dangerouslySetInnerHTML={{
+                        __html: sharedMdParser.render(subPart),
+                      }}
+                    />
+                  );
+                }
+              },
+            );
           } else if (part.type === "image") {
             return (
               <img
@@ -166,7 +170,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                     ? "Generated image"
                     : "Uploaded content"
                 }
-                className="my-2 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg h-auto rounded border border-gray-600"
+                className="my-2 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg h-auto rounded border border-border"
               />
             );
           } else if (part.type === "tool-call") {
@@ -187,10 +191,15 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
             return (
               <div
                 key={index}
-                className={`my-2 p-3 rounded border border-dashed ${part.isError ? "border-red-700 bg-red-900/20 text-red-300" : "border-gray-700 bg-gray-800/30 text-gray-400"} text-xs`}
+                className={cn(
+                  "my-2 p-3 rounded border border-dashed text-xs",
+                  part.isError
+                    ? "border-destructive bg-destructive/10 text-destructive"
+                    : "border-border bg-muted/30 text-muted-foreground",
+                )}
               >
                 <p className="font-semibold">Tool Result ({part.toolName}):</p>
-                <pre className="mt-1 text-gray-300 overflow-x-auto">
+                <pre className="mt-1 text-foreground/80 overflow-x-auto">
                   {typeof part.result === "string"
                     ? part.result
                     : JSON.stringify(part.result, null, 2)}
@@ -210,15 +219,16 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
       finalContent.length > 0 &&
       finalContent.every((part): part is ImagePart => part.type === "image");
 
-    // Remove the wrapping div with prose classes
     return (
       <>
         {isPurelyImages ? (
           <div className="grid grid-cols-2 gap-2 not-prose max-w-full overflow-hidden">
-            {renderContent()}
+            {renderStaticContent()}
           </div>
         ) : (
-          <div className="max-w-full overflow-x-auto">{renderContent()}</div>
+          <div className="max-w-full overflow-x-auto markdown-content">
+            {renderStaticContent()}
+          </div>
         )}
       </>
     );

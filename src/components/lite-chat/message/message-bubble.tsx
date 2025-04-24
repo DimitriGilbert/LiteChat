@@ -1,3 +1,4 @@
+// src/components/lite-chat/message/message-bubble.tsx
 import React, { useState } from "react";
 import type { Message, CustomMessageAction } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -13,7 +14,7 @@ interface MessageBubbleProps {
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   modMessageActions: CustomMessageAction[];
   level?: number;
-  enableStreamingMarkdown: boolean;
+  enableStreamingMarkdown: boolean; // Prop already exists
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -23,7 +24,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   getContextSnapshotForMod,
   modMessageActions,
   level = 0,
-  enableStreamingMarkdown,
+  enableStreamingMarkdown, // Prop already exists
 }) => {
   const initialFoldState = message.role === "system" ? true : false;
   const [isMessageFolded, setIsMessageFolded] = useState(initialFoldState);
@@ -37,10 +38,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
   const indentationClass = `ml-${level * 4}`;
-
-  // Generate a unique ID for the portal target within this bubble
-  // This ID is now only used internally by MessageBody and MessageContentRenderer
-  const portalTargetId = `streaming-portal-${message.id}`;
 
   return (
     <div
@@ -63,16 +60,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         isFolded={isMessageFolded}
         onToggleFold={toggleMessageFold}
       />
-      {/* Pass level down to MessageBody */}
       <MessageBody
         message={message}
         isFolded={isMessageFolded}
-        // level={level}
-        onRegenerate={onRegenerate} // Pass regenerate down if needed by children
-        getContextSnapshotForMod={getContextSnapshotForMod} // Pass context snapshot down
-        modMessageActions={modMessageActions} // Pass actions down
-        enableStreamingMarkdown={enableStreamingMarkdown}
-        portalTargetId={portalTargetId} // Pass the unique ID for the portal target
+        onRegenerate={onRegenerate}
+        getContextSnapshotForMod={getContextSnapshotForMod}
+        modMessageActions={modMessageActions}
+        enableStreamingMarkdown={enableStreamingMarkdown} // Pass prop down
       />
       <MessageActionsContainer
         message={message}
@@ -84,6 +78,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   );
 };
 
+// Memoization logic remains the same
 const messagesAreEqual = (
   prevProps: MessageBubbleProps,
   nextProps: MessageBubbleProps,
@@ -99,13 +94,15 @@ const messagesAreEqual = (
   if (
     prevMsg.id !== nextMsg.id ||
     prevMsg.role !== nextMsg.role ||
-    prevMsg.isStreaming !== nextMsg.isStreaming ||
     prevMsg.error !== nextMsg.error
   ) {
     return false;
   }
 
-  // Compare children array (simple reference check first, then deep compare if needed)
+  if (prevMsg.isStreaming !== nextMsg.isStreaming) {
+    return false;
+  }
+
   if (prevMsg.children !== nextMsg.children) {
     if (
       !prevMsg.children ||
@@ -114,24 +111,15 @@ const messagesAreEqual = (
     ) {
       return false;
     }
-    // Basic deep compare (can be improved if necessary)
     if (JSON.stringify(prevMsg.children) !== JSON.stringify(nextMsg.children)) {
       return false;
     }
   }
 
-  // If the streaming status differs, the messages are different
-  // (This handles the start and end of streaming)
-  if (prevMsg.isStreaming !== nextMsg.isStreaming) {
-    return false;
-  }
-
-  // If NEITHER message is streaming, compare the final content and metadata
   if (!prevMsg.isStreaming && !nextMsg.isStreaming) {
     if (JSON.stringify(prevMsg.content) !== JSON.stringify(nextMsg.content)) {
       return false;
     }
-    // Compare other non-streaming fields only when not streaming
     if (
       JSON.stringify(prevMsg.tool_calls) !==
         JSON.stringify(nextMsg.tool_calls) ||
@@ -147,22 +135,16 @@ const messagesAreEqual = (
       return false;
     }
   }
-  // If messages ARE streaming, we don't compare content here.
-  // The visual update happens via the portal and activeStreamContent state.
-  // The change in isStreaming flag handles the start/end comparison.
 
-  // Compare function references
   if (
     prevProps.getContextSnapshotForMod !== nextProps.getContextSnapshotForMod
   ) {
     return false;
   }
-
   if (prevProps.modMessageActions !== nextProps.modMessageActions) {
     return false;
   }
 
-  // If all checks pass, the messages are considered equal for memoization purposes
   return true;
 };
 

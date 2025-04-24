@@ -44,7 +44,7 @@ export interface ProviderActions {
     currentApiKeys: DbApiKey[], // Pass current keys
   ) => Promise<void>;
   setProviderFetchStatus: (providerId: string, status: FetchStatus) => void;
-  loadInitialSelection: (currentConfigs: DbProviderConfig[]) => Promise<void>; // Pass current configs
+  loadInitialSelection: (currentConfigs: DbProviderConfig[]) => Promise<void>;
   getApiKeyForProvider: (
     providerId: string,
     currentApiKeys: DbApiKey[], // Pass current keys
@@ -72,7 +72,6 @@ const getDefaultModelIdForProvider = (
 ): string | null => {
   if (!providerConfig) return null;
 
-  // Use fetched models if available, otherwise defaults
   const availableModels =
     providerConfig.fetchedModels && providerConfig.fetchedModels.length > 0
       ? providerConfig.fetchedModels
@@ -397,15 +396,12 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
         const lastSelectionState = await db.appState.get(LAST_SELECTION_KEY);
         let providerToSelectId: string | null = null;
         let modelToSelectId: string | null = null;
-        // Filter the passed configs to only consider enabled ones
         const enabledConfigs = currentConfigs.filter((c) => c.isEnabled);
 
         // 1. Try loading saved selection
         if (lastSelectionState?.value) {
           const savedProviderId = lastSelectionState.value.providerId ?? null;
           const savedModelId = lastSelectionState.value.modelId ?? null;
-
-          // Check if saved provider exists *and is enabled*
           const savedProviderConfig = enabledConfigs.find(
             (p) => p.id === savedProviderId,
           );
@@ -431,10 +427,6 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
 
         // 2. If no valid saved selection, find the first enabled provider
         if (!providerToSelectId && enabledConfigs.length > 0) {
-          // Sort enabled configs consistently if needed, e.g., by name or creation date
-          enabledConfigs.sort(
-            (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
-          );
           const firstEnabledProvider = enabledConfigs[0];
           providerToSelectId = firstEnabledProvider.id;
           modelToSelectId = getDefaultModelIdForProvider(firstEnabledProvider);

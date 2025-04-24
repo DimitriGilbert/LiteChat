@@ -1,4 +1,4 @@
-
+// src/components/lite-chat/message/message-body.tsx
 import React, { useState } from "react";
 import type { Message, CustomMessageAction } from "@/lib/types";
 import { MessageRoleLabel } from "./message-role-label";
@@ -11,6 +11,7 @@ import type { ReadonlyChatContextSnapshot } from "@/mods/api";
 import { cn } from "@/lib/utils";
 import { StreamingPortal } from "./streaming-portal";
 import { useCoreChatStore } from "@/store/core-chat.store";
+import { useShallow } from "zustand/react/shallow";
 
 interface MessageBodyProps {
   message: Message;
@@ -18,8 +19,7 @@ interface MessageBodyProps {
   onRegenerate?: (messageId: string) => void;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   modMessageActions: CustomMessageAction[];
-  enableStreamingMarkdown: boolean;
-  portalTargetId: string;
+  enableStreamingMarkdown: boolean; // Prop received
 }
 
 export const MessageBody: React.FC<MessageBodyProps> = React.memo(
@@ -29,11 +29,13 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
     onRegenerate,
     getContextSnapshotForMod,
     modMessageActions,
-    enableStreamingMarkdown,
-    portalTargetId,
+    enableStreamingMarkdown, // Prop received
   }) => {
     const [isChildrenCollapsed, setIsChildrenCollapsed] = useState(true);
-    const activeStreamId = useCoreChatStore((state) => state.activeStreamId);
+    const activeStreamId = useCoreChatStore(
+      useShallow((state) => state.activeStreamId),
+    );
+    const isThisMessageStreaming = activeStreamId === message.id;
 
     const toggleChildrenCollapse = () => {
       setIsChildrenCollapsed((prev) => !prev);
@@ -53,19 +55,14 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
       return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
     })();
 
-    const isThisMessageStreaming = activeStreamId === message.id;
-
     return (
-      // Keep min-w-0 here
       <div className="flex-grow min-w-0 pr-12">
         {!isFolded && <MessageRoleLabel role={message.role} />}
 
         {!isFolded ? (
           <>
             <div
-              id={portalTargetId}
               className={cn(
-                "message-content-area",
                 "prose prose-sm prose-invert max-w-none",
                 "prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1",
                 "prose-headings:mt-4 prose-headings:mb-2",
@@ -76,20 +73,18 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
                 "overflow-x-auto w-full",
               )}
             >
-              {!isThisMessageStreaming && (
+              {isThisMessageStreaming ? (
+                <StreamingPortal
+                  messageId={message.id}
+                  enableStreamingMarkdown={enableStreamingMarkdown} // Pass prop down
+                />
+              ) : (
                 <MessageContentRenderer
                   message={message}
                   enableStreamingMarkdown={enableStreamingMarkdown}
                 />
               )}
             </div>
-
-            {isThisMessageStreaming && (
-              <StreamingPortal
-                messageId={message.id}
-                portalTargetId={portalTargetId}
-              />
-            )}
 
             <MessageMetadataDisplay message={message} />
             <MessageErrorDisplay error={message.error} />

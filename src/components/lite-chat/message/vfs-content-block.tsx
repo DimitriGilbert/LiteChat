@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight, FileTextIcon } from "lucide-react";
@@ -15,6 +14,7 @@ export const VfsContentBlock: React.FC<VfsContentBlockProps> = ({
   path,
   extension,
   className,
+  content,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -47,6 +47,7 @@ export const VfsContentBlock: React.FC<VfsContentBlockProps> = ({
         <div className="text-sm">
           <div className="bg-gray-900 text-gray-100 rounded-b-md">
             <CodeBlock
+              code={content}
               className={extension ? `language-${extension}` : "language-text"}
             />
           </div>
