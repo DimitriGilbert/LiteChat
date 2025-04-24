@@ -1,17 +1,41 @@
-
-import React, { useEffect, useState, useRef } from "react";
+// src/components/lite-chat/streaming-portal.tsx
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { markdownComponents } from "./message-content-utils";
+import { Remarkable } from "remarkable";
+import hljs from "highlight.js";
+
 import { useCoreChatStore } from "@/store/core-chat.store";
 import { useShallow } from "zustand/react/shallow";
-import { useSettingsStore } from "@/store/settings.store";
 
 interface StreamingPortalProps {
   messageId: string;
   portalTargetId: string;
 }
+
+// Explicitly type the mdStream instance
+const mdStream: Remarkable = new Remarkable({
+  html: true,
+  breaks: true,
+  typographer: true,
+  // Add explicit return type ': string' to the highlight function
+  highlight: function (str: string, lang: string): string {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return hljs.highlight(str, { language: lang, ignoreIllegals: true })
+          .value;
+      } catch (__) {
+        /* ignore */
+      }
+    }
+    try {
+      return hljs.highlightAuto(str).value;
+    } catch (__) {
+      /* ignore */
+    }
+    // Use the static Remarkable.utils
+    return Remarkable.utils.escapeHtml(str);
+  },
+});
 
 export const StreamingPortal: React.FC<StreamingPortalProps> = ({
   messageId,
@@ -30,53 +54,56 @@ export const StreamingPortal: React.FC<StreamingPortalProps> = ({
     })),
   );
 
-  const { enableMarkdown, streamingRefreshRateMs } = useSettingsStore(
-    useShallow((state) => ({
-      enableMarkdown: state.enableStreamingMarkdown,
-      streamingRefreshRateMs: state.streamingRefreshRateMs,
-    })),
-  );
-
   useEffect(() => {
     const node = document.getElementById(portalTargetId);
-    setPortalNode(node);
-
-    if (!node) {
-      console.warn(
-        `Streaming portal target element with ID "${portalTargetId}" not found.`,
-      );
-    }
-    if (activeStreamId === messageId) {
-      setDisplayedContent("");
-      accumulatedContentRef.current = "";
-      lastRenderTimeRef.current = 0;
-    }
-
+    if (node) setPortalNode(node);
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
+      if (node) {
+        node.innerHTML = "";
       }
+      setPortalNode(null);
     };
-  }, [portalTargetId, messageId, activeStreamId]);
+  }, [portalTargetId]);
 
   useEffect(() => {
-    if (activeStreamId !== messageId || !portalNode) {
+    if (activeStreamId !== messageId) {
+      if (displayedContent !== "") {
+        setDisplayedContent("");
+        accumulatedContentRef.current = "";
+      }
       return;
     }
 
-    accumulatedContentRef.current = activeStreamContent;
-
-    const updateDisplay = () => {
-      const now = Date.now();
-      if (now - lastRenderTimeRef.current >= streamingRefreshRateMs) {
-        setDisplayedContent(accumulatedContentRef.current);
-        lastRenderTimeRef.current = now;
+    if (!activeStreamContent) {
+      if (displayedContent !== "") {
+        setDisplayedContent("");
+        accumulatedContentRef.current = "";
       }
-      animationFrameRef.current = requestAnimationFrame(updateDisplay);
+      return;
+    }
+
+    const renderStep = () => {
+      const now = performance.now();
+      if (
+        now - lastRenderTimeRef.current > 33 ||
+        accumulatedContentRef.current === activeStreamContent
+      ) {
+        if (displayedContent !== accumulatedContentRef.current) {
+          setDisplayedContent(accumulatedContentRef.current);
+        }
+        lastRenderTimeRef.current = now;
+        animationFrameRef.current = null;
+      } else {
+        if (!animationFrameRef.current) {
+          animationFrameRef.current = requestAnimationFrame(renderStep);
+        }
+      }
     };
 
+    accumulatedContentRef.current = activeStreamContent;
+
     if (!animationFrameRef.current) {
-      animationFrameRef.current = requestAnimationFrame(updateDisplay);
+      animationFrameRef.current = requestAnimationFrame(renderStep);
     }
 
     return () => {
@@ -84,43 +111,21 @@ export const StreamingPortal: React.FC<StreamingPortalProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
-      if (activeStreamId !== messageId) {
-        setDisplayedContent(accumulatedContentRef.current);
-      }
     };
-  }, [
-    activeStreamContent,
-    streamingRefreshRateMs,
-    activeStreamId,
-    messageId,
+  }, [activeStreamContent, activeStreamId, messageId, displayedContent]);
+
+  const renderedHTML = useMemo(
+    () => mdStream.render(displayedContent),
+    [displayedContent],
+  );
+
+  if (!portalNode) return null;
+
+  return createPortal(
+    <div
+      className="markdown-content hljs"
+      dangerouslySetInnerHTML={{ __html: renderedHTML }}
+    />,
     portalNode,
-  ]);
-
-  useEffect(() => {
-    if (activeStreamId !== messageId && portalNode) {
-      setDisplayedContent(accumulatedContentRef.current);
-    }
-  }, [activeStreamId, messageId, portalNode]);
-
-  if (portalNode && activeStreamId === messageId) {
-    return createPortal(
-      <>
-        {enableMarkdown ? (
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={markdownComponents}
-          >
-            {displayedContent}
-          </ReactMarkdown>
-        ) : (
-          <pre className="font-sans text-sm">
-            <code>{displayedContent}</code>
-          </pre>
-        )}
-        <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-white align-baseline"></span>
-      </>,
-      portalNode,
-    );
-  }
-  return null;
+  );
 };

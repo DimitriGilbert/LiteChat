@@ -1,12 +1,39 @@
-
+// src/components/lite-chat/message/message-content-renderer.tsx
 import React from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Remarkable } from "remarkable";
+import hljs from "highlight.js";
 
 import type { Message, ImagePart } from "@/lib/types";
 import { FileContextBlock } from "./file-context-block";
-import { markdownComponents } from "./message-content-utils";
 
+// Explicitly type the md instance
+const md: Remarkable = new Remarkable({
+  html: true,
+  breaks: true,
+  typographer: true,
+  // Add explicit return type ': string' to the highlight function
+  highlight: function (str: string, lang: string): string {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return hljs.highlight(str, { language: lang, ignoreIllegals: true })
+          .value;
+      } catch (__) {
+        /* ignore */
+      }
+    }
+
+    try {
+      return hljs.highlightAuto(str).value;
+    } catch (__) {
+      /* ignore */
+    }
+
+    // Use the static Remarkable.utils
+    return Remarkable.utils.escapeHtml(str);
+  },
+});
+
+// ... rest of the MessageContentRenderer component remains the same
 interface MessageContentRendererProps {
   message: Message;
   enableStreamingMarkdown: boolean;
@@ -92,7 +119,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
         const { fileBlocks, contentParts } =
           extractFileContextBlocks(finalContent);
 
-        return contentParts.map((part, index) => {
+        return contentParts.map((part: string | number, index: number) => {
           if (typeof part === "number") {
             const block = fileBlocks[part];
             if (!block) return null;
@@ -110,53 +137,56 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
               />
             );
           } else {
+            // Apply markdown-content for general styling, hljs for code blocks
             return (
-              <ReactMarkdown
+              <div
                 key={`text-part-${index}`}
-                remarkPlugins={[remarkGfm]}
-                components={markdownComponents}
-              >
-                {part}
-              </ReactMarkdown>
+                dangerouslySetInnerHTML={{ __html: md.render(part) }}
+                className="markdown-content hljs"
+              />
             );
           }
         });
       } else if (Array.isArray(finalContent)) {
-        return finalContent.map((part, index) => {
+        // Process array of ContentPart
+        // @ts-expect-error fuck off
+        return finalContent.map((part: TextPart | ImagePart, index: number) => {
           if (part.type === "text") {
             const { fileBlocks, contentParts } = extractFileContextBlocks(
               part.text,
             );
-            return contentParts.map((subPart, subIndex) => {
-              if (typeof subPart === "number") {
-                const block = fileBlocks[subPart];
-                if (!block) return null;
-                return (
-                  <FileContextBlock
-                    key={`file-block-${index}-${subIndex}`}
-                    type={block.attributes.type as "vfs" | "attached"}
-                    pathOrName={
-                      block.attributes.path || block.attributes.name || ""
-                    }
-                    content={block.content}
-                    extension={block.attributes.extension || ""}
-                    error={block.attributes.error}
-                    status={block.attributes.status}
-                  />
-                );
-              } else {
-                return (
-                  <ReactMarkdown
-                    key={`text-part-${index}-${subIndex}`}
-                    remarkPlugins={[remarkGfm]}
-                    components={markdownComponents}
-                  >
-                    {subPart}
-                  </ReactMarkdown>
-                );
-              }
-            });
+            return contentParts.map(
+              (subPart: string | number, subIndex: number) => {
+                if (typeof subPart === "number") {
+                  const block = fileBlocks[subPart];
+                  if (!block) return null;
+                  return (
+                    <FileContextBlock
+                      key={`file-block-${index}-${subIndex}`}
+                      type={block.attributes.type as "vfs" | "attached"}
+                      pathOrName={
+                        block.attributes.path || block.attributes.name || ""
+                      }
+                      content={block.content}
+                      extension={block.attributes.extension || ""}
+                      error={block.attributes.error}
+                      status={block.attributes.status}
+                    />
+                  );
+                } else {
+                  // Apply markdown-content for general styling, hljs for code blocks
+                  return (
+                    <div
+                      key={`text-part-${index}-${subIndex}`}
+                      dangerouslySetInnerHTML={{ __html: md.render(subPart) }}
+                      className="markdown-content hljs"
+                    />
+                  );
+                }
+              },
+            );
           } else if (part.type === "image") {
+            // Images don't need markdown styling or hljs
             return (
               <img
                 key={index}
@@ -166,14 +196,15 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                     ? "Generated image"
                     : "Uploaded content"
                 }
-                className="my-2 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg h-auto rounded border border-gray-600"
+                className="my-2 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg h-auto rounded border border-border" // Use theme border
               />
             );
           } else if (part.type === "tool-call") {
+            // Tool calls don't need markdown styling or hljs
             return (
               <div
                 key={index}
-                className="my-2 p-3 rounded border border-dashed border-blue-700 bg-blue-900/20 text-xs text-blue-300"
+                className="my-2 p-3 rounded border border-dashed border-blue-700 bg-blue-900/20 text-xs text-blue-300" // Consider theming these colors
               >
                 <p className="font-semibold">
                   Tool Call: <code>{part.toolName}</code>
@@ -184,13 +215,20 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
               </div>
             );
           } else if (part.type === "tool-result") {
+            // Tool results don't need markdown styling or hljs
             return (
               <div
                 key={index}
-                className={`my-2 p-3 rounded border border-dashed ${part.isError ? "border-red-700 bg-red-900/20 text-red-300" : "border-gray-700 bg-gray-800/30 text-gray-400"} text-xs`}
+                className={`my-2 p-3 rounded border border-dashed ${
+                  part.isError
+                    ? "border-destructive bg-destructive/10 text-destructive" // Use theme colors
+                    : "border-border bg-muted/30 text-muted-foreground" // Use theme colors
+                } text-xs`}
               >
                 <p className="font-semibold">Tool Result ({part.toolName}):</p>
-                <pre className="mt-1 text-gray-300 overflow-x-auto">
+                <pre className="mt-1 text-foreground/80 overflow-x-auto">
+                  {" "}
+                  {/* Use theme color */}
                   {typeof part.result === "string"
                     ? part.result
                     : JSON.stringify(part.result, null, 2)}
@@ -210,7 +248,6 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
       finalContent.length > 0 &&
       finalContent.every((part): part is ImagePart => part.type === "image");
 
-    // Remove the wrapping div with prose classes
     return (
       <>
         {isPurelyImages ? (
@@ -218,7 +255,11 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
             {renderContent()}
           </div>
         ) : (
-          <div className="max-w-full overflow-x-auto">{renderContent()}</div>
+          // Apply markdown-content and hljs classes to the main container
+          // This helps ensure consistent styling and background from the theme if needed
+          <div className="max-w-full overflow-x-auto markdown-content hljs">
+            {renderContent()}
+          </div>
         )}
       </>
     );

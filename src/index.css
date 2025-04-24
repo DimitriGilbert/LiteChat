@@ -1,5 +1,7 @@
+/* src/index.css */
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "highlight.js/styles/github-dark.css";
 
 @custom-variant dark (&:is(.dark *));
 @tailwind utilities;
@@ -176,5 +178,85 @@
     }
     body {
         @apply bg-background text-foreground;
+    }
+}
+
+/* --- NEW/MODIFIED STYLES --- */
+@layer utilities {
+    .markdown-content {
+        @apply text-base leading-relaxed; /* Base styles for markdown */
+    }
+
+    .markdown-content h1 {
+        @apply text-3xl font-bold my-4;
+    }
+
+    .markdown-content h2 {
+        @apply text-2xl font-semibold my-3;
+    }
+
+    .markdown-content h3 {
+        @apply text-xl font-semibold my-2;
+    }
+
+    .markdown-content p {
+        @apply my-4; /* Adjust spacing as needed */
+    }
+
+    /* Inline code */
+    .markdown-content code:not(pre > code) {
+        @apply bg-muted text-muted-foreground px-1.5 py-0.5 rounded text-[0.9em] font-mono;
+    }
+
+    /* Code blocks */
+    .markdown-content pre {
+        /* Use muted background, add padding, border, radius */
+        @apply bg-muted/60 dark:bg-muted/30 border border-border rounded-md p-4 my-4 overflow-x-auto;
+    }
+
+    /* Code within pre - reset some styles and let hljs theme handle colors */
+    .markdown-content pre code {
+        @apply bg-transparent p-0 border-none text-inherit font-mono text-sm leading-relaxed;
+        /* The hljs theme CSS (imported above) will style the tokens inside */
+    }
+
+    .markdown-content blockquote {
+        @apply border-l-4 border-border pl-4 italic text-muted-foreground my-4;
+    }
+
+    .markdown-content ul {
+        @apply list-disc list-outside pl-6 my-4;
+    }
+    .markdown-content ol {
+        @apply list-decimal list-outside pl-6 my-4;
+    }
+    .markdown-content li {
+        @apply my-1;
+    }
+
+    .markdown-content table {
+        @apply border-collapse w-full my-4 text-sm;
+    }
+
+    .markdown-content th,
+    .markdown-content td {
+        @apply border border-border px-3 py-2 text-left;
+    }
+
+    .markdown-content th {
+        @apply bg-muted/80 dark:bg-muted/50 font-semibold;
+    }
+
+    .markdown-content a {
+        @apply text-primary underline hover:text-primary/80;
+    }
+
+    /* Ensure hljs theme background doesn't override Tailwind */
+    .markdown-content.hljs {
+        @apply bg-transparent; /* Override hljs theme background if needed */
+    }
+    .markdown-content pre.hljs {
+        /* Let the pre style above handle background */
+        @apply bg-transparent p-0 border-none;
     }
 }
