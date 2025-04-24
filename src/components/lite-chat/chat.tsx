@@ -4,7 +4,7 @@ import ChatProviderInner from "@/context/chat-provider-inner";
 import { ChatSide } from "./chat/chat-side";
 import { ChatWrapper } from "./chat/chat-wrapper";
 import { useLiteChatLogic } from "@/hooks/use-lite-chat-logic";
-import { useChatStorage } from "@/hooks/use-chat-storage";
+// Removed useChatStorage import as it's likely used within useLiteChatLogic now
 import { useShallow } from "zustand/react/shallow";
 import { useSidebarStore } from "@/store/sidebar.store";
 import { useSettingsStore } from "@/store/settings.store";
@@ -15,6 +15,7 @@ import { MenuIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ComponentType } from "react";
 
+// LiteChatProps interface remains the same
 interface LiteChatProps {
   config?: LiteChatConfig;
   className?: string;
@@ -28,6 +29,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
   SideComponent = ChatSide,
   WrapperComponent = ChatWrapper,
 }) => {
+  // State management for sidebar and editing item remains here
   const { defaultSidebarOpen = true } = config;
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -45,6 +47,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
     setEditingItemId(id);
   }, []);
 
+  // Theme effect remains here
   const theme = useSettingsStore((state) => state.theme);
   useEffect(() => {
     if (typeof window === "undefined" || !window.document?.documentElement) {
@@ -75,9 +78,9 @@ export const LiteChat: React.FC<LiteChatProps> = ({
         enableSidebarConfig={config.enableSidebar ?? true}
         SideComponent={SideComponent}
         WrapperComponent={WrapperComponent}
-        editingItemId={editingItemId}
-        setEditingItemId={handleSetEditingItemId}
-        onEditComplete={handleEditComplete}
+        editingItemId={editingItemId} // Pass editing state down
+        setEditingItemId={handleSetEditingItemId} // Pass setter down
+        onEditComplete={handleEditComplete} // Pass completion handler down
         customPromptActions={config.customPromptActions}
         customMessageActions={config.customMessageActions}
         customSettingsTabs={config.customSettingsTabs}
@@ -86,6 +89,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
   );
 };
 
+// LiteChatInnerProps interface remains the same
 interface LiteChatInnerProps {
   className?: string;
   sidebarOpen: boolean;
@@ -115,9 +119,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
   customMessageActions = [],
   customSettingsTabs = [],
 }) => {
-  // Fetch DB data needed by useLiteChatLogic
-  const storage = useChatStorage();
-
+  // Fetch necessary state from stores
   const { enableSidebar: enableSidebarStore } = useSidebarStore(
     useShallow((state) => ({ enableSidebar: state.enableSidebar })),
   );
@@ -129,15 +131,8 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
     })),
   );
 
-  // --- Call useLiteChatLogic ---
-  // Pass only necessary props and DB data
-  const logic = useLiteChatLogic({
-    editingItemId,
-    setEditingItemId,
-    onEditComplete,
-    dbConversations: storage.conversations || [],
-    dbProjects: storage.projects || [],
-  });
+  // --- Call useLiteChatLogic WITHOUT arguments ---
+  const logic = useLiteChatLogic(); // FIX: Removed arguments
 
   // Destructure only the handlers needed by WrapperComponent
   const {
@@ -178,6 +173,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       {showSidebar && sidebarOpen && (
         <SideComponent
           className={cn("w-72 flex-shrink-0", "hidden md:flex")}
+          // Pass editing state down to ChatSide
           editingItemId={editingItemId}
           onEditComplete={onEditComplete}
           setEditingItemId={setEditingItemId}

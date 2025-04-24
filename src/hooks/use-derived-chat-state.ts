@@ -41,63 +41,79 @@ export function useDerivedChatState({
   selectedProviderId,
   selectedModelId,
 }: UseDerivedChatStateProps): UseDerivedChatStateReturn {
-  // Derivations for active item remain the same
+  // --- Active Item Derivation ---
   const activeItemData = useMemo(() => {
     if (!selectedItemId || !selectedItemType) return null;
     if (selectedItemType === "conversation") {
       return dbConversations.find((c) => c.id === selectedItemId) || null;
     } else {
+      // Assumes selectedItemType === 'project'
       return dbProjects.find((p) => p.id === selectedItemId) || null;
     }
   }, [selectedItemId, selectedItemType, dbConversations, dbProjects]);
 
   const activeConversationData = useMemo(() => {
+    // Ensure activeItemData is derived first and is of the correct type
     return selectedItemType === "conversation"
       ? (activeItemData as DbConversation | null)
       : null;
   }, [selectedItemType, activeItemData]);
+
+  // --- API Key Getter ---
+  // Memoize the function itself based on its dependencies
   const getApiKeyForProvider = useMemo(() => {
+    // The returned function closes over the dbProviderConfigs and apiKeys
     return (providerId: string): string | undefined => {
       const config = dbProviderConfigs.find((p) => p.id === providerId);
       if (!config || !config.apiKeyId) return undefined;
       return apiKeys.find((k) => k.id === config.apiKeyId)?.value;
     };
-  }, [dbProviderConfigs, apiKeys]);
+  }, [dbProviderConfigs, apiKeys]); // Dependencies for the getter function
 
-  // Selected Provider derivation uses passed props
+  // --- Selected Provider Derivation ---
   const selectedProvider = useMemo((): AiProviderConfig | undefined => {
     const config = dbProviderConfigs.find((p) => p.id === selectedProviderId);
     if (!config) return undefined;
+
+    // Determine all available models (fetched or default)
     const allAvailable =
       config.fetchedModels && config.fetchedModels.length > 0
         ? config.fetchedModels
         : DEFAULT_MODELS[config.type] || [];
+
+    // Return the AiProviderConfig structure
+    // Note: 'models' field is intentionally empty here as it's populated
+    // by useProviderModelSelection or similar logic based on enabled/sorted models.
+    // This hook primarily provides the base provider info and all potential models.
     return {
       id: config.id,
       name: config.name,
       type: config.type,
-      models: [],
+      models: [], // This will be populated by selection logic elsewhere
       allAvailableModels: allAvailable,
     };
-  }, [selectedProviderId, dbProviderConfigs]);
+  }, [selectedProviderId, dbProviderConfigs]); // Dependencies for selectedProvider
 
-  // Selected Model derivation uses passed props and local getter
+  // --- Selected Model Derivation ---
   const selectedModel = useMemo((): AiModelConfig | undefined => {
     if (!selectedProviderId || !selectedModelId) return undefined;
+
     const config = dbProviderConfigs.find((p) => p.id === selectedProviderId);
     if (!config) return undefined;
 
+    // Get the API key using the memoized getter
     const currentApiKey = getApiKeyForProvider(config.id);
 
-    // Use the utility function to create the AiModelConfig
+    // Use the utility function to create the AiModelConfig, which handles instantiation
     return createAiModelConfig(config, selectedModelId, currentApiKey);
   }, [
     selectedProviderId,
     selectedModelId,
     dbProviderConfigs,
-    getApiKeyForProvider,
-  ]);
+    getApiKeyForProvider, // Dependency on the memoized getter function
+  ]); // Dependencies for selectedModel
 
+  // Return all derived values
   return {
     activeConversationData,
     activeItemData,

@@ -1,4 +1,4 @@
-
+// src/hooks/ai-interaction/error-handler.ts
 import { toast } from "sonner";
 import type { AiModelConfig, AiProviderConfig } from "@/lib/types";
 
@@ -6,6 +6,7 @@ import { requiresApiKey as checkRequiresApiKey } from "@/lib/litechat";
 
 /**
  * Validates essential parameters before making an AI call.
+ * @returns An Error object if validation fails, otherwise null.
  */
 export function validateAiParameters(
   conversationId: string | null,
@@ -53,32 +54,40 @@ export function validateAiParameters(
     return new Error(msg);
   }
 
+  // All checks passed
   return null;
 }
 
 /**
  * Handles errors during the AI stream execution.
- * Returns the error object and potentially partial content.
+ * Logs the error, updates the UI state, and returns the error object
+ * along with any partial content accumulated before the error.
+ *
+ * @param err The error object caught during streaming.
+ * @param setError Function to update the global error state.
+ * @param accumulatedContent The content accumulated before the error occurred.
+ * @returns A tuple containing the Error object and the accumulated content string.
  */
 export function handleStreamError(
   err: unknown,
   setError: (error: string | null) => void,
+  accumulatedContent: string,
 ): [Error, string] {
   let error: Error;
-  const finalContent = "";
+  const finalContent = accumulatedContent; // Return accumulated content on error
 
   if (err instanceof Error && err.name === "AbortError") {
     error = new Error("Stream aborted by user.");
-    // finalContent = contentRef.current;
+    // Don't set global error for user abort, just info toast
     toast.info("Stream stopped.");
   } else if (err instanceof Error) {
     error = err;
     const errorMsg = `Streaming Error: ${error.message}`;
-    setError(errorMsg);
+    setError(errorMsg); // Set global error state
     toast.error(errorMsg);
   } else {
     error = new Error("An unknown streaming error occurred.");
-    setError(error.message);
+    setError(error.message); // Set global error state
     toast.error(error.message);
   }
   console.error("Stream Error Details:", error);

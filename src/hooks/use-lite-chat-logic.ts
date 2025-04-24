@@ -12,7 +12,7 @@ import type {
   DbConversation,
   AiProviderConfig,
   AiModelConfig,
-  DbProject,
+  MessageContent,
 } from "@/lib/types";
 import type { ReadonlyChatContextSnapshot } from "@/mods/api";
 
@@ -20,47 +20,47 @@ import { useAiInteraction } from "@/hooks/ai-interaction";
 import { useChatStorage } from "./use-chat-storage";
 import { useDerivedChatState } from "./use-derived-chat-state";
 
-interface UseLiteChatLogicProps {
-  editingItemId: string | null;
-  setEditingItemId: (id: string | null) => void;
-  onEditComplete: (id: string) => void;
-  dbConversations: DbConversation[];
-  dbProjects: DbProject[];
-}
-
 interface UseLiteChatLogicReturn {
   handleFormSubmit: (
     prompt: string,
     files: File[],
     vfsPaths: string[],
-    context: any,
+    context: {
+      selectedItemId: string | null;
+      contentToSendToAI: MessageContent;
+      vfsContextPaths?: string[];
+    },
   ) => Promise<void>;
   stopStreaming: (parentMessageId?: string | null) => void;
   regenerateMessage: (messageId: string) => Promise<void>;
   clearAllData: () => Promise<void>;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
+  // Expose derived state needed by UI components
   activeConversationData: DbConversation | null;
   selectedProvider: AiProviderConfig | undefined;
   selectedModel: AiModelConfig | undefined;
   getApiKeyForProvider: (providerId: string) => string | undefined;
-  // Pass through complex actions if needed
+  // Expose specific actions needed by UI components (example)
   sidebarActions: Pick<SidebarActions, "renameItem">;
   settingsActions: Pick<SettingsActions, "setSearchTerm">;
   providerActions: Pick<ProviderActions, "updateDbProviderConfig">;
 }
 
-export function useLiteChatLogic(
-  props: UseLiteChatLogicProps,
-): UseLiteChatLogicReturn {
-  const { dbConversations, dbProjects } = props;
+// Removed props from function signature as they are fetched from stores/storage
+export function useLiteChatLogic(): UseLiteChatLogicReturn {
+  // --- Fetch live data from storage ---
   const storage = useChatStorage();
+  const dbConversations = storage.conversations || [];
+  const dbProjects = storage.projects || [];
+  const dbProviderConfigs = storage.providerConfigs || [];
+  const apiKeys = storage.apiKeys || [];
 
-  // --- Get necessary state/actions from stores ---
+  // --- Get necessary state/actions from stores using useShallow ---
   const { selectedItemId, selectedItemType, renameItem } = useSidebarStore(
     useShallow((state) => ({
       selectedItemId: state.selectedItemId,
       selectedItemType: state.selectedItemType,
-      renameItem: state.renameItem,
+      renameItem: state.renameItem, // Keep if needed by UI
     })),
   );
   const {
@@ -96,7 +96,7 @@ export function useLiteChatLogic(
   const {
     selectedProviderId,
     selectedModelId,
-    updateDbProviderConfig,
+    updateDbProviderConfig, // Keep if needed by UI
     getApiKeyForProvider: getApiKeyFromStore,
   } = useProviderStore(
     useShallow((state) => ({
@@ -109,21 +109,26 @@ export function useLiteChatLogic(
   const { streamingRefreshRateMs, setSearchTerm } = useSettingsStore(
     useShallow((state) => ({
       streamingRefreshRateMs: state.streamingRefreshRateMs,
-      setSearchTerm: state.setSearchTerm,
+      setSearchTerm: state.setSearchTerm, // Keep if needed by UI
     })),
   );
-  const { providerConfigs: dbProviderConfigs, apiKeys } = useChatStorage();
+
+  // --- Create Context Snapshot Function ---
+  // This function captures the current state from various stores when called.
   const getContextSnapshotForMod =
     useCallback((): ReadonlyChatContextSnapshot => {
+      // Get current state snapshots from each store
       const coreState = useCoreChatStore.getState();
       const sidebarState = useSidebarStore.getState();
       const providerState = useProviderStore.getState();
       const settingsState = useSettingsStore.getState();
       const vfsState = useVfsStore.getState();
+      // Use live data fetched at the start of the hook
       const currentDbConversations = dbConversations;
-      const currentApiKeys = apiKeys || [];
-      const currentDbProviderConfigs = dbProviderConfigs || [];
+      const currentApiKeys = apiKeys;
+      const currentDbProviderConfigs = dbProviderConfigs;
 
+      // Derive activeSystemPrompt based on current state
       let activeSystemPrompt: string | null = null;
       if (settingsState.enableAdvancedSettings) {
         if (sidebarState.selectedItemType === "conversation") {
@@ -134,6 +139,7 @@ export function useLiteChatLogic(
             activeSystemPrompt = convo.systemPrompt;
           }
         }
+        // Fallback to global prompt if conversation-specific one isn't set
         if (
           !activeSystemPrompt &&
           settingsState.globalSystemPrompt &&
@@ -143,7 +149,8 @@ export function useLiteChatLogic(
         }
       }
 
-      // Use the store's getter, passing the live data
+      // Create the API key getter function for the snapshot
+      // It uses the live data captured at the start of the hook
       const getApiKeyFunc = (providerId: string) =>
         providerState.getApiKeyForProvider(
           providerId,
@@ -151,6 +158,7 @@ export function useLiteChatLogic(
           currentDbProviderConfigs,
         );
 
+      // Construct and freeze the snapshot object
       return Object.freeze({
         selectedItemId: sidebarState.selectedItemId,
         selectedItemType: sidebarState.selectedItemType,
@@ -164,8 +172,9 @@ export function useLiteChatLogic(
         theme: settingsState.theme,
         isVfsEnabledForItem: vfsState.isVfsEnabledForItem,
         getApiKeyForProvider: getApiKeyFunc,
+        // Add other necessary read-only properties here
       });
-    }, [dbConversations, apiKeys, dbProviderConfigs]);
+    }, [dbConversations, apiKeys, dbProviderConfigs]); // Dependencies ensure the snapshot function is stable unless underlying data sources change reference
 
   // --- Use Derived State Hook (pass live data) ---
   const { activeConversationData, selectedProvider, selectedModel } =
@@ -174,83 +183,95 @@ export function useLiteChatLogic(
       selectedItemType,
       dbConversations,
       dbProjects,
-      dbProviderConfigs: dbProviderConfigs || [],
-      apiKeys: apiKeys || [],
+      dbProviderConfigs,
+      apiKeys,
       selectedProviderId,
       selectedModelId,
     });
+
+  // --- API Key Getter for AI Interaction ---
   // This function needs to capture the live apiKeys and dbProviderConfigs
+  // It's passed to useAiInteraction to ensure it uses fresh data when called.
   const getApiKeyForInteraction = useCallback(
     (providerId: string): string | undefined => {
-      const currentApiKeys = storage.apiKeys || [];
-      const currentDbConfigs = storage.providerConfigs || [];
-      return getApiKeyFromStore(providerId, currentApiKeys, currentDbConfigs);
+      // Use the store's getter, passing the live data captured by useChatStorage
+      return getApiKeyFromStore(providerId, apiKeys, dbProviderConfigs);
     },
-    [storage.apiKeys, storage.providerConfigs, getApiKeyFromStore],
+    [apiKeys, dbProviderConfigs, getApiKeyFromStore], // Depend on live data refs
   );
+
+  // --- Initialize AI Interaction Hook ---
   const { handleFormSubmit, stopStreaming, regenerateMessage } =
     useAiInteraction({
-      selectedModel,
-      selectedProvider,
-      getApiKeyForProvider: getApiKeyForInteraction,
-      streamingRefreshRateMs,
-      addMessage,
-      updateMessage,
-      setIsAiStreaming: setIsStreaming,
-      setError,
-      addDbMessage,
-      getContextSnapshotForMod,
-      bulkAddMessages,
-      selectedItemId,
-      selectedItemType,
-      dbProviderConfigs: dbProviderConfigs || [],
-      dbConversations,
-      dbProjects,
-      inputActions: { clearAllInput },
+      selectedModel, // Pass derived state
+      selectedProvider, // Pass derived state
+      getApiKeyForProvider: getApiKeyForInteraction, // Pass the specific getter
+      streamingRefreshRateMs, // Pass setting from store
+      addMessage, // Pass action from store
+      updateMessage, // Pass action from store
+      setIsAiStreaming: setIsStreaming, // Pass action from store
+      setError, // Pass action from store
+      addDbMessage, // Pass action from store
+      getContextSnapshotForMod, // Pass snapshot function
+      bulkAddMessages, // Pass action from store
+      selectedItemId, // Pass current selection state
+      selectedItemType, // Pass current selection state
+      dbProviderConfigs, // Pass live data
+      dbConversations, // Pass live data
+      dbProjects, // Pass live data
+      inputActions: { clearAllInput }, // Pass specific input action
+      // Pass core handlers from CoreChatStore
       handleSubmitCore,
       handleImageGenerationCore,
       stopStreamingCore,
       regenerateMessageCore,
       startWorkflowCore,
     });
+
+  // --- Data Management Action ---
   const clearAllData = useCallback(async () => {
+    // Confirmation dialogs
     if (
-      window.confirm(
+      !window.confirm(
         `🚨 ARE YOU ABSOLUTELY SURE? 🚨
 
-This will permanently delete ALL conversations, messages, and stored API keys from your browser. This action cannot be undone.`,
-      )
-    ) {
-      if (
-        window.confirm(
-          `SECOND CONFIRMATION:
+This will permanently delete ALL conversations, messages, projects, API keys, provider configs, and mods from your browser. This action cannot be undone.`,
+      ) ||
+      !window.confirm(
+        `SECOND CONFIRMATION:
 
 Really delete everything? Consider exporting first.`,
-        )
-      ) {
-        try {
-          await storage.clearAllData();
-          toast.success("All local data cleared. Reloading the application...");
-          setTimeout(() => window.location.reload(), 1500);
-        } catch (error: unknown) {
-          console.error("Failed to clear all data:", error);
-          const message =
-            error instanceof Error ? error.message : "Unknown error";
-          toast.error(`Failed to clear data: ${message}`);
-        }
-      }
+      )
+    ) {
+      return; // Abort if user cancels
     }
-  }, [storage]);
+
+    try {
+      await storage.clearAllData(); // Call storage hook's clear function
+      toast.success("All local data cleared. Reloading the application...");
+      // Reload the page to reflect the cleared state
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (error: unknown) {
+      console.error("Failed to clear all data:", error);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to clear data: ${message}`);
+    }
+  }, [storage]); // Dependency on the storage hook instance
+
+  // --- Return Value ---
+  // Expose only what's needed by the UI components that use this logic hook
   return {
     handleFormSubmit,
     stopStreaming,
     regenerateMessage,
     clearAllData,
     getContextSnapshotForMod,
+    // Derived state for UI
     activeConversationData,
     selectedProvider,
     selectedModel,
-    getApiKeyForProvider: getApiKeyForInteraction,
+    getApiKeyForProvider: getApiKeyForInteraction, // Expose the getter used by AI interaction
+    // Specific actions needed by UI (example)
     sidebarActions: { renameItem },
     settingsActions: { setSearchTerm },
     providerActions: { updateDbProviderConfig },

@@ -1,4 +1,4 @@
-
+// src/hooks/ai-interaction/image-generator.ts
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
 import {
@@ -44,11 +44,12 @@ export async function performImageGeneration({
     selectedProvider,
     apiKey,
     setError,
-    true,
+    true, // Indicate this is for image generation
   );
 
   if (validationError) return { error: validationError.message };
 
+  // Re-check after validationError check for type safety
   if (!selectedProvider || !selectedModel) {
     const errorMsg = "Provider or Model is not selected.";
     setError(errorMsg);
@@ -95,16 +96,17 @@ export async function performImageGeneration({
       model: selectedModel.instance,
       prompt: prompt,
       n: n,
-      size: size as `${number}x${number}`,
-      aspectRatio: aspectRatio as `${number}:${number}`,
+      size: size as `${number}x${number}`, // Cast size to expected format
+      aspectRatio: aspectRatio as `${number}:${number}`, // Cast aspectRatio
       headers: getStreamHeaders(selectedProvider.type, apiKey),
       abortSignal: currentAbortController.signal,
     });
 
-    if (warnings && warnings.length > 0)
+    if (warnings && warnings.length > 0) {
       warnings.forEach((warning: ImageModelCallWarning) =>
         toast.warning(`Image generation warning: ${JSON.stringify(warning)}`),
       );
+    }
 
     const imageParts: ImagePart[] = images.map((img) => ({
       type: "image",
@@ -131,17 +133,26 @@ export async function performImageGeneration({
     });
 
     try {
+      // Ensure the object matches DbMessage structure
       const dbMessageToSave: DbMessage = {
         id: finalImageMessageData.id,
         conversationId: finalImageMessageData.conversationId as string,
         role: finalImageMessageData.role,
-        content: finalImageMessageData.content as MessageContent,
+        content: finalImageMessageData.content as MessageContent, // Cast is okay here if structure matches
         createdAt: placeholderTimestamp,
         providerId: providerId,
         modelId: modelId,
+        // Ensure other optional DbMessage fields are undefined or null if not applicable
+        vfsContextPaths: undefined,
+        tool_calls: undefined,
+        tool_call_id: undefined,
+        children: undefined,
+        workflow: undefined,
+        tokensInput: undefined,
+        tokensOutput: undefined,
       };
 
-      await addDbMessage(dbMessageToSave as DbMessage);
+      await addDbMessage(dbMessageToSave);
       console.log("Saved image generation message to DB:", placeholderId);
       modEvents.emit(ModEvent.RESPONSE_DONE, {
         message: finalImageMessageData,
@@ -161,7 +172,8 @@ export async function performImageGeneration({
     return { images: imageParts, warnings };
   } catch (err: unknown) {
     let errorMessage: string;
-    let finalContent: string = "";
+    let finalContent: string = ""; // Default final content for error cases
+
     if (currentAbortController.signal.aborted) {
       errorMessage = "Cancelled by user.";
       finalContent = "Image generation cancelled.";
@@ -176,12 +188,13 @@ export async function performImageGeneration({
     } else {
       const error = err instanceof Error ? err : new Error(String(err));
       errorMessage = `Image generation failed: ${error.message}`;
-      setError(errorMessage);
+      setError(errorMessage); // Set global error state
       toast.error(errorMessage);
+      finalContent = `Error: ${errorMessage}`; // Provide error info in content
     }
 
     updateMessage(placeholderId, {
-      content: finalContent,
+      content: finalContent, // Update content with error/cancellation message
       error: errorMessage,
       isStreaming: false,
     });
@@ -192,6 +205,7 @@ export async function performImageGeneration({
       abortControllerRef.current = null;
     }
     setIsAiStreaming(false);
+    // Ensure streaming is marked false even if updateMessage was called earlier
     updateMessage(placeholderId, { isStreaming: false });
   }
 }

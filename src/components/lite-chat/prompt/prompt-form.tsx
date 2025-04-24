@@ -23,13 +23,19 @@ import { useSidebarStore } from "@/store/sidebar.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useCoreChatStore } from "@/store/core-chat.store";
 import { useInputStore } from "@/store/input.store";
+
+// Interface definition remains the same
 interface PromptFormProps {
   className?: string;
   onFormSubmit: (
     prompt: string,
     files: File[],
     vfsPaths: string[],
-    context: any,
+    context: {
+      selectedItemId: string | null; // This is the key part
+      contentToSendToAI: MessageContent;
+      vfsContextPaths?: string[];
+    },
   ) => Promise<void>;
   customPromptActions: CustomPromptAction[];
   getContextSnapshot: () => ReadonlyChatContextSnapshot;
@@ -43,6 +49,7 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   customPromptActions,
   getContextSnapshot,
   selectedModel,
+  // stopStreaming prop is not used directly here, but passed down
 }) => {
   // --- Fetch state/actions directly from stores ---
   const {
@@ -68,7 +75,6 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
   );
 
   const { isStreaming, setError } = useCoreChatStore(
-    // Use direct name
     useShallow((state) => ({
       isStreaming: state.isStreaming,
       setError: state.setError,
@@ -98,16 +104,20 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       selectedProviderId: state.selectedProviderId,
     })),
   );
+
+  // Placeholder for middleware - replace with actual implementation if needed
   const runMiddlewarePlaceholder = useCallback(
     async (_hookName: any, payload: any) => {
       return payload;
     },
     [],
   );
+
   const internalHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    console.log("[PromptForm] internalHandleSubmit triggered."); // Log start
+
     if (isStreaming) {
-      // Use store value
       toast.warning("Please wait for the current response to finish.");
       return;
     }
@@ -117,36 +127,55 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       return;
     }
     if (
-      !promptInputValue && // Use store value
-      attachedFiles.length === 0 && // Use store value
-      selectedVfsPaths.length === 0 // Use store value
+      !promptInputValue &&
+      attachedFiles.length === 0 &&
+      selectedVfsPaths.length === 0
     ) {
       toast.info("Please enter a prompt or attach a file.");
       return;
     }
 
     // --- Get Conversation ID ---
-    let currentConversationId =
+    let currentConversationId: string | null =
       selectedItemType === "conversation" ? selectedItemId : null;
+
+    console.log(
+      `[PromptForm] Initial check: selectedItemId=${selectedItemId}, selectedItemType=${selectedItemType}, currentConversationId=${currentConversationId}`,
+    ); // Log initial state
+
+    // If no conversation is selected, try to create one
     if (!currentConversationId) {
       try {
         const parentId = selectedItemType === "project" ? selectedItemId : null;
+        console.log(
+          `[PromptForm] No conversation selected, attempting to create new one (parentId: ${parentId})...`,
+        );
         const newConvId = await createConversation(parentId, "New Chat");
-        currentConversationId = newConvId;
+        console.log(`[PromptForm] createConversation returned: ${newConvId}`); // Log return value
+        currentConversationId = newConvId; // Assign the returned ID
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
+        console.error("[PromptForm] Error creating conversation:", err); // Log error
         setError(`Failed to create conversation: ${message}`);
         toast.error(`Failed to create conversation: ${message}`);
-        return;
+        return; // Stop submission if creation fails
       }
     }
+
+    // Check if ID is valid *after* potential creation attempt
+    console.log(
+      `[PromptForm] After creation attempt, currentConversationId=${currentConversationId}`,
+    ); // Log state after attempt
     if (!currentConversationId) {
-      setError("Failed to determine active conversation.");
-      toast.error("Could not determine active conversation.");
-      return;
+      const errorMsg = "Failed to determine active conversation.";
+      console.error(`[PromptForm] ${errorMsg}`); // Log the specific error point
+      setError(errorMsg);
+      toast.error(errorMsg);
+      return; // Stop submission if ID is still null
     }
 
     // --- Prepare Content ---
+    console.log("[PromptForm] Preparing content..."); // Log content prep
     const vfsContext = {
       isVfsReady,
       isVfsEnabledForItem,
@@ -160,6 +189,7 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       );
     const attachedFileParts =
       await FileHandlingService.processAttachedFiles(attachedFiles);
+
     let finalContent: MessageContent;
     const vfsText = vfsContextResult.contextPrefix.trim();
     const userText = promptInputValue.trim();
@@ -169,6 +199,8 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
     const textPartsFromFiles = attachedFileParts.filter(
       (p): p is TextPart => p.type === "text",
     );
+
+    // Construct final content based on parts
     if (imageParts.length > 0) {
       finalContent = [];
       finalContent.push(...imageParts);
@@ -210,11 +242,12 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       });
       finalContent = combinedText;
     }
+    console.log("[PromptForm] Content prepared:", finalContent); // Log prepared content
 
-    // --- Middleware ---
+    // --- Middleware (Placeholder) ---
     const middlewarePayload: SubmitPromptPayload = {
       prompt: finalContent,
-      conversationId: currentConversationId,
+      conversationId: currentConversationId, // Use the determined ID
       vfsPaths: vfsContextResult.pathsIncludedInContext,
     };
     const middlewareResult = await runMiddlewarePlaceholder(
@@ -227,22 +260,24 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
     }
     const contentToSubmit = middlewareResult.prompt;
     const vfsPathsToSave = middlewareResult.vfsPaths;
+
+    // --- Call the actual submission handler ---
+    console.log(
+      `[PromptForm] Calling onFormSubmit with conversationId: ${currentConversationId}`,
+    ); // Log before calling prop
     try {
-      // Pass original values from store to the handler
-      await onFormSubmit(
-        promptInputValue,
-        attachedFiles,
-        selectedVfsPaths,
-        {
-          selectedItemId: currentConversationId,
-          contentToSendToAI: contentToSubmit,
-          vfsContextPaths: vfsPathsToSave,
-        },
-      );
+      await onFormSubmit(promptInputValue, attachedFiles, selectedVfsPaths, {
+        selectedItemId: currentConversationId, // Pass the validated ID
+        contentToSendToAI: contentToSubmit,
+        vfsContextPaths: vfsPathsToSave,
+      });
+      console.log("[PromptForm] onFormSubmit call completed."); // Log after call
     } catch (error) {
-      console.error("Error during form submission prop call:", error);
+      console.error("[PromptForm] Error during onFormSubmit prop call:", error);
     }
   };
+
+  // Effect to clear selected VFS paths if VFS becomes disabled for the item
   useEffect(() => {
     if (!isVfsEnabledForItem && selectedVfsPaths.length > 0) {
       clearSelectedVfsPaths();
@@ -255,36 +290,35 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       className={cn("flex flex-col", className)}
     >
       <PromptFiles
-        attachedFiles={attachedFiles} // Use store value
-        removeAttachedFile={removeAttachedFile} // Use store action
+        attachedFiles={attachedFiles}
+        removeAttachedFile={removeAttachedFile}
       />
       <SelectedVfsFilesDisplay
-        selectedVfsPaths={selectedVfsPaths} // Use store value
-        removeSelectedVfsPath={removeSelectedVfsPath} // Use store action
-        isVfsEnabledForItem={isVfsEnabledForItem} // From store
-        isVfsReady={isVfsReady} // From store
+        selectedVfsPaths={selectedVfsPaths}
+        removeSelectedVfsPath={removeSelectedVfsPath}
+        isVfsEnabledForItem={isVfsEnabledForItem}
+        isVfsReady={isVfsReady}
       />
 
       <div className="flex items-end p-3 md:p-4">
         <PromptInput
           className="min-h-[60px]"
-          prompt={promptInputValue} // Use store value
-          setPrompt={setPromptInputValue} // Use store action
-          isStreaming={isStreaming} // Use store value
+          prompt={promptInputValue}
+          setPrompt={setPromptInputValue}
+          isStreaming={isStreaming}
         />
         <PromptActions
-          prompt={promptInputValue} // Use store value
-          isStreaming={isStreaming} // Use store value
-          addAttachedFile={addAttachedFile} // Use store action
-          setPrompt={setPromptInputValue} // Use store action
-          selectedModel={selectedModel} // Prop
-          customPromptActions={customPromptActions} // Prop
-          getContextSnapshot={getContextSnapshot} // Prop
+          prompt={promptInputValue}
+          isStreaming={isStreaming}
+          addAttachedFile={addAttachedFile}
+          setPrompt={setPromptInputValue}
+          selectedModel={selectedModel}
+          customPromptActions={customPromptActions}
+          getContextSnapshot={getContextSnapshot}
         />
       </div>
 
       <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
-        {/* Pass stopStreaming prop down */}
         <PromptSettings />
       </div>
     </form>
