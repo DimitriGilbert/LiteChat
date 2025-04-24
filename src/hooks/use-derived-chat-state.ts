@@ -9,13 +9,8 @@ import type {
   AiProviderConfig,
   AiModelConfig,
 } from "@/lib/types";
-import { createOpenAI } from "@ai-sdk/openai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { createOllama } from "ollama-ai-provider";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { ensureV1Path } from "@/utils/chat-utils";
 import { DEFAULT_MODELS } from "@/lib/litechat"; // Import DEFAULT_MODELS
+import { createAiModelConfig } from "@/utils/chat-utils"; // Import the new utility
 
 interface UseDerivedChatStateProps {
   selectedItemId: string | null;
@@ -35,8 +30,6 @@ interface UseDerivedChatStateReturn {
   selectedModel: AiModelConfig | undefined;
   getApiKeyForProvider: (providerId: string) => string | undefined;
 }
-
-// Helper to get default models (removed - using imported DEFAULT_MODELS)
 
 export function useDerivedChatState({
   selectedItemId,
@@ -96,69 +89,10 @@ export function useDerivedChatState({
     const config = dbProviderConfigs.find((p) => p.id === selectedProviderId);
     if (!config) return undefined;
 
-    const allAvailable =
-      config.fetchedModels && config.fetchedModels.length > 0
-        ? config.fetchedModels
-        : DEFAULT_MODELS[config.type] || []; // Use imported DEFAULT_MODELS
-
-    const modelInfo = allAvailable.find((m) => m.id === selectedModelId);
-    if (!modelInfo) return undefined;
-
-    let modelInstance: any = null;
     const currentApiKey = getApiKeyForProvider(config.id); // Use local getter
 
-    try {
-      switch (config.type) {
-        case "openai":
-          modelInstance = createOpenAI({ apiKey: currentApiKey })(modelInfo.id);
-          break;
-        case "google":
-          modelInstance = createGoogleGenerativeAI({ apiKey: currentApiKey })(
-            modelInfo.id,
-          );
-          break;
-        case "openrouter":
-          modelInstance = createOpenRouter({ apiKey: currentApiKey })(
-            modelInfo.id,
-          );
-          break;
-        case "ollama":
-          modelInstance = createOllama({
-            baseURL: config.baseURL ?? undefined,
-          })(modelInfo.id);
-          break;
-        case "openai-compatible":
-          if (!config.baseURL) {
-            throw new Error("Base URL required for openai-compatible");
-          }
-          modelInstance = createOpenAICompatible({
-            baseURL: ensureV1Path(config.baseURL),
-            apiKey: currentApiKey,
-            name: config.name || "Custom API",
-          })(modelInfo.id);
-          break;
-        default:
-          throw new Error(`Unsupported provider type: ${config.type}`);
-      }
-    } catch (e) {
-      console.error(
-        `Failed to instantiate model ${modelInfo.id} for provider ${config.name}:`,
-        e,
-      );
-    }
-
-    const supportsImageGen = config.type === "openai";
-    const supportsTools = ["openai", "google", "openrouter"].includes(
-      config.type,
-    );
-
-    return {
-      id: modelInfo.id,
-      name: modelInfo.name,
-      instance: modelInstance,
-      supportsImageGeneration: supportsImageGen,
-      supportsToolCalling: supportsTools,
-    };
+    // Use the utility function to create the AiModelConfig
+    return createAiModelConfig(config, selectedModelId, currentApiKey);
   }, [
     selectedProviderId,
     selectedModelId,

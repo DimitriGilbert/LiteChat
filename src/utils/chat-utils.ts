@@ -1,17 +1,23 @@
-
+// src/utils/chat-utils.ts
 import type {
   CustomSettingTab,
   CustomPromptAction,
   CustomMessageAction,
   DbProviderConfig,
   DbProviderType,
-  DbMessage, // Import DbMessage
-  Message, // Import Message
-  CoreMessage, // Import CoreMessage
-  MessageContent, // Import MessageContent
-  Role, // Import Role
+  DbMessage,
+  Message,
+  CoreMessage,
+  MessageContent,
+  Role,
+  AiModelConfig,
 } from "@/lib/types";
-
+import { createOpenAI } from "@ai-sdk/openai"; // Added
+import { createGoogleGenerativeAI } from "@ai-sdk/google"; // Added
+import { createOpenRouter } from "@openrouter/ai-sdk-provider"; // Added
+import { createOllama } from "ollama-ai-provider"; // Added
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible"; // Added
+import { DEFAULT_MODELS } from "@/lib/litechat"; // Added
 
 export const decodeUint8Array = (arr: Uint8Array): string => {
   try {
@@ -99,12 +105,10 @@ export function convertDbMessagesToCoreMessages(
     })) as CoreMessage[]; // Cast the final array to CoreMessage[]
 }
 
-
 export const EMPTY_CUSTOM_SETTINGS_TABS: CustomSettingTab[] = [];
 export const EMPTY_CUSTOM_PROMPT_ACTIONS: CustomPromptAction[] = [];
 export const EMPTY_CUSTOM_MESSAGE_ACTIONS: CustomMessageAction[] = [];
 export const EMPTY_DB_PROVIDER_CONFIGS: DbProviderConfig[] = [];
-
 
 export const ensureV1Path = (baseUrl: string): string => {
   try {
@@ -127,3 +131,82 @@ export const ensureV1Path = (baseUrl: string): string => {
     return baseUrl.replace(/\/+$/, "");
   }
 };
+
+/**
+ * Instantiates an AI model instance based on provider configuration.
+ * @param config The provider configuration from the database.
+ * @param modelId The specific model ID to instantiate.
+ * @param apiKey Optional API key value.
+ * @returns The instantiated model object or null if instantiation fails.
+ */
+export function instantiateModelInstance(
+  config: DbProviderConfig,
+  modelId: string,
+  apiKey?: string,
+): any | null {
+  try {
+    switch (config.type) {
+      case "openai":
+        return createOpenAI({ apiKey })(modelId);
+      case "google":
+        return createGoogleGenerativeAI({ apiKey })(modelId);
+      case "openrouter":
+        return createOpenRouter({ apiKey })(modelId);
+      case "ollama":
+        return createOllama({ baseURL: config.baseURL ?? undefined })(modelId);
+      case "openai-compatible":
+        if (!config.baseURL) {
+          throw new Error("Base URL required for openai-compatible");
+        }
+        return createOpenAICompatible({
+          baseURL: ensureV1Path(config.baseURL),
+          apiKey: apiKey,
+          name: config.name || "Custom API",
+        })(modelId);
+      default:
+        throw new Error(`Unsupported provider type: ${config.type}`);
+    }
+  } catch (e) {
+    console.error(
+      `Failed to instantiate model ${modelId} for provider ${config.name}:`,
+      e,
+    );
+    return null;
+  }
+}
+
+/**
+ * Creates an AiModelConfig object including the instantiated model.
+ * @param config The provider configuration.
+ * @param modelId The model ID.
+ * @param apiKey Optional API key.
+ * @returns AiModelConfig object or null if instantiation fails.
+ */
+export function createAiModelConfig(
+  config: DbProviderConfig,
+  modelId: string,
+  apiKey?: string,
+): AiModelConfig | undefined {
+  const allAvailable =
+    config.fetchedModels && config.fetchedModels.length > 0
+      ? config.fetchedModels
+      : DEFAULT_MODELS[config.type] || [];
+  const modelInfo = allAvailable.find((m) => m.id === modelId);
+  if (!modelInfo) return undefined;
+
+  const instance = instantiateModelInstance(config, modelId, apiKey);
+  if (!instance) return undefined;
+
+  const supportsImageGen = config.type === "openai"; // Example, adjust as needed
+  const supportsTools = ["openai", "google", "openrouter"].includes(
+    config.type,
+  ); // Example
+
+  return {
+    id: modelInfo.id,
+    name: modelInfo.name,
+    instance: instance,
+    supportsImageGeneration: supportsImageGen,
+    supportsToolCalling: supportsTools,
+  };
+}

@@ -17,14 +17,10 @@ import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useProviderModelSelection } from "@/hooks/use-provider-model-selection";
 
 import { toast } from "sonner";
-import { createOpenAI } from "@ai-sdk/openai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { createOllama } from "ollama-ai-provider";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+// Removed direct SDK imports
 import { fetchModelsForProvider } from "@/services/model-fetcher";
-import { DEFAULT_MODELS, requiresApiKey } from "@/lib/litechat";
-import { ensureV1Path } from "@/utils/chat-utils";
+import { DEFAULT_MODELS, requiresApiKey } from "@/lib/litechat"; // Import DEFAULT_MODELS
+import { createAiModelConfig } from "@/utils/chat-utils"; // Import the new utility
 
 const EMPTY_API_KEYS: DbApiKey[] = [];
 const EMPTY_DB_PROVIDER_CONFIGS: DbProviderConfig[] = [];
@@ -184,6 +180,18 @@ export const ProviderManagementProvider: React.FC<
     [dbProviderConfigs],
   );
 
+  // --- Helper to get API Key Value ---
+  const getApiKeyForProvider = useCallback(
+    (providerConfigId: string): string | undefined => {
+      const selectedDbConfig = dbProviderConfigs.find(
+        (p) => p.id === providerConfigId,
+      );
+      if (!selectedDbConfig?.apiKeyId) return undefined;
+      return apiKeys.find((k) => k.id === selectedDbConfig.apiKeyId)?.value;
+    },
+    [dbProviderConfigs, apiKeys],
+  );
+
   // --- Generate Active Providers (UPDATED LOGIC) ---
   const activeProviders = useMemo<AiProviderConfig[]>(() => {
     console.log("[ProviderMgmt] Recalculating activeProviders...");
@@ -193,163 +201,90 @@ export const ProviderManagementProvider: React.FC<
     const generatedProviders: AiProviderConfig[] = [];
 
     for (const config of enabledConfigs) {
-      try {
-        let providerInstance: any;
-        let currentApiKey: string | undefined;
+      const currentApiKey = getApiKeyForProvider(config.id);
 
-        if (config.apiKeyId) {
-          currentApiKey = apiKeys.find((k) => k.id === config.apiKeyId)?.value;
+      if (requiresApiKey(config.type) && !currentApiKey) {
+        console.warn(
+          `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): API Key required but not found or not linked.`,
+        );
+        continue;
+      }
 
-          if (!currentApiKey && requiresApiKey(config.type)) {
-            console.warn(
-              `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): API Key ID ${config.apiKeyId} configured but key not found or value missing.`,
-            );
-            continue;
+      const allAvailableModelDefs = getAllAvailableModelDefs(config.id);
+      if (allAvailableModelDefs.length === 0) {
+        console.warn(
+          `[ProviderMgmt] No models found (fetched/default) for provider "${config.name}". Skipping.`,
+        );
+        continue;
+      }
+
+      let modelsForDropdownList: { id: string; name: string }[] = [];
+      const enabledModelIds = config.enabledModels ?? [];
+      const sortOrder = config.modelSortOrder ?? [];
+
+      if (enabledModelIds.length > 0) {
+        const enabledModelDefs = allAvailableModelDefs.filter((m) =>
+          enabledModelIds.includes(m.id),
+        );
+
+        const orderedEnabledList: { id: string; name: string }[] = [];
+        const addedIds = new Set<string>();
+
+        for (const modelId of sortOrder) {
+          const model = enabledModelDefs.find((m) => m.id === modelId);
+          if (model && !addedIds.has(modelId)) {
+            orderedEnabledList.push(model);
+            addedIds.add(modelId);
           }
-        } else if (requiresApiKey(config.type)) {
+        }
+
+        const remainingEnabled = enabledModelDefs
+          .filter((m) => !addedIds.has(m.id))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        modelsForDropdownList = [...orderedEnabledList, ...remainingEnabled];
+
+        if (modelsForDropdownList.length === 0) {
           console.warn(
-            `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): API Key required but none linked.`,
+            `[ProviderMgmt] Enabled models configured for "${config.name}", but none matched available models. Falling back to all available models.`,
           );
-          continue;
-        }
-
-        switch (config.type) {
-          case "openai":
-            providerInstance = createOpenAI({ apiKey: currentApiKey });
-            break;
-          case "google":
-            providerInstance = createGoogleGenerativeAI({
-              apiKey: currentApiKey,
-            });
-            break;
-          case "openrouter":
-            providerInstance = createOpenRouter({ apiKey: currentApiKey });
-            break;
-          case "ollama":
-            providerInstance = createOllama({
-              baseURL: config.baseURL ?? undefined,
-            });
-            break;
-          case "openai-compatible":
-            if (!config.baseURL) {
-              console.warn(
-                `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): Base URL required for openai-compatible.`,
-              );
-              continue;
-            }
-            providerInstance = createOpenAICompatible({
-              name: config.name ?? "OpenAI-Compatible",
-              baseURL: ensureV1Path(config.baseURL),
-              apiKey: currentApiKey,
-            });
-            break;
-          default:
-            console.warn(
-              `[ProviderMgmt] Skipping provider "${config.name}" (ID: ${config.id}): Unsupported type.`,
-            );
-            continue;
-        }
-
-        const allAvailableModelDefs = getAllAvailableModelDefs(config.id);
-        if (allAvailableModelDefs.length === 0) {
-          console.warn(
-            `[ProviderMgmt] No models found (fetched/default) for provider "${config.name}". Skipping.`,
-          );
-          continue;
-        }
-
-        let modelsForDropdownList: { id: string; name: string }[] = [];
-        const enabledModelIds = config.enabledModels ?? [];
-        const sortOrder = config.modelSortOrder ?? [];
-
-        if (enabledModelIds.length > 0) {
-          const enabledModelDefs = allAvailableModelDefs.filter((m) =>
-            enabledModelIds.includes(m.id),
-          );
-
-          const orderedEnabledList: { id: string; name: string }[] = [];
-          const addedIds = new Set<string>();
-
-          for (const modelId of sortOrder) {
-            const model = enabledModelDefs.find((m) => m.id === modelId);
-            if (model && !addedIds.has(modelId)) {
-              orderedEnabledList.push(model);
-              addedIds.add(modelId);
-            }
-          }
-
-          const remainingEnabled = enabledModelDefs
-            .filter((m) => !addedIds.has(m.id))
-            .sort((a, b) => a.name.localeCompare(b.name));
-
-          modelsForDropdownList = [...orderedEnabledList, ...remainingEnabled];
-
-          if (modelsForDropdownList.length === 0) {
-            console.warn(
-              `[ProviderMgmt] Enabled models configured for "${config.name}", but none matched available models. Falling back to all available models.`,
-            );
-            modelsForDropdownList = [...allAvailableModelDefs].sort((a, b) =>
-              a.name.localeCompare(b.name),
-            );
-          }
-        } else {
           modelsForDropdownList = [...allAvailableModelDefs].sort((a, b) =>
             a.name.localeCompare(b.name),
           );
-          console.log(
-            `[ProviderMgmt] No models explicitly enabled for "${config.name}". Displaying all ${modelsForDropdownList.length} available models in dropdown.`,
-          );
         }
-
-        const finalModelsForDropdown: AiModelConfig[] = modelsForDropdownList
-          .map((modelDef) => {
-            try {
-              // Attempt to instantiate the model; might fail if provider/model combo is invalid
-              const modelInstance = providerInstance(modelDef.id);
-              // Basic check if instantiation returned something truthy
-              if (!modelInstance)
-                throw new Error("Instantiation returned null/undefined");
-              return {
-                id: modelDef.id,
-                name: modelDef.name,
-                instance: modelInstance,
-              };
-            } catch (modelErr) {
-              console.error(
-                `[ProviderMgmt] Failed to instantiate model "${modelDef.name}" (ID: ${modelDef.id}) for provider "${config.name}":`,
-                modelErr,
-              );
-              return null; // Filter out models that fail instantiation
-            }
-          })
-          .filter((m): m is AiModelConfig => m !== null); // Ensure only valid models remain
-
-        // Add the provider config if it has models to show
-        if (finalModelsForDropdown.length > 0) {
-          generatedProviders.push({
-            id: config.id,
-            name: config.name,
-            type: config.type,
-            models: finalModelsForDropdown,
-            allAvailableModels: allAvailableModelDefs, // Keep original list for settings UI
-          });
-        } else {
-          console.warn(
-            `[ProviderMgmt] No valid models could be instantiated for provider "${config.name}" after filtering/sorting. Skipping.`,
-          );
-        }
-      } catch (err) {
-        console.error(
-          `[ProviderMgmt] Failed to instantiate provider ${config.name}:`,
-          err,
+      } else {
+        modelsForDropdownList = [...allAvailableModelDefs].sort((a, b) =>
+          a.name.localeCompare(b.name),
         );
-        toast.error(
-          `Failed to load provider "${config.name}". Check configuration or connection. Error: ${err instanceof Error ? err.message : String(err)}`,
+        console.log(
+          `[ProviderMgmt] No models explicitly enabled for "${config.name}". Displaying all ${modelsForDropdownList.length} available models in dropdown.`,
+        );
+      }
+
+      // Instantiate models using the utility function
+      const finalModelsForDropdown: AiModelConfig[] = modelsForDropdownList
+        .map((modelDef) =>
+          createAiModelConfig(config, modelDef.id, currentApiKey),
+        )
+        .filter((m): m is AiModelConfig => m !== null); // Filter out failed instantiations
+
+      // Add the provider config if it has models to show
+      if (finalModelsForDropdown.length > 0) {
+        generatedProviders.push({
+          id: config.id,
+          name: config.name,
+          type: config.type,
+          models: finalModelsForDropdown,
+          allAvailableModels: allAvailableModelDefs, // Keep original list for settings UI
+        });
+      } else {
+        console.warn(
+          `[ProviderMgmt] No valid models could be instantiated for provider "${config.name}" after filtering/sorting. Skipping.`,
         );
       }
     }
     return generatedProviders;
-  }, [dbProviderConfigs, apiKeys, getAllAvailableModelDefs]); // Depend on live data
+  }, [dbProviderConfigs, getAllAvailableModelDefs, getApiKeyForProvider]); // Depend on live data
 
   // --- Model Selection Hook ---
   const providerModel = useProviderModelSelection({
@@ -380,18 +315,6 @@ export const ProviderManagementProvider: React.FC<
       return storage.deleteApiKey(id);
     },
     [enableApiKeyManagement, storage],
-  );
-
-  // --- Helper to get API Key Value ---
-  const getApiKeyForProvider = useCallback(
-    (providerConfigId: string): string | undefined => {
-      const selectedDbConfig = dbProviderConfigs.find(
-        (p) => p.id === providerConfigId,
-      );
-      if (!selectedDbConfig?.apiKeyId) return undefined;
-      return apiKeys.find((k) => k.id === selectedDbConfig.apiKeyId)?.value;
-    },
-    [dbProviderConfigs, apiKeys],
   );
 
   // --- Context Value ---

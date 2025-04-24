@@ -1,4 +1,4 @@
-
+// src/hooks/ai-interaction/use-ai-interaction.ts
 import { useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import {
@@ -10,7 +10,6 @@ import {
 } from "ai";
 import { nanoid } from "nanoid";
 import Dexie from "dexie";
-
 
 import {
   PerformAiStreamParams,
@@ -29,10 +28,8 @@ import {
   // Add types needed by interaction handlers
   AiModelConfig,
   AiProviderConfig,
-  // DbProviderConfig,
 } from "@/lib/types";
 import { modEvents, ModEvent } from "@/mods/events";
-
 
 import { validateAiParameters } from "./error-handler";
 import {
@@ -47,14 +44,10 @@ import { performImageGeneration as performImageGenerationFunc } from "./image-ge
 import { useCoreChatStore } from "@/store/core-chat.store"; // Import store
 import { useSettingsStore } from "@/store/settings.store"; // Import settings store
 import { db } from "@/lib/db"; // Import db
-import { convertDbMessagesToCoreMessages } from "@/utils/chat-utils"; // Import util
-
-import { createOpenAI } from "@ai-sdk/openai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { createOllama } from "ollama-ai-provider";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { ensureV1Path } from "@/utils/chat-utils";
+import {
+  convertDbMessagesToCoreMessages,
+  createAiModelConfig, // Import the new utility
+} from "@/utils/chat-utils"; // Import util
 
 export function useAiInteraction({
   // Destructure all props from UseAiInteractionProps
@@ -572,59 +565,9 @@ export function useAiInteraction({
           ): AiModelConfig | undefined => {
             const config = dbProviderConfigs.find((p) => p.id === provId);
             if (!config) return undefined;
-            const modelInfo = (config.fetchedModels ?? []).find(
-              (m: { id: string }) => m.id === modId,
-            );
-            if (!modelInfo) return undefined;
-            let modelInstance: any = null;
             const currentApiKey = getApiKeyForProvider(config.id);
-            try {
-              switch (config.type) {
-                case "openai":
-                  modelInstance = createOpenAI({ apiKey: currentApiKey })(
-                    modelInfo.id,
-                  );
-                  break;
-                case "google":
-                  modelInstance = createGoogleGenerativeAI({
-                    apiKey: currentApiKey,
-                  })(modelInfo.id);
-                  break;
-                case "openrouter":
-                  modelInstance = createOpenRouter({ apiKey: currentApiKey })(
-                    modelInfo.id,
-                  );
-                  break;
-                case "ollama":
-                  modelInstance = createOllama({
-                    baseURL: config.baseURL ?? undefined,
-                  })(modelInfo.id);
-                  break;
-                case "openai-compatible":
-                  if (!config.baseURL) throw new Error("Base URL required");
-                  modelInstance = createOpenAICompatible({
-                    baseURL: ensureV1Path(config.baseURL),
-                    apiKey: currentApiKey,
-                    name: config.name || "Custom API",
-                  })(modelInfo.id);
-                  break;
-                default:
-                  throw new Error(`Unsupported provider type: ${config.type}`);
-              }
-            } catch (e) {
-              console.error(`Failed to instantiate model ${modelInfo.id}:`, e);
-            }
-            const supportsImageGen = config.type === "openai";
-            const supportsTools = ["openai", "google", "openrouter"].includes(
-              config.type,
-            );
-            return {
-              id: modelInfo.id,
-              name: modelInfo.name,
-              instance: modelInstance,
-              supportsImageGeneration: supportsImageGen,
-              supportsToolCalling: supportsTools,
-            };
+            // Use the utility function
+            return createAiModelConfig(config, modId, currentApiKey);
           };
           await startWorkflowCore(
             conversationId,
@@ -754,59 +697,9 @@ export function useAiInteraction({
           ): AiModelConfig | undefined => {
             const config = dbProviderConfigs.find((p) => p.id === provId);
             if (!config) return undefined;
-            const modelInfo = (config.fetchedModels ?? []).find(
-              (m: { id: string }) => m.id === modId,
-            );
-            if (!modelInfo) return undefined;
-            let modelInstance: any = null;
             const currentApiKey = getApiKeyForProvider(config.id);
-            try {
-              switch (config.type) {
-                case "openai":
-                  modelInstance = createOpenAI({ apiKey: currentApiKey })(
-                    modelInfo.id,
-                  );
-                  break;
-                case "google":
-                  modelInstance = createGoogleGenerativeAI({
-                    apiKey: currentApiKey,
-                  })(modelInfo.id);
-                  break;
-                case "openrouter":
-                  modelInstance = createOpenRouter({ apiKey: currentApiKey })(
-                    modelInfo.id,
-                  );
-                  break;
-                case "ollama":
-                  modelInstance = createOllama({
-                    baseURL: config.baseURL ?? undefined,
-                  })(modelInfo.id);
-                  break;
-                case "openai-compatible":
-                  if (!config.baseURL) throw new Error("Base URL required");
-                  modelInstance = createOpenAICompatible({
-                    baseURL: ensureV1Path(config.baseURL),
-                    apiKey: currentApiKey,
-                    name: config.name || "Custom API",
-                  })(modelInfo.id);
-                  break;
-                default:
-                  throw new Error(`Unsupported provider type: ${config.type}`);
-              }
-            } catch (e) {
-              console.error(`Failed to instantiate model ${modelInfo.id}:`, e);
-            }
-            const supportsImageGen = config.type === "openai";
-            const supportsTools = ["openai", "google", "openrouter"].includes(
-              config.type,
-            );
-            return {
-              id: modelInfo.id,
-              name: modelInfo.name,
-              instance: modelInstance,
-              supportsImageGeneration: supportsImageGen,
-              supportsToolCalling: supportsTools,
-            };
+            // Use the utility function
+            return createAiModelConfig(config, modId, currentApiKey);
           };
           await startWorkflowCore(
             conversationId,
