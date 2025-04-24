@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FileSystemEntry } from "@/lib/types";
-import { NewFolderRow } from "./new-folder-row"; // Import NewFolderRow
-import { FileManagerRow } from "./file-manager-row"; // Import FileManagerRow
+import { NewFolderRow } from "./new-folder-row";
+import { FileManagerRow } from "./file-manager-row";
 
 interface FileManagerTableProps {
   entries: FileSystemEntry[];

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ProviderRow } from "./settings-provider-row";
-import { AddProviderForm } from "./add-provider-form"; // Import the new form
+import { AddProviderForm } from "./add-provider-form";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { DEFAULT_MODELS } from "@/lib/litechat";
 
@@ -29,8 +29,6 @@ const SettingsProvidersComponent: React.FC = () => {
     })),
   );
   const { providerConfigs: dbProviderConfigs, apiKeys } = useChatStorage();
-
-  // Define getAllAvailableModelDefs locally using live data
   const getAllAvailableModelDefs = useCallback(
     (providerConfigId: string): { id: string; name: string }[] => {
       const config = (dbProviderConfigs || []).find(

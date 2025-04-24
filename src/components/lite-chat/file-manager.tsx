@@ -17,8 +17,8 @@ import {
 import { FileManagerBanner } from "./file-manager/file-manager-banner";
 import { FileManagerToolbar } from "./file-manager/file-manager-toolbar";
 import { FileManagerTable } from "./file-manager/file-manager-table";
-import { CommitDialog } from "./file-manager/commit-dialog"; // Import CommitDialog
-import { CloneDialog } from "./file-manager/clone-dialog"; // Import CloneDialog
+import { CommitDialog } from "./file-manager/commit-dialog";
+import { CloneDialog } from "./file-manager/clone-dialog";
 
 import { useInputStore } from "@/store/input.store";
 import { useShallow } from "zustand/react/shallow";

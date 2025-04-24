@@ -42,9 +42,9 @@ interface FileManagerRowProps {
   isEditingThis: boolean;
   isChecked: boolean;
   isGitRepo: boolean;
-  newName: string; // Only relevant if isEditingThis is true
+  newName: string;
   isOperationLoading: boolean;
-  creatingFolder: boolean; // To disable actions while creating folder
+  creatingFolder: boolean;
   handleNavigate: (entry: FileSystemEntry) => void;
   handleCheckboxChange: (checked: boolean, path: string) => void;
   startEditing: (entry: FileSystemEntry) => void;
@@ -52,8 +52,8 @@ interface FileManagerRowProps {
   handleRename: () => void;
   handleDownload: (entry: FileSystemEntry) => void;
   handleDelete: (entry: FileSystemEntry) => void;
-  setNewName: (name: string) => void; // Only relevant if isEditingThis is true
-  renameInputRef: React.RefObject<HTMLInputElement | null>; // Only relevant if isEditingThis is true
+  setNewName: (name: string) => void;
+  renameInputRef: React.RefObject<HTMLInputElement | null>;
   // Git actions
   handleGitInit: (path: string) => void;
   handleGitPull: (path: string) => void;
@@ -167,7 +167,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             title={entry.name}
             onClick={(e) => {
               if (entry.isDirectory) {
-                e.stopPropagation(); // Prevent row click if clicking name to navigate
+                e.stopPropagation();
                 handleNavigate(entry);
               }
             }}
@@ -315,8 +315,6 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
       </TableCell>
     </TableRow>
   );
-
-  // Render with ContextMenu only for directories
   if (entry.isDirectory) {
     return (
       <ContextMenu key={entry.path}>

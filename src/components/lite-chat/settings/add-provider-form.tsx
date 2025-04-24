@@ -57,7 +57,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
   ) => {
     setNewProviderData((prev) => {
       const updated = { ...prev, [field]: value };
-      // Reset dependent fields when type changes
       if (field === "type") {
         const newType = value as DbProviderType;
         updated.apiKeyId = null;
@@ -86,13 +85,13 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
         isEnabled: newProviderData.isEnabled ?? true,
         apiKeyId: newProviderData.apiKeyId ?? null,
         baseURL: newProviderData.baseURL ?? null,
-        enabledModels: null, // Start with no models enabled
+        enabledModels: null,
         autoFetchModels: autoFetch,
         fetchedModels: null,
         modelsLastFetchedAt: null,
         modelSortOrder: null,
       });
-      onCancel(); // Close form on success
+      onCancel();
     } catch (error) {
       // Error toast likely handled by the caller (store action)
       console.error("Failed to add provider (from form component):", error);
