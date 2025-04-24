@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import type { FileSystemEntry } from "@/lib/types";
 import { toast } from "sonner";
 import { AlertCircleIcon, Loader2Icon } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Import Alert components
 import {
   normalizePath,
   joinPath,
@@ -51,6 +52,8 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
   const renameVfsItem = useVfsStore((s) => s.renameVfsItem);
   const createDirectory = useVfsStore((s) => s.createDirectory);
   const fsInstance = useVfsStore((s) => s.fs);
+  const isVfsEnabledForItem = useVfsStore((s) => s.isVfsEnabledForItem); // Get item-specific flag
+  const enableVfsGlobal = useVfsStore((s) => s.enableVfs); // Get global flag
 
   const { selectedVfsPaths, addSelectedVfsPath, removeSelectedVfsPath } =
     useInputStore(
@@ -70,7 +73,17 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
     );
 
     const loadInitialData = async () => {
-      if (!isVfsReady) return;
+      // Only load if VFS is ready AND enabled for the item AND globally enabled
+      if (!isVfsReady || !isVfsEnabledForItem || !enableVfsGlobal) {
+        console.log(
+          `[FileManager] Skipping initial load. isVfsReady=${isVfsReady}, isVfsEnabledForItem=${isVfsEnabledForItem}, enableVfsGlobal=${enableVfsGlobal}`,
+        );
+        if (isMounted) {
+          setEntries([]); // Clear entries if VFS is not usable
+          setCurrentPath("/");
+        }
+        return;
+      }
       if (!isMounted) return;
 
       try {
@@ -100,7 +113,8 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
       }
     };
 
-    if (isVfsReady) {
+    // Trigger load based on readiness and enabled status
+    if (isVfsReady && isVfsEnabledForItem && enableVfsGlobal) {
       loadInitialData();
     } else {
       setEntries([]);
@@ -108,13 +122,16 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
       setEditingPath(null);
       setCreatingFolder(false);
       setCurrentPath("/");
-      console.log("[FileManager] VFS not ready, resetting state.");
+      console.log(
+        "[FileManager] VFS not ready or not enabled for item/globally, resetting state.",
+      );
     }
 
     return () => {
       isMounted = false;
     };
-  }, [isVfsReady, vfsKey, listFiles]);
+    // Add isVfsEnabledForItem and enableVfsGlobal to dependencies
+  }, [isVfsReady, vfsKey, listFiles, isVfsEnabledForItem, enableVfsGlobal]);
 
   const git = useGit(fsInstance);
 
@@ -145,9 +162,9 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
   const renameInputRef = useRef<HTMLInputElement>(null);
   const newFolderInputRef = useRef<HTMLInputElement>(null);
 
-  const isConfigLoading = isVfsLoading;
-  const isCombinedOperationLoading = isVfsOperationLoading || git.loading;
-  const configError = vfsError;
+  const isConfigLoading = isVfsLoading; // Loading VFS config/mount
+  const isCombinedOperationLoading = isVfsOperationLoading || git.loading; // Loading file op or git op
+  const configError = vfsError; // Error during VFS config/mount
   const isAnyLoading = isConfigLoading || isCombinedOperationLoading;
 
   useEffect(() => {
@@ -180,10 +197,17 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
 
   const loadEntries = useCallback(
     async (path: string, forceRefresh = false) => {
-      if (!isVfsReady || isCombinedOperationLoading) {
+      // Check readiness AND enabled status
+      if (
+        !isVfsReady ||
+        !isVfsEnabledForItem ||
+        !enableVfsGlobal ||
+        isCombinedOperationLoading
+      ) {
         console.log(
-          `[FileManager] loadEntries skipped. isVfsReady: ${isVfsReady}, isAnyLoading: ${isCombinedOperationLoading}`,
+          `[FileManager] loadEntries skipped. isVfsReady: ${isVfsReady}, isVfsEnabledForItem: ${isVfsEnabledForItem}, enableVfsGlobal: ${enableVfsGlobal}, isAnyLoading: ${isCombinedOperationLoading}`,
         );
+        setEntries([]); // Clear entries if VFS not usable
         return;
       }
       if (path === currentPath && !forceRefresh) {
@@ -213,6 +237,8 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
     },
     [
       isVfsReady,
+      isVfsEnabledForItem, // Add dependency
+      enableVfsGlobal, // Add dependency
       isCombinedOperationLoading,
       currentPath,
       listFiles,
@@ -294,10 +320,23 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
       if (confirmation) {
         try {
           await deleteVfsItem(entry.path, entry.isDirectory);
-          removeSelectedVfsPath(entry.path);
-          loadEntries(currentPath, true);
+          removeSelectedVfsPath(entry.path); // Remove from selection if deleted
+          // Also remove children from selection if deleting a directory
+          if (entry.isDirectory) {
+            setCheckedPaths((prev) => {
+              const next = new Set(prev);
+              prev.forEach((p) => {
+                if (p.startsWith(entry.path + "/")) {
+                  next.delete(p);
+                }
+              });
+              return next;
+            });
+          }
+          loadEntries(currentPath, true); // Refresh the view
         } catch (error) {
           console.error("FileManager Delete Error (handled by store):", error);
+          // Error toast is handled within the store action
         }
       }
     },
@@ -327,6 +366,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
         }
       } catch (error) {
         console.error("FileManager Download Error (handled by store):", error);
+        // Error toast handled by store action
       }
     },
     [isAnyLoading, isVfsReady, downloadAllAsZip, downloadFile],
@@ -363,6 +403,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
           loadEntries(currentPath, true);
         } catch (error) {
           console.error("FileManager Upload Error (handled by store):", error);
+          // Error toast handled by store action
         }
       }
       e.target.value = "";
@@ -392,6 +433,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
               "FileManager Extract Error (handled by store):",
               error,
             );
+            // Error toast handled by store action
           }
         } else {
           toast.error("Only ZIP archive extraction is currently supported.");
@@ -413,6 +455,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
       await downloadAllAsZip(filename, currentPath);
     } catch (error) {
       console.error("FileManager Export Error (handled by store):", error);
+      // Error toast handled by store action
     }
   }, [isAnyLoading, isVfsReady, currentPath, downloadAllAsZip]);
 
@@ -455,6 +498,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
       loadEntries(currentPath, true);
     } catch (error) {
       console.error("FileManager Rename Error (handled by store):", error);
+      // Error toast handled by store action
     }
   }, [
     isCombinedOperationLoading,
@@ -507,6 +551,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
         "FileManager Create Folder Error (handled by store):",
         error,
       );
+      // Error toast handled by store action
     }
   };
   useEffect(() => {
@@ -659,6 +704,28 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
     }
   };
 
+  // --- Render Logic ---
+
+  // 1. Global VFS Disabled
+  if (!enableVfsGlobal) {
+    return (
+      <div className={cn("p-4 text-center text-sm text-gray-500", className)}>
+        Virtual Filesystem is disabled globally in settings.
+      </div>
+    );
+  }
+
+  // 2. VFS Disabled for this specific item
+  if (!isVfsEnabledForItem) {
+    return (
+      <div className={cn("p-4 text-center text-sm text-gray-500", className)}>
+        Virtual Filesystem is not enabled for this item. Enable it in the prompt
+        settings area.
+      </div>
+    );
+  }
+
+  // 3. VFS Initializing
   if (isConfigLoading) {
     return (
       <div className={cn("p-4 space-y-2", className)}>
@@ -669,34 +736,31 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
       </div>
     );
   }
+
+  // 4. VFS Initialization Error
   if (configError) {
     return (
-      <div className="p-4 text-center text-red-400 flex items-center justify-center gap-2">
-        <AlertCircleIcon className="h-5 w-5" />
-        <span>{configError}</span>
-      </div>
+      <Alert variant="destructive" className={cn("m-4", className)}>
+        <AlertCircleIcon className="h-4 w-4" />
+        <AlertTitle>Filesystem Error</AlertTitle>
+        <AlertDescription>{configError}</AlertDescription>
+      </Alert>
     );
   }
+
+  // 5. VFS Not Ready (but enabled and no error - should be initializing)
   if (!isVfsReady) {
-    console.log(
-      `[FileManager] Not ready. isVfsReady=${isVfsReady}, isVfsLoading=${isVfsLoading}, vfsError=${vfsError}`,
-    );
     return (
-      <div className="p-4 text-center text-sm text-gray-500">
-        {isVfsLoading ? (
-          <div className="flex items-center justify-center gap-2">
-            <Loader2Icon className="h-4 w-4 animate-spin" />
-            <span>Initializing Virtual Filesystem...</span>
-          </div>
-        ) : (
-          <span>
-            Virtual Filesystem not available or not enabled for this item.
-          </span>
-        )}
+      <div className={cn("p-4 text-center text-sm text-gray-500", className)}>
+        <div className="flex items-center justify-center gap-2">
+          <Loader2Icon className="h-4 w-4 animate-spin" />
+          <span>Initializing Virtual Filesystem...</span>
+        </div>
       </div>
     );
   }
 
+  // 6. VFS Ready - Render the File Manager UI
   return (
     <div className={cn("flex flex-col h-[400px]", className)}>
       <FileManagerBanner vfsKey={vfsKey} selectedItemType={selectedItemType} />
@@ -722,6 +786,7 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
         handleFileChange={handleFileChange}
         handleArchiveChange={handleArchiveChange}
       />
+      {/* Show loading overlay only for operations, not initial config load */}
       {isCombinedOperationLoading && !isConfigLoading ? (
         <div className="flex-1 flex items-center justify-center">
           <Loader2Icon className="h-5 w-5 mr-2 animate-spin" />

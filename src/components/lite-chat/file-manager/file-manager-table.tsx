@@ -86,9 +86,8 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
       <Table className="w-full text-sm">
         <TableHeader className="sticky top-0 bg-gray-800 z-10">
           <TableRow className="hover:bg-gray-800">
-            {/* Adjusted widths slightly */}
-            <TableHead className="w-[40px] px-2"></TableHead> {/* Checkbox */}
-            <TableHead className="w-[40px] px-2"></TableHead> {/* Icon */}
+            <TableHead className="w-[40px] px-2"></TableHead>
+            <TableHead className="w-[40px] px-2"></TableHead>
             <TableHead>Name</TableHead>
             <TableHead className="w-[100px] text-right">Size</TableHead>
             <TableHead className="w-[150px] text-right">Modified</TableHead>
