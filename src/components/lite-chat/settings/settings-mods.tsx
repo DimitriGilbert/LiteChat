@@ -23,6 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 
 import { useShallow } from "zustand/react/shallow";
 import { useModStore } from "@/store/mod.store";
@@ -41,6 +42,8 @@ const SettingsModsComponent: React.FC = () => {
 
   // Fetch live data from storage
   const { mods: dbMods } = useChatStorage();
+  // Determine loading state
+  const isLoading = dbMods === undefined;
 
   // Local UI state
   const [modName, setModName] = useState("");
@@ -71,7 +74,7 @@ const SettingsModsComponent: React.FC = () => {
         sourceUrl: modUrl.trim() || null,
         scriptContent: modScript.trim() || null,
         enabled: true,
-        loadOrder: (dbMods.length + 1) * 10,
+        loadOrder: (dbMods?.length ?? 0 + 1) * 10, // Use optional chaining
       };
       await addDbMod(modData);
       setModName("");
@@ -82,7 +85,7 @@ const SettingsModsComponent: React.FC = () => {
     } finally {
       setIsAdding(false);
     }
-  }, [modName, modUrl, modScript, addDbMod, dbMods.length]);
+  }, [modName, modUrl, modScript, addDbMod, dbMods?.length]); // Use optional chaining
 
   const handleToggleEnable = useCallback(
     async (mod: DbMod) => {
@@ -226,86 +229,103 @@ const SettingsModsComponent: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {dbMods.length === 0 && (
+                {isLoading ? (
+                  // Show skeletons while loading
+                  <>
+                    <TableRow>
+                      <TableCell colSpan={5}>
+                        <Skeleton className="h-10 w-full" />
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell colSpan={5}>
+                        <Skeleton className="h-10 w-full" />
+                      </TableCell>
+                    </TableRow>
+                  </>
+                ) : (dbMods || []).length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center">
                       No mods installed yet.
                     </TableCell>
                   </TableRow>
-                )}
-                {dbMods.map((mod: DbMod) => {
-                  const { status, error, tooltip } = getModStatus(mod.id);
-                  const sourceDisplay = mod.sourceUrl
-                    ? new URL(mod.sourceUrl).hostname
-                    : "Direct Script";
-                  const isModUpdating = isUpdating[mod.id];
-                  const isModDeleting = isDeleting[mod.id];
-                  const isDisabled = isModUpdating || isModDeleting;
-                  const hasError = status === "Error";
+                ) : (
+                  (dbMods || []).map((mod: DbMod) => {
+                    const { status, error, tooltip } = getModStatus(mod.id);
+                    const sourceDisplay = mod.sourceUrl
+                      ? new URL(mod.sourceUrl).hostname
+                      : "Direct Script";
+                    const isModUpdating = isUpdating[mod.id];
+                    const isModDeleting = isDeleting[mod.id];
+                    const isDisabled = isModUpdating || isModDeleting;
+                    const hasError = status === "Error";
 
-                  return (
-                    <TableRow key={mod.id}>
-                      <TableCell className="font-medium">{mod.name}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {sourceDisplay}
-                      </TableCell>
-                      <TableCell>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span
-                              className={
-                                hasError
-                                  ? "text-destructive font-semibold cursor-help"
-                                  : ""
-                              }
-                            >
-                              {status}
-                            </span>
-                          </TooltipTrigger>
-                          {tooltip && (
-                            <TooltipContent className="max-w-xs break-words">
-                              <p>{tooltip}</p>
-                            </TooltipContent>
+                    return (
+                      <TableRow key={mod.id}>
+                        <TableCell className="font-medium">
+                          {mod.name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {sourceDisplay}
+                        </TableCell>
+                        <TableCell>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span
+                                className={
+                                  hasError
+                                    ? "text-destructive font-semibold cursor-help"
+                                    : ""
+                                }
+                              >
+                                {status}
+                              </span>
+                            </TooltipTrigger>
+                            {tooltip && (
+                              <TooltipContent className="max-w-xs break-words">
+                                <p>{tooltip}</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                          {hasError && error && (
+                            <p className="text-xs text-destructive truncate">
+                              {error instanceof Error
+                                ? error.message
+                                : String(error)}
+                            </p>
                           )}
-                        </Tooltip>
-                        {hasError && error && (
-                          <p className="text-xs text-destructive truncate">
-                            {error instanceof Error
-                              ? error.message
-                              : String(error)}
-                          </p>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Switch
-                          checked={mod.enabled}
-                          onCheckedChange={() => handleToggleEnable(mod)}
-                          disabled={isDisabled}
-                          aria-label={`Enable ${mod.name}`}
-                        />
-                        {isModUpdating && (
-                          <Loader2 className="h-4 w-4 animate-spin inline-block ml-2" />
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteMod(mod)}
-                          disabled={isDisabled}
-                          aria-label={`Delete ${mod.name}`}
-                          className="text-destructive hover:text-destructive/80"
-                        >
-                          {isModDeleting ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Switch
+                            checked={mod.enabled}
+                            onCheckedChange={() => handleToggleEnable(mod)}
+                            disabled={isDisabled}
+                            aria-label={`Enable ${mod.name}`}
+                          />
+                          {isModUpdating && (
+                            <Loader2 className="h-4 w-4 animate-spin inline-block ml-2" />
                           )}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteMod(mod)}
+                            disabled={isDisabled}
+                            aria-label={`Delete ${mod.name}`}
+                            className="text-destructive hover:text-destructive/80"
+                          >
+                            {isModDeleting ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
               </TableBody>
             </Table>
           </TooltipProvider>

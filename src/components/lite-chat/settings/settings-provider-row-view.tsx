@@ -1,3 +1,4 @@
+// src/components/lite-chat/settings/settings-provider-row-view.tsx
 import React from "react";
 import type { DbProviderConfig, DbApiKey } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -11,10 +12,17 @@ import {
   AlertCircleIcon,
 } from "lucide-react";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"; // Import Tooltip components
+import {
   requiresApiKey,
   requiresBaseURL,
   supportsModelFetching,
 } from "@/lib/litechat";
+import { cn } from "@/lib/utils"; // Import cn
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 interface ProviderRowViewModeProps {
@@ -43,7 +51,7 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   const needsURL = requiresBaseURL(provider.type);
   const canFetch = supportsModelFetching(provider.type);
   const isFetchButtonDisabled = fetchStatus === "fetching" || isDeleting;
-  const isEditButtonDisabled = isDeleting;
+  const isEditButtonDisabled = isDeleting || fetchStatus === "fetching"; // Disable edit during fetch
   const isDeleteButtonDisabled = isDeleting || fetchStatus === "fetching";
 
   const allAvailableModels = getAllAvailableModelDefs();
@@ -60,24 +68,57 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
     })
     .filter((m): m is { id: string; name: string } => m !== null);
 
+  const apiKeyLinked = provider.apiKeyId
+    ? apiKeys.some((k) => k.id === provider.apiKeyId)
+    : false;
+  const showKeyWarning = needsKey && !apiKeyLinked;
+
   return (
     <div>
       {/* Provider Header: Name, Type, Status, Edit/Delete Buttons */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <span
-            className={`h-2 w-2 rounded-full ${provider.isEnabled ? "bg-green-500" : "bg-gray-500"}`}
+            className={cn(
+              "h-2 w-2 rounded-full flex-shrink-0", // Added flex-shrink-0
+              provider.isEnabled ? "bg-green-500" : "bg-gray-500",
+              fetchStatus === "error" && "bg-red-500", // Indicate error status
+            )}
+            title={
+              fetchStatus === "error"
+                ? "Error fetching models"
+                : provider.isEnabled
+                  ? "Enabled"
+                  : "Disabled"
+            }
           ></span>
-          <h3 className="font-semibold text-lg text-white">{provider.name}</h3>
-          <span className="text-sm text-gray-400">({provider.type})</span>
+          <h3 className="font-semibold text-lg text-white truncate">
+            {provider.name}
+          </h3>
+          <span className="text-sm text-gray-400 flex-shrink-0">
+            ({provider.type})
+          </span>
+          {showKeyWarning && (
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger>
+                  <AlertCircleIcon className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p>API Key required but none linked/found.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center space-x-1 flex-shrink-0">
           <Button
             variant="ghost"
             size="icon"
             onClick={onEdit} // Use prop action
             disabled={isEditButtonDisabled}
             aria-label="Edit provider"
+            className="h-8 w-8" // Consistent size
           >
             <Edit2Icon className="h-4 w-4" />
           </Button>
@@ -86,7 +127,7 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
             size="icon"
             onClick={onDelete} // Use prop action
             disabled={isDeleteButtonDisabled}
-            className="text-red-500 hover:text-red-400"
+            className="text-red-500 hover:text-red-400 h-8 w-8" // Consistent size
             aria-label="Delete provider"
           >
             {isDeleting ? ( // Use prop
@@ -98,15 +139,21 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
         </div>
       </div>
       {/* Provider Details: API Key, URL, Auto-fetch */}
-      <div className="text-sm text-gray-400 mt-1 space-y-1">
+      <div className="text-sm text-gray-400 mt-1 space-y-1 pl-5">
+        {" "}
+        {/* Indent details */}
         {needsKey && (
           <div>
             API Key:{" "}
             {provider.apiKeyId ? (
-              <span className="text-green-400">
-                {apiKeys.find((k) => k.id === provider.apiKeyId)?.name ||
-                  "Linked"}
-              </span>
+              apiKeyLinked ? (
+                <span className="text-green-400">
+                  {apiKeys.find((k) => k.id === provider.apiKeyId)?.name ||
+                    "Linked (Unnamed Key)"}
+                </span>
+              ) : (
+                <span className="text-red-500">Linked Key Missing!</span>
+              )
             ) : (
               <span className="text-amber-400">Not Linked</span>
             )}
@@ -166,7 +213,7 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
               size="sm"
               onClick={onFetchModels} // Use prop action
               disabled={isFetchButtonDisabled} // Use derived state
-              className="text-xs"
+              className="text-xs h-7 px-2" // Smaller button
             >
               {fetchStatus === "fetching" && ( // Use prop
                 <Loader2 className="h-3 w-3 mr-1 animate-spin" />
@@ -180,7 +227,11 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
               {fetchStatus === "idle" && ( // Use prop
                 <RefreshCwIcon className="h-3 w-3 mr-1" />
               )}
-              {fetchStatus === "fetching" ? "Fetching..." : "Fetch Models Now"}
+              {fetchStatus === "fetching"
+                ? "Fetching..."
+                : fetchStatus === "error"
+                  ? "Fetch Failed"
+                  : "Fetch Models Now"}
             </Button>
           </div>
         )}

@@ -21,7 +21,7 @@ export interface ProviderActions {
   setEnableApiKeyManagement: (enabled: boolean) => void;
   setSelectedProviderId: (
     id: string | null,
-    currentConfigs: DbProviderConfig[],
+    currentConfigs: DbProviderConfig[], // Pass current configs for validation
   ) => void;
   setSelectedModelId: (id: string | null) => void;
   addApiKey: (
@@ -40,15 +40,15 @@ export interface ProviderActions {
   deleteDbProviderConfig: (id: string) => Promise<void>;
   fetchModels: (
     providerConfigId: string,
-    currentConfigs: DbProviderConfig[],
-    currentApiKeys: DbApiKey[],
+    currentConfigs: DbProviderConfig[], // Pass current configs
+    currentApiKeys: DbApiKey[], // Pass current keys
   ) => Promise<void>;
   setProviderFetchStatus: (providerId: string, status: FetchStatus) => void;
   loadInitialSelection: (currentConfigs: DbProviderConfig[]) => Promise<void>;
   getApiKeyForProvider: (
     providerId: string,
-    currentApiKeys: DbApiKey[],
-    currentConfigs: DbProviderConfig[],
+    currentApiKeys: DbApiKey[], // Pass current keys
+    currentConfigs: DbProviderConfig[], // Pass current configs
   ) => string | undefined;
 }
 
@@ -90,6 +90,12 @@ const getDefaultModelIdForProvider = (
     // Only use the filtered list if it's not empty
     if (filteredByEnabled.length > 0) {
       potentialModels = filteredByEnabled;
+    } else {
+      // If enabledModels is set but filters out everything, maybe warn or fallback?
+      // For now, we'll proceed with all available models if the filter yields nothing.
+      console.warn(
+        `Provider ${providerConfig.id}: enabledModels filter resulted in empty list. Considering all available models.`,
+      );
     }
   }
 
@@ -134,7 +140,9 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
       set({ enableApiKeyManagement }),
 
     setSelectedProviderId: (id, currentConfigs) => {
+      // Find the config using the *passed* currentConfigs
       const targetProviderConfig = currentConfigs.find((p) => p.id === id);
+      // Determine default model based on the *found* config
       const defaultModelId = getDefaultModelIdForProvider(targetProviderConfig);
 
       set({ selectedProviderId: id, selectedModelId: defaultModelId });
@@ -151,13 +159,13 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
         throw new Error("API Key Management is disabled.");
       }
       const keyToAdd = value;
-      value = "";
+      value = ""; // Clear sensitive data immediately
       try {
         const newId = nanoid();
         const newKey: DbApiKey = {
           id: newId,
           name,
-          providerId,
+          providerId, // Keep for potential future use or context
           value: keyToAdd,
           createdAt: new Date(),
         };
@@ -216,11 +224,20 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           id: newId,
           createdAt: now,
           updatedAt: now,
+          // Ensure defaults are set if not provided
+          isEnabled: config.isEnabled ?? true,
+          apiKeyId: config.apiKeyId ?? null,
+          baseURL: config.baseURL ?? null,
+          enabledModels: config.enabledModels ?? null,
+          autoFetchModels: config.autoFetchModels ?? true,
+          fetchedModels: config.fetchedModels ?? null,
+          modelsLastFetchedAt: config.modelsLastFetchedAt ?? null,
+          modelSortOrder: config.modelSortOrder ?? null,
         };
         await db.providerConfigs.add(newConfig);
         toast.success(`Provider "${config.name}" added.`);
         // After adding, if no provider is selected, select the new one
-        if (get().selectedProviderId === null) {
+        if (get().selectedProviderId === null && newConfig.isEnabled) {
           const allConfigs = await db.providerConfigs.toArray(); // Fetch fresh list
           get().setSelectedProviderId(newId, allConfigs);
         }
@@ -240,10 +257,19 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           ...changes,
           updatedAt: new Date(),
         });
-        // If the currently selected provider was updated (e.g., disabled), re-evaluate selection
+        // If the currently selected provider was updated, re-evaluate selection
         if (get().selectedProviderId === id) {
           const updatedConfig = await db.providerConfigs.get(id);
-          if (!updatedConfig?.isEnabled) {
+          if (!updatedConfig) {
+            // Config was deleted concurrently? Select fallback.
+            console.warn(
+              `Selected provider ${id} disappeared after update, finding fallback.`,
+            );
+            const allConfigs = await db.providerConfigs.toArray();
+            const firstEnabled = allConfigs.find((c) => c.isEnabled);
+            get().setSelectedProviderId(firstEnabled?.id ?? null, allConfigs);
+          } else if (!updatedConfig.isEnabled) {
+            // Config was disabled
             console.log(
               `Selected provider ${id} was disabled, finding fallback.`,
             );
@@ -251,21 +277,36 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
             const firstEnabled = allConfigs.find((c) => c.isEnabled);
             get().setSelectedProviderId(firstEnabled?.id ?? null, allConfigs);
           } else {
-            // If enabled status didn't change, but maybe models did, re-evaluate model
+            // Config still enabled, check if current model is still valid
             const currentModelId = get().selectedModelId;
             const defaultModelId = getDefaultModelIdForProvider(updatedConfig);
             const availableModels =
-              updatedConfig?.fetchedModels ??
-              DEFAULT_MODELS[updatedConfig?.type ?? "openai"] ??
+              updatedConfig.fetchedModels ??
+              DEFAULT_MODELS[updatedConfig.type] ??
               [];
-            const currentModelStillValid = availableModels.some(
+            const enabledModelIds = updatedConfig.enabledModels ?? [];
+            const modelsToConsider =
+              enabledModelIds.length > 0
+                ? availableModels.filter((m) => enabledModelIds.includes(m.id))
+                : availableModels;
+
+            const currentModelStillValid = modelsToConsider.some(
               (m) => m.id === currentModelId,
             );
+
             if (!currentModelStillValid) {
               console.log(
-                `Selected model ${currentModelId} no longer valid for ${id}, selecting default: ${defaultModelId}`,
+                `Selected model ${currentModelId} no longer valid/enabled for ${id}, selecting default: ${defaultModelId}`,
               );
               get().setSelectedModelId(defaultModelId);
+            } else {
+              // Model is still valid, but maybe sort order changed?
+              // Re-calculate the default based on the *updated* config
+              // If the current selection isn't the *new* default, maybe update?
+              // For now, let's keep the user's selection if it's still valid.
+              console.log(
+                `Selected model ${currentModelId} still valid for ${id}.`,
+              );
             }
           }
         }
@@ -323,6 +364,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
       get().setProviderFetchStatus(providerConfigId, "fetching");
       try {
         const apiKeyId = config.apiKeyId;
+        // Use the passed currentApiKeys
         const apiKey = currentApiKeys.find((k) => k.id === apiKeyId)?.value;
         const fetched = await fetchModelsForProvider(config, apiKey);
         // Use updateDbProviderConfig to save fetched models
@@ -332,9 +374,11 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
         });
 
         get().setProviderFetchStatus(providerConfigId, "success");
+        // Success toast is handled by fetchModelsForProvider now
       } catch (error) {
         console.error(`Error fetching models for ${config.name}:`, error);
         get().setProviderFetchStatus(providerConfigId, "error");
+        // Error toast is handled by fetchModelsForProvider now
       }
     },
 
@@ -358,8 +402,6 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
         if (lastSelectionState?.value) {
           const savedProviderId = lastSelectionState.value.providerId ?? null;
           const savedModelId = lastSelectionState.value.modelId ?? null;
-
-          // Check if saved provider exists and is enabled
           const savedProviderConfig = enabledConfigs.find(
             (p) => p.id === savedProviderId,
           );
@@ -407,7 +449,11 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
         );
         toast.error("Failed to load last provider selection.");
         // Fallback: select first enabled if any, otherwise null
-        const firstEnabled = currentConfigs.find((c) => c.isEnabled);
+        const enabledConfigs = currentConfigs.filter((c) => c.isEnabled);
+        enabledConfigs.sort(
+          (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+        );
+        const firstEnabled = enabledConfigs[0];
         const fallbackProviderId = firstEnabled?.id ?? null;
         const fallbackModelId = getDefaultModelIdForProvider(firstEnabled);
         set({

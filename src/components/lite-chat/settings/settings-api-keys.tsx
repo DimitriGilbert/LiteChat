@@ -30,6 +30,7 @@ import type { DbProviderConfig, DbApiKey } from "@/lib/types";
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
 import { useChatStorage } from "@/hooks/use-chat-storage";
+import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 
 const SettingsApiKeysComponent: React.FC = () => {
   // --- Fetch actions and flag from store ---
@@ -40,7 +41,10 @@ const SettingsApiKeysComponent: React.FC = () => {
       enableApiKeyManagement: state.enableApiKeyManagement,
     })),
   );
+  // Fetch live data
   const { apiKeys, providerConfigs: dbProviderConfigs } = useChatStorage();
+  // Determine loading state
+  const isLoading = apiKeys === undefined || dbProviderConfigs === undefined;
 
   // Local UI state remains
   const [newKeyName, setNewKeyName] = useState("");
@@ -211,7 +215,13 @@ const SettingsApiKeysComponent: React.FC = () => {
       {/* Stored Keys Table */}
       <div>
         <h3 className="text-lg font-medium mb-2">Stored API Keys</h3>
-        {(apiKeys || []).length === 0 ? (
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : (apiKeys || []).length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">
             No API keys stored yet. Add one above. Link keys to providers in the
             'Providers' tab.
