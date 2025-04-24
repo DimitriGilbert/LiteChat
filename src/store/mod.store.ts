@@ -20,11 +20,17 @@ import type {
   VfsWriteReturn,
 } from "@/mods/types";
 
-import type { RegisteredToolEntry } from "@/context/mod-context";
+// Removed import for RegisteredToolEntry from context
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { toast } from "sonner";
 import { db } from "@/lib/db";
+
+// Define RegisteredToolEntry locally
+export interface RegisteredToolEntry {
+  definition: Tool<any>;
+  implementation?: ToolImplementation<any>;
+}
 
 export interface ModState {
   // REMOVED: dbMods: DbMod[];
@@ -32,7 +38,7 @@ export interface ModState {
   modPromptActions: CustomPromptAction[];
   modMessageActions: CustomMessageAction[];
   modSettingsTabs: CustomSettingTab[];
-  modTools: Map<string, RegisteredToolEntry>;
+  modTools: Map<string, RegisteredToolEntry>; // Use the locally defined type
 }
 
 export interface ModActions {

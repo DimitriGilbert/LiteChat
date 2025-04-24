@@ -94,9 +94,8 @@ export function useAiInteraction({
 
   // Memoize SDK tools creation
   const sdkTools = useMemo(() => {
-    // Assuming modTools are fetched/managed elsewhere (e.g., ModStore or context)
-    const modToolsFromContext = new Map(); // Placeholder
-    return createSdkTools(modToolsFromContext, getContextSnapshotForMod);
+    // Call createSdkTools with only the required argument
+    return createSdkTools(getContextSnapshotForMod);
   }, [getContextSnapshotForMod]);
 
   /**

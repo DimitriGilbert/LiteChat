@@ -208,17 +208,16 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
   const apiKeys = storage.apiKeys || [];
 
   // --- Use Derived State Hook ---
-  const { activeConversationData, selectedProvider, selectedModel } =
-    useDerivedChatState({
-      selectedItemId,
-      selectedItemType,
-      dbConversations,
-      dbProjects,
-      dbProviderConfigs,
-      apiKeys,
-      selectedProviderId,
-      selectedModelId,
-    });
+  const { selectedProvider, selectedModel } = useDerivedChatState({
+    selectedItemId,
+    selectedItemType,
+    dbConversations,
+    dbProjects,
+    dbProviderConfigs,
+    apiKeys,
+    selectedProviderId,
+    selectedModelId,
+  });
 
   // --- Create Context Snapshot Function ---
   const getContextSnapshotForMod =

@@ -1,3 +1,4 @@
+// src/context/chat-middleware.tsx
 import { useCallback, useRef } from "react";
 import { toast } from "sonner";
 import type { z } from "zod";
@@ -22,7 +23,8 @@ import type {
   CustomMessageAction,
   CustomSettingTab,
 } from "@/lib/types";
-import { useModContext } from "./mod-context";
+// Import the store instead of the context hook
+import { useModStore } from "@/store/mod.store";
 
 interface RegistrationCallbacks {
   registerPromptAction: (action: CustomPromptAction) => () => void;
@@ -56,7 +58,8 @@ type MiddlewareRegistry = {
 };
 
 export function useChatMiddleware(setError: (error: string | null) => void) {
-  const modContext = useModContext();
+  // Get actions directly from the store's state
+  const modStoreActions = useModStore.getState();
   const middlewareRegistry = useRef<MiddlewareRegistry>({});
   const eventListeners = useRef<Map<string, Set<(...args: any[]) => void>>>(
     new Map(),
@@ -87,9 +90,10 @@ export function useChatMiddleware(setError: (error: string | null) => void) {
     middlewareRegistry.current = {};
     eventListeners.current.clear();
     modApiInstances.current.clear();
-    modContext._clearRegisteredModItems();
-    modContext._clearRegisteredModTools();
-  }, [modContext]);
+    // Use actions from the store state
+    modStoreActions._clearRegisteredModItems();
+    modStoreActions._clearRegisteredModTools();
+  }, [modStoreActions]); // Add store actions to dependency array
 
   const loadModsWithContext = useCallback(
     async (
@@ -98,11 +102,12 @@ export function useChatMiddleware(setError: (error: string | null) => void) {
     ): Promise<ModInstance[]> => {
       clearModReferences();
 
+      // Use actions directly from the store state
       const registrationCallbacks: RegistrationCallbacks = {
-        registerPromptAction: modContext._registerModPromptAction,
-        registerMessageAction: modContext._registerModMessageAction,
-        registerSettingsTab: modContext._registerModSettingsTab,
-        registerTool: modContext._registerModTool,
+        registerPromptAction: modStoreActions._registerModPromptAction,
+        registerMessageAction: modStoreActions._registerModMessageAction,
+        registerSettingsTab: modStoreActions._registerModSettingsTab,
+        registerTool: modStoreActions._registerModTool,
         registerEventListener: registerEventListener,
         registerMiddleware: <H extends ModMiddlewareHookName>(
           hookName: H,
@@ -152,12 +157,12 @@ export function useChatMiddleware(setError: (error: string | null) => void) {
     },
     [
       clearModReferences,
-      modContext._registerModPromptAction,
-      modContext._registerModMessageAction,
-      modContext._registerModSettingsTab,
-      modContext._registerModTool,
+      modStoreActions._registerModPromptAction,
+      modStoreActions._registerModMessageAction,
+      modStoreActions._registerModSettingsTab,
+      modStoreActions._registerModTool,
       registerEventListener,
-    ],
+    ], // Update dependencies
   );
 
   const runMiddleware = useCallback(
