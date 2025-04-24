@@ -1,10 +1,12 @@
 // src/utils/chat-utils.ts
+
+// Add DbProviderConfig and DbProviderType to imports
 import type {
   CustomSettingTab,
   CustomPromptAction,
   CustomMessageAction,
-  DbProviderConfig,
-  DbProviderType,
+  DbProviderConfig, // Added
+  DbProviderType, // Added
   DbMessage,
   Message,
   CoreMessage,
@@ -19,6 +21,7 @@ import { createOllama } from "ollama-ai-provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { DEFAULT_MODELS } from "@/lib/litechat";
 
+// ... (decodeUint8Array, CODE_FILE_EXTENSIONS, isCodeFile, requiresApiKey remain the same) ...
 export const decodeUint8Array = (arr: Uint8Array): string => {
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(arr);
@@ -84,24 +87,16 @@ export const requiresApiKey = (type: DbProviderType | null): boolean => {
   return type === "openai" || type === "openrouter" || type === "google";
 };
 
-/**
- * Converts an array of DbMessage or Message objects to the CoreMessage format
- * expected by the AI SDK (filtering out non-user/assistant/system roles).
- */
+// ... (convertDbMessagesToCoreMessages, EMPTY_* constants, ensureV1Path remain the same) ...
 export function convertDbMessagesToCoreMessages(
   messages: Array<DbMessage | Message>,
 ): CoreMessage[] {
   const validRoles: Role[] = ["user", "assistant", "system"];
   return messages
-    .filter(
-      (m) => validRoles.includes(m.role),
-    )
+    .filter((m) => validRoles.includes(m.role))
     .map((m) => ({
       role: m.role,
       content: m.content as MessageContent,
-      // Add tool_calls and tool_call_id if they exist and are needed by the SDK format
-      // tool_calls: m.toolCalls,
-      // tool_call_id: m.toolCallId,
     })) as CoreMessage[];
 }
 
@@ -112,16 +107,12 @@ export const EMPTY_DB_PROVIDER_CONFIGS: DbProviderConfig[] = [];
 
 export const ensureV1Path = (baseUrl: string): string => {
   try {
-    // Trim trailing slashes ONLY for the final return value if needed,
     const trimmedForV1Check = baseUrl.replace(/\/+$/, "");
-
     if (trimmedForV1Check.endsWith("/v1")) {
       return trimmedForV1Check;
     } else if (baseUrl.endsWith("/")) {
-      // Ends with '/', append 'v1'
       return baseUrl + "v1";
     } else {
-      // Doesn't end with '/' or '/v1', append '/v1'
       return baseUrl + "/v1";
     }
   } catch (e) {
@@ -130,13 +121,71 @@ export const ensureV1Path = (baseUrl: string): string => {
   }
 };
 
+// --- Moved Helper Function ---
 /**
- * Instantiates an AI model instance based on provider configuration.
- * @param config The provider configuration from the database.
- * @param modelId The specific model ID to instantiate.
- * @param apiKey Optional API key value.
- * @returns The instantiated model object or null if instantiation fails.
+ * Helper to determine the default model for a provider config.
+ * Considers fetched models, enabled models, and sort order.
  */
+export const getDefaultModelIdForProvider = (
+  providerConfig: DbProviderConfig | undefined,
+): string | null => {
+  if (!providerConfig) return null;
+
+  const providerTypeKey = providerConfig.type as keyof typeof DEFAULT_MODELS;
+  const availableModels =
+    providerConfig.fetchedModels && providerConfig.fetchedModels.length > 0
+      ? providerConfig.fetchedModels
+      : DEFAULT_MODELS[providerTypeKey] || [];
+
+  if (availableModels.length === 0) return null;
+
+  const enabledModelIds = providerConfig.enabledModels ?? [];
+  let potentialModels = availableModels;
+
+  if (enabledModelIds.length > 0) {
+    const filteredByEnabled = availableModels.filter((m: { id: string }) =>
+      enabledModelIds.includes(m.id),
+    );
+    if (filteredByEnabled.length > 0) {
+      potentialModels = filteredByEnabled;
+    } else {
+      console.warn(
+        `Provider ${providerConfig.id}: enabledModels filter resulted in empty list. Considering all available models.`,
+      );
+    }
+  }
+
+  const sortOrder = providerConfig.modelSortOrder ?? [];
+  if (sortOrder.length > 0 && potentialModels.length > 0) {
+    const orderedList: { id: string; name: string }[] = [];
+    const addedIds = new Set<string>();
+    const potentialModelMap = new Map(
+      potentialModels.map((m: { id: string; name: string }) => [m.id, m]),
+    );
+    for (const modelId of sortOrder) {
+      const model = potentialModelMap.get(modelId);
+      if (model && !addedIds.has(modelId)) {
+        orderedList.push(model);
+        addedIds.add(modelId);
+      }
+    }
+    const remaining = potentialModels
+      .filter((m: { id: string }) => !addedIds.has(m.id))
+      .sort((a: { name: string }, b: { name: string }) =>
+        a.name.localeCompare(b.name),
+      );
+    potentialModels = [...orderedList, ...remaining];
+  } else {
+    potentialModels.sort((a: { name: string }, b: { name: string }) =>
+      a.name.localeCompare(b.name),
+    );
+  }
+
+  return potentialModels[0]?.id ?? null;
+};
+// --- End Moved Helper Function ---
+
+// ... (instantiateModelInstance, createAiModelConfig remain the same) ...
 export function instantiateModelInstance(
   config: DbProviderConfig,
   modelId: string,
@@ -173,22 +222,16 @@ export function instantiateModelInstance(
   }
 }
 
-/**
- * Creates an AiModelConfig object including the instantiated model.
- * @param config The provider configuration.
- * @param modelId The model ID.
- * @param apiKey Optional API key.
- * @returns AiModelConfig object or null if instantiation fails.
- */
 export function createAiModelConfig(
   config: DbProviderConfig,
   modelId: string,
   apiKey?: string,
 ): AiModelConfig | undefined {
+  const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
   const allAvailable =
     config.fetchedModels && config.fetchedModels.length > 0
       ? config.fetchedModels
-      : DEFAULT_MODELS[config.type] || [];
+      : DEFAULT_MODELS[providerTypeKey] || [];
   const modelInfo = allAvailable.find((m) => m.id === modelId);
   if (!modelInfo) return undefined;
 

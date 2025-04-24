@@ -1,5 +1,7 @@
-
+// src/store/settings.store.ts
 import { create } from "zustand";
+import { db } from "@/lib/db"; // Import db
+import { toast } from "sonner"; // Import toast for potential errors
 
 export interface SettingsState {
   // Feature Flags (can be set during init)
@@ -21,6 +23,8 @@ export interface SettingsState {
 }
 
 export interface SettingsActions {
+  // Add an initialization action
+  loadInitialSettings: () => Promise<void>;
   setEnableAdvancedSettings: (enabled: boolean) => void;
   setTheme: (theme: "light" | "dark" | "system") => void;
   setSearchTerm: (term: string) => void;
@@ -39,7 +43,6 @@ export interface SettingsActions {
   // Derived data (activeSystemPrompt) should be handled by selectors outside the store
 }
 
-
 const defaultGlobalPrompt = `You are a helpful, concise AI assistant designed to provide accurate, relevant answers.
 Follow all instructions exactly, prioritizing clarity, specificity, and relevance.
 Define your role and limitations in context, and adhere strictly to them.
@@ -49,9 +52,31 @@ When reasoning is needed, provide brief chain‑of‑thought steps to improve tr
 Keep responses concise; avoid unnecessary preamble or filler words.
 `;
 
+// Helper to save a setting to DB
+const saveSetting = async (key: string, value: any) => {
+  try {
+    await db.appState.put({ key: `settings:${key}`, value });
+  } catch (error) {
+    console.error(`Failed to save setting ${key}:`, error);
+    toast.error(`Failed to save setting: ${key}`);
+  }
+};
+
+// Helper to load a setting from DB
+const loadSetting = async <T>(key: string, defaultValue: T): Promise<T> => {
+  try {
+    const setting = await db.appState.get(`settings:${key}`);
+    return setting?.value !== undefined ? (setting.value as T) : defaultValue;
+  } catch (error) {
+    console.error(`Failed to load setting ${key}:`, error);
+    toast.error(`Failed to load setting: ${key}`);
+    return defaultValue;
+  }
+};
+
 export const useSettingsStore = create<SettingsState & SettingsActions>()(
   (set) => ({
-    // Initial State
+    // Initial State (will be overwritten by loadInitialSettings)
     enableAdvancedSettings: true,
     theme: "system",
     searchTerm: "",
@@ -66,27 +91,92 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     streamingRefreshRateMs: 33,
     enableStreamingMarkdown: true,
 
-    // Actions
-    setEnableAdvancedSettings: (enableAdvancedSettings) =>
-      set({ enableAdvancedSettings }),
+    // Initialization Action
+    loadInitialSettings: async () => {
+      console.log("[SettingsStore] Loading initial settings from DB...");
+      const loadedSettings = {
+        enableAdvancedSettings: await loadSetting(
+          "enableAdvancedSettings",
+          true,
+        ),
+        theme: await loadSetting<"light" | "dark" | "system">(
+          "theme",
+          "system",
+        ),
+        temperature: await loadSetting("temperature", 0.7),
+        maxTokens: await loadSetting<number | null>("maxTokens", null),
+        globalSystemPrompt: await loadSetting<string | null>(
+          "globalSystemPrompt",
+          defaultGlobalPrompt,
+        ),
+        topP: await loadSetting<number | null>("topP", null),
+        topK: await loadSetting<number | null>("topK", null),
+        presencePenalty: await loadSetting<number | null>(
+          "presencePenalty",
+          null,
+        ),
+        frequencyPenalty: await loadSetting<number | null>(
+          "frequencyPenalty",
+          null,
+        ),
+        streamingRefreshRateMs: await loadSetting("streamingRefreshRateMs", 33),
+        enableStreamingMarkdown: await loadSetting(
+          "enableStreamingMarkdown",
+          true,
+        ),
+      };
+      console.log("[SettingsStore] Loaded settings:", loadedSettings);
+      set(loadedSettings);
+    },
+
+    // Actions (now include saving)
+    setEnableAdvancedSettings: (enableAdvancedSettings) => {
+      set({ enableAdvancedSettings });
+      saveSetting("enableAdvancedSettings", enableAdvancedSettings);
+    },
     setTheme: (theme) => {
       set({ theme });
-      // should be handled by a component subscribing to this state,
+      saveSetting("theme", theme);
     },
-    setSearchTerm: (searchTerm) => set({ searchTerm }),
+    setSearchTerm: (searchTerm) => set({ searchTerm }), // Search term is likely transient, no need to save
     setIsSettingsModalOpen: (isOpen) => {
       set({ isSettingsModalOpen: isOpen });
     },
-    setTemperature: (temperature) => set({ temperature }),
-    setMaxTokens: (maxTokens) => set({ maxTokens }),
-    setGlobalSystemPrompt: (globalSystemPrompt) => set({ globalSystemPrompt }),
-    setTopP: (topP) => set({ topP }),
-    setTopK: (topK) => set({ topK }),
-    setPresencePenalty: (presencePenalty) => set({ presencePenalty }),
-    setFrequencyPenalty: (frequencyPenalty) => set({ frequencyPenalty }),
-    setStreamingRefreshRateMs: (streamingRefreshRateMs) =>
-      set({ streamingRefreshRateMs }),
-    setEnableStreamingMarkdown: (enableStreamingMarkdown) =>
-      set({ enableStreamingMarkdown }),
+    setTemperature: (temperature) => {
+      set({ temperature });
+      saveSetting("temperature", temperature);
+    },
+    setMaxTokens: (maxTokens) => {
+      set({ maxTokens });
+      saveSetting("maxTokens", maxTokens);
+    },
+    setGlobalSystemPrompt: (globalSystemPrompt) => {
+      set({ globalSystemPrompt });
+      saveSetting("globalSystemPrompt", globalSystemPrompt);
+    },
+    setTopP: (topP) => {
+      set({ topP });
+      saveSetting("topP", topP);
+    },
+    setTopK: (topK) => {
+      set({ topK });
+      saveSetting("topK", topK);
+    },
+    setPresencePenalty: (presencePenalty) => {
+      set({ presencePenalty });
+      saveSetting("presencePenalty", presencePenalty);
+    },
+    setFrequencyPenalty: (frequencyPenalty) => {
+      set({ frequencyPenalty });
+      saveSetting("frequencyPenalty", frequencyPenalty);
+    },
+    setStreamingRefreshRateMs: (streamingRefreshRateMs) => {
+      set({ streamingRefreshRateMs });
+      saveSetting("streamingRefreshRateMs", streamingRefreshRateMs);
+    },
+    setEnableStreamingMarkdown: (enableStreamingMarkdown) => {
+      set({ enableStreamingMarkdown });
+      saveSetting("enableStreamingMarkdown", enableStreamingMarkdown);
+    },
   }),
 );

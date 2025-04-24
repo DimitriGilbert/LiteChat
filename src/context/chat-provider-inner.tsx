@@ -1,5 +1,5 @@
 // src/context/chat-provider-inner.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 
 import { useCoreChatStore } from "@/store/core-chat.store";
@@ -9,8 +9,40 @@ import { useSidebarStore } from "@/store/sidebar.store";
 import { useVfsStore } from "@/store/vfs.store";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 
-import type { LiteChatConfig, DbConversation, DbProject } from "@/lib/types";
+// Import necessary types
+import type {
+  LiteChatConfig,
+  DbConversation,
+  DbProject,
+  DbProviderConfig,
+} from "@/lib/types";
 import { DEFAULT_MODELS } from "@/lib/litechat";
+import { getDefaultModelIdForProvider } from "@/utils/chat-utils";
+
+const getFirstEnabledProviderAndModel = (
+  providerConfigs: DbProviderConfig[],
+): { providerId: string | null; modelId: string | null } => {
+  const safeProviderConfigs = Array.isArray(providerConfigs)
+    ? providerConfigs
+    : [];
+  const enabledConfigs = safeProviderConfigs.filter(
+    (c: DbProviderConfig) => c.isEnabled,
+  );
+  enabledConfigs.sort(
+    (a: DbProviderConfig, b: DbProviderConfig) =>
+      a.createdAt.getTime() - b.createdAt.getTime(),
+  );
+  const firstEnabledProvider = enabledConfigs[0];
+
+  if (!firstEnabledProvider) {
+    return { providerId: null, modelId: null };
+  }
+  const defaultModelId = getDefaultModelIdForProvider(firstEnabledProvider);
+  return {
+    providerId: firstEnabledProvider.id,
+    modelId: defaultModelId,
+  };
+};
 
 interface ChatProviderInnerProps {
   children: React.ReactNode;
@@ -21,139 +53,160 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
   children,
   config,
 }) => {
+  const initializationCompleteRef = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isStorageReady, setIsStorageReady] = useState(false);
-  const storage = useChatStorage(); // Get storage hook instance
+  const storage = useChatStorage();
 
   // Effect 1: Watch storage results to set isStorageReady flag ONCE
   useEffect(() => {
-    if (isStorageReady) return; // Already set, do nothing
+    if (isStorageReady) return;
 
-    // Check if all required storage data arrays are no longer undefined
-    const providerConfigsLoaded = storage.providerConfigs !== undefined;
-    const projectsLoaded = storage.projects !== undefined;
-    const conversationsLoaded = storage.conversations !== undefined;
-    const apiKeysLoaded = storage.apiKeys !== undefined; // Add checks for all relevant stores
-    const modsLoaded = storage.mods !== undefined;
+    const allLoaded =
+      storage.providerConfigs !== undefined &&
+      storage.projects !== undefined &&
+      storage.conversations !== undefined &&
+      storage.apiKeys !== undefined &&
+      storage.mods !== undefined;
 
-    if (
-      providerConfigsLoaded &&
-      projectsLoaded &&
-      conversationsLoaded &&
-      apiKeysLoaded &&
-      modsLoaded
-    ) {
+    if (allLoaded) {
       console.log(
         "[ChatProviderInner Effect 1] All required storage ready. Setting flag.",
       );
-      setIsStorageReady(true); // Set the flag
+      setIsStorageReady(true);
     }
-    // This effect depends on the storage values changing from undefined to defined
   }, [
     storage.providerConfigs,
     storage.projects,
     storage.conversations,
     storage.apiKeys,
     storage.mods,
-    isStorageReady, // Include to prevent re-running after set to true
+    isStorageReady,
   ]);
 
-  // Effect 2: Main initialization logic, runs ONCE when storage is ready
+  // Effect 3: Main initialization logic
   useEffect(() => {
-    // Guard: Only run if storage is ready AND initialization hasn't completed
-    if (!isStorageReady || isInitialized) {
+    // --- STRICT GUARD ---
+    if (!isStorageReady || initializationCompleteRef.current) {
       return;
     }
-
-    // Ensure providerConfigs has loaded (it might be [] initially from useLiveQuery)
-    // We rely on isStorageReady which checks for !== undefined, which is sufficient here.
-    const currentProviderConfigs = storage.providerConfigs || [];
+    // Check providerConfigs *after* storage is ready
+    const currentProviderConfigs = storage.providerConfigs;
     if (currentProviderConfigs === undefined) {
       console.log(
-        "[ChatProviderInner Effect 2] Waiting for providerConfigs to load...",
+        "[ChatProviderInner Effect 3] Waiting: providerConfigs not yet defined.",
       );
-      return; // Wait if configs are still undefined (shouldn't happen if isStorageReady is true)
+      return;
     }
+    // --- END GUARD ---
 
     console.log(
-      "[ChatProviderInner Effect 2] Running initialization logic with loaded providerConfigs:",
-      currentProviderConfigs,
+      `[ChatProviderInner Effect 3] Starting initialization logic... Configs count: ${currentProviderConfigs.length}`,
     );
 
-    // --- Initialization Logic ---
     const initializeApp = async () => {
+      initializationCompleteRef.current = true; // Prevent re-entry
+      console.log(
+        `[ChatProviderInner Init] Setting initialization ref to true at start.`,
+      );
+
       let initializationError: Error | null = null;
       try {
-        // Access storage data directly - it's ready now
-        // Use the variable captured at the start of the effect
         const currentProjects = storage.projects || [];
         const currentConversations = storage.conversations || [];
 
-        // 1. Initialize Feature Flags and Configurable Settings
+        // --- 1. Load Persisted Settings ---
+        console.log("[ChatProviderInner Init] Loading persisted settings...");
+        await useSettingsStore.getState().loadInitialSettings();
+        await useProviderStore.getState().loadInitialProviderSettings();
+        console.log("[ChatProviderInner Init] Persisted settings loaded.");
+
+        // --- 2. Apply Config Feature Flags/Settings ---
         console.log("[ChatProviderInner Init] Setting feature flags...");
-        useProviderStore
-          .getState()
-          .setEnableApiKeyManagement(config.enableApiKeyManagement ?? true);
-        useSettingsStore
-          .getState()
-          .setEnableAdvancedSettings(config.enableAdvancedSettings ?? true);
-        useSidebarStore
-          .getState()
-          .setEnableSidebar(config.enableSidebar ?? true);
-        useVfsStore.getState()._setEnableVfs(config.enableVfs ?? true);
+        if (config.enableApiKeyManagement !== undefined) {
+          useProviderStore
+            .getState()
+            .setEnableApiKeyManagement(config.enableApiKeyManagement);
+        }
+        if (config.enableAdvancedSettings !== undefined) {
+          useSettingsStore
+            .getState()
+            .setEnableAdvancedSettings(config.enableAdvancedSettings);
+        }
+        if (config.enableSidebar !== undefined) {
+          useSidebarStore.getState().setEnableSidebar(config.enableSidebar);
+        }
+        if (config.enableVfs !== undefined) {
+          useVfsStore.getState()._setEnableVfs(config.enableVfs);
+        }
         if (config.streamingRefreshRateMs !== undefined) {
           useSettingsStore
             .getState()
             .setStreamingRefreshRateMs(config.streamingRefreshRateMs);
         }
 
-        // 2. Trigger store initialization actions (Provider Selection)
+        // --- 3. Determine Initial Provider/Model Selection ---
         console.log(
-          "[ChatProviderInner Init] Triggering provider selection initialization...",
+          "[ChatProviderInner Init] Determining initial provider/model selection...",
         );
-        // Pass the *currently loaded* provider configs
-        await useProviderStore
+        // Call loadInitialSelection WITHOUT passing configs
+        const loadedSelection = await useProviderStore
           .getState()
-          .loadInitialSelection(currentProviderConfigs);
-        console.log("[ChatProviderInner Init] Provider selection initialized.");
+          .loadInitialSelection();
 
-        // 3. Apply Config Overrides and Set Initial Sidebar Selection
-        console.log("[ChatProviderInner Init] Applying config overrides...");
-        const {
-          initialSelectedItemId,
-          initialSelectedItemType,
-          initialProviderId,
-          initialModelId,
-        } = config;
+        let providerToSet: string | null = loadedSelection.providerId;
+        let modelToSet: string | null = loadedSelection.modelId;
 
-        // Get state *after* loadInitialSelection has run
-        const currentSelectedProviderId =
-          useProviderStore.getState().selectedProviderId;
-        const currentSelectedModelId =
-          useProviderStore.getState().selectedModelId;
+        // Fallback logic still uses currentProviderConfigs fetched earlier in this effect
+        if (!providerToSet && currentProviderConfigs.some((c) => c.isEnabled)) {
+          console.log(
+            "[ChatProviderInner Init] No valid saved selection found, finding first enabled provider...",
+          );
+          const fallback = getFirstEnabledProviderAndModel(
+            currentProviderConfigs,
+          );
+          providerToSet = fallback.providerId;
+          modelToSet = fallback.modelId;
+          console.log(
+            `[ChatProviderInner Init] Fallback selection: Provider=${providerToSet}, Model=${modelToSet}`,
+          );
+        } else if (!providerToSet) {
+          console.log(
+            "[ChatProviderInner Init] No valid saved selection and no enabled providers found.",
+          );
+        } else {
+          console.log(
+            `[ChatProviderInner Init] Using loaded selection: Provider=${providerToSet}, Model=${modelToSet}`,
+          );
+        }
 
-        let finalProviderId = currentSelectedProviderId;
-        let finalModelId = currentSelectedModelId;
+        // --- 4. Apply Config Overrides for Provider/Model ---
+        const { initialProviderId, initialModelId } = config;
+        console.log(
+          `[ChatProviderInner Init] Applying config overrides. Initial Config: P=${initialProviderId}, M=${initialModelId}. Current Determined: P=${providerToSet}, M=${modelToSet}`,
+        );
 
-        // Apply provider override from config, if different from loaded state
-        if (
-          initialProviderId &&
-          initialProviderId !== currentSelectedProviderId
-        ) {
+        let finalProviderId = providerToSet;
+        let finalModelId = modelToSet;
+
+        if (initialProviderId && initialProviderId !== finalProviderId) {
           const isValidOverride = currentProviderConfigs.some(
-            (p) => p.id === initialProviderId && p.isEnabled,
+            (p: DbProviderConfig) => p.id === initialProviderId && p.isEnabled,
           );
           if (isValidOverride) {
             console.log(
-              `[ChatProviderInner Init] Config overriding initial provider: ${initialProviderId}`,
+              `[ChatProviderInner Init] Config overriding provider: ${initialProviderId}`,
             );
-            // Call setSelectedProviderId which handles setting the default model
-            useProviderStore
-              .getState()
-              .setSelectedProviderId(initialProviderId, currentProviderConfigs);
-            // Update local vars with the state set by the action
-            finalProviderId = useProviderStore.getState().selectedProviderId;
-            finalModelId = useProviderStore.getState().selectedModelId;
+            finalProviderId = initialProviderId;
+            const overriddenProviderConfig = currentProviderConfigs.find(
+              (p: DbProviderConfig) => p.id === initialProviderId,
+            );
+            finalModelId = getDefaultModelIdForProvider(
+              overriddenProviderConfig,
+            );
+            console.log(
+              `[ChatProviderInner Init] Model set to default for overridden provider: ${finalModelId}`,
+            );
           } else {
             console.warn(
               `[ChatProviderInner Init] Config initialProviderId ${initialProviderId} invalid/disabled. Ignoring override.`,
@@ -161,42 +214,63 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
           }
         }
 
-        // Apply model override from config, if provider matches and model is different
         if (
-          finalProviderId && // Ensure a provider is selected
-          initialModelId && // Ensure a model override is specified
-          initialModelId !== finalModelId // Ensure it's different from current/default
+          finalProviderId &&
+          initialModelId &&
+          initialModelId !== finalModelId
         ) {
-          const providerConfig = currentProviderConfigs.find(
-            (p) => p.id === finalProviderId,
+          const finalProviderConfig = currentProviderConfigs.find(
+            (p: DbProviderConfig) => p.id === finalProviderId,
           );
+          const providerTypeKey =
+            finalProviderConfig?.type as keyof typeof DEFAULT_MODELS;
           const availableModels =
-            providerConfig?.fetchedModels ??
-            (providerConfig ? DEFAULT_MODELS[providerConfig.type] || [] : []);
+            finalProviderConfig?.fetchedModels ??
+            (finalProviderConfig ? DEFAULT_MODELS[providerTypeKey] || [] : []);
+          const enabledModelIds = finalProviderConfig?.enabledModels ?? [];
+          const modelsToConsider =
+            enabledModelIds.length > 0
+              ? availableModels.filter((m: { id: string }) =>
+                  enabledModelIds.includes(m.id),
+                )
+              : availableModels;
+
           if (
-            availableModels.some(
-              (m: { id: string; name: string }) => m.id === initialModelId,
+            modelsToConsider.some(
+              (m: { id: string }) => m.id === initialModelId,
             )
           ) {
             console.log(
-              `[ChatProviderInner Init] Config setting initial model: ${initialModelId} for provider ${finalProviderId}`,
+              `[ChatProviderInner Init] Config overriding model to: ${initialModelId} for provider ${finalProviderId}`,
             );
-            useProviderStore.getState().setSelectedModelId(initialModelId);
-            finalModelId = initialModelId; // Update local var
+            finalModelId = initialModelId;
           } else {
             console.warn(
-              `[ChatProviderInner Init] Config initialModelId ${initialModelId} invalid for provider ${finalProviderId}. Using default/current ${finalModelId}.`,
+              `[ChatProviderInner Init] Config initialModelId ${initialModelId} invalid/disabled for provider ${finalProviderId}. Using determined model: ${finalModelId}.`,
             );
           }
         }
 
-        // Set initial sidebar selection
+        // --- 5. Set Final Provider/Model State in Store ---
+        console.log(
+          `[ChatProviderInner Init] Setting final selection state: Provider=${finalProviderId}, Model=${finalModelId}`,
+        );
+        // Pass currentProviderConfigs here for default model logic within setSelectedProviderId
+        useProviderStore
+          .getState()
+          .setSelectedProviderId(finalProviderId, currentProviderConfigs);
+        if (useProviderStore.getState().selectedModelId !== finalModelId) {
+          useProviderStore.getState().setSelectedModelId(finalModelId);
+        }
+
+        // --- 6. Set Initial Sidebar Selection ---
         console.log("[ChatProviderInner Init] Setting sidebar selection...");
+        const { initialSelectedItemId, initialSelectedItemType } = config;
         const currentSidebarItemId = useSidebarStore.getState().selectedItemId;
+        let targetItemId = currentSidebarItemId;
+        let targetItemType = useSidebarStore.getState().selectedItemType;
+
         if (initialSelectedItemId && initialSelectedItemType) {
-          console.log(
-            `[ChatProviderInner Init] Attempting selection from config: ${initialSelectedItemType} - ${initialSelectedItemId}`,
-          );
           let itemExists = false;
           if (initialSelectedItemType === "conversation") {
             itemExists = currentConversations.some(
@@ -207,54 +281,32 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
               (p) => p.id === initialSelectedItemId,
             );
           }
-
           if (itemExists) {
-            await useSidebarStore
-              .getState()
-              .selectItem(initialSelectedItemId, initialSelectedItemType);
+            targetItemId = initialSelectedItemId;
+            targetItemType = initialSelectedItemType;
           } else {
             console.warn(
-              `[ChatProviderInner Init] Config initialSelectedItemId ${initialSelectedItemId} (${initialSelectedItemType}) not found. Selecting fallback.`,
+              `[ChatProviderInner Init] Config initialSelectedItemId ${initialSelectedItemId} not found. Falling back.`,
             );
             const fallbackItem = getFirstAvailableItem(
               currentProjects,
               currentConversations,
             );
-            await useSidebarStore
-              .getState()
-              .selectItem(fallbackItem?.id ?? null, fallbackItem?.type ?? null);
+            targetItemId = fallbackItem?.id ?? null;
+            targetItemType = fallbackItem?.type ?? null;
           }
         } else if (!currentSidebarItemId) {
-          console.log(
-            "[ChatProviderInner Init] No initial item selection. Selecting first available.",
-          );
           const firstItem = getFirstAvailableItem(
             currentProjects,
             currentConversations,
           );
-          if (firstItem) {
-            console.log(
-              `[ChatProviderInner Init] Selecting first available item: ${firstItem.type} - ${firstItem.id}`,
-            );
-            await useSidebarStore
-              .getState()
-              .selectItem(firstItem.id, firstItem.type);
-          } else {
-            console.log("[ChatProviderInner Init] No items found to select.");
-            await useSidebarStore.getState().selectItem(null, null);
-          }
-        } else {
-          console.log(
-            "[ChatProviderInner Init] Sidebar selection already present:",
-            currentSidebarItemId,
-          );
-          const currentSidebarItemType =
-            useSidebarStore.getState().selectedItemType;
-          // Re-select to ensure message/VFS loading triggers correctly
-          await useSidebarStore
-            .getState()
-            .selectItem(currentSidebarItemId, currentSidebarItemType);
+          targetItemId = firstItem?.id ?? null;
+          targetItemType = firstItem?.type ?? null;
         }
+
+        await useSidebarStore
+          .getState()
+          .selectItem(targetItemId, targetItemType);
 
         console.log(
           "[ChatProviderInner Init] Post-initialization setup complete.",
@@ -273,21 +325,19 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
           .getState()
           .setError("Failed to load initial application data.");
       } finally {
-        // Set initialized to true *only after* the first attempt (success or fail)
+        // --- Trigger re-render by setting state ---
         setIsInitialized(true);
         console.log(
-          `[ChatProviderInner Init] Initialization sequence finished. isInitialized: true.`,
+          `[ChatProviderInner Init] Initialization sequence finished. State set to true.`,
         );
       }
     };
 
     initializeApp();
-    // Add storage.providerConfigs to dependencies to ensure the effect runs
-    // *after* the configs are loaded by useLiveQuery.
-    // The isInitialized flag prevents it from running again after the first successful execution.
-  }, [isStorageReady, isInitialized, config, storage.providerConfigs]); // Added storage.providerConfigs
+    // Dependencies: Only isStorageReady and config. The check for providerConfigs happens inside.
+  }, [isStorageReady, config, storage.providerConfigs]); // Keep storage.providerConfigs dependency
 
-  // Helper function (remains the same)
+  // Helper function
   const getFirstAvailableItem = (
     projects: DbProject[],
     conversations: DbConversation[],
@@ -302,8 +352,8 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
     return combinedItems[0];
   };
 
-  // Render loading state until *both* storage is ready *and* initialization is complete
-  if (!isStorageReady || !isInitialized) {
+  // Render loading state based on the isInitialized STATE variable
+  if (!isInitialized) {
     const initError = useCoreChatStore.getState().error;
     const loadingMessage = !isStorageReady
       ? "Loading data..."
