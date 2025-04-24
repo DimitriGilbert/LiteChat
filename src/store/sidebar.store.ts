@@ -75,19 +75,24 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
     setEnableSidebar: (enableSidebar) => set({ enableSidebar }),
 
     selectItem: async (id, type) => {
-      // selectItem logic... (no changes needed here for this bug)
       const currentId = get().selectedItemId;
       const currentType = get().selectedItemType;
 
       if (currentId === id && currentType === type) {
-        return;
+        console.log(
+          `[SidebarStore] Item ${type} - ${id} already selected. Skipping redundant selection.`,
+        );
+        // Even if skipping selection state update, ensure VFS/Messages are synced
+        // This handles cases where the underlying item data might change while selected
+      } else {
+        console.log(`[SidebarStore] Selecting item: ${type} - ${id}`);
+        set({
+          selectedItemId: id,
+          selectedItemType: type,
+        });
       }
 
-      console.log(`[SidebarStore] Selecting item: ${type} - ${id}`);
-      set({
-        selectedItemId: id,
-        selectedItemType: type,
-      });
+      // --- Load Messages ---
       const coreChatActions = useCoreChatStore.getState();
       if (type === "conversation" && id) {
         console.log(`[SidebarStore] Loading messages for conversation: ${id}`);
@@ -99,6 +104,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         await coreChatActions.loadMessages(null);
       }
 
+      // --- Update VFS State ---
       const vfsActions = useVfsStore.getState();
       let isVfsEnabledForItem = false;
       let vfsKey: string | null = null;
@@ -107,45 +113,104 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         let selectedItem: DbProject | DbConversation | undefined;
         let parentProject: DbProject | undefined;
 
-        if (type === "project") {
-          selectedItem = await db.projects.get(id);
-        } else {
-          selectedItem = await db.conversations.get(id);
-          if (selectedItem?.parentId) {
-            parentProject = await db.projects.get(selectedItem.parentId);
-          }
-        }
-
-        isVfsEnabledForItem = selectedItem?.vfsEnabled ?? false;
-
-        if (type === "project") {
-          vfsKey = `project-${id}`;
-        } else if (type === "conversation") {
-          const convo = selectedItem as DbConversation | undefined;
-          if (convo?.parentId && parentProject) {
-            vfsKey = `project-${convo.parentId}`;
-            isVfsEnabledForItem = parentProject.vfsEnabled ?? false;
+        try {
+          if (type === "project") {
+            selectedItem = await db.projects.get(id);
           } else {
-            vfsKey = "orphan";
-            isVfsEnabledForItem = convo?.vfsEnabled ?? false;
+            selectedItem = await db.conversations.get(id);
+            if (selectedItem?.parentId) {
+              parentProject = await db.projects.get(selectedItem.parentId);
+            }
           }
+
+          if (!selectedItem) {
+            console.warn(
+              `[SidebarStore] Selected item ${id} (${type}) not found in DB during VFS state update.`,
+            );
+          } else {
+            isVfsEnabledForItem = selectedItem.vfsEnabled ?? false;
+
+            if (type === "project") {
+              vfsKey = `project-${id}`;
+              // Project's own vfsEnabled state is used directly
+            } else if (type === "conversation") {
+              const convo = selectedItem as DbConversation;
+              if (convo.parentId && parentProject) {
+                // Conversation is in a project, use project's VFS key and enabled state
+                vfsKey = `project-${convo.parentId}`;
+                isVfsEnabledForItem = parentProject.vfsEnabled ?? false;
+              } else {
+                // Orphan conversation, use its own VFS key and enabled state
+                vfsKey = "orphan"; // Use a consistent key for all orphans
+                // isVfsEnabledForItem remains as convo.vfsEnabled
+              }
+            }
+          }
+        } catch (dbError) {
+          console.error(
+            "[SidebarStore] Error fetching item details for VFS state update:",
+            dbError,
+          );
+          toast.error("Failed to update filesystem status.");
+          // Reset VFS state on error
+          vfsKey = null;
+          isVfsEnabledForItem = false;
         }
       }
 
       console.log(
         `[SidebarStore] Updating VFS state: key=${vfsKey}, enabled=${isVfsEnabledForItem}`,
       );
-      vfsActions.setVfsKey(vfsKey);
-      vfsActions.setIsVfsEnabledForItem(isVfsEnabledForItem);
-      vfsActions.clearSelectedVfsPaths();
 
-      modEvents.emit(ModEvent.CHAT_SELECTED, { id, type });
+      // Check if VFS state actually needs changing
+      const currentVfsKey = useVfsStore.getState().vfsKey;
+      const currentVfsEnabled = useVfsStore.getState().isVfsEnabledForItem;
+
+      if (
+        vfsKey !== currentVfsKey ||
+        isVfsEnabledForItem !== currentVfsEnabled
+      ) {
+        // Reset VFS ready state before changing key/enabled state
+        // This forces re-initialization if needed
+        if (useVfsStore.getState().isVfsReady) {
+          console.log(
+            `[SidebarStore] Resetting VFS ready state before changing key/enabled state (Key: ${currentVfsKey} -> ${vfsKey}, Enabled: ${currentVfsEnabled} -> ${isVfsEnabledForItem})`,
+          );
+          vfsActions.setVfsReady(false);
+          vfsActions.setConfiguredVfsKey(null); // Clear configured key
+          vfsActions._setFsInstance(null); // Clear fs instance
+        }
+
+        vfsActions.setVfsKey(vfsKey);
+        vfsActions.setIsVfsEnabledForItem(isVfsEnabledForItem);
+        vfsActions.clearSelectedVfsPaths(); // Clear selections on item change
+
+        // Trigger initialization if the new state requires it
+        if (vfsKey && isVfsEnabledForItem && useVfsStore.getState().enableVfs) {
+          console.log(
+            "[SidebarStore] Triggering VFS initialization after selection change.",
+          );
+          // Use setTimeout to ensure state updates propagate before init
+          setTimeout(() => {
+            vfsActions.initializeVfs();
+          }, 0);
+        }
+      } else {
+        console.log(
+          "[SidebarStore] VFS state (key/enabled) unchanged, skipping VFS reset/init.",
+        );
+      }
+
+      // Emit event only if selection actually changed
+      if (currentId !== id || currentType !== type) {
+        modEvents.emit(ModEvent.CHAT_SELECTED, { id, type });
+      }
     },
 
     createConversation: async (parentId, title = "New Chat") => {
       console.log(
         `[SidebarStore] createConversation called with parentId: ${parentId}, title: ${title}`,
-      ); // Log entry
+      );
       try {
         const newId = nanoid();
         const now = new Date();
@@ -156,37 +221,36 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           systemPrompt: null,
           createdAt: now,
           updatedAt: now,
-          vfsEnabled: false,
+          vfsEnabled: false, // Default VFS to false for new conversations
         };
         await db.conversations.add(newConversation);
-        console.log(`[SidebarStore] Added conversation ${newId} to DB.`); // Log DB add
+        console.log(`[SidebarStore] Added conversation ${newId} to DB.`);
         if (parentId) {
           await db.projects.update(parentId, { updatedAt: now });
           console.log(
             `[SidebarStore] Updated parent project ${parentId} timestamp.`,
-          ); // Log parent update
+          );
         }
         modEvents.emit(ModEvent.CHAT_CREATED, {
           id: newId,
           type: "conversation",
           parentId,
         });
-        // *** Select the new item AFTER creation ***
+        // Select the new item AFTER creation
         await get().selectItem(newId, "conversation");
         console.log(
           `[SidebarStore] createConversation returning new ID: ${newId}`,
-        ); // Log return value
-        return newId; // Return the ID
+        );
+        return newId;
       } catch (error) {
-        console.error("[SidebarStore] Failed to create conversation:", error); // Log error
+        console.error("[SidebarStore] Failed to create conversation:", error);
         toast.error(
           `Failed to create chat: ${error instanceof Error ? error.message : String(error)}`,
         );
-        throw error; // Re-throw
+        throw error;
       }
     },
 
-    // Other actions remain the same...
     createProject: async (parentId, name = "New Project") => {
       try {
         const newId = nanoid();
@@ -197,7 +261,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           parentId,
           createdAt: now,
           updatedAt: now,
-          vfsEnabled: false,
+          vfsEnabled: false, // Default VFS to false for new projects
         };
         await db.projects.add(newProject);
         if (parentId) {
@@ -208,7 +272,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           type: "project",
           parentId,
         });
-        // await get().selectItem(newProject.id, "project"); // Don't auto-select projects
+        // Don't auto-select projects
         return { id: newProject.id, name: newProject.name };
       } catch (error) {
         console.error("Failed to create project:", error);
@@ -268,6 +332,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
               await tx.messages.where("conversationId").equals(id).delete();
               await tx.conversations.delete(id);
             } else if (type === "project") {
+              // Re-verify emptiness within transaction for safety
               const finalChildProjects = await tx.projects
                 .where("parentId")
                 .equals(id)
@@ -284,8 +349,13 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
                 );
               }
             }
+            // Update parent timestamp if applicable
             if (parentId) {
-              await tx.projects.update(parentId, { updatedAt: now });
+              // Check if parent still exists before updating
+              const parentExists = await tx.projects.get(parentId);
+              if (parentExists) {
+                await tx.projects.update(parentId, { updatedAt: now });
+              }
             }
           },
         );
@@ -298,6 +368,8 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           }" deleted.`,
         );
         modEvents.emit(ModEvent.CHAT_DELETED, { id, type });
+
+        // If the deleted item was selected, select the next available item
         if (currentSelectedId === id) {
           const [projects, conversations] = await Promise.all([
             db.projects.orderBy("updatedAt").reverse().toArray(),
@@ -409,7 +481,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           content:
             typeof msg.content === "string"
               ? msg.content
-              : JSON.stringify(msg.content),
+              : JSON.stringify(msg.content), // Ensure content is stringified if not already
           createdAt: msg.createdAt.toISOString(),
         }));
         const jsonString = JSON.stringify(exportData, null, 2);
@@ -463,7 +535,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
               importedMessages.map((msg) => ({
                 id: nanoid(),
                 role: msg.role,
-                content: msg.content as MessageContent,
+                content: msg.content as MessageContent, // Assume content is string for import schema
                 createdAt: msg.createdAt,
                 conversationId: newConversationId,
               })),
@@ -524,7 +596,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
               content:
                 typeof msg.content === "string"
                   ? msg.content
-                  : JSON.stringify(msg.content),
+                  : JSON.stringify(msg.content), // Ensure content is stringified if not already
               createdAt: msg.createdAt.toISOString(),
             })),
           });
@@ -592,49 +664,9 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           }
         }
 
+        // If the toggled item is currently selected, update the VFS store state
         if (get().selectedItemId === id) {
-          const vfsStore = useVfsStore.getState();
-          let newVfsKey: string | null = null;
-          let newEnabledState = optimisticNewVfsState;
-          if (type === "project") {
-            newVfsKey = `project-${id}`;
-          } else if (type === "conversation") {
-            const convo = item as DbConversation;
-            if (convo.parentId) {
-              const parentProject = await db.projects.get(convo.parentId);
-              if (parentProject) {
-                newVfsKey = `project-${convo.parentId}`;
-                newEnabledState = parentProject.vfsEnabled ?? false;
-              } else {
-                newVfsKey = "orphan";
-              }
-            } else {
-              newVfsKey = "orphan";
-            }
-          }
-
-          console.log(
-            `[SidebarStore] Updating VFS store: isVfsEnabledForItem=${newEnabledState}, vfsKey=${newVfsKey}`,
-          );
-          if (vfsStore.isVfsReady) {
-            console.log(
-              `[SidebarStore] Resetting VFS ready state before changing key/enabled state`,
-            );
-            vfsStore.setVfsReady(false);
-            vfsStore.setConfiguredVfsKey(null);
-            vfsStore._setFsInstance(null);
-          }
-
-          vfsStore.setVfsKey(newVfsKey);
-          vfsStore.setIsVfsEnabledForItem(newEnabledState);
-          if (newEnabledState) {
-            console.log(
-              "[SidebarStore] Directly initializing VFS after toggle",
-            );
-            setTimeout(() => {
-              vfsStore.initializeVfs();
-            }, 0);
-          }
+          await get().selectItem(id, type); // Re-run selectItem to update VFS state correctly
         }
 
         modEvents.emit(ModEvent.CHAT_VFS_TOGGLED, {
