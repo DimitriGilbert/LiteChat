@@ -122,7 +122,7 @@ export const StreamingPortal: React.FC<StreamingPortalProps> = ({
     // We get the active stream state *inside* the loop using getState()
     // to avoid restarting the loop unnecessarily on every chunk.
     // displayedContent is needed to compare for the final update.
-  }, [messageId, streamingRefreshRateMs, displayedContent]); // Removed activeStreamId, isStreaming
+  }, [messageId, streamingRefreshRateMs, displayedContent, activeStreamId]); // Removed activeStreamId, isStreaming
 
   // Memoize the HTML rendering based on the displayed content
   const renderedHTML = useMemo(() => {

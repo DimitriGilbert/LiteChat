@@ -25,68 +25,65 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
 
   useEffect(() => {
     if (isInitialized) return;
-    const providerConfigsReady =
-      storage.providerConfigs && storage.providerConfigs.length > 0;
-    const sidebarDataReady = storage.projects && storage.conversations;
 
-    if (!providerConfigsReady || !sidebarDataReady) {
-      console.log("[ChatProviderInner] Waiting for essential storage data...", {
-        providerConfigsReady,
-        sidebarDataReady,
-      });
-      return;
+    // Check if the live queries are still loading (value is undefined)
+    const isLoading =
+      storage.providerConfigs === undefined ||
+      storage.projects === undefined ||
+      storage.conversations === undefined;
+
+    if (isLoading) {
+      console.log(
+        "[ChatProviderInner] Waiting for initial storage queries...",
+        {
+          providerConfigs: storage.providerConfigs,
+          projects: storage.projects,
+          conversations: storage.conversations,
+        },
+      );
+      return; // Wait until queries resolve (even if to null/[])
     }
 
-    console.log("[ChatProviderInner] Essential data ready. Initializing...");
+    console.log(
+      "[ChatProviderInner] Initial queries resolved. Proceeding with initialization...",
+    );
 
-    // 1. Initialize Feature Flags and Configurable Settings (Synchronous)
-    useProviderStore
-      .getState()
-      .setEnableApiKeyManagement(config.enableApiKeyManagement ?? true);
-    useSettingsStore
-      .getState()
-      .setEnableAdvancedSettings(config.enableAdvancedSettings ?? true);
-    useSidebarStore.getState().setEnableSidebar(config.enableSidebar ?? true);
-    useVfsStore.getState()._setEnableVfs(config.enableVfs ?? true);
-    if (config.streamingRefreshRateMs !== undefined) {
-      useSettingsStore
-        .getState()
-        .setStreamingRefreshRateMs(config.streamingRefreshRateMs);
-    }
-
-    // 2. Trigger store initialization actions (async) - Simplified
-    const initializeStores = async () => {
+    // --- Initialization Logic ---
+    const initializeApp = async () => {
       let initializationError: Error | null = null;
       try {
+        // 1. Initialize Feature Flags and Configurable Settings (Synchronous)
+        useProviderStore
+          .getState()
+          .setEnableApiKeyManagement(config.enableApiKeyManagement ?? true);
+        useSettingsStore
+          .getState()
+          .setEnableAdvancedSettings(config.enableAdvancedSettings ?? true);
+        useSidebarStore
+          .getState()
+          .setEnableSidebar(config.enableSidebar ?? true);
+        useVfsStore.getState()._setEnableVfs(config.enableVfs ?? true);
+        if (config.streamingRefreshRateMs !== undefined) {
+          useSettingsStore
+            .getState()
+            .setStreamingRefreshRateMs(config.streamingRefreshRateMs);
+        }
+
+        // 2. Trigger store initialization actions (async)
         console.log(
           "[ChatProviderInner] Triggering store initialization actions...",
         );
+        // Use the resolved values (which might be null/[])
         const currentProviderConfigs = storage.providerConfigs || [];
         await useProviderStore
           .getState()
           .loadInitialSelection(currentProviderConfigs);
-        // await useModStore.getState().initializeFromDb();
 
         console.log(
           "[ChatProviderInner] Store initialization actions complete.",
         );
-      } catch (error) {
-        initializationError =
-          error instanceof Error ? error : new Error(String(error));
-        console.error(
-          "[ChatProviderInner] Error during store initialization actions:",
-          initializationError,
-        );
-        toast.error(
-          `Failed to initialize application stores: ${initializationError.message}`,
-        );
-        useCoreChatStore
-          .getState()
-          .setError("Failed to load initial application data.");
-      }
 
-      // 3. Set Initial Selection (using live data and initialized store state)
-      try {
+        // 3. Set Initial Selection (using live data and initialized store state)
         const {
           initialSelectedItemId,
           initialSelectedItemType,
@@ -97,6 +94,7 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
           useProviderStore.getState().selectedProviderId;
         const currentSelectedModelId =
           useProviderStore.getState().selectedModelId;
+
         if (
           initialProviderId &&
           initialProviderId !== currentSelectedProviderId
@@ -104,12 +102,10 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
           console.log(
             `[ChatProviderInner] Config overriding initial provider: ${initialProviderId}`,
           );
-          useProviderStore
-            .getState()
-            .setSelectedProviderId(
-              initialProviderId,
-              storage.providerConfigs || [],
-            );
+          useProviderStore.getState().setSelectedProviderId(
+            initialProviderId,
+            storage.providerConfigs || [], // Use resolved value
+          );
           if (initialModelId) {
             console.log(
               `[ChatProviderInner] Config setting initial model: ${initialModelId}`,
@@ -117,9 +113,9 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
             useProviderStore.getState().setSelectedModelId(initialModelId);
           }
         } else if (
-          initialProviderId && // Provider matches loaded state
-          initialModelId && // Model specified in config
-          initialModelId !== currentSelectedModelId // Model differs from loaded state
+          initialProviderId &&
+          initialModelId &&
+          initialModelId !== currentSelectedModelId
         ) {
           console.log(
             `[ChatProviderInner] Config setting initial model for existing provider: ${initialModelId}`,
@@ -136,10 +132,10 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
             .getState()
             .selectItem(initialSelectedItemId, initialSelectedItemType);
         } else if (!useSidebarStore.getState().selectedItemId) {
-          // Only select first item if nothing is selected (respect loaded state)
           console.log(
             "[ChatProviderInner] No initial item selection provided or loaded. Selecting first item if available.",
           );
+          // Use resolved values
           const allProjects = storage.projects || [];
           const allConversations = storage.conversations || [];
           const combinedItems = [
@@ -172,28 +168,20 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
           );
         }
 
-        // 4. Initialize Mods (Placeholder - Needs actual implementation)
-        // const dbMods = storage.mods || [];
-        // if (dbMods.length > 0) {
-        //   console.log(`[ChatProviderInner] Initializing ${dbMods.length} mods...`);
-        //   // e.g., await modService.loadMods(dbMods, ...);
-
         console.log("[ChatProviderInner] Post-initialization setup complete.");
       } catch (error) {
-        const selectionError =
+        initializationError =
           error instanceof Error ? error : new Error(String(error));
         console.error(
-          "[ChatProviderInner] Error during initial selection:",
-          selectionError,
+          "[ChatProviderInner] Error during initialization:",
+          initializationError,
         );
         toast.error(
-          `Failed to set initial selection: ${selectionError.message}`,
+          `Failed to initialize application: ${initializationError.message}`,
         );
-        if (!initializationError) {
-          useCoreChatStore
-            .getState()
-            .setError("Failed to set initial selection.");
-        }
+        useCoreChatStore
+          .getState()
+          .setError("Failed to load initial application data.");
       } finally {
         setIsInitialized(true);
         console.log(
@@ -202,10 +190,10 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
       }
     };
 
-    initializeStores();
+    initializeApp();
   }, [
     config,
-    storage.providerConfigs,
+    storage.providerConfigs, // Keep dependencies on the storage values
     storage.projects,
     storage.conversations,
     isInitialized,
@@ -218,7 +206,7 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
         {initError ? (
           <span className="text-red-400">Error: {initError}</span>
         ) : (
-          "Initializing LiteChat..."
+          "Initializing LiteChat..." // Show generic loading message
         )}
       </div>
     );
