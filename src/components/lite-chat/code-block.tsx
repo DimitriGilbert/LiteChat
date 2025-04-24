@@ -78,10 +78,9 @@ export const CodeBlock: React.FC<CodeBlockProps> = React.memo(
         </div>
 
         {/* Rendered HTML from highlight.js */}
-        {/* Apply hljs class for theme compatibility */}
-        <pre className="code-block-content m-0 p-0 border-0 bg-transparent">
+        <pre className="code-block-content m-0 p-0 border-0">
           <code
-            className={cn("hljs", language ? `language-${language}` : "")}
+            className={cn("p-4 hljs", language ? `language-${language}` : "")}
             dangerouslySetInnerHTML={{ __html: highlightedHtml }}
           />
         </pre>
