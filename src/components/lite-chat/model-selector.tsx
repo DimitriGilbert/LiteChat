@@ -5,8 +5,8 @@ import { useProviderStore } from "@/store/provider.store";
 import { Combobox } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AiProviderConfig, DbProviderConfig } from "@/lib/types";
-import { useChatStorage } from "@/hooks/use-chat-storage"; // Import storage hook
-import { DEFAULT_MODELS } from "@/lib/litechat"; // Import DEFAULT_MODELS
+import { useChatStorage } from "@/hooks/use-chat-storage";
+import { DEFAULT_MODELS } from "@/lib/litechat";
 
 const ModelSelectorComponent: React.FC = () => {
   // --- Fetch state/actions from store ---
@@ -18,9 +18,7 @@ const ModelSelectorComponent: React.FC = () => {
         setSelectedModelId: state.setSelectedModelId,
       })),
     );
-
-  // Fetch providerConfigs from storage
-  const { providerConfigs: dbProviderConfigs } = useChatStorage(); // Use storage hook
+  const { providerConfigs: dbProviderConfigs } = useChatStorage();
 
   // Derive selectedDbProviderConfig using store state and fetched data
   const selectedDbProviderConfig = useMemo(
@@ -30,16 +28,13 @@ const ModelSelectorComponent: React.FC = () => {
       ),
     [dbProviderConfigs, selectedProviderId],
   );
-
-  // Derive selectedProvider (for model list) using derived config
   const selectedProvider = useMemo((): AiProviderConfig | undefined => {
     if (!selectedDbProviderConfig) return undefined;
-    // Use helper function or inline logic to get default models
     const allModels =
       selectedDbProviderConfig.fetchedModels &&
       selectedDbProviderConfig.fetchedModels.length > 0
         ? selectedDbProviderConfig.fetchedModels
-        : DEFAULT_MODELS[selectedDbProviderConfig.type] || []; // Use imported DEFAULT_MODELS
+        : DEFAULT_MODELS[selectedDbProviderConfig.type] || [];
 
     const enabledIds = new Set(selectedDbProviderConfig.enabledModels ?? []);
     let displayModels =
@@ -75,13 +70,11 @@ const ModelSelectorComponent: React.FC = () => {
       models: displayModels.map((m) => ({
         id: m.id,
         name: m.name,
-        instance: null, // Instance not needed here
+        instance: null,
       })),
       allAvailableModels: allModels,
     };
   }, [selectedDbProviderConfig]);
-
-  // Derive model options using derived selectedProvider
   const modelOptions = useMemo(() => {
     if (!selectedProvider?.models) return [];
     return selectedProvider.models.map((model) => ({
@@ -97,14 +90,10 @@ const ModelSelectorComponent: React.FC = () => {
       label: model.name,
     }));
   }, [selectedProvider?.allAvailableModels]);
-
-  // Use store action
   const handleModelChange = (value: string | null) => {
     setSelectedModelId(value);
   };
-
-  // Loading/disabled states based on derived data
-  const isLoading = !dbProviderConfigs; // Basic loading state
+  const isLoading = !dbProviderConfigs;
 
   if (isLoading) {
     return <Skeleton className="h-9" />;

@@ -26,7 +26,7 @@ import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { useVfsStore } from "@/store/vfs.store";
 import { useSidebarStore } from "@/store/sidebar.store";
-import { useChatStorage } from "@/hooks/use-chat-storage"; // Import storage hook
+import { useChatStorage } from "@/hooks/use-chat-storage";
 
 const PromptSettingsComponent: React.FC<{ className?: string }> = ({
   className,
@@ -38,9 +38,7 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
       enableApiKeyManagement: state.enableApiKeyManagement,
     })),
   );
-
-  // Fetch live data from storage
-  const { providerConfigs: dbProviderConfigs, apiKeys } = useChatStorage(); // Use storage hook
+  const { providerConfigs: dbProviderConfigs, apiKeys } = useChatStorage();
 
   const { enableAdvancedSettings } = useSettingsStore(
     useShallow((state) => ({
@@ -51,7 +49,6 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
   const {
     enableVfs,
     isVfsEnabledForItem,
-    // isVfsReady, // Not directly needed here
   } = useVfsStore(
     useShallow((state) => ({
       enableVfs: state.enableVfs,
@@ -65,36 +62,30 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
       useShallow((state) => ({
         selectedItemId: state.selectedItemId,
         selectedItemType: state.selectedItemType,
-        toggleVfsEnabled: state.toggleVfsEnabled, // Keep action
+        toggleVfsEnabled: state.toggleVfsEnabled,
       })),
     );
-
-  // --- Local UI State ---
   const [isAdvancedPanelOpen, setIsAdvancedPanelOpen] = useState(false);
   const [advancedInitialTab, setAdvancedInitialTab] =
     useState<string>("parameters");
-
-  // --- Derived State (using live data) ---
   const selectedDbProviderConfig = useMemo(
     () =>
       (dbProviderConfigs || []).find(
         (p: DbProviderConfig) => p.id === selectedProviderId,
       ),
-    [dbProviderConfigs, selectedProviderId], // Depend on live data
+    [dbProviderConfigs, selectedProviderId],
   );
 
   const needsKey = requiresApiKey(selectedDbProviderConfig?.type ?? null);
   const keyIsLinked = !!selectedDbProviderConfig?.apiKeyId;
   const keyIsAvailable =
     keyIsLinked &&
-    !!(apiKeys || []).find((k) => k.id === selectedDbProviderConfig.apiKeyId); // Use live data
+    !!(apiKeys || []).find((k) => k.id === selectedDbProviderConfig.apiKeyId);
 
   const showKeyRequiredWarning = needsKey && (!keyIsLinked || !keyIsAvailable);
   const showKeyProvidedIndicator = needsKey && keyIsLinked && keyIsAvailable;
 
   const isItemSelected = !!selectedItemId;
-
-  // --- Callbacks ---
   const openAdvancedPanel = useCallback((tabId: string = "parameters") => {
     setAdvancedInitialTab(tabId);
     setIsAdvancedPanelOpen(true);
@@ -103,7 +94,7 @@ const PromptSettingsComponent: React.FC<{ className?: string }> = ({
   const handleToggleAdvancedClick = useCallback(() => {
     setIsAdvancedPanelOpen((prev) => !prev);
     if (!isAdvancedPanelOpen) {
-      setAdvancedInitialTab("parameters"); // Reset tab when closing
+      setAdvancedInitialTab("parameters");
     }
   }, [isAdvancedPanelOpen]);
 

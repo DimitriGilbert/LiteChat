@@ -9,8 +9,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { db } from "@/lib/db"; // Import db instance
-import { toast } from "sonner"; // Import toast
+import { db } from "@/lib/db";
+import { toast } from "sonner";
 
 export interface ProjectSettingsModalProps {
   projectId: string;
@@ -25,14 +25,12 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
 }) => {
   const [projectName, setProjectName] = useState("Loading...");
   const [isLoading, setIsLoading] = useState(true);
-
-  // Load project details when modal opens or projectId changes
   useEffect(() => {
     const loadProject = async () => {
       if (open && projectId) {
         setIsLoading(true);
         try {
-          const project = await db.projects.get(projectId); // Use Dexie
+          const project = await db.projects.get(projectId);
           if (project) {
             setProjectName(project.name);
           } else {

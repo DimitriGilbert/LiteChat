@@ -5,12 +5,12 @@ import { ensureV1Path } from "@/utils/chat-utils";
 
 interface FetchedModel {
   id: string;
-  name: string; // Optional: Some APIs might only return ID
+  name: string;
 }
 
 
 const fetchCache = new Map<string, Promise<FetchedModel[]>>();
-const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION_MS = 5 * 60 * 1000;
 
 export async function fetchModelsForProvider(
   config: DbProviderConfig,
@@ -46,15 +46,12 @@ export async function fetchModelsForProvider(
           break;
         case "ollama":
           if (!config.baseURL) throw new Error("Base URL required for Ollama");
-          // Ollama uses /api/tags, no /v1 needed
           url = new URL("/api/tags", config.baseURL).toString();
           break;
         case "openai-compatible":
           if (!config.baseURL)
             throw new Error("Base URL required for OpenAI-Compatible");
-          // 1. Ensure base URL has the /v1 path correctly using the user's exact logic
           const baseUrlWithV1 = ensureV1Path(config.baseURL);
-          // 2. Construct the final URL for the /models endpoint
           //    Ensure the base path has a trailing slash for correct relative resolution.
           url = new URL("models", baseUrlWithV1 + "/").toString();
           break;
@@ -73,7 +70,7 @@ export async function fetchModelsForProvider(
       toast.error(
         `Invalid Base URL for ${config.name}: ${urlError instanceof Error ? urlError.message : String(urlError)}`,
       );
-      return []; // Return empty array if URL construction fails
+      return [];
     }
 
     console.log(

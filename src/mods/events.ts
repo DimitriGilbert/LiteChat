@@ -1,6 +1,6 @@
 
 import mitt from "mitt";
-import type { ModEventPayloadMap } from "./types"; // Import the payload map
+import type { ModEventPayloadMap } from "./types";
 
 
 export const ModEvent = {
@@ -9,9 +9,9 @@ export const ModEvent = {
   CHAT_SELECTED: "chat:selected",
   CHAT_CREATED: "chat:created",
   CHAT_DELETED: "chat:deleted",
-  CHAT_RENAMED: "chat:renamed", // Added
-  CHAT_SYSTEM_PROMPT_UPDATED: "chat:systemPromptUpdated", // Added
-  CHAT_VFS_TOGGLED: "chat:vfsToggled", // Added
+  CHAT_RENAMED: "chat:renamed",
+  CHAT_SYSTEM_PROMPT_UPDATED: "chat:systemPromptUpdated",
+  CHAT_VFS_TOGGLED: "chat:vfsToggled",
   MESSAGE_BEFORE_SUBMIT: "message:beforeSubmit",
   MESSAGE_SUBMITTED: "message:submitted",
   RESPONSE_START: "response:start",
@@ -25,8 +25,7 @@ export const ModEvent = {
   SETTINGS_CLOSED: "settings:closed",
   MOD_LOADED: "mod:loaded",
   MOD_ERROR: "mod:error",
-  // Add other event names here...
-} as const; // Use 'as const' for stricter typing
+} as const;
 
 
 export type ModEventName = (typeof ModEvent)[keyof typeof ModEvent];
@@ -35,7 +34,7 @@ export type ModEventName = (typeof ModEvent)[keyof typeof ModEvent];
 type EmitterEvents = {
   [K in ModEventName]: K extends keyof ModEventPayloadMap
     ? ModEventPayloadMap[K]
-    : unknown; // Use 'unknown' for events without defined payloads
+    : unknown;
 };
 
 

@@ -34,7 +34,7 @@ export async function performImageGeneration({
   setIsAiStreaming,
   setError,
   addDbMessage,
-  abortControllerRef, // This is the ref passed specifically for this call
+  abortControllerRef,
 }: PerformImageGenerationParams): Promise<PerformImageGenerationResult> {
   // Pass provider ID to getApiKeyForProvider
   const apiKey = getApiKeyForProvider(selectedProvider?.id || "");
@@ -68,11 +68,10 @@ export async function performImageGeneration({
 
   setIsAiStreaming(true);
   setError(null);
-  // Use the passed AbortController ref
   const currentAbortController =
     abortControllerRef.current ?? new AbortController();
   if (!abortControllerRef.current) {
-    abortControllerRef.current = currentAbortController; // Ensure ref is set if it was null
+    abortControllerRef.current = currentAbortController;
   }
 
   const placeholderId = nanoid();
@@ -99,7 +98,7 @@ export async function performImageGeneration({
       size: size as `${number}x${number}`,
       aspectRatio: aspectRatio as `${number}:${number}`,
       headers: getStreamHeaders(selectedProvider.type, apiKey),
-      abortSignal: currentAbortController.signal, // Use the signal from the controller
+      abortSignal: currentAbortController.signal,
     });
 
     if (warnings && warnings.length > 0)
@@ -163,8 +162,6 @@ export async function performImageGeneration({
   } catch (err: unknown) {
     let errorMessage: string;
     let finalContent: string = "";
-
-    // Check if the error is due to the abort signal from the passed controller
     if (currentAbortController.signal.aborted) {
       errorMessage = "Cancelled by user.";
       finalContent = "Image generation cancelled.";
@@ -195,7 +192,6 @@ export async function performImageGeneration({
       abortControllerRef.current = null;
     }
     setIsAiStreaming(false);
-    // Ensure streaming is false even if update didn't happen before finally
     updateMessage(placeholderId, { isStreaming: false });
   }
 }

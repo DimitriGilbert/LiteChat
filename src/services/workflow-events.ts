@@ -1,12 +1,11 @@
 
 import mitt from "mitt";
-import type { Message, Workflow } from "@/lib/types"; // Assuming Workflow type is defined in types.ts
+import type { Message, Workflow } from "@/lib/types";
 
 
 type WorkflowStartPayload = {
   parentMessageId: string;
   workflowType: Workflow["type"];
-  // Define tasks more concretely if possible, e.g., model/prompt pairs
   tasks: Array<{ taskId: string; config: any }>;
 };
 type WorkflowTaskStartPayload = { parentMessageId: string; taskId: string };
@@ -18,7 +17,7 @@ type WorkflowTaskChunkPayload = {
 type WorkflowTaskFinishPayload = {
   parentMessageId: string;
   taskId: string;
-  result: Message; // The final child message object
+  result: Message;
   usage?: { promptTokens: number; completionTokens: number };
   finishReason?: string;
 };

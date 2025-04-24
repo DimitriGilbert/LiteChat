@@ -4,10 +4,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { GitBranchIcon, Loader2 } from "lucide-react"; // Added Loader2
+import { GitBranchIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { db } from "@/lib/db"; // Import db instance
-import type { DbProject } from "@/lib/types"; // Import DbProject
+import { db } from "@/lib/db";
+import type { DbProject } from "@/lib/types";
 
 export interface ProjectGitConfigProps {
   projectId: string;
@@ -21,14 +21,12 @@ export const ProjectGitConfig: React.FC<ProjectGitConfigProps> = ({
   const [gitRepoBranch, setGitRepoBranch] = useState("main");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Load project git configuration
   useEffect(() => {
     const loadProjectConfig = async () => {
       if (projectId) {
         setIsLoading(true);
         try {
-          const project = await db.projects.get(projectId); // Use Dexie directly
+          const project = await db.projects.get(projectId);
           if (project) {
             setGitEnabled(!!project.gitRepoEnabled);
             setGitRepoUrl(project.gitRepoUrl || "");
@@ -47,8 +45,6 @@ export const ProjectGitConfig: React.FC<ProjectGitConfigProps> = ({
 
     loadProjectConfig();
   }, [projectId]);
-
-  // Save project git configuration
   const handleSaveConfig = useCallback(async () => {
     if (!gitRepoUrl && gitEnabled) {
       toast.error("Please enter a repository URL");
@@ -59,11 +55,11 @@ export const ProjectGitConfig: React.FC<ProjectGitConfigProps> = ({
     try {
       const updateData: Partial<DbProject> = {
         gitRepoEnabled: gitEnabled,
-        gitRepoUrl: gitEnabled ? gitRepoUrl : null, // Store null if disabled
-        gitRepoBranch: gitEnabled ? gitRepoBranch || "main" : null, // Store null if disabled
-        updatedAt: new Date(), // Update timestamp
+        gitRepoUrl: gitEnabled ? gitRepoUrl : null,
+        gitRepoBranch: gitEnabled ? gitRepoBranch || "main" : null,
+        updatedAt: new Date(),
       };
-      await db.projects.update(projectId, updateData); // Use Dexie directly
+      await db.projects.update(projectId, updateData);
       toast.success("Project git configuration saved");
     } catch (error) {
       console.error("Failed to save git configuration:", error);

@@ -9,16 +9,16 @@ import type {
   AiProviderConfig,
   AiModelConfig,
 } from "@/lib/types";
-import { DEFAULT_MODELS } from "@/lib/litechat"; // Import DEFAULT_MODELS
-import { createAiModelConfig } from "@/utils/chat-utils"; // Import the new utility
+import { DEFAULT_MODELS } from "@/lib/litechat";
+import { createAiModelConfig } from "@/utils/chat-utils";
 
 interface UseDerivedChatStateProps {
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
   dbConversations: DbConversation[];
   dbProjects: DbProject[];
-  dbProviderConfigs: DbProviderConfig[]; // Now passed directly
-  apiKeys: DbApiKey[]; // Now passed directly
+  dbProviderConfigs: DbProviderConfig[];
+  apiKeys: DbApiKey[];
   selectedProviderId: string | null;
   selectedModelId: string | null;
 }
@@ -36,8 +36,8 @@ export function useDerivedChatState({
   selectedItemType,
   dbConversations,
   dbProjects,
-  dbProviderConfigs, // Use passed prop
-  apiKeys, // Use passed prop
+  dbProviderConfigs,
+  apiKeys,
   selectedProviderId,
   selectedModelId,
 }: UseDerivedChatStateProps): UseDerivedChatStateReturn {
@@ -56,15 +56,13 @@ export function useDerivedChatState({
       ? (activeItemData as DbConversation | null)
       : null;
   }, [selectedItemType, activeItemData]);
-
-  // API Key getter uses passed props
   const getApiKeyForProvider = useMemo(() => {
     return (providerId: string): string | undefined => {
       const config = dbProviderConfigs.find((p) => p.id === providerId);
       if (!config || !config.apiKeyId) return undefined;
       return apiKeys.find((k) => k.id === config.apiKeyId)?.value;
     };
-  }, [dbProviderConfigs, apiKeys]); // Depend on passed props
+  }, [dbProviderConfigs, apiKeys]);
 
   // Selected Provider derivation uses passed props
   const selectedProvider = useMemo((): AiProviderConfig | undefined => {
@@ -73,15 +71,15 @@ export function useDerivedChatState({
     const allAvailable =
       config.fetchedModels && config.fetchedModels.length > 0
         ? config.fetchedModels
-        : DEFAULT_MODELS[config.type] || []; // Use imported DEFAULT_MODELS
+        : DEFAULT_MODELS[config.type] || [];
     return {
       id: config.id,
       name: config.name,
       type: config.type,
-      models: [], // Instances created in selectedModel
+      models: [],
       allAvailableModels: allAvailable,
     };
-  }, [selectedProviderId, dbProviderConfigs]); // Depend on passed props
+  }, [selectedProviderId, dbProviderConfigs]);
 
   // Selected Model derivation uses passed props and local getter
   const selectedModel = useMemo((): AiModelConfig | undefined => {
@@ -89,15 +87,15 @@ export function useDerivedChatState({
     const config = dbProviderConfigs.find((p) => p.id === selectedProviderId);
     if (!config) return undefined;
 
-    const currentApiKey = getApiKeyForProvider(config.id); // Use local getter
+    const currentApiKey = getApiKeyForProvider(config.id);
 
     // Use the utility function to create the AiModelConfig
     return createAiModelConfig(config, selectedModelId, currentApiKey);
   }, [
     selectedProviderId,
     selectedModelId,
-    dbProviderConfigs, // Depend on passed prop
-    getApiKeyForProvider, // Depend on local getter
+    dbProviderConfigs,
+    getApiKeyForProvider,
   ]);
 
   return {
@@ -105,6 +103,6 @@ export function useDerivedChatState({
     activeItemData,
     selectedProvider,
     selectedModel,
-    getApiKeyForProvider, // Return the local getter
+    getApiKeyForProvider,
   };
 }

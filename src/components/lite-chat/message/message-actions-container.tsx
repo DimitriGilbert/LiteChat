@@ -1,6 +1,6 @@
 
 import React from "react";
-import type { Message, CustomMessageAction } from "@/lib/types"; // Added CustomMessageAction
+import type { Message, CustomMessageAction } from "@/lib/types";
 import { MessageActions } from "./message-actions";
 import type { ReadonlyChatContextSnapshot } from "@/mods/api";
 
@@ -9,7 +9,7 @@ interface MessageActionsContainerProps {
   message: Message;
   onRegenerate?: (messageId: string) => void;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
-  modMessageActions: CustomMessageAction[]; // Add prop
+  modMessageActions: CustomMessageAction[];
 }
 
 export const MessageActionsContainer: React.FC<MessageActionsContainerProps> =
@@ -18,16 +18,12 @@ export const MessageActionsContainer: React.FC<MessageActionsContainerProps> =
       message,
       onRegenerate,
       getContextSnapshotForMod,
-      modMessageActions, // Destructure prop
+      modMessageActions,
     }) => {
       // REMOVED: Select custom actions here, outside MessageActions
       // const customMessageActions = useModStore((s) => s.modMessageActions);
-
-      // console.log(
       //   `[MessageActionsContainer] Rendering for msg ${message.id}. Custom actions count: ${modMessageActions.length}`
       // );
-
-      // Hide actions for system messages
       if (message.role === "system") {
         return null;
       }

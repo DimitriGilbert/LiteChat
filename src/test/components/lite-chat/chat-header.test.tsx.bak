@@ -1,9 +1,9 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { ChatHeader } from "@/components/lite-chat/chat/chat-header"; // Alias used here
-import { ChatContext } from "@/hooks/use-chat-context"; // Verify path
-import type { ChatContextProps, DbConversation, DbProject } from "@/lib/types"; // Verify path
+import { ChatHeader } from "@/components/lite-chat/chat/chat-header";
+import { ChatContext } from "@/hooks/use-chat-context";
+import type { ChatContextProps, DbConversation, DbProject } from "@/lib/types";
 import { useLiveQuery } from "dexie-react-hooks";
 
 
@@ -74,20 +74,15 @@ describe("ChatHeader", () => {
     vi.clearAllMocks();
     mockedUseLiveQuery.mockReturnValue(null);
   });
-
-  // --- Test Case 1 ---
   it("renders default title 'LiteChat' when no item is selected", async () => {
     renderChatHeader({ selectedItemId: null, selectedItemType: null });
     expect(
       screen.getByRole("heading", { name: "LiteChat" }),
     ).toBeInTheDocument();
-    // Check console output for the *new* log message
     const actions = await screen.findByTestId("mock-chat-header-actions");
     expect(actions).toBeInTheDocument();
     expect(actions).not.toHaveAttribute("data-convoid");
   });
-
-  // --- Test Case 2 ---
   it("renders conversation title when a conversation is selected", async () => {
     mockedUseLiveQuery.mockReturnValue(mockConversation);
     renderChatHeader({
@@ -97,13 +92,10 @@ describe("ChatHeader", () => {
     expect(
       screen.getByRole("heading", { name: "My Test Conversation" }),
     ).toBeInTheDocument();
-    // Check console output for the *new* log message
     const actions = await screen.findByTestId("mock-chat-header-actions");
     expect(actions).toBeInTheDocument();
     expect(actions).toHaveAttribute("data-convoid", "convo-abc");
   });
-
-  // --- Test Case 3 ---
   it("renders project name when a project is selected", async () => {
     mockedUseLiveQuery.mockReturnValue(mockProject);
     renderChatHeader({
@@ -113,13 +105,10 @@ describe("ChatHeader", () => {
     expect(
       screen.getByRole("heading", { name: "My Test Project" }),
     ).toBeInTheDocument();
-    // Check console output for the *new* log message
     const actions = await screen.findByTestId("mock-chat-header-actions");
     expect(actions).toBeInTheDocument();
     expect(actions).not.toHaveAttribute("data-convoid");
   });
-
-  // --- Test Case 4 (Keep async/await for consistency) ---
   it("updates title when selected item changes", async () => {
     mockedUseLiveQuery.mockReturnValue(null);
     const baseContext: ChatContextProps = {
@@ -146,7 +135,6 @@ describe("ChatHeader", () => {
     expect(
       screen.getByRole("heading", { name: "LiteChat" }),
     ).toBeInTheDocument();
-    // Optional: await screen.findByTestId("mock-chat-header-actions");
 
     mockedUseLiveQuery.mockReturnValue(mockConversation);
     rerender(
@@ -163,7 +151,6 @@ describe("ChatHeader", () => {
     expect(
       screen.getByRole("heading", { name: "My Test Conversation" }),
     ).toBeInTheDocument();
-    // Optional: await screen.findByTestId("mock-chat-header-actions");
 
     mockedUseLiveQuery.mockReturnValue(mockProject);
     rerender(
@@ -180,6 +167,5 @@ describe("ChatHeader", () => {
     expect(
       screen.getByRole("heading", { name: "My Test Project" }),
     ).toBeInTheDocument();
-    // Optional: await screen.findByTestId("mock-chat-header-actions");
   });
 });

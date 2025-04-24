@@ -13,7 +13,7 @@ export function validateAiParameters(
   provider: AiProviderConfig | undefined,
   apiKey: string | undefined,
   setError: (error: string | null) => void,
-  isImageGeneration: boolean = false, // Add flag for image generation check
+  isImageGeneration: boolean = false,
 ): Error | null {
   if (!conversationId) {
     const msg = "No active conversation selected.";
@@ -53,7 +53,7 @@ export function validateAiParameters(
     return new Error(msg);
   }
 
-  return null; // No error
+  return null;
 }
 
 /**
@@ -65,11 +65,10 @@ export function handleStreamError(
   setError: (error: string | null) => void,
 ): [Error, string] {
   let error: Error;
-  const finalContent = ""; // Usually empty on error, but could capture partial
+  const finalContent = "";
 
   if (err instanceof Error && err.name === "AbortError") {
     error = new Error("Stream aborted by user.");
-    // Optionally capture partial content if available before abort
     // finalContent = contentRef.current;
     toast.info("Stream stopped.");
   } else if (err instanceof Error) {

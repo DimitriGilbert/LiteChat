@@ -9,8 +9,8 @@ import type {
   ModEventPayloadMap,
   ModMiddlewarePayloadMap,
   ModMiddlewareReturnMap,
-  Tool, // Import Tool type
-  ToolImplementation, // Import ToolImplementation type
+  Tool,
+  ToolImplementation,
 } from "./types";
 
 
@@ -41,7 +41,6 @@ export const ModMiddlewareHook = {
   PROCESS_RESPONSE_CHUNK: "middleware:processResponseChunk",
   RENDER_MESSAGE: "middleware:renderMessage",
   VFS_WRITE: "middleware:vfsWrite",
-  // Add other hook names here...
 } as const;
 
 export type ModMiddlewareHookName =
@@ -68,8 +67,6 @@ export interface LiteChatModApi {
     toolDefinition: Tool<PARAMETERS>,
     implementation?: ToolImplementation<PARAMETERS>,
   ) => () => void;
-
-  // --- Event Listening ---
   /**
    * Listens for specific events within LiteChat.
    * @param eventName The name of the event to listen for (e.g., ModEvent.CHAT_SELECTED).
@@ -80,8 +77,6 @@ export interface LiteChatModApi {
     eventName: E,
     callback: (payload: ModEventPayloadMap[E]) => void,
   ) => () => void;
-
-  // --- Middleware ---
   /**
    * Adds a middleware function to intercept and potentially modify data or cancel actions.
    * Middleware functions are executed sequentially in the order they were registered.
@@ -93,14 +88,10 @@ export interface LiteChatModApi {
     hookName: H,
     callback: (
       payload: ModMiddlewarePayloadMap[H],
-    ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>, // Allow async middleware
+    ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>,
   ) => () => void;
-
-  // --- Context Access ---
   /** Returns a read-only snapshot of the current chat state. */
   getContextSnapshot: () => ReadonlyChatContextSnapshot;
-
-  // --- Utilities ---
   /** Displays a toast notification. */
   showToast: (
     type: "success" | "error" | "info" | "warning",
@@ -108,8 +99,6 @@ export interface LiteChatModApi {
   ) => void;
   /** Logs messages to the console, prefixed with the mod's name. */
   log: (level: "log" | "warn" | "error", ...args: any[]) => void;
-
-  // --- Mod Info ---
   /** The unique ID of this mod instance. */
   readonly modId: string;
   /** The user-defined name of this mod. */

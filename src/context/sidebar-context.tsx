@@ -13,20 +13,19 @@ import type {
   DbProject,
   ProjectSidebarItem,
   ConversationSidebarItem,
-  // DbMessage, // REMOVED - Unused
 } from "@/lib/types";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 
 import { toast } from "sonner";
-import { z } from "zod"; // Keep for import validation
-import { nanoid } from "nanoid"; // Keep for import message IDs
-import { modEvents, ModEvent } from "@/mods/events"; // Keep for event emission
+import { z } from "zod";
+import { nanoid } from "nanoid";
+import { modEvents, ModEvent } from "@/mods/events";
 
 const EMPTY_SIDEBAR_ITEMS: SidebarItem[] = [];
 
 const messageImportSchema = z.object({
   role: z.enum(["user", "assistant"]),
-  content: z.string(), // Assuming simple string content for import for now
+  content: z.string(),
   createdAt: z
     .string()
     .datetime()
@@ -67,10 +66,10 @@ interface SidebarContextProps {
   toggleVfsEnabled: (
     id: string,
     type: SidebarItemType,
-    currentVfsState: boolean, // Pass current state for toggle logic
+    currentVfsState: boolean,
   ) => Promise<void>;
-  activeItemData: DbConversation | DbProject | null; // Provide derived active item data
-  activeConversationData: DbConversation | null; // Provide derived active conversation data
+  activeItemData: DbConversation | DbProject | null;
+  activeConversationData: DbConversation | null;
 }
 
 const SidebarContext = createContext<SidebarContextProps | undefined>(
@@ -82,7 +81,7 @@ interface SidebarProviderProps {
   initialSelectedItemId?: string | null;
   initialSelectedItemType?: SidebarItemType | null;
   enableSidebar?: boolean;
-  onSelectItem: (id: string | null, type: SidebarItemType | null) => void; // Callback for parent
+  onSelectItem: (id: string | null, type: SidebarItemType | null) => void;
 }
 
 export const SidebarProvider: React.FC<SidebarProviderProps> = ({
@@ -93,15 +92,11 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
   onSelectItem,
 }) => {
   const storage = useChatStorage();
-
-  // --- Manage Selection State Locally ---
   const [selectedItemId, setSelectedItemId] = useState<string | null>(
     initialSelectedItemId,
   );
   const [selectedItemType, setSelectedItemType] =
     useState<SidebarItemType | null>(initialSelectedItemType);
-
-  // --- Derive Sidebar Items from Storage ---
   const sidebarItems = useMemo<SidebarItem[]>(() => {
     const allProjects = storage.projects || [];
     const allConversations = storage.conversations || [];
@@ -113,32 +108,27 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
         (c): ConversationSidebarItem => ({ ...c, type: "conversation" }),
       ),
     ];
-    // Sort by updatedAt descending (most recent first)
     combinedItems.sort(
       (a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
     );
     return combinedItems;
   }, [storage.projects, storage.conversations]);
 
-  // --- Define Actions Locally ---
-
   const selectItem = useCallback(
     async (id: string | null, type: SidebarItemType | null) => {
       setSelectedItemId(id);
       setSelectedItemType(type);
-      onSelectItem(id, type); // Notify parent (ChatProviderInner)
+      onSelectItem(id, type);
       // Event emission moved to ChatProviderInner's handleSelectItem or equivalent effect
     },
     [onSelectItem],
   );
-
-  // Effect to handle initial selection notification
   useEffect(() => {
     if (initialSelectedItemId && initialSelectedItemType) {
       onSelectItem(initialSelectedItemId, initialSelectedItemType);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSelectedItemId, initialSelectedItemType]); // Run only on mount
+  }, [initialSelectedItemId, initialSelectedItemType]);
 
   const createConversation = useCallback(
     async (
@@ -155,7 +145,7 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
         title,
         initialSystemPrompt,
       );
-      await selectItem(newId, "conversation"); // Select the new item
+      await selectItem(newId, "conversation");
       // Event emission moved to ChatProviderInner or equivalent effect
       return newId;
     },
@@ -172,7 +162,6 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
         throw new Error("Sidebar is disabled.");
       }
       const newProject = await storage.createProject(name, parentId);
-      // Event emission moved to ChatProviderInner or equivalent effect
       modEvents.emit(ModEvent.CHAT_CREATED, {
         id: newProject.id,
         type: "project",
@@ -189,7 +178,7 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
         console.warn("Sidebar is disabled.");
         return;
       }
-      const currentSelectedId = selectedItemId; // Capture before potential change
+      const currentSelectedId = selectedItemId;
 
       if (type === "project") {
         try {
@@ -217,12 +206,9 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
 
         toast.success(`${type === "project" ? "Project" : "Chat"} deleted.`);
         modEvents.emit(ModEvent.CHAT_DELETED, { id, type });
-
-        // If the deleted item was selected, select the next most recent item
         if (currentSelectedId === id) {
           // sidebarItems is derived and up-to-date due to useMemo and storage dependency
           const remainingItems = sidebarItems.filter((item) => item.id !== id);
-          // Already sorted by updatedAt descending
           const nextItem = remainingItems[0];
           await selectItem(nextItem?.id ?? null, nextItem?.type ?? null);
         }
@@ -237,7 +223,7 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
       storage,
       selectedItemId,
       selectItem,
-      sidebarItems, // Need current items for finding next selection
+      sidebarItems,
     ],
   );
 
@@ -280,7 +266,6 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
         throw new Error("Sidebar is disabled.");
       }
       await storage.updateConversationSystemPrompt(id, systemPrompt);
-      // Event emission moved
     },
     [enableSidebar, storage],
   );
@@ -309,7 +294,7 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
           content:
             typeof msg.content === "string"
               ? msg.content
-              : JSON.stringify(msg.content), // Handle complex content
+              : JSON.stringify(msg.content),
           createdAt: msg.createdAt.toISOString(),
         }));
         const jsonString = JSON.stringify(exportData, null, 2);
@@ -365,14 +350,13 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
             parentId,
             newConversationTitle,
           );
-          // Event emission moved
 
           if (importedMessages.length > 0) {
             await storage.bulkAddMessages(
               importedMessages.map((msg) => ({
                 id: nanoid(),
                 role: msg.role,
-                content: msg.content, // Store imported content directly
+                content: msg.content,
                 createdAt: msg.createdAt,
                 conversationId: newConversationId,
               })),
@@ -411,7 +395,7 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
     toast.info("Exporting all conversations...");
     try {
       // Assuming storage provides a way to get all conversations
-      const allConversations = storage.conversations || []; // Use live query result
+      const allConversations = storage.conversations || [];
       if (allConversations.length === 0) {
         toast.info("No conversations found to export.");
         return;
@@ -422,7 +406,6 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
         const messages = await storage.getMessagesForConversation(
           conversation.id,
         );
-        // Fix: Correct object structure
         exportPackage.push({
           // conversation details ... // This was the invalid line, remove it
           id: conversation.id,
@@ -437,7 +420,7 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
             content:
               typeof msg.content === "string"
                 ? msg.content
-                : JSON.stringify(msg.content), // Handle complex content
+                : JSON.stringify(msg.content),
             createdAt: msg.createdAt.toISOString(),
           })),
         });
@@ -468,7 +451,7 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
     async (
       id: string,
       type: SidebarItemType,
-      currentVfsState: boolean, // Receive current state
+      currentVfsState: boolean,
     ): Promise<void> => {
       if (!enableSidebar) {
         console.warn("Sidebar is disabled.");
@@ -484,7 +467,6 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
         toast.success(
           `Virtual Filesystem ${isNowEnabled ? "enabled" : "disabled"} for ${type}.`,
         );
-        // Event emission moved
       } catch (err) {
         console.error("Failed to toggle VFS:", err);
         toast.error("Failed to update VFS setting.");
@@ -492,13 +474,9 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
     },
     [enableSidebar, storage],
   );
-
-  // --- Derive active item data ---
   const activeItemData = useMemo(() => {
     if (!selectedItemId || !selectedItemType) return null;
-    // Find in the derived sidebarItems list
     const item = sidebarItems.find((i) => i.id === selectedItemId);
-    // Ensure the found item's type matches the selected type
     if (item && item.type === selectedItemType) {
       return item;
     }
@@ -510,8 +488,6 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
       ? (activeItemData as DbConversation | null)
       : null;
   }, [selectedItemType, activeItemData]);
-
-  // --- Create dummy actions if sidebar is disabled ---
   const dummyAction = async (...args: any[]): Promise<any> => {
     console.warn("Sidebar is disabled.");
     if (args.length > 0 && typeof args[args.length - 1] === "function") {
@@ -533,8 +509,6 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
     console.warn("Sidebar is disabled.");
     throw new Error("Sidebar is disabled.");
   };
-
-  // --- Context Value ---
   const value = useMemo(
     () => ({
       enableSidebar: enableSidebar ?? true,

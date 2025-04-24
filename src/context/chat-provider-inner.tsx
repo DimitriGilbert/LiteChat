@@ -7,7 +7,6 @@ import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { useSidebarStore } from "@/store/sidebar.store";
 import { useVfsStore } from "@/store/vfs.store";
-// REMOVED: useModStore import (initialization handled differently or not needed)
 import { useChatStorage } from "@/hooks/use-chat-storage";
 
 import type { LiteChatConfig } from "@/lib/types";
@@ -22,12 +21,10 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
   config,
 }) => {
   const [isInitialized, setIsInitialized] = useState(false);
-  const storage = useChatStorage(); // Use storage hook to monitor data readiness
+  const storage = useChatStorage();
 
   useEffect(() => {
     if (isInitialized) return;
-
-    // Check if essential storage data is ready (providerConfigs is a good indicator)
     const providerConfigsReady =
       storage.providerConfigs && storage.providerConfigs.length > 0;
     const sidebarDataReady = storage.projects && storage.conversations;
@@ -37,12 +34,10 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
         providerConfigsReady,
         sidebarDataReady,
       });
-      return; // Wait for data to load
+      return;
     }
 
     console.log("[ChatProviderInner] Essential data ready. Initializing...");
-
-    // --- Start Initialization Logic ---
 
     // 1. Initialize Feature Flags and Configurable Settings (Synchronous)
     useProviderStore
@@ -52,7 +47,7 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
       .getState()
       .setEnableAdvancedSettings(config.enableAdvancedSettings ?? true);
     useSidebarStore.getState().setEnableSidebar(config.enableSidebar ?? true);
-    useVfsStore.getState()._setEnableVfs(config.enableVfs ?? true); // Use internal setter
+    useVfsStore.getState()._setEnableVfs(config.enableVfs ?? true);
     if (config.streamingRefreshRateMs !== undefined) {
       useSettingsStore
         .getState()
@@ -66,16 +61,10 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
         console.log(
           "[ChatProviderInner] Triggering store initialization actions...",
         );
-
-        // Get live provider configs from storage hook
         const currentProviderConfigs = storage.providerConfigs || [];
-
-        // Only load initial *selection* state now
         await useProviderStore
           .getState()
           .loadInitialSelection(currentProviderConfigs);
-
-        // Mod store initialization might not be needed here anymore if it doesn't load DB state itself
         // await useModStore.getState().initializeFromDb();
 
         console.log(
@@ -104,14 +93,10 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
           initialProviderId,
           initialModelId,
         } = config;
-
-        // Get potentially updated selection state after initialization
         const currentSelectedProviderId =
           useProviderStore.getState().selectedProviderId;
         const currentSelectedModelId =
           useProviderStore.getState().selectedModelId;
-
-        // Apply config provider/model selection *only if* different from loaded state
         if (
           initialProviderId &&
           initialProviderId !== currentSelectedProviderId
@@ -119,7 +104,6 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
           console.log(
             `[ChatProviderInner] Config overriding initial provider: ${initialProviderId}`,
           );
-          // Pass current configs from storage
           useProviderStore
             .getState()
             .setSelectedProviderId(
@@ -189,12 +173,10 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
         }
 
         // 4. Initialize Mods (Placeholder - Needs actual implementation)
-        // const dbMods = storage.mods || []; // Get mods from storage
+        // const dbMods = storage.mods || [];
         // if (dbMods.length > 0) {
         //   console.log(`[ChatProviderInner] Initializing ${dbMods.length} mods...`);
-        //   // Call the mod loading logic here, passing dbMods
         //   // e.g., await modService.loadMods(dbMods, ...);
-        // }
 
         console.log("[ChatProviderInner] Post-initialization setup complete.");
       } catch (error) {
@@ -221,13 +203,12 @@ const ChatProviderInner: React.FC<ChatProviderInnerProps> = ({
     };
 
     initializeStores();
-    // --- End Initialization Logic ---
   }, [
     config,
-    storage.providerConfigs, // Re-run when live data is available/changes
+    storage.providerConfigs,
     storage.projects,
     storage.conversations,
-    isInitialized, // Prevent re-running if already initialized
+    isInitialized,
   ]);
 
   if (!isInitialized) {

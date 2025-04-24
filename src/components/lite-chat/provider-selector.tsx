@@ -11,7 +11,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
 import { cn } from "@/lib/utils";
 import type { AiProviderConfig, DbProviderConfig } from "@/lib/types";
-import { useChatStorage } from "@/hooks/use-chat-storage"; // Import storage hook
+import { useChatStorage } from "@/hooks/use-chat-storage";
 
 // Keep this helper, but it's less critical now
 const deriveAiProviderConfig = (
@@ -22,7 +22,7 @@ const deriveAiProviderConfig = (
     id: config.id,
     name: config.name,
     type: config.type,
-    models: [], // Placeholder
+    models: [],
     allAvailableModels: config.fetchedModels || [],
   };
 };
@@ -39,9 +39,7 @@ const ProviderSelectorComponent: React.FC<{ className?: string }> = ({
         setSelectedModelId: state.setSelectedModelId,
       })),
     );
-
-  // Fetch providerConfigs from storage
-  const { providerConfigs: dbProviderConfigs } = useChatStorage(); // Use storage hook
+  const { providerConfigs: dbProviderConfigs } = useChatStorage();
 
   // Derive activeProviders using store state and fetched data
   const activeProviders = useMemo((): AiProviderConfig[] => {
@@ -50,12 +48,10 @@ const ProviderSelectorComponent: React.FC<{ className?: string }> = ({
       .map((c: DbProviderConfig) => deriveAiProviderConfig(c)) // Use helper
       .filter((p: any): p is AiProviderConfig => !!p);
   }, [dbProviderConfigs]);
-
-  // Use store actions
   const handleValueChange = (value: string) => {
     // Pass current configs from storage to the action
     setSelectedProviderId(value, dbProviderConfigs || []);
-    setSelectedModelId(null); // Reset model
+    setSelectedModelId(null);
   };
 
   const isDisabled = activeProviders.length <= 1;

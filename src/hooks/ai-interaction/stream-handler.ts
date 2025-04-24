@@ -51,7 +51,6 @@ export function getStreamHeaders(
   // Headers with API key
   return {
     Authorization: `Bearer ${apiKey}`,
-    // Add OpenRouter headers if needed
     ...(providerType === "openrouter" && {
       "HTTP-Referer": globalThis.location?.origin || "http://localhost",
       "X-Title": "LiteChat",
@@ -73,15 +72,11 @@ export function finalizeStreamedMessageUI(
   setActiveStream: (messageId: string | null) => void,
 ): void {
   const endTime = Date.now();
-
-  // Calculate tokens per second, avoid division by zero
   const durationSeconds = (endTime - startTime) / 1000;
   const tokensPerSecond =
     streamError || durationSeconds <= 0 || !usage?.completionTokens
       ? undefined
       : usage.completionTokens / durationSeconds;
-
-  // Construct the final updates object
   const finalUpdates: Partial<Message> = {
     content: finalContent,
     isStreaming: false,
@@ -90,18 +85,12 @@ export function finalizeStreamedMessageUI(
     tokensOutput: usage?.completionTokens,
     tokensPerSecond: tokensPerSecond,
   };
-
-  // Call updateMessage with the final updates for the message in the main list
   updateMessage(messageId, finalUpdates);
-
-  // Clear the active stream state in the store
   setActiveStream(null);
-
-  // Emit event only if the message was successfully finalized without error
   if (!streamError) {
     // Emit the event with the finalized message data
     modEvents.emit(ModEvent.RESPONSE_DONE, {
-      message: { id: messageId, ...finalUpdates }, // Pass finalized data
+      message: { id: messageId, ...finalUpdates },
     });
   }
 }

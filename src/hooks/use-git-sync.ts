@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 
 import { useVfsStore } from "@/store/vfs.store";
 import { GitSyncManager } from "@/utils/git-sync-manager";
-import { fs } from "@zenfs/core"; // Import fs
+import { fs } from "@zenfs/core";
 
 export function useGitSync() {
   // Get VFS state from store
@@ -11,12 +11,8 @@ export function useGitSync() {
     isVfsReady: s.isVfsReady,
     vfsKey: s.vfsKey,
   }));
-
-  // Local state remains
   const [syncManager, setSyncManager] = useState<GitSyncManager | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Initialize the sync manager when VFS is ready
   useEffect(() => {
     // Use store state for readiness check
     if (isVfsReady) {
@@ -25,7 +21,7 @@ export function useGitSync() {
     } else {
       setSyncManager(null);
     }
-  }, [isVfsReady, vfsKey]); // Depend on store state
+  }, [isVfsReady, vfsKey]);
 
   // Callbacks remain the same, use local syncManager instance
   const initializeProjectRepo = useCallback(

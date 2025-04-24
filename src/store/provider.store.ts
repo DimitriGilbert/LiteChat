@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { db } from "@/lib/db";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
 import { nanoid } from "nanoid";
-import { DEFAULT_MODELS } from "@/lib/litechat"; // Import DEFAULT_MODELS
+import { DEFAULT_MODELS } from "@/lib/litechat";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 const LAST_SELECTION_KEY = "lastProviderSelection";
@@ -21,39 +21,39 @@ export interface ProviderActions {
   setEnableApiKeyManagement: (enabled: boolean) => void;
   setSelectedProviderId: (
     id: string | null,
-    currentConfigs: DbProviderConfig[], // Keep parameter
+    currentConfigs: DbProviderConfig[],
   ) => void;
   setSelectedModelId: (id: string | null) => void;
   addApiKey: (
     name: string,
-    providerId: string, // Keep providerId for context, though not stored in this store
+    providerId: string,
     value: string,
-  ) => Promise<string>; // Action remains, but implementation uses db directly
-  deleteApiKey: (id: string) => Promise<void>; // Action remains, but implementation uses db directly
+  ) => Promise<string>;
+  deleteApiKey: (id: string) => Promise<void>;
   addDbProviderConfig: (
     config: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
-  ) => Promise<string>; // Action remains, but implementation uses db directly
+  ) => Promise<string>;
   updateDbProviderConfig: (
     id: string,
     changes: Partial<DbProviderConfig>,
-  ) => Promise<void>; // Action remains, but implementation uses db directly
-  deleteDbProviderConfig: (id: string) => Promise<void>; // Action remains, but implementation uses db directly
+  ) => Promise<void>;
+  deleteDbProviderConfig: (id: string) => Promise<void>;
   fetchModels: (
     providerConfigId: string,
-    currentConfigs: DbProviderConfig[], // Keep parameter
-    currentApiKeys: DbApiKey[], // Keep parameter
-  ) => Promise<void>; // Action remains
+    currentConfigs: DbProviderConfig[],
+    currentApiKeys: DbApiKey[],
+  ) => Promise<void>;
   setProviderFetchStatus: (providerId: string, status: FetchStatus) => void;
   loadInitialSelection: (
-    currentConfigs: DbProviderConfig[], // Add parameter
-  ) => Promise<void>; // Renamed from initializeFromDb
+    currentConfigs: DbProviderConfig[],
+  ) => Promise<void>;
   // REMOVED: _setDbProviderConfigs
   // REMOVED: _setApiKeys
   getApiKeyForProvider: (
     providerId: string,
-    currentApiKeys: DbApiKey[], // Add parameter
-    currentConfigs: DbProviderConfig[], // Add parameter
-  ) => string | undefined; // Modified signature
+    currentApiKeys: DbApiKey[],
+    currentConfigs: DbProviderConfig[],
+  ) => string | undefined;
 }
 
 const saveSelectionToDb = async (
@@ -70,8 +70,6 @@ const saveSelectionToDb = async (
   }
 };
 
-// Helper to get default models (removed - using imported DEFAULT_MODELS)
-
 export const useProviderStore = create<ProviderState & ProviderActions>()(
   (set, get) => ({
     // Initial State
@@ -79,10 +77,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
     selectedProviderId: null,
     selectedModelId: null,
     providerFetchStatus: {},
-    // REMOVED: dbProviderConfigs: [],
     // REMOVED: apiKeys: [],
-
-    // Actions
     setEnableApiKeyManagement: (enableApiKeyManagement) =>
       set({ enableApiKeyManagement }),
 
@@ -96,7 +91,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           targetProviderConfig.fetchedModels &&
           targetProviderConfig.fetchedModels.length > 0
             ? targetProviderConfig.fetchedModels
-            : DEFAULT_MODELS[targetProviderConfig.type] || []; // Use imported DEFAULT_MODELS
+            : DEFAULT_MODELS[targetProviderConfig.type] || [];
 
         const enabledModelIds = targetProviderConfig.enabledModels ?? [];
         let potentialModels = availableModels;
@@ -143,15 +138,13 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
       set({ selectedModelId });
       saveSelectionToDb(get().selectedProviderId, selectedModelId);
     },
-
-    // DB Actions now directly modify Dexie and rely on useChatStorage for UI updates
     addApiKey: async (name, providerId, value) => {
       if (!get().enableApiKeyManagement) {
         toast.error("API Key Management is disabled.");
         throw new Error("API Key Management is disabled.");
       }
       const keyToAdd = value;
-      value = ""; // Clear sensitive data immediately
+      value = "";
       try {
         const newId = nanoid();
         const newKey: DbApiKey = {
@@ -162,7 +155,6 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           createdAt: new Date(),
         };
         await db.apiKeys.add(newKey);
-        // No state update here - useChatStorage handles it
         toast.success(`API Key "${name}" added.`);
         return newId;
       } catch (error) {
@@ -179,7 +171,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
         toast.error("API Key Management is disabled.");
         throw new Error("API Key Management is disabled.");
       }
-      const keyToDelete = await db.apiKeys.get(id); // Check if exists before toast
+      const keyToDelete = await db.apiKeys.get(id);
       if (!keyToDelete) {
         toast.error("API Key not found.");
         return;
@@ -198,7 +190,6 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
             await Promise.all(updates);
           }
         });
-        // No state update here - useChatStorage handles it
         toast.success(`API Key "${keyToDelete.name}" deleted.`);
       } catch (error) {
         console.error("Failed to delete API key:", error);
@@ -220,7 +211,6 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           updatedAt: now,
         };
         await db.providerConfigs.add(newConfig);
-        // No state update here - useChatStorage handles it
         toast.success(`Provider "${config.name}" added.`);
         return newId;
       } catch (error) {
@@ -238,7 +228,6 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           ...changes,
           updatedAt: new Date(),
         });
-        // No state update here - useChatStorage handles it
       } catch (error) {
         console.error("Failed to update provider config:", error);
         toast.error(
@@ -249,7 +238,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
     },
 
     deleteDbProviderConfig: async (id) => {
-      const configToDelete = await db.providerConfigs.get(id); // Check before toast
+      const configToDelete = await db.providerConfigs.get(id);
       if (!configToDelete) {
         toast.error("Provider configuration not found.");
         return;
@@ -263,7 +252,6 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
 
       try {
         await db.providerConfigs.delete(id);
-        // No state update here - useChatStorage handles it
         toast.success(`Provider "${configToDelete.name}" deleted.`);
       } catch (error) {
         console.error("Failed to delete provider config:", error);
@@ -290,22 +278,17 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
       get().setProviderFetchStatus(providerConfigId, "fetching");
       try {
         const apiKeyId = config.apiKeyId;
-        // Find API key from the passed currentApiKeys
         const apiKey = currentApiKeys.find((k) => k.id === apiKeyId)?.value;
         const fetched = await fetchModelsForProvider(config, apiKey);
-
-        // Use updateDbProviderConfig to update Dexie (which triggers useChatStorage update)
         await get().updateDbProviderConfig(providerConfigId, {
           fetchedModels: fetched,
           modelsLastFetchedAt: new Date(),
         });
 
         get().setProviderFetchStatus(providerConfigId, "success");
-        // Toast is now handled by the updateDbProviderConfig success/failure
       } catch (error) {
         console.error(`Error fetching models for ${config.name}:`, error);
         get().setProviderFetchStatus(providerConfigId, "error");
-        // Toast is handled by fetchModelsForProvider or updateDbProviderConfig
       }
     },
 
@@ -338,7 +321,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
             initialProviderId = loadedProviderId;
             const availableModels =
               providerConfig.fetchedModels ??
-              (DEFAULT_MODELS[providerConfig.type] || []); // Use imported DEFAULT_MODELS
+              (DEFAULT_MODELS[providerConfig.type] || []);
             const modelExists = availableModels.some(
               (m) => m.id === loadedModelId,
             );
@@ -364,7 +347,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           if (providerConfig) {
             const availableModels =
               providerConfig.fetchedModels ??
-              (DEFAULT_MODELS[providerConfig.type] || []); // Use imported DEFAULT_MODELS
+              (DEFAULT_MODELS[providerConfig.type] || []);
             const enabledModelIds = providerConfig.enabledModels ?? [];
             let potentialModels = availableModels;
 
@@ -417,10 +400,9 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           error,
         );
         toast.error("Failed to load last provider selection.");
-        // Fallback selection if DB load fails
         const firstEnabled = currentConfigs.find((c) => c.isEnabled);
         if (firstEnabled) {
-          get().setSelectedProviderId(firstEnabled.id, currentConfigs); // This will set default model
+          get().setSelectedProviderId(firstEnabled.id, currentConfigs);
         } else {
           set({ selectedProviderId: null, selectedModelId: null });
         }

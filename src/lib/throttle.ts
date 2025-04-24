@@ -20,7 +20,6 @@ export function throttle<T extends (...args: any[]) => any>(
             lastRan = Date.now();
           }
         },
-        // Calculate remaining time accurately
         Math.max(0, limit - (Date.now() - (lastRan ?? 0))),
       );
     }
@@ -30,8 +29,7 @@ export function throttle<T extends (...args: any[]) => any>(
     if (lastFunc) {
       clearTimeout(lastFunc);
       lastFunc = undefined;
-      // Reset lastRan as well, so the next call executes immediately if needed
-      // lastRan = undefined; // Optional: Reset lastRan on cancel? Depends on desired behavior.
+      // lastRan = undefined;
       // Keeping lastRan allows the throttle timer to potentially resume if called again quickly.
       // Clearing it makes the next call immediate. Let's keep it for now.
     }

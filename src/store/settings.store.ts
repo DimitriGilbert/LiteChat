@@ -4,11 +4,9 @@ import { create } from "zustand";
 export interface SettingsState {
   // Feature Flags (can be set during init)
   enableAdvancedSettings: boolean;
-  // UI Settings
   theme: "light" | "dark" | "system";
-  searchTerm: string; // For sidebar/item search
+  searchTerm: string;
   isSettingsModalOpen: boolean;
-  // AI Parameters (Global/Defaults)
   temperature: number;
   maxTokens: number | null;
   globalSystemPrompt: string | null;
@@ -16,11 +14,10 @@ export interface SettingsState {
   topK: number | null;
   presencePenalty: number | null;
   frequencyPenalty: number | null;
-  // Other Config
   /** Refresh rate for UI updates during AI response streaming (in milliseconds). */
   streamingRefreshRateMs: number;
   /** Enable markdown parsing during streaming */
-  enableStreamingMarkdown: boolean; // Added
+  enableStreamingMarkdown: boolean;
 }
 
 export interface SettingsActions {
@@ -38,7 +35,7 @@ export interface SettingsActions {
   /** Sets the UI refresh rate during streaming (in milliseconds). */
   setStreamingRefreshRateMs: (rate: number) => void;
   /** Sets whether markdown should be parsed during streaming */
-  setEnableStreamingMarkdown: (enabled: boolean) => void; // Added
+  setEnableStreamingMarkdown: (enabled: boolean) => void;
   // Derived data (activeSystemPrompt) should be handled by selectors outside the store
 }
 
@@ -61,22 +58,20 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     isSettingsModalOpen: false,
     temperature: 0.7,
     maxTokens: null,
-    globalSystemPrompt: defaultGlobalPrompt, // Initialize with default
+    globalSystemPrompt: defaultGlobalPrompt,
     topP: null,
     topK: null,
     presencePenalty: null,
     frequencyPenalty: null,
-    streamingRefreshRateMs: 33, // Default ~30 FPS (1000ms / 30)
-    enableStreamingMarkdown: true, // Added default
+    streamingRefreshRateMs: 33,
+    enableStreamingMarkdown: true,
 
     // Actions
     setEnableAdvancedSettings: (enableAdvancedSettings) =>
       set({ enableAdvancedSettings }),
     setTheme: (theme) => {
       set({ theme });
-      // IMPORTANT: The side effect of applying the theme to the DOM
       // should be handled by a component subscribing to this state,
-      // not directly within the store action.
     },
     setSearchTerm: (searchTerm) => set({ searchTerm }),
     setIsSettingsModalOpen: (isOpen) => {
@@ -92,6 +87,6 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     setStreamingRefreshRateMs: (streamingRefreshRateMs) =>
       set({ streamingRefreshRateMs }),
     setEnableStreamingMarkdown: (enableStreamingMarkdown) =>
-      set({ enableStreamingMarkdown }), // Added action
+      set({ enableStreamingMarkdown }),
   }),
 );

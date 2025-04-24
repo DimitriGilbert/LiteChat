@@ -4,7 +4,7 @@ import { create } from "zustand";
 export interface InputState {
   promptInputValue: string;
   attachedFiles: File[];
-  selectedVfsPaths: string[]; // Added
+  selectedVfsPaths: string[];
 }
 
 export interface InputActions {
@@ -12,21 +12,21 @@ export interface InputActions {
   setAttachedFiles: (files: File[]) => void;
   addAttachedFile: (file: File) => void;
   removeAttachedFile: (fileName: string) => void;
-  clearAttachedFiles: () => void; // Added
+  clearAttachedFiles: () => void;
   // VFS Path Actions
-  setSelectedVfsPaths: (paths: string[]) => void; // Added
-  addSelectedVfsPath: (path: string) => void; // Added
-  removeSelectedVfsPath: (path: string) => void; // Added
-  clearSelectedVfsPaths: () => void; // Added
+  setSelectedVfsPaths: (paths: string[]) => void;
+  addSelectedVfsPath: (path: string) => void;
+  removeSelectedVfsPath: (path: string) => void;
+  clearSelectedVfsPaths: () => void;
   // Combined Clear Action
-  clearAllInput: () => void; // Renamed from clearPromptInput
+  clearAllInput: () => void;
 }
 
 export const useInputStore = create<InputState & InputActions>()((set) => ({
   // Initial State
   promptInputValue: "",
   attachedFiles: [],
-  selectedVfsPaths: [], // Added
+  selectedVfsPaths: [],
 
   // Actions
   setPromptInputValue: (promptInputValue) => set({ promptInputValue }),
@@ -41,12 +41,12 @@ export const useInputStore = create<InputState & InputActions>()((set) => ({
     set((state) => ({
       attachedFiles: state.attachedFiles.filter((f) => f.name !== fileName),
     })),
-  clearAttachedFiles: () => set({ attachedFiles: [] }), // Added specific clear action
+  clearAttachedFiles: () => set({ attachedFiles: [] }),
 
   // VFS Path Actions
-  setSelectedVfsPaths: (selectedVfsPaths) => set({ selectedVfsPaths }), // Added
+  setSelectedVfsPaths: (selectedVfsPaths) => set({ selectedVfsPaths }),
   addSelectedVfsPath: (
-    path, // Added
+    path,
   ) =>
     set((state) => ({
       selectedVfsPaths: state.selectedVfsPaths.includes(path)
@@ -54,12 +54,12 @@ export const useInputStore = create<InputState & InputActions>()((set) => ({
         : [...state.selectedVfsPaths, path].sort(),
     })),
   removeSelectedVfsPath: (
-    path, // Added
+    path,
   ) =>
     set((state) => ({
       selectedVfsPaths: state.selectedVfsPaths.filter((p) => p !== path),
     })),
-  clearSelectedVfsPaths: () => set({ selectedVfsPaths: [] }), // Added
+  clearSelectedVfsPaths: () => set({ selectedVfsPaths: [] }),
 
   // Combined Clear Action
   clearAllInput: () =>

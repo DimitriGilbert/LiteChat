@@ -28,7 +28,7 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 10 : undefined, // Ensure dragging item is on top
+    zIndex: isDragging ? 10 : undefined,
     cursor: disabled ? "not-allowed" : "grab",
     opacity: disabled ? 0.5 : 1,
   };

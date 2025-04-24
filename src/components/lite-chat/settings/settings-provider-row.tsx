@@ -23,13 +23,13 @@ export interface ProviderRowProps {
 
 
 const ProviderRowComponent: React.FC<ProviderRowProps> = ({
-  provider, // Use prop
-  apiKeys, // Use prop
-  onUpdate, // Use prop action
-  onDelete, // Use prop action
-  onFetchModels, // Use prop action
-  fetchStatus, // Use prop
-  getAllAvailableModelDefs, // Use prop function
+  provider,
+  apiKeys,
+  onUpdate,
+  onDelete,
+  onFetchModels,
+  fetchStatus,
+  getAllAvailableModelDefs,
 }) => {
   // Local UI state remains
   const [isEditing, setIsEditing] = useState(false);
@@ -39,8 +39,6 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   const [allAvailableModels, setAllAvailableModels] = useState<
     { id: string; name: string }[]
   >([]);
-
-  // Memoized list derivation remains the same, uses local state/props
   const orderedEnabledModels = useMemo<{ id: string; name: string }[]>(() => {
     if (!isEditing) return [];
     const enabledIds = new Set(editData.enabledModels ?? []);
@@ -75,8 +73,6 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     () => orderedEnabledModels.map((m) => m.id),
     [orderedEnabledModels],
   );
-
-  // Drag handler remains the same, uses local state
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
@@ -102,11 +98,9 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     },
     [orderedEnabledModels],
   );
-
-  // Effect to initialize edit state uses props
   useEffect(() => {
     if (isEditing) {
-      const models = getAllAvailableModelDefs(provider.id); // Use prop function
+      const models = getAllAvailableModelDefs(provider.id);
       models.sort((a, b) => a.name.localeCompare(b.name));
       setAllAvailableModels(models);
       setEditData({
@@ -133,10 +127,8 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     provider.enabledModels,
     provider.autoFetchModels,
     provider.modelSortOrder,
-    getAllAvailableModelDefs, // Depend on prop function
+    getAllAvailableModelDefs,
   ]);
-
-  // Handlers use props/prop actions
   const handleEdit = () => {
     setIsEditing(true);
   };
@@ -160,7 +152,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
         modelSortOrder:
           finalSortOrder && finalSortOrder.length > 0 ? finalSortOrder : null,
       };
-      await onUpdate(provider.id, finalEditData); // Use prop action
+      await onUpdate(provider.id, finalEditData);
       setIsEditing(false);
       setEditData({});
       toast.success(
@@ -173,7 +165,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     } finally {
       setIsSaving(false);
     }
-  }, [editData, onUpdate, provider.id, provider.name]); // Depend on local state and prop action
+  }, [editData, onUpdate, provider.id, provider.name]);
 
   const handleChange = useCallback(
     (
@@ -217,22 +209,22 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     ) {
       setIsDeleting(true);
       try {
-        await onDelete(provider.id); // Use prop action
+        await onDelete(provider.id);
         // Success toast handled by parent/store action
       } catch (error) {
         // Error toast handled by parent/store action
         setIsDeleting(false);
       }
     }
-  }, [onDelete, provider.id, provider.name]); // Depend on prop action
+  }, [onDelete, provider.id, provider.name]);
 
   const handleFetchModels = useCallback(async () => {
-    await onFetchModels(provider.id); // Use prop action
-  }, [onFetchModels, provider.id]); // Depend on prop action
+    await onFetchModels(provider.id);
+  }, [onFetchModels, provider.id]);
 
   const getAvailableModelsForView = useCallback(() => {
-    return getAllAvailableModelDefs(provider.id); // Use prop function
-  }, [getAllAvailableModelDefs, provider.id]); // Depend on prop function
+    return getAllAvailableModelDefs(provider.id);
+  }, [getAllAvailableModelDefs, provider.id]);
 
   return (
     <div className="border-b border-gray-700 p-4 space-y-3">

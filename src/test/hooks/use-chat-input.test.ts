@@ -58,12 +58,10 @@ describe("useChatInput", () => {
     });
     expect(result.current.attachedFiles).toHaveLength(1);
     expect(result.current.attachedFiles[0]).toBe(file2);
-
-    // Try removing non-existent file
     act(() => {
       result.current.removeAttachedFile("nonexistent.png");
     });
-    expect(result.current.attachedFiles).toHaveLength(1); // Should not change
+    expect(result.current.attachedFiles).toHaveLength(1);
 
     act(() => {
       result.current.removeAttachedFile("file2.jpg");

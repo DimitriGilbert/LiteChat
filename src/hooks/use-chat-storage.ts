@@ -9,7 +9,7 @@ import type {
   SidebarItemType,
   DbProviderConfig,
   MessageContent,
-  Workflow, // Import Workflow type
+  Workflow,
 } from "@/lib/types";
 import type { DbMod } from "@/mods/types";
 import { nanoid } from "nanoid";
@@ -43,8 +43,6 @@ export function useChatStorage() {
     [],
     [],
   );
-
-  // === Projects ===
   const createProject = useCallback(
     async (
       name: string = "New Project",
@@ -98,8 +96,6 @@ export function useChatStorage() {
     },
     [],
   );
-
-  // === Conversations ===
   const createConversation = useCallback(
     async (
       parentId: string | null = null,
@@ -171,8 +167,6 @@ export function useChatStorage() {
     },
     [],
   );
-
-  // === VFS Toggle ===
   const toggleVfsEnabled = useCallback(
     async (id: string, type: SidebarItemType): Promise<void> => {
       const now = new Date();
@@ -213,8 +207,6 @@ export function useChatStorage() {
     },
     [],
   );
-
-  // === Messages ===
   const getMessagesForConversation = useCallback(
     async (conversationId: string): Promise<DbMessage[]> => {
       // Use the compound index for efficient sorting
@@ -240,27 +232,21 @@ export function useChatStorage() {
         id: messageData.id ?? nanoid(),
         createdAt: messageData.createdAt ?? new Date(),
         role: messageData.role,
-        content: messageData.content, // Store the MessageContent directly
+        content: messageData.content,
         conversationId: messageData.conversationId,
         vfsContextPaths: messageData.vfsContextPaths ?? undefined,
-        // Include optional tool fields if provided
         tool_calls: messageData.tool_calls ?? undefined,
         tool_call_id: messageData.tool_call_id ?? undefined,
-        // Include children if provided
         children: messageData.children ?? undefined,
-        // Include workflow if provided
         workflow: messageData.workflow ?? undefined,
-        // Include provider/model if provided
         providerId: messageData.providerId ?? undefined,
         modelId: messageData.modelId ?? undefined,
-        // Include tokens if provided
         tokensInput: messageData.tokensInput ?? undefined,
         tokensOutput: messageData.tokensOutput ?? undefined,
       };
       const conversation = await db.conversations.get(
         messageData.conversationId,
       );
-      // Dexie handles storing the object/array structure
       await db.messages.add(newMessage);
       const now = new Date();
       await db.conversations.update(messageData.conversationId, {
@@ -282,8 +268,6 @@ export function useChatStorage() {
     },
     [],
   );
-
-  // Add a function to update the workflow status of a message
   const updateDbMessageWorkflow = useCallback(
     async (messageId: string, workflow: Workflow | null): Promise<void> => {
       await db.messages.update(messageId, { workflow: workflow ?? undefined });
@@ -302,14 +286,13 @@ export function useChatStorage() {
     async (convId: string, messageId: string): Promise<DbMessage[]> => {
       const targetMsg = await db.messages.get(messageId);
       if (!targetMsg) return [];
-      // Use compound index for potentially faster filtering and sorting
       return db.messages
         .where("[conversationId+createdAt]")
         .between(
           [convId, Dexie.minKey],
           [convId, targetMsg.createdAt],
-          false, // lower bound exclusive (minKey is okay)
-          true, // upper bound exclusive (don't include targetMsg)
+          false,
+          true,
         )
         .sortBy("createdAt");
     },
@@ -319,14 +302,13 @@ export function useChatStorage() {
   const bulkAddMessages = useCallback(
     async (messages: DbMessage[]): Promise<unknown> => {
       if (messages.length === 0) return;
-      // Dexie handles bulk adding objects with complex fields
       // Ensure conversation timestamp is updated based on the latest message
       const latestMessage = messages.reduce((latest, current) =>
         latest.createdAt > current.createdAt ? latest : current,
       );
       const conversationId = latestMessage.conversationId;
       const conversation = await db.conversations.get(conversationId);
-      const now = new Date(); // Use a consistent time for updates
+      const now = new Date();
 
       await db.transaction(
         "rw",
@@ -355,8 +337,6 @@ export function useChatStorage() {
     },
     [],
   );
-
-  // === API Keys ===
   const addApiKey = useCallback(
     async (
       name: string,
@@ -392,8 +372,6 @@ export function useChatStorage() {
       }
     });
   }, []);
-
-  // === Mods ===
   const addMod = useCallback(
     async (modData: Omit<DbMod, "id" | "createdAt">): Promise<string> => {
       const newId = nanoid();
@@ -422,8 +400,6 @@ export function useChatStorage() {
   const getMods = useCallback(async (): Promise<DbMod[]> => {
     return db.mods.orderBy("loadOrder").toArray();
   }, []);
-
-  // === Provider Configs ===
   const addProviderConfig = useCallback(
     async (
       configData: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
@@ -458,8 +434,6 @@ export function useChatStorage() {
     },
     [],
   );
-
-  // === Data Management ===
   const clearAllData = useCallback(async (): Promise<void> => {
     await Promise.all([
       db.projects.clear(),
@@ -468,11 +442,9 @@ export function useChatStorage() {
       db.apiKeys.clear(),
       db.mods.clear(),
       db.providerConfigs.clear(),
-      db.appState.clear(), // Clear app state as well
+      db.appState.clear(),
     ]);
   }, []);
-
-  // Return memoized functions and live query results
   return {
     // Projects
     projects: projects || [],
@@ -481,7 +453,6 @@ export function useChatStorage() {
     deleteProject,
     getProject,
     countChildProjects,
-    // Conversations
     conversations: conversations || [],
     createConversation,
     deleteConversation,
@@ -490,32 +461,27 @@ export function useChatStorage() {
     getConversation,
     updateConversationTimestamp,
     countChildConversations,
-    // VFS Toggle
     toggleVfsEnabled,
-    // Messages
     getMessagesForConversation,
-    addDbMessage, // Handles new fields implicitly
+    addDbMessage,
     updateDbMessageContent,
-    updateDbMessageWorkflow, // Added workflow update function
+    updateDbMessageWorkflow,
     deleteDbMessage,
     getDbMessagesUpTo,
-    bulkAddMessages, // Handles new fields implicitly
+    bulkAddMessages,
     // API Keys
     apiKeys: apiKeys || [],
     addApiKey,
     deleteApiKey,
-    // Mods
     mods: mods || [],
     addMod,
     updateMod,
     deleteMod,
     getMods,
-    // Provider Configs
     providerConfigs: providerConfigs || [],
     addProviderConfig,
     updateProviderConfig,
     deleteProviderConfig,
-    // Data Management
     clearAllData,
   };
 }

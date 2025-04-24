@@ -2,7 +2,6 @@
 import React, { useRef, useState, useEffect, useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-// Use MemoizedMessageBubble if that's the intended export, otherwise use MessageBubble
 // Assuming MemoizedMessageBubble is the correct one based on the user's file content
 import { MemoizedMessageBubble } from "../message/message-bubble";
 import { EmptyContent } from "./empty-content";
@@ -17,7 +16,7 @@ interface ChatContentProps {
   className?: string;
   messages: Message[];
   isLoadingMessages: boolean;
-  isStreaming: boolean; // Keep isStreaming prop for logic within ChatContent
+  isStreaming: boolean;
   regenerateMessage: (messageId: string) => Promise<void>;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   modMessageActions: CustomMessageAction[];
@@ -28,7 +27,7 @@ const ChatContentComponent: React.FC<ChatContentProps> = ({
   className,
   messages,
   isLoadingMessages,
-  isStreaming, // Keep isStreaming prop for internal logic if needed
+  isStreaming,
   regenerateMessage,
   getContextSnapshotForMod,
   modMessageActions,
@@ -107,7 +106,6 @@ const ChatContentComponent: React.FC<ChatContentProps> = ({
     ));
   }, [
     safeMessages,
-    // isStreaming, // Remove dependency if prop is removed
     regenerateMessage,
     getContextSnapshotForMod,
     safeModMessageActions,

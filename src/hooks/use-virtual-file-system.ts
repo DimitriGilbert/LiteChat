@@ -10,9 +10,9 @@ import { toast } from "sonner";
  * Receives key state values as arguments to ensure reactivity.
  */
 export function useVirtualFileSystemManager(
-  vfsKey: string | null, // Argument
-  isEnabled: boolean, // Argument (isVfsEnabledForItem)
-  globalEnableVfs: boolean, // Argument
+  vfsKey: string | null,
+  isEnabled: boolean,
+  globalEnableVfs: boolean,
 ): void {
   // Select only actions and state needed *within* the hook's logic
   const setVfsLoading = useVfsStore((s) => s.setVfsLoading);
@@ -25,16 +25,12 @@ export function useVirtualFileSystemManager(
   const isMountedRef = useRef(false);
   const configuringForVfsKeyRef = useRef<string | null>(null);
   const lastPropsRef = useRef({ vfsKey, isEnabled, globalEnableVfs });
-
-  // Force a more verbose logging to debug the issue
   console.log(
     `[VFS Manager Hook] RENDER with props: vfsKey=${vfsKey}, isEnabled=${isEnabled}, globalEnableVfs=${globalEnableVfs}`,
   );
 
   useEffect(() => {
     isMountedRef.current = true;
-
-    // Log changes in props to help debug
     if (
       lastPropsRef.current.vfsKey !== vfsKey ||
       lastPropsRef.current.isEnabled !== isEnabled ||
@@ -114,8 +110,6 @@ export function useVirtualFileSystemManager(
         console.log(
           `[VFS Manager Hook] configureSingle SUCCESS for key: ${key}`,
         );
-
-        // Re-fetch the target key from the store *after* await
         const currentTargetKey = useVfsStore.getState().vfsKey;
         console.log(
           `[VFS Manager Hook] Post-config check for key: ${key}. Mounted: ${isMountedRef.current}, Current Target Key: ${currentTargetKey}`,
@@ -123,7 +117,6 @@ export function useVirtualFileSystemManager(
         if (isMountedRef.current && currentTargetKey === key) {
           _setFsInstance(fs);
           setConfiguredVfsKey(key);
-          // Set ready state last to ensure all other state is set first
           setVfsReady(true);
           console.log(
             `[VFS Manager Hook] State updated for SUCCESS (Ready: true) for key: ${key}`,
@@ -143,7 +136,6 @@ export function useVirtualFileSystemManager(
           `[VFS Manager Hook] configureSingle FAILED for key: ${key}:`,
           err,
         );
-        // Re-fetch the target key from the store *after* await
         const currentTargetKey = useVfsStore.getState().vfsKey;
         if (isMountedRef.current && currentTargetKey === key) {
           const errorMsg = `Failed to initialize filesystem: ${err instanceof Error ? err.message : String(err)}`;
@@ -191,7 +183,6 @@ export function useVirtualFileSystemManager(
         console.log(
           `[VFS Manager Hook] Keys match ('${vfsKey}'). Ensuring state consistency.`,
         );
-        // Use direct store reads for latest state within the effect
         const latestStoreState = useVfsStore.getState();
         if (!latestStoreState.isVfsReady) setVfsReady(true);
         if (latestStoreState.isVfsLoading) setVfsLoading(false);
@@ -202,7 +193,6 @@ export function useVirtualFileSystemManager(
       console.log(
         `[VFS Manager Hook] Condition: Should NOT be active. Clearing state.`,
       );
-      // Use direct store reads for latest state before setting
       const latestStoreState = useVfsStore.getState();
       if (latestStoreState.isVfsReady) setVfsReady(false);
       if (latestStoreState.configuredVfsKey !== null) setConfiguredVfsKey(null);
@@ -221,7 +211,6 @@ export function useVirtualFileSystemManager(
     vfsKey,
     isEnabled,
     globalEnableVfs,
-    // Include the actions
     setVfsLoading,
     setVfsOperationLoading,
     setVfsError,

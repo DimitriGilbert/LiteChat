@@ -29,20 +29,18 @@ import { toast } from "sonner";
 import type { DbProviderConfig, DbApiKey } from "@/lib/types";
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
-import { useChatStorage } from "@/hooks/use-chat-storage"; // Import storage hook
+import { useChatStorage } from "@/hooks/use-chat-storage";
 
 const SettingsApiKeysComponent: React.FC = () => {
   // --- Fetch actions and flag from store ---
   const { addApiKey, deleteApiKey, enableApiKeyManagement } = useProviderStore(
     useShallow((state) => ({
-      addApiKey: state.addApiKey, // Action remains
-      deleteApiKey: state.deleteApiKey, // Action remains
+      addApiKey: state.addApiKey,
+      deleteApiKey: state.deleteApiKey,
       enableApiKeyManagement: state.enableApiKeyManagement,
     })),
   );
-
-  // Fetch live data from storage
-  const { apiKeys, providerConfigs: dbProviderConfigs } = useChatStorage(); // Use storage hook
+  const { apiKeys, providerConfigs: dbProviderConfigs } = useChatStorage();
 
   // Local UI state remains
   const [newKeyName, setNewKeyName] = useState("");
@@ -107,8 +105,6 @@ const SettingsApiKeysComponent: React.FC = () => {
     },
     [deleteApiKey],
   );
-
-  // Derivations use live data from storage
   const linkedProviderNames = useMemo(() => {
     const map = new Map<string, string>();
     (apiKeys || []).forEach((key: DbApiKey) => {
@@ -123,7 +119,7 @@ const SettingsApiKeysComponent: React.FC = () => {
       );
     });
     return map;
-  }, [apiKeys, dbProviderConfigs]); // Depend on live data
+  }, [apiKeys, dbProviderConfigs]);
 
   if (!enableApiKeyManagement) {
     return (

@@ -30,7 +30,7 @@ import type { SidebarItem, SidebarItemType } from "@/lib/types";
 import { toast } from "sonner";
 import { ProjectSettingsModal } from "@/components/lite-chat/project/project-settings-modal";
 
-import { useChatStorage } from "@/hooks/use-chat-storage"; // To get items
+import { useChatStorage } from "@/hooks/use-chat-storage";
 
 interface HistoryItemProps {
   item: SidebarItem;
@@ -351,7 +351,6 @@ HistoryItem.displayName = "HistoryItem";
 
 export interface ChatHistoryProps {
   className?: string;
-  // Remove sidebarItems prop
   editingItemId: string | null;
   selectedItemId: string | null;
   onEditComplete: (id: string) => void;
@@ -368,7 +367,6 @@ export interface ChatHistoryProps {
 
 const ChatHistoryComponent: React.FC<ChatHistoryProps> = ({
   className,
-  // Remove sidebarItems prop
   editingItemId,
   selectedItemId,
   onEditComplete,
@@ -395,7 +393,6 @@ const ChatHistoryComponent: React.FC<ChatHistoryProps> = ({
     );
     return combinedItems;
   }, [projects, conversations]);
-  // --- End fetch items ---
 
   const itemsToDisplay = sidebarItems;
 

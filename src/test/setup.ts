@@ -202,7 +202,7 @@ vi.mock("nanoid", () => ({
 
 
 afterEach(() => {
-  cleanup(); // Cleans up RTL renders
-  vi.clearAllMocks(); // Clears mock call history etc.
-  localStorageMock.clear(); // Clear mocked localStorage
+  cleanup();
+  vi.clearAllMocks();
+  localStorageMock.clear();
 });

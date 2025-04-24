@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { useShallow } from "zustand/react/shallow";
 import { useSidebarStore } from "@/store/sidebar.store";
-import { useChatStorage } from "@/hooks/use-chat-storage"; // For clearAllData
+import { useChatStorage } from "@/hooks/use-chat-storage";
 
 const SettingsDataManagementComponent: React.FC = () => {
   // --- Fetch actions from stores ---
@@ -16,15 +16,13 @@ const SettingsDataManagementComponent: React.FC = () => {
       exportAllConversations: state.exportAllConversations,
     })),
   );
-  const { clearAllData } = useChatStorage(); // Get clearAllData from storage hook
+  const { clearAllData } = useChatStorage();
 
   // Local UI state remains
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
-
-  // Handlers use store actions
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };

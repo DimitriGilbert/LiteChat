@@ -7,7 +7,7 @@ import {
   beforeEach,
   afterEach,
   beforeAll,
-} from "vitest"; // Add beforeAll
+} from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useChatSettings } from "@/hooks/use-chat-settings";
 import type { DbConversation } from "@/lib/types";
@@ -35,14 +35,14 @@ const mockRoot = { classList: { add: vi.fn(), remove: vi.fn() } };
 if (typeof document !== "undefined") {
   Object.defineProperty(document, "documentElement", {
     value: mockRoot,
-    writable: true, // Allow modification if needed later
+    writable: true,
     configurable: true,
   });
 }
 
 
 const mockMatchMedia = vi.fn().mockImplementation((query) => ({
-  matches: false, // Default light
+  matches: false,
   media: query,
   addEventListener: vi.fn(),
   removeEventListener: vi.fn(),
@@ -61,14 +61,12 @@ describe("useChatSettings", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset matchMedia mock if needed for specific tests
     mockMatchMedia.mockImplementation((query) => ({
-      matches: false, // Default light
+      matches: false,
       media: query,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     }));
-    // Reset classList mocks
     mockRoot.classList.add.mockClear();
     mockRoot.classList.remove.mockClear();
   });
@@ -89,7 +87,7 @@ describe("useChatSettings", () => {
     );
     expect(result.current.activeSystemPrompt).toBe(
       "You are a helpful AI assistant.",
-    ); // Falls back to global
+    );
     expect(result.current.topP).toBeNull();
     expect(result.current.topK).toBeNull();
     expect(result.current.presencePenalty).toBeNull();
@@ -111,7 +109,7 @@ describe("useChatSettings", () => {
 
     act(() => result.current.setGlobalSystemPrompt("New global prompt"));
     expect(result.current.globalSystemPrompt).toBe("New global prompt");
-    expect(result.current.activeSystemPrompt).toBe("New global prompt"); // Still global
+    expect(result.current.activeSystemPrompt).toBe("New global prompt");
 
     act(() => result.current.setTopP(0.9));
     expect(result.current.topP).toBe(0.9);
@@ -136,7 +134,7 @@ describe("useChatSettings", () => {
     expect(result.current.globalSystemPrompt).toBe(
       "You are a helpful AI assistant.",
     );
-    expect(result.current.activeSystemPrompt).toBe("You are a test AI."); // Uses conversation prompt
+    expect(result.current.activeSystemPrompt).toBe("You are a test AI.");
   });
 
   it("falls back to globalSystemPrompt if conversation prompt is null/empty", () => {
@@ -168,8 +166,6 @@ describe("useChatSettings", () => {
       "You are a helpful AI assistant.",
     );
   });
-
-  // These tests might still fail if the underlying issue prevents
   // the hook from rendering correctly at all, but the setup tries
   // to test the state logic independent of the DOM effect.
   it("applies light theme correctly (state check)", () => {
@@ -178,7 +174,6 @@ describe("useChatSettings", () => {
     );
     act(() => result.current.setTheme("light"));
     expect(result.current.theme).toBe("light");
-    // We don't check mockRoot.classList because the effect is skipped in tests
   });
 
   it("applies dark theme correctly (state check)", () => {
@@ -187,12 +182,11 @@ describe("useChatSettings", () => {
     );
     act(() => result.current.setTheme("dark"));
     expect(result.current.theme).toBe("dark");
-    // We don't check mockRoot.classList
   });
 
   it("applies system theme (light preference) (state check)", () => {
     mockMatchMedia.mockImplementation((query) => ({
-      matches: false, // System prefers light
+      matches: false,
       media: query,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
@@ -202,12 +196,11 @@ describe("useChatSettings", () => {
     );
     act(() => result.current.setTheme("system"));
     expect(result.current.theme).toBe("system");
-    // We don't check mockRoot.classList
   });
 
   it("applies system theme (dark preference) (state check)", () => {
     mockMatchMedia.mockImplementation((query) => ({
-      matches: true, // System prefers dark
+      matches: true,
       media: query,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
@@ -217,6 +210,5 @@ describe("useChatSettings", () => {
     );
     act(() => result.current.setTheme("system"));
     expect(result.current.theme).toBe("system");
-    // We don't check mockRoot.classList
   });
 });

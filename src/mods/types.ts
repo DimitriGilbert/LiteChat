@@ -1,7 +1,7 @@
 
-import type { Message, SidebarItemType, MessageContent } from "@/lib/types"; // Import MessageContent
+import type { Message, SidebarItemType, MessageContent } from "@/lib/types";
 import type { LiteChatModApi } from "./api";
-import type { Tool, ToolImplementation } from "./tools"; // Import Tool types
+import type { Tool, ToolImplementation } from "./tools";
 
 
 
@@ -20,8 +20,8 @@ export interface DbMod {
 export interface ModInstance {
   id: string;
   name: string;
-  api: LiteChatModApi; // The API instance provided to this mod
-  error?: Error | string; // Error during loading/execution
+  api: LiteChatModApi;
+  error?: Error | string;
 }
 
 
@@ -46,7 +46,7 @@ export interface ChatRenamedPayload {
   newName: string;
 }
 export interface ChatSystemPromptUpdatedPayload {
-  id: string; // Conversation ID
+  id: string;
   systemPrompt: string | null;
 }
 export interface ChatVfsToggledPayload {
@@ -61,7 +61,7 @@ export interface ChatVfsToggledPayload {
 
 
 export interface MessageSubmittedPayload {
-  message: Message; // Use the Message type from lib/types
+  message: Message;
 }
 export interface ResponseStartPayload {
   conversationId: string;
@@ -71,7 +71,7 @@ export interface ResponseChunkPayload {
   conversationId: string;
 }
 export interface ResponseDonePayload {
-  message: Partial<Message>; // Use the Message type from lib/types
+  message: Partial<Message>;
 }
 export interface VfsFileOpPayload {
   path: string;
@@ -90,7 +90,7 @@ export interface ModErrorPayload {
 }
 export interface AppErrorPayload {
   message: string;
-  error?: Error; // Optional original error object
+  error?: Error;
 }
 
 
@@ -100,10 +100,10 @@ export interface ModEventPayloadMap {
   "chat:selected": ChatSelectedPayload;
   "chat:created": ChatCreatedPayload;
   "chat:deleted": ChatDeletedPayload;
-  "chat:renamed": ChatRenamedPayload; // Added
-  "chat:systemPromptUpdated": ChatSystemPromptUpdatedPayload; // Added
-  "chat:vfsToggled": ChatVfsToggledPayload; // Added
-  // "message:beforeSubmit": MessageBeforeSubmitPayload; // Removed as it seems unused
+  "chat:renamed": ChatRenamedPayload;
+  "chat:systemPromptUpdated": ChatSystemPromptUpdatedPayload;
+  "chat:vfsToggled": ChatVfsToggledPayload;
+  // "message:beforeSubmit": MessageBeforeSubmitPayload;
   "message:submitted": MessageSubmittedPayload;
   "response:start": ResponseStartPayload;
   "response:chunk": ResponseChunkPayload;
@@ -116,7 +116,6 @@ export interface ModEventPayloadMap {
   "settings:closed": undefined;
   "mod:loaded": ModLoadedPayload;
   "mod:error": ModErrorPayload;
-  // Add other events here...
 }
 
 
@@ -130,7 +129,6 @@ export interface SubmitPromptPayload {
   vfsPaths: string[];
   /** The ID of the conversation the prompt belongs to. */
   conversationId: string;
-  // Removed originalUserPrompt and attachedFiles as they are processed before this hook
 }
 /** Return type for the SUBMIT_PROMPT middleware hook. Can modify the payload or cancel submission. */
 export type SubmitPromptReturn = SubmitPromptPayload | false;
@@ -158,7 +156,6 @@ export interface ModMiddlewarePayloadMap {
   "middleware:processResponseChunk": ProcessResponseChunkPayload;
   "middleware:renderMessage": RenderMessagePayload;
   "middleware:vfsWrite": VfsWritePayload;
-  // Add other middleware hooks here...
 }
 
 
@@ -167,7 +164,6 @@ export interface ModMiddlewareReturnMap {
   "middleware:processResponseChunk": ProcessResponseChunkReturn;
   "middleware:renderMessage": RenderMessageReturn;
   "middleware:vfsWrite": VfsWriteReturn;
-  // Add other middleware hooks here...
 }
 
 

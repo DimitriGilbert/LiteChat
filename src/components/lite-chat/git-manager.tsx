@@ -24,15 +24,13 @@ export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
   const {
     isVfsReady,
     vfsKey,
-    fs: fsInstance, // Get fs instance from store
+    fs: fsInstance,
   } = useVfsStore((s) => ({
     isVfsReady: s.isVfsReady,
     vfsKey: s.vfsKey,
-    fs: s.fs, // Select fs instance
+    fs: s.fs,
   }));
-
-  // Initialize useGit with fs instance from the store
-  const git = useGit(fsInstance); // Pass fsInstance
+  const git = useGit(fsInstance);
 
   const [currentPath] = useState("/");
   const [repoUrl, setRepoUrl] = useState("");
@@ -74,8 +72,7 @@ export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
     };
 
     checkIfRepo();
-    // Re-run if git becomes initialized OR if the underlying VFS key changes
-  }, [git.initialized, currentPath, vfsKey, git]); // Added git dependency
+  }, [git.initialized, currentPath, vfsKey, git]);
 
   const handleClone = async () => {
     if (!repoUrl) {
@@ -177,8 +174,6 @@ export const GitManager: React.FC<{ className?: string }> = ({ className }) => {
   const toggleAdvancedSettings = () => {
     setIsAdvancedVisible(!isAdvancedVisible);
   };
-
-  // Render logic depends on VFS readiness and git initialization
   if (!isVfsReady) {
     return (
       <div className="p-4 text-center text-sm text-gray-500">

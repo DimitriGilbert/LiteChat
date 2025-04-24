@@ -7,7 +7,7 @@ import {
   GitRepoInfoData,
 } from "@/utils/git-utils";
 import { toast } from "sonner";
-import { fs } from "@zenfs/core"; // Import fs type
+import { fs } from "@zenfs/core";
 
 /**
  * Custom hook for git operations in the VFS
@@ -24,13 +24,13 @@ export function useGit(fsInstance: typeof fs | null) {
     if (fsInstance && typeof fsInstance === "object") {
       // Pass the fsInstance to GitUtils constructor
       // Assuming GitUtils constructor accepts fs instance
-      setGitUtils(new GitUtils(fsInstance, null)); // Pass null for vfsKey for now
+      setGitUtils(new GitUtils(fsInstance, null));
       console.log("[useGit] GitUtils initialized with fs instance.");
     } else {
       setGitUtils(null);
       console.log("[useGit] fsInstance is null, GitUtils not initialized.");
     }
-  }, [fsInstance]); // Re-run effect when fsInstance changes
+  }, [fsInstance]);
 
   const withLoading = useCallback(
     async <T>(
@@ -39,7 +39,7 @@ export function useGit(fsInstance: typeof fs | null) {
       if (!gitUtils) {
         const errorMsg =
           "Git functionality is not available (VFS/Git might be initializing).";
-        toast.error(errorMsg); // Show toast for user feedback
+        toast.error(errorMsg);
         return {
           success: false,
           message: errorMsg,
@@ -72,7 +72,7 @@ export function useGit(fsInstance: typeof fs | null) {
         setLoading(false);
       }
     },
-    [gitUtils], // Depends on gitUtils instance
+    [gitUtils],
   );
 
   const cloneRepository = useCallback(
@@ -177,7 +177,6 @@ export function useGit(fsInstance: typeof fs | null) {
   const isGitRepository = useCallback(
     async (dir: string): Promise<boolean> => {
       if (!gitUtils) return false;
-      // Assuming gitUtils.isGitRepo doesn't need withLoading wrapper
       return gitUtils.isGitRepo(dir);
     },
     [gitUtils],
@@ -185,7 +184,7 @@ export function useGit(fsInstance: typeof fs | null) {
 
   return {
     loading,
-    initialized: gitUtils !== null, // Based on whether gitUtils is initialized
+    initialized: gitUtils !== null,
     cloneRepository,
     initRepository,
     getStatus,

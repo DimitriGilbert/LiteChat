@@ -17,13 +17,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import type { DbProviderConfig } from "@/lib/types"; // Removed unused types
+import type { DbProviderConfig } from "@/lib/types";
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useSidebarStore } from "@/store/sidebar.store";
 import { useVfsStore } from "@/store/vfs.store";
-import { useChatStorage } from "@/hooks/use-chat-storage"; // Import storage hook
+import { useChatStorage } from "@/hooks/use-chat-storage";
 
 const PromptSettingsAdvancedComponent: React.FC<{
   className?: string;
@@ -67,41 +67,37 @@ const PromptSettingsAdvancedComponent: React.FC<{
   const {
     selectedProviderId,
     enableApiKeyManagement,
-    updateDbProviderConfig, // Keep action
+    updateDbProviderConfig,
   } = useProviderStore(
     useShallow((state) => ({
       selectedProviderId: state.selectedProviderId,
       enableApiKeyManagement: state.enableApiKeyManagement,
-      updateDbProviderConfig: state.updateDbProviderConfig, // Keep action
+      updateDbProviderConfig: state.updateDbProviderConfig,
     })),
   );
-
-  // Fetch live data from storage
   const {
     providerConfigs: dbProviderConfigs,
     apiKeys,
     conversations,
-  } = useChatStorage(); // Use storage hook
+  } = useChatStorage();
 
   const {
     selectedItemId,
     selectedItemType,
-    updateConversationSystemPrompt, // Keep action
+    updateConversationSystemPrompt,
   } = useSidebarStore(
     useShallow((state) => ({
       selectedItemId: state.selectedItemId,
       selectedItemType: state.selectedItemType,
-      updateConversationSystemPrompt: state.updateConversationSystemPrompt, // Keep action
+      updateConversationSystemPrompt: state.updateConversationSystemPrompt,
     })),
   );
-
-  // Derive activeConversationData locally using live data
   const activeConversationData = useMemo(() => {
     if (selectedItemType === "conversation" && selectedItemId) {
       return (conversations || []).find((c) => c.id === selectedItemId);
     }
     return null;
-  }, [selectedItemId, selectedItemType, conversations]); // Depend on live data
+  }, [selectedItemId, selectedItemType, conversations]);
 
   const {
     isVfsEnabledForItem,
@@ -120,14 +116,10 @@ const PromptSettingsAdvancedComponent: React.FC<{
       initializeVfs: state.initializeVfs,
     })),
   );
-
-  // --- Local UI State ---
   const [localConvoSystemPrompt, setLocalConvoSystemPrompt] = useState<
     string | null
   >(null);
   const [isConvoPromptDirty, setIsConvoPromptDirty] = useState(false);
-
-  // --- Derived State ---
   const conversationId = useMemo(() => {
     return selectedItemType === "conversation" ? selectedItemId : null;
   }, [selectedItemId, selectedItemType]);
@@ -147,8 +139,6 @@ const PromptSettingsAdvancedComponent: React.FC<{
     }
     return null;
   }, [enableAdvancedSettings, activeConversationData, globalSystemPrompt]);
-
-  // --- Effects ---
   useEffect(() => {
     if (isVfsEnabledForItem && !isVfsReady && !isVfsLoading && vfsKey) {
       console.log(
@@ -170,8 +160,6 @@ const PromptSettingsAdvancedComponent: React.FC<{
       setIsConvoPromptDirty(false);
     }
   }, [conversationId, enableAdvancedSettings, activeConversationData]);
-
-  // --- Callbacks ---
   const handleConvoSystemPromptChange = (
     e: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
@@ -183,7 +171,6 @@ const PromptSettingsAdvancedComponent: React.FC<{
     if (enableAdvancedSettings && conversationId && isConvoPromptDirty) {
       const promptToSave =
         localConvoSystemPrompt?.trim() === "" ? null : localConvoSystemPrompt;
-      // Use store action
       updateConversationSystemPrompt(conversationId, promptToSave)
         .then(() => {
           setIsConvoPromptDirty(false);
@@ -219,13 +206,11 @@ const PromptSettingsAdvancedComponent: React.FC<{
     },
     [],
   );
-
-  // Derive selectedDbProviderConfig using live data
   const selectedDbProviderConfig = useMemo(() => {
     return (dbProviderConfigs || []).find(
       (p: DbProviderConfig) => p.id === selectedProviderId,
     );
-  }, [dbProviderConfigs, selectedProviderId]); // Depend on live data
+  }, [dbProviderConfigs, selectedProviderId]);
 
   const handleApiKeySelectionChange = useCallback(
     (keyId: string | null) => {

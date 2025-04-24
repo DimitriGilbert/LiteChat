@@ -20,14 +20,14 @@ import type {
   VfsWriteReturn,
 } from "@/mods/types";
 
-import type { RegisteredToolEntry } from "@/context/mod-context"; // Keep this type
+import type { RegisteredToolEntry } from "@/context/mod-context";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { toast } from "sonner";
 import { db } from "@/lib/db";
 
 export interface ModState {
-  // REMOVED: dbMods: DbMod[]; // Data comes from useChatStorage
+  // REMOVED: dbMods: DbMod[];
   loadedMods: ModInstance[];
   modPromptActions: CustomPromptAction[];
   modMessageActions: CustomMessageAction[];
@@ -51,7 +51,6 @@ export interface ModActions {
   ) => () => void;
   _clearRegisteredModItems: () => void;
   _clearRegisteredModTools: () => void;
-  // Middleware hooks (placeholders - implementation needed elsewhere)
   applySubmitPromptMiddleware: (
     payload: SubmitPromptPayload,
   ) => Promise<SubmitPromptReturn>;
@@ -64,7 +63,6 @@ export interface ModActions {
   applyVfsWriteMiddleware: (
     payload: VfsWritePayload,
   ) => Promise<VfsWriteReturn>;
-  // REMOVED: initializeFromDb
 }
 
 export const useModStore = create<ModState & ModActions>()((set) => ({
@@ -75,8 +73,6 @@ export const useModStore = create<ModState & ModActions>()((set) => ({
   modMessageActions: [],
   modSettingsTabs: [],
   modTools: new Map(),
-
-  // Actions
   addDbMod: async (modData) => {
     try {
       const newId = nanoid();
@@ -87,7 +83,6 @@ export const useModStore = create<ModState & ModActions>()((set) => ({
         loadOrder: modData.loadOrder ?? Date.now(),
       };
       await db.mods.add(newMod);
-      // No state update here - useChatStorage handles it
       toast.success(`Mod "${modData.name}" added.`);
       return newId;
     } catch (error) {
@@ -102,7 +97,6 @@ export const useModStore = create<ModState & ModActions>()((set) => ({
   updateDbMod: async (id, changes) => {
     try {
       await db.mods.update(id, changes);
-      // No state update here - useChatStorage handles it
     } catch (error) {
       console.error("Failed to update mod:", error);
       toast.error(
@@ -113,10 +107,9 @@ export const useModStore = create<ModState & ModActions>()((set) => ({
   },
 
   deleteDbMod: async (id) => {
-    const modToDelete = await db.mods.get(id); // Get name before delete
+    const modToDelete = await db.mods.get(id);
     try {
       await db.mods.delete(id);
-      // No state update here - useChatStorage handles it
       if (modToDelete) {
         toast.success(`Mod "${modToDelete.name}" deleted.`);
       }
@@ -203,8 +196,6 @@ export const useModStore = create<ModState & ModActions>()((set) => ({
     console.log("[Mod Store] Clearing registered mod tools.");
     set({ modTools: new Map() });
   },
-
-  // --- Placeholder Middleware ---
   applySubmitPromptMiddleware: async (payload) => {
     console.warn(
       "applySubmitPromptMiddleware placeholder called - needs implementation",

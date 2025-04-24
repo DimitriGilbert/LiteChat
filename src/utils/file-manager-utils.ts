@@ -54,8 +54,8 @@ export const dirname = (path: string): string => {
   const normalized = normalizePath(path);
   if (normalized === "/") return "/";
   const lastSlash = normalized.lastIndexOf("/");
-  if (lastSlash === -1) return "/"; // Should not happen with normalizePath
-  if (lastSlash === 0) return "/"; // Parent of /file is /
+  if (lastSlash === -1) return "/";
+  if (lastSlash === 0) return "/";
   return normalized.substring(0, lastSlash);
 };
 
@@ -66,6 +66,6 @@ export const dirname = (path: string): string => {
  */
 export const basename = (path: string): string => {
   const normalized = normalizePath(path);
-  if (normalized === "/") return ""; // No basename for root
+  if (normalized === "/") return "";
   return normalized.substring(normalized.lastIndexOf("/") + 1);
 };

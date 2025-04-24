@@ -90,7 +90,6 @@ export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {
   /** Updated content type - can be string or array of parts */
   content: MessageContent;
   vfsContextPaths?: string[];
-  // Optional fields matching AI SDK structure for tool interactions
   /** Present on assistant messages that contain tool calls */
   tool_calls?: Array<{
     id: string;
@@ -99,7 +98,6 @@ export interface DbMessage extends Pick<DbBase, "id" | "createdAt"> {
   }>;
   /** Present on tool messages to link them to the corresponding tool call */
   tool_call_id?: string;
-  // Add optional token fields
   tokensInput?: number;
   tokensOutput?: number;
   /** Optional array to store child messages for workflows/alternatives */
@@ -144,7 +142,6 @@ export type ModInstance = ModInstanceType;
 export interface Message {
   id: string;
   role: Role;
-  // Use the MessageContent type directly
   content: MessageContent;
   conversationId?: string;
   createdAt?: Date;
@@ -158,7 +155,6 @@ export interface Message {
   tokensInput?: number;
   tokensOutput?: number;
   tokensPerSecond?: number;
-  // Optional fields matching AI SDK structure for tool interactions
   /** Present on assistant messages that contain tool calls */
   tool_calls?: Array<{
     id: string;
@@ -189,11 +185,9 @@ export type SidebarItem = ProjectSidebarItem | ConversationSidebarItem;
 export interface AiModelConfig {
   id: string;
   name: string;
-  instance: any; // Keeping 'any' for flexibility with different SDK provider instances
+  instance: any;
   contextWindow?: number;
-  // Add flag to indicate image generation capability
   supportsImageGeneration?: boolean;
-  // Flag to indicate tool calling capability (can be refined later)
   supportsToolCalling?: boolean;
 }
 
@@ -230,7 +224,6 @@ export interface CustomPromptAction extends CustomActionBase {
 export interface CustomMessageAction extends CustomActionBase {
   // onClick should accept the Readonly Snapshot
   onClick: (message: Message, context: ReadonlyChatContextSnapshot) => void;
-  // isVisible should also accept the Readonly Snapshot
   isVisible?: (
     message: Message,
     context: ReadonlyChatContextSnapshot,
@@ -245,7 +238,6 @@ export interface CustomSettingTabProps {
 export interface CustomSettingTab {
   id: string;
   title: string;
-  // The component should use hooks internally, not receive context via props
   component: React.ComponentType<CustomSettingTabProps>;
 }
 
@@ -279,7 +271,6 @@ export interface CoreChatContextProps {
     contentToSendToAI: MessageContent,
     vfsContextPaths?: string[],
   ) => Promise<void>;
-  // Add image generation core function
   handleImageGenerationCore: (
     currentConversationId: string,
     prompt: string,
@@ -295,7 +286,6 @@ export interface VfsContextObject {
   isOperationLoading: boolean;
   error: string | null;
   configuredVfsKey: string | null;
-  // Use the type of the imported global fs object
   fs: typeof fs | null;
   listFiles: (path: string) => Promise<FileSystemEntry[]>;
   readFile: (path: string) => Promise<Uint8Array>;
@@ -311,8 +301,6 @@ export interface VfsContextObject {
 }
 
 export type ReadonlyChatContextSnapshot = ModApiSnapshot;
-
-// This full context type might become less relevant as components
 // increasingly rely on specific hooks/stores, but keep it for now.
 export interface ChatContextProps {
   // --- Feature Flags (from Settings/ProviderMgmt) ---
@@ -320,18 +308,13 @@ export interface ChatContextProps {
   enableAdvancedSettings: boolean;
   enableSidebar: boolean;
   enableVfs: boolean;
-
-  // --- Provider/Model Selection (from ProviderManagementContext) ---
   activeProviders: AiProviderConfig[];
   selectedProviderId: string | null;
   setSelectedProviderId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedModelId: string | null;
   setSelectedModelId: React.Dispatch<React.SetStateAction<string | null>>;
   getApiKeyForProvider: (providerConfigId: string) => string | undefined;
-  // Add selected model details for checking capabilities
   selectedModel: AiModelConfig | undefined;
-
-  // --- API Key Management (from ProviderManagementContext) ---
   apiKeys: DbApiKey[];
   addApiKey: (
     name: string,
@@ -339,8 +322,6 @@ export interface ChatContextProps {
     value: string,
   ) => Promise<string>;
   deleteApiKey: (id: string) => Promise<void>;
-
-  // --- Provider Configuration Management (from ProviderManagementContext) ---
   dbProviderConfigs: DbProviderConfig[];
   addDbProviderConfig: (
     config: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
@@ -350,8 +331,6 @@ export interface ChatContextProps {
     changes: Partial<DbProviderConfig>,
   ) => Promise<void>;
   deleteDbProviderConfig: (id: string) => Promise<void>;
-
-  // --- Sidebar / Item Management (from SidebarContext) ---
   sidebarItems: SidebarItem[];
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
@@ -377,15 +356,11 @@ export interface ChatContextProps {
     id: string,
     systemPrompt: string | null,
   ) => Promise<void>;
-
-  // --- Messages & Streaming (from CoreChatContext) ---
   messages: Message[];
-  isLoading: boolean; // Combined loading state?
+  isLoading: boolean;
   isStreaming: boolean;
   error: string | null;
   setError: (error: string | null) => void;
-
-  // --- Interaction Handlers (defined in ChatProvider) ---
   handleSubmit: (
     promptValue: string,
     attachedFilesValue: File[],
@@ -393,14 +368,10 @@ export interface ChatContextProps {
   ) => Promise<void>;
   stopStreaming: () => void;
   regenerateMessage: (messageId: string) => Promise<void>;
-
-  // --- VFS Selection State (from VfsContext) ---
   selectedVfsPaths: string[];
   addSelectedVfsPath: (path: string) => void;
   removeSelectedVfsPath: (path: string) => void;
   clearSelectedVfsPaths: () => void;
-
-  // --- Settings (from SettingsContext) ---
   temperature: number;
   setTemperature: React.Dispatch<React.SetStateAction<number>>;
   maxTokens: number | null;
@@ -418,40 +389,30 @@ export interface ChatContextProps {
   setFrequencyPenalty: React.Dispatch<React.SetStateAction<number | null>>;
   theme: "light" | "dark" | "system";
   setTheme: React.Dispatch<React.SetStateAction<"light" | "dark" | "system">>;
-  streamingThrottleRate: number; // Renamed from streamingThrottleRateMs for consistency
+  streamingThrottleRate: number;
   searchTerm: string;
   setSearchTerm: React.Dispatch<React.SetStateAction<string>>;
-  enableStreamingMarkdown: boolean; // Added
-  setEnableStreamingMarkdown: (enabled: boolean) => void; // Added
+  enableStreamingMarkdown: boolean;
+  setEnableStreamingMarkdown: (enabled: boolean) => void;
 
   // --- Import/Export & Data Management (from SidebarContext/Storage) ---
   exportConversation: (conversationId: string | null) => Promise<void>;
   importConversation: (file: File, parentId: string | null) => Promise<void>;
   exportAllConversations: () => Promise<void>;
   clearAllData: () => Promise<void>;
-
-  // --- Virtual File System (from VfsContext) ---
   isVfsEnabledForItem: boolean;
-  toggleVfsEnabled: () => Promise<void>; // Simplified signature if context knows selected item
+  toggleVfsEnabled: () => Promise<void>;
   vfs: VfsContextObject;
-
-  // --- DB Accessors (from Storage hook) ---
   getConversation: (id: string) => Promise<DbConversation | undefined>;
   getProject: (id: string) => Promise<DbProject | undefined>;
-
-  // --- Extensibility (Combined - User Config + Mods from ModContext) ---
   customPromptActions: CustomPromptAction[];
   customMessageActions: CustomMessageAction[];
   customSettingsTabs: CustomSettingTab[];
-
-  // --- Mod System (from ModContext) ---
   dbMods: DbMod[];
   loadedMods: ModInstance[];
   addDbMod: (modData: Omit<DbMod, "id" | "createdAt">) => Promise<string>;
   updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>;
   deleteDbMod: (id: string) => Promise<void>;
-
-  // --- Settings Modal Control (from SettingsContext) ---
   isSettingsModalOpen: boolean;
   onSettingsModalOpenChange: (open: boolean) => void;
 }

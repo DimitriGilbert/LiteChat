@@ -74,7 +74,7 @@ export class GitUtils {
       });
       return {
         success: true,
-        message: `Repository cloned successfully into ${dir}`, // Use dir instead of basename
+        message: `Repository cloned successfully into ${dir}`,
       };
     } catch (error) {
       console.error("Clone error:", error);
@@ -93,7 +93,7 @@ export class GitUtils {
       await git.init({ fs: this.fs, dir });
       return {
         success: true,
-        message: `Git repository initialized in ${dir}`, // Use dir instead of basename
+        message: `Git repository initialized in ${dir}`,
       };
     } catch (error) {
       console.error("Init error:", error);

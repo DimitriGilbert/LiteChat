@@ -35,7 +35,7 @@ export const ChildrenToggleButton: React.FC<ChildrenToggleButtonProps> =
                 className,
               )}
               onClick={(e) => {
-                e.stopPropagation(); // Prevent triggering message fold
+                e.stopPropagation();
                 onToggle();
               }}
               aria-label={label}

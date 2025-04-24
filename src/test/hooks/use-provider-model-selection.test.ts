@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { renderHook, act, waitFor } from "@testing-library/react"; // Import waitFor
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { useProviderModelSelection } from "@/hooks/use-provider-model-selection";
 import type { AiProviderConfig } from "@/lib/types";
 
@@ -52,7 +52,6 @@ describe("useProviderModelSelection", () => {
     const { result, rerender } = renderHook(() =>
       useProviderModelSelection({ providers: mockProviders }),
     );
-    // Initial render might set state, effects run, rerender ensures we see final state
     rerender();
     expect(result.current.selectedProviderId).toBe("openai");
     expect(result.current.selectedModelId).toBe("gpt-4");
@@ -68,7 +67,7 @@ describe("useProviderModelSelection", () => {
         initialModelId: "claude-3",
       }),
     );
-    rerender(); // Ensure effects run if any depend on initial props
+    rerender();
     expect(result.current.selectedProviderId).toBe("anthropic");
     expect(result.current.selectedModelId).toBe("claude-3");
     expect(result.current.selectedProvider).toBe(mockProviders[1]);
@@ -79,18 +78,17 @@ describe("useProviderModelSelection", () => {
     const { result, rerender } = renderHook(() =>
       useProviderModelSelection({ providers: mockProviders }),
     );
-    rerender(); // Ensure initial state is set
+    rerender();
     expect(result.current.selectedProviderId).toBe("openai");
     expect(result.current.selectedModelId).toBe("gpt-4");
 
     act(() => {
       result.current.setSelectedProviderId("anthropic");
     });
-    // Rerender after act to ensure the useEffect that selects the model runs
     rerender();
 
     expect(result.current.selectedProviderId).toBe("anthropic");
-    expect(result.current.selectedModelId).toBe("claude-3"); // Auto-selected first model
+    expect(result.current.selectedModelId).toBe("claude-3");
     expect(result.current.selectedProvider).toBe(mockProviders[1]);
     expect(result.current.selectedModel).toBe(mockProviders[1].models[0]);
   });
@@ -99,14 +97,13 @@ describe("useProviderModelSelection", () => {
     const { result, rerender } = renderHook(() =>
       useProviderModelSelection({ providers: mockProviders }),
     );
-    rerender(); // Ensure initial state is set
+    rerender();
     expect(result.current.selectedProviderId).toBe("openai");
     expect(result.current.selectedModelId).toBe("gpt-4");
 
     act(() => {
       result.current.setSelectedModelId("gpt-3.5");
     });
-    // Rerender might be needed if other effects depend on modelId
     rerender();
 
     expect(result.current.selectedProviderId).toBe("openai");
@@ -120,20 +117,19 @@ describe("useProviderModelSelection", () => {
       useProviderModelSelection({
         providers: mockProviders,
         initialProviderId: "openai",
-        initialModelId: "gpt-3.5", // Start with a specific model
+        initialModelId: "gpt-3.5",
       }),
     );
-    rerender(); // Ensure initial state is set
+    rerender();
     expect(result.current.selectedModelId).toBe("gpt-3.5");
 
     act(() => {
       result.current.setSelectedProviderId("anthropic");
     });
-    // Rerender after act to ensure the useEffect that resets the model runs
     rerender();
 
     expect(result.current.selectedProviderId).toBe("anthropic");
-    expect(result.current.selectedModelId).toBe("claude-3"); // Resets to first valid model
+    expect(result.current.selectedModelId).toBe("claude-3");
   });
 
   it("clears model if provider is set to null", async () => {
@@ -141,25 +137,20 @@ describe("useProviderModelSelection", () => {
     const { result, rerender } = renderHook(() =>
       useProviderModelSelection({ providers: mockProviders }),
     );
-    rerender(); // Ensure initial state is set
+    rerender();
     expect(result.current.selectedProviderId).toBe("openai");
     expect(result.current.selectedModelId).toBe("gpt-4");
 
     act(() => {
       result.current.setSelectedProviderId(null);
     });
-    // Rerender after act to ensure the useEffect that clears the model runs
     rerender();
-
-    // Use waitFor to ensure state updates and effects have settled
     await waitFor(() => {
-      expect(result.current.selectedProviderId).toBeNull(); // Check provider first
+      expect(result.current.selectedProviderId).toBeNull();
     });
     await waitFor(() => {
-      expect(result.current.selectedModelId).toBeNull(); // Then check model
+      expect(result.current.selectedModelId).toBeNull();
     });
-
-    // Final check after waitFor
     expect(result.current.selectedProviderId).toBeNull();
     expect(result.current.selectedModelId).toBeNull();
     expect(result.current.selectedProvider).toBeUndefined();
@@ -172,19 +163,16 @@ describe("useProviderModelSelection", () => {
     const { result, rerender } = renderHook(
       // Pass the hook directly, initialProps are in the options object
       useProviderModelSelection,
-      { initialProps }, // Start with only OpenAI
+      { initialProps },
     );
-    // No need for extra rerender immediately after renderHook with initialProps
 
     // Wait for initial state to settle (effects might run)
     await waitFor(() => {
       expect(result.current.selectedProviderId).toBe("openai");
     });
     expect(result.current.selectedModelId).toBe("gpt-4");
-
-    // Rerender with the full list - pass the new props object directly
     const nextPropsFull = { providers: mockProviders };
-    rerender(nextPropsFull); // Pass only the new props
+    rerender(nextPropsFull);
 
     // Wait for effects triggered by prop change
     await waitFor(() => {
@@ -192,10 +180,8 @@ describe("useProviderModelSelection", () => {
       expect(result.current.selectedProviderId).toBe("openai");
       expect(result.current.selectedModelId).toBe("gpt-4");
     });
-
-    // Rerender with only Anthropic - pass the new props object directly
     const nextPropsAnthropic = { providers: [mockProviders[1]] };
-    rerender(nextPropsAnthropic); // Pass only the new props
+    rerender(nextPropsAnthropic);
 
     // Wait for effects triggered by prop change
     await waitFor(() => {

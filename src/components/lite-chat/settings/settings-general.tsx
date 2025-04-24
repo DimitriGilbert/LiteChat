@@ -20,26 +20,22 @@ const SettingsGeneralComponent: React.FC = () => {
     setTheme,
     streamingRefreshRateMs,
     setStreamingRefreshRateMs,
-    enableStreamingMarkdown, // Added
-    setEnableStreamingMarkdown, // Added
+    enableStreamingMarkdown,
+    setEnableStreamingMarkdown,
   } = useSettingsStore(
     useShallow((state) => ({
       theme: state.theme,
       setTheme: state.setTheme,
       streamingRefreshRateMs: state.streamingRefreshRateMs,
       setStreamingRefreshRateMs: state.setStreamingRefreshRateMs,
-      enableStreamingMarkdown: state.enableStreamingMarkdown, // Added
-      setEnableStreamingMarkdown: state.setEnableStreamingMarkdown, // Added
+      enableStreamingMarkdown: state.enableStreamingMarkdown,
+      setEnableStreamingMarkdown: state.setEnableStreamingMarkdown,
     })),
   );
-
-  // Local UI state for git config (if managed here)
   const [rootGitEnabled, setRootGitEnabled] = useState(false);
   const [rootGitRepoUrl, setRootGitRepoUrl] = useState("");
   const [rootGitRepoBranch, setRootGitRepoBranch] = useState("main");
   const [isSaving, setIsSaving] = useState(false);
-
-  // Handler uses prop action (example for git config)
   const handleSaveRootGitConfig = useCallback(async () => {
     if (!rootGitRepoUrl && rootGitEnabled) {
       toast.error("Please enter a repository URL");
@@ -59,7 +55,7 @@ const SettingsGeneralComponent: React.FC = () => {
 
   const handleSliderChange = useCallback(
     (value: number[]) => {
-      setStreamingRefreshRateMs(value[0]); // Use store action
+      setStreamingRefreshRateMs(value[0]);
     },
     [setStreamingRefreshRateMs],
   );

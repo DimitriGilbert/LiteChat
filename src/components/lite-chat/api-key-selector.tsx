@@ -35,12 +35,10 @@ export const ApiKeySelector: React.FC<ApiKeySelectorProps> = ({
     // Pass null if "none" is selected, otherwise pass the key ID
     onKeySelected(value === "none" ? null : value);
   };
-
-  // Determine the display value for the trigger
   const selectedKeyName = apiKeys.find((k) => k.id === selectedKeyId)?.name;
   const displayValue = selectedKeyId
     ? selectedKeyName || `Key ID: ${selectedKeyId.substring(0, 6)}...` // Show name or truncated ID
-    : "None"; // Show "None" if no key is linked
+    : "None";
 
   return (
     <Select

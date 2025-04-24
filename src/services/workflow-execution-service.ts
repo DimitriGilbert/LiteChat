@@ -10,31 +10,29 @@ import type {
   CoreMessage,
   Workflow,
 } from "@/lib/types";
-import { getStreamHeaders } from "@/hooks/ai-interaction/stream-handler"; // Reuse helper
+import { getStreamHeaders } from "@/hooks/ai-interaction/stream-handler";
 
 
 
 
 export interface TaskConfig {
-  model: AiModelConfig; // Specific model instance for this task
-  provider: AiProviderConfig; // Provider info
-  messages: CoreMessage[]; // Messages specific to this task's context
+  model: AiModelConfig;
+  provider: AiProviderConfig;
+  messages: CoreMessage[];
   systemPrompt?: string | null;
   temperature?: number;
   maxTokens?: number | null;
-  // Add other relevant parameters (topP, topK, etc.) as needed
 }
 
 
 export interface WorkflowExecutionOptions {
   getApiKey: (providerId: string) => string | undefined;
-  // Add other shared options if necessary (e.g., access to stores/context)
 }
 
 
 export interface WorkflowTask {
-  taskId: string; // Unique ID for this specific task instance within the workflow
-  config: TaskConfig; // Configuration for this task
+  taskId: string;
+  config: TaskConfig;
 }
 
 export class WorkflowExecutionService {
@@ -65,8 +63,6 @@ export class WorkflowExecutionService {
     console.log(
       `[WorkflowService] Starting workflow (${workflowType}) for ${parentMessageId}`,
     );
-
-    // Ensure an abort map exists for this workflow instance
     if (!this.workflowAbortControllers.has(parentMessageId)) {
       this.workflowAbortControllers.set(
         parentMessageId,
@@ -78,7 +74,7 @@ export class WorkflowExecutionService {
     workflowEvents.emit(WorkflowEvent.START, {
       parentMessageId,
       workflowType: workflowType,
-      tasks: tasks.map((t) => ({ taskId: t.taskId, config: t.config })), // Pass config details
+      tasks: tasks.map((t) => ({ taskId: t.taskId, config: t.config })),
     });
 
     try {
@@ -102,19 +98,17 @@ export class WorkflowExecutionService {
       // Emit completion event if execution didn't throw
       workflowEvents.emit(WorkflowEvent.COMPLETE, {
         parentMessageId,
-        status: "completed", // Assuming completion if no error bubbled up
+        status: "completed",
       });
     } catch (error) {
       console.error(
         `[WorkflowService] Workflow ${parentMessageId} failed:`,
         error,
       );
-      // Emit completion event with error status
       workflowEvents.emit(WorkflowEvent.COMPLETE, {
         parentMessageId,
         status: "error",
       });
-      // Optionally re-throw or handle the error further
     } finally {
       // Clean up controllers for this workflow instance once it's fully settled or errored
       this.workflowAbortControllers.delete(parentMessageId);
@@ -138,11 +132,8 @@ export class WorkflowExecutionService {
         console.log(`[WorkflowService] Aborting task ${taskId}`);
         controller.abort();
       });
-      // Don't delete the map here, let the finally block in startWorkflow handle it
       // This prevents race conditions if cancellation happens during execution.
       // this.workflowAbortControllers.delete(parentMessageId);
-
-      // Optionally emit a cancellation event if needed by the UI
       // workflowEvents.emit(WorkflowEvent.CANCELLED, { parentMessageId });
       toast.info(`Workflow ${parentMessageId} cancelled.`);
     } else {
@@ -164,15 +155,11 @@ export class WorkflowExecutionService {
     const promises = tasks.map((task) =>
       this.executeSingleTask(parentMessageId, task.taskId, task.config),
     );
-
-    // Wait for all tasks to settle (complete or fail)
     const results = await Promise.allSettled(promises);
     console.log(
       `[WorkflowService] Parallel tasks settled for ${parentMessageId}`,
       results,
     );
-
-    // Check if any task failed
     const firstRejection = results.find((r) => r.status === "rejected");
     if (firstRejection) {
       // Throw the error from the first rejected promise to signal workflow failure
@@ -203,7 +190,6 @@ export class WorkflowExecutionService {
       console.log(
         `[WorkflowService] Executing sequential task ${task.taskId} for ${parentMessageId}`,
       );
-      // Await each task individually. If one fails, the loop will break
       // because executeSingleTask will throw on error.
       await this.executeSingleTask(parentMessageId, task.taskId, task.config);
       console.log(`[WorkflowService] Completed sequential task ${task.taskId}`);
@@ -224,8 +210,6 @@ export class WorkflowExecutionService {
   ): Promise<void> {
     const abortController = new AbortController();
     const parentMap = this.workflowAbortControllers.get(parentMessageId);
-
-    // Check if the parent map exists and if the workflow hasn't been cancelled already
     if (!parentMap) {
       console.warn(
         `[WorkflowService] Parent abort map not found for ${parentMessageId} when starting task ${taskId}. Workflow might have been cancelled.`,
@@ -249,13 +233,10 @@ export class WorkflowExecutionService {
       | { promptTokens: number; completionTokens: number }
       | undefined = undefined;
     let finalFinishReason: string | undefined = undefined;
-    // Note: Tool calls within workflows might need specific handling - simplified for now
 
     try {
       const apiKey = this.options.getApiKey(config.provider.id);
       const headers = getStreamHeaders(config.provider.type, apiKey);
-
-      // Basic validation (can be expanded)
       if (!config.model.instance) {
         throw new Error(`Model instance missing for task ${taskId}`);
       }
@@ -266,10 +247,8 @@ export class WorkflowExecutionService {
         system: config.systemPrompt ?? undefined,
         temperature: config.temperature,
         maxTokens: config.maxTokens ?? undefined,
-        // Add other parameters from config as needed
         headers,
         abortSignal: abortController.signal,
-        // tools: undefined, // Add tool handling later if needed
         // toolChoice: undefined,
       });
 
@@ -280,7 +259,7 @@ export class WorkflowExecutionService {
         if (abortController.signal.aborted) {
           streamError = new Error("Stream aborted by user.");
           toast.info(`Task ${taskId} stopped.`);
-          break; // Exit the loop
+          break;
         }
 
         switch (part.type) {
@@ -307,7 +286,7 @@ export class WorkflowExecutionService {
             toast.error(
               `Task ${taskId} error: ${streamError ? streamError.message : "Unknown"}`,
             );
-            break; // Continue processing stream if possible, but record error
+            break;
           case "finish":
             finalUsage = part.usage;
             finalFinishReason = part.finishReason;
@@ -317,7 +296,7 @@ export class WorkflowExecutionService {
 
       // If the stream finished but an error was recorded earlier
       if (streamError) {
-        throw streamError; // Propagate the error
+        throw streamError;
       }
 
       // Check if aborted *after* the loop (in case it was aborted but loop finished)
@@ -333,24 +312,19 @@ export class WorkflowExecutionService {
       // Get final usage if not received during stream
       if (!finalUsage) finalUsage = await result.usage;
       if (!finalFinishReason) finalFinishReason = await result.finishReason;
-
-      // --- Task Success ---
       console.log(
         `[WorkflowService] Task ${taskId} succeeded for ${parentMessageId}.`,
       );
-
-      // Prepare the final child message object
       const finalChildMessage: Message = {
-        id: taskId, // Use taskId as the message ID for the child
+        id: taskId,
         role: "assistant",
         content: contentRef.current,
-        createdAt: new Date(startTime), // Or use a more accurate timestamp if available
-        conversationId: parentMessageId, // Link to parent conversation
+        createdAt: new Date(startTime),
+        conversationId: parentMessageId,
         providerId: config.provider.id,
         modelId: config.model.id,
         tokensInput: finalUsage?.promptTokens,
         tokensOutput: finalUsage?.completionTokens,
-        // Calculate tokensPerSecond if needed
         isStreaming: false,
         error: null,
       };
@@ -374,15 +348,11 @@ export class WorkflowExecutionService {
         `[WorkflowService] Task ${taskId} failed for ${parentMessageId}:`,
         streamError,
       );
-
-      // Emit error event
       workflowEvents.emit(WorkflowEvent.TASK_ERROR, {
         parentMessageId,
         taskId,
         error: streamError,
       });
-
-      // Re-throw the error to signal failure to the calling workflow logic (parallel/sequential)
       throw streamError;
     } finally {
       // Clean up this task's controller from the map *if* it still exists

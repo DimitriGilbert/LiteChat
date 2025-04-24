@@ -32,7 +32,7 @@ const mockProviders: AiProviderConfig[] = [
     requiresApiKey: false,
   },
 ];
-let mockApiKeys: DbApiKey[] = []; // Use let for easier reset
+let mockApiKeys: DbApiKey[] = [];
 
 
 const renderApiKeySelector = (
@@ -61,7 +61,6 @@ const renderApiKeySelector = (
 describe.skip("ApiKeySelector", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset mock keys if needed per test
     mockApiKeys = [
       {
         id: "k1",
@@ -86,8 +85,6 @@ describe.skip("ApiKeySelector", () => {
       },
     ];
   });
-
-  // --- Tests that should pass (no UI interaction) ---
   it("does not render if selected provider does not require API key", () => {
     const { container } = renderApiKeySelector({ selectedProviderId: "mock" });
     expect(container.firstChild).toBeNull();
@@ -97,11 +94,8 @@ describe.skip("ApiKeySelector", () => {
     const { container } = renderApiKeySelector({ selectedProviderId: null });
     expect(container.firstChild).toBeNull();
   });
-
-  // --- Test Rendering and Disabled States ---
   it("renders the select trigger button when provider requires key", () => {
     renderApiKeySelector({ selectedProviderId: "openai" });
-    // Query directly by the explicit aria-label added to the component
     const trigger = screen.getByRole("combobox", { name: "Select API Key" });
     expect(trigger).toBeInTheDocument();
   });
@@ -109,20 +103,17 @@ describe.skip("ApiKeySelector", () => {
   it("disables the trigger if no keys are available for the selected provider", () => {
     renderApiKeySelector({
       selectedProviderId: "anthropic",
-      apiKeys: mockApiKeys.filter((k) => k.providerId !== "anthropic"), // No anthropic keys
+      apiKeys: mockApiKeys.filter((k) => k.providerId !== "anthropic"),
     });
     const trigger = screen.getByRole("combobox", { name: "Select API Key" });
     expect(trigger).toBeDisabled();
   });
-
-  // --- Test Displayed Value ---
   it("displays the currently selected key name in the trigger", () => {
     renderApiKeySelector({
       selectedProviderId: "openai",
       selectedApiKeyId: { openai: "k2" },
     });
     const trigger = screen.getByRole("combobox", { name: "Select API Key" });
-    // Check text content *within* the trigger
     expect(trigger).toHaveTextContent("OpenAI Key 2");
     expect(trigger).not.toHaveTextContent(/None \(Use Default\)/i);
   });
@@ -144,8 +135,6 @@ describe.skip("ApiKeySelector", () => {
     const trigger = screen.getByRole("combobox", { name: "Select API Key" });
     expect(trigger).toHaveTextContent(/None \(Use Default\)/i);
   });
-
-  // --- Tests involving interaction (opening dropdown) ---
   it("lists available keys and 'None' option after clicking trigger", async () => {
     const user = userEvent.setup();
     renderApiKeySelector({ selectedProviderId: "openai" });
@@ -153,8 +142,6 @@ describe.skip("ApiKeySelector", () => {
       name: "Select API Key",
     });
     await user.click(selectTrigger);
-
-    // Use findByRole scoped to body (more robust for portals)
     const noneOption = await within(document.body).findByRole("option", {
       name: /None \(Use Default\)/i,
     });
@@ -168,7 +155,6 @@ describe.skip("ApiKeySelector", () => {
     expect(noneOption).toBeInTheDocument();
     expect(key1Option).toBeInTheDocument();
     expect(key2Option).toBeInTheDocument();
-    // Check other keys not present
     expect(screen.queryByRole("option", { name: "Claude Key" })).toBeNull();
   });
 
@@ -193,7 +179,7 @@ describe.skip("ApiKeySelector", () => {
     const user = userEvent.setup();
     renderApiKeySelector({
       selectedProviderId: "openai",
-      selectedApiKeyId: { openai: "k1" }, // Start with a key selected
+      selectedApiKeyId: { openai: "k1" },
     });
     const selectTrigger = screen.getByRole("combobox", {
       name: "Select API Key",

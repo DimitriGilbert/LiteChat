@@ -36,9 +36,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
-
-  // Calculate indentation based on level
-  const indentationClass = `ml-${level * 4}`; // Example: ml-0, ml-4, ml-8 etc.
+  const indentationClass = `ml-${level * 4}`;
 
   // Generate a unique ID for the portal target within this bubble
   // This ID is now only used internally by MessageBody and MessageContentRenderer
@@ -54,9 +52,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             ? "bg-muted/30 border border-dashed border-border"
             : "bg-muted/60",
         !isSystem && "hover:bg-muted/80 transition-all duration-200",
-        indentationClass, // Apply indentation class
-        "max-w-full", // Set maximum width
-        "overflow-hidden", // Hide overflowing content
+        indentationClass,
+        "max-w-full",
+        "overflow-hidden",
         className,
       )}
     >
@@ -92,13 +90,9 @@ const messagesAreEqual = (
 ): boolean => {
   const prevMsg = prevProps.message;
   const nextMsg = nextProps.message;
-
-  // Check level prop
   if (prevProps.level !== nextProps.level) return false;
-  // Check enableStreamingMarkdown prop
   if (prevProps.enableStreamingMarkdown !== nextProps.enableStreamingMarkdown)
     return false;
-  // REMOVED: Check streamingPortalId prop
 
   if (prevMsg === nextMsg) return true;
 
@@ -118,7 +112,7 @@ const messagesAreEqual = (
       !nextMsg.children ||
       prevMsg.children.length !== nextMsg.children.length
     ) {
-      return false; // Different lengths or one is missing
+      return false;
     }
     // Basic deep compare (can be improved if necessary)
     if (JSON.stringify(prevMsg.children) !== JSON.stringify(nextMsg.children)) {

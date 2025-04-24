@@ -29,14 +29,14 @@ interface ProviderRowViewModeProps {
 }
 
 const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
-  provider, // Use prop
-  apiKeys, // Use prop
-  onEdit, // Use prop action
-  onDelete, // Use prop action
-  onFetchModels, // Use prop action
-  fetchStatus, // Use prop
-  isDeleting, // Use prop
-  getAllAvailableModelDefs, // Use prop function
+  provider,
+  apiKeys,
+  onEdit,
+  onDelete,
+  onFetchModels,
+  fetchStatus,
+  isDeleting,
+  getAllAvailableModelDefs,
 }) => {
   // Derivations use props
   const needsKey = requiresApiKey(provider.type);
@@ -46,7 +46,7 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   const isEditButtonDisabled = isDeleting;
   const isDeleteButtonDisabled = isDeleting || fetchStatus === "fetching";
 
-  const allAvailableModels = getAllAvailableModelDefs(); // Use prop function
+  const allAvailableModels = getAllAvailableModelDefs();
   const enabledModelsSet = new Set(provider.enabledModels ?? []);
   const orderedDisplayModels = (
     provider.modelSortOrder ??

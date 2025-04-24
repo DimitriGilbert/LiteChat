@@ -5,7 +5,7 @@ import React, {
   useState,
   useEffect,
 } from "react";
-import type { DbConversation } from "@/lib/types"; // Removed DbProject import
+import type { DbConversation } from "@/lib/types";
 
 interface SettingsContextProps {
   enableAdvancedSettings: boolean;
@@ -39,9 +39,7 @@ const SettingsContext = createContext<SettingsContextProps | undefined>(
 interface SettingsProviderProps {
   children: React.ReactNode;
   enableAdvancedSettings?: boolean;
-  // Pass active item data needed for activeSystemPrompt derivation
   activeConversationData: DbConversation | null;
-  // activeProjectData: DbProject | null; // REMOVED - Unused
   // Pass modal state control
   isSettingsModalOpen: boolean;
   onSettingsModalOpenChange: (open: boolean) => void;
@@ -65,13 +63,11 @@ function useThemeEffect(theme: "light" | "dark" | "system") {
     // Skip during Vitest runs if needed
     // if (import.meta.env.VITEST) {
     //   return;
-    // }
 
     const root = window.document.documentElement;
-    root.classList.remove("light", "dark"); // Remove previous theme classes
+    root.classList.remove("light", "dark");
 
     let effectiveTheme = theme;
-    // Determine effective theme if 'system' is selected
     if (theme === "system") {
       effectiveTheme =
         window.matchMedia &&
@@ -82,14 +78,13 @@ function useThemeEffect(theme: "light" | "dark" | "system") {
 
     // Add the calculated theme class to the root element
     root.classList.add(effectiveTheme);
-  }, [theme]); // Re-run effect only when the theme state changes
+  }, [theme]);
 }
 
 export const SettingsProvider: React.FC<SettingsProviderProps> = ({
   children,
   enableAdvancedSettings = true,
   activeConversationData,
-  // activeProjectData, // REMOVED - Unused
   isSettingsModalOpen,
   onSettingsModalOpenChange,
 }) => {
@@ -106,11 +101,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
   const [topK, setTopK] = useState<number | null>(null);
   const [presencePenalty, setPresencePenalty] = useState<number | null>(null);
   const [frequencyPenalty, setFrequencyPenalty] = useState<number | null>(null);
-
-  // Effect to reset advanced settings if the flag changes to disabled
   useEffect(() => {
     if (!enableAdvancedSettings) {
-      setTemperature(defaultTemp); // Reset to default
+      setTemperature(defaultTemp);
       setMaxTokens(null);
       setGlobalSystemPrompt(null);
       setTopP(null);
@@ -124,7 +117,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
       }
     }
     // Only run when enableAdvancedSettings changes
-  }, [enableAdvancedSettings, globalSystemPrompt]); // Added globalSystemPrompt dependency
+  }, [enableAdvancedSettings, globalSystemPrompt]);
 
   // Determine the active system prompt
   const activeSystemPrompt = useMemo(() => {
@@ -142,11 +135,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
     }
     return null;
   }, [enableAdvancedSettings, activeConversationData, globalSystemPrompt]);
-
-  // Apply theme effect
   useThemeEffect(theme);
-
-  // --- Create dummy setters if advanced settings are disabled ---
   const noOpSetter = () => {};
   const setTemperatureFinal = enableAdvancedSettings
     ? setTemperature

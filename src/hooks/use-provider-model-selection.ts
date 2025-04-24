@@ -35,7 +35,7 @@ export function useProviderModelSelection({
     }
     // Otherwise, no provider can be selected initially
     return null;
-  }, [providers, initialProviderId]); // Depends on the current list and the initial prop
+  }, [providers, initialProviderId]);
 
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
     getEffectiveInitialProviderId,

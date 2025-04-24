@@ -73,7 +73,7 @@ export const MessageBody: React.FC<MessageBodyProps> = React.memo(
                 "prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-0",
                 "[&_img]:my-3",
                 "py-2",
-                "overflow-x-auto w-full", // Only adding these constraints
+                "overflow-x-auto w-full",
               )}
             >
               {!isThisMessageStreaming && (

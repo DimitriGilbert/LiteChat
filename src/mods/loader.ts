@@ -3,14 +3,14 @@ import type {
   DbMod,
   ModInstance,
   ModEventPayloadMap,
-  Tool, // Import Tool types
+  Tool,
   ToolImplementation,
-  ModMiddlewarePayloadMap, // Import payload map
-  ModMiddlewareReturnMap, // Import return map
+  ModMiddlewarePayloadMap,
+  ModMiddlewareReturnMap,
 } from "./types";
 import type { LiteChatModApi, ReadonlyChatContextSnapshot } from "./api";
 import { toast } from "sonner";
-import { modEvents } from "./events"; // Use modEvents instance
+import { modEvents } from "./events";
 import { ModEvent } from "./events";
 import type {
   CustomPromptAction,
@@ -18,14 +18,13 @@ import type {
   CustomSettingTab,
 } from "@/lib/types";
 import type { ModMiddlewareHookName } from "./api";
-import type { z } from "zod"; // Import z
+import type { z } from "zod";
 
 
 interface RegistrationCallbacks {
   registerPromptAction: (action: CustomPromptAction) => () => void;
   registerMessageAction: (action: CustomMessageAction) => () => void;
   registerSettingsTab: (tab: CustomSettingTab) => () => void;
-  // Add registerTool callback type
   registerTool: <PARAMETERS extends z.ZodSchema<any>>(
     toolName: string,
     definition: Tool<PARAMETERS>,
@@ -35,13 +34,12 @@ interface RegistrationCallbacks {
     eventName: E,
     callback: (payload: ModEventPayloadMap[E]) => void,
   ) => () => void;
-  // FIX: Add modId to the signature to match usage
   registerMiddleware: <H extends ModMiddlewareHookName>(
     hookName: H,
     callback: (
       payload: ModMiddlewarePayloadMap[H],
     ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>,
-    modId: string, // Add modId here
+    modId: string,
   ) => () => void;
 }
 
@@ -49,13 +47,11 @@ interface RegistrationCallbacks {
  * Loads and executes enabled mods from the database.
  */
 export async function loadMods(
-  dbMods: DbMod[], // FIX: Use dbMods parameter
+  dbMods: DbMod[],
   registrationCallbacks: RegistrationCallbacks,
   getContextSnapshot: () => ReadonlyChatContextSnapshot,
 ): Promise<ModInstance[]> {
   console.log(`[ModLoader] Loading ${dbMods.length} mods from DB.`);
-
-  // FIX: Filter enabled mods from dbMods
   const enabledMods = dbMods.filter((mod) => mod.enabled);
   console.log(`[ModLoader] ${enabledMods.length} mods are enabled.`);
 
@@ -65,12 +61,12 @@ export async function loadMods(
       let scriptContent = mod.scriptContent;
       let modApi: LiteChatModApi | null = null;
       let instanceError: Error | string | null = null;
-      const modId = mod.id; // Keep modId accessible
+      const modId = mod.id;
 
       try {
         // Pass the modId to createApiForMod so it can be used in registerMiddleware
         modApi = createApiForMod(
-          mod, // Pass the full mod object
+          mod,
           registrationCallbacks,
           getContextSnapshot,
         );
@@ -134,7 +130,7 @@ export async function loadMods(
         // Ensure API exists even if loading/execution failed, for potential cleanup/error reporting
         if (!modApi) {
           modApi = createApiForMod(
-            mod, // Pass the full mod object
+            mod,
             registrationCallbacks,
             getContextSnapshot,
           );
@@ -142,11 +138,9 @@ export async function loadMods(
         const instance: ModInstance = {
           id: modId,
           name: mod.name,
-          api: modApi, // API is always attached
-          error: instanceError ?? undefined, // Store error if one occurred
+          api: modApi,
+          error: instanceError ?? undefined,
         };
-
-        // Emit events based on success or failure
         if (instance.error) {
           modEvents.emit(ModEvent.MOD_ERROR, {
             id: modId,
@@ -156,7 +150,7 @@ export async function loadMods(
         } else {
           modEvents.emit(ModEvent.MOD_LOADED, { id: modId, name: mod.name });
         }
-        return instance; // Return instance for Promise.all
+        return instance;
       }
     }),
   );
@@ -168,11 +162,11 @@ export async function loadMods(
 }
 
 function createApiForMod(
-  mod: DbMod, // Receive the full mod object
+  mod: DbMod,
   registrationCallbacks: RegistrationCallbacks,
   getContextSnapshot: () => ReadonlyChatContextSnapshot,
 ): LiteChatModApi {
-  const modId = mod.id; // Get modId from the mod object
+  const modId = mod.id;
   const modName = mod.name;
 
   const unsubscribeCallbacks: Set<() => void> = new Set();
@@ -213,10 +207,8 @@ function createApiForMod(
       unsubscribeCallbacks.add(unsubscribe);
       return unsubscribe;
     },
-    // This addMiddleware is the one exposed to the mod script
     addMiddleware: <H extends ModMiddlewareHookName>(
       hookName: H,
-      // Use the specific callback type from the maps
       callback: (
         payload: ModMiddlewarePayloadMap[H],
       ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>,
@@ -226,7 +218,7 @@ function createApiForMod(
       const unsubscribe = registrationCallbacks.registerMiddleware(
         hookName,
         callback,
-        modId, // Pass the modId
+        modId,
       );
       unsubscribeCallbacks.add(unsubscribe);
       return unsubscribe;
@@ -240,13 +232,8 @@ function createApiForMod(
     log: (level, ...args) => {
       console[level](`[Mod: ${modName}]`, ...args);
     },
-
-
-    // cleanup: () => {
     //   unsubscribeCallbacks.forEach(cb => cb());
-    //   unsubscribeCallbacks.clear();
     //   console.log(`[Mod: ${modName}] Cleaned up registrations.`);
-    // }
   };
 
   return api;

@@ -7,12 +7,12 @@ import {
   PaperclipIcon,
   FolderIcon,
 } from "lucide-react";
-import { CodeBlock } from "@/components/lite-chat/code-block"; // Corrected import path if needed
+import { CodeBlock } from "@/components/lite-chat/code-block";
 
 interface FileContextBlockProps {
   type: "vfs" | "attached";
-  pathOrName: string; // VFS path or attached file name
-  content: string | null; // Content can be null if there was an error or skipped
+  pathOrName: string;
+  content: string | null;
   extension: string;
   error?: string;
   status?: string;
@@ -28,7 +28,7 @@ export const FileContextBlock: React.FC<FileContextBlockProps> = ({
   status,
   className,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false); // Default to collapsed
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const toggleExpanded = () => setIsExpanded((prev) => !prev);
 

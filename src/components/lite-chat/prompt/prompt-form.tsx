@@ -23,8 +23,6 @@ import { useSidebarStore } from "@/store/sidebar.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useCoreChatStore } from "@/store/core-chat.store";
 import { useInputStore } from "@/store/input.store";
-
-// CORRECTED Props Interface
 interface PromptFormProps {
   className?: string;
   onFormSubmit: (
@@ -36,12 +34,11 @@ interface PromptFormProps {
   customPromptActions: CustomPromptAction[];
   getContextSnapshot: () => ReadonlyChatContextSnapshot;
   selectedModel: AiModelConfig | undefined;
-  stopStreaming: (parentMessageId?: string | null) => void; // Keep stopStreaming prop
+  stopStreaming: (parentMessageId?: string | null) => void;
 }
 
 const PromptFormComponent: React.FC<PromptFormProps> = ({
   className,
-  // Destructure only the necessary props
   onFormSubmit,
   customPromptActions,
   getContextSnapshot,
@@ -49,7 +46,7 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
 }) => {
   // --- Fetch state/actions directly from stores ---
   const {
-    promptInputValue, // Use direct names
+    promptInputValue,
     setPromptInputValue,
     attachedFiles,
     addAttachedFile,
@@ -101,20 +98,14 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       selectedProviderId: state.selectedProviderId,
     })),
   );
-
-  // --- Placeholder for middleware ---
   const runMiddlewarePlaceholder = useCallback(
     async (_hookName: any, payload: any) => {
-      return payload; // Pass through
+      return payload;
     },
     [],
   );
-
-  // --- Internal Submit Handler ---
   const internalHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    // --- Validations ---
     if (isStreaming) {
       // Use store value
       toast.warning("Please wait for the current response to finish.");
@@ -164,14 +155,14 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
     };
     const vfsContextResult =
       await FileHandlingService.processVfsFilesWithContext(
-        selectedVfsPaths, // Use store value
+        selectedVfsPaths,
         vfsContext,
       );
     const attachedFileParts =
-      await FileHandlingService.processAttachedFiles(attachedFiles); // Use store value
+      await FileHandlingService.processAttachedFiles(attachedFiles);
     let finalContent: MessageContent;
     const vfsText = vfsContextResult.contextPrefix.trim();
-    const userText = promptInputValue.trim(); // Use store value
+    const userText = promptInputValue.trim();
     const imageParts = attachedFileParts.filter(
       (p): p is ImagePart => p.type === "image",
     );
@@ -236,14 +227,12 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
     }
     const contentToSubmit = middlewareResult.prompt;
     const vfsPathsToSave = middlewareResult.vfsPaths;
-
-    // --- Call the passed onFormSubmit wrapper ---
     try {
       // Pass original values from store to the handler
       await onFormSubmit(
-        promptInputValue, // Use store value
-        attachedFiles, // Use store value
-        selectedVfsPaths, // Use store value
+        promptInputValue,
+        attachedFiles,
+        selectedVfsPaths,
         {
           selectedItemId: currentConversationId,
           contentToSendToAI: contentToSubmit,
@@ -254,11 +243,9 @@ const PromptFormComponent: React.FC<PromptFormProps> = ({
       console.error("Error during form submission prop call:", error);
     }
   };
-
-  // Effect for VFS path clearing - USE STORE VALUES
   useEffect(() => {
     if (!isVfsEnabledForItem && selectedVfsPaths.length > 0) {
-      clearSelectedVfsPaths(); // Use store action
+      clearSelectedVfsPaths();
     }
   }, [isVfsEnabledForItem, selectedVfsPaths, clearSelectedVfsPaths]);
 

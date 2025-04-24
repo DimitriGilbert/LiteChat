@@ -25,7 +25,6 @@ import {
   TextPart as LocalTextPart,
   ToolCallPart as LocalToolCallPartType,
   ToolResultPart as LocalToolResultPartType,
-  // Add types needed by interaction handlers
   AiModelConfig,
   AiProviderConfig,
 } from "@/lib/types";
@@ -41,20 +40,19 @@ import { mapToCoreMessages } from "./message-mapper";
 import { createSdkTools } from "./tool-handler";
 import { performImageGeneration as performImageGenerationFunc } from "./image-generator";
 
-import { useCoreChatStore } from "@/store/core-chat.store"; // Import store
-import { useSettingsStore } from "@/store/settings.store"; // Import settings store
-import { db } from "@/lib/db"; // Import db
+import { useCoreChatStore } from "@/store/core-chat.store";
+import { useSettingsStore } from "@/store/settings.store";
+import { db } from "@/lib/db";
 import {
   convertDbMessagesToCoreMessages,
-  createAiModelConfig, // Import the new utility
-} from "@/utils/chat-utils"; // Import util
+  createAiModelConfig,
+} from "@/utils/chat-utils";
 
 export function useAiInteraction({
   // Destructure all props from UseAiInteractionProps
   selectedModel,
   selectedProvider,
   getApiKeyForProvider,
-  // REMOVED: streamingRefreshRateMs,
   addMessage,
   updateMessage,
   setIsAiStreaming,
@@ -62,11 +60,9 @@ export function useAiInteraction({
   addDbMessage,
   getContextSnapshotForMod,
   bulkAddMessages,
-  // selectedItemId,
   // selectedItemType,
   dbProviderConfigs,
-  // dbConversations, // Not directly needed, context snapshot handles it
-  // dbProjects, // Not directly needed, context snapshot handles it
+  // dbProjects,
   inputActions,
   handleSubmitCore,
   handleImageGenerationCore,
@@ -78,7 +74,6 @@ export function useAiInteraction({
   const setAbortController = useCoreChatStore(
     (state) => state.setAbortController,
   );
-  // Get actions for managing active stream state
   const setActiveStream = useCoreChatStore((state) => state.setActiveStream);
   const updateActiveStreamContent = useCoreChatStore(
     (state) => state.updateActiveStreamContent,
@@ -94,7 +89,7 @@ export function useAiInteraction({
   } | null>(null);
 
   const sdkTools = useMemo(() => {
-    const modToolsFromContext = new Map(); // Placeholder for actual mod tools
+    const modToolsFromContext = new Map();
     return createSdkTools(modToolsFromContext, getContextSnapshotForMod);
   }, [getContextSnapshotForMod]);
 
@@ -143,10 +138,8 @@ export function useAiInteraction({
       // Set global streaming state (might be redundant if setActiveStream does it)
       setIsAiStreaming(true);
       setError(null);
-      contentRef.current = ""; // Reset accumulated content
+      contentRef.current = "";
       placeholderRef.current = null;
-
-      // Create and set the controller in the store
       const currentAbortController = new AbortController();
       setAbortController(currentAbortController);
 
@@ -166,11 +159,7 @@ export function useAiInteraction({
         modelId: currentSelectedModel.id,
         conversationId: conversationIdToUse,
       };
-
-      // Add the placeholder message to the main list (marks it as streaming)
       addMessage(assistantPlaceholder);
-
-      // Set the active stream state
       setActiveStream(assistantMessageId, "");
 
       const messagesForApi = mapToCoreMessages(
@@ -184,7 +173,7 @@ export function useAiInteraction({
         | undefined = undefined;
       let finalFinishReason: string | undefined = undefined;
       const finalToolCalls: ToolCallPart[] = [];
-      let finalContent: MessageContent = ""; // Initialize final content
+      let finalContent: MessageContent = "";
 
       try {
         modEvents.emit(ModEvent.RESPONSE_START, {
@@ -216,8 +205,8 @@ export function useAiInteraction({
 
           switch (part.type) {
             case "text-delta":
-              contentRef.current += part.textDelta; // Accumulate locally
-              updateActiveStreamContent(part.textDelta); // Update isolated stream state
+              contentRef.current += part.textDelta;
+              updateActiveStreamContent(part.textDelta);
               modEvents.emit(ModEvent.RESPONSE_CHUNK, {
                 chunk: part.textDelta,
                 conversationId: conversationIdToUse,
@@ -260,7 +249,7 @@ export function useAiInteraction({
                 toolCallId: toolResult.toolCallId,
                 toolName: toolResult.toolName,
                 result: toolResult.result,
-                isError: false, // Assuming success unless error handling is added
+                isError: false,
               };
               const toolResultMessage: Message = {
                 id: nanoid(),
@@ -284,8 +273,6 @@ export function useAiInteraction({
                 tool_call_id: toolResultMessage.tool_call_id,
               });
             });
-
-            // Add tool result messages to UI and DB
             toolResultMessages.forEach(addMessage);
             try {
               await bulkAddMessages(toolResultDbMessages);
@@ -307,8 +294,6 @@ export function useAiInteraction({
 
         if (!finalUsage) finalUsage = await result.usage;
         if (!finalFinishReason) finalFinishReason = await result.finishReason;
-
-        // Determine final content structure
         if (finalToolCalls.length > 0) {
           const parts: Array<LocalTextPart | LocalToolCallPartType> = [];
           if (contentRef.current) {
@@ -331,7 +316,7 @@ export function useAiInteraction({
         if (currentAbortController.signal.aborted && !streamError) {
           streamError = new Error("Stream aborted by user.");
         }
-        if (streamError) throw streamError; // Throw if any error occurred
+        if (streamError) throw streamError;
       } catch (err: unknown) {
         if ((err as any)?.name === "AbortError") {
           if (!currentAbortController.signal.aborted) {
@@ -358,12 +343,12 @@ export function useAiInteraction({
         // Finalize the message in the main list
         finalizeStreamedMessageUI(
           assistantMessageId,
-          finalContent, // Pass final content (text or parts)
+          finalContent,
           streamError,
           finalUsage,
           startTime,
           updateMessage,
-          setActiveStream, // Pass action to clear active stream
+          setActiveStream,
         );
 
         const placeholderData = placeholderRef.current;
@@ -375,7 +360,7 @@ export function useAiInteraction({
             id: placeholderData.id,
             conversationId: placeholderData.conversationId,
             role: "assistant",
-            content: finalContent, // Save final content
+            content: finalContent,
             createdAt: placeholderData.timestamp,
             tool_calls:
               finalToolCalls.length > 0
@@ -411,18 +396,16 @@ export function useAiInteraction({
           console.log(
             `Skipping DB save for assistant message (ID: ${placeholderData?.id || "unknown"}) due to stream error: ${streamError?.message || "Unknown stream error"}`,
           );
-          // Optionally save the errored message placeholder to DB if needed
           if (placeholderData) {
             try {
               await addDbMessage({
                 id: placeholderData.id,
                 conversationId: placeholderData.conversationId,
                 role: "assistant",
-                content: finalContent, // Save partial content
+                content: finalContent,
                 createdAt: placeholderData.timestamp,
                 providerId: placeholderData.providerId,
                 modelId: placeholderData.modelId,
-                // Mark error in DB? Depends on schema/requirements
               });
             } catch (dbErr) {
               console.error(
@@ -439,14 +422,12 @@ export function useAiInteraction({
           toast.error("Internal error: Failed to finalize message for saving.");
         }
         placeholderRef.current = null;
-        // Global streaming state is reset by setActiveStream(null) in finalize
       }
     },
     [
       selectedModel,
       selectedProvider,
       getApiKeyForProvider,
-      // REMOVED: streamingRefreshRateMs,
       addMessage,
       updateMessage,
       setIsAiStreaming,
@@ -455,12 +436,10 @@ export function useAiInteraction({
       bulkAddMessages,
       sdkTools,
       setAbortController,
-      setActiveStream, // Add dependency
-      updateActiveStreamContent, // Add dependency
+      setActiveStream,
+      updateActiveStreamContent,
     ],
   );
-
-  // performImageGenerationCallback remains largely the same
   const performImageGenerationCallback = useCallback(
     async (
       params: Omit<
@@ -517,8 +496,6 @@ export function useAiInteraction({
       addDbMessage,
     ],
   );
-
-  // handleFormSubmit remains largely the same, but uses performAiStream
   const handleFormSubmit = useCallback(
     async (
       promptValue: string,
@@ -566,7 +543,6 @@ export function useAiInteraction({
             const config = dbProviderConfigs.find((p) => p.id === provId);
             if (!config) return undefined;
             const currentApiKey = getApiKeyForProvider(config.id);
-            // Use the utility function
             return createAiModelConfig(config, modId, currentApiKey);
           };
           await startWorkflowCore(
@@ -603,15 +579,12 @@ export function useAiInteraction({
             context.contentToSendToAI,
             context.vfsContextPaths,
           );
-          // Get the *updated* message list *after* submitting the user message
           const currentMessages = useCoreChatStore.getState().messages;
           const settings = useSettingsStore.getState();
           const activeSystemPrompt =
             getContextSnapshotForMod().activeSystemPrompt;
           const messagesForApi =
             convertDbMessagesToCoreMessages(currentMessages);
-
-          // Now call performAiStream with the updated history
           await performAiStream({
             conversationIdToUse: conversationId,
             messagesToSend: messagesForApi,
@@ -626,7 +599,6 @@ export function useAiInteraction({
           inputActions.clearAllInput();
         } catch (err) {
           console.error("Error during form submission flow:", err);
-          // Error handling is done within performAiStream or handleSubmitCore
         }
       }
     },
@@ -642,8 +614,6 @@ export function useAiInteraction({
       getContextSnapshotForMod,
     ],
   );
-
-  // stopStreaming and regenerateMessage remain the same, using core actions
   const stopStreaming = useCallback(
     (parentMessageId: string | null = null) => {
       stopStreamingCore(parentMessageId);
@@ -660,18 +630,14 @@ export function useAiInteraction({
           return;
         }
         const conversationId = originalMessage.conversationId;
-
-        // Prepare UI by removing the message to be regenerated
         await regenerateMessageCore(messageId);
-
-        // Get the history *before* the regenerated message
         const historyBefore = await db.messages
           .where("[conversationId+createdAt]")
           .between(
             [conversationId, Dexie.minKey],
             [conversationId, originalMessage.createdAt],
-            false, // lower bound exclusive
-            true, // upper bound exclusive
+            false,
+            true,
           )
           .sortBy("createdAt");
 
@@ -698,7 +664,6 @@ export function useAiInteraction({
             const config = dbProviderConfigs.find((p) => p.id === provId);
             if (!config) return undefined;
             const currentApiKey = getApiKeyForProvider(config.id);
-            // Use the utility function
             return createAiModelConfig(config, modId, currentApiKey);
           };
           await startWorkflowCore(

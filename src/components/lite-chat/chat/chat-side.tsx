@@ -68,8 +68,6 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   const [parentIdForNewItem, setParentIdForNewItem] = useState<string | null>(
     null,
   );
-
-  // Determine parentId based on current selection
   useEffect(() => {
     let determinedParentId: string | null = null;
     if (selectedItemType === "project") {
@@ -98,7 +96,7 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   const handleCreateProject = useCallback(async () => {
     try {
       const { id: newProjectId } = await createProject(parentIdForNewItem);
-      setEditingItemId(newProjectId); // Start editing the new project name
+      setEditingItemId(newProjectId);
     } catch (error) {
       console.error("Failed to create project:", error);
       toast.error("Failed to create project.");
@@ -124,8 +122,6 @@ const ChatSideComponent: React.FC<ChatSideProps> = ({
   const handleOpenSettingsModal = useCallback(() => {
     setIsSettingsModalOpen(true);
   }, [setIsSettingsModalOpen]);
-
-  // Callback to initiate rename mode in ChatHistory
   const startRename = (id: string) => {
     setEditingItemId(id);
   };

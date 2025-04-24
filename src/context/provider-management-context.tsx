@@ -17,10 +17,9 @@ import { useChatStorage } from "@/hooks/use-chat-storage";
 import { useProviderModelSelection } from "@/hooks/use-provider-model-selection";
 
 import { toast } from "sonner";
-// Removed direct SDK imports
 import { fetchModelsForProvider } from "@/services/model-fetcher";
-import { DEFAULT_MODELS, requiresApiKey } from "@/lib/litechat"; // Import DEFAULT_MODELS
-import { createAiModelConfig } from "@/utils/chat-utils"; // Import the new utility
+import { DEFAULT_MODELS, requiresApiKey } from "@/lib/litechat";
+import { createAiModelConfig } from "@/utils/chat-utils";
 
 const EMPTY_API_KEYS: DbApiKey[] = [];
 const EMPTY_DB_PROVIDER_CONFIGS: DbProviderConfig[] = [];
@@ -95,8 +94,6 @@ export const ProviderManagementProvider: React.FC<
   const [providerFetchStatus, setProviderFetchStatus] = useState<
     Record<string, FetchStatus>
   >({});
-
-  // --- Internal Fetch Logic ---
   const fetchAndUpdateModelsInternal = useCallback(
     async (config: DbProviderConfig) => {
       if (providerFetchStatus[config.id] === "fetching") {
@@ -127,8 +124,6 @@ export const ProviderManagementProvider: React.FC<
     },
     [storage, apiKeys, providerFetchStatus],
   );
-
-  // --- Auto-fetching on Load ---
   useEffect(() => {
     const configsToFetch = dbProviderConfigs.filter(
       (c) =>
@@ -136,7 +131,7 @@ export const ProviderManagementProvider: React.FC<
         c.autoFetchModels &&
         !c.fetchedModels && // Only fetch if not already fetched
         providerFetchStatus[c.id] !== "fetching" &&
-        providerFetchStatus[c.id] !== "success", // Avoid re-fetching if successful
+        providerFetchStatus[c.id] !== "success",
     );
     if (configsToFetch.length > 0) {
       console.log(
@@ -152,8 +147,6 @@ export const ProviderManagementProvider: React.FC<
     // The dependency on providerFetchStatus prevents re-triggering fetches that are ongoing or completed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dbProviderConfigs, providerFetchStatus]);
-
-  // --- Manual Fetch Trigger ---
   const fetchModels = useCallback(
     async (providerConfigId: string) => {
       const config = dbProviderConfigs.find((p) => p.id === providerConfigId);
@@ -165,22 +158,17 @@ export const ProviderManagementProvider: React.FC<
     },
     [dbProviderConfigs, fetchAndUpdateModelsInternal],
   );
-
-  // --- Helper to get model definitions ---
   const getAllAvailableModelDefs = useCallback(
     (providerConfigId: string): { id: string; name: string }[] => {
       const config = dbProviderConfigs.find((p) => p.id === providerConfigId);
       if (!config) return [];
-      // Prioritize fetched models, then fall back to defaults
       if (config.fetchedModels && config.fetchedModels.length > 0) {
         return config.fetchedModels;
       }
-      return DEFAULT_MODELS[config.type] || []; // Use imported DEFAULT_MODELS
+      return DEFAULT_MODELS[config.type] || [];
     },
     [dbProviderConfigs],
   );
-
-  // --- Helper to get API Key Value ---
   const getApiKeyForProvider = useCallback(
     (providerConfigId: string): string | undefined => {
       const selectedDbConfig = dbProviderConfigs.find(
@@ -191,8 +179,6 @@ export const ProviderManagementProvider: React.FC<
     },
     [dbProviderConfigs, apiKeys],
   );
-
-  // --- Generate Active Providers (UPDATED LOGIC) ---
   const activeProviders = useMemo<AiProviderConfig[]>(() => {
     console.log("[ProviderMgmt] Recalculating activeProviders...");
     const enabledConfigs = dbProviderConfigs.filter((c) => c.isEnabled);
@@ -266,7 +252,7 @@ export const ProviderManagementProvider: React.FC<
         .map((modelDef) =>
           createAiModelConfig(config, modelDef.id, currentApiKey),
         )
-        .filter((m): m is AiModelConfig => m !== null); // Filter out failed instantiations
+        .filter((m): m is AiModelConfig => m !== null);
 
       // Add the provider config if it has models to show
       if (finalModelsForDropdown.length > 0) {
@@ -275,7 +261,7 @@ export const ProviderManagementProvider: React.FC<
           name: config.name,
           type: config.type,
           models: finalModelsForDropdown,
-          allAvailableModels: allAvailableModelDefs, // Keep original list for settings UI
+          allAvailableModels: allAvailableModelDefs,
         });
       } else {
         console.warn(
@@ -284,7 +270,7 @@ export const ProviderManagementProvider: React.FC<
       }
     }
     return generatedProviders;
-  }, [dbProviderConfigs, getAllAvailableModelDefs, getApiKeyForProvider]); // Depend on live data
+  }, [dbProviderConfigs, getAllAvailableModelDefs, getApiKeyForProvider]);
 
   // --- Model Selection Hook ---
   const providerModel = useProviderModelSelection({
@@ -292,8 +278,6 @@ export const ProviderManagementProvider: React.FC<
     initialProviderId,
     initialModelId,
   });
-
-  // --- API Key Management Actions ---
   // Use storage functions directly, conditionally based on enableApiKeyManagement
   const addApiKeyAction = useCallback(
     async (
@@ -302,7 +286,6 @@ export const ProviderManagementProvider: React.FC<
       value: string,
     ): Promise<string> => {
       if (!enableApiKeyManagement) return dummyAddApiKey();
-      // Add any validation or pre-processing if needed
       return storage.addApiKey(name, providerId, value);
     },
     [enableApiKeyManagement, storage],
@@ -311,13 +294,10 @@ export const ProviderManagementProvider: React.FC<
   const deleteApiKeyAction = useCallback(
     async (id: string): Promise<void> => {
       if (!enableApiKeyManagement) return dummyDeleteApiKey();
-      // Add any confirmation logic if needed
       return storage.deleteApiKey(id);
     },
     [enableApiKeyManagement, storage],
   );
-
-  // --- Context Value ---
   const value = useMemo(
     () => ({
       enableApiKeyManagement: enableApiKeyManagement ?? true,
@@ -329,8 +309,8 @@ export const ProviderManagementProvider: React.FC<
       selectedProvider: providerModel.selectedProvider,
       selectedModel: providerModel.selectedModel,
       apiKeys,
-      addApiKey: addApiKeyAction, // Use the conditional action
-      deleteApiKey: deleteApiKeyAction, // Use the conditional action
+      addApiKey: addApiKeyAction,
+      deleteApiKey: deleteApiKeyAction,
       getApiKeyForProvider,
       dbProviderConfigs,
       addDbProviderConfig: storage.addProviderConfig,
@@ -350,8 +330,8 @@ export const ProviderManagementProvider: React.FC<
       providerModel.selectedProvider,
       providerModel.selectedModel,
       apiKeys,
-      addApiKeyAction, // Dependency on the action itself
-      deleteApiKeyAction, // Dependency on the action itself
+      addApiKeyAction,
+      deleteApiKeyAction,
       getApiKeyForProvider,
       dbProviderConfigs,
       storage.addProviderConfig,

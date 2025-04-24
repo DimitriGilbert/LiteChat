@@ -21,12 +21,12 @@ const VfsContext = createContext<VfsContextProps | undefined>(undefined);
 
 interface VfsProviderProps {
   children: React.ReactNode;
-  enableVfs?: boolean; // Global config flag passed during setup
+  enableVfs?: boolean;
 }
 
 export const VfsProvider: React.FC<VfsProviderProps> = ({
   children,
-  enableVfs: configEnableVfs = true, // Default to true if not provided
+  enableVfs: configEnableVfs = true,
 }) => {
   // Select state needed for context value
   const {
@@ -58,11 +58,7 @@ export const VfsProvider: React.FC<VfsProviderProps> = ({
     _setEnableVfs: state._setEnableVfs,
     initializeVfs: state.initializeVfs,
   }));
-
-  // Determine the effective global enable flag (config prop overrides store default)
   const effectiveGlobalEnableVfs = configEnableVfs ?? globalEnableVfsFromStore;
-
-  // Ensure the store reflects the config prop if it was provided
   React.useEffect(() => {
     if (
       configEnableVfs !== undefined &&
@@ -84,8 +80,6 @@ export const VfsProvider: React.FC<VfsProviderProps> = ({
     effectiveGlobalEnableVfs,
     initializeVfs,
   ]);
-
-  // Context value construction
   const value = useMemo(
     () => ({
       enableVfs: effectiveGlobalEnableVfs,

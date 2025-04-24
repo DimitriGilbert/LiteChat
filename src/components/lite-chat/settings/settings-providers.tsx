@@ -25,7 +25,7 @@ import {
   requiresBaseURL,
   PROVIDER_TYPES,
 } from "@/lib/litechat";
-import { useChatStorage } from "@/hooks/use-chat-storage"; // Import storage hook
+import { useChatStorage } from "@/hooks/use-chat-storage";
 
 const SettingsProvidersComponent: React.FC = () => {
   // --- Fetch actions and status from store ---
@@ -44,9 +44,7 @@ const SettingsProvidersComponent: React.FC = () => {
       providerFetchStatus: state.providerFetchStatus,
     })),
   );
-
-  // Fetch live data from storage
-  const { providerConfigs: dbProviderConfigs, apiKeys } = useChatStorage(); // Use storage hook
+  const { providerConfigs: dbProviderConfigs, apiKeys } = useChatStorage();
 
   // Define getAllAvailableModelDefs locally using live data
   const getAllAvailableModelDefs = useCallback(
@@ -54,7 +52,6 @@ const SettingsProvidersComponent: React.FC = () => {
       const config = (dbProviderConfigs || []).find(
         (p) => p.id === providerConfigId,
       );
-      // Add default models logic if needed, similar to provider.store.ts
       const getDefaultModels = (
         type: DbProviderType,
       ): { id: string; name: string }[] => {
@@ -91,10 +88,8 @@ const SettingsProvidersComponent: React.FC = () => {
         ? config.fetchedModels
         : getDefaultModels(config.type);
     },
-    [dbProviderConfigs], // Depend on live data
+    [dbProviderConfigs],
   );
-
-  // Local UI state remains
   const [isAdding, setIsAdding] = useState(false);
   const [isSavingNew, setIsSavingNew] = useState(false);
   const [newProviderData, setNewProviderData] = useState<
@@ -111,13 +106,9 @@ const SettingsProvidersComponent: React.FC = () => {
     modelsLastFetchedAt: null,
     modelSortOrder: null,
   });
-
-  // Handlers use store actions
   const handleAddNew = () => {
     setIsAdding(true);
   };
-
-  // Wrap handleCancelNew in useCallback
   const handleCancelNew = useCallback(() => {
     setIsAdding(false);
     setIsSavingNew(false);
@@ -133,7 +124,7 @@ const SettingsProvidersComponent: React.FC = () => {
       modelsLastFetchedAt: null,
       modelSortOrder: null,
     });
-  }, []); // Empty dependency array as it only uses setters
+  }, []);
 
   const handleSaveNew = useCallback(async () => {
     if (!newProviderData.name || !newProviderData.type) {
@@ -145,27 +136,26 @@ const SettingsProvidersComponent: React.FC = () => {
       const type = newProviderData.type!;
       const autoFetch =
         newProviderData.autoFetchModels ?? supportsModelFetching(type);
-      // Call store action which now only interacts with DB
       await addDbProviderConfig({
         name: newProviderData.name,
         type: type,
         isEnabled: newProviderData.isEnabled ?? true,
         apiKeyId: newProviderData.apiKeyId ?? null,
         baseURL: newProviderData.baseURL ?? null,
-        enabledModels: null, // Initial state
+        enabledModels: null,
         autoFetchModels: autoFetch,
         fetchedModels: null,
         modelsLastFetchedAt: null,
         modelSortOrder: null,
       });
-      handleCancelNew(); // Reset form on success
+      handleCancelNew();
     } catch (error) {
       // Error toast handled by the action
       console.error("Failed to add provider (from component):", error);
     } finally {
       setIsSavingNew(false);
     }
-  }, [addDbProviderConfig, newProviderData, handleCancelNew]); // handleCancelNew is now stable
+  }, [addDbProviderConfig, newProviderData, handleCancelNew]);
 
   const handleNewChange = (
     field: keyof DbProviderConfig,
@@ -173,7 +163,6 @@ const SettingsProvidersComponent: React.FC = () => {
   ) => {
     setNewProviderData((prev) => {
       const updated = { ...prev, [field]: value };
-      // Reset dependent fields when type changes
       if (field === "type") {
         const newType = value as DbProviderType;
         updated.apiKeyId = null;
@@ -185,8 +174,6 @@ const SettingsProvidersComponent: React.FC = () => {
       return updated;
     });
   };
-
-  // Local derived state remains
   const needsKey = requiresApiKey(newProviderData.type ?? null);
   const needsURL = requiresBaseURL(newProviderData.type ?? null);
   const canFetch = supportsModelFetching(newProviderData.type ?? null);

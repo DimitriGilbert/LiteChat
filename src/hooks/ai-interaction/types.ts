@@ -8,7 +8,6 @@ import {
   CoreMessage,
   ImagePart,
   ReadonlyChatContextSnapshot,
-  // Add necessary types for interaction handlers
   SidebarItemType,
   DbConversation,
   DbProject,
@@ -35,14 +34,12 @@ export interface UseAiInteractionProps {
   ) => Promise<string>;
   getContextSnapshotForMod: () => ReadonlyChatContextSnapshot;
   bulkAddMessages: (messages: DbMessage[]) => Promise<unknown>;
-  // --- Add dependencies for interaction handlers ---
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
   dbProviderConfigs: DbProviderConfig[];
-  dbConversations: DbConversation[]; // Needed for context snapshot
-  dbProjects: DbProject[]; // Needed for context snapshot
+  dbConversations: DbConversation[];
+  dbProjects: DbProject[];
   inputActions: Pick<InputActions, "clearAllInput">;
-  // Add core actions needed by interaction handlers
   handleSubmitCore: (
     currentConversationId: string,
     contentToSendToAI: MessageContent,
@@ -93,7 +90,7 @@ export interface PerformImageGenerationParams {
   setIsAiStreaming: (isStreaming: boolean) => void;
   setError: (error: string | null) => void;
   addDbMessage: (message: DbMessage) => Promise<string | void>;
-  abortControllerRef: React.MutableRefObject<AbortController | null>; // Keep for image gen
+  abortControllerRef: React.MutableRefObject<AbortController | null>;
 }
 
 export interface PerformImageGenerationResult {
@@ -118,7 +115,6 @@ export interface UseAiInteractionReturn {
       | "abortControllerRef"
     >,
   ) => Promise<PerformImageGenerationResult>;
-  // --- Add interaction handlers ---
   handleFormSubmit: (
     promptValue: string,
     files: File[],

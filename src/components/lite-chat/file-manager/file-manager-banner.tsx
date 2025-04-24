@@ -44,5 +44,5 @@ export const FileManagerBanner: React.FC<FileManagerBannerProps> = ({
     );
   }
 
-  return null; // No banner otherwise
+  return null;
 };

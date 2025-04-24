@@ -42,43 +42,41 @@ import { SortableModelItem } from "@/components/lite-chat/sortable-model-item";
 
 interface ProviderRowEditModeProps {
   providerId: string;
-  editData: Partial<DbProviderConfig>; // Local edit state from ProviderRow
-  apiKeys: DbApiKey[]; // Passed down
-  allAvailableModels: { id: string; name: string }[]; // Passed down
-  orderedEnabledModels: { id: string; name: string }[]; // Passed down
-  orderedEnabledModelIds: string[]; // Passed down
-  isSaving: boolean; // Passed down
-  onCancel: () => void; // Passed down
-  onSave: () => Promise<void>; // Passed down
+  editData: Partial<DbProviderConfig>;
+  apiKeys: DbApiKey[];
+  allAvailableModels: { id: string; name: string }[];
+  orderedEnabledModels: { id: string; name: string }[];
+  orderedEnabledModelIds: string[];
+  isSaving: boolean;
+  onCancel: () => void;
+  onSave: () => Promise<void>;
   onChange: (
     field: keyof DbProviderConfig,
     value: string | boolean | string[] | null,
-  ) => void; // Passed down
-  onEnabledModelChange: (modelId: string, checked: boolean) => void; // Passed down
-  onDragEnd: (event: DragEndEvent) => void; // Passed down
+  ) => void;
+  onEnabledModelChange: (modelId: string, checked: boolean) => void;
+  onDragEnd: (event: DragEndEvent) => void;
 }
 
 
 const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
   providerId,
-  editData, // Use prop
-  apiKeys, // Use prop
-  allAvailableModels, // Use prop
-  orderedEnabledModels, // Use prop
-  orderedEnabledModelIds, // Use prop
-  isSaving, // Use prop
-  onCancel, // Use prop action
-  onSave, // Use prop action
-  onChange, // Use prop action
-  onEnabledModelChange, // Use prop action
-  onDragEnd, // Use prop action
+  editData,
+  apiKeys,
+  allAvailableModels,
+  orderedEnabledModels,
+  orderedEnabledModelIds,
+  isSaving,
+  onCancel,
+  onSave,
+  onChange,
+  onEnabledModelChange,
+  onDragEnd,
 }) => {
   // Derivations use props
   const needsKey = requiresApiKey(editData.type ?? null);
   const needsURL = requiresBaseURL(editData.type ?? null);
   const canFetch = supportsModelFetching(editData.type ?? null);
-
-  // DND setup remains the same
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {

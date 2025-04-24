@@ -12,7 +12,7 @@ import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { z } from "zod";
 import { modEvents, ModEvent } from "@/mods/events";
-import { useCoreChatStore } from "./core-chat.store"; // Import Core Chat Store
+import { useCoreChatStore } from "./core-chat.store";
 import { useVfsStore } from "./vfs.store";
 import { db } from "@/lib/db";
 
@@ -68,8 +68,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
     enableSidebar: true,
     selectedItemId: null,
     selectedItemType: null,
-
-    // Actions
     setEnableSidebar: (enableSidebar) => set({ enableSidebar }),
 
     selectItem: async (id, type) => {
@@ -77,7 +75,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
       const currentType = get().selectedItemType;
 
       if (currentId === id && currentType === type) {
-        return; // No change
+        return;
       }
 
       console.log(`[SidebarStore] Selecting item: ${type} - ${id}`);
@@ -85,8 +83,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         selectedItemId: id,
         selectedItemType: type,
       });
-
-      // --- Trigger message loading ---
       const coreChatActions = useCoreChatStore.getState();
       if (type === "conversation" && id) {
         console.log(`[SidebarStore] Loading messages for conversation: ${id}`);
@@ -95,7 +91,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         console.log(
           "[SidebarStore] Clearing messages (no conversation selected).",
         );
-        await coreChatActions.loadMessages(null); // Clear messages if no conversation
+        await coreChatActions.loadMessages(null);
       }
       // --- End Trigger message loading ---
 
@@ -138,7 +134,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
       );
       vfsActions.setVfsKey(vfsKey);
       vfsActions.setIsVfsEnabledForItem(isVfsEnabledForItem);
-      vfsActions.clearSelectedVfsPaths(); // Clear selected VFS files on item change
+      vfsActions.clearSelectedVfsPaths();
       // --- End VFS State Update ---
 
       modEvents.emit(ModEvent.CHAT_SELECTED, { id, type });
@@ -166,7 +162,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           type: "conversation",
           parentId,
         });
-        // Select the newly created conversation
         await get().selectItem(newId, "conversation");
         return newId;
       } catch (error) {
@@ -199,7 +194,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           type: "project",
           parentId,
         });
-        // Optionally select the new project, or let the user do it
         // await get().selectItem(newProject.id, "project");
         return { id: newProject.id, name: newProject.name };
       } catch (error) {
@@ -292,8 +286,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           }" deleted.`,
         );
         modEvents.emit(ModEvent.CHAT_DELETED, { id, type });
-
-        // If the deleted item was selected, select the next most recent item
         if (currentSelectedId === id) {
           const [projects, conversations] = await Promise.all([
             db.projects.orderBy("updatedAt").reverse().toArray(),
@@ -405,7 +397,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           content:
             typeof msg.content === "string"
               ? msg.content
-              : JSON.stringify(msg.content), // Handle complex content
+              : JSON.stringify(msg.content),
           createdAt: msg.createdAt.toISOString(),
         }));
         const jsonString = JSON.stringify(exportData, null, 2);
@@ -437,8 +429,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         try {
           const jsonString = event.target?.result as string;
           const parsedData = JSON.parse(jsonString);
-
-          // Validate the structure of the imported data
           const validationResult =
             conversationImportSchema.safeParse(parsedData);
           if (!validationResult.success) {
@@ -449,8 +439,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             return;
           }
           const importedMessages = validationResult.data;
-
-          // Create a new conversation for the imported data
           const newConversationTitle = `Imported: ${file.name.replace(/\.json$/i, "").substring(0, 50)}`;
           const newConversationId = nanoid();
           const now = new Date();
@@ -458,10 +446,10 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             id: newConversationId,
             parentId,
             title: newConversationTitle,
-            systemPrompt: null, // Or try to extract from import if available
+            systemPrompt: null,
             createdAt: now,
             updatedAt: now,
-            vfsEnabled: false, // Default VFS state for imported chats
+            vfsEnabled: false,
           };
           await db.conversations.add(newConversation);
           if (parentId) {
@@ -473,19 +461,16 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             type: "conversation",
             parentId,
           });
-
-          // Bulk add the imported messages
           if (importedMessages.length > 0) {
             await db.messages.bulkAdd(
               importedMessages.map((msg) => ({
-                id: nanoid(), // Generate new IDs for imported messages
+                id: nanoid(),
                 role: msg.role,
-                content: msg.content as MessageContent, // Assume content is string for now
+                content: msg.content as MessageContent,
                 createdAt: msg.createdAt,
                 conversationId: newConversationId,
               })),
             );
-            // Update conversation timestamp to the last message's time
             const lastMessageTime =
               importedMessages[importedMessages.length - 1].createdAt;
             await db.conversations.update(newConversationId, {
@@ -540,13 +525,12 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
             createdAt: conversation.createdAt.toISOString(),
             updatedAt: conversation.updatedAt.toISOString(),
             vfsEnabled: conversation.vfsEnabled,
-            // Messages
             messages: messages.map((msg: DbMessage) => ({
               role: msg.role,
               content:
                 typeof msg.content === "string"
                   ? msg.content
-                  : JSON.stringify(msg.content), // Basic serialization for complex content
+                  : JSON.stringify(msg.content),
               createdAt: msg.createdAt.toISOString(),
             })),
           });
@@ -619,8 +603,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           const vfsStore = useVfsStore.getState();
           let newVfsKey: string | null = null;
           let newEnabledState = optimisticNewVfsState;
-
-          // Determine the correct VFS key and potentially override enabled state based on parent project
           if (type === "project") {
             newVfsKey = `project-${id}`;
           } else if (type === "conversation") {
@@ -629,7 +611,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
               const parentProject = await db.projects.get(convo.parentId);
               if (parentProject) {
                 newVfsKey = `project-${convo.parentId}`;
-                // For conversations, we need to check if the parent project has VFS enabled
                 // If the parent project has VFS enabled, the conversation inherits that
                 newEnabledState = parentProject.vfsEnabled ?? false;
               } else {
@@ -645,8 +626,6 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           console.log(
             `[SidebarStore] Updating VFS store: isVfsEnabledForItem=${newEnabledState}, vfsKey=${newVfsKey}`,
           );
-
-          // Reset VFS state first to force a clean initialization
           if (vfsStore.isVfsReady) {
             console.log(
               `[SidebarStore] Resetting VFS ready state before changing key/enabled state`,
@@ -659,13 +638,10 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           // Update VFS store state
           vfsStore.setVfsKey(newVfsKey);
           vfsStore.setIsVfsEnabledForItem(newEnabledState);
-
-          // Directly initialize VFS if enabled
           if (newEnabledState) {
             console.log(
               "[SidebarStore] Directly initializing VFS after toggle",
             );
-            // Use setTimeout to ensure state updates propagate before init
             setTimeout(() => {
               vfsStore.initializeVfs();
             }, 0);

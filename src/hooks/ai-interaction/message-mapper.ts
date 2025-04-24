@@ -33,7 +33,7 @@ export function mapToCoreMessages(localMessages: Message[]): CoreMessage[] {
               .map((part): TextPart | ImagePart | null => {
                 // Use type guards to determine the correct SDK type
                 if (part.type === "text") {
-                  return part as TextPart; // Direct cast if structure matches
+                  return part as TextPart;
                 }
                 if (part.type === "image") {
                   // Ensure 'image' property exists before proceeding
@@ -42,11 +42,10 @@ export function mapToCoreMessages(localMessages: Message[]): CoreMessage[] {
                     ? part.image.split(",")[1]
                     : part.image;
                   if (!base64Data) return null;
-                  // Construct the SDK ImagePart
                   return {
                     type: "image",
                     image: Buffer.from(base64Data, "base64"),
-                    mimeType: part.mediaType, // Use mediaType if available
+                    mimeType: part.mediaType,
                   };
                 }
                 // Ignore other part types for user messages
@@ -57,7 +56,7 @@ export function mapToCoreMessages(localMessages: Message[]): CoreMessage[] {
                   p !== null,
               );
           } else {
-            coreContent = ""; // Default to empty string if content is unexpected
+            coreContent = "";
           }
           // Ensure content is not an empty array, default to empty string
           if (Array.isArray(coreContent) && coreContent.length === 0) {
@@ -77,9 +76,9 @@ export function mapToCoreMessages(localMessages: Message[]): CoreMessage[] {
                 // Construct SDK ToolCallPart
                 contentParts.push({
                   type: "tool-call",
-                  toolCallId: part.toolCallId ?? "", // Provide default if missing
-                  toolName: part.toolName ?? "", // Provide default if missing
-                  args: part.args ?? {}, // Provide default if missing
+                  toolCallId: part.toolCallId ?? "",
+                  toolName: part.toolName ?? "",
+                  args: part.args ?? {},
                 });
               }
             });
@@ -121,9 +120,9 @@ export function mapToCoreMessages(localMessages: Message[]): CoreMessage[] {
                 toolResultParts.push({
                   type: "tool-result",
                   toolCallId: m.tool_call_id,
-                  toolName: part.toolName ?? "", // Provide default
-                  result: part.result ?? null, // Provide default
-                  isError: part.isError ?? false, // Provide default
+                  toolName: part.toolName ?? "",
+                  result: part.result ?? null,
+                  isError: part.isError ?? false,
                 });
               }
             });
@@ -132,19 +131,18 @@ export function mapToCoreMessages(localMessages: Message[]): CoreMessage[] {
               "Mapping tool message with non-array content, structure assumed:",
               m,
             );
-            // Attempt to create a result part if possible, otherwise skip
           }
 
-          if (toolResultParts.length === 0) return null; // Skip if no valid results
+          if (toolResultParts.length === 0) return null;
           return { role: "tool", content: toolResultParts };
         }
-        return null; // Ignore other roles like 'system'
+        return null;
       } catch (error) {
         console.error("Error mapping local message to CoreMessage:", m, error);
         return null;
       }
     })
-    .filter((m): m is CoreMessage => m !== null); // Filter out any null results
+    .filter((m): m is CoreMessage => m !== null);
 }
 
 /**

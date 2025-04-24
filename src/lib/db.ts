@@ -6,14 +6,13 @@ import type {
   DbApiKey,
   DbProject,
   DbProviderConfig,
-  // Workflow, // Removed unused import
 } from "./types";
 import type { DbMod } from "@/mods/types";
 
 
 export interface DbAppState {
-  key: string; // Primary key (e.g., 'lastSelection')
-  value: any; // Store various state values
+  key: string;
+  value: any;
 }
 
 export class ChatDatabase extends Dexie {
@@ -23,11 +22,10 @@ export class ChatDatabase extends Dexie {
   apiKeys!: Table<DbApiKey, string>;
   mods!: Table<DbMod, string>;
   providerConfigs!: Table<DbProviderConfig, string>;
-  appState!: Table<DbAppState, string>; // Add the new table definition
+  appState!: Table<DbAppState, string>;
 
   constructor() {
     super("LiteChatDatabase");
-    // Increment version number for the schema change (adding providerId, modelId to messages)
     this.version(12).stores({
       // Keep previous definitions
       providerConfigs:
@@ -35,13 +33,11 @@ export class ChatDatabase extends Dexie {
       mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
       projects: "++id, name, parentId, createdAt, updatedAt",
       conversations: "id, parentId, createdAt, updatedAt",
-      // Add 'providerId', 'modelId' to the messages schema string. They are not indexed.
       messages:
         "id, conversationId, createdAt, role, tool_call_id, children, workflow, providerId, modelId, [conversationId+createdAt]",
       apiKeys: "id, name, providerId, createdAt",
       appState: "&key",
     });
-    // No upgrade needed for v11 -> v12 as we are just adding non-indexed fields
 
     // --- Keep previous version definitions ---
     this.version(11).stores({
@@ -50,7 +46,6 @@ export class ChatDatabase extends Dexie {
       mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
       projects: "++id, name, parentId, createdAt, updatedAt",
       conversations: "id, parentId, createdAt, updatedAt",
-      // Schema for v11 (with 'children', 'workflow', without provider/model)
       messages:
         "id, conversationId, createdAt, role, tool_call_id, children, workflow, [conversationId+createdAt]",
       apiKeys: "id, name, providerId, createdAt",
@@ -63,7 +58,6 @@ export class ChatDatabase extends Dexie {
       mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
       projects: "++id, name, parentId, createdAt, updatedAt",
       conversations: "id, parentId, createdAt, updatedAt",
-      // Schema for v10 (with 'children', without 'workflow', provider/model)
       messages:
         "id, conversationId, createdAt, role, tool_call_id, children, [conversationId+createdAt]",
       apiKeys: "id, name, providerId, createdAt",
@@ -76,7 +70,6 @@ export class ChatDatabase extends Dexie {
       mods: "++id, &name, sourceUrl, enabled, createdAt, loadOrder",
       projects: "++id, name, parentId, createdAt, updatedAt",
       conversations: "id, parentId, createdAt, updatedAt",
-      // Schema for v9 (without 'children', 'workflow', provider/model)
       messages:
         "id, conversationId, createdAt, role, tool_call_id, [conversationId+createdAt]",
       apiKeys: "id, name, providerId, createdAt",

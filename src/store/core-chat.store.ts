@@ -46,11 +46,10 @@ const findMessageAndParent = (
 interface CoreChatState {
   messages: Message[];
   isLoadingMessages: boolean;
-  isStreaming: boolean; // Global streaming indicator
+  isStreaming: boolean;
   error: string | null;
   activeWorkflows: Map<string, WorkflowExecutionService>;
   abortController: AbortController | null;
-  // State for the currently active stream
   activeStreamId: string | null;
   activeStreamContent: string;
 }
@@ -97,7 +96,6 @@ export interface CoreChatActions {
   ) => void;
   _subscribeToWorkflowEvents: () => () => void;
   setAbortController: (controller: AbortController | null) => void;
-  // Actions for active stream state
   setActiveStream: (messageId: string | null, initialContent?: string) => void;
   updateActiveStreamContent: (contentChunk: string) => void;
 }
@@ -110,7 +108,6 @@ export const useCoreChatStore = create(
     error: null,
     activeWorkflows: new Map(),
     abortController: null,
-    // Initial active stream state
     activeStreamId: null,
     activeStreamContent: "",
 
@@ -145,7 +142,7 @@ export const useCoreChatStore = create(
             modelId: dbMsg.modelId,
             tokensInput: dbMsg.tokensInput,
             tokensOutput: dbMsg.tokensOutput,
-            isStreaming: false, // Initialize as not streaming
+            isStreaming: false,
             error: null,
           }),
         );
@@ -388,7 +385,6 @@ export const useCoreChatStore = create(
         } else if (currentAbortController) {
           currentAbortController.abort();
           state.abortController = null;
-          // Update the UI state of the message that *was* streaming
           const streamingMsgId = state.activeStreamId;
           if (streamingMsgId) {
             const msgIndex = state.messages.findIndex(
@@ -406,7 +402,7 @@ export const useCoreChatStore = create(
         }
 
         if (stoppedSomething) {
-          state.isStreaming = false; // Explicitly set global streaming to false
+          state.isStreaming = false;
         } else {
           console.log(
             "[CoreStore StopStreaming] No active stream or workflow found to stop.",
@@ -470,7 +466,7 @@ export const useCoreChatStore = create(
         } else if (isWorkflowChild && parentWorkflowMessage) {
           get().stopStreamingCore(parentWorkflowMessage.id);
         } else {
-          get().stopStreamingCore(); // Stop potential single stream
+          get().stopStreamingCore();
         }
       });
       console.log(
@@ -584,8 +580,8 @@ export const useCoreChatStore = create(
         childPlaceholders.push({
           id: taskId,
           role: "assistant",
-          content: "", // Final content is empty initially
-          isStreaming: true, // Mark as streaming
+          content: "",
+          isStreaming: true,
           createdAt: now,
           conversationId: conversationId,
           providerId: taskProvider.id,
@@ -731,13 +727,11 @@ export const useCoreChatStore = create(
     setAbortController: (controller) => {
       set({ abortController: controller });
     },
-
-    // Actions for active stream state
     setActiveStream: (messageId, initialContent = "") => {
       set({
         activeStreamId: messageId,
         activeStreamContent: initialContent,
-        isStreaming: !!messageId, // Update global streaming state
+        isStreaming: !!messageId,
       });
     },
 

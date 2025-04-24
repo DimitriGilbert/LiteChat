@@ -12,12 +12,12 @@ import type {
   Role,
   AiModelConfig,
 } from "@/lib/types";
-import { createOpenAI } from "@ai-sdk/openai"; // Added
-import { createGoogleGenerativeAI } from "@ai-sdk/google"; // Added
-import { createOpenRouter } from "@openrouter/ai-sdk-provider"; // Added
-import { createOllama } from "ollama-ai-provider"; // Added
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible"; // Added
-import { DEFAULT_MODELS } from "@/lib/litechat"; // Added
+import { createOpenAI } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createOllama } from "ollama-ai-provider";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { DEFAULT_MODELS } from "@/lib/litechat";
 
 export const decodeUint8Array = (arr: Uint8Array): string => {
   try {
@@ -94,15 +94,15 @@ export function convertDbMessagesToCoreMessages(
   const validRoles: Role[] = ["user", "assistant", "system"];
   return messages
     .filter(
-      (m) => validRoles.includes(m.role), // Filter only by valid roles for AI interaction
+      (m) => validRoles.includes(m.role),
     )
     .map((m) => ({
       role: m.role,
-      content: m.content as MessageContent, // Cast content, assuming it's already correct
+      content: m.content as MessageContent,
       // Add tool_calls and tool_call_id if they exist and are needed by the SDK format
-      // tool_calls: m.toolCalls, // Example if tool calls were stored
-      // tool_call_id: m.toolCallId, // Example if tool call ID was stored
-    })) as CoreMessage[]; // Cast the final array to CoreMessage[]
+      // tool_calls: m.toolCalls,
+      // tool_call_id: m.toolCallId,
+    })) as CoreMessage[];
 }
 
 export const EMPTY_CUSTOM_SETTINGS_TABS: CustomSettingTab[] = [];
@@ -113,11 +113,10 @@ export const EMPTY_DB_PROVIDER_CONFIGS: DbProviderConfig[] = [];
 export const ensureV1Path = (baseUrl: string): string => {
   try {
     // Trim trailing slashes ONLY for the final return value if needed,
-    // but perform checks on the original or slightly modified string.
-    const trimmedForV1Check = baseUrl.replace(/\/+$/, ""); // Trim only for the /v1 check
+    const trimmedForV1Check = baseUrl.replace(/\/+$/, "");
 
     if (trimmedForV1Check.endsWith("/v1")) {
-      return trimmedForV1Check; // Return the version ending in /v1 (already trimmed)
+      return trimmedForV1Check;
     } else if (baseUrl.endsWith("/")) {
       // Ends with '/', append 'v1'
       return baseUrl + "v1";
@@ -127,7 +126,6 @@ export const ensureV1Path = (baseUrl: string): string => {
     }
   } catch (e) {
     console.error("Error processing base URL for /v1 path:", baseUrl, e);
-    // Fallback: return original URL trimmed of trailing slashes
     return baseUrl.replace(/\/+$/, "");
   }
 };
@@ -197,10 +195,10 @@ export function createAiModelConfig(
   const instance = instantiateModelInstance(config, modelId, apiKey);
   if (!instance) return undefined;
 
-  const supportsImageGen = config.type === "openai"; // Example, adjust as needed
+  const supportsImageGen = config.type === "openai";
   const supportsTools = ["openai", "google", "openrouter"].includes(
     config.type,
-  ); // Example
+  );
 
   return {
     id: modelInfo.id,

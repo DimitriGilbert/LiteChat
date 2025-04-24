@@ -9,7 +9,7 @@ import { useVfsStore } from "@/store/vfs.store";
 type ContentPart = TextPart | ImagePart;
 
 export interface FileContextResult {
-  contextPrefix: string; // This will now contain the <file_context> tags for VFS files
+  contextPrefix: string;
   pathsIncludedInContext: string[];
 }
 
@@ -112,7 +112,7 @@ ${escapeXml(contentText)}
       // Combine all text/code file contexts into a single TextPart
       finalParts.push({
         type: "text",
-        text: textContextParts.join("\n\n"), // Separate blocks
+        text: textContextParts.join("\n\n"),
       });
     }
 
@@ -184,8 +184,6 @@ ${escapeXml(contentText)}
         const fileExtension = path.split(".").pop()?.toLowerCase() || "";
         const filename = path.split("/").pop() || path;
         console.log(`Successfully read VFS file: ${path}`);
-
-        // Use the standardized tag format
         return `<file_context type="vfs" path="${escapeXml(path)}" name="${escapeXml(filename)}" extension="${escapeXml(fileExtension)}">
 ${escapeXml(contentText)}
 </file_context>`;
@@ -199,7 +197,7 @@ ${escapeXml(contentText)}
 
     const vfsContents = await Promise.all(vfsContentPromises);
     if (vfsContents.length > 0) {
-      contextPrefix = vfsContents.join("\n\n") + "\n\n"; // Separate blocks
+      contextPrefix = vfsContents.join("\n\n") + "\n\n";
     }
 
     console.log(

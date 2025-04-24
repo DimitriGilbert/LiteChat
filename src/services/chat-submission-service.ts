@@ -54,11 +54,10 @@ interface SubmitChatContext {
     contentToSendToAI: MessageContent,
     vfsContextPaths?: string[],
   ) => Promise<void>;
-  // Add the image generation function from the core hook
   handleImageGenerationCore: (
     currentConversationId: string,
     prompt: string,
-  ) => Promise<void>; // Changed return type to void as it handles DB saving
+  ) => Promise<void>;
 }
 
 export class ChatSubmissionService {
@@ -82,10 +81,8 @@ export class ChatSubmissionService {
       isVfsEnabledForItem,
       runMiddleware,
       handleSubmitCore,
-      handleImageGenerationCore, // Destructure the new function
+      handleImageGenerationCore,
     } = context;
-
-    // Basic validations
     if (isStreaming) {
       toast.warning("Please wait for the current response to finish.");
       return;
@@ -102,8 +99,6 @@ export class ChatSubmissionService {
 
     let currentConversationId =
       selectedItemType === "conversation" ? selectedItemId : null;
-
-    // Create new conversation if none is selected
     if (!currentConversationId) {
       try {
         const parentId = selectedItemType === "project" ? selectedItemId : null;
@@ -139,7 +134,7 @@ export class ChatSubmissionService {
 
       // For now, directly call the core image generation handler
       await handleImageGenerationCore(currentConversationId, imagePrompt);
-      return; // Stop further processing for text chat
+      return;
     } else if (
       promptValue.startsWith(imageGenCommand) &&
       !selectedModel.supportsImageGeneration
@@ -166,13 +161,13 @@ export class ChatSubmissionService {
     const vfsContextResult =
       await FileHandlingService.processVfsFilesWithContext(
         vfsPaths,
-        vfsSimpleContext, // Pass the simplified context
+        vfsSimpleContext,
       );
     const attachedFileParts =
       await FileHandlingService.processAttachedFiles(attachedFiles);
 
     const vfsText = vfsContextResult.contextPrefix.trim();
-    const userText = promptValue.trim(); // Use the original promptValue here
+    const userText = promptValue.trim();
 
     const imageParts = attachedFileParts.filter(
       (p): p is ImagePart => p.type === "image",
@@ -224,8 +219,6 @@ export class ChatSubmissionService {
 
     const contentToSubmit = middlewareResult.prompt;
     const vfsPathsToSave = middlewareResult.vfsPaths;
-
-    // Call Core Text/Multi-modal Submission Logic
     await handleSubmitCore(
       currentConversationId,
       contentToSubmit,
