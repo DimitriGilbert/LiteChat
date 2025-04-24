@@ -1,4 +1,4 @@
-
+// src/components/lite-chat/file-manager.tsx
 import React, { useState, useEffect, useCallback, useRef, memo } from "react";
 import { useVfsStore } from "@/store/vfs.store";
 import { useSidebarStore } from "@/store/sidebar.store";
@@ -17,20 +17,10 @@ import {
 import { FileManagerBanner } from "./file-manager/file-manager-banner";
 import { FileManagerToolbar } from "./file-manager/file-manager-toolbar";
 import { FileManagerTable } from "./file-manager/file-manager-table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { CommitDialog } from "./file-manager/commit-dialog"; // Import CommitDialog
+import { CloneDialog } from "./file-manager/clone-dialog"; // Import CloneDialog
 
 import { useInputStore } from "@/store/input.store";
-
 import { useShallow } from "zustand/react/shallow";
 
 const getRepoNameFromUrl = (url: string): string => {
@@ -62,7 +52,6 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
   const createDirectory = useVfsStore((s) => s.createDirectory);
   const fsInstance = useVfsStore((s) => s.fs);
 
-  // Get actions from InputStore using useShallow
   const { selectedVfsPaths, addSelectedVfsPath, removeSelectedVfsPath } =
     useInputStore(
       useShallow((state) => ({
@@ -769,132 +758,42 @@ const FileManagerComponent: React.FC<{ className?: string }> = ({
         />
       )}
 
-      <Dialog
-        open={isCommitDialogOpen}
+      {/* Use CommitDialog component */}
+      <CommitDialog
+        isOpen={isCommitDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
             setIsCommitDialogOpen(false);
             setCommitPath(null);
+          } else {
+            setIsCommitDialogOpen(true);
           }
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Commit Changes</DialogTitle>
-            <DialogDescription>
-              Enter a commit message for the changes in{" "}
-              <code>{commitPath}</code>. All current changes in this directory
-              will be staged and committed.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="commit-msg" className="text-right">
-                Message
-              </Label>
-              <Input
-                id="commit-msg"
-                value={commitMessage}
-                onChange={(e) => setCommitMessage(e.target.value)}
-                className="col-span-3"
-                placeholder="e.g., Add feature X"
-                disabled={isCommitting}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsCommitDialogOpen(false)}
-              disabled={isCommitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={submitCommit}
-              disabled={isCommitting || !commitMessage.trim()}
-            >
-              {isCommitting ? (
-                <>
-                  <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
-                  Committing...
-                </>
-              ) : (
-                "Commit"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        commitPath={commitPath}
+        commitMessage={commitMessage}
+        setCommitMessage={setCommitMessage}
+        isCommitting={isCommitting}
+        onSubmitCommit={submitCommit}
+      />
 
-      <Dialog
-        open={isCloneDialogOpen}
+      {/* Use CloneDialog component */}
+      <CloneDialog
+        isOpen={isCloneDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
             setIsCloneDialogOpen(false);
+          } else {
+            setIsCloneDialogOpen(true);
           }
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Clone Git Repository</DialogTitle>
-            <DialogDescription>
-              Enter the repository URL. It will be cloned into a new folder
-              named after the repository within <code>{currentPath}</code>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="clone-url" className="text-right">
-                URL
-              </Label>
-              <Input
-                id="clone-url"
-                value={cloneRepoUrl}
-                onChange={(e) => setCloneRepoUrl(e.target.value)}
-                className="col-span-3"
-                placeholder="https://github.com/user/repo.git"
-                disabled={isCloning}
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="clone-branch" className="text-right">
-                Branch
-              </Label>
-              <Input
-                id="clone-branch"
-                value={cloneBranch}
-                onChange={(e) => setCloneBranch(e.target.value)}
-                className="col-span-3"
-                placeholder="main (default)"
-                disabled={isCloning}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsCloneDialogOpen(false)}
-              disabled={isCloning}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={submitClone}
-              disabled={isCloning || !cloneRepoUrl.trim()}
-            >
-              {isCloning ? (
-                <>
-                  <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
-                  Cloning...
-                </>
-              ) : (
-                "Clone"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        cloneRepoUrl={cloneRepoUrl}
+        setCloneRepoUrl={setCloneRepoUrl}
+        cloneBranch={cloneBranch}
+        setCloneBranch={setCloneBranch}
+        isCloning={isCloning}
+        onSubmitClone={submitClone}
+        currentPath={currentPath}
+      />
     </div>
   );
 };
