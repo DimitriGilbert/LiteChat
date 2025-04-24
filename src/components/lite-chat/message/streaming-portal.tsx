@@ -104,7 +104,6 @@ export const StreamingPortal: React.FC<StreamingPortalProps> = ({
     // Start the loop only if this message becomes the active stream
     // and the loop isn't already running.
     if (activeStreamId === messageId && !animationFrameRef.current) {
-      console.log(`[StreamingPortal ${messageId}] Starting render loop.`);
       lastRenderTimeRef.current = performance.now(); // Initialize timer
       animationFrameRef.current = requestAnimationFrame(renderLoop);
     }
@@ -113,7 +112,6 @@ export const StreamingPortal: React.FC<StreamingPortalProps> = ({
     // unmounts or when the activeStreamId changes away from this messageId.
     return () => {
       if (animationFrameRef.current) {
-        console.log(`[StreamingPortal ${messageId}] Cancelling render loop.`);
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }

@@ -1,21 +1,28 @@
 // src/components/lite-chat/chat.tsx
+
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import ChatProviderInner from "@/context/chat-provider-inner";
 import { ChatSide } from "./chat/chat-side";
 import { ChatWrapper } from "./chat/chat-wrapper";
-import { useLiteChatLogic } from "@/hooks/use-lite-chat-logic";
-// Removed useChatStorage import as it's likely used within useLiteChatLogic now
 import { useShallow } from "zustand/react/shallow";
 import { useSidebarStore } from "@/store/sidebar.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { useModStore } from "@/store/mod.store";
-import type { LiteChatConfig } from "@/lib/types";
+import { useCoreChatStore } from "@/store/core-chat.store";
+import { useAiInteraction } from "@/hooks/ai-interaction";
+import { useProviderStore } from "@/store/provider.store";
+import { useDerivedChatState } from "@/hooks/use-derived-chat-state";
+import { useChatStorage } from "@/hooks/use-chat-storage";
+import { useInputStore } from "@/store/input.store";
+// Import useVfsStore
+import { useVfsStore } from "@/store/vfs.store";
+
+import type { LiteChatConfig, ReadonlyChatContextSnapshot } from "@/lib/types"; // Added ReadonlyChatContextSnapshot
 import { cn } from "@/lib/utils";
 import { MenuIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ComponentType } from "react";
 
-// LiteChatProps interface remains the same
 interface LiteChatProps {
   config?: LiteChatConfig;
   className?: string;
@@ -29,7 +36,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({
   SideComponent = ChatSide,
   WrapperComponent = ChatWrapper,
 }) => {
-  // State management for sidebar and editing item remains here
   const { defaultSidebarOpen = true } = config;
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -47,7 +53,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({
     setEditingItemId(id);
   }, []);
 
-  // Theme effect remains here
   const theme = useSettingsStore((state) => state.theme);
   useEffect(() => {
     if (typeof window === "undefined" || !window.document?.documentElement) {
@@ -78,9 +83,9 @@ export const LiteChat: React.FC<LiteChatProps> = ({
         enableSidebarConfig={config.enableSidebar ?? true}
         SideComponent={SideComponent}
         WrapperComponent={WrapperComponent}
-        editingItemId={editingItemId} // Pass editing state down
-        setEditingItemId={handleSetEditingItemId} // Pass setter down
-        onEditComplete={handleEditComplete} // Pass completion handler down
+        editingItemId={editingItemId}
+        setEditingItemId={handleSetEditingItemId}
+        onEditComplete={handleEditComplete}
         customPromptActions={config.customPromptActions}
         customMessageActions={config.customMessageActions}
         customSettingsTabs={config.customSettingsTabs}
@@ -89,7 +94,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({
   );
 };
 
-// LiteChatInnerProps interface remains the same
 interface LiteChatInnerProps {
   className?: string;
   sidebarOpen: boolean;
@@ -119,7 +123,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
   customMessageActions = [],
   customSettingsTabs = [],
 }) => {
-  // Fetch necessary state from stores
+  // --- Fetch state/actions directly from stores ---
   const { enableSidebar: enableSidebarStore } = useSidebarStore(
     useShallow((state) => ({ enableSidebar: state.enableSidebar })),
   );
@@ -130,17 +134,188 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       modSettingsTabs: state.modSettingsTabs,
     })),
   );
-
-  // --- Call useLiteChatLogic WITHOUT arguments ---
-  const logic = useLiteChatLogic(); // FIX: Removed arguments
-
-  // Destructure only the handlers needed by WrapperComponent
   const {
-    handleFormSubmit,
-    stopStreaming,
-    regenerateMessage,
-    getContextSnapshotForMod,
-  } = logic;
+    messages: coreMessages, // Rename to avoid conflict
+    isStreaming: coreIsStreaming, // Rename to avoid conflict
+    addMessage,
+    updateMessage,
+    setIsStreaming,
+    setError,
+    addDbMessage,
+    bulkAddMessages,
+    handleSubmitCore,
+    handleImageGenerationCore,
+    stopStreamingCore,
+    regenerateMessageCore,
+    startWorkflowCore,
+  } = useCoreChatStore(
+    useShallow((state) => ({
+      messages: state.messages,
+      isStreaming: state.isStreaming,
+      addMessage: state.addMessage,
+      updateMessage: state.updateMessage,
+      setIsStreaming: state.setIsStreaming,
+      setError: state.setError,
+      addDbMessage: state.addDbMessage,
+      bulkAddMessages: state.bulkAddMessages,
+      handleSubmitCore: state.handleSubmitCore,
+      handleImageGenerationCore: state.handleImageGenerationCore,
+      stopStreamingCore: state.stopStreamingCore,
+      regenerateMessageCore: state.regenerateMessageCore,
+      startWorkflowCore: state.startWorkflowCore,
+    })),
+  );
+  const { temperature, maxTokens, theme, streamingRefreshRateMs } =
+    useSettingsStore(
+      useShallow((state) => ({
+        temperature: state.temperature,
+        maxTokens: state.maxTokens,
+        theme: state.theme, // Needed for snapshot
+        streamingRefreshRateMs: state.streamingRefreshRateMs,
+      })),
+    );
+  const { selectedProviderId, selectedModelId, getApiKeyForProvider } =
+    useProviderStore(
+      useShallow((state) => ({
+        selectedProviderId: state.selectedProviderId,
+        selectedModelId: state.selectedModelId,
+        getApiKeyForProvider: state.getApiKeyForProvider,
+      })),
+    );
+  const { selectedItemId, selectedItemType, exportConversation } =
+    useSidebarStore(
+      useShallow((state) => ({
+        selectedItemId: state.selectedItemId,
+        selectedItemType: state.selectedItemType,
+        exportConversation: state.exportConversation,
+      })),
+    );
+  const { clearAllInput } = useInputStore(
+    useShallow((state) => ({ clearAllInput: state.clearAllInput })),
+  );
+  // Fetch VFS state needed for snapshot
+  const { isVfsEnabledForItem } = useVfsStore(
+    useShallow((state) => ({
+      isVfsEnabledForItem: state.isVfsEnabledForItem,
+    })),
+  );
+
+  // --- Fetch live data for derived state and API key getter ---
+  const storage = useChatStorage();
+  const dbConversations = storage.conversations || [];
+  const dbProjects = storage.projects || [];
+  const dbProviderConfigs = storage.providerConfigs || [];
+  const apiKeys = storage.apiKeys || [];
+
+  // --- Use Derived State Hook ---
+  const { activeConversationData, selectedProvider, selectedModel } =
+    useDerivedChatState({
+      selectedItemId,
+      selectedItemType,
+      dbConversations,
+      dbProjects,
+      dbProviderConfigs,
+      apiKeys,
+      selectedProviderId,
+      selectedModelId,
+    });
+
+  // --- Create Context Snapshot Function ---
+  const getContextSnapshotForMod =
+    useCallback((): ReadonlyChatContextSnapshot => {
+      // Use state fetched directly above
+      const getApiKeyFunc = (providerId: string) =>
+        getApiKeyForProvider(
+          providerId,
+          apiKeys, // Use live data
+          dbProviderConfigs, // Use live data
+        );
+
+      // Derive activeSystemPrompt based on current state
+      let activeSystemPrompt: string | null = null;
+      const settingsState = useSettingsStore.getState(); // Get latest settings state
+      if (settingsState.enableAdvancedSettings) {
+        if (selectedItemType === "conversation") {
+          const convo = dbConversations.find((c) => c.id === selectedItemId);
+          if (convo?.systemPrompt && convo.systemPrompt.trim() !== "") {
+            activeSystemPrompt = convo.systemPrompt;
+          }
+        }
+        if (
+          !activeSystemPrompt &&
+          settingsState.globalSystemPrompt &&
+          settingsState.globalSystemPrompt.trim() !== ""
+        ) {
+          activeSystemPrompt = settingsState.globalSystemPrompt;
+        }
+      }
+
+      return Object.freeze({
+        selectedItemId: selectedItemId,
+        selectedItemType: selectedItemType,
+        messages: coreMessages, // Use renamed state variable
+        isStreaming: coreIsStreaming, // Use renamed state variable
+        selectedProviderId: selectedProviderId,
+        selectedModelId: selectedModelId,
+        activeSystemPrompt: activeSystemPrompt, // Use derived value
+        temperature: temperature,
+        maxTokens: maxTokens,
+        theme: theme,
+        isVfsEnabledForItem: isVfsEnabledForItem, // Use state from useVfsStore
+        getApiKeyForProvider: getApiKeyFunc,
+      });
+      // Update dependencies
+    }, [
+      selectedItemId,
+      selectedItemType,
+      coreMessages,
+      coreIsStreaming,
+      selectedProviderId,
+      selectedModelId,
+      temperature,
+      maxTokens,
+      theme,
+      isVfsEnabledForItem, // Add VFS state dependency
+      getApiKeyForProvider,
+      apiKeys,
+      dbProviderConfigs,
+      dbConversations, // Add dependency for deriving system prompt
+    ]);
+
+  // --- API Key Getter for AI Interaction ---
+  const getApiKeyForInteraction = useCallback(
+    (providerId: string): string | undefined => {
+      return getApiKeyForProvider(providerId, apiKeys, dbProviderConfigs);
+    },
+    [apiKeys, dbProviderConfigs, getApiKeyForProvider],
+  );
+
+  // --- Initialize AI Interaction Hook ---
+  const { handleFormSubmit, stopStreaming, regenerateMessage } =
+    useAiInteraction({
+      selectedModel,
+      selectedProvider,
+      getApiKeyForProvider: getApiKeyForInteraction,
+      streamingRefreshRateMs,
+      addMessage,
+      updateMessage,
+      setIsAiStreaming: setIsStreaming,
+      setError,
+      addDbMessage,
+      getContextSnapshotForMod,
+      bulkAddMessages,
+      selectedItemId,
+      selectedItemType,
+      dbProviderConfigs,
+      dbConversations,
+      dbProjects,
+      inputActions: { clearAllInput },
+      handleSubmitCore,
+      handleImageGenerationCore,
+      stopStreamingCore,
+      regenerateMessageCore,
+      startWorkflowCore,
+    });
 
   // --- Combine User and Mod Actions/Tabs ---
   const combinedPromptActions = useMemo(
@@ -158,11 +333,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
 
   const showSidebar = enableSidebarConfig && enableSidebarStore;
 
-  // Fetch exportConversation action directly from store for ChatHeader (passed to Wrapper)
-  const exportConversationAction = useSidebarStore(
-    (state) => state.exportConversation,
-  );
-
   return (
     <div
       className={cn(
@@ -173,7 +343,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
       {showSidebar && sidebarOpen && (
         <SideComponent
           className={cn("w-72 flex-shrink-0", "hidden md:flex")}
-          // Pass editing state down to ChatSide
           editingItemId={editingItemId}
           onEditComplete={onEditComplete}
           setEditingItemId={setEditingItemId}
@@ -198,7 +367,6 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
             )}
           </Button>
         )}
-        {/* Pass only necessary props to WrapperComponent */}
         <WrapperComponent
           className="h-full"
           customPromptActions={combinedPromptActions}
@@ -207,7 +375,7 @@ const LiteChatInner: React.FC<LiteChatInnerProps> = ({
           handleFormSubmit={handleFormSubmit}
           stopStreaming={stopStreaming}
           regenerateMessage={regenerateMessage}
-          exportConversation={exportConversationAction}
+          exportConversation={exportConversation}
           getContextSnapshotForMod={getContextSnapshotForMod}
         />
       </div>
