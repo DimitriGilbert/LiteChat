@@ -10,6 +10,7 @@ import { ProviderRow } from "./settings-provider-row";
 import { AddProviderForm } from "./add-provider-form";
 import { useChatStorage } from "@/hooks/use-chat-storage";
 import { DEFAULT_MODELS } from "@/lib/litechat";
+import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 
 const SettingsProvidersComponent: React.FC = () => {
   // --- Fetch actions and status from store ---
@@ -28,7 +29,11 @@ const SettingsProvidersComponent: React.FC = () => {
       providerFetchStatus: state.providerFetchStatus,
     })),
   );
+  // Fetch live data from storage
   const { providerConfigs: dbProviderConfigs, apiKeys } = useChatStorage();
+  // Determine loading state based on whether data is defined
+  const isLoading = dbProviderConfigs === undefined || apiKeys === undefined;
+
   const getAllAvailableModelDefs = useCallback(
     (providerConfigId: string): { id: string; name: string }[] => {
       const config = (dbProviderConfigs || []).find(
@@ -70,7 +75,11 @@ const SettingsProvidersComponent: React.FC = () => {
       {/* Add Provider Button / Form */}
       <div className="mt-auto pt-4 flex-shrink-0">
         {!isAdding ? (
-          <Button onClick={handleAddNew} className="w-full">
+          <Button
+            onClick={handleAddNew}
+            className="w-full"
+            disabled={isLoading} // Disable if loading
+          >
             <PlusIcon className="h-4 w-4 mr-1" /> Add Provider
           </Button>
         ) : (
@@ -85,23 +94,41 @@ const SettingsProvidersComponent: React.FC = () => {
       {/* Provider List */}
       <ScrollArea className="flex-grow pr-3 -mr-3">
         <div className="space-y-2">
-          {(dbProviderConfigs || []).map((provider: DbProviderConfig) => (
-            <ProviderRow
-              key={provider.id}
-              provider={provider}
-              apiKeys={apiKeys || []} // Pass live data
-              onUpdate={updateDbProviderConfig} // Pass store action
-              onDelete={deleteDbProviderConfig} // Pass store action
-              // Pass fetchModels action with current data from storage
-              onFetchModels={() =>
-                fetchModels(provider.id, dbProviderConfigs || [], apiKeys || [])
-              }
-              fetchStatus={providerFetchStatus[provider.id] || "idle"}
-              getAllAvailableModelDefs={() =>
-                getAllAvailableModelDefs(provider.id)
-              } // Pass local getter
-            />
-          ))}
+          {isLoading ? (
+            // Show skeletons while loading
+            <>
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </>
+          ) : (
+            (dbProviderConfigs || []).map((provider: DbProviderConfig) => (
+              <ProviderRow
+                key={provider.id}
+                provider={provider}
+                apiKeys={apiKeys || []} // Pass live data
+                onUpdate={updateDbProviderConfig} // Pass store action
+                onDelete={deleteDbProviderConfig} // Pass store action
+                // Pass fetchModels action with current data from storage
+                onFetchModels={() =>
+                  fetchModels(
+                    provider.id,
+                    dbProviderConfigs || [],
+                    apiKeys || [],
+                  )
+                }
+                fetchStatus={providerFetchStatus[provider.id] || "idle"}
+                getAllAvailableModelDefs={() =>
+                  getAllAvailableModelDefs(provider.id)
+                } // Pass local getter
+              />
+            ))
+          )}
+          {!isLoading && dbProviderConfigs?.length === 0 && !isAdding && (
+            <p className="text-sm text-gray-500 text-center py-4">
+              No providers configured yet. Click "Add Provider" below.
+            </p>
+          )}
         </div>
       </ScrollArea>
     </div>
