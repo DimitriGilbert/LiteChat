@@ -1,52 +1,26 @@
-// src/components/lite-chat/streaming-portal.tsx
+// src/components/lite-chat/message/streaming-portal.tsx
 import React, { useEffect, useState, useRef, useMemo } from "react";
-import { createPortal } from "react-dom";
-import { Remarkable } from "remarkable";
-import hljs from "highlight.js";
+import { sharedMdParser } from "@/lib/markdown-parser";
 
 import { useCoreChatStore } from "@/store/core-chat.store";
+import { useSettingsStore } from "@/store/settings.store"; // Import settings store
 import { useShallow } from "zustand/react/shallow";
 
 interface StreamingPortalProps {
   messageId: string;
-  portalTargetId: string;
+  enableStreamingMarkdown: boolean; // Receive prop
 }
-
-// Explicitly type the mdStream instance
-const mdStream: Remarkable = new Remarkable({
-  html: true,
-  breaks: true,
-  typographer: true,
-  // Add explicit return type ': string' to the highlight function
-  highlight: function (str: string, lang: string): string {
-    if (lang && hljs.getLanguage(lang)) {
-      try {
-        return hljs.highlight(str, { language: lang, ignoreIllegals: true })
-          .value;
-      } catch (__) {
-        /* ignore */
-      }
-    }
-    try {
-      return hljs.highlightAuto(str).value;
-    } catch (__) {
-      /* ignore */
-    }
-    // Use the static Remarkable.utils
-    return Remarkable.utils.escapeHtml(str);
-  },
-});
 
 export const StreamingPortal: React.FC<StreamingPortalProps> = ({
   messageId,
-  portalTargetId,
+  enableStreamingMarkdown, // Use prop
 }) => {
-  const [portalNode, setPortalNode] = useState<Element | null>(null);
   const [displayedContent, setDisplayedContent] = useState<string>("");
   const lastRenderTimeRef = useRef<number>(0);
   const animationFrameRef = useRef<number | null>(null);
   const accumulatedContentRef = useRef<string>("");
 
+  // Get streaming state
   const { activeStreamId, activeStreamContent } = useCoreChatStore(
     useShallow((state) => ({
       activeStreamId: state.activeStreamId,
@@ -54,16 +28,10 @@ export const StreamingPortal: React.FC<StreamingPortalProps> = ({
     })),
   );
 
-  useEffect(() => {
-    const node = document.getElementById(portalTargetId);
-    if (node) setPortalNode(node);
-    return () => {
-      if (node) {
-        node.innerHTML = "";
-      }
-      setPortalNode(null);
-    };
-  }, [portalTargetId]);
+  // Get refresh rate from settings store
+  const streamingRefreshRateMs = useSettingsStore(
+    (state) => state.streamingRefreshRateMs,
+  );
 
   useEffect(() => {
     if (activeStreamId !== messageId) {
@@ -84,8 +52,9 @@ export const StreamingPortal: React.FC<StreamingPortalProps> = ({
 
     const renderStep = () => {
       const now = performance.now();
+      // Use streamingRefreshRateMs from settings store for throttling
       if (
-        now - lastRenderTimeRef.current > 33 ||
+        now - lastRenderTimeRef.current >= streamingRefreshRateMs ||
         accumulatedContentRef.current === activeStreamContent
       ) {
         if (displayedContent !== accumulatedContentRef.current) {
@@ -95,37 +64,58 @@ export const StreamingPortal: React.FC<StreamingPortalProps> = ({
         animationFrameRef.current = null;
       } else {
         if (!animationFrameRef.current) {
-          animationFrameRef.current = requestAnimationFrame(renderStep);
+          // Calculate remaining time for more accurate scheduling
+          const remainingTime = Math.max(
+            0,
+            streamingRefreshRateMs - (now - lastRenderTimeRef.current),
+          );
+          // Use setTimeout for scheduling based on remaining time
+          // Note: requestAnimationFrame is usually smoother, but setTimeout
+          // allows respecting the specific millisecond delay from settings.
+          // If perfect smoothness is prioritized over exact ms delay,
+          // revert to requestAnimationFrame.
+          animationFrameRef.current = window.setTimeout(() => {
+            animationFrameRef.current = null; // Clear timeout ID before next potential step
+            renderStep(); // Re-run the check
+          }, remainingTime);
         }
       }
     };
 
     accumulatedContentRef.current = activeStreamContent;
 
+    // Use requestAnimationFrame to initially schedule the check
     if (!animationFrameRef.current) {
       animationFrameRef.current = requestAnimationFrame(renderStep);
     }
 
+    // Cleanup function
     return () => {
       if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
+        // Use clearTimeout since we might have scheduled with setTimeout
+        clearTimeout(animationFrameRef.current);
         animationFrameRef.current = null;
       }
     };
-  }, [activeStreamContent, activeStreamId, messageId, displayedContent]);
+    // Add streamingRefreshRateMs to dependencies
+  }, [
+    activeStreamContent,
+    activeStreamId,
+    messageId,
+    displayedContent,
+    streamingRefreshRateMs,
+  ]);
 
-  const renderedHTML = useMemo(
-    () => mdStream.render(displayedContent),
-    [displayedContent],
-  );
+  // Conditionally parse markdown based on the prop
+  const renderedHTML = useMemo(() => {
+    if (enableStreamingMarkdown) {
+      return sharedMdParser.render(displayedContent);
+    } else {
+      // Render plain text - basic escaping might be needed depending on content
+      // Using a <pre> tag preserves whitespace and prevents accidental HTML injection
+      return `<pre style="white-space: pre-wrap; word-wrap: break-word; margin: 0; padding: 0; background: transparent; border: none;">${displayedContent.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
+    }
+  }, [displayedContent, enableStreamingMarkdown]);
 
-  if (!portalNode) return null;
-
-  return createPortal(
-    <div
-      className="markdown-content hljs"
-      dangerouslySetInnerHTML={{ __html: renderedHTML }}
-    />,
-    portalNode,
-  );
+  return <span dangerouslySetInnerHTML={{ __html: renderedHTML }} />;
 };

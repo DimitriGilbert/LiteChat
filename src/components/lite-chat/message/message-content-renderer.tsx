@@ -1,70 +1,18 @@
 // src/components/lite-chat/message/message-content-renderer.tsx
 import React from "react";
-import { Remarkable } from "remarkable";
-import hljs from "highlight.js";
+// REMOVED: Remarkable, hljs, ReactDOMServer, CodeBlock imports
+import { sharedMdParser } from "@/lib/markdown-parser"; // Import the shared instance
 import { cn } from "@/lib/utils";
-import ReactDOMServer from "react-dom/server"; // Import for server-side rendering
 
-import type {
-  Message,
-  ImagePart,
-  // ToolCallPart, // Removed unused import
-  // ToolResultPart, // Removed unused import
-  // MessageContent, // Removed unused import
-} from "@/lib/types";
+import type { Message, ImagePart } from "@/lib/types";
 import { FileContextBlock } from "./file-context-block";
-import { CodeBlock } from "@/components/lite-chat/code-block"; // Import CodeBlock
-
-// Explicitly type the md instance
-const md = new Remarkable({
-  html: false, // Keep false for security
-  breaks: true,
-  typographer: false,
-  // Highlight function is now only for inline code if Remarkable uses it,
-  // or as a fallback. Fenced blocks are handled by the rule override.
-  highlight: function (str: string, lang: string): string {
-    // This might still be used for inline code depending on Remarkable config,
-    // but primary highlighting for blocks is handled by the rule override.
-    if (lang && hljs.getLanguage(lang)) {
-      try {
-        return hljs.highlight(str, { language: lang, ignoreIllegals: true })
-          .value;
-      } catch (__) {
-        /* ignore */
-      }
-    }
-    try {
-      return hljs.highlightAuto(str).value;
-    } catch (__) {
-      /* ignore */
-    }
-    return Remarkable.utils.escapeHtml(str);
-  },
-});
-
-// --- Override Remarkable's fence rule ---
-// Store the original fence rule
-// const originalFenceRule = md.renderer.rules.fence;
-
-md.renderer.rules.fence = (tokens, idx) => {
-  const token = tokens[idx];
-  const lang = token.params ? token.params.split(/\s+/g)[0] : "";
-  const codeContent = token.content;
-
-  // Render the CodeBlock component to an HTML string
-  const codeBlockHtml = ReactDOMServer.renderToString(
-    <CodeBlock code={codeContent} language={lang} />,
-  );
-
-  // Return the rendered HTML string
-  return codeBlockHtml;
-};
-// --- End Rule Override ---
 
 interface MessageContentRendererProps {
   message: Message;
   enableStreamingMarkdown: boolean;
 }
+
+// REMOVED: Remarkable instance creation and fence rule override here
 
 const decodeXml = (encoded: string): string => {
   if (typeof document === "undefined" || !encoded?.includes("&")) {
@@ -141,8 +89,7 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
       return { fileBlocks, contentParts: finalContentParts };
     };
 
-    const renderContent = () => {
-      // --- Handle string content ---
+    const renderStaticContent = () => {
       if (typeof finalContent === "string") {
         const { fileBlocks, contentParts } =
           extractFileContextBlocks(finalContent);
@@ -165,20 +112,19 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
               />
             );
           } else {
-            // Render markdown string using Remarkable (which now uses CodeBlock for fences)
+            // Use the imported shared parser instance
             return (
               <div
                 key={`text-part-${index}`}
-                dangerouslySetInnerHTML={{ __html: md.render(part) }}
+                dangerouslySetInnerHTML={{
+                  __html: sharedMdParser.render(part),
+                }}
               />
             );
           }
         });
-      }
-      // --- Handle array content ---
-      else if (Array.isArray(finalContent)) {
+      } else if (Array.isArray(finalContent)) {
         return finalContent.map((part, index) => {
-          // Use type guards
           if (part.type === "text") {
             const { fileBlocks, contentParts } = extractFileContextBlocks(
               part.text,
@@ -202,10 +148,13 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
                     />
                   );
                 } else {
+                  // Use the imported shared parser instance
                   return (
                     <div
                       key={`text-part-${index}-${subIndex}`}
-                      dangerouslySetInnerHTML={{ __html: md.render(subPart) }}
+                      dangerouslySetInnerHTML={{
+                        __html: sharedMdParser.render(subPart),
+                      }}
                     />
                   );
                 }
@@ -274,12 +223,11 @@ export const MessageContentRenderer: React.FC<MessageContentRendererProps> =
       <>
         {isPurelyImages ? (
           <div className="grid grid-cols-2 gap-2 not-prose max-w-full overflow-hidden">
-            {renderContent()}
+            {renderStaticContent()}
           </div>
         ) : (
-          // Apply markdown-content for general prose styling
           <div className="max-w-full overflow-x-auto markdown-content">
-            {renderContent()}
+            {renderStaticContent()}
           </div>
         )}
       </>
