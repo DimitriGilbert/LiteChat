@@ -80,10 +80,9 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
 
       if (currentId === id && currentType === type) {
         console.log(
-          `[SidebarStore] Item ${type} - ${id} already selected. Skipping redundant selection.`,
+          `[SidebarStore] Item ${type} - ${id} already selected. Re-syncing VFS/Messages.`,
         );
-        // Even if skipping selection state update, ensure VFS/Messages are synced
-        // This handles cases where the underlying item data might change while selected
+        // Force VFS/Message sync even if selection doesn't change state
       } else {
         console.log(`[SidebarStore] Selecting item: ${type} - ${id}`);
         set({
@@ -138,7 +137,7 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
               if (convo.parentId && parentProject) {
                 // Conversation is in a project, use project's VFS key and enabled state
                 vfsKey = `project-${convo.parentId}`;
-                isVfsEnabledForItem = parentProject.vfsEnabled ?? false;
+                isVfsEnabledForItem = parentProject.vfsEnabled ?? false; // Inherit enabled state
               } else {
                 // Orphan conversation, use its own VFS key and enabled state
                 vfsKey = "orphan"; // Use a consistent key for all orphans
@@ -162,46 +161,12 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
         `[SidebarStore] Updating VFS state: key=${vfsKey}, enabled=${isVfsEnabledForItem}`,
       );
 
-      // Check if VFS state actually needs changing
-      const currentVfsKey = useVfsStore.getState().vfsKey;
-      const currentVfsEnabled = useVfsStore.getState().isVfsEnabledForItem;
+      // Update VFS store state - this will trigger initializeVfs if needed
+      vfsActions.setIsVfsEnabledForItem(isVfsEnabledForItem);
+      vfsActions.setVfsKey(vfsKey); // Set key *after* enabled state
+      vfsActions.clearSelectedVfsPaths(); // Clear selections on item change
 
-      if (
-        vfsKey !== currentVfsKey ||
-        isVfsEnabledForItem !== currentVfsEnabled
-      ) {
-        // Reset VFS ready state before changing key/enabled state
-        // This forces re-initialization if needed
-        if (useVfsStore.getState().isVfsReady) {
-          console.log(
-            `[SidebarStore] Resetting VFS ready state before changing key/enabled state (Key: ${currentVfsKey} -> ${vfsKey}, Enabled: ${currentVfsEnabled} -> ${isVfsEnabledForItem})`,
-          );
-          vfsActions.setVfsReady(false);
-          vfsActions.setConfiguredVfsKey(null); // Clear configured key
-          vfsActions._setFsInstance(null); // Clear fs instance
-        }
-
-        vfsActions.setVfsKey(vfsKey);
-        vfsActions.setIsVfsEnabledForItem(isVfsEnabledForItem);
-        vfsActions.clearSelectedVfsPaths(); // Clear selections on item change
-
-        // Trigger initialization if the new state requires it
-        if (vfsKey && isVfsEnabledForItem && useVfsStore.getState().enableVfs) {
-          console.log(
-            "[SidebarStore] Triggering VFS initialization after selection change.",
-          );
-          // Use setTimeout to ensure state updates propagate before init
-          setTimeout(() => {
-            vfsActions.initializeVfs();
-          }, 0);
-        }
-      } else {
-        console.log(
-          "[SidebarStore] VFS state (key/enabled) unchanged, skipping VFS reset/init.",
-        );
-      }
-
-      // Emit event only if selection actually changed
+      // Emit event only if selection actually changed state
       if (currentId !== id || currentType !== type) {
         modEvents.emit(ModEvent.CHAT_SELECTED, { id, type });
       }
@@ -664,9 +629,13 @@ export const useSidebarStore = create<SidebarState & SidebarActions>()(
           }
         }
 
-        // If the toggled item is currently selected, update the VFS store state
+        // If the toggled item is currently selected, re-run selectItem
+        // to ensure the VFS store state (key, enabled status) is correctly updated.
         if (get().selectedItemId === id) {
-          await get().selectItem(id, type); // Re-run selectItem to update VFS state correctly
+          console.log(
+            `[SidebarStore] Re-selecting item ${id} to update VFS state after toggle.`,
+          );
+          await get().selectItem(id, type);
         }
 
         modEvents.emit(ModEvent.CHAT_VFS_TOGGLED, {
