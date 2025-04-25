@@ -14,32 +14,38 @@ import { useModStore } from "@/store/mod.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { loadMods } from "@/modding/loader";
-// Removed unused db import
 import { Toaster } from "@/components/ui/sonner";
 import type { CoreMessage } from "ai";
 import { InputArea } from "./prompt/InputArea";
 import { useShallow } from "zustand/react/shallow";
-import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
+import { emitter } from "@/lib/litechat/event-emitter";
+import { cn } from "@/lib/utils";
+
+// Import control registration hooks/components
 import { useConversationListControlRegistration } from "./chat/control/ConversationList";
 import { useSettingsControlRegistration } from "./chat/control/Settings";
 import { useModelProviderControlRegistration } from "./prompt/control/ModelProvider";
 
 export const LiteChat: React.FC = () => {
-  const { selectedConversationId, loadConversations } = useConversationStore(
-    useShallow((state) => ({
-      selectedConversationId: state.selectedConversationId,
-      loadConversations: state.loadConversations,
-    })),
-  );
+  // --- Store Hooks ---
+  const { selectedConversationId, loadConversations, addConversation } =
+    useConversationStore(
+      useShallow((state) => ({
+        selectedConversationId: state.selectedConversationId,
+        loadConversations: state.loadConversations,
+        addConversation: state.addConversation,
+        selectConversation: state.selectConversation,
+      })),
+    );
   const {
     interactions,
     status: interactionStatus,
-    // Removed unused streamingInteractionIds
+    setCurrentConversationId,
   } = useInteractionStore(
     useShallow((state) => ({
       interactions: state.interactions,
       status: state.status,
-      // streamingInteractionIds: state.streamingInteractionIds, // Removed
+      setCurrentConversationId: state.setCurrentConversationId,
     })),
   );
   const globalError = useUIStateStore((state) => state.globalError);
@@ -64,28 +70,39 @@ export const LiteChat: React.FC = () => {
     })),
   );
 
-  // Register core controls
+  // --- Register Core Controls ---
+  // These hooks run once on mount and register the controls
   useConversationListControlRegistration();
   useSettingsControlRegistration();
   useModelProviderControlRegistration();
 
+  // --- Initialization Effect ---
   useEffect(() => {
     let isMounted = true;
     const initialize = async () => {
+      console.log("LiteChat: Starting initialization...");
       if (!isMounted) return;
       await loadSettings();
+      console.log("LiteChat: Settings loaded.");
       if (!isMounted) return;
       await loadProviderData();
+      console.log("LiteChat: Provider data loaded.");
       if (!isMounted) return;
       await loadConversations();
+      console.log("LiteChat: Conversations loaded.");
       if (!isMounted) return;
       await loadDbMods();
+      console.log("LiteChat: DB Mods loaded.");
       if (!isMounted) return;
       try {
         const currentDbMods = useModStore.getState().dbMods;
+        console.log(`LiteChat: Loading ${currentDbMods.length} mods...`);
         if (!isMounted) return;
         const loaded = await loadMods(currentDbMods);
-        if (isMounted) setLoadedMods(loaded);
+        if (isMounted) {
+          setLoadedMods(loaded);
+          console.log(`LiteChat: ${loaded.length} mods processed.`);
+        }
       } catch (error) {
         console.error("LiteChat: Failed to load mods:", error);
       }
@@ -94,6 +111,7 @@ export const LiteChat: React.FC = () => {
     initialize();
     return () => {
       isMounted = false;
+      console.log("LiteChat: Unmounting, initialization cancelled if pending.");
     };
   }, [
     loadConversations,
@@ -103,18 +121,31 @@ export const LiteChat: React.FC = () => {
     loadSettings,
   ]);
 
+  // --- Prompt Submission Handler ---
   const handlePromptSubmit = async (turnData: PromptTurnObject) => {
     let currentConvId = selectedConversationId;
+
     if (!currentConvId) {
-      currentConvId = await useConversationStore
-        .getState()
-        .addConversation({ title: "New Chat" });
-      useConversationStore.getState().selectConversation(currentConvId);
-      await new Promise((resolve) => setTimeout(resolve, 0)); // Allow state update
+      console.log("LiteChat: No conversation selected, creating new one...");
+      try {
+        currentConvId = await addConversation({ title: "New Chat" });
+        useConversationStore.getState().selectConversation(currentConvId);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        console.log(
+          `LiteChat: New conversation created and selected: ${currentConvId}`,
+        );
+      } catch (error) {
+        console.error("LiteChat: Failed to create new conversation", error);
+        return;
+      }
     }
+
     const interactionState = useInteractionStore.getState();
     if (interactionState.currentConversationId !== currentConvId) {
-      interactionState.setCurrentConversationId(currentConvId);
+      console.log(
+        `LiteChat: Syncing InteractionStore to conversation ${currentConvId}`,
+      );
+      setCurrentConversationId(currentConvId);
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
@@ -128,9 +159,9 @@ export const LiteChat: React.FC = () => {
         i.response ? { role: "assistant", content: i.response } : null,
       ])
       .filter((m): m is CoreMessage => m !== null);
+
     messages.push({ role: "user", content: turnData.content as string });
 
-    // TODO: Get conversation-specific system prompt override
     const systemPrompt = defaultSystemPrompt;
 
     const aiPayload: PromptObject = {
@@ -140,33 +171,55 @@ export const LiteChat: React.FC = () => {
       metadata: turnData.metadata,
     };
 
-    emitter.emit("prompt:finalised", { prompt: aiPayload }); // Emit event before AI call
+    emitter.emit("prompt:finalised", { prompt: aiPayload });
+    console.log("LiteChat: Submitting prompt to AIService:", aiPayload);
 
     try {
       await AIService.startInteraction(aiPayload, turnData);
+      console.log("LiteChat: AIService interaction started.");
     } catch (e) {
-      console.error("Error starting AI interaction:", e);
+      console.error("LiteChat: Error starting AI interaction:", e);
     }
   };
 
+  // --- Render Logic ---
   const sidebarControls = chatControls
     .filter(
       (c) => (c.panel ?? "main") === "sidebar" && (c.show ? c.show() : true),
     )
     .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
 
+  // Find the settings modal renderer
+  const settingsModalRenderer = chatControls.find(
+    (c) => c.id === "core-settings-trigger",
+  )?.settingsRenderer;
+
   return (
-    <div className="flex h-full w-full border rounded-lg overflow-hidden bg-background text-foreground">
+    <div
+      className={cn(
+        "flex h-full w-full border rounded-lg overflow-hidden bg-background text-foreground",
+      )}
+    >
+      {/* Sidebar */}
       <ChatControlWrapper
         controls={sidebarControls}
         panelId="sidebar"
         className="w-64 border-r hidden md:flex flex-col bg-card"
       />
+
+      {/* Main Chat Area */}
       <div className="flex flex-col flex-grow min-w-0">
+        {/* Header Area - Example using ChatControlWrapper */}
+        <ChatControlWrapper
+          controls={chatControls}
+          panelId="header"
+          className="flex items-center justify-end p-2 border-b bg-card flex-shrink-0" // Example styling
+        />
+
+        {/* Chat Canvas */}
         <ChatCanvas
           conversationId={selectedConversationId}
           interactions={interactions}
-          // Removed unused allInteractions parameter
           interactionRenderer={(interaction) => (
             <div
               key={interaction.id}
@@ -197,17 +250,26 @@ export const LiteChat: React.FC = () => {
           status={interactionStatus}
           className="flex-grow overflow-y-auto p-4 space-y-4"
         />
+
+        {/* Global Error Display */}
         {globalError && (
           <div className="p-2 bg-destructive text-destructive-foreground text-sm text-center">
             Error: {globalError}
           </div>
         )}
+
+        {/* Prompt Input Area */}
         <PromptWrapper
           InputAreaRenderer={(props) => <InputArea {...props} />}
           onSubmit={handlePromptSubmit}
           className="border-t bg-card flex-shrink-0"
         />
       </div>
+
+      {/* Render the Settings Modal if its renderer exists */}
+      {settingsModalRenderer && settingsModalRenderer()}
+
+      {/* Toast Notifications */}
       <Toaster richColors position="top-right" />
     </div>
   );
