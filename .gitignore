@@ -29,3 +29,4 @@ src/test/**/*.notest.*
 .proompts/
 src.bak.d
 .update_scripts/*
+todo.*.md

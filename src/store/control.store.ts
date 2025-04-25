@@ -1,50 +1,165 @@
-import { create } from 'zustand';
-import { immer } from 'zustand/middleware/immer';
-import type { PromptControl } from '@/types/litechat/prompt.types';
-import type { ChatControl } from '@/types/litechat/chat.types';
-import type { ModMiddlewareHookName, ModMiddlewarePayloadMap, ModMiddlewareReturnMap } from '@/types/litechat/modding.types';
+// src/store/control.store.ts
+import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
+import type { PromptControl } from "@/types/litechat/prompt";
+import type { ChatControl } from "@/types/litechat/chat";
+import type {
+  ModMiddlewareHookName,
+  ModMiddlewarePayloadMap,
+  ModMiddlewareReturnMap,
+} from "@/types/litechat/modding";
 
 interface RegisteredMiddleware<H extends ModMiddlewareHookName> {
-  modId: string; callback: (payload: ModMiddlewarePayloadMap[H]) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>; order?: number;
+  modId: string;
+  callback: (
+    payload: ModMiddlewarePayloadMap[H],
+  ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>;
+  order?: number; // Order for middleware execution
 }
-type MiddlewareRegistry = { [H in ModMiddlewareHookName]?: RegisteredMiddleware<H>[]; };
+
+// Type for the registry, mapping hook names to arrays of registered middleware
+type MiddlewareRegistry = {
+  [H in ModMiddlewareHookName]?: RegisteredMiddleware<H>[];
+};
 
 interface ControlState {
-  promptControls: Record<string, PromptControl>; chatControls: Record<string, ChatControl>;
+  promptControls: Record<string, PromptControl>;
+  chatControls: Record<string, ChatControl>;
   middlewareRegistry: MiddlewareRegistry;
 }
+
 interface ControlActions {
-  registerPromptControl: (control: PromptControl) => () => void; unregisterPromptControl: (id: string) => void;
-  registerChatControl: (control: ChatControl) => () => void; unregisterChatControl: (id: string) => void;
-  registerMiddleware: <H extends ModMiddlewareHookName>(hookName: H, modId: string, callback: RegisteredMiddleware<H>['callback'], order?: number) => () => void;
-  unregisterMiddleware: <H extends ModMiddlewareHookName>(hookName: H, modId: string, callback: RegisteredMiddleware<H>['callback']) => void;
-  getMiddlewareForHook: <H extends ModMiddlewareHookName>(hookName: H) => RegisteredMiddleware<H>[];
+  registerPromptControl: (control: PromptControl) => () => void; // Returns unregister function
+  unregisterPromptControl: (id: string) => void;
+  registerChatControl: (control: ChatControl) => () => void; // Returns unregister function
+  unregisterChatControl: (id: string) => void;
+  registerMiddleware: <H extends ModMiddlewareHookName>(
+    hookName: H,
+    modId: string,
+    callback: RegisteredMiddleware<H>["callback"],
+    order?: number, // Optional order parameter
+  ) => () => void; // Returns unregister function
+  unregisterMiddleware: <H extends ModMiddlewareHookName>(
+    hookName: H,
+    modId: string,
+    callback: RegisteredMiddleware<H>["callback"], // Need callback to identify which one to remove
+  ) => void;
+  getMiddlewareForHook: <H extends ModMiddlewareHookName>(
+    hookName: H,
+  ) => ReadonlyArray<RegisteredMiddleware<H>>; // Return a readonly sorted copy
 }
 
 export const useControlRegistryStore = create(
   immer<ControlState & ControlActions>((set, get) => ({
-    promptControls: {}, chatControls: {}, middlewareRegistry: {},
-    registerPromptControl: (c) => { set((s) => { s.promptControls[c.id] = c; }); return () => get().unregisterPromptControl(c.id); },
-    unregisterPromptControl: (id) => { set((s) => { delete s.promptControls[id]; }); },
-    registerChatControl: (c) => { set((s) => { s.chatControls[c.id] = c; }); return () => get().unregisterChatControl(c.id); },
-    unregisterChatControl: (id) => { set((s) => { delete s.chatControls[id]; }); },
-    registerMiddleware: (hN, mId, cb, o = 0) => {
-      const reg: RegisteredMiddleware<any> = { modId: mId, callback: cb, order: o };
-      set((s) => {
-        if (!s.middlewareRegistry[hN]) s.middlewareRegistry[hN] = [];
-        (s.middlewareRegistry[hN] as RegisteredMiddleware<any>[]).push(reg);
-        (s.middlewareRegistry[hN] as RegisteredMiddleware<any>[]).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    // Initial State
+    promptControls: {},
+    chatControls: {},
+    middlewareRegistry: {},
+
+    // Actions
+    registerPromptControl: (control) => {
+      set((state) => {
+        if (state.promptControls[control.id]) {
+          console.warn(
+            `ControlRegistryStore: PromptControl with ID "${control.id}" already registered. Overwriting.`,
+          );
+        }
+        state.promptControls[control.id] = control;
       });
-      return () => get().unregisterMiddleware(hN, mId, cb);
+      // Return the unregister function
+      return () => get().unregisterPromptControl(control.id);
     },
-    unregisterMiddleware: (hN, mId, cb) => {
-      set((s) => {
-        if (s.middlewareRegistry[hN]) {
-          s.middlewareRegistry[hN] = (s.middlewareRegistry[hN] as RegisteredMiddleware<any>[]).filter(reg => !(reg.modId === mId && reg.callback === cb));
-          if (s.middlewareRegistry[hN]?.length === 0) delete s.middlewareRegistry[hN];
+
+    unregisterPromptControl: (id) => {
+      set((state) => {
+        if (state.promptControls[id]) {
+          delete state.promptControls[id];
+        } else {
+          console.warn(
+            `ControlRegistryStore: PromptControl with ID "${id}" not found for unregistration.`,
+          );
         }
       });
     },
-    getMiddlewareForHook: (hN) => ([...(get().middlewareRegistry[hN] ?? [])] as RegisteredMiddleware<any>[]),
-  }))
+
+    registerChatControl: (control) => {
+      set((state) => {
+        if (state.chatControls[control.id]) {
+          console.warn(
+            `ControlRegistryStore: ChatControl with ID "${control.id}" already registered. Overwriting.`,
+          );
+        }
+        state.chatControls[control.id] = control;
+      });
+      // Return the unregister function
+      return () => get().unregisterChatControl(control.id);
+    },
+
+    unregisterChatControl: (id) => {
+      set((state) => {
+        if (state.chatControls[id]) {
+          delete state.chatControls[id];
+        } else {
+          console.warn(
+            `ControlRegistryStore: ChatControl with ID "${id}" not found for unregistration.`,
+          );
+        }
+      });
+    },
+
+    registerMiddleware: (hookName, modId, callback, order = 0) => {
+      const registration: RegisteredMiddleware<any> = {
+        modId,
+        callback,
+        order,
+      };
+      set((state) => {
+        if (!state.middlewareRegistry[hookName]) {
+          state.middlewareRegistry[hookName] = [];
+        }
+        // Add the new middleware
+        (
+          state.middlewareRegistry[hookName] as RegisteredMiddleware<any>[]
+        ).push(registration);
+        // Sort the middleware array by order after adding
+        (
+          state.middlewareRegistry[hookName] as RegisteredMiddleware<any>[]
+        ).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      });
+      // Return the unregister function
+      return () => get().unregisterMiddleware(hookName, modId, callback);
+    },
+
+    unregisterMiddleware: (hookName, modId, callback) => {
+      set((state) => {
+        if (state.middlewareRegistry[hookName]) {
+          // Filter out the specific middleware by modId and callback reference
+          state.middlewareRegistry[hookName] = (
+            state.middlewareRegistry[hookName] as RegisteredMiddleware<any>[]
+          ).filter(
+            (reg) => !(reg.modId === modId && reg.callback === callback),
+          );
+          // Clean up the array if it becomes empty
+          if (state.middlewareRegistry[hookName]?.length === 0) {
+            delete state.middlewareRegistry[hookName];
+          }
+        } else {
+          console.warn(
+            `ControlRegistryStore: Middleware hook "${hookName}" not found for unregistration.`,
+          );
+        }
+      });
+    },
+
+    getMiddlewareForHook: (hookName) => {
+      // Return a readonly copy of the sorted array, or an empty array if none exist
+      const middleware = get().middlewareRegistry[hookName] ?? [];
+      // Ensure sorting just in case (though registerMiddleware should maintain it)
+      return Object.freeze(
+        [...(middleware as RegisteredMiddleware<any>[])].sort(
+          (a, b) => (a.order ?? 0) - (b.order ?? 0),
+        ),
+      );
+    },
+  })),
 );
