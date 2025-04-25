@@ -1,180 +1,69 @@
-// src/lib/litechat/provider-helpers.ts
 import type {
-  DbProviderConfig,
-  DbProviderType,
-  AiModelConfig,
-} from "@/types/litechat/provider.types"; // Use new type location
-import { createOpenAI } from "@ai-sdk/openai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { createOllama } from "ollama-ai-provider";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+  DbProviderConfig, DbProviderType, AiModelConfig,
+} from '@/types/litechat/provider.types';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { createOllama } from 'ollama-ai-provider';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 
-// --- Constants (Moved from old litechat.ts/chat-utils.ts) ---
-
-// Define default models here as they are closely tied to provider logic
-export const DEFAULT_MODELS: Record<
-  DbProviderType,
-  { id: string; name: string }[]
-> = {
-  openai: [{ id: "gpt-4o", name: "GPT-4o" }],
-  google: [
-    { id: "gemini-1.5-flash-latest", name: "Gemini 1.5 Flash" },
-    { id: "gemini-1.5-pro-latest", name: "Gemini 1.5 Pro" },
-  ],
-  openrouter: [], // OpenRouter models should ideally be fetched
-  ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }], // Example default
-  "openai-compatible": [], // No sensible default
+export const DEFAULT_MODELS: Record<DbProviderType, { id: string; name: string }[]> = {
+  openai: [{ id: 'gpt-4o', name: 'GPT-4o' }],
+  google: [ { id: 'gemini-1.5-flash-latest', name: 'Gemini 1.5 Flash' }, { id: 'gemini-1.5-pro-latest', name: 'Gemini 1.5 Pro' }, ],
+  openrouter: [], ollama: [{ id: 'llama3', name: 'Llama 3 (Ollama)' }], 'openai-compatible': [],
 };
-
-// --- Helper Functions (Moved/Adapted) ---
 
 export const ensureV1Path = (baseUrl: string): string => {
   try {
-    const trimmedForV1Check = baseUrl.replace(/\/+$/, "");
-    if (trimmedForV1Check.endsWith("/v1")) {
-      return trimmedForV1Check;
-    } else if (baseUrl.endsWith("/")) {
-      return baseUrl + "v1";
-    } else {
-      return baseUrl + "/v1";
-    }
-  } catch (e) {
-    console.error("Error processing base URL for /v1 path:", baseUrl, e);
-    return baseUrl.replace(/\/+$/, ""); // Return trimmed on error
-  }
+    const trimmed = baseUrl.replace(/\/+$/, '');
+    return trimmed.endsWith('/v1') ? trimmed : baseUrl.endsWith('/') ? baseUrl + 'v1' : baseUrl + '/v1';
+  } catch (e) { console.error('Error processing base URL:', baseUrl, e); return baseUrl.replace(/\/+$/, ''); }
 };
 
-export function instantiateModelInstance(
-  config: DbProviderConfig,
-  modelId: string,
-  apiKey?: string,
-): any | null {
+export function instantiateModelInstance(config: DbProviderConfig, modelId: string, apiKey?: string): any | null {
   try {
     switch (config.type) {
-      case "openai":
-        return createOpenAI({ apiKey })(modelId);
-      case "google":
-        // Ensure API key is passed if required by the specific model/API version
-        return createGoogleGenerativeAI({ apiKey })(modelId);
-      case "openrouter":
-        return createOpenRouter({ apiKey })(modelId);
-      case "ollama":
-        return createOllama({ baseURL: config.baseURL ?? undefined })(modelId);
-      case "openai-compatible":
-        if (!config.baseURL) {
-          throw new Error("Base URL required for openai-compatible");
-        }
-        return createOpenAICompatible({
-          baseURL: ensureV1Path(config.baseURL),
-          apiKey: apiKey, // Pass API key if provided
-          // name: config.name || 'Custom API', // Optional name
-        })(modelId);
-      default:
-        console.warn(
-          `Unsupported provider type for instantiation: ${config.type}`,
-        );
-        return null; // Return null for unsupported types
+      case 'openai': return createOpenAI({ apiKey })(modelId);
+      case 'google': return createGoogleGenerativeAI({ apiKey })(modelId);
+      case 'openrouter': return createOpenRouter({ apiKey })(modelId);
+      case 'ollama': return createOllama({ baseURL: config.baseURL ?? undefined })(modelId);
+      case 'openai-compatible': if (!config.baseURL) throw new Error('Base URL required'); return createOpenAICompatible({ baseURL: ensureV1Path(config.baseURL), apiKey })(modelId);
+      default: console.warn(`Unsupported provider type: ${config.type}`); return null;
     }
-  } catch (e) {
-    console.error(
-      `Failed to instantiate model ${modelId} for provider ${config.name}:`,
-      e,
-    );
-    return null;
-  }
+  } catch (e) { console.error(`Failed instantiate model ${modelId} for ${config.name}:`, e); return null; }
 }
 
-export function createAiModelConfig(
-  config: DbProviderConfig,
-  modelId: string,
-  apiKey?: string,
-): AiModelConfig | undefined {
+export function createAiModelConfig(config: DbProviderConfig, modelId: string, apiKey?: string): AiModelConfig | undefined {
   const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
-  const allAvailable =
-    config.fetchedModels && config.fetchedModels.length > 0
-      ? config.fetchedModels
-      : DEFAULT_MODELS[providerTypeKey] || [];
+  const allAvailable = config.fetchedModels?.length ? config.fetchedModels : DEFAULT_MODELS[providerTypeKey] || [];
   const modelInfo = allAvailable.find((m) => m.id === modelId);
   if (!modelInfo) return undefined;
-
   const instance = instantiateModelInstance(config, modelId, apiKey);
-  // Return undefined if instantiation fails
   if (!instance) return undefined;
-
-  // Determine capabilities based on provider type (adjust as needed)
-  const supportsImageGen = config.type === "openai"; // Example
-  const supportsTools = ["openai", "google", "openrouter"].includes(
-    config.type,
-  ); // Example
-
-  return {
-    id: modelInfo.id,
-    name: modelInfo.name,
-    instance: instance,
-    supportsImageGeneration: supportsImageGen,
-    supportsToolCalling: supportsTools,
-    // contextWindow: ... // Add if available
-  };
+  const supportsImageGen = config.type === 'openai';
+  const supportsTools = ['openai', 'google', 'openrouter'].includes(config.type);
+  return { id: modelInfo.id, name: modelInfo.name, instance, supportsImageGeneration: supportsImageGen, supportsToolCalling: supportsTools };
 }
 
-export const getDefaultModelIdForProvider = (
-  providerConfig: DbProviderConfig | undefined,
-): string | null => {
+export const getDefaultModelIdForProvider = (providerConfig: DbProviderConfig | undefined): string | null => {
   if (!providerConfig) return null;
-
   const providerTypeKey = providerConfig.type as keyof typeof DEFAULT_MODELS;
-  const availableModels =
-    providerConfig.fetchedModels && providerConfig.fetchedModels.length > 0
-      ? providerConfig.fetchedModels
-      : DEFAULT_MODELS[providerTypeKey] || [];
-
+  const availableModels = providerConfig.fetchedModels?.length ? providerConfig.fetchedModels : DEFAULT_MODELS[providerTypeKey] || [];
   if (availableModels.length === 0) return null;
-
   const enabledModelIds = providerConfig.enabledModels ?? [];
   let potentialModels = availableModels;
-
-  // Filter by enabled models if the list is not empty
   if (enabledModelIds.length > 0) {
-    const filteredByEnabled = availableModels.filter((m) =>
-      enabledModelIds.includes(m.id),
-    );
-    // Only use the filtered list if it's not empty, otherwise fallback to all available
-    if (filteredByEnabled.length > 0) {
-      potentialModels = filteredByEnabled;
-    } else {
-      console.warn(
-        `Provider ${providerConfig.id}: enabledModels filter resulted in empty list. Considering all available models for default selection.`,
-      );
-    }
+    const filtered = availableModels.filter((m) => enabledModelIds.includes(m.id));
+    if (filtered.length > 0) potentialModels = filtered;
+    else console.warn(`Provider ${providerConfig.id}: enabledModels filter empty.`);
   }
-
-  // Apply sort order if available
   const sortOrder = providerConfig.modelSortOrder ?? [];
   if (sortOrder.length > 0 && potentialModels.length > 0) {
-    const orderedList: { id: string; name: string }[] = [];
-    const addedIds = new Set<string>();
-    const potentialModelMap = new Map(potentialModels.map((m) => [m.id, m]));
-    for (const modelId of sortOrder) {
-      const model = potentialModelMap.get(modelId);
-      // Ensure the model from sort order is actually in the potential list
-      if (model && !addedIds.has(modelId)) {
-        orderedList.push(model);
-        addedIds.add(modelId);
-      }
-    }
-    // Add remaining potential models (those not in sort order) sorted alphabetically
-    const remainingEnabled = potentialModels
-      .filter((m) => !addedIds.has(m.id))
-      .sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
-    potentialModels = [...orderedList, ...remainingEnabled];
-  } else {
-    // Default sort alphabetically if no sort order defined
-    potentialModels.sort((a, b) =>
-      (a.name || a.id).localeCompare(b.name || b.id),
-    );
-  }
-
-  // Return the ID of the first model in the final sorted/filtered list
+    const orderedList: { id: string; name: string }[] = []; const addedIds = new Set<string>();
+    const potentialMap = new Map(potentialModels.map((m) => [m.id, m]));
+    for (const mId of sortOrder) { const m = potentialMap.get(mId); if (m && !addedIds.has(mId)) { orderedList.push(m); addedIds.add(mId); } }
+    const remaining = potentialModels.filter((m) => !addedIds.has(m.id)).sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
+    potentialModels = [...orderedList, ...remaining];
+  } else { potentialModels.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id)); }
   return potentialModels[0]?.id ?? null;
 };

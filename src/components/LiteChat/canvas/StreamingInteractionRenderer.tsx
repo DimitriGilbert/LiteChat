@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 const SingleStreamingInteraction: React.FC<{ interactionId: string }> = ({ interactionId }) => {
    const interaction = useInteractionStore(useShallow(state => state.interactions.find(i => i.id === interactionId)));
    if (!interaction || interaction.status !== 'STREAMING') return null;
+   // TODO: Replace with a proper InteractionCard/Renderer for streaming state
    return (
      <div key={interaction.id} className='p-3 my-2 border rounded-md shadow-sm bg-card border-dashed animate-pulse'>
        <div className='text-xs text-muted-foreground mb-1'>Idx:{interaction.index} | {interaction.type} | Streaming...</div>

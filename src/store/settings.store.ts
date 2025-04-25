@@ -4,7 +4,6 @@ import { PersistenceService } from '@/services/persistence.service';
 
 interface SettingsState {
   theme: 'light' | 'dark' | 'system'; defaultTemperature: number; defaultMaxTokens: number | null;
-  // Add default system prompt setting
   defaultSystemPrompt: string | null;
 }
 interface SettingsActions {
@@ -14,7 +13,7 @@ interface SettingsActions {
   loadSettings: () => Promise<void>;
 }
 
-const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant.`; // Example default
+const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant.`;
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set) => ({

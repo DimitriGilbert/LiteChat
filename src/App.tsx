@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { LiteChat } from './components/LiteChat/LiteChat'; // Use correct component name
+import { LiteChat } from './components/LiteChat/LiteChat';
 import { useConversationStore } from '@/store/conversation.store';
 import { useSettingsStore } from '@/store/settings.store';
 import { useModStore } from '@/store/mod.store';
@@ -17,7 +17,7 @@ function App() {
     <div className='h-screen bg-background text-foreground flex flex-col p-4'>
       <h1 className='text-xl font-bold mb-4 text-center'>LiteChat Rewrite</h1>
       <main className='flex-grow overflow-hidden'>
-        <LiteChat /> {/* Use LiteChat component */}
+        <LiteChat />
       </main>
     </div>
   );

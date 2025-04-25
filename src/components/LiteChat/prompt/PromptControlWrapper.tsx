@@ -1,27 +1,10 @@
-import React from "react";
-import type { PromptControl } from "@/types/litechat/prompt";
+import React from 'react';
+import type { PromptControl } from '@/types/litechat/prompt.types';
 
-interface PromptControlWrapperProps {
-  controls: PromptControl[];
-  area: "trigger" | "panel";
-  className?: string;
-}
+interface PromptControlWrapperProps { controls: PromptControl[]; area: 'trigger' | 'panel'; className?: string; }
 
-export const PromptControlWrapper: React.FC<PromptControlWrapperProps> = ({
-  controls,
-  area,
-  className,
-}) => {
-  const controlsToRender = controls.filter((c) =>
-    area === "trigger" ? c.trigger : c.renderer,
-  );
+export const PromptControlWrapper: React.FC<PromptControlWrapperProps> = ({ controls, area, className }) => {
+  const controlsToRender = controls.filter(c => area === 'trigger' ? c.trigger : c.renderer);
   if (controlsToRender.length === 0) return null;
-  return (
-    <div className={className}>
-      {controlsToRender.map((c) => {
-        const e = area === "trigger" ? c.trigger?.() : c.renderer?.();
-        return e ? <React.Fragment key={c.id}>{e}</React.Fragment> : null;
-      })}
-    </div>
-  );
+  return (<div className={className}>{controlsToRender.map((c) => { const e = area === 'trigger' ? c.trigger?.() : c.renderer?.(); return e ? <React.Fragment key={c.id}>{e}</React.Fragment> : null; })}</div>);
 };
