@@ -1,5 +1,5 @@
 // src/components/LiteChat/LiteChat.tsx
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback } from "react"; // Import useCallback
 import { PromptWrapper } from "./prompt/PromptWrapper";
 import { ChatCanvas } from "./canvas/ChatCanvas";
 import { ChatControlWrapper } from "./chat/ChatControlWrapper";
@@ -20,6 +20,9 @@ import { InputArea } from "./prompt/InputArea";
 import { useShallow } from "zustand/react/shallow";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { cn } from "@/lib/utils";
+import { InteractionCard } from "./canvas/InteractionCard";
+import { StopButton } from "./common/StopButton";
+import { toast } from "sonner"; // Import toast
 
 // Import control registration hooks/components
 import { useConversationListControlRegistration } from "./chat/control/ConversationList";
@@ -71,7 +74,6 @@ export const LiteChat: React.FC = () => {
   );
 
   // --- Register Core Controls ---
-  // These hooks run once on mount and register the controls
   useConversationListControlRegistration();
   useSettingsControlRegistration();
   useModelProviderControlRegistration();
@@ -182,6 +184,79 @@ export const LiteChat: React.FC = () => {
     }
   };
 
+  // --- Regeneration Handler ---
+  const onRegenerateInteraction = useCallback(async (interactionId: string) => {
+    console.log(`LiteChat: Regenerating interaction ${interactionId}`);
+    const interactionStore = useInteractionStore.getState();
+    const targetInteraction = interactionStore.interactions.find(
+      (i) => i.id === interactionId,
+    );
+
+    if (!targetInteraction || !targetInteraction.prompt) {
+      console.error(
+        `LiteChat: Cannot regenerate - interaction ${interactionId} or its prompt not found.`,
+      );
+      toast.error("Cannot regenerate: Original interaction data missing.");
+      return;
+    }
+
+    const historyUpToParent = interactionStore.interactions.filter(
+      (i) => i.index < targetInteraction.index,
+    );
+
+    const messages: CoreMessage[] = historyUpToParent
+      .filter(
+        (i) => i.type === "message.user_assistant" && i.status === "COMPLETED",
+      )
+      .flatMap((i) => [
+        i.prompt ? { role: "user", content: i.prompt.content as string } : null,
+        i.response ? { role: "assistant", content: i.response } : null,
+      ])
+      .filter((m): m is CoreMessage => m !== null);
+
+    messages.push({
+      role: "user",
+      content: targetInteraction.prompt.content as string,
+    });
+
+    const systemPrompt = useSettingsStore.getState().defaultSystemPrompt;
+
+    const aiPayload: PromptObject = {
+      system: systemPrompt,
+      messages: messages,
+      parameters: targetInteraction.prompt.parameters,
+      metadata: {
+        ...targetInteraction.prompt.metadata,
+        regeneratedFromId: interactionId,
+      },
+    };
+
+    emitter.emit("prompt:finalised", { prompt: aiPayload });
+    console.log(
+      `LiteChat: Submitting regeneration request for ${interactionId}:`,
+      aiPayload,
+    );
+
+    try {
+      await AIService.startInteraction(aiPayload, targetInteraction.prompt);
+      console.log(
+        `LiteChat: AIService regeneration interaction started for ${interactionId}.`,
+      );
+    } catch (e) {
+      console.error(
+        `LiteChat: Error starting regeneration for ${interactionId}:`,
+        e,
+      );
+      toast.error("Failed to start regeneration.");
+    }
+  }, []);
+
+  // --- Stop Handler ---
+  const onStopInteraction = useCallback((interactionId: string) => {
+    console.log(`LiteChat: Stopping interaction ${interactionId}`);
+    AIService.stopInteraction(interactionId);
+  }, []);
+
   // --- Render Logic ---
   const sidebarControls = chatControls
     .filter(
@@ -189,7 +264,6 @@ export const LiteChat: React.FC = () => {
     )
     .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
 
-  // Find the settings modal renderer
   const settingsModalRenderer = chatControls.find(
     (c) => c.id === "core-settings-trigger",
   )?.settingsRenderer;
@@ -209,43 +283,31 @@ export const LiteChat: React.FC = () => {
 
       {/* Main Chat Area */}
       <div className="flex flex-col flex-grow min-w-0">
-        {/* Header Area - Example using ChatControlWrapper */}
+        {/* Header Area */}
         <ChatControlWrapper
           controls={chatControls}
           panelId="header"
-          className="flex items-center justify-end p-2 border-b bg-card flex-shrink-0" // Example styling
+          className="flex items-center justify-end p-2 border-b bg-card flex-shrink-0"
         />
 
         {/* Chat Canvas */}
         <ChatCanvas
           conversationId={selectedConversationId}
           interactions={interactions}
-          interactionRenderer={(interaction) => (
-            <div
+          interactionRenderer={(interaction, allInteractions) => (
+            <InteractionCard
               key={interaction.id}
-              className="p-3 my-2 border rounded-md shadow-sm bg-card"
-            >
-              <div className="text-xs text-muted-foreground mb-1">
-                Idx:{interaction.index}{" "}
-                {interaction.parentId &&
-                  `(Parent:${interaction.parentId.substring(0, 4)})`}{" "}
-                | {interaction.type} | {interaction.status}
-              </div>
-              {interaction.prompt && (
-                <pre className="text-xs bg-muted p-1 rounded mb-1 overflow-x-auto">
-                  TurnData: {JSON.stringify(interaction.prompt)}
-                </pre>
-              )}
-              <pre className="text-sm whitespace-pre-wrap">
-                {typeof interaction.response === "string" ||
-                interaction.response === null
-                  ? interaction.response
-                  : JSON.stringify(interaction.response)}
-              </pre>
-            </div>
+              interaction={interaction}
+              // allInteractions={allInteractions} // Pass if needed by Card
+              onRegenerate={onRegenerateInteraction}
+            />
           )}
+          // Fix: Pass onStopInteraction to the renderer
           streamingInteractionsRenderer={(ids) => (
-            <StreamingInteractionRenderer interactionIds={ids} />
+            <StreamingInteractionRenderer
+              interactionIds={ids}
+              onStop={onStopInteraction}
+            />
           )}
           status={interactionStatus}
           className="flex-grow overflow-y-auto p-4 space-y-4"
@@ -266,7 +328,7 @@ export const LiteChat: React.FC = () => {
         />
       </div>
 
-      {/* Render the Settings Modal if its renderer exists */}
+      {/* Render the Settings Modal */}
       {settingsModalRenderer && settingsModalRenderer()}
 
       {/* Toast Notifications */}
