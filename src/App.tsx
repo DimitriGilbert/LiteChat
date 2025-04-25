@@ -1,19 +1,25 @@
-
-import { LiteChat } from "./components/lite-chat/chat";
-import { Toaster } from "@/components/ui/sonner";
-import ErrorBoundary from "./components/error-boundary";
+import React, { useEffect } from 'react';
+import { LiteChat } from './components/LiteChat/LiteChat'; // Use correct component name
+import { useConversationStore } from '@/store/conversation.store';
+import { useSettingsStore } from '@/store/settings.store';
+import { useModStore } from '@/store/mod.store';
+import { useProviderStore } from '@/store/provider.store';
 
 function App() {
+  useEffect(() => {
+     useSettingsStore.getState().loadSettings();
+     useProviderStore.getState().loadInitialData();
+     useConversationStore.getState().loadConversations();
+     useModStore.getState().loadDbMods();
+  }, []);
+
   return (
-    <ErrorBoundary>
-      <div className="h-screen bg-gray-900 flex flex-col">
-        <main className="flex-grow overflow-hidden">
-          <LiteChat />
-        </main>
-        <Toaster richColors position="top-right" />
-      </div>
-    </ErrorBoundary>
+    <div className='h-screen bg-background text-foreground flex flex-col p-4'>
+      <h1 className='text-xl font-bold mb-4 text-center'>LiteChat Rewrite</h1>
+      <main className='flex-grow overflow-hidden'>
+        <LiteChat /> {/* Use LiteChat component */}
+      </main>
+    </div>
   );
 }
-
 export default App;
