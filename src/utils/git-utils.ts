@@ -1,9 +1,8 @@
+// src/utils/git-utils.ts
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import * as git from "isomorphic-git";
 import http from "isomorphic-git/http/web";
-
-
 
 export interface GitRepoInfoData {
   url: string | null;
@@ -21,7 +20,6 @@ export interface GitRepoInfoData {
   } | null;
 }
 
-
 export interface GitCommitOptions {
   message: string;
   author: {
@@ -29,7 +27,6 @@ export interface GitCommitOptions {
     email: string;
   };
 }
-
 
 export type GitOperationResult<T = void> = T extends void
   ? { success: true; message: string } | { success: false; message: string }
@@ -232,6 +229,12 @@ export class GitUtils {
         dir,
         remote: options.remote || "origin",
         ref: options.branch || "main",
+        singleBranch: true, // Often useful with pull
+        // Provide default author info for potential merge commits
+        author: {
+          name: "LiteChat User",
+          email: "user@litechat.dev",
+        },
         onAuth: options.credentials ? () => options.credentials : undefined,
         corsProxy: "https://cors.isomorphic-git.org",
       });
