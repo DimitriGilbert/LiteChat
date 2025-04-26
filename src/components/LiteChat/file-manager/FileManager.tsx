@@ -33,14 +33,10 @@ import {
   HomeIcon,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-// Correct import path for VFS types
-import { VfsFile, VfsNode } from "@/types/litechat/vfs"; // Correct path
-// Correct import path for utils
-import { formatBytes } from "@/lib/litechat/file-manager-utils"; // Correct path
-// Correct import path for Utils
-import { getFileIcon } from "./Utils"; // Correct path relative to this file
-// Removed unused toast import
-import { Skeleton } from "@/components/ui/skeleton"; // Keep Skeleton
+import { VfsFile, VfsNode } from "@/types/litechat/vfs";
+import { formatBytes } from "@/lib/litechat/file-manager-utils";
+import { getFileIcon } from "./Utils";
+// Removed unused Skeleton import
 import { cn } from "@/lib/utils";
 
 export const FileManager = memo(() => {
@@ -61,7 +57,7 @@ export const FileManager = memo(() => {
     deselectFile,
     setCurrentPath,
     downloadFile,
-    initializeVFS, // Use correct name
+    initializeVFS,
     rootId,
   } = useVfsStore(
     useShallow((state) => ({
@@ -80,7 +76,7 @@ export const FileManager = memo(() => {
       deselectFile: state.deselectFile,
       setCurrentPath: state.setCurrentPath,
       downloadFile: state.downloadFile,
-      initializeVFS: state.initializeVFS, // Correct name
+      initializeVFS: state.initializeVFS,
       rootId: state.rootId,
     })),
   );
@@ -110,12 +106,11 @@ export const FileManager = memo(() => {
 
   // --- Effects ---
   useEffect(() => {
-    // Initialize VFS with a default key or one derived from context if needed
     const keyToInit = "default_vfs_key"; // Replace with actual key logic later
     if (!rootId) {
-      initializeVFS(keyToInit); // Use correct name
+      initializeVFS(keyToInit);
     }
-  }, [rootId, initializeVFS]); // Use correct name
+  }, [rootId, initializeVFS]);
 
   useEffect(() => {
     if (currentParentId !== null && !childrenMap[currentParentId]) {

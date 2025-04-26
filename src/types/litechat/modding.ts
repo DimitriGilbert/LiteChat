@@ -70,6 +70,10 @@ export const ModEvent = {
   SETTINGS_CLOSED: "settings:closed",
   MOD_LOADED: "mod:loaded",
   MOD_ERROR: "mod:error",
+  // VFS Events
+  VFS_FILE_READ: "vfs:file:read",
+  VFS_FILE_WRITTEN: "vfs:file:written",
+  VFS_FILE_DELETED: "vfs:file:deleted",
 } as const;
 export type ModEventName = (typeof ModEvent)[keyof typeof ModEvent];
 export interface ModEventPayloadMap {
@@ -103,6 +107,10 @@ export interface ModEventPayloadMap {
     name: string;
     error: Error | string;
   };
+  // VFS Event Payloads
+  [ModEvent.VFS_FILE_READ]: { path: string };
+  [ModEvent.VFS_FILE_WRITTEN]: { path: string };
+  [ModEvent.VFS_FILE_DELETED]: { path: string };
 }
 
 // --- Middleware ---

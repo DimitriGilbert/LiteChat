@@ -184,25 +184,24 @@ export class PersistenceService {
 
   static async deleteApiKey(id: string): Promise<void> {
     try {
-      await db.transaction("rw", db.apiKeys, db.providerConfigs, async (tx) => {
-        const configsToUpdate = await tx
-          .table<DbProviderConfig>("providerConfigs")
+      // Pass tables as an array in the second argument
+      await db.transaction("rw", [db.apiKeys, db.providerConfigs], async () => {
+        // Use db.table directly inside the transaction
+        const configsToUpdate = await db.providerConfigs
           .where("apiKeyId")
           .equals(id)
           .toArray();
 
         if (configsToUpdate.length > 0) {
           const updates = configsToUpdate.map((config) =>
-            tx
-              .table<DbProviderConfig>("providerConfigs")
-              .update(config.id, { apiKeyId: null }),
+            db.providerConfigs.update(config.id, { apiKeyId: null }),
           );
           await Promise.all(updates);
           console.log(
             `PersistenceService: Unlinked API key ${id} from ${configsToUpdate.length} provider configs.`,
           );
         }
-        await tx.table<DbApiKey>("apiKeys").delete(id);
+        await db.apiKeys.delete(id);
       });
     } catch (error) {
       console.error("PersistenceService: Error deleting API key:", error);
@@ -210,21 +209,22 @@ export class PersistenceService {
     }
   }
 
-  // --- Corrected clearAllData ---
   static async clearAllData(): Promise<void> {
     try {
-      // Pass table instances directly as arguments after the mode string
+      // Pass ALL table instances involved in the clear operation as an array
       await db.transaction(
         "rw",
-        db.conversations,
-        db.interactions,
-        db.mods,
-        db.appState,
-        db.providerConfigs,
-        db.apiKeys,
-        // Add other tables here if needed
+        [
+          db.conversations,
+          db.interactions,
+          db.mods,
+          db.appState,
+          db.providerConfigs,
+          db.apiKeys,
+          // Add other tables here if they exist and need clearing
+        ],
         async () => {
-          // Clear each table within the transaction
+          // Use db.table.clear() within the transaction
           await db.interactions.clear();
           await db.conversations.clear();
           await db.mods.clear();

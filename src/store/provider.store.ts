@@ -6,7 +6,7 @@ import type {
   DbApiKey,
   AiProviderConfig,
   AiModelConfig,
-  DbProviderType, // Keep DbProviderType
+  DbProviderType,
 } from "@/types/litechat/provider";
 import { PersistenceService } from "@/services/persistence.service";
 import {
@@ -16,8 +16,7 @@ import {
 } from "@/lib/litechat/provider-helpers";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
-// Correct import path for model-fetcher service
-import { fetchModelsForProvider } from "@/services/model-fetcher"; // Correct path
+import { fetchModelsForProvider } from "@/services/model-fetcher";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 const LAST_SELECTION_KEY = "provider:lastSelection";
@@ -116,7 +115,6 @@ export const useProviderStore = create(
           const providerConfig =
             savedProviderConfig ??
             configs.find((p) => p.id === providerToSelect);
-          // Add null check for providerConfig
           if (providerConfig) {
             const providerTypeKey =
               providerConfig.type as keyof typeof DEFAULT_MODELS;
@@ -140,10 +138,9 @@ export const useProviderStore = create(
               modelToSelect = null;
             }
           } else {
-            // If the saved provider ID doesn't exist anymore
             modelToSelect = null;
-            providerToSelect = null; // Also reset provider
-            const firstEnabled = configs.find((p) => p.isEnabled); // Find fallback again
+            providerToSelect = null;
+            const firstEnabled = configs.find((p) => p.isEnabled);
             providerToSelect = firstEnabled?.id ?? null;
           }
         }
@@ -280,83 +277,93 @@ export const useProviderStore = create(
     },
 
     updateProviderConfig: async (id, changes) => {
-      let configToSave: DbProviderConfig | null = null;
       let originalConfig: DbProviderConfig | undefined;
+      let configExists = false;
 
       set((state) => {
         const index = state.dbProviderConfigs.findIndex((p) => p.id === id);
         if (index !== -1) {
+          configExists = true;
           originalConfig = { ...state.dbProviderConfigs[index] };
-          // Ensure type safety when merging changes
           const currentConfig = state.dbProviderConfigs[index];
-          const updatedConfigData = {
+          const updatedConfigData: DbProviderConfig = {
             ...currentConfig,
             ...changes,
             updatedAt: new Date(),
           };
           state.dbProviderConfigs[index] = updatedConfigData;
-          configToSave = state.dbProviderConfigs[index];
         } else {
           console.warn(`ProviderStore: Config ${id} not found for update.`);
         }
       });
 
-      if (configToSave) {
-        // Ensure configToSave is not null before accessing properties
-        const safeConfigToSave = configToSave;
-        try {
-          await PersistenceService.saveProviderConfig(safeConfigToSave);
-          if (get().selectedProviderId === id) {
-            // Use safeConfigToSave here
-            if (!safeConfigToSave.isEnabled) {
-              const firstEnabled = get().dbProviderConfigs.find(
-                (p) => p.isEnabled,
-              );
-              get().selectProvider(firstEnabled?.id ?? null);
-            } else {
-              const currentModelId = get().selectedModelId;
-              // Use safeConfigToSave here
-              const defaultModelId =
-                getDefaultModelIdForProvider(safeConfigToSave);
-              const providerTypeKey =
-                safeConfigToSave.type as keyof typeof DEFAULT_MODELS;
-              const availableModels =
-                safeConfigToSave.fetchedModels ??
-                (DEFAULT_MODELS[providerTypeKey] || []);
-              const enabledModelIds = safeConfigToSave.enabledModels ?? [];
-              const modelsToConsider =
-                enabledModelIds.length > 0
-                  ? availableModels.filter((m) =>
-                      enabledModelIds.includes(m.id),
-                    )
-                  : availableModels;
+      if (configExists) {
+        // Fetch the potentially updated config *after* the set operation
+        const updatedConfig = get().dbProviderConfigs.find((p) => p.id === id);
 
-              const modelIsValid = modelsToConsider.some(
-                (m) => m.id === currentModelId,
-              );
-
-              if (!modelIsValid) {
-                get().selectModel(defaultModelId);
+        if (updatedConfig) {
+          // Check if it still exists after set
+          try {
+            await PersistenceService.saveProviderConfig(updatedConfig);
+            // Re-validate selection using the confirmed updatedConfig
+            if (get().selectedProviderId === id) {
+              if (!updatedConfig.isEnabled) {
+                const firstEnabled = get().dbProviderConfigs.find(
+                  (p) => p.isEnabled,
+                );
+                get().selectProvider(firstEnabled?.id ?? null);
               } else {
-                PersistenceService.saveSetting(LAST_SELECTION_KEY, {
-                  providerId: id,
-                  modelId: currentModelId,
-                });
+                const currentModelId = get().selectedModelId;
+                const defaultModelId =
+                  getDefaultModelIdForProvider(updatedConfig);
+                const providerTypeKey =
+                  updatedConfig.type as keyof typeof DEFAULT_MODELS;
+                const availableModels =
+                  updatedConfig.fetchedModels ??
+                  (DEFAULT_MODELS[providerTypeKey] || []);
+                const enabledModelIds = updatedConfig.enabledModels ?? [];
+                const modelsToConsider =
+                  enabledModelIds.length > 0
+                    ? availableModels.filter((m) =>
+                        enabledModelIds.includes(m.id),
+                      )
+                    : availableModels;
+
+                const modelIsValid = modelsToConsider.some(
+                  (m) => m.id === currentModelId,
+                );
+
+                if (!modelIsValid) {
+                  get().selectModel(defaultModelId);
+                } else {
+                  PersistenceService.saveSetting(LAST_SELECTION_KEY, {
+                    providerId: id,
+                    modelId: currentModelId,
+                  });
+                }
               }
             }
+          } catch (e) {
+            console.error("ProviderStore: Error updating provider config", e);
+            toast.error(
+              `Failed to update Provider: ${e instanceof Error ? e.message : String(e)}`,
+            );
+            // Revert state using originalConfig if save failed
+            set((state) => {
+              const index = state.dbProviderConfigs.findIndex(
+                (p) => p.id === id,
+              );
+              if (index !== -1 && originalConfig) {
+                state.dbProviderConfigs[index] = originalConfig;
+              }
+            });
+            throw e;
           }
-        } catch (e) {
-          console.error("ProviderStore: Error updating provider config", e);
-          toast.error(
-            `Failed to update Provider: ${e instanceof Error ? e.message : String(e)}`,
+        } else {
+          console.error(
+            `ProviderStore: Config ${id} disappeared unexpectedly after update attempt.`,
           );
-          set((state) => {
-            const index = state.dbProviderConfigs.findIndex((p) => p.id === id);
-            if (index !== -1 && originalConfig) {
-              state.dbProviderConfigs[index] = originalConfig;
-            }
-          });
-          throw e;
+          // Handle potential race condition or error state if needed
         }
       }
     },
@@ -465,7 +472,6 @@ export const useProviderStore = create(
             addedIds.add(modelId);
           }
         }
-        // Add type annotations for a and b
         const remaining = displayModels
           .filter((m: { id: string }) => !addedIds.has(m.id))
           .sort(
@@ -476,7 +482,6 @@ export const useProviderStore = create(
           );
         displayModels = [...orderedList, ...remaining];
       } else {
-        // Add type annotations for a and b
         displayModels.sort(
           (
             a: { name?: string; id: string },
@@ -550,7 +555,6 @@ export const useProviderStore = create(
                 addedIds.add(modelId);
               }
             }
-            // Add type annotations for a and b
             const remaining = displayModels
               .filter((m: { id: string }) => !addedIds.has(m.id))
               .sort(
@@ -561,7 +565,6 @@ export const useProviderStore = create(
               );
             displayModels = [...orderedList, ...remaining];
           } else {
-            // Add type annotations for a and b
             displayModels.sort(
               (
                 a: { name?: string; id: string },

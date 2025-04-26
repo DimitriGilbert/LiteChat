@@ -23,8 +23,8 @@ import { useVfsStore } from "@/store/vfs.store";
 import { useInputStore } from "@/store/input.store"; // Correct store
 import { cn } from "@/lib/utils";
 import type { PromptControl } from "@/types/litechat/prompt";
-// Import VfsFile only
-import type { VfsFile } from "@/types/litechat/vfs"; // Correct path
+// Import VfsFile and VfsFileObject
+import type { VfsFile, VfsFileObject } from "@/types/litechat/vfs"; // Correct path
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
 
@@ -61,20 +61,23 @@ const VfsPromptControl: React.FC = () => {
   }, [selectedFileIds, nodes]);
 
   // Map VFS nodes to VfsFileObject for InputStore
-  const mapToInputStoreFormat = useCallback((vfsNodes: VfsFile[]) => {
-    return vfsNodes.map((node) => ({
-      id: node.id,
-      name: node.name,
-      size: node.size,
-      type: node.mimeType || "application/octet-stream",
-      path: node.path,
-    }));
-  }, []);
+  const mapToInputStoreFormat = useCallback(
+    (vfsNodes: VfsFile[]): VfsFileObject[] => {
+      // Add return type
+      return vfsNodes.map((node) => ({
+        id: node.id,
+        name: node.name,
+        size: node.size,
+        type: node.mimeType || "application/octet-stream",
+        path: node.path,
+      }));
+    },
+    [],
+  );
 
   useEffect(() => {
     if (isDialogOpen) {
       const inputStoreFiles = mapToInputStoreFormat(selectedVfsNodes);
-      // Only update if the content actually differs (simple length check first)
       if (
         inputStoreFiles.length !== selectedVfsFiles.length ||
         JSON.stringify(inputStoreFiles) !== JSON.stringify(selectedVfsFiles)
@@ -82,8 +85,13 @@ const VfsPromptControl: React.FC = () => {
         setSelectedFiles(inputStoreFiles);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDialogOpen, selectedVfsNodes, setSelectedFiles]); // Removed selectedVfsFiles from deps
+  }, [
+    isDialogOpen,
+    selectedVfsNodes,
+    setSelectedFiles,
+    selectedVfsFiles,
+    mapToInputStoreFormat,
+  ]); // Add mapToInputStoreFormat
 
   const handleFileSelectConfirm = useCallback(() => {
     const inputStoreFiles = mapToInputStoreFormat(selectedVfsNodes);
@@ -94,7 +102,7 @@ const VfsPromptControl: React.FC = () => {
     );
     toast.success(`${inputStoreFiles.length} file(s) attached from VFS.`);
     setIsDialogOpen(false);
-  }, [selectedVfsNodes, setSelectedFiles, mapToInputStoreFormat]);
+  }, [selectedVfsNodes, setSelectedFiles, mapToInputStoreFormat]); // Add mapToInputStoreFormat
 
   const handleDialogClose = useCallback(() => {
     clearSelection();
@@ -188,7 +196,7 @@ const VfsPromptControl: React.FC = () => {
           </DialogClose>
           <Button
             onClick={handleFileSelectConfirm}
-            disabled={selectedVfsNodes.length === 0} // Use VFS store selection for button disable
+            disabled={selectedVfsNodes.length === 0}
           >
             Attach Selected ({selectedVfsNodes.length})
           </Button>

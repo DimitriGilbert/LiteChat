@@ -43,6 +43,7 @@ export const useModStore = create(
         ...modData,
         loadOrder: modData.loadOrder ?? Date.now(),
       };
+      // Optimistic update
       set((state) => {
         state.dbMods.push(newMod);
         state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
@@ -54,6 +55,7 @@ export const useModStore = create(
       } catch (e) {
         const errorMsg = "Failed to save new mod";
         console.error("ModStore: Error adding mod", e);
+        // Revert optimistic update
         set((state) => {
           state.dbMods = state.dbMods.filter((m) => m.id !== newId);
           state.error = errorMsg;
@@ -70,11 +72,10 @@ export const useModStore = create(
       set((state) => {
         const index = state.dbMods.findIndex((m) => m.id === id);
         if (index !== -1) {
-          originalMod = { ...state.dbMods[index] }; // Capture original state
-          // Apply changes to a temporary object first to ensure type safety
+          originalMod = { ...state.dbMods[index] };
           const updatedModData = { ...state.dbMods[index], ...changes };
-          state.dbMods[index] = updatedModData; // Assign the updated object
-          modToUpdate = state.dbMods[index]; // Reference the updated object in state
+          state.dbMods[index] = updatedModData;
+          modToUpdate = state.dbMods[index];
           if (changes.loadOrder !== undefined) {
             state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
           }
@@ -85,17 +86,15 @@ export const useModStore = create(
 
       if (modToUpdate) {
         try {
-          // Use the guaranteed valid modToUpdate reference here
           await PersistenceService.saveMod(modToUpdate);
-          toast.success(`Mod "${modToUpdate.name}" updated.`); // Safe to access name
+          toast.success(`Mod "${modToUpdate.name}" updated.`);
         } catch (e) {
           const errorMsg = "Failed to save mod update";
           console.error("ModStore: Error updating mod", e);
           set((state) => {
             const index = state.dbMods.findIndex((m) => m.id === id);
-            // Use originalMod for reverting, as modToUpdate might be stale if save failed
             if (index !== -1 && originalMod) {
-              state.dbMods[index] = originalMod; // Revert to original
+              state.dbMods[index] = originalMod;
               state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
             }
             state.error = errorMsg;
@@ -107,6 +106,7 @@ export const useModStore = create(
     },
 
     deleteDbMod: async (id) => {
+      // Get the mod details *before* modifying the state
       const modToDelete: DbMod | undefined = get().dbMods.find(
         (m: DbMod) => m.id === id,
       );
@@ -115,21 +115,23 @@ export const useModStore = create(
         return;
       }
 
+      // Optimistic UI update
       set((state) => ({
         dbMods: state.dbMods.filter((m: DbMod) => m.id !== id),
       }));
 
       try {
         await PersistenceService.deleteMod(id);
+        // Use the name fetched *before* the state update
         toast.success(`Mod "${modToDelete.name}" deleted.`);
       } catch (e) {
         const errorMsg = "Failed to delete mod";
         console.error("ModStore: Error deleting mod", e);
+        // Revert optimistic update
         set((state) => {
-          if (modToDelete) {
-            state.dbMods.push(modToDelete);
-            state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
-          }
+          // Add the mod back if it was removed optimistically
+          state.dbMods.push(modToDelete);
+          state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
           state.error = errorMsg;
         });
         toast.error(errorMsg);

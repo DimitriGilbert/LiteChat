@@ -5,7 +5,8 @@ import { toast } from "sonner";
 // Corrected import path for types, use FileSystemEntry from vfs.ts
 import type { FileSystemEntry } from "@/types/litechat/vfs"; // Correct path
 // Corrected import path for events
-import { modEvents, ModEvent } from "@/mods/events"; // Correct path for mod events
+import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
+import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent from modding types
 import JSZip from "jszip";
 // Corrected import path for utils
 import {
@@ -103,7 +104,7 @@ export const readFileOp = async (path: string): Promise<Uint8Array> => {
   const normalizedPath = normalizePath(path);
   try {
     const data = await fs.promises.readFile(normalizedPath);
-    modEvents.emit(ModEvent.VFS_FILE_READ, { path: normalizedPath });
+    emitter.emit(ModEvent.VFS_FILE_READ, { path: normalizedPath }); // Use emitter
     return data;
   } catch (err: unknown) {
     console.error(`[VFS Op] Failed to read file ${normalizedPath}:`, err);
@@ -125,7 +126,7 @@ export const writeFileOp = async (
       await createDirectoryRecursive(parentDir);
     }
     await fs.promises.writeFile(normalized, data);
-    modEvents.emit(ModEvent.VFS_FILE_WRITTEN, { path: normalized });
+    emitter.emit(ModEvent.VFS_FILE_WRITTEN, { path: normalized }); // Use emitter
   } catch (err: unknown) {
     if (
       !(
@@ -154,10 +155,10 @@ export const deleteItemOp = async (
     const fileStat = await fs.promises.stat(normalized);
     if (fileStat.isDirectory()) {
       await fs.promises.rm(normalized, { recursive });
-      modEvents.emit(ModEvent.VFS_FILE_DELETED, { path: normalized });
+      emitter.emit(ModEvent.VFS_FILE_DELETED, { path: normalized }); // Use emitter
     } else {
       await fs.promises.unlink(normalized);
-      modEvents.emit(ModEvent.VFS_FILE_DELETED, { path: normalized });
+      emitter.emit(ModEvent.VFS_FILE_DELETED, { path: normalized }); // Use emitter
     }
     toast.success(`"${basename(normalized)}" deleted.`);
   } catch (err: unknown) {

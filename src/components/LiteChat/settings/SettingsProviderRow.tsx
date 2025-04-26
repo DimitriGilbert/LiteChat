@@ -1,13 +1,13 @@
 // src/components/LiteChat/settings/SettingsProviderRow.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 // Corrected import path for types
-import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider"; // Correct path
+import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import { toast } from "sonner";
 import { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 // Corrected import paths for sub-components
-import { ProviderRowViewMode } from "./SettingsProviderRowView"; // Correct path
-import { ProviderRowEditMode } from "./SettingsProviderRowEdit"; // Correct path
+import { ProviderRowViewMode } from "./SettingsProviderRowView";
+import { ProviderRowEditMode } from "./SettingsProviderRowEdit";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 export interface ProviderRowProps {
@@ -154,6 +154,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
         enabledModels: finalEnabledModels,
         modelSortOrder: finalSortOrder,
       };
+      // Remove undefined keys before sending update
       Object.keys(finalEditData).forEach((key) => {
         if (finalEditData[key as keyof typeof finalEditData] === undefined) {
           delete finalEditData[key as keyof typeof finalEditData];
@@ -167,14 +168,16 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
       );
     } catch (error) {
       console.error("Failed to save provider update:", error);
+      // Toast handled by the store action
     } finally {
       setIsSaving(false);
     }
   }, [editData, onUpdate, provider.id, provider.name]);
 
+  // Correct the type of 'field' here
   const handleChange = useCallback(
     (
-      field: keyof DbProviderConfig,
+      field: keyof DbProviderConfig, // Use the specific keyof type
       value: string | boolean | string[] | null,
     ) => {
       setEditData((prev: Partial<DbProviderConfig>) => ({
@@ -198,10 +201,12 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
         const currentSortOrder = prev.modelSortOrder ?? [];
         let newSortOrder: string[];
         if (checked) {
+          // Add to sort order only if not already present
           newSortOrder = currentSortOrder.includes(modelId)
             ? currentSortOrder
             : [...currentSortOrder, modelId];
         } else {
+          // Remove from sort order
           newSortOrder = currentSortOrder.filter(
             (id: string) => id !== modelId,
           );
@@ -221,14 +226,18 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
       setIsDeleting(true);
       try {
         await onDelete(provider.id);
+        // Success toast handled by parent/store action
       } catch (error) {
-        setIsDeleting(false);
+        // Error toast handled by parent/store action
+        setIsDeleting(false); // Ensure state is reset on error
       }
+      // No finally needed as state is reset on error
     }
   }, [onDelete, provider.id, provider.name]);
 
   const handleFetchModels = useCallback(async () => {
     await onFetchModels(provider.id);
+    // Re-fetch available models for edit mode if it's open after fetch completes
     if (isEditing) {
       const models = getAllAvailableModelDefs(provider.id);
       models.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
@@ -241,7 +250,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   }, [getAllAvailableModelDefs, provider.id]);
 
   return (
-    <div className="border-b border-gray-700 p-4 space-y-3">
+    <div className="border-b border-border p-4 space-y-3">
       {isEditing ? (
         <ProviderRowEditMode
           providerId={provider.id}
@@ -253,7 +262,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
           isSaving={isSaving}
           onCancel={handleCancel}
           onSave={handleSave}
-          onChange={handleChange}
+          onChange={handleChange} // Pass the correctly typed handleChange
           onEnabledModelChange={handleEnabledModelChange}
           onDragEnd={handleDragEnd}
         />

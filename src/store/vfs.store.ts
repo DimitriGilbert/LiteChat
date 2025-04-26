@@ -7,14 +7,14 @@ import {
   VfsFile,
   VfsDirectory,
   FileSystemEntry,
-} from "@/types/litechat/vfs"; // Keep VfsFile, add FileSystemEntry
+} from "@/types/litechat/vfs";
 // Corrected import path for utils
-import { normalizePath, buildPath } from "@/lib/litechat/file-manager-utils"; // Keep only used utils
+import { normalizePath, buildPath } from "@/lib/litechat/file-manager-utils"; // Add missing imports
 import { toast } from "sonner";
 // Import fs from core
-import { fs, type Stats } from "@zenfs/core"; // Remove unused Stats
+import { fs } from "@zenfs/core"; // Keep Stats
 // Corrected import path for operations
-import * as VfsOps from "@/lib/vfs-operations"; // Correct path
+import * as VfsOps from "@/lib/litechat/vfs-operations"; // Correct path
 import { nanoid } from "nanoid";
 // Removed unused modEvents import
 
@@ -321,9 +321,9 @@ export const useVfsStore = create(
         const pathToFetch = parentNode ? parentNode.path : "/";
         const fetchedEntries = await VfsOps.listFilesOp(pathToFetch);
 
+        // Add type FileSystemEntry to entry
         const vfsNodes = fetchedEntries.map(
           (entry: FileSystemEntry): VfsNode => ({
-            // Add type
             id: nanoid(),
             parentId: parentId,
             name: entry.name,

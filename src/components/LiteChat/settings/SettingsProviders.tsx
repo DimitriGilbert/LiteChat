@@ -1,32 +1,33 @@
-// src/components/LiteChat/settings/settings-providers.tsx
+// src/components/LiteChat/settings/SettingsProviders.tsx
 import React, { useState, useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
-// Corrected import path for types
 import type {
   DbProviderConfig,
   DbProviderType,
-  DbApiKey, // Keep DbApiKey as it's used in AddProviderForm prop
+  DbApiKey,
 } from "@/types/litechat/provider"; // Correct path
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-// Corrected import path for sub-components
-import { ProviderRow } from "./SettingsProviderRow"; // Correct path
-import { AddProviderForm } from "./AddProviderForm"; // Correct path
-// Corrected import path for hook
-import { useChatStorage } from "@/hooks/use-chat-storage"; // Correct path
-// Corrected import path for helpers
-import { DEFAULT_MODELS } from "@/lib/litechat/provider-helpers"; // Correct path
+import { ProviderRow } from "./SettingsProviderRow";
+import { AddProviderForm } from "./AddProviderForm";
+// REMOVED incorrect import for useChatStorage
+import { DEFAULT_MODELS } from "@/lib/litechat/provider-helpers";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const SettingsProvidersComponent: React.FC = () => {
+  // Fetch actions AND data directly from ProviderStore
   const {
     addDbProviderConfig,
     updateDbProviderConfig,
     deleteDbProviderConfig,
     fetchModels,
     providerFetchStatus,
+    // Fetch data directly from the store state
+    dbProviderConfigs,
+    apiKeys,
+    isLoading,
   } = useProviderStore(
     useShallow((state) => ({
       addDbProviderConfig: state.addProviderConfig,
@@ -34,12 +35,14 @@ const SettingsProvidersComponent: React.FC = () => {
       deleteDbProviderConfig: state.deleteProviderConfig,
       fetchModels: state.fetchModels,
       providerFetchStatus: state.providerFetchStatus,
+      // Select data directly from the store state
+      dbProviderConfigs: state.dbProviderConfigs,
+      apiKeys: state.dbApiKeys, // Use dbApiKeys from state
+      isLoading: state.isLoading,
     })),
   );
-  // Use the hook correctly
-  const { providerConfigs: dbProviderConfigs, apiKeys } = useChatStorage();
-  const isLoading = dbProviderConfigs === undefined || apiKeys === undefined;
 
+  // getAllAvailableModelDefs remains the same, using data from the store state
   const getAllAvailableModelDefs = useCallback(
     (providerConfigId: string): { id: string; name: string }[] => {
       const config = (dbProviderConfigs || []).find(
@@ -55,17 +58,16 @@ const SettingsProvidersComponent: React.FC = () => {
         ? config.fetchedModels
         : getDefaultModels(config.type);
     },
-    [dbProviderConfigs],
+    [dbProviderConfigs], // Dependency is the data from the store
   );
 
   const [isAdding, setIsAdding] = useState(false);
   const handleAddNew = () => setIsAdding(true);
   const handleCancelNew = useCallback(() => setIsAdding(false), []);
 
-  // Corrected handleFetchModels signature to match ProviderRowProps
+  // handleFetchModels remains the same
   const handleFetchModels = useCallback(
     async (providerId: string): Promise<void> => {
-      // Match Promise<void>
       await fetchModels(providerId);
     },
     [fetchModels],
@@ -93,7 +95,7 @@ const SettingsProvidersComponent: React.FC = () => {
           </Button>
         ) : (
           <AddProviderForm
-            apiKeys={apiKeys || []}
+            apiKeys={apiKeys || []} // Use data from store
             onAddProvider={addDbProviderConfig}
             onCancel={handleCancelNew}
           />
@@ -114,10 +116,10 @@ const SettingsProvidersComponent: React.FC = () => {
               <ProviderRow
                 key={provider.id}
                 provider={provider}
-                apiKeys={apiKeys || []}
+                apiKeys={apiKeys || []} // Use data from store
                 onUpdate={updateDbProviderConfig}
                 onDelete={deleteDbProviderConfig}
-                onFetchModels={handleFetchModels} // Pass corrected handler
+                onFetchModels={handleFetchModels}
                 fetchStatus={providerFetchStatus[provider.id] || "idle"}
                 getAllAvailableModelDefs={getAllAvailableModelDefs}
               />

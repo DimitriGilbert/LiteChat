@@ -1,7 +1,30 @@
 // src/components/LiteChat/settings/SettingsProviderRowView.tsx
 import React from "react";
-import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider"; // Correct path
+// Corrected import path for types
+import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Edit2Icon,
+  Trash2Icon,
+  Loader2,
+  RefreshCwIcon,
+  CheckIcon,
+  AlertCircleIcon,
+} from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+// Corrected import path for helpers - Changed from provider-helpers to litechat
+import {
+  requiresApiKey,
+  requiresBaseURL,
+  supportsModelFetching,
+} from "@/lib/litechat/provider-helpers"; // Corrected path
+import { cn } from "@/lib/utils";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 
@@ -16,41 +39,241 @@ interface ProviderRowViewModeProps {
   getAllAvailableModelDefs: () => { id: string; name: string }[];
 }
 
-export const ProviderRowViewMode: React.FC<ProviderRowViewModeProps> = ({
+// Renamed component function
+const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   provider,
+  apiKeys,
   onEdit,
   onDelete,
+  onFetchModels,
+  fetchStatus,
   isDeleting,
+  getAllAvailableModelDefs,
 }) => {
-  // Placeholder implementation
+  const needsKey = requiresApiKey(provider.type);
+  const needsURL = requiresBaseURL(provider.type);
+  const canFetch = supportsModelFetching(provider.type);
+  const isFetchButtonDisabled = fetchStatus === "fetching" || isDeleting;
+  const isEditButtonDisabled = isDeleting || fetchStatus === "fetching";
+  const isDeleteButtonDisabled = isDeleting || fetchStatus === "fetching";
+
+  const allAvailableModels = getAllAvailableModelDefs();
+  const enabledModelsSet = new Set(provider.enabledModels ?? []);
+
+  const orderedDisplayModels = (
+    provider.modelSortOrder ??
+    provider.enabledModels ??
+    []
+  )
+    // Add explicit type for modelId
+    .map((modelId: string) => {
+      if (!enabledModelsSet.has(modelId)) return null;
+      const modelDef = allAvailableModels.find((m) => m.id === modelId);
+      return { id: modelId, name: modelDef?.name || modelId };
+    })
+    .filter((m): m is { id: string; name: string } => m !== null);
+
+  const apiKeyLinked = provider.apiKeyId
+    ? apiKeys.some((k) => k.id === provider.apiKeyId)
+    : false;
+  const showKeyWarning = needsKey && !apiKeyLinked;
+
   return (
-    <div className="flex justify-between items-center p-2 border rounded mb-2 bg-card">
-      <div>
-        <p className="font-semibold">{provider.name}</p>
-        <p className="text-xs text-muted-foreground">Type: {provider.type}</p>
-        <p className="text-xs text-muted-foreground">
-          Enabled: {provider.isEnabled ? "Yes" : "No"}
-        </p>
-        <p className="text-xs text-red-500">(Placeholder View)</p>
+    <div className="space-y-2">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3 min-w-0">
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger>
+                <span
+                  className={cn(
+                    "h-2.5 w-2.5 rounded-full flex-shrink-0 block",
+                    fetchStatus === "error"
+                      ? "bg-destructive animate-pulse"
+                      : provider.isEnabled
+                        ? "bg-green-500"
+                        : "bg-muted-foreground",
+                  )}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {fetchStatus === "error"
+                  ? "Error fetching models"
+                  : provider.isEnabled
+                    ? "Enabled"
+                    : "Disabled"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <h3 className="font-semibold text-lg text-card-foreground truncate">
+            {provider.name}
+          </h3>
+          <span className="text-sm text-muted-foreground flex-shrink-0">
+            ({provider.type})
+          </span>
+          {showKeyWarning && (
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger>
+                  <AlertCircleIcon className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p>API Key required but none linked/found.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+        <div className="flex items-center space-x-1 flex-shrink-0">
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onEdit}
+                  disabled={isEditButtonDisabled}
+                  aria-label="Edit provider"
+                  className="h-8 w-8"
+                >
+                  <Edit2Icon className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Edit</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onDelete}
+                  disabled={isDeleteButtonDisabled}
+                  className="text-destructive hover:text-destructive/80 h-8 w-8"
+                  aria-label="Delete provider"
+                >
+                  {isDeleting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2Icon className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Delete</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
-      <div className="flex gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onEdit}
-          disabled={isDeleting}
-        >
-          Edit
-        </Button>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={onDelete}
-          disabled={isDeleting}
-        >
-          {isDeleting ? "Deleting..." : "Delete"}
-        </Button>
+
+      {/* Details */}
+      <div className="text-sm text-muted-foreground mt-1 space-y-1 pl-5">
+        {needsKey && (
+          <div>
+            API Key:{" "}
+            {provider.apiKeyId ? (
+              apiKeyLinked ? (
+                <span className="text-green-400">
+                  {apiKeys.find((k) => k.id === provider.apiKeyId)?.name ||
+                    "Linked (Unnamed Key)"}
+                </span>
+              ) : (
+                <span className="text-destructive">Linked Key Missing!</span>
+              )
+            ) : (
+              <span className="text-amber-400">Not Linked</span>
+            )}
+          </div>
+        )}
+        {needsURL && <div>Base URL: {provider.baseURL || "Not Set"}</div>}
+        <div>
+          Auto-fetch Models:{" "}
+          {provider.autoFetchModels ? (
+            <span className="text-green-400">Enabled</span>
+          ) : (
+            <span className="text-muted-foreground/80">Disabled</span>
+          )}
+        </div>
+
+        {/* Enabled & Ordered Models List */}
+        {orderedDisplayModels.length > 0 && (
+          <div className="pt-1">
+            <span className="font-medium text-card-foreground">
+              Enabled & Ordered Models ({orderedDisplayModels.length}):
+            </span>
+            <ScrollArea className="h-16 mt-1 rounded-md border border-border p-2 bg-background/50 text-xs">
+              {orderedDisplayModels.map((model) => (
+                <div key={model.id} className="truncate" title={model.name}>
+                  {model.name}
+                </div>
+              ))}
+            </ScrollArea>
+          </div>
+        )}
+
+        {/* All Available Models List */}
+        {allAvailableModels.length > 0 && (
+          <div className="pt-1">
+            <span className="font-medium text-card-foreground">
+              All Available Models ({allAvailableModels.length}):
+            </span>
+            <ScrollArea className="h-20 mt-1 rounded-md border border-border p-2 bg-background/50 text-xs">
+              {allAvailableModels
+                .slice() // Create a copy before sorting
+                .sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id))
+                // Add explicit type for m
+                .map((m: { id: string; name?: string }) => (
+                  <div key={m.id} className="truncate" title={m.name || m.id}>
+                    {m.name || m.id}
+                  </div>
+                ))}
+            </ScrollArea>
+            {provider.fetchedModels && (
+              <span className="text-xs text-muted-foreground/80">
+                Last fetched:{" "}
+                {provider.modelsLastFetchedAt
+                  ? provider.modelsLastFetchedAt.toLocaleString()
+                  : "Never"}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Fetch Models Button */}
+        {canFetch && (
+          <div className="pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onFetchModels}
+              disabled={isFetchButtonDisabled}
+              className="text-xs h-7 px-2"
+            >
+              {fetchStatus === "fetching" && (
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              )}
+              {fetchStatus === "success" && (
+                <CheckIcon className="h-3 w-3 mr-1 text-green-500" />
+              )}
+              {fetchStatus === "error" && (
+                <AlertCircleIcon className="h-3 w-3 mr-1 text-destructive" />
+              )}
+              {fetchStatus === "idle" && (
+                <RefreshCwIcon className="h-3 w-3 mr-1" />
+              )}
+              {fetchStatus === "fetching"
+                ? "Fetching..."
+                : fetchStatus === "error"
+                  ? "Fetch Failed"
+                  : "Fetch Models Now"}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
 };
+
+// Correctly export the memoized component
+export const ProviderRowViewMode = React.memo(ProviderRowViewModeComponent);
