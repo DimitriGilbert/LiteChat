@@ -2,6 +2,11 @@
 import { create } from "zustand";
 import type { Interaction } from "@/types/litechat/interaction";
 import { PersistenceService } from "@/services/persistence.service";
+// useSettingsStore import removed as throttling is moved to UI
+
+// Throttling state removed
+// const chunkBuffers: Record<string, string> = {};
+// const throttleTimeouts: Record<string, NodeJS.Timeout> = {};
 
 interface InteractionState {
   interactions: Interaction[];
@@ -17,12 +22,11 @@ interface InteractionActions {
   _updateInteractionInState: (
     id: string,
     updates: Partial<Omit<Interaction, "id" | "index">>,
-  ) => void; // Renamed for clarity, still sync state update
-  appendInteractionResponseChunk: (id: string, chunk: string) => void;
+  ) => void;
+  appendInteractionResponseChunk: (id: string, chunk: string) => void; // Reverted to direct update
   _removeInteractionFromState: (id: string) => void;
   // --- Async Actions (Involving Persistence) ---
   addInteractionAndPersist: (
-    // Renamed for clarity
     interactionData: Omit<Interaction, "index">,
   ) => Promise<Interaction>;
   updateInteractionAndPersist: (interaction: Interaction) => Promise<void>;
@@ -83,7 +87,7 @@ export const useInteractionStore = create<
       console.warn(
         `InteractionStore: Interaction ${interaction.id} already exists in state.`,
       );
-      return {}; // No change
+      return {};
     });
   },
 
@@ -94,7 +98,6 @@ export const useInteractionStore = create<
         const updatedInteraction = {
           ...state.interactions[index],
           ...updates,
-          // Ensure metadata is merged correctly
           ...(updates.metadata && {
             metadata: {
               ...state.interactions[index].metadata,
@@ -106,15 +109,15 @@ export const useInteractionStore = create<
         newInteractions[index] = updatedInteraction;
         return { interactions: newInteractions };
       } else {
-        // Log clearly if not found during update attempt
         console.warn(
           `InteractionStore: Interaction ${id} not found for sync state update.`,
         );
-        return {}; // No state change if not found
+        return {};
       }
     });
   },
 
+  // --- Direct Chunk Appending (No Throttling Here) ---
   appendInteractionResponseChunk: (id, chunk) => {
     set((state) => {
       const index = state.interactions.findIndex(
@@ -130,19 +133,17 @@ export const useInteractionStore = create<
         newInteractions[index] = updatedInteraction;
         return { interactions: newInteractions };
       } else {
-        // Don't warn if simply not streaming, only if interaction exists but isn't streaming
         const interactionExists = state.interactions.find((i) => i.id === id);
         if (interactionExists) {
           console.warn(
             `InteractionStore: Tried to append chunk to non-streaming interaction ${id} (Status: ${interactionExists.status})`,
           );
         } else {
-          // This might happen if the update arrives before the add state is fully processed
           console.warn(
             `InteractionStore: Interaction ${id} not found for appending chunk.`,
           );
         }
-        return {}; // No change
+        return {};
       }
     });
   },
@@ -169,23 +170,20 @@ export const useInteractionStore = create<
       parentId: parentId,
     };
 
-    // Add to state first
     get()._addInteractionToState(newInteraction);
 
-    // Then persist
     try {
       await PersistenceService.saveInteraction(newInteraction);
       return newInteraction;
     } catch (e) {
       console.error("InteractionStore: Error persisting added interaction", e);
-      get()._removeInteractionFromState(newInteraction.id); // Revert state add
+      get()._removeInteractionFromState(newInteraction.id);
       set({ error: "Failed to save interaction" });
       throw e;
     }
   },
 
   updateInteractionAndPersist: async (interaction) => {
-    // State should have been updated synchronously before calling this
     try {
       await PersistenceService.saveInteraction({ ...interaction });
     } catch (e) {
@@ -194,7 +192,6 @@ export const useInteractionStore = create<
         e,
       );
       set({ error: "Failed to save final interaction state" });
-      // Consider how to handle UI/state if final save fails (e.g., show error on the interaction card)
       throw e;
     }
   },
@@ -205,13 +202,13 @@ export const useInteractionStore = create<
     const interactionCopy = { ...interactionToDelete };
 
     get()._removeInteractionFromState(id);
-    get()._removeStreamingId(id);
+    get()._removeStreamingId(id); // Call this to update streaming state
 
     try {
       await PersistenceService.deleteInteraction(id);
     } catch (e) {
       console.error("InteractionStore: Error deleting interaction", e);
-      get()._addInteractionToState(interactionCopy); // Revert state
+      get()._addInteractionToState(interactionCopy);
       if (interactionCopy.status === "STREAMING") {
         get()._addStreamingId(id);
       }
@@ -224,6 +221,7 @@ export const useInteractionStore = create<
   setCurrentConversationId: (id) => {
     if (get().currentConversationId !== id) {
       console.log(`InteractionStore: Setting current conversation ID to ${id}`);
+      // Throttling state removed, no need to clear here
       if (id) {
         get().loadInteractions(id);
       } else {
@@ -237,6 +235,7 @@ export const useInteractionStore = create<
   },
   clearInteractions: () => {
     console.log("InteractionStore: Clearing interactions.");
+    // Throttling state removed, no need to clear here
     set({
       interactions: [],
       streamingInteractionIds: [],
@@ -280,6 +279,7 @@ export const useInteractionStore = create<
     });
   },
   _removeStreamingId: (id) => {
+    // Throttling state removed
     set((state) => {
       if (state.streamingInteractionIds.includes(id)) {
         const newStreamingIds = state.streamingInteractionIds.filter(

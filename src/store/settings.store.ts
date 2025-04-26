@@ -13,7 +13,8 @@ interface SettingsState {
   presencePenalty: number | null;
   frequencyPenalty: number | null;
   enableAdvancedSettings: boolean;
-  enableStreamingMarkdown: boolean; // New setting
+  enableStreamingMarkdown: boolean;
+  streamingRenderFPS: number; // Renamed state
 }
 
 interface SettingsActions {
@@ -26,11 +27,13 @@ interface SettingsActions {
   setPresencePenalty: (penalty: number | null) => void;
   setFrequencyPenalty: (penalty: number | null) => void;
   setEnableAdvancedSettings: (enabled: boolean) => void;
-  setEnableStreamingMarkdown: (enabled: boolean) => void; // New action
+  setEnableStreamingMarkdown: (enabled: boolean) => void;
+  setStreamingRenderFPS: (fps: number) => void; // Renamed action
   loadSettings: () => Promise<void>;
 }
 
 const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant.`;
+const DEFAULT_STREAMING_FPS = 30; // Default FPS target
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set) => ({
@@ -44,7 +47,8 @@ export const useSettingsStore = create(
     presencePenalty: 0.0,
     frequencyPenalty: 0.0,
     enableAdvancedSettings: true,
-    enableStreamingMarkdown: true, // Default to true
+    enableStreamingMarkdown: true,
+    streamingRenderFPS: DEFAULT_STREAMING_FPS, // Initialize with FPS
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -86,10 +90,16 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("enableAdvancedSettings", enabled);
     },
 
-    // New action implementation
     setEnableStreamingMarkdown: (enabled) => {
       set({ enableStreamingMarkdown: enabled });
       PersistenceService.saveSetting("enableStreamingMarkdown", enabled);
+    },
+
+    // Action for FPS setting
+    setStreamingRenderFPS: (fps) => {
+      const clampedFps = Math.max(1, Math.min(60, fps)); // Clamp between 1 and 60 FPS
+      set({ streamingRenderFPS: clampedFps });
+      PersistenceService.saveSetting("streamingRenderFPS", clampedFps); // Use new key
     },
 
     loadSettings: async () => {
@@ -104,7 +114,8 @@ export const useSettingsStore = create(
           frequencyPenalty,
           systemPrompt,
           enableAdvanced,
-          enableStreamingMd, // Load new setting
+          enableStreamingMd,
+          streamingFps, // Load FPS setting
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -127,9 +138,13 @@ export const useSettingsStore = create(
             "enableAdvancedSettings",
             true,
           ),
-          PersistenceService.loadSetting<boolean>( // Load new setting
+          PersistenceService.loadSetting<boolean>(
             "enableStreamingMarkdown",
-            true, // Default value
+            true,
+          ),
+          PersistenceService.loadSetting<number>( // Load FPS setting
+            "streamingRenderFPS", // Use new key
+            DEFAULT_STREAMING_FPS, // Default FPS value
           ),
         ]);
 
@@ -143,7 +158,8 @@ export const useSettingsStore = create(
           frequencyPenalty,
           globalSystemPrompt: systemPrompt,
           enableAdvancedSettings: enableAdvanced,
-          enableStreamingMarkdown: enableStreamingMd, // Set loaded value
+          enableStreamingMarkdown: enableStreamingMd,
+          streamingRenderFPS: streamingFps, // Set loaded FPS value
         });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);

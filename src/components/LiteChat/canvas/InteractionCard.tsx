@@ -15,42 +15,48 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useMarkdownParser } from "@/lib/litechat/useMarkdownParser"; // Import the hook
+// Import the new parser hook and types
+import {
+  useMarkdownParser,
+  type ParsedContent,
+  type CodeBlockData,
+} from "@/lib/litechat/useMarkdownParser";
+// Import the new CodeBlockRenderer
+import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
+import { memo } from "react";
 
 interface InteractionCardProps {
-  interaction: Interaction; // This should be the ASSISTANT interaction
-  allInteractionsInGroup: Interaction[]; // All interactions with the same index
+  interaction: Interaction;
+  allInteractionsInGroup: Interaction[];
   onRegenerate?: (id: string) => void;
   className?: string;
 }
 
-export const InteractionCard: React.FC<InteractionCardProps> = ({
-  interaction, // Expecting the assistant interaction here
+const InteractionCardComponent: React.FC<InteractionCardProps> = ({
+  interaction,
   allInteractionsInGroup,
   onRegenerate,
   className,
 }) => {
-  const [revisionIndex, setRevisionIndex] = useState(0); // 0 is the latest
+  const [revisionIndex, setRevisionIndex] = useState(0);
 
-  // Find all assistant revisions for the current interaction's index
   const revisions = useMemo(() => {
     return allInteractionsInGroup
       .filter(
         (i) =>
-          i.type === "message.user_assistant" && // Only assistant parts
+          i.type === "message.user_assistant" &&
           i.status !== "STREAMING" &&
-          i.response !== null, // Ensure it's an assistant response
+          i.response !== null,
       )
       .sort(
         (a, b) => (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0),
-      ); // Sort descending by time (latest first)
+      );
   }, [allInteractionsInGroup]);
 
-  // The interaction currently being displayed (based on revisionIndex)
-  const displayedInteraction = revisions[revisionIndex] || interaction; // Fallback
+  const displayedInteraction = revisions[revisionIndex] || interaction;
 
-  // Parse the Markdown content
-  const renderedHtml = useMarkdownParser(
+  // Use the new parser hook
+  const parsedContent: ParsedContent = useMarkdownParser(
     typeof displayedInteraction.response === "string"
       ? displayedInteraction.response
       : null,
@@ -59,17 +65,16 @@ export const InteractionCard: React.FC<InteractionCardProps> = ({
   const canRegenerate =
     displayedInteraction.status === "COMPLETED" &&
     typeof onRegenerate === "function" &&
-    revisionIndex === 0; // Only allow regenerating the latest revision
+    revisionIndex === 0;
 
   const handleRegenerateClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onRegenerate) {
-      // We need the ID of the *user* interaction that prompted this response
       const userInteraction = allInteractionsInGroup.find(
         (i) => i.type === "message.user_assistant" && i.prompt !== null,
       );
       if (userInteraction) {
-        onRegenerate(userInteraction.id); // Regenerate based on the user prompt interaction ID
+        onRegenerate(userInteraction.id);
       } else {
         console.error("Could not find user interaction to regenerate from.");
       }
@@ -97,7 +102,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = ({
         className,
       )}
     >
-      {/* Header Info - Simplified for Assistant Response */}
+      {/* Header remains the same */}
       <div className="text-xs text-muted-foreground mb-1 flex justify-between items-center">
         <span>
           Assistant | {displayedInteraction.status}
@@ -107,9 +112,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = ({
             </span>
           )}
         </span>
-        {/* Actions (Regenerate, Revisions) - Positioned top-right */}
         <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1">
-          {/* Revision Controls */}
           {hasRevisions && (
             <div className="flex items-center border border-border rounded bg-background/50">
               <TooltipProvider delayDuration={100}>
@@ -151,7 +154,6 @@ export const InteractionCard: React.FC<InteractionCardProps> = ({
               </TooltipProvider>
             </div>
           )}
-          {/* Regenerate Button */}
           {canRegenerate && (
             <TooltipProvider delayDuration={100}>
               <Tooltip>
@@ -173,13 +175,30 @@ export const InteractionCard: React.FC<InteractionCardProps> = ({
         </div>
       </div>
 
-      {/* Response Content - Rendered as HTML */}
-      <div
-        className="text-sm markdown-content" // Add markdown-content class
-        dangerouslySetInnerHTML={{ __html: renderedHtml }}
-      />
+      {/* Render mixed content */}
+      <div className="text-sm markdown-content">
+        {parsedContent.map((part, index) => {
+          console.log(`[InteractionCard] Rendering part ${index}:`, part); // Log each part
+          if (typeof part === "string") {
+            // Render HTML string parts
+            return (
+              <div key={index} dangerouslySetInnerHTML={{ __html: part }} />
+            );
+          } else if (part.type === "code") {
+            // Render CodeBlockRenderer for code parts
+            return (
+              <CodeBlockRenderer
+                key={index}
+                lang={part.lang}
+                code={part.code}
+              />
+            );
+          }
+          return null;
+        })}
+      </div>
 
-      {/* Error Display */}
+      {/* Error Display remains the same */}
       {displayedInteraction.status === "ERROR" &&
         displayedInteraction.metadata?.error && (
           <div className="mt-2 flex items-center gap-1 text-xs text-destructive">
@@ -190,3 +209,5 @@ export const InteractionCard: React.FC<InteractionCardProps> = ({
     </div>
   );
 };
+
+export const InteractionCard = memo(InteractionCardComponent);

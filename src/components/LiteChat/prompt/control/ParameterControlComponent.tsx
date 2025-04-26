@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/control/ParameterControlComponent.tsx
-import React, { useCallback } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
@@ -29,19 +29,32 @@ export const ParameterControlComponent: React.FC<
     setFrequencyPenalty,
   } = useSettingsStore(
     useShallow((state) => ({
-      temperature: state.temperature, // Now exists
-      setTemperature: state.setTemperature, // Now exists
-      topP: state.topP, // Now exists
-      setTopP: state.setTopP, // Now exists
-      maxTokens: state.maxTokens, // Now exists
-      setMaxTokens: state.setMaxTokens, // Now exists
-      topK: state.topK, // Now exists
-      setTopK: state.setTopK, // Now exists
-      presencePenalty: state.presencePenalty, // Now exists
-      setPresencePenalty: state.setPresencePenalty, // Now exists
-      frequencyPenalty: state.frequencyPenalty, // Now exists
-      setFrequencyPenalty: state.setFrequencyPenalty, // Now exists
+      temperature: state.temperature,
+      setTemperature: state.setTemperature,
+      topP: state.topP,
+      setTopP: state.setTopP,
+      maxTokens: state.maxTokens,
+      setMaxTokens: state.setMaxTokens,
+      topK: state.topK,
+      setTopK: state.setTopK,
+      presencePenalty: state.presencePenalty,
+      setPresencePenalty: state.setPresencePenalty,
+      frequencyPenalty: state.frequencyPenalty,
+      setFrequencyPenalty: state.setFrequencyPenalty,
     })),
+  );
+
+  const [localTemp, setLocalTemp] = useState(temperature);
+  const [localTopP, setLocalTopP] = useState(topP ?? 1.0);
+  const [localPresence, setLocalPresence] = useState(presencePenalty ?? 0.0);
+  const [localFrequency, setLocalFrequency] = useState(frequencyPenalty ?? 0.0);
+
+  useEffect(() => setLocalTemp(temperature), [temperature]);
+  useEffect(() => setLocalTopP(topP ?? 1.0), [topP]);
+  useEffect(() => setLocalPresence(presencePenalty ?? 0.0), [presencePenalty]);
+  useEffect(
+    () => setLocalFrequency(frequencyPenalty ?? 0.0),
+    [frequencyPenalty],
   );
 
   const handleNumberInputChange = useCallback(
@@ -50,14 +63,27 @@ export const ParameterControlComponent: React.FC<
       e: React.ChangeEvent<HTMLInputElement>,
     ) => {
       const value = e.target.value;
-      setter(value === "" ? null : parseInt(value, 10) || null);
+      const numValue = value === "" ? null : parseInt(value, 10);
+      if (value === "" || (!isNaN(numValue!) && numValue !== null)) {
+        setter(numValue);
+      }
     },
     [],
   );
 
-  const handleSliderChange = useCallback(
-    (setter: (value: number | null) => void, value: number[]) => {
+  const handleSliderVisualChange = useCallback(
+    (setter: React.Dispatch<React.SetStateAction<number>>, value: number[]) => {
       setter(value[0]);
+    },
+    [],
+  );
+
+  // Correctly type the setter based on whether it accepts null or not
+  const handleSliderCommit = useCallback(
+    <T extends number | null>(setter: (value: T) => void, value: number[]) => {
+      // The slider always provides a number, so value[0] is safe
+      // We cast to T to satisfy the specific setter's requirement (number or number | null)
+      setter(value[0] as T);
     },
     [],
   );
@@ -66,28 +92,30 @@ export const ParameterControlComponent: React.FC<
     <div className={cn("space-y-4 p-4 w-80", className)}>
       <div className="space-y-1.5">
         <Label htmlFor="popover-temperature" className="text-xs">
-          Temperature ({temperature.toFixed(2)})
+          Temperature ({localTemp.toFixed(2)})
         </Label>
         <Slider
           id="popover-temperature"
           min={0}
           max={1}
           step={0.01}
-          value={[temperature]}
-          onValueChange={(value) => setTemperature(value[0])}
+          value={[localTemp]}
+          onValueChange={(v) => handleSliderVisualChange(setLocalTemp, v)}
+          onValueCommit={(v) => handleSliderCommit(setTemperature, v)}
         />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="popover-top-p" className="text-xs">
-          Top P ({(topP ?? 1.0).toFixed(2)})
+          Top P ({localTopP.toFixed(2)})
         </Label>
         <Slider
           id="popover-top-p"
           min={0}
           max={1}
           step={0.01}
-          value={[topP ?? 1.0]}
-          onValueChange={(value) => handleSliderChange(setTopP, value)}
+          value={[localTopP]}
+          onValueChange={(v) => handleSliderVisualChange(setLocalTopP, v)}
+          onValueCommit={(v) => handleSliderCommit(setTopP, v)}
         />
       </div>
       <div className="grid grid-cols-2 gap-4 items-end">
@@ -122,32 +150,30 @@ export const ParameterControlComponent: React.FC<
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="popover-presence-penalty" className="text-xs">
-          Presence Penalty ({(presencePenalty ?? 0.0).toFixed(2)})
+          Presence Penalty ({localPresence.toFixed(2)})
         </Label>
         <Slider
           id="popover-presence-penalty"
           min={-2}
           max={2}
           step={0.01}
-          value={[presencePenalty ?? 0.0]}
-          onValueChange={(value) =>
-            handleSliderChange(setPresencePenalty, value)
-          }
+          value={[localPresence]}
+          onValueChange={(v) => handleSliderVisualChange(setLocalPresence, v)}
+          onValueCommit={(v) => handleSliderCommit(setPresencePenalty, v)}
         />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="popover-frequency-penalty" className="text-xs">
-          Frequency Penalty ({(frequencyPenalty ?? 0.0).toFixed(2)})
+          Frequency Penalty ({localFrequency.toFixed(2)})
         </Label>
         <Slider
           id="popover-frequency-penalty"
           min={-2}
           max={2}
           step={0.01}
-          value={[frequencyPenalty ?? 0.0]}
-          onValueChange={(value) =>
-            handleSliderChange(setFrequencyPenalty, value)
-          }
+          value={[localFrequency]}
+          onValueChange={(v) => handleSliderVisualChange(setLocalFrequency, v)}
+          onValueCommit={(v) => handleSliderCommit(setFrequencyPenalty, v)}
         />
       </div>
     </div>
