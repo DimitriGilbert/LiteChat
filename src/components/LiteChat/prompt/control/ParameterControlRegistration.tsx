@@ -40,8 +40,8 @@ export const useParameterControlRegistration = () => {
   React.useEffect(() => {
     const control: PromptControl = {
       id: "core-parameter-control",
-      status: () => "ready",
-      trigger: () => (
+      // Removed status property
+      triggerRenderer: () => (
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -75,7 +75,8 @@ export const useParameterControlRegistration = () => {
           params.presence_penalty = latestSettings.presencePenalty;
         if (latestSettings.frequencyPenalty !== 0.0)
           params.frequency_penalty = latestSettings.frequencyPenalty;
-        return Object.keys(params).length > 0 ? params : null;
+        // Return undefined instead of null if empty
+        return Object.keys(params).length > 0 ? params : undefined;
       },
       order: 20, // Example order
     };

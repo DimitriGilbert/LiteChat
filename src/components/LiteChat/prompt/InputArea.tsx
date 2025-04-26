@@ -1,8 +1,18 @@
 // src/components/LiteChat/prompt/InputArea.tsx
 import React from "react";
-import type { InputAreaProps } from "@/types/litechat/prompt";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils"; // Import cn for potential class merging
+
+// Define the props interface directly within the component file
+interface InputAreaProps {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  disabled?: boolean;
+  placeholder?: string;
+  // Allow any other props to be passed down
+  [key: string]: any;
+}
 
 export const InputArea: React.FC<InputAreaProps> = ({
   value,

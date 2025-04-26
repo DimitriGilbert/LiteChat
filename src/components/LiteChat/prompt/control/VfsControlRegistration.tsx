@@ -230,15 +230,20 @@ export const useVfsControlRegistration = () => {
   useEffect(() => {
     const control: PromptControl = {
       id: CONTROL_ID,
-      status: () => "ready",
-      trigger: () => <VfsPromptControl />,
+      // Removed status property
+      triggerRenderer: () => <VfsPromptControl />,
       show: () => enableVfs,
       getMetadata: () => {
         const selected = useInputStore.getState().selectedVfsFiles;
-        if (selected.length === 0) return null;
-        return {
-          attachedVfsFiles: selected.map((f) => ({ id: f.id, path: f.path })),
-        };
+        // Return undefined instead of null
+        if (selected.length === 0) return undefined;
+        // Filter out files without a path before returning metadata
+        const validFiles = selected
+          .filter((f): f is typeof f & { path: string } => !!f.path)
+          .map((f) => ({ id: f.id, path: f.path }));
+        return validFiles.length > 0
+          ? { attachedVfsFiles: validFiles }
+          : undefined;
       },
       clearOnSubmit: () => {
         // Clear InputStore selection unconditionally after submit

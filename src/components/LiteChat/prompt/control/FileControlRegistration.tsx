@@ -44,8 +44,8 @@ export const useFileControlRegistration = () => {
   React.useEffect(() => {
     const control: PromptControl = {
       id: "core-file-control",
-      status: () => "ready",
-      trigger: () => (
+      // Removed status property
+      triggerRenderer: () => (
         <>
           {/* Hidden file input */}
           <input
@@ -66,6 +66,7 @@ export const useFileControlRegistration = () => {
           >
             <PaperclipIcon className="h-5 w-5" />
           </Button>
+          modelpro
         </>
       ),
       // No separate renderer needed, PromptForm handles display
@@ -73,7 +74,8 @@ export const useFileControlRegistration = () => {
       getMetadata: () => {
         // Provide count as metadata, actual files handled by PromptForm/Wrapper
         const count = useInputStore.getState().attachedFiles.length;
-        return count > 0 ? { attachedFileCount: count } : null;
+        // Return undefined instead of null
+        return count > 0 ? { attachedFileCount: count } : undefined;
       },
       clearOnSubmit: () => {
         clearAttachedFiles(); // Use action from store
@@ -84,7 +86,7 @@ export const useFileControlRegistration = () => {
     const unregister = register(control);
     return unregister;
     // Re-register if actions change (unlikely but good practice)
-  }, [register, addAttachedFile, clearAttachedFiles]);
+  }, [register, addAttachedFile, clearAttachedFiles, handleFileChange]);
 
   return null; // This hook doesn't render anything itself
 };

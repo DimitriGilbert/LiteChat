@@ -1,48 +1,20 @@
 // src/components/LiteChat/file-manager/FileManager.tsx
 import React, { useState, useEffect, useCallback, useRef, memo } from "react";
 import { useVfsStore } from "@/store/vfs.store";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Trash2,
-  Upload,
-  FolderPlus,
-  FolderUp,
-  RefreshCw,
-  Check,
-  X,
-  Edit2,
-  Download,
-  Loader2,
-  HomeIcon,
-} from "lucide-react";
+// Removed unused imports: Button, Input, ScrollArea, Table components, Tooltip components
+// Removed unused imports: Checkbox, Lucide icons
 import { useShallow } from "zustand/react/shallow";
-import { VfsFile, VfsNode } from "@/types/litechat/vfs";
+// Removed unused import: VfsFile
+import { VfsNode } from "@/types/litechat/vfs";
+// Removed unused import: formatBytes
 import {
-  formatBytes,
   dirname,
   basename,
-  buildPath,
-  normalizePath,
+  // Removed unused import: buildPath
+  // Removed unused import: normalizePath
 } from "@/lib/litechat/file-manager-utils";
-import { getFileIcon } from "./Utils";
-import { cn } from "@/lib/utils";
+// Removed unused import: getFileIcon
+// Removed unused import: cn
 import { FileManagerTable } from "./FileManagerTable";
 import { FileManagerToolbar } from "./FileManagerToolbar";
 import { CloneDialog } from "./CloneDialog";
@@ -57,7 +29,7 @@ export const FileManager = memo(() => {
     nodes,
     childrenMap,
     currentParentId,
-    selectedFileIds,
+    // Removed unused state: selectedFileIds
     loading, // Global VFS loading (init, major fetches)
     error,
     fetchNodes,
@@ -65,13 +37,12 @@ export const FileManager = memo(() => {
     uploadFiles,
     deleteNodes,
     renameNode,
-    selectFile,
-    deselectFile,
+    // Removed unused actions: selectFile, deselectFile
     setCurrentPath,
     initializeVFS,
     rootId,
     fs: fsInstance,
-    _setOperationLoading, // Action to set operation loading state
+    // Removed unused action: _setOperationLoading
     _setError, // Action to set error state
   } = useVfsStore(
     useShallow((state) => ({
@@ -104,9 +75,7 @@ export const FileManager = memo(() => {
   const [newFolderName, setNewFolderName] = useState("");
   const [checkedPaths, setCheckedPaths] = useState<Set<string>>(new Set());
   const [isOperationLoading, setIsOperationLoading] = useState(false); // Local op loading
-  const [gitRepoStatus, setGitRepoStatus] = useState<Record<string, boolean>>(
-    {},
-  );
+  const [gitRepoStatus] = useState<Record<string, boolean>>({});
   const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
   const [cloneRepoUrl, setCloneRepoUrl] = useState("");
   const [cloneBranch, setCloneBranch] = useState("");
@@ -328,7 +297,13 @@ export const FileManager = memo(() => {
   const handleDelete = useCallback(
     async (entry: VfsNode) => {
       const confirmation = window.confirm(
-        `Delete ${entry.type} "${entry.name}"?${entry.type === "folder" ? "\n\nWARNING: This will delete all contents inside!" : ""}`,
+        `Delete ${entry.type} "${entry.name}"?${
+          entry.type === "folder"
+            ? `
+
+WARNING: This will delete all contents inside`
+            : ""
+        }`,
       );
       if (confirmation) {
         await runOperation(() => deleteNodes([entry.id]));

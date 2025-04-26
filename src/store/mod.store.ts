@@ -3,10 +3,8 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type {
   DbMod,
-  ModInstance,
   ModState as ModStoreState,
   ModActions as ModStoreActions,
-  CustomSettingTab,
 } from "@/types/litechat/modding"; // Correct path
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
@@ -67,15 +65,15 @@ export const useModStore = create(
 
     updateDbMod: async (id, changes) => {
       let originalMod: DbMod | undefined;
-      let modToUpdate: DbMod | null = null;
+      let modIndex = -1;
 
+      // Perform the state update using set
       set((state) => {
-        const index = state.dbMods.findIndex((m) => m.id === id);
-        if (index !== -1) {
-          originalMod = { ...state.dbMods[index] };
-          const updatedModData = { ...state.dbMods[index], ...changes };
-          state.dbMods[index] = updatedModData;
-          modToUpdate = state.dbMods[index];
+        modIndex = state.dbMods.findIndex((m) => m.id === id);
+        if (modIndex !== -1) {
+          originalMod = { ...state.dbMods[modIndex] }; // Store original for potential revert
+          // Directly update the mod in the state array
+          state.dbMods[modIndex] = { ...state.dbMods[modIndex], ...changes };
           if (changes.loadOrder !== undefined) {
             state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
           }
@@ -84,23 +82,29 @@ export const useModStore = create(
         }
       });
 
-      if (modToUpdate) {
+      // After the state update, get the potentially updated mod
+      const updatedMod = modIndex !== -1 ? get().dbMods[modIndex] : undefined;
+
+      // Proceed with persistence only if the mod was found and updated in state
+      if (updatedMod) {
         try {
-          await PersistenceService.saveMod(modToUpdate);
-          toast.success(`Mod "${modToUpdate.name}" updated.`);
+          await PersistenceService.saveMod(updatedMod);
+          // Use the name from the guaranteed updated mod object
+          toast.success(`Mod "${updatedMod.name}" updated.`);
         } catch (e) {
           const errorMsg = "Failed to save mod update";
           console.error("ModStore: Error updating mod", e);
+          // Revert state using the stored originalMod
           set((state) => {
-            const index = state.dbMods.findIndex((m) => m.id === id);
-            if (index !== -1 && originalMod) {
-              state.dbMods[index] = originalMod;
+            const revertIndex = state.dbMods.findIndex((m) => m.id === id);
+            if (revertIndex !== -1 && originalMod) {
+              state.dbMods[revertIndex] = originalMod; // Revert state
               state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
             }
             state.error = errorMsg;
           });
           toast.error(errorMsg);
-          throw e;
+          throw e; // Re-throw the error after handling state revert
         }
       }
     },
@@ -114,6 +118,8 @@ export const useModStore = create(
         console.warn(`ModStore: Mod ${id} not found for deletion.`);
         return;
       }
+      // Capture name before potential state changes
+      const modName = modToDelete.name;
 
       // Optimistic UI update
       set((state) => ({
@@ -122,8 +128,8 @@ export const useModStore = create(
 
       try {
         await PersistenceService.deleteMod(id);
-        // Use the name fetched *before* the state update
-        toast.success(`Mod "${modToDelete.name}" deleted.`);
+        // Use the name captured *before* the state update
+        toast.success(`Mod "${modName}" deleted.`);
       } catch (e) {
         const errorMsg = "Failed to delete mod";
         console.error("ModStore: Error deleting mod", e);

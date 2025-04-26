@@ -43,7 +43,8 @@ export interface ChatControl {
 export interface ChatCanvasProps {
   conversationId: string | null;
   interactions: Interaction[];
-  interactionRenderer: (
+  // Make interactionRenderer optional as ChatCanvas handles rendering internally now
+  interactionRenderer?: (
     interaction: Interaction,
     allInteractions: Interaction[],
   ) => React.ReactElement | null;

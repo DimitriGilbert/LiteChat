@@ -5,7 +5,7 @@ import { useProviderStore } from "@/store/provider.store";
 import type {
   DbProviderConfig,
   DbProviderType,
-  DbApiKey,
+  // Removed unused DbApiKey import
 } from "@/types/litechat/provider"; // Correct path
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";

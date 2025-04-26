@@ -16,7 +16,8 @@ export const PromptControlWrapper: React.FC<PromptControlWrapperProps> = ({
 }) => {
   // Filter controls based on the area and whether the corresponding function exists
   const controlsToRender = controls.filter((c) =>
-    area === "trigger" ? !!c.trigger : !!c.renderer,
+    // Use triggerRenderer instead of trigger
+    area === "trigger" ? !!c.triggerRenderer : !!c.renderer,
   );
 
   // Return null if no controls are relevant for this area
@@ -27,9 +28,10 @@ export const PromptControlWrapper: React.FC<PromptControlWrapperProps> = ({
   return (
     <div className={cn(className)}>
       {controlsToRender.map((c) => {
-        // Call the appropriate render function (trigger or renderer)
+        // Call the appropriate render function (triggerRenderer or renderer)
         const elementToRender =
-          area === "trigger" ? c.trigger?.() : c.renderer?.();
+          // Use triggerRenderer instead of trigger
+          area === "trigger" ? c.triggerRenderer?.() : c.renderer?.();
         // Render the element inside a Fragment with a key
         return elementToRender ? (
           <React.Fragment key={c.id}>{elementToRender}</React.Fragment>

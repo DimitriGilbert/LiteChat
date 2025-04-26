@@ -41,6 +41,12 @@ export interface PromptObject {
   messages: CoreMessage[];
   /** Tools available for the AI model */
   tools?: Tool[];
+  /** How the model should use tools */
+  toolChoice?:
+    | "auto"
+    | "none"
+    | "required"
+    | { type: "tool"; toolName: string };
   /** Final combined parameters for the AI call */
   parameters: Record<string, any>;
   /** Final combined metadata for the AI call */

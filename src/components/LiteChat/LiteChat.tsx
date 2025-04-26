@@ -15,17 +15,19 @@ import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { loadMods } from "@/modding/loader";
 import { Toaster } from "@/components/ui/sonner";
-import type { CoreMessage, ToolCallPart, ToolResultPart } from "ai"; // Import tool types
+// Removed unused ToolCallPart import
+import type { CoreMessage, ToolResultPart } from "ai"; // Import tool types
 import { InputArea } from "./prompt/InputArea";
 import { useShallow } from "zustand/react/shallow";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { cn } from "@/lib/utils";
-import { InteractionCard } from "./canvas/InteractionCard";
+// Removed unused InteractionCard import
 import { toast } from "sonner";
 import type { Interaction } from "@/types/litechat/interaction"; // Import Interaction type
 
 // Import control registration hooks/components
 import { useConversationListControlRegistration } from "./chat/control/ConversationList";
+
 import { useSettingsControlRegistration } from "./chat/control/Settings";
 import { useModelProviderControlRegistration } from "./prompt/control/ModelProvider";
 import { useParameterControlRegistration } from "./prompt/control/ParameterControlRegistration";
@@ -221,7 +223,7 @@ export const LiteChat: React.FC = () => {
         });
       }
 
-      const systemPrompt = globalSystemPrompt;
+      const systemPrompt = globalSystemPrompt || undefined;
 
       const aiPayload: PromptObject = {
         system: systemPrompt,
@@ -315,7 +317,8 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
-      const systemPrompt = useSettingsStore.getState().globalSystemPrompt;
+      const systemPrompt =
+        useSettingsStore.getState().globalSystemPrompt || undefined;
 
       // Use the original turn data's parameters and metadata, but mark as regeneration
       const aiPayload: PromptObject = {
@@ -349,7 +352,7 @@ export const LiteChat: React.FC = () => {
         toast.error("Failed to start regeneration.");
       }
     },
-    [globalSystemPrompt, buildHistoryMessages], // Add helper to dependencies
+    [buildHistoryMessages], // Add helper to dependencies
   );
 
   // --- Stop Handler ---
@@ -392,11 +395,11 @@ export const LiteChat: React.FC = () => {
         />
 
         {/* Chat Canvas - Pass allInteractions */}
+        {/* Line 398 */}
         <ChatCanvas
           conversationId={selectedConversationId}
           interactions={interactions}
-          // interactionRenderer is handled internally by ChatCanvas now
-          // We pass onRegenerateInteraction down to InteractionCard via ChatCanvas
+          // interactionRenderer prop removed as ChatCanvas handles rendering internally
           onRegenerateInteraction={onRegenerateInteraction}
           streamingInteractionsRenderer={(ids) => (
             <StreamingInteractionRenderer

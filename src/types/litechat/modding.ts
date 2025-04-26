@@ -1,6 +1,7 @@
 // src/types/litechat/modding.ts
 import type { z } from "zod";
-import type { PromptTurnObject, PromptControl } from "./prompt";
+// Import PromptObject correctly
+import type { PromptTurnObject, PromptControl, PromptObject } from "./prompt";
 import type { ChatControl } from "./chat";
 import type { Interaction } from "./interaction";
 
@@ -98,6 +99,7 @@ export interface ModEventPayloadMap {
     error?: string;
   };
   [ModEvent.PROMPT_SUBMITTED]: { turnData: PromptTurnObject };
+  // Use PromptObject here
   [ModEvent.PROMPT_FINALISED]: { prompt: PromptObject };
   [ModEvent.SETTINGS_OPENED]: undefined;
   [ModEvent.SETTINGS_CLOSED]: undefined;
@@ -124,6 +126,7 @@ export type ModMiddlewareHookName =
   (typeof ModMiddlewareHook)[keyof typeof ModMiddlewareHook];
 export interface ModMiddlewarePayloadMap {
   [ModMiddlewareHook.PROMPT_TURN_FINALIZE]: { turnData: PromptTurnObject };
+  // Use PromptObject here
   [ModMiddlewareHook.INTERACTION_BEFORE_START]: {
     prompt: PromptObject;
     conversationId: string;
@@ -138,6 +141,7 @@ export interface ModMiddlewareReturnMap {
   [ModMiddlewareHook.PROMPT_TURN_FINALIZE]:
     | { turnData: PromptTurnObject }
     | false;
+  // Use PromptObject here
   [ModMiddlewareHook.INTERACTION_BEFORE_START]:
     | {
         prompt: PromptObject;

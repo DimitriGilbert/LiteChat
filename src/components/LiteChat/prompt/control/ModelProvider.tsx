@@ -170,8 +170,8 @@ export const useModelProviderControlRegistration = () => {
   React.useEffect(() => {
     const control: PromptControl = {
       id: "core-model-provider",
-      status: () => (providerState.isLoading ? "loading" : "ready"),
-      trigger: () => <ModelProviderControlComponent />,
+      // Removed status property
+      triggerRenderer: () => <ModelProviderControlComponent />,
       show: () => true,
       getMetadata: () => ({
         providerId: providerState.selectedProviderId,

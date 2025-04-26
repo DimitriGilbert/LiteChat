@@ -32,14 +32,14 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
         {/* <div className="text-xs text-muted-foreground mb-1">
                     User | Idx: {interaction.index}
                 </div> */}
-        <pre className="text-sm whitespace-pre-wrap">{userContent}</pre>
-        {/* Display attached files or other metadata if needed */}
-        {interaction.prompt?.metadata?.attachedFileCount > 0 && (
-          <div className="text-xs text-muted-foreground mt-1">
-            (+{interaction.prompt.metadata.attachedFileCount} file(s))
-          </div>
-        )}
       </div>
+      <pre className="text-sm whitespace-pre-wrap">{userContent}</pre>
+      {/* Display attached files or other metadata if needed */}
+      {interaction.prompt?.metadata?.attachedFileCount > 0 && (
+        <div className="text-xs text-muted-foreground mt-1">
+          ({interaction.prompt?.metadata.attachedFileCount} file(s))
+        </div>
+      )}
     </div>
   );
 };

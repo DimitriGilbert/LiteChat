@@ -16,9 +16,6 @@ import {
   StreamTextResult,
   LanguageModelV1,
   CoreMessage,
-  ToolDefinition,
-  ToolCallPart,
-  ToolResultPart,
   LanguageModelUsage,
   ProviderMetadata,
 } from "ai";
@@ -122,7 +119,7 @@ export class AIService {
         : null;
 
     // This object will be mutated locally during the stream
-    let currentInteractionData: Interaction = {
+    const currentInteractionData: Interaction = {
       id: interactionId,
       conversationId: conversationId,
       type: "message.user_assistant",
@@ -195,6 +192,7 @@ export class AIService {
         messages: finalPayload.messages as CoreMessage[],
         signal: abortController.signal,
         ...(Object.keys(toolsForSdk).length > 0 && { tools: toolsForSdk }),
+        // Use toolChoice from payload if provided, otherwise default logic
         toolChoice:
           finalPayload.toolChoice ??
           (Object.keys(toolsForSdk).length > 0 ? "auto" : "none"),
