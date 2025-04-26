@@ -3,9 +3,10 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type {
   DbMod,
-  // Removed unused ModInstance import
+  ModInstance, // Added back ModInstance
   ModState as ModStoreState,
   ModActions as ModStoreActions,
+  CustomSettingTab, // Import CustomSettingTab
 } from "@/types/litechat/modding";
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
@@ -13,10 +14,10 @@ import { toast } from "sonner";
 
 export const useModStore = create(
   immer<ModStoreState & ModStoreActions>((set, get) => ({
-    // Added get
     // Initial State
     dbMods: [],
     loadedMods: [],
+    modSettingsTabs: [], // Initialize tabs state
     isLoading: false,
     error: null,
 
@@ -102,7 +103,6 @@ export const useModStore = create(
     },
 
     deleteDbMod: async (id) => {
-      // Explicitly type modToDelete
       const modToDelete: DbMod | undefined = get().dbMods.find(
         (m: DbMod) => m.id === id,
       );
@@ -117,14 +117,16 @@ export const useModStore = create(
 
       try {
         await PersistenceService.deleteMod(id);
-        // Access name safely after checking modToDelete exists
         toast.success(`Mod "${modToDelete.name}" deleted.`);
       } catch (e) {
         const errorMsg = "Failed to delete mod";
         console.error("ModStore: Error deleting mod", e);
         set((state) => {
-          state.dbMods.push(modToDelete);
-          state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
+          // Ensure modToDelete is available here
+          if (modToDelete) {
+            state.dbMods.push(modToDelete);
+            state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
+          }
           state.error = errorMsg;
         });
         toast.error(errorMsg);
@@ -134,6 +136,26 @@ export const useModStore = create(
 
     setLoadedMods: (loadedMods) => {
       set({ loadedMods });
+    },
+
+    // Added tab actions
+    _addSettingsTab: (tab) => {
+      set((state) => {
+        // Avoid duplicates
+        if (!state.modSettingsTabs.some((t) => t.id === tab.id)) {
+          state.modSettingsTabs.push(tab);
+          state.modSettingsTabs.sort(
+            (a, b) => (a.order ?? 999) - (b.order ?? 999),
+          );
+        }
+      });
+    },
+    _removeSettingsTab: (tabId) => {
+      set((state) => {
+        state.modSettingsTabs = state.modSettingsTabs.filter(
+          (t) => t.id !== tabId,
+        );
+      });
     },
   })),
 );

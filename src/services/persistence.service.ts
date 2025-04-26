@@ -216,4 +216,32 @@ export class PersistenceService {
       throw error;
     }
   }
+
+  // --- Added clearAllData ---
+  static async clearAllData(): Promise<void> {
+    try {
+      // await db.transaction(
+      //   "rw",
+      //   db.conversations,
+      //   db.interactions,
+      //   db.mods,
+      //   db.appState,
+      //   db.providerConfigs,
+      //   db.apiKeys,
+      //   async () => {
+      //     await db.interactions.clear();
+      //     await db.conversations.clear();
+      //     await db.mods.clear();
+      //     await db.appState.clear();
+      //     await db.providerConfigs.clear();
+      //     await db.apiKeys.clear();
+      //   },
+      // );
+      // console.log("PersistenceService: All data cleared.");
+      throw new Error("TODO");
+    } catch (error) {
+      console.error("PersistenceService: Error clearing all data:", error);
+      throw error;
+    }
+  }
 }

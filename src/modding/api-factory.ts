@@ -2,25 +2,26 @@
 import type {
   DbMod,
   LiteChatModApi,
-  Tool,
-  ToolImplementation,
+  // Removed unused Tool import
+  // Removed unused ToolImplementation import
   ReadonlyChatContextSnapshot,
+  CustomSettingTab, // Import CustomSettingTab
 } from "@/types/litechat/modding";
-// Removed unused PromptControl import
-// Removed unused ChatControl import
 import { useControlRegistryStore } from "@/store/control.store";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { useProviderStore } from "@/store/provider.store";
+import { useModStore } from "@/store/mod.store"; // Import ModStore
 import { emitter } from "@/lib/litechat/event-emitter";
 import { toast } from "sonner";
-import { z } from "zod";
+// Removed unused z import
 
 export function createModApi(mod: DbMod): LiteChatModApi {
   const modId = mod.id;
   const modName = mod.name;
   const controlStoreActions = useControlRegistryStore.getState();
+  const modStoreActions = useModStore.getState(); // Get mod store actions
   const unsubscribers: (() => void)[] = [];
 
   const api: LiteChatModApi = {
@@ -36,9 +37,9 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       unsubscribers.push(u);
       return u;
     },
-    // Removed unused parameters tN, d, i
-    registerTool: <P extends z.ZodSchema<any>>() => {
-      console.warn("registerTool not implemented");
+    // Removed unused parameters tN, d, i and generic P
+    registerTool: () => {
+      console.warn(`[${modName}] registerTool not implemented`);
       return () => {};
     },
     on: (eN, cb) => {
@@ -49,6 +50,13 @@ export function createModApi(mod: DbMod): LiteChatModApi {
     },
     addMiddleware: (hN, cb) => {
       const u = controlStoreActions.registerMiddleware(hN, modId, cb);
+      unsubscribers.push(u);
+      return u;
+    },
+    // Added implementation for registerSettingsTab
+    registerSettingsTab: (tab: CustomSettingTab) => {
+      modStoreActions._addSettingsTab(tab);
+      const u = () => modStoreActions._removeSettingsTab(tab.id);
       unsubscribers.push(u);
       return u;
     },
@@ -66,9 +74,9 @@ export function createModApi(mod: DbMod): LiteChatModApi {
         isStreaming: iS.status === "streaming",
         selectedProviderId: pS.selectedProviderId,
         selectedModelId: pS.selectedModelId,
-        activeSystemPrompt: null, // TODO: Implement system prompt logic
-        temperature: sS.defaultTemperature,
-        maxTokens: sS.defaultMaxTokens,
+        activeSystemPrompt: sS.globalSystemPrompt, // Use globalSystemPrompt
+        temperature: sS.temperature, // Use temperature
+        maxTokens: sS.maxTokens, // Use maxTokens
         theme: sS.theme,
       });
     },

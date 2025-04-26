@@ -1,5 +1,5 @@
-// src/components/LiteChat/LiteChat.tsx
-import React, { useEffect, useCallback } from "react"; // Import useCallback
+// src/components/lite-chat/LiteChat.tsx
+import React, { useEffect, useCallback } from "react";
 import { PromptWrapper } from "./prompt/PromptWrapper";
 import { ChatCanvas } from "./canvas/ChatCanvas";
 import { ChatControlWrapper } from "./chat/ChatControlWrapper";
@@ -21,13 +21,16 @@ import { useShallow } from "zustand/react/shallow";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { cn } from "@/lib/utils";
 import { InteractionCard } from "./canvas/InteractionCard";
-import { StopButton } from "./common/StopButton";
-import { toast } from "sonner"; // Import toast
+import { toast } from "sonner";
 
 // Import control registration hooks/components
 import { useConversationListControlRegistration } from "./chat/control/ConversationList";
 import { useSettingsControlRegistration } from "./chat/control/Settings";
 import { useModelProviderControlRegistration } from "./prompt/control/ModelProvider";
+import { useParameterControlRegistration } from "./prompt/control/ParameterControlRegistration";
+import { useFileControlRegistration } from "./prompt/control/FileControlRegistration";
+// Import the new VFS control registration hook
+import { useVfsControlRegistration } from "./prompt/control/VfsControlRegistration";
 
 export const LiteChat: React.FC = () => {
   // --- Store Hooks ---
@@ -69,7 +72,7 @@ export const LiteChat: React.FC = () => {
   const { loadSettings, defaultSystemPrompt } = useSettingsStore(
     useShallow((state) => ({
       loadSettings: state.loadSettings,
-      defaultSystemPrompt: state.defaultSystemPrompt,
+      defaultSystemPrompt: state.globalSystemPrompt,
     })),
   );
 
@@ -77,6 +80,9 @@ export const LiteChat: React.FC = () => {
   useConversationListControlRegistration();
   useSettingsControlRegistration();
   useModelProviderControlRegistration();
+  useParameterControlRegistration();
+  useFileControlRegistration();
+  useVfsControlRegistration(); // Register the VFS control
 
   // --- Initialization Effect ---
   useEffect(() => {
@@ -162,6 +168,7 @@ export const LiteChat: React.FC = () => {
       ])
       .filter((m): m is CoreMessage => m !== null);
 
+    // TODO: Handle multi-modal content from turnData.content if it's an object/array
     messages.push({ role: "user", content: turnData.content as string });
 
     const systemPrompt = defaultSystemPrompt;
@@ -177,6 +184,7 @@ export const LiteChat: React.FC = () => {
     console.log("LiteChat: Submitting prompt to AIService:", aiPayload);
 
     try {
+      // TODO: Pass multi-modal content to AIService if needed
       await AIService.startInteraction(aiPayload, turnData);
       console.log("LiteChat: AIService interaction started.");
     } catch (e) {
@@ -214,12 +222,13 @@ export const LiteChat: React.FC = () => {
       ])
       .filter((m): m is CoreMessage => m !== null);
 
+    // TODO: Handle multi-modal content from targetInteraction.prompt.content
     messages.push({
       role: "user",
       content: targetInteraction.prompt.content as string,
     });
 
-    const systemPrompt = useSettingsStore.getState().defaultSystemPrompt;
+    const systemPrompt = useSettingsStore.getState().globalSystemPrompt;
 
     const aiPayload: PromptObject = {
       system: systemPrompt,
@@ -238,6 +247,7 @@ export const LiteChat: React.FC = () => {
     );
 
     try {
+      // TODO: Pass multi-modal content if needed
       await AIService.startInteraction(aiPayload, targetInteraction.prompt);
       console.log(
         `LiteChat: AIService regeneration interaction started for ${interactionId}.`,
@@ -294,7 +304,10 @@ export const LiteChat: React.FC = () => {
         <ChatCanvas
           conversationId={selectedConversationId}
           interactions={interactions}
-          interactionRenderer={(interaction, allInteractions) => (
+          interactionRenderer={(
+            interaction,
+            //  allInteractions
+          ) => (
             <InteractionCard
               key={interaction.id}
               interaction={interaction}
@@ -302,7 +315,6 @@ export const LiteChat: React.FC = () => {
               onRegenerate={onRegenerateInteraction}
             />
           )}
-          // Fix: Pass onStopInteraction to the renderer
           streamingInteractionsRenderer={(ids) => (
             <StreamingInteractionRenderer
               interactionIds={ids}

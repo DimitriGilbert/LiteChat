@@ -20,7 +20,14 @@ export interface ModInstance {
   api: LiteChatModApi;
   error?: Error | string;
 }
-
+// --- Custom Settings Tab ---
+export interface CustomSettingTab {
+  id: string; // Unique ID for the tab (e.g., 'mod-myfeature-settings')
+  title: string; // Title shown on the tab trigger
+  component: React.ComponentType<any>; // The React component to render
+  order?: number; // Optional order for placement
+  icon?: React.ReactElement; // Optional icon for the tab
+}
 // --- Readonly Context Snapshot ---
 export interface ReadonlyChatContextSnapshot {
   readonly selectedConversationId: string | null;
@@ -139,6 +146,8 @@ export interface ModMiddlewareReturnMap {
 export interface LiteChatModApi {
   registerPromptControl: (control: PromptControl) => () => void;
   registerChatControl: (control: ChatControl) => () => void;
+  registerSettingsTab: (tab: CustomSettingTab) => () => void;
+
   registerTool: <P extends z.ZodSchema<any>>(
     toolName: string,
     definition: Tool<P>,
@@ -164,10 +173,10 @@ export interface LiteChatModApi {
   readonly modName: string;
 }
 
-// --- Mod Store Types ---
 export interface ModState {
   dbMods: DbMod[];
   loadedMods: ModInstance[];
+  modSettingsTabs: CustomSettingTab[]; // Added state for tabs
   isLoading: boolean;
   error: string | null;
 }
@@ -177,4 +186,7 @@ export interface ModActions {
   updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>;
   deleteDbMod: (id: string) => Promise<void>;
   setLoadedMods: (mods: ModInstance[]) => void;
+  // Added actions for tabs
+  _addSettingsTab: (tab: CustomSettingTab) => void;
+  _removeSettingsTab: (tabId: string) => void;
 }

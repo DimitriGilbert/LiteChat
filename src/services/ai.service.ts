@@ -8,7 +8,7 @@ import { nanoid } from "nanoid";
 // Import specific types needed from 'ai'
 import {
   streamText,
-  CoreTool,
+  // Removed unused CoreTool import
   StreamTextResult,
   // LanguageModelV1CallOptions, // Not needed directly
   LanguageModelV1, // Import LanguageModelV1 for casting if needed
@@ -16,7 +16,7 @@ import {
 } from "ai";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { useProviderStore } from "@/store/provider.store";
-import type { InteractionStatus } from "@/types/litechat/interaction";
+// Removed unused InteractionStatus import
 import { toast } from "sonner";
 
 async function runMiddleware<H extends ModMiddlewareHookName>(
@@ -86,9 +86,11 @@ export class AIService {
       startedAt: new Date(),
       endedAt: null,
       metadata: { ...finalPayload.metadata },
-      parentId: interactionStore.interactions.at(-1)?.id ?? null,
+      // Parent ID calculation moved to InteractionStore.addInteraction
+      parentId: null, // Set to null initially, store will handle it
     };
 
+    // Add interaction first, store calculates index/parentId
     await interactionStore.addInteraction(interactionData);
     interactionStore.setInteractionStatus(interactionId, "STREAMING");
     emitter.emit("interaction:started", {
@@ -231,6 +233,7 @@ export class AIService {
     if (controller && !controller.signal.aborted) {
       console.log(`AIService: Aborting interaction ${interactionId}...`);
       controller.abort();
+      // Status is set to CANCELLED in the startInteraction finally block
     } else {
       console.log(
         `AIService: No active controller found or already aborted for interaction ${interactionId}.`,

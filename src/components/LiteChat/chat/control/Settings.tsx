@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { SettingsIcon } from "lucide-react";
 import type { ChatControl } from "@/types/litechat/chat";
 import { useControlRegistryStore } from "@/store/control.store";
-import { SettingsModal } from "@/components/LiteChat/common/SettingsModal";
+import { SettingsModal } from "@/components/LiteChat/settings/SettingsModal";
 import { useShallow } from "zustand/react/shallow"; // Import useShallow
 
 export const SettingsControlComponent: React.FC = () => {

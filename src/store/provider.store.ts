@@ -6,8 +6,7 @@ import type {
   DbApiKey,
   AiProviderConfig,
   AiModelConfig,
-  DbProviderType, // Re-added DbProviderType
-} from "@/types/litechat/provider";
+} from "@/types/litechat/provider"; // Removed DbProviderType import
 import { PersistenceService } from "@/services/persistence.service";
 import {
   createAiModelConfig,
@@ -19,7 +18,8 @@ import { toast } from "sonner";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 
-interface ProviderState {
+// Export ProviderState for use in components
+export interface ProviderState {
   dbProviderConfigs: DbProviderConfig[];
   dbApiKeys: DbApiKey[];
   selectedProviderId: string | null;
@@ -27,13 +27,19 @@ interface ProviderState {
   providerFetchStatus: Record<string, FetchStatus>;
   isLoading: boolean;
   error: string | null;
+  enableApiKeyManagement: boolean; // Added property
 }
 
 interface ProviderActions {
   loadInitialData: () => Promise<void>;
   selectProvider: (id: string | null) => void;
   selectModel: (id: string | null) => void;
-  addApiKey: (name: string, value: string) => Promise<string>;
+  // Updated addApiKey signature
+  addApiKey: (
+    name: string,
+    providerId: string,
+    value: string,
+  ) => Promise<string>;
   deleteApiKey: (id: string) => Promise<void>;
   addProviderConfig: (
     configData: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
@@ -49,6 +55,8 @@ interface ProviderActions {
   getApiKeyForProvider: (providerId: string) => string | undefined;
   getActiveProviders: () => AiProviderConfig[];
   _setProviderFetchStatus: (providerId: string, status: FetchStatus) => void;
+  // Action to set the flag (optional, could be loaded from env/config)
+  setEnableApiKeyManagement: (enabled: boolean) => void;
 }
 
 export const useProviderStore = create(
@@ -61,16 +69,34 @@ export const useProviderStore = create(
     providerFetchStatus: {},
     isLoading: true,
     error: null,
+    enableApiKeyManagement: true, // Default value, load from settings/env if needed
+
+    // Action to set the flag
+    setEnableApiKeyManagement: (enabled) => {
+      set({ enableApiKeyManagement: enabled });
+      // Optionally persist this setting if it's user-configurable
+      // PersistenceService.saveSetting('enableApiKeyManagement', enabled);
+    },
 
     // Actions
     loadInitialData: async () => {
       set({ isLoading: true, error: null });
       try {
+        // Load API key management setting if persisted
+        const enableApiMgmt = await PersistenceService.loadSetting<boolean>(
+          "enableApiKeyManagement",
+          true,
+        ); // Load setting or use default
+
         const [configs, keys] = await Promise.all([
           PersistenceService.loadProviderConfigs(),
           PersistenceService.loadApiKeys(),
         ]);
-        set({ dbProviderConfigs: configs, dbApiKeys: keys });
+        set({
+          dbProviderConfigs: configs,
+          dbApiKeys: keys,
+          enableApiKeyManagement: enableApiMgmt,
+        }); // Set loaded value
 
         const lastSelection = await PersistenceService.loadSetting<{
           providerId: string | null;
@@ -157,14 +183,16 @@ export const useProviderStore = create(
       });
     },
 
-    addApiKey: async (name, value) => {
+    // Updated addApiKey implementation
+    addApiKey: async (name, providerId, value) => {
       const newValue = value;
-      value = "";
+      value = ""; // Clear original variable for safety
       const newId = nanoid();
       const newKey: DbApiKey = {
         id: newId,
         name,
         value: newValue,
+        providerId: providerId, // Store the intended provider type/ID
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -352,6 +380,7 @@ export const useProviderStore = create(
         console.log(
           `[ProviderStore] TODO: Implement actual fetchModelsForProvider service call for ${config.name}`,
         );
+        // Placeholder fetch logic
         const fetched: { id: string; name: string }[] = [
           {
             id: `fetched-${config.type}-${Date.now() % 100}`,
@@ -361,6 +390,7 @@ export const useProviderStore = create(
             id: `fetched-${config.type}-other`,
             name: `Fetched ${config.type} Other`,
           },
+          ...(DEFAULT_MODELS[config.type as keyof typeof DEFAULT_MODELS] || []),
         ];
         await get().updateProviderConfig(providerConfigId, {
           fetchedModels: fetched,
@@ -398,14 +428,18 @@ export const useProviderStore = create(
       const enabledModelIds = new Set(config.enabledModels ?? []);
       let displayModels =
         enabledModelIds.size > 0
-          ? allAvailable.filter((m) => enabledModelIds.has(m.id))
+          ? allAvailable.filter((m: { id: string }) =>
+              enabledModelIds.has(m.id),
+            ) // Added type
           : allAvailable;
 
       const sortOrder = config.modelSortOrder ?? [];
       if (sortOrder.length > 0 && displayModels.length > 0) {
         const orderedList: { id: string; name: string }[] = [];
         const addedIds = new Set<string>();
-        const displayModelMap = new Map(displayModels.map((m) => [m.id, m]));
+        const displayModelMap = new Map(
+          displayModels.map((m: { id: string; name: string }) => [m.id, m]), // Added type
+        );
 
         for (const modelId of sortOrder) {
           const model = displayModelMap.get(modelId);
@@ -415,14 +449,19 @@ export const useProviderStore = create(
           }
         }
         const remaining = displayModels
-          .filter((m) => !addedIds.has(m.id))
-          .sort((a, b) => a.name.localeCompare(b.name));
+          .filter((m: { id: string }) => !addedIds.has(m.id)) // Added type
+          .sort((a: { name: string }, b: { name: string }) =>
+            a.name.localeCompare(b.name),
+          ); // Added type
         displayModels = [...orderedList, ...remaining];
       } else {
-        displayModels.sort((a, b) => a.name.localeCompare(b.name));
+        displayModels.sort((a: { name: string }, b: { name: string }) =>
+          a.name.localeCompare(b.name),
+        ); // Added type
       }
 
-      const aiModels = displayModels.map((m) => ({
+      const aiModels = displayModels.map((m: { id: string; name: string }) => ({
+        // Added type
         id: m.id,
         name: m.name,
         instance: null,
@@ -446,8 +485,8 @@ export const useProviderStore = create(
       } = get();
       const config = dbProviderConfigs.find((p) => p.id === selectedProviderId);
       if (!config || !selectedModelId) return undefined;
-      const apiKey = dbApiKeys.find((k) => k.id === config.apiKeyId)?.value;
-      return createAiModelConfig(config, selectedModelId, apiKey);
+      const apiKeyRecord = dbApiKeys.find((k) => k.id === config.apiKeyId); // Removed unused apiKey variable
+      return createAiModelConfig(config, selectedModelId, apiKeyRecord?.value); // Pass value directly
     },
 
     getApiKeyForProvider: (providerId) => {
@@ -456,78 +495,65 @@ export const useProviderStore = create(
     },
 
     getActiveProviders: () => {
-      return (
-        get()
-          // Add explicit type DbProviderConfig to p
-          .dbProviderConfigs.filter((p: DbProviderConfig) => p.isEnabled)
-          // Add explicit type DbProviderConfig to c
-          .map((c: DbProviderConfig) => {
-            const providerTypeKey = c.type as keyof typeof DEFAULT_MODELS;
-            const allAvailable =
-              c.fetchedModels ?? (DEFAULT_MODELS[providerTypeKey] || []);
+      return get()
+        .dbProviderConfigs.filter((p: DbProviderConfig) => p.isEnabled) // Added type
+        .map((c: DbProviderConfig) => {
+          // Added type
+          const providerTypeKey = c.type as keyof typeof DEFAULT_MODELS;
+          const allAvailable =
+            c.fetchedModels ?? (DEFAULT_MODELS[providerTypeKey] || []);
 
-            const enabledModelIds = new Set(c.enabledModels ?? []);
-            let displayModels =
-              enabledModelIds.size > 0
-                ? allAvailable.filter(
-                    // Add explicit type { id: string } to m
-                    (m: { id: string }) => enabledModelIds.has(m.id),
-                  )
-                : allAvailable;
+          const enabledModelIds = new Set(c.enabledModels ?? []);
+          let displayModels =
+            enabledModelIds.size > 0
+              ? allAvailable.filter((m: { id: string }) =>
+                  enabledModelIds.has(m.id),
+                ) // Added type
+              : allAvailable;
 
-            const sortOrder = c.modelSortOrder ?? [];
-            if (sortOrder.length > 0 && displayModels.length > 0) {
-              const orderedList: { id: string; name: string }[] = [];
-              const addedIds = new Set<string>();
-              const displayModelMap = new Map(
-                // Add explicit type { id: string; name: string } to m
-                displayModels.map((m: { id: string; name: string }) => [
-                  m.id,
-                  m,
-                ]),
-              );
-              for (const modelId of sortOrder) {
-                const model = displayModelMap.get(modelId);
-                if (model && !addedIds.has(modelId)) {
-                  orderedList.push(model);
-                  addedIds.add(modelId);
-                }
-              }
-              const remaining = displayModels
-                // Add explicit type { id: string } to m
-                .filter((m: { id: string }) => !addedIds.has(m.id))
-                .sort(
-                  // Add explicit types { name: string } to a and b
-                  (a: { name: string }, b: { name: string }) =>
-                    a.name.localeCompare(b.name),
-                );
-              displayModels = [...orderedList, ...remaining];
-            } else {
-              displayModels.sort(
-                // Add explicit types { name: string } to a and b
-                (a: { name: string }, b: { name: string }) =>
-                  a.name.localeCompare(b.name),
-              );
-            }
-
-            const aiModels = displayModels.map(
-              // Add explicit type { id: string; name: string } to m
-              (m: { id: string; name: string }) => ({
-                id: m.id,
-                name: m.name,
-                instance: null,
-              }),
+          const sortOrder = c.modelSortOrder ?? [];
+          if (sortOrder.length > 0 && displayModels.length > 0) {
+            const orderedList: { id: string; name: string }[] = [];
+            const addedIds = new Set<string>();
+            const displayModelMap = new Map(
+              displayModels.map((m: { id: string; name: string }) => [m.id, m]), // Added type
             );
+            for (const modelId of sortOrder) {
+              const model = displayModelMap.get(modelId);
+              if (model && !addedIds.has(modelId)) {
+                orderedList.push(model);
+                addedIds.add(modelId);
+              }
+            }
+            const remaining = displayModels
+              .filter((m: { id: string }) => !addedIds.has(m.id)) // Added type
+              .sort((a: { name: string }, b: { name: string }) =>
+                a.name.localeCompare(b.name),
+              ); // Added type
+            displayModels = [...orderedList, ...remaining];
+          } else {
+            displayModels.sort((a: { name: string }, b: { name: string }) =>
+              a.name.localeCompare(b.name),
+            ); // Added type
+          }
 
-            return {
-              id: c.id,
-              name: c.name,
-              type: c.type,
-              models: aiModels,
-              allAvailableModels: allAvailable,
-            };
-          })
-      );
+          const aiModels = displayModels.map(
+            (m: { id: string; name: string }) => ({
+              // Added type
+              id: m.id,
+              name: m.name,
+              instance: null,
+            }),
+          );
+
+          return {
+            id: c.id,
+            name: c.name,
+            type: c.type,
+            models: aiModels,
+            allAvailableModels: allAvailable,
+          };
+        });
     },
   })),
 );

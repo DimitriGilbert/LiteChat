@@ -5,6 +5,7 @@ import type { Conversation } from "@/types/litechat/chat";
 import { useInteractionStore } from "./interaction.store";
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
+import { toast } from "sonner"; // Import toast
 
 interface ConversationState {
   conversations: Conversation[];
@@ -23,6 +24,9 @@ interface ConversationActions {
   ) => Promise<void>;
   deleteConversation: (id: string) => Promise<void>;
   selectConversation: (id: string | null) => void;
+  // Added actions
+  importConversation: (file: File) => Promise<void>;
+  exportAllConversations: () => Promise<void>;
 }
 
 export const useConversationStore = create(
@@ -170,6 +174,79 @@ export const useConversationStore = create(
         // If clicking the already selected conversation, maybe force a reload?
         // Or just do nothing. For now, do nothing.
         console.log(`Conversation ${id} already selected.`);
+      }
+    },
+
+    // Added action implementations
+    importConversation: async (file) => {
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        // TODO: Add validation logic for the imported data structure
+        if (!data.conversation || !data.interactions) {
+          throw new Error("Invalid import file format.");
+        }
+        const importedConversation: Conversation = data.conversation;
+        const importedInteractions: Interaction[] = data.interactions;
+
+        // Create a new conversation with imported title/metadata but new ID/timestamps
+        const newId = await get().addConversation({
+          title: importedConversation.title || "Imported Chat",
+          metadata: importedConversation.metadata,
+        });
+
+        // Save interactions linked to the new conversation ID
+        const interactionPromises = importedInteractions.map((i) =>
+          PersistenceService.saveInteraction({
+            ...i,
+            conversationId: newId, // Link to new conversation
+            id: nanoid(), // Generate new interaction ID
+          }),
+        );
+        await Promise.all(interactionPromises);
+
+        get().selectConversation(newId); // Select the newly imported conversation
+        toast.success("Conversation imported successfully.");
+      } catch (error) {
+        console.error("ConversationStore: Error importing conversation", error);
+        toast.error(
+          `Import failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw error;
+      }
+    },
+
+    exportAllConversations: async () => {
+      try {
+        const conversations = await PersistenceService.loadConversations();
+        const exportData = [];
+
+        for (const convo of conversations) {
+          const interactions =
+            await PersistenceService.loadInteractionsForConversation(convo.id);
+          exportData.push({ conversation: convo, interactions });
+        }
+
+        const jsonString = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `litechat_export_${new Date().toISOString().split("T")[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success("All conversations exported.");
+      } catch (error) {
+        console.error(
+          "ConversationStore: Error exporting conversations",
+          error,
+        );
+        toast.error(
+          `Export failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw error;
       }
     },
   })),
