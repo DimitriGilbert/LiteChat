@@ -1,11 +1,7 @@
 // src/store/interaction.store.ts
 import { create } from "zustand";
-import type {
-  Interaction,
-  InteractionStatus,
-} from "@/types/litechat/interaction";
+import type { Interaction } from "@/types/litechat/interaction";
 import { PersistenceService } from "@/services/persistence.service";
-import { toast } from "sonner";
 
 interface InteractionState {
   interactions: Interaction[];

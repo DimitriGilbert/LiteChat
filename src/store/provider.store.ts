@@ -6,7 +6,6 @@ import type {
   DbApiKey,
   AiProviderConfig,
   AiModelConfig,
-  DbProviderType,
 } from "@/types/litechat/provider";
 import { PersistenceService } from "@/services/persistence.service";
 import {

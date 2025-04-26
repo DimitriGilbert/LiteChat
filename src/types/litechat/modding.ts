@@ -1,6 +1,6 @@
 // src/types/litechat/modding.ts
 import type { z } from "zod";
-import type { PromptObject, PromptTurnObject, PromptControl } from "./prompt";
+import type { PromptTurnObject, PromptControl } from "./prompt";
 import type { ChatControl } from "./chat";
 import type { Interaction } from "./interaction";
 

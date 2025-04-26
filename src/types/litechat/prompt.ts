@@ -1,58 +1,123 @@
 // src/types/litechat/prompt.ts
 import type React from "react";
-import type { CoreMessage, ToolDefinition } from "ai"; // Import ToolDefinition
+import type { CoreMessage, Tool } from "ai";
 
-// Represents the data collected from the user input turn by PromptWrapper
+/**
+ * Represents the data captured from the user's input turn via the PromptWrapper.
+ * This includes the text content, parameters derived from controls, and metadata.
+ */
 export interface PromptTurnObject {
-  id: string; // Unique ID for this input turn data
-  content: string | object; // Content from the InputArea (object for potential multi-modal)
-  parameters: Record<string, any>; // AI parameters from controls
-  metadata: Record<string, any>; // Other data (selected model/provider, file refs, etc.)
+  /** Unique ID for this specific turn attempt */
+  id: string;
+  /** The main text content entered by the user */
+  content: string;
+  /** Parameters collected from active PromptControls (e.g., model settings, temperature) */
+  parameters: Record<string, any>;
+  /** Metadata collected from active PromptControls (e.g., selected model ID, file references) */
+  metadata: Record<string, any> & {
+    attachedFiles?: {
+      id?: string; // <-- Made 'id' optional here
+      name: string;
+      type: string;
+      size: number;
+    }[];
+    selectedVfsFiles?: {
+      id: string;
+      name: string;
+      path: string;
+      type: string;
+    }[];
+  };
 }
 
-// Represents the final data structure passed to the AI Service (aligned with AI SDK)
+/**
+ * Represents the complete object prepared for submission to the AIService.
+ * This is constructed from the PromptTurnObject and conversation history/context.
+ */
 export interface PromptObject {
-  system: string | null;
-  messages: CoreMessage[]; // Constructed history + current user message
-  tools?: ToolDefinition[]; // Use SDK type for tool definitions
-  toolChoice?: "auto" | "none" | { type: "tool"; name: string }; // Example based on common patterns
-  parameters: Record<string, any>; // Final AI params
-  metadata: Record<string, any>; // Final metadata
+  /** The system prompt string, if any */
+  system?: string;
+  /** The history of messages in the conversation */
+  messages: CoreMessage[];
+  /** Tools available for the AI model */
+  tools?: Tool[];
+  /** Final combined parameters for the AI call */
+  parameters: Record<string, any>;
+  /** Final combined metadata for the AI call */
+  metadata: Record<string, any>;
+  // Add any other fields required by the specific AI SDK or service
 }
 
-// --- Input Area ---
-export interface InputAreaProps {
+/**
+ * Defines the props expected by a custom Input Area renderer component.
+ */
+export interface InputAreaRendererProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
   disabled?: boolean;
-}
-export interface InputAreaRenderer {
-  (props: InputAreaProps): React.ReactElement;
+  placeholder?: string;
+  // Allow any other props to be passed down
+  [key: string]: any;
 }
 
-// --- Prompt Control ---
-export type PromptControlStatus = "loading" | "ready" | "error";
+/**
+ * Defines the type for a custom Input Area renderer component.
+ */
+export type InputAreaRenderer = React.ComponentType<InputAreaRendererProps>;
+
+/**
+ * Defines the interface for a Prompt Control.
+ * These controls manage specific input-related features (model selection, file handling, parameters).
+ */
 export interface PromptControl {
+  /** Unique identifier for the control */
   id: string;
-  status: () => PromptControlStatus;
-  trigger?: () => React.ReactElement | null;
-  renderer?: () => React.ReactElement | null;
+  /** Display order preference (lower numbers appear first/higher priority) */
+  order?: number;
+  /** Optional function to determine if the control should be shown */
   show?: () => boolean;
-  // Returns data for the *current turn* to be merged into PromptTurnObject
+  /**
+   * Optional function to render the control's main UI (e.g., file previews, parameter sliders).
+   * Rendered in the 'panel' area above the text input.
+   */
+  renderer?: () => React.ReactNode;
+  /**
+   * Optional function to render a trigger UI element (e.g., an icon button).
+   * Rendered in the 'trigger' area (location depends on PromptWrapper layout).
+   */
+  triggerRenderer?: () => React.ReactNode;
+  /**
+   * Optional function to get parameters to add to the PromptTurnObject.
+   * Called just before finalizing the turn data.
+   */
   getParameters?: () =>
     | Record<string, any>
-    | null
-    | Promise<Record<string, any> | null>;
+    | Promise<Record<string, any> | undefined>
+    | undefined;
+  /**
+   * Optional function to get metadata to add to the PromptTurnObject.
+   * Called just before finalizing the turn data.
+   */
   getMetadata?: () =>
     | Record<string, any>
-    | null
-    | Promise<Record<string, any> | null>;
-  // Middleware modifies the PromptTurnObject before it's finalized by PromptWrapper
-  middleware?: (
-    turnData: PromptTurnObject,
-  ) => PromptTurnObject | Promise<PromptTurnObject>;
-  onClick?: () => void;
-  order?: number;
+    | Promise<Record<string, any> | undefined>
+    | undefined;
+  /**
+   * Optional function to clear the control's state on prompt submission.
+   */
   clearOnSubmit?: () => void;
+  /**
+   * Optional function called when the control is initialized or registered.
+   */
+  onRegister?: () => void;
+  /**
+   * Optional function called when the control is unregistered or removed.
+   */
+  onUnregister?: () => void;
 }
+
+/**
+ * Defines the area where a PromptControl can render its UI.
+ */
+export type PromptControlArea = "panel" | "trigger";

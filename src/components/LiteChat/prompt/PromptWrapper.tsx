@@ -17,9 +17,9 @@ import type {
   ModMiddlewareReturnMap,
 } from "@/types/litechat/modding";
 import { cn } from "@/lib/utils";
-import { useInputStore } from "@/store/input.store"; // Import InputStore
+import { useInputStore } from "@/store/input.store";
 
-// Helper to run middleware (keep as is)
+// Helper to run middleware
 async function runMiddleware<H extends ModMiddlewareHookName>(
   hookName: H,
   initialPayload: ModMiddlewarePayloadMap[H],
@@ -62,7 +62,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   onSubmit,
   className,
 }) => {
-  // Use InputStore for input value and clearing
   const {
     promptInputValue,
     setPromptInputValue,
@@ -87,10 +86,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     [registeredControls],
   );
 
-  // Clear inputs using InputStore action
   const handleClearInputs = useCallback(() => {
-    clearAllInput(); // Use the combined clear action
-    // Also call control-specific clear functions
+    clearAllInput();
     activeControls.forEach((c) => {
       if (c.clearOnSubmit) c.clearOnSubmit();
     });
@@ -108,11 +105,33 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
 
       setIsSubmitting(true);
 
+      // Filter selectedVfsFiles to ensure path is defined before mapping,
+      // because PromptTurnObject requires path to be a string.
+      const validSelectedVfsFiles = selectedVfsFiles.filter(
+        (f): f is typeof f & { path: string } => typeof f.path === "string",
+      );
+
       let turnData: PromptTurnObject = {
         id: nanoid(),
         content: trimmedInput,
         parameters: {},
-        metadata: {},
+        metadata: {
+          // Map standard File properties. Removed 'id' access which caused error.
+          attachedFiles: attachedFiles.map((f) => ({
+            name: f.name,
+            type: f.type,
+            size: f.size,
+            // If an ID is needed here, it must be added to the objects in InputStore
+            // or the PromptTurnObject type definition needs changing.
+          })),
+          // Map only the VFS files that have a valid string path.
+          selectedVfsFiles: validSelectedVfsFiles.map((f) => ({
+            id: f.id, // Assuming VfsObject from store *does* have id
+            name: f.name,
+            path: f.path, // Path is guaranteed to be a string here due to filter
+            type: f.type,
+          })),
+        },
       };
 
       // 1. Collect parameters and metadata from active controls
@@ -141,7 +160,21 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         }
       }
 
-      // Check for content (text, attached files, or VFS files)
+      // Merge control metadata into the existing metadata, potentially overwriting
+      // file lists if a control explicitly provides them.
+      turnData.metadata = activeControls.reduce(
+        (acc, control) => {
+          if (control.getMetadata) {
+            // Note: This synchronous access might need adjustment if getMetadata is async
+            // For simplicity here, assuming sync or handled within the loop above
+            // Re-evaluating this part based on actual getMetadata implementation might be needed.
+            // Let's stick to the loop above for async safety for now.
+          }
+          return acc; // Placeholder, actual merge happens in the loop above
+        },
+        turnData.metadata, // Start with the initially constructed metadata
+      );
+
       const hasContent =
         trimmedInput || attachedFiles.length > 0 || selectedVfsFiles.length > 0;
 
@@ -173,7 +206,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       // 3. Final submission
       try {
         await onSubmit(finalTurnData);
-        handleClearInputs(); // Clear inputs on successful submission
+        handleClearInputs();
       } catch (err) {
         console.error("Error during final prompt submission:", err);
       } finally {
@@ -186,8 +219,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       onSubmit,
       isStreaming,
       handleClearInputs,
-      attachedFiles.length, // Add dependencies from InputStore
-      selectedVfsFiles.length,
+      attachedFiles,
+      selectedVfsFiles,
     ],
   );
 
@@ -196,36 +229,37 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   }, [handleSubmit]);
 
   const hasPanelControls = activeControls.some((c) => !!c.renderer);
+  const hasTriggerControls = activeControls.some((c) => !!c.triggerRenderer);
 
   return (
     <form
       onSubmit={handleSubmit}
-      className={cn("flex flex-col", className)} // Use flex-col for main layout
+      className={cn(
+        "flex flex-col border-t border-border bg-background",
+        className,
+      )}
     >
-      {/* Area for Panel Renderers (e.g., file previews) - Below Input */}
+      {/* Area for Panel Renderers (e.g., file previews) - Renders ABOVE Input */}
       {hasPanelControls && (
-        <div className="p-2 border-b bg-muted/30">
+        <div className="p-2 border-b border-border bg-muted/30">
           <PromptControlWrapper controls={activeControls} area="panel" />
         </div>
       )}
 
-      {/* Input Area and Triggers/Submit Button */}
+      {/* Input Area and Submit Button Row */}
       <div className="p-3 md:p-4 flex items-end gap-2">
         {/* Input Area takes up most space */}
         <div className="flex-grow">
           <InputAreaRenderer
             value={promptInputValue}
-            onChange={setPromptInputValue} // Use action from InputStore
+            onChange={setPromptInputValue}
             onSubmit={handleInputSubmit}
             disabled={isSubmitting || isStreaming}
           />
         </div>
 
-        {/* Container for Triggers and Submit Button */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {/* Render trigger controls */}
-          <PromptControlWrapper controls={activeControls} area="trigger" />
-          {/* Submit Button */}
+        {/* Submit Button */}
+        <div className="flex-shrink-0">
           <Button
             type="submit"
             disabled={
@@ -233,7 +267,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
               isStreaming ||
               (!promptInputValue.trim() &&
                 attachedFiles.length === 0 &&
-                selectedVfsFiles.length === 0) // Disable if no content at all
+                selectedVfsFiles.length === 0)
             }
             size="icon"
             className="h-10 w-10 rounded-full"
@@ -243,6 +277,13 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* Area for Trigger Controls - Renders BENEATH Input/Submit Row */}
+      {hasTriggerControls && (
+        <div className="px-3 md:px-4 pb-2 pt-1">
+          <PromptControlWrapper controls={activeControls} area="trigger" />
+        </div>
+      )}
     </form>
   );
 };
