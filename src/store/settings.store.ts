@@ -14,7 +14,8 @@ interface SettingsState {
   frequencyPenalty: number | null;
   enableAdvancedSettings: boolean;
   enableStreamingMarkdown: boolean;
-  streamingRenderFPS: number; // Renamed state
+  streamingRenderFPS: number; // General FPS
+  streamingCodeRenderFPS: number; // FPS specifically for code blocks
 }
 
 interface SettingsActions {
@@ -28,12 +29,14 @@ interface SettingsActions {
   setFrequencyPenalty: (penalty: number | null) => void;
   setEnableAdvancedSettings: (enabled: boolean) => void;
   setEnableStreamingMarkdown: (enabled: boolean) => void;
-  setStreamingRenderFPS: (fps: number) => void; // Renamed action
+  setStreamingRenderFPS: (fps: number) => void;
+  setStreamingCodeRenderFPS: (fps: number) => void; // Action for code FPS
   loadSettings: () => Promise<void>;
 }
 
 const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant.`;
-const DEFAULT_STREAMING_FPS = 30; // Default FPS target
+const DEFAULT_STREAMING_FPS = 30;
+const DEFAULT_STREAMING_CODE_FPS = 10; // Slower default for code blocks
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set) => ({
@@ -48,7 +51,8 @@ export const useSettingsStore = create(
     frequencyPenalty: 0.0,
     enableAdvancedSettings: true,
     enableStreamingMarkdown: true,
-    streamingRenderFPS: DEFAULT_STREAMING_FPS, // Initialize with FPS
+    streamingRenderFPS: DEFAULT_STREAMING_FPS,
+    streamingCodeRenderFPS: DEFAULT_STREAMING_CODE_FPS, // Initialize code FPS
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -95,11 +99,17 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("enableStreamingMarkdown", enabled);
     },
 
-    // Action for FPS setting
     setStreamingRenderFPS: (fps) => {
-      const clampedFps = Math.max(1, Math.min(60, fps)); // Clamp between 1 and 60 FPS
+      const clampedFps = Math.max(1, Math.min(60, fps));
       set({ streamingRenderFPS: clampedFps });
-      PersistenceService.saveSetting("streamingRenderFPS", clampedFps); // Use new key
+      PersistenceService.saveSetting("streamingRenderFPS", clampedFps);
+    },
+
+    // Action for Code FPS setting
+    setStreamingCodeRenderFPS: (fps) => {
+      const clampedFps = Math.max(1, Math.min(60, fps)); // Clamp between 1 and 60 FPS
+      set({ streamingCodeRenderFPS: clampedFps });
+      PersistenceService.saveSetting("streamingCodeRenderFPS", clampedFps); // Use new key
     },
 
     loadSettings: async () => {
@@ -115,7 +125,8 @@ export const useSettingsStore = create(
           systemPrompt,
           enableAdvanced,
           enableStreamingMd,
-          streamingFps, // Load FPS setting
+          streamingFps,
+          streamingCodeFps, // Load code FPS setting
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -142,9 +153,13 @@ export const useSettingsStore = create(
             "enableStreamingMarkdown",
             true,
           ),
-          PersistenceService.loadSetting<number>( // Load FPS setting
-            "streamingRenderFPS", // Use new key
-            DEFAULT_STREAMING_FPS, // Default FPS value
+          PersistenceService.loadSetting<number>(
+            "streamingRenderFPS",
+            DEFAULT_STREAMING_FPS,
+          ),
+          PersistenceService.loadSetting<number>( // Load code FPS setting
+            "streamingCodeRenderFPS", // Use new key
+            DEFAULT_STREAMING_CODE_FPS, // Default code FPS value
           ),
         ]);
 
@@ -159,7 +174,8 @@ export const useSettingsStore = create(
           globalSystemPrompt: systemPrompt,
           enableAdvancedSettings: enableAdvanced,
           enableStreamingMarkdown: enableStreamingMd,
-          streamingRenderFPS: streamingFps, // Set loaded FPS value
+          streamingRenderFPS: streamingFps,
+          streamingCodeRenderFPS: streamingCodeFps, // Set loaded code FPS value
         });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);

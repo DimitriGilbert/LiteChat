@@ -1,20 +1,18 @@
 // src/components/LiteChat/canvas/StreamingInteractionRenderer.tsx
-import React, { useState, useEffect, useRef, useCallback, memo } from "react"; // Added memo
+import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
 import { StopButton } from "@/components/LiteChat/common/StopButton";
-// Import the new parser hook and types
 import {
   useMarkdownParser,
   type ParsedContent,
   type CodeBlockData,
 } from "@/lib/litechat/useMarkdownParser";
-// Import the new CodeBlockRenderer
 import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
 
-// Simple throttle function (keep as is)
+// Simple throttle function (remains the same)
 function throttle(func: () => void, limit: number) {
   let inThrottle: boolean;
   let lastFunc: NodeJS.Timeout;
@@ -40,6 +38,11 @@ function throttle(func: () => void, limit: number) {
   };
 }
 
+// Helper to quickly check for unclosed code fences (basic check)
+const containsCodeBlock = (text: string): boolean => {
+  return /```/.test(text); // Simple check for fence presence
+};
+
 // Memoize the inner component
 const SingleStreamingInteraction = memo(
   ({
@@ -54,46 +57,91 @@ const SingleStreamingInteraction = memo(
         state.interactions.find((i) => i.id === interactionId),
       ),
     );
-    const { enableStreamingMarkdown, streamingRenderFPS } = useSettingsStore(
+    // Fetch both FPS settings
+    const {
+      enableStreamingMarkdown,
+      streamingRenderFPS,
+      streamingCodeRenderFPS,
+    } = useSettingsStore(
       useShallow((state) => ({
         enableStreamingMarkdown: state.enableStreamingMarkdown,
         streamingRenderFPS: state.streamingRenderFPS,
+        streamingCodeRenderFPS: state.streamingCodeRenderFPS, // Get code FPS
       })),
     );
 
     const [displayedContent, setDisplayedContent] = useState<string>("");
     const latestContentRef = useRef<string>("");
     const throttledUpdateRef = useRef<(() => void) | undefined>(undefined);
+    // Store the currently active throttle interval
+    const currentThrottleMsRef = useRef<number>(100);
 
+    // Update latest content and trigger throttled update
     useEffect(() => {
       latestContentRef.current = interaction?.response || "";
+      // Determine which FPS to use based on latest content
+      const hasCode = containsCodeBlock(latestContentRef.current);
+      const targetFPS = hasCode ? streamingCodeRenderFPS : streamingRenderFPS;
+      const newThrottleMs = targetFPS > 0 ? 1000 / targetFPS : 100;
+
+      // If the throttle interval needs to change, recreate the throttle function
+      if (newThrottleMs !== currentThrottleMsRef.current) {
+        // console.log(`[Streaming] Changing throttle to ${newThrottleMs}ms (Code: ${hasCode})`);
+        currentThrottleMsRef.current = newThrottleMs;
+        throttledUpdateRef.current = throttle(() => {
+          setDisplayedContent(latestContentRef.current);
+        }, newThrottleMs);
+      }
+
+      // Always attempt to trigger the update
       throttledUpdateRef.current?.();
-    }, [interaction?.response]);
+    }, [
+      interaction?.response,
+      streamingRenderFPS,
+      streamingCodeRenderFPS, // Add dependency
+    ]);
 
+    // Initial setup for the throttle function
     useEffect(() => {
-      const updateDisplayedContent = () => {
+      const initialHasCode = containsCodeBlock(latestContentRef.current);
+      const initialFPS = initialHasCode
+        ? streamingCodeRenderFPS
+        : streamingRenderFPS;
+      const initialThrottleMs = initialFPS > 0 ? 1000 / initialFPS : 100;
+      currentThrottleMsRef.current = initialThrottleMs;
+
+      throttledUpdateRef.current = throttle(() => {
         setDisplayedContent(latestContentRef.current);
+      }, initialThrottleMs);
+
+      // Initial display update
+      setDisplayedContent(latestContentRef.current);
+
+      // Cleanup function (optional, depends on throttle implementation)
+      return () => {
+        // Cleanup logic if needed by the throttle function
       };
+      // Rerun setup if FPS settings change
+    }, [streamingRenderFPS, streamingCodeRenderFPS]);
 
-      const throttleMs =
-        streamingRenderFPS > 0 ? 1000 / streamingRenderFPS : 100;
-
-      throttledUpdateRef.current = throttle(updateDisplayedContent, throttleMs);
-
-      updateDisplayedContent();
-    }, [streamingRenderFPS]);
-
-    // Parse the *displayed* content
+    // Parse the *displayed* (throttled) content
     const parsedContent: ParsedContent = useMarkdownParser(
       enableStreamingMarkdown ? displayedContent : null,
     );
 
+    // Ensure final content is displayed when streaming stops
+    useEffect(() => {
+      if (interaction && interaction.status !== "STREAMING") {
+        // If the displayed content isn't the final one, update it directly
+        if (displayedContent !== (interaction.response || "")) {
+          setDisplayedContent(interaction.response || "");
+        }
+      }
+    }, [interaction, displayedContent]); // Add displayedContent dependency
+
     if (!interaction || interaction.status !== "STREAMING") {
-      // This check might be less reliable now with throttled display updates
-      // Consider removing or adjusting if final state isn't always shown correctly
-      // if (interaction && displayedContent !== interaction.response) {
-      //     setDisplayedContent(interaction.response || "");
-      // }
+      // Render nothing if the interaction is gone or finished streaming
+      // The final state will be handled by InteractionCard
       return null;
     }
 
@@ -121,14 +169,10 @@ const SingleStreamingInteraction = memo(
             <StopButton interactionId={interactionId} onStop={onStop} />
           </div>
         </div>
-        {/* Render mixed content */}
+        {/* Render mixed content based on throttled state */}
         {enableStreamingMarkdown ? (
           <div className="text-sm markdown-content">
             {parsedContent.map((part, index) => {
-              console.log(
-                `[StreamingInteraction] Rendering part ${index}:`,
-                part,
-              ); // Log each part
               if (typeof part === "string") {
                 return (
                   <div key={index} dangerouslySetInnerHTML={{ __html: part }} />

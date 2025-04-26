@@ -178,7 +178,6 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
       {/* Render mixed content */}
       <div className="text-sm markdown-content">
         {parsedContent.map((part, index) => {
-          console.log(`[InteractionCard] Rendering part ${index}:`, part); // Log each part
           if (typeof part === "string") {
             // Render HTML string parts
             return (

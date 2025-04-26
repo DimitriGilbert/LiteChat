@@ -35,8 +35,6 @@ function isFenceToken(
 export function useMarkdownParser(
   markdownString: string | null | undefined,
 ): ParsedContent {
-  console.log("[useMarkdownParser] Input:", markdownString); // Keep logging input
-
   const parsedContent = useMemo((): ParsedContent => {
     if (!markdownString) {
       return [];
@@ -106,6 +104,5 @@ export function useMarkdownParser(
     }
   }, [markdownString]);
 
-  console.log("[useMarkdownParser] Output:", parsedContent); // Keep logging output
   return parsedContent;
 }

@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsGeneral.tsx
-import React, { useCallback, useState } from "react"; // Added useState
+import React, { useCallback, useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -24,6 +24,8 @@ const SettingsGeneralComponent: React.FC = () => {
     setEnableStreamingMarkdown,
     streamingRenderFPS,
     setStreamingRenderFPS,
+    streamingCodeRenderFPS, // Get code FPS state
+    setStreamingCodeRenderFPS, // Get code FPS action
   } = useSettingsStore(
     useShallow((state) => ({
       theme: state.theme,
@@ -34,26 +36,25 @@ const SettingsGeneralComponent: React.FC = () => {
       setEnableStreamingMarkdown: state.setEnableStreamingMarkdown,
       streamingRenderFPS: state.streamingRenderFPS,
       setStreamingRenderFPS: state.setStreamingRenderFPS,
+      streamingCodeRenderFPS: state.streamingCodeRenderFPS, // Select code FPS state
+      setStreamingCodeRenderFPS: state.setStreamingCodeRenderFPS, // Select code FPS action
     })),
   );
 
-  // Local state for slider visual feedback while dragging
+  // Local state for sliders
   const [localFps, setLocalFps] = useState(streamingRenderFPS);
+  const [localCodeFps, setLocalCodeFps] = useState(streamingCodeRenderFPS);
 
-  // Update local state immediately on slider change
+  // General FPS Handlers
   const handleFpsSliderVisualChange = useCallback((value: number[]) => {
     setLocalFps(value[0]);
   }, []);
-
-  // Update store only when slider interaction ends (commit)
   const handleFpsSliderCommit = useCallback(
     (value: number[]) => {
       setStreamingRenderFPS(value[0]);
     },
     [setStreamingRenderFPS],
   );
-
-  // Handler for FPS input change (updates store immediately)
   const handleFpsInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
@@ -62,22 +63,49 @@ const SettingsGeneralComponent: React.FC = () => {
       if (!isNaN(numValue)) {
         const clampedFps = Math.max(1, Math.min(60, numValue));
         setStreamingRenderFPS(clampedFps);
-        setLocalFps(clampedFps); // Sync local state if input changes
+        setLocalFps(clampedFps);
       }
     },
     [setStreamingRenderFPS],
   );
 
-  // Sync local state if store changes from elsewhere
-  React.useEffect(() => {
+  // Code FPS Handlers
+  const handleCodeFpsSliderVisualChange = useCallback((value: number[]) => {
+    setLocalCodeFps(value[0]);
+  }, []);
+  const handleCodeFpsSliderCommit = useCallback(
+    (value: number[]) => {
+      setStreamingCodeRenderFPS(value[0]);
+    },
+    [setStreamingCodeRenderFPS],
+  );
+  const handleCodeFpsInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      const numValue =
+        value === "" ? 10 : parseInt(value.replace(/[^0-9]/g, ""), 10); // Default 10 for code
+      if (!isNaN(numValue)) {
+        const clampedFps = Math.max(1, Math.min(60, numValue));
+        setStreamingCodeRenderFPS(clampedFps);
+        setLocalCodeFps(clampedFps);
+      }
+    },
+    [setStreamingCodeRenderFPS],
+  );
+
+  // Sync local states if store changes from elsewhere
+  useEffect(() => {
     setLocalFps(streamingRenderFPS);
   }, [streamingRenderFPS]);
+  useEffect(() => {
+    setLocalCodeFps(streamingCodeRenderFPS);
+  }, [streamingCodeRenderFPS]);
 
   return (
     <div className="space-y-6 p-1">
       <div className="space-y-2">
         <h3 className="text-lg font-medium">Appearance</h3>
-        {/* Theme and Markdown settings remain the same */}
+        {/* Theme */}
         <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
           <Label htmlFor="theme-select" className="font-medium">
             Theme
@@ -96,6 +124,7 @@ const SettingsGeneralComponent: React.FC = () => {
             </SelectContent>
           </Select>
         </div>
+        {/* Streaming Markdown Toggle */}
         <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
           <div>
             <Label htmlFor="streaming-markdown-switch" className="font-medium">
@@ -112,15 +141,14 @@ const SettingsGeneralComponent: React.FC = () => {
             onCheckedChange={setEnableStreamingMarkdown}
           />
         </div>
-        {/* Streaming FPS Setting */}
+        {/* General Streaming FPS Setting */}
         <div className="rounded-lg border p-3 shadow-sm space-y-2">
           <div>
             <Label htmlFor="streaming-fps-slider" className="font-medium">
-              Streaming Update Rate ({localFps} FPS)
+              General Streaming Update Rate ({localFps} FPS)
             </Label>
             <p className="text-xs text-muted-foreground">
-              Controls how smoothly streaming text appears. Higher FPS uses more
-              resources. (Default: 30)
+              Controls how smoothly streaming text appears. (Default: 30)
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -129,9 +157,9 @@ const SettingsGeneralComponent: React.FC = () => {
               min={1}
               max={60}
               step={1}
-              value={[localFps]} // Use local state for visual value
-              onValueChange={handleFpsSliderVisualChange} // Update local state visually
-              onValueCommit={handleFpsSliderCommit} // Update store on commit
+              value={[localFps]}
+              onValueChange={handleFpsSliderVisualChange}
+              onValueCommit={handleFpsSliderCommit}
               className="flex-grow"
             />
             <Input
@@ -139,8 +167,42 @@ const SettingsGeneralComponent: React.FC = () => {
               min={1}
               max={60}
               step={1}
-              value={localFps} // Bind input to local state as well
-              onChange={handleFpsInputChange} // Input updates store directly
+              value={localFps}
+              onChange={handleFpsInputChange}
+              className="w-20 h-8 text-xs"
+            />
+            <span className="text-xs text-muted-foreground">FPS</span>
+          </div>
+        </div>
+        {/* Code Block Streaming FPS Setting */}
+        <div className="rounded-lg border p-3 shadow-sm space-y-2">
+          <div>
+            <Label htmlFor="streaming-code-fps-slider" className="font-medium">
+              Code Block Streaming Update Rate ({localCodeFps} FPS)
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Specific update rate when code blocks are streaming (lower values
+              reduce lag). (Default: 10)
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <Slider
+              id="streaming-code-fps-slider"
+              min={1}
+              max={60}
+              step={1}
+              value={[localCodeFps]}
+              onValueChange={handleCodeFpsSliderVisualChange}
+              onValueCommit={handleCodeFpsSliderCommit}
+              className="flex-grow"
+            />
+            <Input
+              type="number"
+              min={1}
+              max={60}
+              step={1}
+              value={localCodeFps}
+              onChange={handleCodeFpsInputChange}
               className="w-20 h-8 text-xs"
             />
             <span className="text-xs text-muted-foreground">FPS</span>
@@ -148,7 +210,7 @@ const SettingsGeneralComponent: React.FC = () => {
         </div>
       </div>
 
-      {/* Advanced Settings remain the same */}
+      {/* Advanced Settings */}
       <div className="space-y-2">
         <h3 className="text-lg font-medium">Advanced Settings</h3>
         <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
