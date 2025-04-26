@@ -1,4 +1,4 @@
-// src/components/lite-chat/LiteChat.tsx
+// src/components/LiteChat/LiteChat.tsx
 import React, { useEffect, useCallback } from "react";
 import { PromptWrapper } from "./prompt/PromptWrapper";
 import { ChatCanvas } from "./canvas/ChatCanvas";
@@ -15,6 +15,7 @@ import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { loadMods } from "@/modding/loader";
 import { Toaster } from "@/components/ui/sonner";
+// Import CoreMessage type correctly
 import type { CoreMessage } from "ai";
 import { InputArea } from "./prompt/InputArea";
 import { useShallow } from "zustand/react/shallow";
@@ -29,20 +30,23 @@ import { useSettingsControlRegistration } from "./chat/control/Settings";
 import { useModelProviderControlRegistration } from "./prompt/control/ModelProvider";
 import { useParameterControlRegistration } from "./prompt/control/ParameterControlRegistration";
 import { useFileControlRegistration } from "./prompt/control/FileControlRegistration";
-// Import the new VFS control registration hook
 import { useVfsControlRegistration } from "./prompt/control/VfsControlRegistration";
 
 export const LiteChat: React.FC = () => {
   // --- Store Hooks ---
-  const { selectedConversationId, loadConversations, addConversation } =
-    useConversationStore(
-      useShallow((state) => ({
-        selectedConversationId: state.selectedConversationId,
-        loadConversations: state.loadConversations,
-        addConversation: state.addConversation,
-        selectConversation: state.selectConversation,
-      })),
-    );
+  const {
+    selectedConversationId,
+    loadConversations,
+    addConversation,
+    selectConversation,
+  } = useConversationStore(
+    useShallow((state) => ({
+      selectedConversationId: state.selectedConversationId,
+      loadConversations: state.loadConversations,
+      addConversation: state.addConversation,
+      selectConversation: state.selectConversation,
+    })),
+  );
   const {
     interactions,
     status: interactionStatus,
@@ -68,11 +72,16 @@ export const LiteChat: React.FC = () => {
       setLoadedMods: state.setLoadedMods,
     })),
   );
-  const loadProviderData = useProviderStore((state) => state.loadInitialData);
-  const { loadSettings, defaultSystemPrompt } = useSettingsStore(
+  // Use correct action name from ProviderStore
+  const { loadInitialData: loadProviderData } = useProviderStore(
+    useShallow((state) => ({
+      loadInitialData: state.loadInitialData,
+    })),
+  );
+  const { loadSettings, globalSystemPrompt } = useSettingsStore(
     useShallow((state) => ({
       loadSettings: state.loadSettings,
-      defaultSystemPrompt: state.globalSystemPrompt,
+      globalSystemPrompt: state.globalSystemPrompt,
     })),
   );
 
@@ -82,7 +91,7 @@ export const LiteChat: React.FC = () => {
   useModelProviderControlRegistration();
   useParameterControlRegistration();
   useFileControlRegistration();
-  useVfsControlRegistration(); // Register the VFS control
+  useVfsControlRegistration();
 
   // --- Initialization Effect ---
   useEffect(() => {
@@ -130,136 +139,185 @@ export const LiteChat: React.FC = () => {
   ]);
 
   // --- Prompt Submission Handler ---
-  const handlePromptSubmit = async (turnData: PromptTurnObject) => {
-    let currentConvId = selectedConversationId;
+  const handlePromptSubmit = useCallback(
+    async (turnData: PromptTurnObject) => {
+      let currentConvId = selectedConversationId;
 
-    if (!currentConvId) {
-      console.log("LiteChat: No conversation selected, creating new one...");
-      try {
-        currentConvId = await addConversation({ title: "New Chat" });
-        useConversationStore.getState().selectConversation(currentConvId);
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        console.log(
-          `LiteChat: New conversation created and selected: ${currentConvId}`,
-        );
-      } catch (error) {
-        console.error("LiteChat: Failed to create new conversation", error);
-        return;
+      if (!currentConvId) {
+        console.log("LiteChat: No conversation selected, creating new one...");
+        try {
+          currentConvId = await addConversation({ title: "New Chat" });
+          selectConversation(currentConvId);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          console.log(
+            `LiteChat: New conversation created and selected: ${currentConvId}`,
+          );
+        } catch (error) {
+          console.error("LiteChat: Failed to create new conversation", error);
+          toast.error("Failed to start new chat.");
+          return;
+        }
       }
-    }
 
-    const interactionState = useInteractionStore.getState();
-    if (interactionState.currentConversationId !== currentConvId) {
-      console.log(
-        `LiteChat: Syncing InteractionStore to conversation ${currentConvId}`,
-      );
-      setCurrentConversationId(currentConvId);
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
+      const interactionState = useInteractionStore.getState();
+      if (interactionState.currentConversationId !== currentConvId) {
+        console.log(
+          `LiteChat: Syncing InteractionStore to conversation ${currentConvId}`,
+        );
+        setCurrentConversationId(currentConvId);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
 
-    const currentHistory = useInteractionStore.getState().interactions;
-    const messages: CoreMessage[] = currentHistory
-      .filter(
-        (i) => i.type === "message.user_assistant" && i.status === "COMPLETED",
-      )
-      .flatMap((i) => [
-        i.prompt ? { role: "user", content: i.prompt.content as string } : null,
-        i.response ? { role: "assistant", content: i.response } : null,
-      ])
-      .filter((m): m is CoreMessage => m !== null);
+      const currentHistory = useInteractionStore.getState().interactions;
+      // Corrected mapping: Ensure only valid CoreMessages are included
+      const messages: CoreMessage[] = currentHistory
+        .filter(
+          (i) =>
+            i.type === "message.user_assistant" && i.status === "COMPLETED",
+        )
+        .flatMap((i): CoreMessage[] => {
+          // Return CoreMessage[] explicitly
+          const msgs: CoreMessage[] = [];
+          // Ensure prompt content is string before adding user message
+          if (i.prompt?.content && typeof i.prompt.content === "string") {
+            msgs.push({ role: "user", content: i.prompt.content });
+          }
+          // Ensure response is string before adding assistant message
+          if (i.response && typeof i.response === "string") {
+            msgs.push({ role: "assistant", content: i.response });
+          }
+          // TODO: Handle non-string/complex assistant responses if needed
+          return msgs;
+        }); // No need for filter(Boolean) after flatMap if logic is correct
 
-    // TODO: Handle multi-modal content from turnData.content if it's an object/array
-    messages.push({ role: "user", content: turnData.content as string });
+      // Add the current user turn to the messages
+      if (typeof turnData.content === "string" && turnData.content.trim()) {
+        messages.push({ role: "user", content: turnData.content });
+      } else if (typeof turnData.content === "object") {
+        console.warn("Multi-modal content in turnData not fully handled yet.");
+        messages.push({ role: "user", content: "[User provided content]" });
+      }
 
-    const systemPrompt = defaultSystemPrompt;
+      const systemPrompt = globalSystemPrompt;
 
-    const aiPayload: PromptObject = {
-      system: systemPrompt,
-      messages: messages,
-      parameters: turnData.parameters,
-      metadata: turnData.metadata,
-    };
+      const aiPayload: PromptObject = {
+        system: systemPrompt,
+        messages: messages, // Use the correctly typed array
+        parameters: turnData.parameters,
+        metadata: turnData.metadata,
+      };
 
-    emitter.emit("prompt:finalised", { prompt: aiPayload });
-    console.log("LiteChat: Submitting prompt to AIService:", aiPayload);
+      emitter.emit("prompt:finalised", { prompt: aiPayload });
+      console.log("LiteChat: Submitting prompt to AIService:", aiPayload);
 
-    try {
-      // TODO: Pass multi-modal content to AIService if needed
-      await AIService.startInteraction(aiPayload, turnData);
-      console.log("LiteChat: AIService interaction started.");
-    } catch (e) {
-      console.error("LiteChat: Error starting AI interaction:", e);
-    }
-  };
+      try {
+        await AIService.startInteraction(aiPayload, turnData);
+        console.log("LiteChat: AIService interaction started.");
+      } catch (e) {
+        console.error("LiteChat: Error starting AI interaction:", e);
+        toast.error(
+          `Failed to start AI interaction: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    },
+    [
+      selectedConversationId,
+      addConversation,
+      selectConversation,
+      setCurrentConversationId,
+      globalSystemPrompt,
+    ],
+  );
 
   // --- Regeneration Handler ---
-  const onRegenerateInteraction = useCallback(async (interactionId: string) => {
-    console.log(`LiteChat: Regenerating interaction ${interactionId}`);
-    const interactionStore = useInteractionStore.getState();
-    const targetInteraction = interactionStore.interactions.find(
-      (i) => i.id === interactionId,
-    );
-
-    if (!targetInteraction || !targetInteraction.prompt) {
-      console.error(
-        `LiteChat: Cannot regenerate - interaction ${interactionId} or its prompt not found.`,
+  const onRegenerateInteraction = useCallback(
+    async (interactionId: string) => {
+      console.log(`LiteChat: Regenerating interaction ${interactionId}`);
+      const interactionStore = useInteractionStore.getState();
+      const targetInteraction = interactionStore.interactions.find(
+        (i) => i.id === interactionId,
       );
-      toast.error("Cannot regenerate: Original interaction data missing.");
-      return;
-    }
 
-    const historyUpToParent = interactionStore.interactions.filter(
-      (i) => i.index < targetInteraction.index,
-    );
+      if (!targetInteraction || !targetInteraction.prompt) {
+        console.error(
+          `LiteChat: Cannot regenerate - interaction ${interactionId} or its prompt not found.`,
+        );
+        toast.error("Cannot regenerate: Original interaction data missing.");
+        return;
+      }
 
-    const messages: CoreMessage[] = historyUpToParent
-      .filter(
-        (i) => i.type === "message.user_assistant" && i.status === "COMPLETED",
-      )
-      .flatMap((i) => [
-        i.prompt ? { role: "user", content: i.prompt.content as string } : null,
-        i.response ? { role: "assistant", content: i.response } : null,
-      ])
-      .filter((m): m is CoreMessage => m !== null);
+      const historyUpToIndex = targetInteraction.index;
+      const historyUpToParent = interactionStore.interactions.filter(
+        (i) => i.index < historyUpToIndex,
+      );
 
-    // TODO: Handle multi-modal content from targetInteraction.prompt.content
-    messages.push({
-      role: "user",
-      content: targetInteraction.prompt.content as string,
-    });
+      // Corrected mapping
+      const messages: CoreMessage[] = historyUpToParent
+        .filter(
+          (i) =>
+            i.type === "message.user_assistant" && i.status === "COMPLETED",
+        )
+        .flatMap((i): CoreMessage[] => {
+          // Return CoreMessage[] explicitly
+          const msgs: CoreMessage[] = [];
+          if (i.prompt?.content && typeof i.prompt.content === "string") {
+            msgs.push({ role: "user", content: i.prompt.content });
+          }
+          if (i.response && typeof i.response === "string") {
+            msgs.push({ role: "assistant", content: i.response });
+          }
+          return msgs;
+        }); // No need for filter
 
-    const systemPrompt = useSettingsStore.getState().globalSystemPrompt;
+      if (
+        targetInteraction.prompt?.content &&
+        typeof targetInteraction.prompt.content === "string"
+      ) {
+        messages.push({
+          role: "user",
+          content: targetInteraction.prompt.content,
+        });
+      } else {
+        console.error(
+          `LiteChat: Cannot regenerate - missing or invalid user prompt content in interaction ${interactionId}.`,
+        );
+        toast.error("Cannot regenerate: Original user prompt missing.");
+        return;
+      }
 
-    const aiPayload: PromptObject = {
-      system: systemPrompt,
-      messages: messages,
-      parameters: targetInteraction.prompt.parameters,
-      metadata: {
-        ...targetInteraction.prompt.metadata,
-        regeneratedFromId: interactionId,
-      },
-    };
+      const systemPrompt = useSettingsStore.getState().globalSystemPrompt;
 
-    emitter.emit("prompt:finalised", { prompt: aiPayload });
-    console.log(
-      `LiteChat: Submitting regeneration request for ${interactionId}:`,
-      aiPayload,
-    );
+      const aiPayload: PromptObject = {
+        system: systemPrompt,
+        messages: messages, // Use correctly typed array
+        parameters: targetInteraction.prompt.parameters,
+        metadata: {
+          ...targetInteraction.prompt.metadata,
+          regeneratedFromId: interactionId,
+        },
+      };
 
-    try {
-      // TODO: Pass multi-modal content if needed
-      await AIService.startInteraction(aiPayload, targetInteraction.prompt);
+      emitter.emit("prompt:finalised", { prompt: aiPayload });
       console.log(
-        `LiteChat: AIService regeneration interaction started for ${interactionId}.`,
+        `LiteChat: Submitting regeneration request for ${interactionId}:`,
+        aiPayload,
       );
-    } catch (e) {
-      console.error(
-        `LiteChat: Error starting regeneration for ${interactionId}:`,
-        e,
-      );
-      toast.error("Failed to start regeneration.");
-    }
-  }, []);
+
+      try {
+        await AIService.startInteraction(aiPayload, targetInteraction.prompt);
+        console.log(
+          `LiteChat: AIService regeneration interaction started for ${interactionId}.`,
+        );
+      } catch (e) {
+        console.error(
+          `LiteChat: Error starting regeneration for ${interactionId}:`,
+          e,
+        );
+        toast.error("Failed to start regeneration.");
+      }
+    },
+    [globalSystemPrompt],
+  );
 
   // --- Stop Handler ---
   const onStopInteraction = useCallback((interactionId: string) => {
@@ -300,18 +358,15 @@ export const LiteChat: React.FC = () => {
           className="flex items-center justify-end p-2 border-b bg-card flex-shrink-0"
         />
 
-        {/* Chat Canvas */}
+        {/* Chat Canvas - Remove unused allInteractions prop */}
         <ChatCanvas
           conversationId={selectedConversationId}
           interactions={interactions}
-          interactionRenderer={(
-            interaction,
-            //  allInteractions
-          ) => (
+          interactionRenderer={(interaction /* Removed allInteractions */) => (
             <InteractionCard
               key={interaction.id}
               interaction={interaction}
-              // allInteractions={allInteractions} // Pass if needed by Card
+              // allInteractions={allInteractions} // Removed
               onRegenerate={onRegenerateInteraction}
             />
           )}

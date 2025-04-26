@@ -3,11 +3,11 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type {
   DbMod,
-  ModInstance, // Added back ModInstance
+  ModInstance,
   ModState as ModStoreState,
   ModActions as ModStoreActions,
-  CustomSettingTab, // Import CustomSettingTab
-} from "@/types/litechat/modding";
+  CustomSettingTab,
+} from "@/types/litechat/modding"; // Correct path
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
@@ -17,7 +17,7 @@ export const useModStore = create(
     // Initial State
     dbMods: [],
     loadedMods: [],
-    modSettingsTabs: [], // Initialize tabs state
+    modSettingsTabs: [],
     isLoading: false,
     error: null,
 
@@ -70,9 +70,11 @@ export const useModStore = create(
       set((state) => {
         const index = state.dbMods.findIndex((m) => m.id === id);
         if (index !== -1) {
-          originalMod = { ...state.dbMods[index] };
-          Object.assign(state.dbMods[index], changes);
-          modToUpdate = state.dbMods[index];
+          originalMod = { ...state.dbMods[index] }; // Capture original state
+          // Apply changes to a temporary object first to ensure type safety
+          const updatedModData = { ...state.dbMods[index], ...changes };
+          state.dbMods[index] = updatedModData; // Assign the updated object
+          modToUpdate = state.dbMods[index]; // Reference the updated object in state
           if (changes.loadOrder !== undefined) {
             state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
           }
@@ -83,15 +85,17 @@ export const useModStore = create(
 
       if (modToUpdate) {
         try {
+          // Use the guaranteed valid modToUpdate reference here
           await PersistenceService.saveMod(modToUpdate);
-          toast.success(`Mod "${modToUpdate.name}" updated.`);
+          toast.success(`Mod "${modToUpdate.name}" updated.`); // Safe to access name
         } catch (e) {
           const errorMsg = "Failed to save mod update";
           console.error("ModStore: Error updating mod", e);
           set((state) => {
             const index = state.dbMods.findIndex((m) => m.id === id);
+            // Use originalMod for reverting, as modToUpdate might be stale if save failed
             if (index !== -1 && originalMod) {
-              state.dbMods[index] = originalMod;
+              state.dbMods[index] = originalMod; // Revert to original
               state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
             }
             state.error = errorMsg;
@@ -122,7 +126,6 @@ export const useModStore = create(
         const errorMsg = "Failed to delete mod";
         console.error("ModStore: Error deleting mod", e);
         set((state) => {
-          // Ensure modToDelete is available here
           if (modToDelete) {
             state.dbMods.push(modToDelete);
             state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
@@ -138,10 +141,8 @@ export const useModStore = create(
       set({ loadedMods });
     },
 
-    // Added tab actions
     _addSettingsTab: (tab) => {
       set((state) => {
-        // Avoid duplicates
         if (!state.modSettingsTabs.some((t) => t.id === tab.id)) {
           state.modSettingsTabs.push(tab);
           state.modSettingsTabs.sort(

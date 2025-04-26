@@ -1,5 +1,5 @@
 // src/services/persistence.service.ts
-import { db } from "@/lib/litechat/db";
+import { db } from "@/lib/litechat/db"; // Correct path
 import type { Conversation } from "@/types/litechat/chat";
 import type { Interaction } from "@/types/litechat/interaction";
 import type { DbMod } from "@/types/litechat/modding";
@@ -12,7 +12,7 @@ export class PersistenceService {
       return await db.conversations.orderBy("updatedAt").reverse().toArray();
     } catch (error) {
       console.error("PersistenceService: Error loading conversations:", error);
-      throw error; // Re-throw for the store to handle
+      throw error;
     }
   }
 
@@ -27,7 +27,6 @@ export class PersistenceService {
 
   static async deleteConversation(id: string): Promise<void> {
     try {
-      // Transaction handled by caller (ConversationStore)
       await db.conversations.delete(id);
     } catch (error) {
       console.error("PersistenceService: Error deleting conversation:", error);
@@ -113,7 +112,6 @@ export class PersistenceService {
   // App State (Settings)
   static async saveSetting(key: string, value: any): Promise<string> {
     try {
-      // Prefix key to avoid collisions
       return await db.appState.put({ key: `settings:${key}`, value });
     } catch (error) {
       console.error("PersistenceService: Error saving setting:", error);
@@ -127,7 +125,6 @@ export class PersistenceService {
       return setting?.value !== undefined ? (setting.value as T) : defaultVal;
     } catch (error) {
       console.error("PersistenceService: Error loading setting:", error);
-      // Return default value on error to allow app to continue
       return defaultVal;
     }
   }
@@ -188,14 +185,12 @@ export class PersistenceService {
   static async deleteApiKey(id: string): Promise<void> {
     try {
       await db.transaction("rw", db.apiKeys, db.providerConfigs, async (tx) => {
-        // 1. Find configs linked to this key
         const configsToUpdate = await tx
           .table<DbProviderConfig>("providerConfigs")
           .where("apiKeyId")
           .equals(id)
           .toArray();
 
-        // 2. Update linked configs to remove the apiKeyId
         if (configsToUpdate.length > 0) {
           const updates = configsToUpdate.map((config) =>
             tx
@@ -207,8 +202,6 @@ export class PersistenceService {
             `PersistenceService: Unlinked API key ${id} from ${configsToUpdate.length} provider configs.`,
           );
         }
-
-        // 3. Delete the API key itself
         await tx.table<DbApiKey>("apiKeys").delete(id);
       });
     } catch (error) {
@@ -217,28 +210,31 @@ export class PersistenceService {
     }
   }
 
-  // --- Added clearAllData ---
+  // --- Corrected clearAllData ---
   static async clearAllData(): Promise<void> {
     try {
-      // await db.transaction(
-      //   "rw",
-      //   db.conversations,
-      //   db.interactions,
-      //   db.mods,
-      //   db.appState,
-      //   db.providerConfigs,
-      //   db.apiKeys,
-      //   async () => {
-      //     await db.interactions.clear();
-      //     await db.conversations.clear();
-      //     await db.mods.clear();
-      //     await db.appState.clear();
-      //     await db.providerConfigs.clear();
-      //     await db.apiKeys.clear();
-      //   },
-      // );
-      // console.log("PersistenceService: All data cleared.");
-      throw new Error("TODO");
+      // Pass table instances directly as arguments after the mode string
+      await db.transaction(
+        "rw",
+        db.conversations,
+        db.interactions,
+        db.mods,
+        db.appState,
+        db.providerConfigs,
+        db.apiKeys,
+        // Add other tables here if needed
+        async () => {
+          // Clear each table within the transaction
+          await db.interactions.clear();
+          await db.conversations.clear();
+          await db.mods.clear();
+          await db.appState.clear();
+          await db.providerConfigs.clear();
+          await db.apiKeys.clear();
+          // Add clear calls for other tables here
+        },
+      );
+      console.log("PersistenceService: All data cleared.");
     } catch (error) {
       console.error("PersistenceService: Error clearing all data:", error);
       throw error;

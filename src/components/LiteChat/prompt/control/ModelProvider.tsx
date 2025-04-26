@@ -10,40 +10,52 @@ import {
 } from "@/components/ui/select";
 import { useShallow } from "zustand/react/shallow";
 import type { PromptControl } from "@/types/litechat/prompt";
+// Import DbProviderConfig and AiProviderConfig types
+import type {
+  DbProviderConfig,
+  AiProviderConfig,
+} from "@/types/litechat/provider";
 import { useControlRegistryStore } from "@/store/control.store";
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const ModelProviderControlComponent: React.FC = () => {
   const {
     selectedProviderId,
     selectedModelId,
-    selectProvider,
-    selectModel,
-    getActiveProviders,
-    dbProviderConfigs, // Need configs to get models
-    isLoading, // Add isLoading state
+    selectProvider, // Use correct action name
+    selectModel, // Use correct action name
+    getActiveProviders, // Use correct action name
+    dbProviderConfigs, // Use correct state name
+    isLoading, // Use correct state name
   } = useProviderStore(
     useShallow((state) => ({
       selectedProviderId: state.selectedProviderId,
       selectedModelId: state.selectedModelId,
-      selectProvider: state.selectProvider,
-      selectModel: state.selectModel,
-      getActiveProviders: state.getActiveProviders,
-      dbProviderConfigs: state.dbProviderConfigs,
-      isLoading: state.isLoading, // Get isLoading
+      selectProvider: state.selectProvider, // Correct action
+      selectModel: state.selectModel, // Correct action
+      getActiveProviders: state.getActiveProviders, // Correct action
+      dbProviderConfigs: state.dbProviderConfigs, // Correct state
+      isLoading: state.isLoading, // Correct state
     })),
   );
 
-  const activeProviders = getActiveProviders();
+  // Ensure getActiveProviders is called correctly
+  const activeProviders = getActiveProviders ? getActiveProviders() : [];
+
   const modelsForSelectedProvider = React.useMemo(() => {
-    const config = dbProviderConfigs.find((p) => p.id === selectedProviderId);
+    // Add type annotation for p
+    const config = dbProviderConfigs.find(
+      (p: DbProviderConfig) => p.id === selectedProviderId,
+    );
     if (!config) return [];
-    const all = config.fetchedModels ?? []; // Use fetched or default logic if needed
+    const all = config.fetchedModels ?? [];
     const enabled = config.enabledModels ?? [];
-    return enabled.length > 0 ? all.filter((m) => enabled.includes(m.id)) : all;
+    // Add type annotation for m
+    return enabled.length > 0
+      ? all.filter((m: { id: string }) => enabled.includes(m.id))
+      : all;
   }, [selectedProviderId, dbProviderConfigs]);
 
-  // Show skeleton loaders if data is loading
   if (isLoading) {
     return (
       <div className="flex items-center gap-1">
@@ -57,8 +69,8 @@ export const ModelProviderControlComponent: React.FC = () => {
     <div className="flex items-center gap-1">
       <Select
         value={selectedProviderId ?? ""}
-        onValueChange={(v) => selectProvider(v || null)}
-        disabled={activeProviders.length === 0} // Disable if no providers
+        onValueChange={(v) => selectProvider(v || null)} // Call correct action
+        disabled={activeProviders.length === 0}
       >
         <SelectTrigger className="h-8 text-xs w-[120px]">
           <SelectValue placeholder="Provider" />
@@ -69,7 +81,8 @@ export const ModelProviderControlComponent: React.FC = () => {
               No providers enabled
             </SelectItem>
           )}
-          {activeProviders.map((p) => (
+          {/* Add type annotation for p */}
+          {activeProviders.map((p: AiProviderConfig) => (
             <SelectItem key={p.id} value={p.id}>
               {p.name}
             </SelectItem>
@@ -78,8 +91,8 @@ export const ModelProviderControlComponent: React.FC = () => {
       </Select>
       <Select
         value={selectedModelId ?? ""}
-        onValueChange={(v) => selectModel(v || null)}
-        disabled={!selectedProviderId || modelsForSelectedProvider.length === 0} // Disable if no provider or models
+        onValueChange={(v) => selectModel(v || null)} // Call correct action
+        disabled={!selectedProviderId || modelsForSelectedProvider.length === 0}
       >
         <SelectTrigger className="h-8 text-xs w-[150px]">
           <SelectValue placeholder="Model" />
@@ -90,7 +103,8 @@ export const ModelProviderControlComponent: React.FC = () => {
               {selectedProviderId ? "No models available" : "Select provider"}
             </SelectItem>
           )}
-          {modelsForSelectedProvider.map((m) => (
+          {/* Add type annotation for m */}
+          {modelsForSelectedProvider.map((m: { id: string; name?: string }) => (
             <SelectItem key={m.id} value={m.id}>
               {m.name || m.id}
             </SelectItem>
@@ -106,10 +120,9 @@ export const useModelProviderControlRegistration = () => {
   const register = useControlRegistryStore(
     (state) => state.registerPromptControl,
   );
-  // Use a single selector for provider state
   const providerState = useProviderStore(
     useShallow((state) => ({
-      isLoading: state.isLoading,
+      isLoading: state.isLoading, // Use correct state name
       selectedProviderId: state.selectedProviderId,
       selectedModelId: state.selectedModelId,
     })),
@@ -118,20 +131,17 @@ export const useModelProviderControlRegistration = () => {
   React.useEffect(() => {
     const control: PromptControl = {
       id: "core-model-provider",
-      // Status depends only on isLoading
       status: () => (providerState.isLoading ? "loading" : "ready"),
       trigger: () => <ModelProviderControlComponent />,
       show: () => true,
-      // Provide selected IDs as metadata for the PromptTurnObject
       getMetadata: () => ({
         providerId: providerState.selectedProviderId,
         modelId: providerState.selectedModelId,
       }),
-      order: 10, // Define an order
+      order: 10,
     };
     const unregister = register(control);
     return unregister;
-    // Ensure re-registration if relevant state changes that affect metadata or status
   }, [
     register,
     providerState.isLoading,
@@ -139,6 +149,5 @@ export const useModelProviderControlRegistration = () => {
     providerState.selectedModelId,
   ]);
 
-  // This hook doesn't render anything itself
   return null;
 };

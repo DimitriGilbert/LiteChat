@@ -6,7 +6,8 @@ import type {
   DbApiKey,
   AiProviderConfig,
   AiModelConfig,
-} from "@/types/litechat/provider"; // Removed DbProviderType import
+  DbProviderType, // Keep DbProviderType
+} from "@/types/litechat/provider";
 import { PersistenceService } from "@/services/persistence.service";
 import {
   createAiModelConfig,
@@ -15,10 +16,12 @@ import {
 } from "@/lib/litechat/provider-helpers";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
+// Correct import path for model-fetcher service
+import { fetchModelsForProvider } from "@/services/model-fetcher"; // Correct path
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
+const LAST_SELECTION_KEY = "provider:lastSelection";
 
-// Export ProviderState for use in components
 export interface ProviderState {
   dbProviderConfigs: DbProviderConfig[];
   dbApiKeys: DbApiKey[];
@@ -27,14 +30,13 @@ export interface ProviderState {
   providerFetchStatus: Record<string, FetchStatus>;
   isLoading: boolean;
   error: string | null;
-  enableApiKeyManagement: boolean; // Added property
+  enableApiKeyManagement: boolean;
 }
 
-interface ProviderActions {
+export interface ProviderActions {
   loadInitialData: () => Promise<void>;
   selectProvider: (id: string | null) => void;
   selectModel: (id: string | null) => void;
-  // Updated addApiKey signature
   addApiKey: (
     name: string,
     providerId: string,
@@ -55,7 +57,6 @@ interface ProviderActions {
   getApiKeyForProvider: (providerId: string) => string | undefined;
   getActiveProviders: () => AiProviderConfig[];
   _setProviderFetchStatus: (providerId: string, status: FetchStatus) => void;
-  // Action to set the flag (optional, could be loaded from env/config)
   setEnableApiKeyManagement: (enabled: boolean) => void;
 }
 
@@ -69,25 +70,20 @@ export const useProviderStore = create(
     providerFetchStatus: {},
     isLoading: true,
     error: null,
-    enableApiKeyManagement: true, // Default value, load from settings/env if needed
+    enableApiKeyManagement: true,
 
-    // Action to set the flag
     setEnableApiKeyManagement: (enabled) => {
       set({ enableApiKeyManagement: enabled });
-      // Optionally persist this setting if it's user-configurable
-      // PersistenceService.saveSetting('enableApiKeyManagement', enabled);
+      PersistenceService.saveSetting("enableApiKeyManagement", enabled);
     },
 
-    // Actions
     loadInitialData: async () => {
       set({ isLoading: true, error: null });
       try {
-        // Load API key management setting if persisted
         const enableApiMgmt = await PersistenceService.loadSetting<boolean>(
           "enableApiKeyManagement",
           true,
-        ); // Load setting or use default
-
+        );
         const [configs, keys] = await Promise.all([
           PersistenceService.loadProviderConfigs(),
           PersistenceService.loadApiKeys(),
@@ -96,12 +92,12 @@ export const useProviderStore = create(
           dbProviderConfigs: configs,
           dbApiKeys: keys,
           enableApiKeyManagement: enableApiMgmt,
-        }); // Set loaded value
+        });
 
         const lastSelection = await PersistenceService.loadSetting<{
           providerId: string | null;
           modelId: string | null;
-        }>("providerLastSelection", { providerId: null, modelId: null });
+        }>(LAST_SELECTION_KEY, { providerId: null, modelId: null });
 
         let providerToSelect = lastSelection.providerId;
         let modelToSelect = lastSelection.modelId;
@@ -120,23 +116,35 @@ export const useProviderStore = create(
           const providerConfig =
             savedProviderConfig ??
             configs.find((p) => p.id === providerToSelect);
-          const providerTypeKey =
-            providerConfig?.type as keyof typeof DEFAULT_MODELS;
-          const availableModels =
-            providerConfig?.fetchedModels ??
-            (providerConfig ? DEFAULT_MODELS[providerTypeKey] || [] : []);
-          const enabledModelIds = providerConfig?.enabledModels ?? [];
-          const modelsToConsider =
-            enabledModelIds.length > 0
-              ? availableModels.filter((m) => enabledModelIds.includes(m.id))
-              : availableModels;
+          // Add null check for providerConfig
+          if (providerConfig) {
+            const providerTypeKey =
+              providerConfig.type as keyof typeof DEFAULT_MODELS;
+            const availableModels =
+              providerConfig.fetchedModels ??
+              (DEFAULT_MODELS[providerTypeKey] || []);
+            const enabledModelIds = providerConfig.enabledModels ?? [];
+            const modelsToConsider =
+              enabledModelIds.length > 0
+                ? availableModels.filter((m) => enabledModelIds.includes(m.id))
+                : availableModels;
 
-          const modelIsValid = modelsToConsider.some(
-            (m) => m.id === modelToSelect,
-          );
+            const modelIsValid = modelsToConsider.some(
+              (m) => m.id === modelToSelect,
+            );
 
-          if (!modelIsValid) {
+            if (!modelIsValid) {
+              console.warn(
+                `Saved model ${modelToSelect} invalid for provider ${providerToSelect}, resetting.`,
+              );
+              modelToSelect = null;
+            }
+          } else {
+            // If the saved provider ID doesn't exist anymore
             modelToSelect = null;
+            providerToSelect = null; // Also reset provider
+            const firstEnabled = configs.find((p) => p.isEnabled); // Find fallback again
+            providerToSelect = firstEnabled?.id ?? null;
           }
         }
 
@@ -152,7 +160,7 @@ export const useProviderStore = create(
           selectedModelId: modelToSelect,
           isLoading: false,
         });
-        PersistenceService.saveSetting("providerLastSelection", {
+        await PersistenceService.saveSetting(LAST_SELECTION_KEY, {
           providerId: providerToSelect,
           modelId: modelToSelect,
         });
@@ -162,6 +170,7 @@ export const useProviderStore = create(
           isLoading: false,
           error: "Failed to load provider data",
         });
+        toast.error("Failed to load provider data");
       }
     },
 
@@ -169,32 +178,33 @@ export const useProviderStore = create(
       const config = get().dbProviderConfigs.find((p) => p.id === id);
       const modelId = getDefaultModelIdForProvider(config);
       set({ selectedProviderId: id, selectedModelId: modelId });
-      PersistenceService.saveSetting("providerLastSelection", {
+      PersistenceService.saveSetting(LAST_SELECTION_KEY, {
         providerId: id,
         modelId: modelId,
       });
     },
 
     selectModel: (id) => {
+      const currentProviderId = get().selectedProviderId;
       set({ selectedModelId: id });
-      PersistenceService.saveSetting("providerLastSelection", {
-        providerId: get().selectedProviderId,
+      PersistenceService.saveSetting(LAST_SELECTION_KEY, {
+        providerId: currentProviderId,
         modelId: id,
       });
     },
 
-    // Updated addApiKey implementation
     addApiKey: async (name, providerId, value) => {
       const newValue = value;
-      value = ""; // Clear original variable for safety
+      value = "";
       const newId = nanoid();
+      const now = new Date();
       const newKey: DbApiKey = {
         id: newId,
         name,
         value: newValue,
-        providerId: providerId, // Store the intended provider type/ID
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        providerId: providerId,
+        createdAt: now,
+        updatedAt: now,
       };
       try {
         await PersistenceService.saveApiKey(newKey);
@@ -277,10 +287,14 @@ export const useProviderStore = create(
         const index = state.dbProviderConfigs.findIndex((p) => p.id === id);
         if (index !== -1) {
           originalConfig = { ...state.dbProviderConfigs[index] };
-          Object.assign(state.dbProviderConfigs[index], {
+          // Ensure type safety when merging changes
+          const currentConfig = state.dbProviderConfigs[index];
+          const updatedConfigData = {
+            ...currentConfig,
             ...changes,
             updatedAt: new Date(),
-          });
+          };
+          state.dbProviderConfigs[index] = updatedConfigData;
           configToSave = state.dbProviderConfigs[index];
         } else {
           console.warn(`ProviderStore: Config ${id} not found for update.`);
@@ -288,23 +302,28 @@ export const useProviderStore = create(
       });
 
       if (configToSave) {
+        // Ensure configToSave is not null before accessing properties
+        const safeConfigToSave = configToSave;
         try {
-          await PersistenceService.saveProviderConfig(configToSave);
+          await PersistenceService.saveProviderConfig(safeConfigToSave);
           if (get().selectedProviderId === id) {
-            if (!configToSave.isEnabled) {
+            // Use safeConfigToSave here
+            if (!safeConfigToSave.isEnabled) {
               const firstEnabled = get().dbProviderConfigs.find(
                 (p) => p.isEnabled,
               );
               get().selectProvider(firstEnabled?.id ?? null);
             } else {
               const currentModelId = get().selectedModelId;
-              const defaultModelId = getDefaultModelIdForProvider(configToSave);
+              // Use safeConfigToSave here
+              const defaultModelId =
+                getDefaultModelIdForProvider(safeConfigToSave);
               const providerTypeKey =
-                configToSave.type as keyof typeof DEFAULT_MODELS;
+                safeConfigToSave.type as keyof typeof DEFAULT_MODELS;
               const availableModels =
-                configToSave.fetchedModels ??
+                safeConfigToSave.fetchedModels ??
                 (DEFAULT_MODELS[providerTypeKey] || []);
-              const enabledModelIds = configToSave.enabledModels ?? [];
+              const enabledModelIds = safeConfigToSave.enabledModels ?? [];
               const modelsToConsider =
                 enabledModelIds.length > 0
                   ? availableModels.filter((m) =>
@@ -318,6 +337,11 @@ export const useProviderStore = create(
 
               if (!modelIsValid) {
                 get().selectModel(defaultModelId);
+              } else {
+                PersistenceService.saveSetting(LAST_SELECTION_KEY, {
+                  providerId: id,
+                  modelId: currentModelId,
+                });
               }
             }
           }
@@ -369,41 +393,33 @@ export const useProviderStore = create(
         (p) => p.id === providerConfigId,
       );
       if (!config) {
-        toast.error("Provider not found for fetching models.");
+        toast.error("Provider configuration not found for fetching models.");
         return;
       }
-      if (get().providerFetchStatus[providerConfigId] === "fetching") return;
+      if (get().providerFetchStatus[providerConfigId] === "fetching") {
+        console.log(
+          `[ProviderStore] Fetch already in progress for ${config.name}`,
+        );
+        return;
+      }
 
       get()._setProviderFetchStatus(providerConfigId, "fetching");
       try {
-        const apiKey = get().getApiKeyForProvider(providerConfigId);
-        console.log(
-          `[ProviderStore] TODO: Implement actual fetchModelsForProvider service call for ${config.name}`,
-        );
-        // Placeholder fetch logic
-        const fetched: { id: string; name: string }[] = [
-          {
-            id: `fetched-${config.type}-${Date.now() % 100}`,
-            name: `Fetched ${config.type} ${Date.now() % 100}`,
-          },
-          {
-            id: `fetched-${config.type}-other`,
-            name: `Fetched ${config.type} Other`,
-          },
-          ...(DEFAULT_MODELS[config.type as keyof typeof DEFAULT_MODELS] || []),
-        ];
+        const apiKeyId = config.apiKeyId;
+        const apiKey = get().dbApiKeys.find((k) => k.id === apiKeyId)?.value;
+
+        const fetched = await fetchModelsForProvider(config, apiKey);
+
         await get().updateProviderConfig(providerConfigId, {
           fetchedModels: fetched,
           modelsLastFetchedAt: new Date(),
         });
+
         get()._setProviderFetchStatus(providerConfigId, "success");
         toast.success(`Models fetched successfully for ${config.name}`);
       } catch (error) {
         console.error(`Error fetching models for ${config.name}:`, error);
         get()._setProviderFetchStatus(providerConfigId, "error");
-        toast.error(
-          `Failed to fetch models for ${config.name}: ${error instanceof Error ? error.message : String(error)}`,
-        );
       }
     },
 
@@ -416,6 +432,7 @@ export const useProviderStore = create(
       }));
     },
 
+    // --- Selectors ---
     getSelectedProvider: () => {
       const { selectedProviderId, dbProviderConfigs } = get();
       const config = dbProviderConfigs.find((p) => p.id === selectedProviderId);
@@ -430,7 +447,7 @@ export const useProviderStore = create(
         enabledModelIds.size > 0
           ? allAvailable.filter((m: { id: string }) =>
               enabledModelIds.has(m.id),
-            ) // Added type
+            )
           : allAvailable;
 
       const sortOrder = config.modelSortOrder ?? [];
@@ -438,7 +455,7 @@ export const useProviderStore = create(
         const orderedList: { id: string; name: string }[] = [];
         const addedIds = new Set<string>();
         const displayModelMap = new Map(
-          displayModels.map((m: { id: string; name: string }) => [m.id, m]), // Added type
+          displayModels.map((m: { id: string; name: string }) => [m.id, m]),
         );
 
         for (const modelId of sortOrder) {
@@ -448,24 +465,33 @@ export const useProviderStore = create(
             addedIds.add(modelId);
           }
         }
+        // Add type annotations for a and b
         const remaining = displayModels
-          .filter((m: { id: string }) => !addedIds.has(m.id)) // Added type
-          .sort((a: { name: string }, b: { name: string }) =>
-            a.name.localeCompare(b.name),
-          ); // Added type
+          .filter((m: { id: string }) => !addedIds.has(m.id))
+          .sort(
+            (
+              a: { name?: string; id: string },
+              b: { name?: string; id: string },
+            ) => (a.name || a.id).localeCompare(b.name || b.id),
+          );
         displayModels = [...orderedList, ...remaining];
       } else {
-        displayModels.sort((a: { name: string }, b: { name: string }) =>
-          a.name.localeCompare(b.name),
-        ); // Added type
+        // Add type annotations for a and b
+        displayModels.sort(
+          (
+            a: { name?: string; id: string },
+            b: { name?: string; id: string },
+          ) => (a.name || a.id).localeCompare(b.name || b.id),
+        );
       }
 
-      const aiModels = displayModels.map((m: { id: string; name: string }) => ({
-        // Added type
-        id: m.id,
-        name: m.name,
-        instance: null,
-      }));
+      const aiModels = displayModels.map(
+        (m: { id: string; name: string }): AiModelConfig => ({
+          id: m.id,
+          name: m.name,
+          instance: null,
+        }),
+      );
 
       return {
         id: config.id,
@@ -485,8 +511,8 @@ export const useProviderStore = create(
       } = get();
       const config = dbProviderConfigs.find((p) => p.id === selectedProviderId);
       if (!config || !selectedModelId) return undefined;
-      const apiKeyRecord = dbApiKeys.find((k) => k.id === config.apiKeyId); // Removed unused apiKey variable
-      return createAiModelConfig(config, selectedModelId, apiKeyRecord?.value); // Pass value directly
+      const apiKeyRecord = dbApiKeys.find((k) => k.id === config.apiKeyId);
+      return createAiModelConfig(config, selectedModelId, apiKeyRecord?.value);
     },
 
     getApiKeyForProvider: (providerId) => {
@@ -496,9 +522,8 @@ export const useProviderStore = create(
 
     getActiveProviders: () => {
       return get()
-        .dbProviderConfigs.filter((p: DbProviderConfig) => p.isEnabled) // Added type
-        .map((c: DbProviderConfig) => {
-          // Added type
+        .dbProviderConfigs.filter((p: DbProviderConfig) => p.isEnabled)
+        .map((c: DbProviderConfig): AiProviderConfig | null => {
           const providerTypeKey = c.type as keyof typeof DEFAULT_MODELS;
           const allAvailable =
             c.fetchedModels ?? (DEFAULT_MODELS[providerTypeKey] || []);
@@ -508,7 +533,7 @@ export const useProviderStore = create(
             enabledModelIds.size > 0
               ? allAvailable.filter((m: { id: string }) =>
                   enabledModelIds.has(m.id),
-                ) // Added type
+                )
               : allAvailable;
 
           const sortOrder = c.modelSortOrder ?? [];
@@ -516,7 +541,7 @@ export const useProviderStore = create(
             const orderedList: { id: string; name: string }[] = [];
             const addedIds = new Set<string>();
             const displayModelMap = new Map(
-              displayModels.map((m: { id: string; name: string }) => [m.id, m]), // Added type
+              displayModels.map((m: { id: string; name: string }) => [m.id, m]),
             );
             for (const modelId of sortOrder) {
               const model = displayModelMap.get(modelId);
@@ -525,21 +550,28 @@ export const useProviderStore = create(
                 addedIds.add(modelId);
               }
             }
+            // Add type annotations for a and b
             const remaining = displayModels
-              .filter((m: { id: string }) => !addedIds.has(m.id)) // Added type
-              .sort((a: { name: string }, b: { name: string }) =>
-                a.name.localeCompare(b.name),
-              ); // Added type
+              .filter((m: { id: string }) => !addedIds.has(m.id))
+              .sort(
+                (
+                  a: { name?: string; id: string },
+                  b: { name?: string; id: string },
+                ) => (a.name || a.id).localeCompare(b.name || b.id),
+              );
             displayModels = [...orderedList, ...remaining];
           } else {
-            displayModels.sort((a: { name: string }, b: { name: string }) =>
-              a.name.localeCompare(b.name),
-            ); // Added type
+            // Add type annotations for a and b
+            displayModels.sort(
+              (
+                a: { name?: string; id: string },
+                b: { name?: string; id: string },
+              ) => (a.name || a.id).localeCompare(b.name || b.id),
+            );
           }
 
           const aiModels = displayModels.map(
-            (m: { id: string; name: string }) => ({
-              // Added type
+            (m: { id: string; name: string }): AiModelConfig => ({
               id: m.id,
               name: m.name,
               instance: null,
@@ -553,7 +585,8 @@ export const useProviderStore = create(
             models: aiModels,
             allAvailableModels: allAvailable,
           };
-        });
+        })
+        .filter((p): p is AiProviderConfig => p !== null);
     },
   })),
 );
