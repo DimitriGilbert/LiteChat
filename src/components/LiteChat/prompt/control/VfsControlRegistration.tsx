@@ -20,17 +20,17 @@ import {
 import { FileManager } from "@/components/LiteChat/file-manager/FileManager";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useVfsStore } from "@/store/vfs.store";
-import { useInputStore } from "@/store/input.store"; // Correct store
+import { useInputStore } from "@/store/input.store";
 import { cn } from "@/lib/utils";
 import type { PromptControl } from "@/types/litechat/prompt";
-// Import VfsFile and VfsFileObject
-import type { VfsFile, VfsFileObject } from "@/types/litechat/vfs"; // Correct path
+import type { VfsFile, VfsFileObject } from "@/types/litechat/vfs";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
 
 const CONTROL_ID = "core-vfs-control";
 
 // --- VFS Prompt Control Component ---
+// VfsPromptControl component remains the same...
 const VfsPromptControl: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -44,13 +44,12 @@ const VfsPromptControl: React.FC = () => {
     })),
   );
 
-  // Use correct actions from InputStore
   const { setSelectedFiles, selectedVfsFiles, clearSelectedFiles } =
     useInputStore(
       useShallow((state) => ({
-        setSelectedFiles: state.setSelectedFiles, // Correct action name
-        selectedVfsFiles: state.selectedVfsFiles, // Correct state name
-        clearSelectedFiles: state.clearSelectedFiles, // Correct action name
+        setSelectedFiles: state.setSelectedFiles,
+        selectedVfsFiles: state.selectedVfsFiles,
+        clearSelectedFiles: state.clearSelectedFiles,
       })),
     );
 
@@ -60,10 +59,8 @@ const VfsPromptControl: React.FC = () => {
       .filter((node): node is VfsFile => !!node && node.type === "file");
   }, [selectedFileIds, nodes]);
 
-  // Map VFS nodes to VfsFileObject for InputStore
   const mapToInputStoreFormat = useCallback(
     (vfsNodes: VfsFile[]): VfsFileObject[] => {
-      // Add return type
       return vfsNodes.map((node) => ({
         id: node.id,
         name: node.name,
@@ -91,7 +88,7 @@ const VfsPromptControl: React.FC = () => {
     setSelectedFiles,
     selectedVfsFiles,
     mapToInputStoreFormat,
-  ]); // Add mapToInputStoreFormat
+  ]);
 
   const handleFileSelectConfirm = useCallback(() => {
     const inputStoreFiles = mapToInputStoreFormat(selectedVfsNodes);
@@ -102,13 +99,17 @@ const VfsPromptControl: React.FC = () => {
     );
     toast.success(`${inputStoreFiles.length} file(s) attached from VFS.`);
     setIsDialogOpen(false);
-  }, [selectedVfsNodes, setSelectedFiles, mapToInputStoreFormat]); // Add mapToInputStoreFormat
+  }, [selectedVfsNodes, setSelectedFiles, mapToInputStoreFormat]);
 
   const handleDialogClose = useCallback(() => {
-    clearSelection();
-    clearSelectedFiles(); // Use correct action
+    // Only clear VFS store selection if dialog is closed *without* confirming
+    if (selectedFileIds.size > 0) {
+      clearSelection();
+    }
+    // Always clear InputStore selection on close, as it reflects the *intended* attachment
+    clearSelectedFiles();
     setIsDialogOpen(false);
-  }, [clearSelection, clearSelectedFiles]); // Use correct action
+  }, [clearSelection, clearSelectedFiles, selectedFileIds.size]);
 
   const getCurrentParentId = useVfsStore.getState().currentParentId;
 
@@ -143,10 +144,19 @@ const VfsPromptControl: React.FC = () => {
 
   const attachedVfsCount = useInputStore(
     (state) => state.selectedVfsFiles.length,
-  ); // Use correct state name
+  );
 
   return (
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+    <Dialog
+      open={isDialogOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          handleDialogClose(); // Use the close handler
+        } else {
+          setIsDialogOpen(true);
+        }
+      }}
+    >
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -211,10 +221,9 @@ export const useVfsControlRegistration = () => {
   const registerControl = useControlRegistryStore(
     (state) => state.registerPromptControl,
   );
-  // Use correct state name from VfsStore
   const { enableVfs } = useVfsStore(
     useShallow((state) => ({
-      enableVfs: state.enableVfs, // Correct state name
+      enableVfs: state.enableVfs,
     })),
   );
 
@@ -223,9 +232,8 @@ export const useVfsControlRegistration = () => {
       id: CONTROL_ID,
       status: () => "ready",
       trigger: () => <VfsPromptControl />,
-      show: () => enableVfs, // Use correct state name
+      show: () => enableVfs,
       getMetadata: () => {
-        // Use correct state name from InputStore
         const selected = useInputStore.getState().selectedVfsFiles;
         if (selected.length === 0) return null;
         return {
@@ -233,16 +241,21 @@ export const useVfsControlRegistration = () => {
         };
       },
       clearOnSubmit: () => {
-        // Use correct action name from InputStore
+        // Clear InputStore selection unconditionally after submit
         useInputStore.getState().clearSelectedFiles();
-        useVfsStore.getState().clearSelection();
+
+        // Only clear VFS store selection if it's not empty
+        const vfsStore = useVfsStore.getState();
+        if (vfsStore.selectedFileIds.size > 0) {
+          vfsStore.clearSelection();
+        }
       },
       order: 40,
     };
 
     const unregister = registerControl(control);
     return unregister;
-  }, [registerControl, enableVfs]); // Use correct state name
+  }, [registerControl, enableVfs]);
 
   return null;
 };

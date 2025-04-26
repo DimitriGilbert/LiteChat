@@ -16,9 +16,10 @@ import type {
   ModMiddlewarePayloadMap,
   ModMiddlewareReturnMap,
 } from "@/types/litechat/modding";
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils";
+import { useInputStore } from "@/store/input.store"; // Import InputStore
 
-// Helper to run middleware (could be moved to a service/hook)
+// Helper to run middleware (keep as is)
 async function runMiddleware<H extends ModMiddlewareHookName>(
   hookName: H,
   initialPayload: ModMiddlewarePayloadMap[H],
@@ -29,34 +30,30 @@ async function runMiddleware<H extends ModMiddlewareHookName>(
 
   for (const middleware of middlewareCallbacks) {
     try {
-      // Ensure the callback receives the correct payload type
-      const result = await middleware.callback(currentPayload as any); // Cast needed due to generic complexity
+      const result = await middleware.callback(currentPayload as any);
       if (result === false) {
         console.log(
           `Middleware ${middleware.modId} cancelled action for hook ${hookName}`,
         );
-        return false as ModMiddlewareReturnMap[H]; // Return false to indicate cancellation
+        return false as ModMiddlewareReturnMap[H];
       }
-      // Update payload only if middleware returned a new object
       if (result && typeof result === "object") {
-        currentPayload = result as any; // Update payload, cast needed
+        currentPayload = result as any;
       }
     } catch (error) {
       console.error(
         `Middleware error in mod ${middleware.modId} for hook ${hookName}:`,
         error,
       );
-      // Optionally cancel on error, or just log and continue
-      return false as ModMiddlewareReturnMap[H]; // Cancel on error
+      return false as ModMiddlewareReturnMap[H];
     }
   }
-  // Return the final payload (potentially modified)
   return currentPayload as ModMiddlewareReturnMap[H];
 }
 
 interface PromptWrapperProps {
   InputAreaRenderer: InputAreaRenderer;
-  onSubmit: (turnData: PromptTurnObject) => Promise<void>; // Submit the turn data
+  onSubmit: (turnData: PromptTurnObject) => Promise<void>;
   className?: string;
 }
 
@@ -65,7 +62,15 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   onSubmit,
   className,
 }) => {
-  const [inputValue, setInputValue] = useState("");
+  // Use InputStore for input value and clearing
+  const {
+    promptInputValue,
+    setPromptInputValue,
+    attachedFiles,
+    selectedVfsFiles,
+    clearAllInput,
+  } = useInputStore();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const registeredControls = useControlRegistryStore(
     (state) => state.promptControls,
@@ -82,19 +87,20 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     [registeredControls],
   );
 
-  const clearInputs = useCallback(() => {
-    setInputValue("");
+  // Clear inputs using InputStore action
+  const handleClearInputs = useCallback(() => {
+    clearAllInput(); // Use the combined clear action
+    // Also call control-specific clear functions
     activeControls.forEach((c) => {
       if (c.clearOnSubmit) c.clearOnSubmit();
     });
-  }, [activeControls]);
+  }, [activeControls, clearAllInput]);
 
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
       e?.preventDefault();
-      const trimmedInput = inputValue.trim();
+      const trimmedInput = promptInputValue.trim();
 
-      // Prevent submission if streaming
       if (isStreaming) {
         console.warn("Submit prevented: AI is currently streaming.");
         return;
@@ -135,20 +141,17 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         }
       }
 
-      // Basic check for content (can be refined, e.g., check for file metadata)
+      // Check for content (text, attached files, or VFS files)
       const hasContent =
-        trimmedInput ||
-        Object.keys(turnData.metadata).some((key) =>
-          key.startsWith("fileRef:"),
-        ); // Example check for file refs
+        trimmedInput || attachedFiles.length > 0 || selectedVfsFiles.length > 0;
 
       if (!hasContent) {
-        console.warn("Submit prevented: No content (text or file refs).");
+        console.warn("Submit prevented: No content provided.");
         setIsSubmitting(false);
         return;
       }
 
-      emitter.emit("prompt:submitted", { turnData }); // Emit event before middleware
+      emitter.emit("prompt:submitted", { turnData });
 
       // 2. Apply PROMPT_TURN_FINALIZE middleware
       const middlewareResult = await runMiddleware(
@@ -156,61 +159,82 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         { turnData },
       );
 
-      // Check if middleware cancelled the submission
       if (middlewareResult === false) {
         console.log("Submission cancelled by middleware:prompt:turnFinalize.");
         setIsSubmitting(false);
         return;
       }
 
-      // Ensure the result has the expected structure
       const finalTurnData =
         middlewareResult && typeof middlewareResult === "object"
           ? (middlewareResult as { turnData: PromptTurnObject }).turnData
-          : turnData; // Fallback to original if middleware result is unexpected
+          : turnData;
 
       // 3. Final submission
       try {
         await onSubmit(finalTurnData);
-        clearInputs(); // Clear inputs only on successful submission
+        handleClearInputs(); // Clear inputs on successful submission
       } catch (err) {
         console.error("Error during final prompt submission:", err);
-        // Optionally show an error toast to the user here
       } finally {
-        setIsSubmitting(false); // Always reset submitting state
+        setIsSubmitting(false);
       }
     },
-    [inputValue, activeControls, onSubmit, isStreaming, clearInputs],
+    [
+      promptInputValue,
+      activeControls,
+      onSubmit,
+      isStreaming,
+      handleClearInputs,
+      attachedFiles.length, // Add dependencies from InputStore
+      selectedVfsFiles.length,
+    ],
   );
 
-  // Separate handler for the InputArea's onSubmit prop
   const handleInputSubmit = useCallback(() => {
-    handleSubmit(); // Trigger the main form submission logic
+    handleSubmit();
   }, [handleSubmit]);
 
+  const hasPanelControls = activeControls.some((c) => !!c.renderer);
+
   return (
-    <form onSubmit={handleSubmit} className={cn(className)}>
-      {/* Render panel controls */}
-      <PromptControlWrapper
-        controls={activeControls}
-        area="panel"
-        className="p-2 border-b bg-muted/30" // Example styling
-      />
+    <form
+      onSubmit={handleSubmit}
+      className={cn("flex flex-col", className)} // Use flex-col for main layout
+    >
+      {/* Area for Panel Renderers (e.g., file previews) - Below Input */}
+      {hasPanelControls && (
+        <div className="p-2 border-b bg-muted/30">
+          <PromptControlWrapper controls={activeControls} area="panel" />
+        </div>
+      )}
+
+      {/* Input Area and Triggers/Submit Button */}
       <div className="p-3 md:p-4 flex items-end gap-2">
-        {/* Render the input area */}
-        <InputAreaRenderer
-          value={inputValue}
-          onChange={setInputValue}
-          onSubmit={handleInputSubmit} // Pass the specific handler
-          disabled={isSubmitting || isStreaming}
-        />
-        <div className="flex flex-col items-center gap-1">
+        {/* Input Area takes up most space */}
+        <div className="flex-grow">
+          <InputAreaRenderer
+            value={promptInputValue}
+            onChange={setPromptInputValue} // Use action from InputStore
+            onSubmit={handleInputSubmit}
+            disabled={isSubmitting || isStreaming}
+          />
+        </div>
+
+        {/* Container for Triggers and Submit Button */}
+        <div className="flex items-center gap-1 flex-shrink-0">
           {/* Render trigger controls */}
           <PromptControlWrapper controls={activeControls} area="trigger" />
           {/* Submit Button */}
           <Button
             type="submit"
-            disabled={isSubmitting || isStreaming || !inputValue.trim()} // Disable if no text input
+            disabled={
+              isSubmitting ||
+              isStreaming ||
+              (!promptInputValue.trim() &&
+                attachedFiles.length === 0 &&
+                selectedVfsFiles.length === 0) // Disable if no content at all
+            }
             size="icon"
             className="h-10 w-10 rounded-full"
             aria-label="Send message"

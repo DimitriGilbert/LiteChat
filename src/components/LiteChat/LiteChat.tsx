@@ -395,14 +395,9 @@ export const LiteChat: React.FC = () => {
         <ChatCanvas
           conversationId={selectedConversationId}
           interactions={interactions}
-          interactionRenderer={(interaction, allInteractions) => (
-            <InteractionCard
-              key={interaction.id}
-              interaction={interaction}
-              allInteractions={allInteractions} // Pass down all interactions
-              onRegenerate={onRegenerateInteraction}
-            />
-          )}
+          // interactionRenderer is handled internally by ChatCanvas now
+          // We pass onRegenerateInteraction down to InteractionCard via ChatCanvas
+          onRegenerateInteraction={onRegenerateInteraction}
           streamingInteractionsRenderer={(ids) => (
             <StreamingInteractionRenderer
               interactionIds={ids}

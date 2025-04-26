@@ -13,15 +13,23 @@ import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
 
 const SettingsGeneralComponent: React.FC = () => {
-  const { theme, setTheme, enableAdvancedSettings, setEnableAdvancedSettings } =
-    useSettingsStore(
-      useShallow((state) => ({
-        theme: state.theme,
-        setTheme: state.setTheme,
-        enableAdvancedSettings: state.enableAdvancedSettings,
-        setEnableAdvancedSettings: state.setEnableAdvancedSettings,
-      })),
-    );
+  const {
+    theme,
+    setTheme,
+    enableAdvancedSettings,
+    setEnableAdvancedSettings,
+    enableStreamingMarkdown, // Get new state
+    setEnableStreamingMarkdown, // Get new action
+  } = useSettingsStore(
+    useShallow((state) => ({
+      theme: state.theme,
+      setTheme: state.setTheme,
+      enableAdvancedSettings: state.enableAdvancedSettings,
+      setEnableAdvancedSettings: state.setEnableAdvancedSettings,
+      enableStreamingMarkdown: state.enableStreamingMarkdown, // Select new state
+      setEnableStreamingMarkdown: state.setEnableStreamingMarkdown, // Select new action
+    })),
+  );
 
   return (
     <div className="space-y-6 p-1">
@@ -32,7 +40,6 @@ const SettingsGeneralComponent: React.FC = () => {
             Theme
           </Label>
           <Select
-            // Ensure value is controlled and never undefined
             value={theme ?? "system"}
             onValueChange={(value) => setTheme(value as typeof theme)}
           >
@@ -45,6 +52,23 @@ const SettingsGeneralComponent: React.FC = () => {
               <SelectItem value="system">System</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        {/* New Setting: Streaming Markdown */}
+        <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+          <div>
+            <Label htmlFor="streaming-markdown-switch" className="font-medium">
+              Parse Markdown While Streaming
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Render Markdown formatting as the response arrives (may impact
+              performance slightly).
+            </p>
+          </div>
+          <Switch
+            id="streaming-markdown-switch"
+            checked={enableStreamingMarkdown ?? true} // Default checked state
+            onCheckedChange={setEnableStreamingMarkdown}
+          />
         </div>
       </div>
 
@@ -62,13 +86,11 @@ const SettingsGeneralComponent: React.FC = () => {
           </div>
           <Switch
             id="advanced-settings-switch"
-            // Ensure checked is always boolean
             checked={enableAdvancedSettings ?? false}
             onCheckedChange={setEnableAdvancedSettings}
           />
         </div>
       </div>
-      {/* Add other general settings here */}
     </div>
   );
 };

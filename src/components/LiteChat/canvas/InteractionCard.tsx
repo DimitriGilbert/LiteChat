@@ -15,42 +15,48 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useMarkdownParser } from "@/lib/litechat/useMarkdownParser"; // Import the hook
 
 interface InteractionCardProps {
-  interaction: Interaction;
-  allInteractions: Interaction[]; // Re-added prop
+  interaction: Interaction; // This should be the ASSISTANT interaction
+  allInteractionsInGroup: Interaction[]; // All interactions with the same index
   onRegenerate?: (id: string) => void;
   className?: string;
 }
 
 export const InteractionCard: React.FC<InteractionCardProps> = ({
-  interaction,
-  allInteractions, // Use this prop
+  interaction, // Expecting the assistant interaction here
+  allInteractionsInGroup,
   onRegenerate,
   className,
 }) => {
   const [revisionIndex, setRevisionIndex] = useState(0); // 0 is the latest
 
-  // Find all revisions for the current interaction's index
+  // Find all assistant revisions for the current interaction's index
   const revisions = useMemo(() => {
-    return allInteractions
+    return allInteractionsInGroup
       .filter(
         (i) =>
-          i.index === interaction.index &&
+          i.type === "message.user_assistant" && // Only assistant parts
           i.status !== "STREAMING" &&
-          i.type === interaction.type, // Ensure same type for revisions
+          i.response !== null, // Ensure it's an assistant response
       )
       .sort(
         (a, b) => (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0),
       ); // Sort descending by time (latest first)
-  }, [allInteractions, interaction.index, interaction.type]);
+  }, [allInteractionsInGroup]);
 
   // The interaction currently being displayed (based on revisionIndex)
-  const displayedInteraction = revisions[revisionIndex] || interaction; // Fallback to original prop
+  const displayedInteraction = revisions[revisionIndex] || interaction; // Fallback
 
-  const isAssistant = displayedInteraction.type === "message.user_assistant";
+  // Parse the Markdown content
+  const renderedHtml = useMarkdownParser(
+    typeof displayedInteraction.response === "string"
+      ? displayedInteraction.response
+      : null,
+  );
+
   const canRegenerate =
-    isAssistant &&
     displayedInteraction.status === "COMPLETED" &&
     typeof onRegenerate === "function" &&
     revisionIndex === 0; // Only allow regenerating the latest revision
@@ -58,7 +64,15 @@ export const InteractionCard: React.FC<InteractionCardProps> = ({
   const handleRegenerateClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onRegenerate) {
-      onRegenerate(displayedInteraction.id); // Regenerate the currently displayed one
+      // We need the ID of the *user* interaction that prompted this response
+      const userInteraction = allInteractionsInGroup.find(
+        (i) => i.type === "message.user_assistant" && i.prompt !== null,
+      );
+      if (userInteraction) {
+        onRegenerate(userInteraction.id); // Regenerate based on the user prompt interaction ID
+      } else {
+        console.error("Could not find user interaction to regenerate from.");
+      }
     }
   };
 
@@ -83,13 +97,10 @@ export const InteractionCard: React.FC<InteractionCardProps> = ({
         className,
       )}
     >
-      {/* Header Info */}
+      {/* Header Info - Simplified for Assistant Response */}
       <div className="text-xs text-muted-foreground mb-1 flex justify-between items-center">
         <span>
-          Idx:{displayedInteraction.index}{" "}
-          {displayedInteraction.parentId &&
-            `(Parent:${displayedInteraction.parentId.substring(0, 4)})`}{" "}
-          | {displayedInteraction.type} | {displayedInteraction.status}
+          Assistant | {displayedInteraction.status}
           {displayedInteraction.metadata?.modelId && (
             <span className="ml-2 text-blue-400">
               ({displayedInteraction.metadata.modelId})
@@ -162,25 +173,11 @@ export const InteractionCard: React.FC<InteractionCardProps> = ({
         </div>
       </div>
 
-      {/* Prompt Data (if available) */}
-      {displayedInteraction.prompt && (
-        <details className="mb-1 cursor-pointer">
-          <summary className="text-xs text-muted-foreground hover:text-foreground">
-            Show Turn Data
-          </summary>
-          <pre className="text-xs bg-muted p-1 rounded mt-1 overflow-x-auto">
-            {JSON.stringify(displayedInteraction.prompt, null, 2)}
-          </pre>
-        </details>
-      )}
-
-      {/* Response Content */}
-      <pre className="text-sm whitespace-pre-wrap">
-        {typeof displayedInteraction.response === "string" ||
-        displayedInteraction.response === null
-          ? displayedInteraction.response
-          : JSON.stringify(displayedInteraction.response, null, 2)}
-      </pre>
+      {/* Response Content - Rendered as HTML */}
+      <div
+        className="text-sm markdown-content" // Add markdown-content class
+        dangerouslySetInnerHTML={{ __html: renderedHtml }}
+      />
 
       {/* Error Display */}
       {displayedInteraction.status === "ERROR" &&

@@ -1,20 +1,32 @@
 // src/components/LiteChat/canvas/StreamingInteractionRenderer.tsx
 import React from "react";
 import { useInteractionStore } from "@/store/interaction.store";
+import { useSettingsStore } from "@/store/settings.store"; // Import SettingsStore
 import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
-import { StopButton } from "@/components/LiteChat/common/StopButton"; // Import StopButton
+import { StopButton } from "@/components/LiteChat/common/StopButton";
+import { useMarkdownParser } from "@/lib/litechat/useMarkdownParser"; // Import parser hook
 
 // Internal component to render a single streaming interaction
 const SingleStreamingInteraction: React.FC<{
   interactionId: string;
-  onStop: (id: string) => void; // Add onStop prop
+  onStop: (id: string) => void;
 }> = ({ interactionId, onStop }) => {
   // Select the specific interaction using its ID
   const interaction = useInteractionStore(
     useShallow((state) =>
       state.interactions.find((i) => i.id === interactionId),
     ),
+  );
+  // Get the setting for streaming markdown
+  const enableStreamingMarkdown = useSettingsStore(
+    (state) => state.enableStreamingMarkdown,
+  );
+
+  // Parse markdown conditionally
+  const contentToRender = interaction?.response || "";
+  const renderedHtml = useMarkdownParser(
+    enableStreamingMarkdown ? contentToRender : null, // Only parse if enabled
   );
 
   // Return null if interaction not found or not streaming
@@ -26,7 +38,7 @@ const SingleStreamingInteraction: React.FC<{
     <div
       key={interaction.id}
       className={cn(
-        "p-3 my-2 border rounded-md shadow-sm bg-card border-dashed animate-pulse relative group", // Add relative and group
+        "p-3 my-2 border rounded-md shadow-sm bg-card border-dashed animate-pulse relative group",
       )}
     >
       {/* Header Info */}
@@ -45,16 +57,23 @@ const SingleStreamingInteraction: React.FC<{
         </div>
       </div>
       {/* Display accumulated response content */}
-      <pre className="text-sm whitespace-pre-wrap">
-        {interaction.response || ""}
-      </pre>
+      {enableStreamingMarkdown ? (
+        // Render parsed HTML if enabled
+        <div
+          className="text-sm markdown-content" // Add markdown class
+          dangerouslySetInnerHTML={{ __html: renderedHtml }}
+        />
+      ) : (
+        // Render plain text if disabled
+        <pre className="text-sm whitespace-pre-wrap">{contentToRender}</pre>
+      )}
     </div>
   );
 };
 
 interface StreamingInteractionRendererProps {
   interactionIds: string[];
-  onStop: (id: string) => void; // Add onStop prop
+  onStop: (id: string) => void;
 }
 
 export const StreamingInteractionRenderer: React.FC<
@@ -72,7 +91,7 @@ export const StreamingInteractionRenderer: React.FC<
         <SingleStreamingInteraction
           key={id}
           interactionId={id}
-          onStop={onStop} // Pass onStop down
+          onStop={onStop}
         />
       ))}
     </>

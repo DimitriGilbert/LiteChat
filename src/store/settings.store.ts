@@ -5,32 +5,28 @@ import { PersistenceService } from "@/services/persistence.service";
 
 interface SettingsState {
   theme: "light" | "dark" | "system";
-  // Renamed defaultSystemPrompt to globalSystemPrompt
   globalSystemPrompt: string | null;
-  // Added parameter states
   temperature: number;
   maxTokens: number | null;
   topP: number | null;
   topK: number | null;
   presencePenalty: number | null;
   frequencyPenalty: number | null;
-  // Added general setting state
   enableAdvancedSettings: boolean;
+  enableStreamingMarkdown: boolean; // New setting
 }
 
 interface SettingsActions {
   setTheme: (theme: SettingsState["theme"]) => void;
-  // Renamed action
   setGlobalSystemPrompt: (prompt: string | null) => void;
-  // Added parameter actions
   setTemperature: (temp: number) => void;
   setMaxTokens: (tokens: number | null) => void;
   setTopP: (topP: number | null) => void;
   setTopK: (topK: number | null) => void;
   setPresencePenalty: (penalty: number | null) => void;
   setFrequencyPenalty: (penalty: number | null) => void;
-  // Added general setting action
   setEnableAdvancedSettings: (enabled: boolean) => void;
+  setEnableStreamingMarkdown: (enabled: boolean) => void; // New action
   loadSettings: () => Promise<void>;
 }
 
@@ -47,20 +43,19 @@ export const useSettingsStore = create(
     topK: null,
     presencePenalty: 0.0,
     frequencyPenalty: 0.0,
-    enableAdvancedSettings: true, // Default to true or false as needed
+    enableAdvancedSettings: true,
+    enableStreamingMarkdown: true, // Default to true
 
     setTheme: (theme) => {
       set({ theme: theme });
       PersistenceService.saveSetting("theme", theme);
     },
 
-    // Renamed action implementation
     setGlobalSystemPrompt: (prompt) => {
       set({ globalSystemPrompt: prompt });
       PersistenceService.saveSetting("globalSystemPrompt", prompt);
     },
 
-    // Added parameter action implementations
     setTemperature: (temp) => {
       set({ temperature: temp });
       PersistenceService.saveSetting("temperature", temp);
@@ -86,10 +81,15 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("frequencyPenalty", penalty);
     },
 
-    // Added general setting action implementation
     setEnableAdvancedSettings: (enabled) => {
       set({ enableAdvancedSettings: enabled });
       PersistenceService.saveSetting("enableAdvancedSettings", enabled);
+    },
+
+    // New action implementation
+    setEnableStreamingMarkdown: (enabled) => {
+      set({ enableStreamingMarkdown: enabled });
+      PersistenceService.saveSetting("enableStreamingMarkdown", enabled);
     },
 
     loadSettings: async () => {
@@ -104,6 +104,7 @@ export const useSettingsStore = create(
           frequencyPenalty,
           systemPrompt,
           enableAdvanced,
+          enableStreamingMd, // Load new setting
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -126,6 +127,10 @@ export const useSettingsStore = create(
             "enableAdvancedSettings",
             true,
           ),
+          PersistenceService.loadSetting<boolean>( // Load new setting
+            "enableStreamingMarkdown",
+            true, // Default value
+          ),
         ]);
 
         set({
@@ -138,10 +143,10 @@ export const useSettingsStore = create(
           frequencyPenalty,
           globalSystemPrompt: systemPrompt,
           enableAdvancedSettings: enableAdvanced,
+          enableStreamingMarkdown: enableStreamingMd, // Set loaded value
         });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);
-        // Keep default values if loading fails
       }
     },
   })),
