@@ -3,7 +3,7 @@ import type {
   DbProviderConfig,
   DbProviderType,
   AiModelConfig,
-} from "@/types/litechat/provider"; // Use correct type path
+} from "@/types/litechat/provider";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
@@ -29,7 +29,6 @@ export const supportsModelFetching = (type: DbProviderType | null): boolean => {
   );
 };
 
-// *** ADDED PROVIDER_TYPES EXPORT HERE ***
 export const PROVIDER_TYPES: { value: DbProviderType; label: string }[] = [
   { value: "openai", label: "OpenAI" },
   { value: "google", label: "Google Gemini" },
@@ -38,7 +37,6 @@ export const PROVIDER_TYPES: { value: DbProviderType; label: string }[] = [
   { value: "openai-compatible", label: "OpenAI-Compatible (LMStudio, etc.)" },
 ];
 
-// This might be redundant if requiresApiKey covers it, but keep for clarity if needed elsewhere
 export const REQUIRES_API_KEY_TYPES: DbProviderType[] = [
   "openai",
   "openrouter",
@@ -47,21 +45,18 @@ export const REQUIRES_API_KEY_TYPES: DbProviderType[] = [
 
 // --- Default Models ---
 
-// Consolidated default models - Keep this central source of truth
 export const DEFAULT_MODELS: Record<
   DbProviderType,
   { id: string; name: string }[]
 > = {
   openai: [{ id: "gpt-4o", name: "GPT-4o" }],
   google: [
-    // Note: Specific Gemini model IDs can change. Use identifiers known to the SDK.
     { id: "gemini-1.5-flash-latest", name: "Gemini 1.5 Flash" },
     { id: "gemini-1.5-pro-latest", name: "Gemini 1.5 Pro" },
-    // Add other relevant Gemini models if needed
   ],
-  openrouter: [], // OpenRouter models are fetched dynamically
-  ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }], // Example, user needs Ollama running
-  "openai-compatible": [], // No defaults, requires fetching or manual entry
+  openrouter: [],
+  ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }],
+  "openai-compatible": [],
 };
 
 // --- Instantiation and Configuration Helpers ---
@@ -69,11 +64,11 @@ export const DEFAULT_MODELS: Record<
 export const ensureV1Path = (baseUrl: string): string => {
   try {
     const trimmed = baseUrl.replace(/\/+$/, "");
-    return trimmed.endsWith("/v1")
-      ? trimmed
-      : baseUrl.endsWith("/")
-        ? baseUrl + "v1"
-        : baseUrl + "/v1";
+    // Check if it *already* ends with /v1 or similar version path
+    if (/\/(v\d+)$/.test(trimmed)) {
+      return trimmed;
+    }
+    return trimmed + "/v1";
   } catch (e) {
     console.error("Error processing base URL:", baseUrl, e);
     return baseUrl.replace(/\/+$/, "");
@@ -100,7 +95,7 @@ export function instantiateModelInstance(
         return createOpenAICompatible({
           baseURL: ensureV1Path(config.baseURL),
           apiKey,
-          name: config.name || "Custom API", // Add the name property
+          name: config.name || "Custom API",
         })(modelId);
       default:
         console.warn(`Unsupported provider type: ${config.type}`);
@@ -121,7 +116,7 @@ export function createAiModelConfig(
   const allAvailable =
     config.fetchedModels && config.fetchedModels.length > 0
       ? config.fetchedModels
-      : DEFAULT_MODELS[providerTypeKey] || []; // Use imported DEFAULT_MODELS
+      : DEFAULT_MODELS[providerTypeKey] || [];
   const modelInfo = allAvailable.find((m) => m.id === modelId);
   if (!modelInfo) return undefined;
 
@@ -151,15 +146,15 @@ export const getDefaultModelIdForProvider = (
   const availableModels =
     providerConfig.fetchedModels && providerConfig.fetchedModels.length > 0
       ? providerConfig.fetchedModels
-      : DEFAULT_MODELS[providerTypeKey] || []; // Use imported DEFAULT_MODELS
+      : DEFAULT_MODELS[providerTypeKey] || [];
 
   if (availableModels.length === 0) return null;
 
   const enabledModelIds = providerConfig.enabledModels ?? [];
-  let potentialModels = availableModels;
+  let potentialModels = [...availableModels]; // Create a mutable copy
 
   if (enabledModelIds.length > 0) {
-    const filteredByEnabled = availableModels.filter((m: { id: string }) =>
+    const filteredByEnabled = potentialModels.filter((m: { id: string }) =>
       enabledModelIds.includes(m.id),
     );
     if (filteredByEnabled.length > 0) {
@@ -168,6 +163,7 @@ export const getDefaultModelIdForProvider = (
       console.warn(
         `Provider ${providerConfig.id}: enabledModels filter resulted in empty list. Considering all available models.`,
       );
+      // Keep potentialModels as the copy of all available models
     }
   }
 
@@ -185,15 +181,19 @@ export const getDefaultModelIdForProvider = (
         addedIds.add(modelId);
       }
     }
-    const remaining = potentialModels
+    // Create a mutable copy before sorting remaining
+    const remaining = [...potentialModels]
       .filter((m: { id: string }) => !addedIds.has(m.id))
-      .sort((a: { name: string }, b: { name: string }) =>
-        a.name.localeCompare(b.name),
+      .sort(
+        (a: { name?: string; id: string }, b: { name?: string; id: string }) =>
+          (a.name || a.id).localeCompare(b.name || b.id),
       );
     potentialModels = [...orderedList, ...remaining];
   } else {
-    potentialModels.sort((a: { name: string }, b: { name: string }) =>
-      a.name.localeCompare(b.name),
+    // Sort the mutable copy
+    potentialModels.sort(
+      (a: { name?: string; id: string }, b: { name?: string; id: string }) =>
+        (a.name || a.id).localeCompare(b.name || b.id),
     );
   }
 

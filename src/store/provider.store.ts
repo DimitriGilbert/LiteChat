@@ -108,20 +108,21 @@ export const useProviderStore = create(
         if (!savedProviderConfig) {
           const firstEnabled = configs.find((p) => p.isEnabled);
           providerToSelect = firstEnabled?.id ?? null;
-          modelToSelect = null;
+          modelToSelect = null; // Reset model if provider changed
         }
 
+        // Validate the selected model against the selected provider
         if (providerToSelect && modelToSelect) {
-          const providerConfig =
-            savedProviderConfig ??
-            configs.find((p) => p.id === providerToSelect);
-          if (providerConfig) {
+          const finalProviderConfig = configs.find(
+            (p) => p.id === providerToSelect,
+          );
+          if (finalProviderConfig) {
             const providerTypeKey =
-              providerConfig.type as keyof typeof DEFAULT_MODELS;
+              finalProviderConfig.type as keyof typeof DEFAULT_MODELS;
             const availableModels =
-              providerConfig.fetchedModels ??
+              finalProviderConfig.fetchedModels ??
               (DEFAULT_MODELS[providerTypeKey] || []);
-            const enabledModelIds = providerConfig.enabledModels ?? [];
+            const enabledModelIds = finalProviderConfig.enabledModels ?? [];
             const modelsToConsider =
               enabledModelIds.length > 0
                 ? availableModels.filter((m) => enabledModelIds.includes(m.id))
@@ -135,16 +136,16 @@ export const useProviderStore = create(
               console.warn(
                 `Saved model ${modelToSelect} invalid for provider ${providerToSelect}, resetting.`,
               );
-              modelToSelect = null;
+              modelToSelect = null; // Reset model if invalid
             }
           } else {
-            modelToSelect = null;
+            // If the saved provider doesn't exist anymore, reset both
             providerToSelect = null;
-            const firstEnabled = configs.find((p) => p.isEnabled);
-            providerToSelect = firstEnabled?.id ?? null;
+            modelToSelect = null;
           }
         }
 
+        // If provider is selected but model is not (or was reset), find the default
         if (providerToSelect && modelToSelect === null) {
           const finalProviderConfig = configs.find(
             (p) => p.id === providerToSelect,
@@ -152,11 +153,21 @@ export const useProviderStore = create(
           modelToSelect = getDefaultModelIdForProvider(finalProviderConfig);
         }
 
+        // If still no provider, select the first enabled one if available
+        if (providerToSelect === null) {
+          const firstEnabled = configs.find((p) => p.isEnabled);
+          providerToSelect = firstEnabled?.id ?? null;
+          if (providerToSelect) {
+            modelToSelect = getDefaultModelIdForProvider(firstEnabled);
+          }
+        }
+
         set({
           selectedProviderId: providerToSelect,
           selectedModelId: modelToSelect,
           isLoading: false,
         });
+        // Save the final selection state
         await PersistenceService.saveSetting(LAST_SELECTION_KEY, {
           providerId: providerToSelect,
           modelId: modelToSelect,
@@ -191,14 +202,12 @@ export const useProviderStore = create(
     },
 
     addApiKey: async (name, providerId, value) => {
-      const newValue = value;
-      value = "";
       const newId = nanoid();
       const now = new Date();
       const newKey: DbApiKey = {
         id: newId,
         name,
-        value: newValue,
+        value: value,
         providerId: providerId,
         createdAt: now,
         updatedAt: now,
@@ -224,12 +233,14 @@ export const useProviderStore = create(
         get().dbApiKeys.find((k) => k.id === id)?.name ?? "Unknown Key";
       try {
         await PersistenceService.deleteApiKey(id);
-        set((state) => ({
-          dbApiKeys: state.dbApiKeys.filter((k) => k.id !== id),
-          dbProviderConfigs: state.dbProviderConfigs.map((p) =>
+        // Update state *after* successful deletion
+        set((state) => {
+          state.dbApiKeys = state.dbApiKeys.filter((k) => k.id !== id);
+          // Also update provider configs that might have used this key
+          state.dbProviderConfigs = state.dbProviderConfigs.map((p) =>
             p.apiKeyId === id ? { ...p, apiKeyId: null } : p,
-          ),
-        }));
+          );
+        });
         toast.success(`API Key "${keyName}" deleted.`);
       } catch (e) {
         console.error("ProviderStore: Error deleting API key", e);
@@ -259,10 +270,12 @@ export const useProviderStore = create(
       };
       try {
         await PersistenceService.saveProviderConfig(newConfig);
+        // Update state *after* successful save
         set((state) => {
           state.dbProviderConfigs.push(newConfig);
         });
         toast.success(`Provider "${configData.name}" added.`);
+        // Select the new provider if none was selected and it's enabled
         if (get().selectedProviderId === null && newConfig.isEnabled) {
           get().selectProvider(newId);
         }
@@ -277,94 +290,81 @@ export const useProviderStore = create(
     },
 
     updateProviderConfig: async (id, changes) => {
-      let originalConfig: DbProviderConfig | undefined;
-      let configExists = false;
+      // Get the current config first
+      const originalConfig = get().dbProviderConfigs.find((p) => p.id === id);
+      if (!originalConfig) {
+        console.warn(`ProviderStore: Config ${id} not found for update.`);
+        return;
+      }
 
-      set((state) => {
-        const index = state.dbProviderConfigs.findIndex((p) => p.id === id);
-        if (index !== -1) {
-          configExists = true;
-          originalConfig = { ...state.dbProviderConfigs[index] };
-          const currentConfig = state.dbProviderConfigs[index];
-          const updatedConfigData: DbProviderConfig = {
-            ...currentConfig,
-            ...changes,
-            updatedAt: new Date(),
-          };
-          state.dbProviderConfigs[index] = updatedConfigData;
-        } else {
-          console.warn(`ProviderStore: Config ${id} not found for update.`);
-        }
-      });
+      // Create the updated config data
+      const updatedConfigData: DbProviderConfig = {
+        ...originalConfig,
+        ...changes,
+        updatedAt: new Date(),
+      };
 
-      if (configExists) {
-        // Fetch the potentially updated config *after* the set operation
-        const updatedConfig = get().dbProviderConfigs.find((p) => p.id === id);
+      try {
+        // Save to persistence first
+        await PersistenceService.saveProviderConfig(updatedConfigData);
 
-        if (updatedConfig) {
-          // Check if it still exists after set
-          try {
-            await PersistenceService.saveProviderConfig(updatedConfig);
-            // Re-validate selection using the confirmed updatedConfig
-            if (get().selectedProviderId === id) {
-              if (!updatedConfig.isEnabled) {
-                const firstEnabled = get().dbProviderConfigs.find(
-                  (p) => p.isEnabled,
-                );
-                get().selectProvider(firstEnabled?.id ?? null);
-              } else {
-                const currentModelId = get().selectedModelId;
-                const defaultModelId =
-                  getDefaultModelIdForProvider(updatedConfig);
-                const providerTypeKey =
-                  updatedConfig.type as keyof typeof DEFAULT_MODELS;
-                const availableModels =
-                  updatedConfig.fetchedModels ??
-                  (DEFAULT_MODELS[providerTypeKey] || []);
-                const enabledModelIds = updatedConfig.enabledModels ?? [];
-                const modelsToConsider =
-                  enabledModelIds.length > 0
-                    ? availableModels.filter((m) =>
-                        enabledModelIds.includes(m.id),
-                      )
-                    : availableModels;
-
-                const modelIsValid = modelsToConsider.some(
-                  (m) => m.id === currentModelId,
-                );
-
-                if (!modelIsValid) {
-                  get().selectModel(defaultModelId);
-                } else {
-                  PersistenceService.saveSetting(LAST_SELECTION_KEY, {
-                    providerId: id,
-                    modelId: currentModelId,
-                  });
-                }
-              }
-            }
-          } catch (e) {
-            console.error("ProviderStore: Error updating provider config", e);
-            toast.error(
-              `Failed to update Provider: ${e instanceof Error ? e.message : String(e)}`,
-            );
-            // Revert state using originalConfig if save failed
-            set((state) => {
-              const index = state.dbProviderConfigs.findIndex(
-                (p) => p.id === id,
-              );
-              if (index !== -1 && originalConfig) {
-                state.dbProviderConfigs[index] = originalConfig;
-              }
-            });
-            throw e;
+        // Update state *after* successful save
+        set((state) => {
+          const index = state.dbProviderConfigs.findIndex((p) => p.id === id);
+          if (index !== -1) {
+            state.dbProviderConfigs[index] = updatedConfigData;
           }
-        } else {
-          console.error(
-            `ProviderStore: Config ${id} disappeared unexpectedly after update attempt.`,
-          );
-          // Handle potential race condition or error state if needed
+        });
+
+        // Re-validate selection *after* state update
+        if (get().selectedProviderId === id) {
+          if (!updatedConfigData.isEnabled) {
+            // If disabled, select the first available enabled provider
+            const firstEnabled = get().dbProviderConfigs.find(
+              (p) => p.isEnabled,
+            );
+            get().selectProvider(firstEnabled?.id ?? null);
+          } else {
+            // If still enabled, check if the current model is still valid
+            const currentModelId = get().selectedModelId;
+            const defaultModelId =
+              getDefaultModelIdForProvider(updatedConfigData);
+
+            const providerTypeKey =
+              updatedConfigData.type as keyof typeof DEFAULT_MODELS;
+            const availableModels =
+              updatedConfigData.fetchedModels ??
+              (DEFAULT_MODELS[providerTypeKey] || []);
+            const enabledModelIds = updatedConfigData.enabledModels ?? [];
+            const modelsToConsider =
+              enabledModelIds.length > 0
+                ? availableModels.filter((m) => enabledModelIds.includes(m.id))
+                : availableModels;
+
+            const modelIsValid = modelsToConsider.some(
+              (m) => m.id === currentModelId,
+            );
+
+            if (!modelIsValid) {
+              // If current model is no longer valid, select the default
+              get().selectModel(defaultModelId);
+            } else {
+              // If model is still valid, ensure the selection is persisted
+              PersistenceService.saveSetting(LAST_SELECTION_KEY, {
+                providerId: id,
+                modelId: currentModelId,
+              });
+            }
+          }
         }
+        // Don't toast success here, let the caller (e.g., Settings UI) handle it
+      } catch (e) {
+        console.error("ProviderStore: Error updating provider config", e);
+        toast.error(
+          `Failed to update Provider: ${e instanceof Error ? e.message : String(e)}`,
+        );
+        // No state revert needed as the update failed before setting state
+        throw e;
       }
     },
 
@@ -372,15 +372,17 @@ export const useProviderStore = create(
       const configName =
         get().dbProviderConfigs.find((p) => p.id === id)?.name ?? "Unknown";
       const wasSelected = get().selectedProviderId === id;
-      const originalConfigs = [...get().dbProviderConfigs];
-
-      set((state) => ({
-        dbProviderConfigs: state.dbProviderConfigs.filter((p) => p.id !== id),
-      }));
 
       try {
         await PersistenceService.deleteProviderConfig(id);
+        // Update state *after* successful deletion
+        set((state) => {
+          state.dbProviderConfigs = state.dbProviderConfigs.filter(
+            (p) => p.id !== id,
+          );
+        });
         toast.success(`Provider "${configName}" deleted.`);
+        // If the deleted provider was selected, select the first enabled one
         if (wasSelected) {
           const firstEnabled = get().dbProviderConfigs.find((p) => p.isEnabled);
           get().selectProvider(firstEnabled?.id ?? null);
@@ -390,7 +392,6 @@ export const useProviderStore = create(
         toast.error(
           `Failed to delete Provider: ${e instanceof Error ? e.message : String(e)}`,
         );
-        set({ dbProviderConfigs: originalConfigs });
         throw e;
       }
     },
@@ -410,33 +411,38 @@ export const useProviderStore = create(
         return;
       }
 
+      // Set status immediately before await
       get()._setProviderFetchStatus(providerConfigId, "fetching");
+
       try {
         const apiKeyId = config.apiKeyId;
+        // Get latest API key value *before* the await
         const apiKey = get().dbApiKeys.find((k) => k.id === apiKeyId)?.value;
 
         const fetched = await fetchModelsForProvider(config, apiKey);
 
+        // Update the provider config *after* the await
+        // Use the updateProviderConfig action to handle state update and persistence
         await get().updateProviderConfig(providerConfigId, {
           fetchedModels: fetched,
           modelsLastFetchedAt: new Date(),
         });
 
+        // Set status *after* successful update
         get()._setProviderFetchStatus(providerConfigId, "success");
         toast.success(`Models fetched successfully for ${config.name}`);
       } catch (error) {
         console.error(`Error fetching models for ${config.name}:`, error);
+        // Set status *after* error
         get()._setProviderFetchStatus(providerConfigId, "error");
+        // Toast is handled by fetchModelsForProvider or updateProviderConfig
       }
     },
 
     _setProviderFetchStatus: (providerId, status) => {
-      set((state) => ({
-        providerFetchStatus: {
-          ...state.providerFetchStatus,
-          [providerId]: status,
-        },
-      }));
+      set((state) => {
+        state.providerFetchStatus[providerId] = status;
+      });
     },
 
     // --- Selectors ---
@@ -446,8 +452,9 @@ export const useProviderStore = create(
       if (!config) return undefined;
 
       const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
-      const allAvailable =
-        config.fetchedModels ?? (DEFAULT_MODELS[providerTypeKey] || []);
+      const allAvailable = [
+        ...(config.fetchedModels ?? (DEFAULT_MODELS[providerTypeKey] || [])),
+      ]; // Create copy
 
       const enabledModelIds = new Set(config.enabledModels ?? []);
       let displayModels =
@@ -455,7 +462,7 @@ export const useProviderStore = create(
           ? allAvailable.filter((m: { id: string }) =>
               enabledModelIds.has(m.id),
             )
-          : allAvailable;
+          : [...allAvailable]; // Create copy
 
       const sortOrder = config.modelSortOrder ?? [];
       if (sortOrder.length > 0 && displayModels.length > 0) {
@@ -472,7 +479,8 @@ export const useProviderStore = create(
             addedIds.add(modelId);
           }
         }
-        const remaining = displayModels
+        // Create copy before sorting remaining
+        const remaining = [...displayModels]
           .filter((m: { id: string }) => !addedIds.has(m.id))
           .sort(
             (
@@ -482,6 +490,7 @@ export const useProviderStore = create(
           );
         displayModels = [...orderedList, ...remaining];
       } else {
+        // Sort the copy
         displayModels.sort(
           (
             a: { name?: string; id: string },
@@ -494,7 +503,7 @@ export const useProviderStore = create(
         (m: { id: string; name: string }): AiModelConfig => ({
           id: m.id,
           name: m.name,
-          instance: null,
+          instance: null, // Instance is fetched on demand by getSelectedModel
         }),
       );
 
@@ -503,7 +512,7 @@ export const useProviderStore = create(
         name: config.name,
         type: config.type,
         models: aiModels,
-        allAvailableModels: allAvailable,
+        allAvailableModels: allAvailable, // Return the copy
       };
     },
 
@@ -530,16 +539,19 @@ export const useProviderStore = create(
         .dbProviderConfigs.filter((p: DbProviderConfig) => p.isEnabled)
         .map((c: DbProviderConfig): AiProviderConfig | null => {
           const providerTypeKey = c.type as keyof typeof DEFAULT_MODELS;
-          const allAvailable =
-            c.fetchedModels ?? (DEFAULT_MODELS[providerTypeKey] || []);
+          // Create copy
+          const allAvailable = [
+            ...(c.fetchedModels ?? (DEFAULT_MODELS[providerTypeKey] || [])),
+          ];
 
           const enabledModelIds = new Set(c.enabledModels ?? []);
+          // Create copy
           let displayModels =
             enabledModelIds.size > 0
               ? allAvailable.filter((m: { id: string }) =>
                   enabledModelIds.has(m.id),
                 )
-              : allAvailable;
+              : [...allAvailable];
 
           const sortOrder = c.modelSortOrder ?? [];
           if (sortOrder.length > 0 && displayModels.length > 0) {
@@ -555,7 +567,8 @@ export const useProviderStore = create(
                 addedIds.add(modelId);
               }
             }
-            const remaining = displayModels
+            // Create copy before sorting remaining
+            const remaining = [...displayModels]
               .filter((m: { id: string }) => !addedIds.has(m.id))
               .sort(
                 (
@@ -565,6 +578,7 @@ export const useProviderStore = create(
               );
             displayModels = [...orderedList, ...remaining];
           } else {
+            // Sort the copy
             displayModels.sort(
               (
                 a: { name?: string; id: string },
@@ -586,7 +600,7 @@ export const useProviderStore = create(
             name: c.name,
             type: c.type,
             models: aiModels,
-            allAvailableModels: allAvailable,
+            allAvailableModels: allAvailable, // Return the copy
           };
         })
         .filter((p): p is AiProviderConfig => p !== null);

@@ -1,4 +1,4 @@
-// src/components/LiteChat/settings/settings-general.tsx
+// src/components/LiteChat/settings/SettingsGeneral.tsx
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -31,7 +31,11 @@ const SettingsGeneralComponent: React.FC = () => {
           <Label htmlFor="theme-select" className="font-medium">
             Theme
           </Label>
-          <Select value={theme} onValueChange={setTheme}>
+          <Select
+            // Ensure value is controlled and never undefined
+            value={theme ?? "system"}
+            onValueChange={(value) => setTheme(value as typeof theme)}
+          >
             <SelectTrigger id="theme-select" className="w-[180px]">
               <SelectValue placeholder="Select theme" />
             </SelectTrigger>
@@ -58,7 +62,8 @@ const SettingsGeneralComponent: React.FC = () => {
           </div>
           <Switch
             id="advanced-settings-switch"
-            checked={enableAdvancedSettings}
+            // Ensure checked is always boolean
+            checked={enableAdvancedSettings ?? false}
             onCheckedChange={setEnableAdvancedSettings}
           />
         </div>

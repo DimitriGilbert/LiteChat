@@ -1,4 +1,4 @@
-// src/components/LiteChat/settings/settings-api-keys.tsx
+// src/components/LiteChat/settings/SettingsApiKeys.tsx
 import React, { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,37 +26,33 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-// Corrected import path
-import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider"; // Correct path
+import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
-// Removed useChatStorage import
 import { Skeleton } from "@/components/ui/skeleton";
 
 const SettingsApiKeysComponent: React.FC = () => {
-  // --- Fetch actions and state from store ---
   const {
     addApiKey,
     deleteApiKey,
     enableApiKeyManagement,
-    dbApiKeys, // Use correct state name
-    dbProviderConfigs, // Use correct state name
-    isLoading, // Use correct state name
+    dbApiKeys,
+    dbProviderConfigs,
+    isLoading,
   } = useProviderStore(
     useShallow((state) => ({
       addApiKey: state.addApiKey,
       deleteApiKey: state.deleteApiKey,
       enableApiKeyManagement: state.enableApiKeyManagement,
-      dbApiKeys: state.dbApiKeys, // Correct state name
-      dbProviderConfigs: state.dbProviderConfigs, // Correct state name
-      isLoading: state.isLoading, // Correct state name
+      dbApiKeys: state.dbApiKeys,
+      dbProviderConfigs: state.dbProviderConfigs,
+      isLoading: state.isLoading,
     })),
   );
 
-  // Local UI state remains
   const [newKeyName, setNewKeyName] = useState("");
   const [newKeyValue, setNewKeyValue] = useState("");
-  const [newKeyProviderType, setNewKeyProviderType] = useState<string>("");
+  const [newKeyProviderType, setNewKeyProviderType] = useState<string>(""); // Use "" as initial value
   const [isAdding, setIsAdding] = useState(false);
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
   const [showValues, setShowValues] = useState<Record<string, boolean>>({});
@@ -77,9 +73,10 @@ const SettingsApiKeysComponent: React.FC = () => {
         );
         setNewKeyName("");
         setNewKeyValue("");
-        setNewKeyProviderType("");
+        setNewKeyProviderType(""); // Reset to empty string
       } catch (error: unknown) {
         console.error("Failed to add API key (from component):", error);
+        // Toast handled by store action
       } finally {
         setIsAdding(false);
       }
@@ -97,6 +94,7 @@ const SettingsApiKeysComponent: React.FC = () => {
         setIsDeleting((prev) => ({ ...prev, [id]: true }));
         try {
           await deleteApiKey(id);
+          // State update handled by store action now
           setShowValues((prev) => {
             const next = { ...prev };
             delete next[id];
@@ -104,7 +102,9 @@ const SettingsApiKeysComponent: React.FC = () => {
           });
         } catch (error: unknown) {
           console.error("Failed to delete API key (from component):", error);
+          // Toast handled by store action
         } finally {
+          // Reset deleting state regardless of success/failure if error is caught
           setIsDeleting((prev) => ({ ...prev, [id]: false }));
         }
       }
@@ -126,7 +126,7 @@ const SettingsApiKeysComponent: React.FC = () => {
       );
     });
     return map;
-  }, [dbApiKeys, dbProviderConfigs]); // Use correct state names
+  }, [dbApiKeys, dbProviderConfigs]);
 
   if (!enableApiKeyManagement) {
     return (
@@ -142,16 +142,15 @@ const SettingsApiKeysComponent: React.FC = () => {
   };
 
   const getKeyTypeLabel = (providerIdOrType: string): string => {
-    const knownTypes = [
-      "openai",
-      "google",
-      "openrouter",
-      "ollama",
-      "openai-compatible",
-    ];
-    return knownTypes.includes(providerIdOrType)
-      ? providerIdOrType
-      : "Unknown/Custom";
+    // Consider adding more types or making this dynamic if needed
+    const knownTypes: Record<string, string> = {
+      openai: "OpenAI",
+      google: "Google",
+      openrouter: "OpenRouter",
+      "openai-compatible": "OpenAI-Compatible",
+      // Add other known provider IDs/types here
+    };
+    return knownTypes[providerIdOrType] || "Unknown/Custom";
   };
 
   return (
@@ -177,6 +176,7 @@ const SettingsApiKeysComponent: React.FC = () => {
               Intended Provider Type
             </Label>
             <Select
+              // Ensure value is controlled, use "" for empty state
               value={newKeyProviderType}
               onValueChange={setNewKeyProviderType}
               required
@@ -186,12 +186,14 @@ const SettingsApiKeysComponent: React.FC = () => {
                 <SelectValue placeholder="Select Type..." />
               </SelectTrigger>
               <SelectContent>
+                {/* Add more relevant types */}
                 <SelectItem value="openai">OpenAI</SelectItem>
                 <SelectItem value="google">Google</SelectItem>
                 <SelectItem value="openrouter">OpenRouter</SelectItem>
                 <SelectItem value="openai-compatible">
                   OpenAI-Compatible
                 </SelectItem>
+                {/* Add other types as needed */}
               </SelectContent>
             </Select>
           </div>
@@ -218,13 +220,13 @@ const SettingsApiKeysComponent: React.FC = () => {
       {/* Stored Keys Table */}
       <div>
         <h3 className="text-lg font-medium mb-2">Stored API Keys</h3>
-        {isLoading ? ( // Use correct state name
+        {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
           </div>
-        ) : (dbApiKeys || []).length === 0 ? ( // Use correct state name
+        ) : (dbApiKeys || []).length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">
             No API keys stored yet. Add one above. Link keys to providers in the
             'Providers' tab.
@@ -243,7 +245,6 @@ const SettingsApiKeysComponent: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {(dbApiKeys || []).map((key: DbApiKey) => {
-                  // Use correct state name
                   const isKeyDeleting = isDeleting[key.id];
                   return (
                     <TableRow key={key.id}>

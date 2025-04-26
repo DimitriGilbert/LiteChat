@@ -10,50 +10,91 @@ import {
 } from "@/components/ui/select";
 import { useShallow } from "zustand/react/shallow";
 import type { PromptControl } from "@/types/litechat/prompt";
-// Import DbProviderConfig and AiProviderConfig types
 import type {
   DbProviderConfig,
   AiProviderConfig,
 } from "@/types/litechat/provider";
 import { useControlRegistryStore } from "@/store/control.store";
 import { Skeleton } from "@/components/ui/skeleton";
+// Import the missing constant
+import { DEFAULT_MODELS } from "@/lib/litechat/provider-helpers";
 
 export const ModelProviderControlComponent: React.FC = () => {
   const {
     selectedProviderId,
     selectedModelId,
-    selectProvider, // Use correct action name
-    selectModel, // Use correct action name
-    getActiveProviders, // Use correct action name
-    dbProviderConfigs, // Use correct state name
-    isLoading, // Use correct state name
+    selectProvider,
+    selectModel,
+    getActiveProviders,
+    dbProviderConfigs,
+    isLoading,
   } = useProviderStore(
     useShallow((state) => ({
       selectedProviderId: state.selectedProviderId,
       selectedModelId: state.selectedModelId,
-      selectProvider: state.selectProvider, // Correct action
-      selectModel: state.selectModel, // Correct action
-      getActiveProviders: state.getActiveProviders, // Correct action
-      dbProviderConfigs: state.dbProviderConfigs, // Correct state
-      isLoading: state.isLoading, // Correct state
+      selectProvider: state.selectProvider,
+      selectModel: state.selectModel,
+      getActiveProviders: state.getActiveProviders,
+      dbProviderConfigs: state.dbProviderConfigs,
+      isLoading: state.isLoading,
     })),
   );
 
-  // Ensure getActiveProviders is called correctly
   const activeProviders = getActiveProviders ? getActiveProviders() : [];
 
   const modelsForSelectedProvider = React.useMemo(() => {
-    // Add type annotation for p
     const config = dbProviderConfigs.find(
       (p: DbProviderConfig) => p.id === selectedProviderId,
     );
     if (!config) return [];
-    const all = config.fetchedModels ?? [];
-    const enabled = config.enabledModels ?? [];
-    // Add type annotation for m
-    return enabled.length > 0
-      ? all.filter((m: { id: string }) => enabled.includes(m.id))
-      : all;
+
+    // Use the logic from getActiveProviders/getSelectedProvider for consistency
+    // Combine fetched models and defaults, then deduplicate
+    const allAvailable = [
+      ...(config.fetchedModels ?? []), // Prioritize fetched models
+      ...(DEFAULT_MODELS[config.type as keyof typeof DEFAULT_MODELS] || []), // Add defaults if needed
+    ].reduce(
+      (acc, model) => {
+        // Deduplicate based on ID
+        if (!acc.some((m) => m.id === model.id)) {
+          acc.push(model);
+        }
+        return acc;
+      },
+      [] as { id: string; name: string }[],
+    );
+
+    const enabledIds = new Set(config.enabledModels ?? []);
+    let displayModels =
+      enabledIds.size > 0
+        ? allAvailable.filter((m) => enabledIds.has(m.id))
+        : [...allAvailable]; // Use copy
+
+    const sortOrder = config.modelSortOrder ?? [];
+    if (sortOrder.length > 0 && displayModels.length > 0) {
+      const orderedList: { id: string; name: string }[] = [];
+      const addedIds = new Set<string>();
+      const displayModelMap = new Map(displayModels.map((m) => [m.id, m]));
+      for (const modelId of sortOrder) {
+        const model = displayModelMap.get(modelId);
+        if (model && !addedIds.has(modelId)) {
+          orderedList.push(model);
+          addedIds.add(modelId);
+        }
+      }
+      const remaining = [...displayModels] // Create copy
+        .filter((m) => !addedIds.has(m.id))
+        .sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
+      displayModels = [...orderedList, ...remaining];
+    } else {
+      displayModels.sort(
+        (
+          a,
+          b, // Sort copy
+        ) => (a.name || a.id).localeCompare(b.name || b.id),
+      );
+    }
+    return displayModels;
   }, [selectedProviderId, dbProviderConfigs]);
 
   if (isLoading) {
@@ -69,7 +110,7 @@ export const ModelProviderControlComponent: React.FC = () => {
     <div className="flex items-center gap-1">
       <Select
         value={selectedProviderId ?? ""}
-        onValueChange={(v) => selectProvider(v || null)} // Call correct action
+        onValueChange={(v) => selectProvider(v || null)}
         disabled={activeProviders.length === 0}
       >
         <SelectTrigger className="h-8 text-xs w-[120px]">
@@ -81,7 +122,6 @@ export const ModelProviderControlComponent: React.FC = () => {
               No providers enabled
             </SelectItem>
           )}
-          {/* Add type annotation for p */}
           {activeProviders.map((p: AiProviderConfig) => (
             <SelectItem key={p.id} value={p.id}>
               {p.name}
@@ -91,7 +131,7 @@ export const ModelProviderControlComponent: React.FC = () => {
       </Select>
       <Select
         value={selectedModelId ?? ""}
-        onValueChange={(v) => selectModel(v || null)} // Call correct action
+        onValueChange={(v) => selectModel(v || null)}
         disabled={!selectedProviderId || modelsForSelectedProvider.length === 0}
       >
         <SelectTrigger className="h-8 text-xs w-[150px]">
@@ -103,7 +143,6 @@ export const ModelProviderControlComponent: React.FC = () => {
               {selectedProviderId ? "No models available" : "Select provider"}
             </SelectItem>
           )}
-          {/* Add type annotation for m */}
           {modelsForSelectedProvider.map((m: { id: string; name?: string }) => (
             <SelectItem key={m.id} value={m.id}>
               {m.name || m.id}
@@ -122,7 +161,7 @@ export const useModelProviderControlRegistration = () => {
   );
   const providerState = useProviderStore(
     useShallow((state) => ({
-      isLoading: state.isLoading, // Use correct state name
+      isLoading: state.isLoading,
       selectedProviderId: state.selectedProviderId,
       selectedModelId: state.selectedModelId,
     })),

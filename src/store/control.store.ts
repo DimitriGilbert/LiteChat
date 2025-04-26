@@ -7,17 +7,19 @@ import type {
   ModMiddlewareHookName,
   ModMiddlewarePayloadMap,
   ModMiddlewareReturnMap,
+  Tool,
+  ToolImplementation,
 } from "@/types/litechat/modding";
+import type { z } from "zod";
 
 interface RegisteredMiddleware<H extends ModMiddlewareHookName> {
   modId: string;
   callback: (
     payload: ModMiddlewarePayloadMap[H],
   ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>;
-  order?: number; // Order for middleware execution
+  order?: number;
 }
 
-// Type for the registry, mapping hook names to arrays of registered middleware
 type MiddlewareRegistry = {
   [H in ModMiddlewareHookName]?: RegisteredMiddleware<H>[];
 };
@@ -26,27 +28,43 @@ interface ControlState {
   promptControls: Record<string, PromptControl>;
   chatControls: Record<string, ChatControl>;
   middlewareRegistry: MiddlewareRegistry;
+  tools: Record<
+    string,
+    {
+      definition: Tool<any>;
+      implementation?: ToolImplementation<any>;
+      modId: string;
+    }
+  >;
 }
 
 interface ControlActions {
-  registerPromptControl: (control: PromptControl) => () => void; // Returns unregister function
+  registerPromptControl: (control: PromptControl) => () => void;
   unregisterPromptControl: (id: string) => void;
-  registerChatControl: (control: ChatControl) => () => void; // Returns unregister function
+  registerChatControl: (control: ChatControl) => () => void;
   unregisterChatControl: (id: string) => void;
   registerMiddleware: <H extends ModMiddlewareHookName>(
     hookName: H,
     modId: string,
     callback: RegisteredMiddleware<H>["callback"],
-    order?: number, // Optional order parameter
-  ) => () => void; // Returns unregister function
+    order?: number,
+  ) => () => void;
   unregisterMiddleware: <H extends ModMiddlewareHookName>(
     hookName: H,
     modId: string,
-    callback: RegisteredMiddleware<H>["callback"], // Need callback to identify which one to remove
+    callback: RegisteredMiddleware<H>["callback"],
   ) => void;
   getMiddlewareForHook: <H extends ModMiddlewareHookName>(
     hookName: H,
-  ) => ReadonlyArray<RegisteredMiddleware<H>>; // Return a readonly sorted copy
+  ) => ReadonlyArray<RegisteredMiddleware<H>>;
+  registerTool: <P extends z.ZodSchema<any>>(
+    modId: string,
+    toolName: string,
+    definition: Tool<P>,
+    implementation?: ToolImplementation<P>,
+  ) => () => void;
+  unregisterTool: (toolName: string) => void;
+  getRegisteredTools: () => Readonly<ControlState["tools"]>; // Ensure this matches the interface
 }
 
 export const useControlRegistryStore = create(
@@ -55,6 +73,7 @@ export const useControlRegistryStore = create(
     promptControls: {},
     chatControls: {},
     middlewareRegistry: {},
+    tools: {},
 
     // Actions
     registerPromptControl: (control) => {
@@ -66,7 +85,6 @@ export const useControlRegistryStore = create(
         }
         state.promptControls[control.id] = control;
       });
-      // Return the unregister function
       return () => get().unregisterPromptControl(control.id);
     },
 
@@ -91,7 +109,6 @@ export const useControlRegistryStore = create(
         }
         state.chatControls[control.id] = control;
       });
-      // Return the unregister function
       return () => get().unregisterChatControl(control.id);
     },
 
@@ -117,29 +134,24 @@ export const useControlRegistryStore = create(
         if (!state.middlewareRegistry[hookName]) {
           state.middlewareRegistry[hookName] = [];
         }
-        // Add the new middleware
         (
           state.middlewareRegistry[hookName] as RegisteredMiddleware<any>[]
         ).push(registration);
-        // Sort the middleware array by order after adding
         (
           state.middlewareRegistry[hookName] as RegisteredMiddleware<any>[]
         ).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       });
-      // Return the unregister function
       return () => get().unregisterMiddleware(hookName, modId, callback);
     },
 
     unregisterMiddleware: (hookName, modId, callback) => {
       set((state) => {
         if (state.middlewareRegistry[hookName]) {
-          // Filter out the specific middleware by modId and callback reference
           state.middlewareRegistry[hookName] = (
             state.middlewareRegistry[hookName] as RegisteredMiddleware<any>[]
           ).filter(
             (reg) => !(reg.modId === modId && reg.callback === callback),
           );
-          // Clean up the array if it becomes empty
           if (state.middlewareRegistry[hookName]?.length === 0) {
             delete state.middlewareRegistry[hookName];
           }
@@ -152,14 +164,43 @@ export const useControlRegistryStore = create(
     },
 
     getMiddlewareForHook: (hookName) => {
-      // Return a readonly copy of the sorted array, or an empty array if none exist
       const middleware = get().middlewareRegistry[hookName] ?? [];
-      // Ensure sorting just in case (though registerMiddleware should maintain it)
+      // Return a frozen copy to prevent mutation
       return Object.freeze(
         [...(middleware as RegisteredMiddleware<any>[])].sort(
           (a, b) => (a.order ?? 0) - (b.order ?? 0),
         ),
       );
+    },
+
+    registerTool: (modId, toolName, definition, implementation) => {
+      set((state) => {
+        if (state.tools[toolName]) {
+          console.warn(
+            `ControlRegistryStore: Tool "${toolName}" already registered by mod "${state.tools[toolName].modId}". Overwriting with registration from mod "${modId}".`,
+          );
+        }
+        state.tools[toolName] = { definition, implementation, modId };
+      });
+      return () => get().unregisterTool(toolName);
+    },
+
+    unregisterTool: (toolName) => {
+      set((state) => {
+        if (state.tools[toolName]) {
+          delete state.tools[toolName];
+        } else {
+          console.warn(
+            `ControlRegistryStore: Tool "${toolName}" not found for unregistration.`,
+          );
+        }
+      });
+    },
+
+    // Correctly implement and return getRegisteredTools
+    getRegisteredTools: () => {
+      // Return a frozen shallow copy
+      return Object.freeze({ ...get().tools });
     },
   })),
 );

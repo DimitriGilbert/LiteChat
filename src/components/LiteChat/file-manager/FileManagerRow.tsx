@@ -35,23 +35,23 @@ import {
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/litechat/file-manager-utils";
-import type { VfsNode } from "@/types/litechat/vfs"; // Updated path and type
+import type { VfsNode } from "@/types/litechat/vfs";
 
 interface FileManagerRowProps {
-  entry: VfsNode; // Changed type
+  entry: VfsNode;
   isEditingThis: boolean;
   isChecked: boolean;
   isGitRepo: boolean;
   newName: string;
   isOperationLoading: boolean;
-  creatingFolder: boolean; // To disable actions while creating new folder
-  handleNavigate: (entry: VfsNode) => void; // Changed type
+  creatingFolder: boolean;
+  handleNavigate: (entry: VfsNode) => void;
   handleCheckboxChange: (checked: boolean, path: string) => void;
-  startEditing: (entry: VfsNode) => void; // Changed type
+  startEditing: (entry: VfsNode) => void;
   cancelEditing: () => void;
   handleRename: () => void;
-  handleDownload: (entry: VfsNode) => void; // Changed type
-  handleDelete: (entry: VfsNode) => void; // Changed type
+  handleDownload: (entry: VfsNode) => void; // Should handle both file/folder
+  handleDelete: (entry: VfsNode) => void;
   setNewName: (name: string) => void;
   renameInputRef: React.RefObject<HTMLInputElement | null>;
   // Git actions
@@ -75,7 +75,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
   startEditing,
   cancelEditing,
   handleRename,
-  handleDownload,
+  handleDownload, // Use this prop
   handleDelete,
   setNewName,
   renameInputRef,
@@ -86,11 +86,11 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
   handleGitStatus,
 }) => {
   const handleRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
+    // Prevent navigation when clicking interactive elements
     if (
       (e.target as HTMLElement).closest(
-        'input[type="checkbox"], button, input[type="text"]',
-      ) ||
-      (e.target as HTMLElement).closest("[data-radix-context-menu-trigger]")
+        'input[type="checkbox"], button, input[type="text"], [data-radix-context-menu-trigger]',
+      )
     ) {
       return;
     }
@@ -107,7 +107,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
     }
   };
 
-  const isDirectory = entry.type === "folder"; // Check type property
+  const isDirectory = entry.type === "folder";
 
   const Icon = isDirectory
     ? isGitRepo
@@ -153,10 +153,10 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             ref={renameInputRef}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            onBlur={handleRename}
+            onBlur={handleRename} // Consider if onBlur is best, maybe explicit save?
             onKeyDown={handleKeyDown}
             className="h-7 px-2 py-1 text-sm bg-input border-border focus:ring-1 focus:ring-primary w-full"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()} // Prevent row click when editing name
             disabled={isOperationLoading}
           />
         ) : (
@@ -167,6 +167,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             )}
             title={entry.name}
             onClick={(e) => {
+              // Allow clicking name to navigate into folder
               if (isDirectory) {
                 e.stopPropagation();
                 handleNavigate(entry);
@@ -178,21 +179,19 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
         )}
       </TableCell>
       <TableCell className="text-right py-1 px-2 text-xs text-muted-foreground">
-        {/* Access size only if it's a file */}
         {entry.type === "file" && entry.size !== undefined
           ? formatBytes(entry.size)
           : ""}
       </TableCell>
       <TableCell className="text-right text-xs text-muted-foreground py-1 px-2">
-        {/* Use lastModified from VfsNode */}
         {new Date(entry.lastModified).toLocaleString()}
       </TableCell>
       <TableCell className="text-right pr-4 py-1">
         <div
           className={cn(
             "flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity",
-            isEditingThis && "opacity-100",
-            isOperationLoading && "opacity-30",
+            isEditingThis && "opacity-100", // Ensure actions visible when editing
+            isOperationLoading && "opacity-30", // Dim actions when loading
           )}
         >
           {isEditingThis ? (
@@ -273,12 +272,12 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
                       className="h-6 w-6 text-muted-foreground hover:text-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDownload(entry);
+                        handleDownload(entry); // Call the download handler
                       }}
                       aria-label={
                         isDirectory ? "Download folder as ZIP" : "Download file"
                       }
-                      disabled={isOperationLoading || entry.type !== "file"} // Disable download for folders for now
+                      disabled={isOperationLoading} // Enable for both types
                     >
                       <DownloadIcon className="h-3.5 w-3.5" />
                     </Button>
@@ -315,6 +314,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
     </TableRow>
   );
 
+  // Context Menu for Folders
   if (isDirectory) {
     return (
       <ContextMenu key={entry.path}>
@@ -381,8 +381,8 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             Rename
           </ContextMenuItem>
           <ContextMenuItem
-            onSelect={() => handleDownload(entry)}
-            disabled={isOperationLoading} // Disable download for folders for now
+            onSelect={() => handleDownload(entry)} // Add download to context menu
+            disabled={isOperationLoading}
           >
             <DownloadIcon className="mr-2 h-4 w-4" />
             Download as ZIP
@@ -399,7 +399,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
       </ContextMenu>
     );
   } else {
-    // It's a file, render without context menu for now
+    // Files don't have the extended context menu for now
     return rowContent;
   }
 };

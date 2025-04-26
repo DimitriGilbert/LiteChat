@@ -1,4 +1,4 @@
-// src/components/LiteChat/settings/settings-mods.tsx
+// src/components/LiteChat/settings/SettingsMods.tsx
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/table";
 import { AlertTriangle, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-// Corrected import path
 import type { DbMod, ModInstance } from "@/types/litechat/modding";
 import {
   Tooltip,
@@ -24,33 +23,24 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { useShallow } from "zustand/react/shallow";
 import { useModStore } from "@/store/mod.store";
-// Removed useChatStorage import
 
 const SettingsModsComponent: React.FC = () => {
-  // --- Fetch state/actions from store ---
-  const {
-    loadedMods,
-    addDbMod,
-    updateDbMod,
-    deleteDbMod,
-    dbMods, // Get mods from store
-    isLoading, // Get loading state from store
-  } = useModStore(
-    useShallow((state) => ({
-      loadedMods: state.loadedMods,
-      addDbMod: state.addDbMod,
-      updateDbMod: state.updateDbMod,
-      deleteDbMod: state.deleteDbMod,
-      dbMods: state.dbMods,
-      isLoading: state.isLoading,
-    })),
-  );
+  const { loadedMods, addDbMod, updateDbMod, deleteDbMod, dbMods, isLoading } =
+    useModStore(
+      useShallow((state) => ({
+        loadedMods: state.loadedMods,
+        addDbMod: state.addDbMod,
+        updateDbMod: state.updateDbMod,
+        deleteDbMod: state.deleteDbMod,
+        dbMods: state.dbMods,
+        isLoading: state.isLoading,
+      })),
+    );
 
-  // Local UI state
   const [modName, setModName] = useState("");
   const [modUrl, setModUrl] = useState("");
   const [modScript, setModScript] = useState("");
@@ -78,34 +68,33 @@ const SettingsModsComponent: React.FC = () => {
         name: modName.trim(),
         sourceUrl: modUrl.trim() || null,
         scriptContent: modScript.trim() || null,
-        enabled: true,
-        loadOrder: (dbMods?.length ?? 0 + 1) * 10, // Use optional chaining
+        enabled: true, // Default to enabled
+        loadOrder: (dbMods?.length ?? 0 + 1) * 10,
       };
-      // Call store action
       await addDbMod(modData);
       setModName("");
       setModUrl("");
       setModScript("");
+      toast.info("Mod added. Reload required for changes to take effect.");
     } catch (error) {
-      // Error toast handled by action
       console.error("Failed to add mod (from component):", error);
+      // Toast handled by store action
     } finally {
       setIsAdding(false);
     }
-  }, [modName, modUrl, modScript, addDbMod, dbMods?.length]); // Use optional chaining
+  }, [modName, modUrl, modScript, addDbMod, dbMods?.length]);
 
   const handleToggleEnable = useCallback(
     async (mod: DbMod) => {
       setIsUpdating((prev) => ({ ...prev, [mod.id]: true }));
       try {
-        // Call store action
         await updateDbMod(mod.id, { enabled: !mod.enabled });
         toast.info(
           `Mod "${mod.name}" ${!mod.enabled ? "enabled" : "disabled"}. Reload required for changes to take effect.`,
         );
       } catch (error) {
-        // Error toast handled by action
         console.error("Failed to update mod (from component):", error);
+        // Toast handled by store action
       } finally {
         setIsUpdating((prev) => ({ ...prev, [mod.id]: false }));
       }
@@ -124,12 +113,14 @@ const SettingsModsComponent: React.FC = () => {
       }
       setIsDeleting((prev) => ({ ...prev, [mod.id]: true }));
       try {
-        // Call store action
         await deleteDbMod(mod.id);
+        // Toast handled by store action
+        toast.info("Mod deleted. Reload required for changes to take effect.");
       } catch (error) {
-        // Error toast handled by action
         console.error("Failed to delete mod (from component):", error);
+        // Toast handled by store action
       } finally {
+        // Reset deleting state regardless of success/failure if error is caught
         setIsDeleting((prev) => ({ ...prev, [mod.id]: false }));
       }
     },
@@ -158,10 +149,10 @@ const SettingsModsComponent: React.FC = () => {
       }
       const dbMod = (dbMods || []).find((m: DbMod) => m.id === modId);
       if (!dbMod) {
-        return { status: "Unknown" };
+        return { status: "Unknown" }; // Should not happen if dbMods is synced
       }
       return dbMod.enabled
-        ? { status: "Load Pending" }
+        ? { status: "Load Pending (Reload Required)" }
         : { status: "Disabled" };
     },
     [loadedMods, dbMods],
@@ -210,7 +201,7 @@ const SettingsModsComponent: React.FC = () => {
             id="mod-script"
             value={modScript}
             onChange={(e) => setModScript(e.target.value)}
-            placeholder="/* Paste your mod script here */"
+            placeholder="/* Paste your mod script here */\n// Example: modApi.log('log', 'My Mod Loaded!');"
             className="min-h-[100px] font-mono text-xs"
             disabled={isAdding || !!modUrl.trim()}
           />
@@ -241,7 +232,6 @@ const SettingsModsComponent: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  // Show skeletons while loading
                   <>
                     <TableRow>
                       <TableCell colSpan={5}>
@@ -264,7 +254,7 @@ const SettingsModsComponent: React.FC = () => {
                   (dbMods || []).map((mod: DbMod) => {
                     const { status, error, tooltip } = getModStatus(mod.id);
                     const sourceDisplay = mod.sourceUrl
-                      ? new URL(mod.sourceUrl).hostname // Basic display, might need refinement
+                      ? new URL(mod.sourceUrl).hostname // Basic display
                       : "Direct Script";
                     const isModUpdating = isUpdating[mod.id];
                     const isModDeleting = isDeleting[mod.id];
@@ -308,7 +298,8 @@ const SettingsModsComponent: React.FC = () => {
                         </TableCell>
                         <TableCell className="text-center">
                           <Switch
-                            checked={mod.enabled}
+                            // Ensure checked is always boolean
+                            checked={mod.enabled ?? false}
                             onCheckedChange={() => handleToggleEnable(mod)}
                             disabled={isDisabled}
                             aria-label={`Enable ${mod.name}`}

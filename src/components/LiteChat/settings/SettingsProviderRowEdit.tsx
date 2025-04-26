@@ -1,6 +1,5 @@
 // src/components/LiteChat/settings/SettingsProviderRowEdit.tsx
 import React from "react";
-// Corrected import path for types
 import type {
   DbProviderConfig,
   DbApiKey,
@@ -20,15 +19,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { SaveIcon, XIcon, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-// Corrected import path
 import { ApiKeySelector } from "@/components/LiteChat/settings/ApiKeySelector";
-// Corrected import path for helpers
 import {
   requiresApiKey,
   requiresBaseURL,
   supportsModelFetching,
-  PROVIDER_TYPES, // This should now be correctly exported and found
-} from "@/lib/litechat/provider-helpers"; // Adjusted path
+  PROVIDER_TYPES,
+} from "@/lib/litechat/provider-helpers";
 import { Separator } from "@/components/ui/separator";
 import {
   DndContext,
@@ -44,7 +41,6 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-// Corrected import path
 import { SortableModelItem } from "@/components/LiteChat/settings/SortableModelItem";
 
 interface ProviderRowEditModeProps {
@@ -57,7 +53,6 @@ interface ProviderRowEditModeProps {
   isSaving: boolean;
   onCancel: () => void;
   onSave: () => Promise<void>;
-  // Ensure onChange accepts the specific keyof type
   onChange: (
     field: keyof DbProviderConfig,
     value: string | boolean | string[] | null,
@@ -66,7 +61,6 @@ interface ProviderRowEditModeProps {
   onDragEnd: (event: DragEndEvent) => void;
 }
 
-// Renamed component function
 const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
   providerId,
   editData,
@@ -92,6 +86,10 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
     }),
   );
 
+  // Ensure boolean fields have defaults for controlled components
+  const isEnabled = editData.isEnabled ?? false;
+  const autoFetchModels = editData.autoFetchModels ?? false;
+
   return (
     <div className="space-y-4">
       {/* Basic Settings */}
@@ -109,7 +107,8 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
             aria-label="Provider Name"
           />
           <Select
-            value={editData.type}
+            // Ensure value is never undefined
+            value={editData.type ?? ""}
             onValueChange={(value) => onChange("type", value as DbProviderType)}
             disabled={isSaving}
           >
@@ -117,7 +116,6 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
               <SelectValue placeholder="Select Type" />
             </SelectTrigger>
             <SelectContent>
-              {/* Add explicit type for pt */}
               {PROVIDER_TYPES.map(
                 (pt: { value: DbProviderType; label: string }) => (
                   <SelectItem key={pt.value} value={pt.value}>
@@ -130,7 +128,8 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
           <div className="flex items-center space-x-2">
             <Switch
               id={`edit-enabled-${providerId}`}
-              checked={editData.isEnabled}
+              // Ensure checked is always boolean
+              checked={isEnabled}
               onCheckedChange={(checked) => onChange("isEnabled", checked)}
               disabled={isSaving}
               aria-labelledby={`edit-enabled-label-${providerId}`}
@@ -149,7 +148,6 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
               <ApiKeySelector
                 label="API Key:"
                 selectedKeyId={editData.apiKeyId ?? null}
-                // Add explicit type for keyId
                 onKeySelected={(keyId: string | null) =>
                   onChange("apiKeyId", keyId)
                 }
@@ -173,7 +171,8 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
         <div className="flex items-center space-x-2">
           <Switch
             id={`edit-autofetch-${providerId}`}
-            checked={editData.autoFetchModels}
+            // Ensure checked is always boolean
+            checked={autoFetchModels}
             onCheckedChange={(checked) => onChange("autoFetchModels", checked)}
             disabled={!canFetch || isSaving}
             aria-labelledby={`edit-autofetch-label-${providerId}`}
@@ -214,6 +213,7 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
                     >
                       <Checkbox
                         id={`enable-model-${providerId}-${model.id}`}
+                        // Ensure checked is always boolean
                         checked={(editData.enabledModels ?? []).includes(
                           model.id,
                         )}
@@ -308,5 +308,4 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
   );
 };
 
-// Correctly export the memoized component using the internal component name
 export const ProviderRowEditMode = React.memo(ProviderRowEditModeComponent);

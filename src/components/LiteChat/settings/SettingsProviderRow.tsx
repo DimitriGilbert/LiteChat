@@ -1,11 +1,9 @@
 // src/components/LiteChat/settings/SettingsProviderRow.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-// Corrected import path for types
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import { toast } from "sonner";
 import { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
-// Corrected import paths for sub-components
 import { ProviderRowViewMode } from "./SettingsProviderRowView";
 import { ProviderRowEditMode } from "./SettingsProviderRowEdit";
 
@@ -35,20 +33,34 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [editData, setEditData] = useState<Partial<DbProviderConfig>>({});
-  const [allAvailableModels, setAllAvailableModels] = useState<
+  // Store the raw models fetched for editing
+  const [rawAvailableModels, setRawAvailableModels] = useState<
     { id: string; name: string }[]
   >([]);
+
+  // Memoize the sorted version for display/use in edit mode
+  const allAvailableModels = useMemo(() => {
+    // Create a copy and sort it
+    return [...rawAvailableModels].sort((a, b) =>
+      (a.name || a.id).localeCompare(b.name || b.id),
+    );
+  }, [rawAvailableModels]);
 
   const orderedEnabledModels = useMemo<{ id: string; name: string }[]>(() => {
     if (!isEditing) return [];
     const enabledIds = new Set(editData.enabledModels ?? []);
     if (enabledIds.size === 0) return [];
+
+    // Filter from the already sorted 'allAvailableModels'
     const enabledModelDefs = allAvailableModels.filter((m) =>
       enabledIds.has(m.id),
     );
+
     const currentSortOrder = editData.modelSortOrder ?? [];
     const orderedList: { id: string; name: string }[] = [];
     const addedIds = new Set<string>();
+
+    // Build the ordered list based on modelSortOrder
     for (const modelId of currentSortOrder) {
       if (enabledIds.has(modelId)) {
         const model = enabledModelDefs.find((m) => m.id === modelId);
@@ -58,15 +70,20 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
         }
       }
     }
-    const remainingEnabled = enabledModelDefs
-      .filter((m) => !addedIds.has(m.id))
-      .sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
+
+    // Find remaining enabled models (those not in sortOrder)
+    // Filter from the already sorted 'enabledModelDefs'
+    const remainingEnabled = enabledModelDefs.filter(
+      (m) => !addedIds.has(m.id),
+    );
+    // No need to sort remainingEnabled again as they inherit order from allAvailableModels
+
     return [...orderedList, ...remainingEnabled];
   }, [
     isEditing,
     editData.enabledModels,
     editData.modelSortOrder,
-    allAvailableModels,
+    allAvailableModels, // Depend on the sorted version
   ]);
 
   const orderedEnabledModelIds = useMemo(
@@ -79,11 +96,12 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
       const { active, over } = event;
       if (over && active.id !== over.id) {
         setEditData((prevEdit: Partial<DbProviderConfig>) => {
+          // Use the current ordered IDs directly from the memoized state
           const currentOrderedIds = orderedEnabledModels.map((m) => m.id);
           const oldIndex = currentOrderedIds.indexOf(active.id as string);
           const newIndex = currentOrderedIds.indexOf(over.id as string);
           if (oldIndex === -1 || newIndex === -1) {
-            return prevEdit;
+            return prevEdit; // Should not happen if IDs are correct
           }
           const newOrderedIds = arrayMove(
             currentOrderedIds,
@@ -97,26 +115,28 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
         });
       }
     },
-    [orderedEnabledModels],
+    [orderedEnabledModels], // Depend on the memoized state
   );
 
   useEffect(() => {
     if (isEditing) {
+      // Fetch raw models and store them
       const models = getAllAvailableModelDefs(provider.id);
-      models.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
-      setAllAvailableModels(models);
+      setRawAvailableModels(models); // Store raw, unsorted models
+
+      // Initialize editData based on the provider prop
       setEditData({
         name: provider.name,
         type: provider.type,
         isEnabled: provider.isEnabled,
         apiKeyId: provider.apiKeyId,
         baseURL: provider.baseURL,
-        enabledModels: provider.enabledModels ?? [],
+        enabledModels: provider.enabledModels ?? [], // Ensure it's always an array
         autoFetchModels: provider.autoFetchModels,
         modelSortOrder: provider.modelSortOrder ?? null,
       });
     } else {
-      setAllAvailableModels([]);
+      setRawAvailableModels([]); // Clear raw models when not editing
     }
   }, [
     isEditing,
@@ -135,12 +155,14 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   const handleEdit = () => setIsEditing(true);
   const handleCancel = () => {
     setIsEditing(false);
-    setEditData({});
+    setEditData({}); // Clear edit data
     setIsSaving(false);
   };
+
   const handleSave = useCallback(async () => {
     setIsSaving(true);
     try {
+      // Ensure enabledModels and modelSortOrder are null if empty
       const finalEnabledModels =
         editData.enabledModels && editData.enabledModels.length > 0
           ? editData.enabledModels
@@ -149,17 +171,20 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
         editData.modelSortOrder && editData.modelSortOrder.length > 0
           ? editData.modelSortOrder
           : null;
+
       const finalEditData: Partial<DbProviderConfig> = {
         ...editData,
         enabledModels: finalEnabledModels,
         modelSortOrder: finalSortOrder,
       };
-      // Remove undefined keys before sending update
+
+      // Remove undefined keys before sending update (optional, belt-and-suspenders)
       Object.keys(finalEditData).forEach((key) => {
         if (finalEditData[key as keyof typeof finalEditData] === undefined) {
           delete finalEditData[key as keyof typeof finalEditData];
         }
       });
+
       await onUpdate(provider.id, finalEditData);
       setIsEditing(false);
       setEditData({});
@@ -174,10 +199,9 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     }
   }, [editData, onUpdate, provider.id, provider.name]);
 
-  // Correct the type of 'field' here
   const handleChange = useCallback(
     (
-      field: keyof DbProviderConfig, // Use the specific keyof type
+      field: keyof DbProviderConfig,
       value: string | boolean | string[] | null,
     ) => {
       setEditData((prev: Partial<DbProviderConfig>) => ({
@@ -198,6 +222,8 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
           currentEnabledSet.delete(modelId);
         }
         const newEnabledModels = Array.from(currentEnabledSet);
+
+        // Update sort order based on the new enabled models
         const currentSortOrder = prev.modelSortOrder ?? [];
         let newSortOrder: string[];
         if (checked) {
@@ -211,9 +237,11 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
             (id: string) => id !== modelId,
           );
         }
+
         return {
           ...prev,
           enabledModels: newEnabledModels,
+          // Ensure modelSortOrder is null if empty, otherwise use the new array
           modelSortOrder: newSortOrder.length > 0 ? newSortOrder : null,
         };
       });
@@ -231,7 +259,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
         // Error toast handled by parent/store action
         setIsDeleting(false); // Ensure state is reset on error
       }
-      // No finally needed as state is reset on error
+      // No finally needed as state is reset on error if it throws
     }
   }, [onDelete, provider.id, provider.name]);
 
@@ -240,11 +268,11 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     // Re-fetch available models for edit mode if it's open after fetch completes
     if (isEditing) {
       const models = getAllAvailableModelDefs(provider.id);
-      models.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
-      setAllAvailableModels(models);
+      setRawAvailableModels(models); // Update raw models
     }
   }, [onFetchModels, provider.id, isEditing, getAllAvailableModelDefs]);
 
+  // Memoize the function passed to ViewMode to avoid unnecessary re-renders
   const getAvailableModelsForView = useCallback(() => {
     return getAllAvailableModelDefs(provider.id);
   }, [getAllAvailableModelDefs, provider.id]);
@@ -256,13 +284,13 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
           providerId={provider.id}
           editData={editData}
           apiKeys={apiKeys}
-          allAvailableModels={allAvailableModels}
+          allAvailableModels={allAvailableModels} // Pass the sorted version
           orderedEnabledModels={orderedEnabledModels}
           orderedEnabledModelIds={orderedEnabledModelIds}
           isSaving={isSaving}
           onCancel={handleCancel}
           onSave={handleSave}
-          onChange={handleChange} // Pass the correctly typed handleChange
+          onChange={handleChange}
           onEnabledModelChange={handleEnabledModelChange}
           onDragEnd={handleDragEnd}
         />

@@ -15,14 +15,14 @@ import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { loadMods } from "@/modding/loader";
 import { Toaster } from "@/components/ui/sonner";
-// Import CoreMessage type correctly
-import type { CoreMessage } from "ai";
+import type { CoreMessage, ToolCallPart, ToolResultPart } from "ai"; // Import tool types
 import { InputArea } from "./prompt/InputArea";
 import { useShallow } from "zustand/react/shallow";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { cn } from "@/lib/utils";
 import { InteractionCard } from "./canvas/InteractionCard";
 import { toast } from "sonner";
+import type { Interaction } from "@/types/litechat/interaction"; // Import Interaction type
 
 // Import control registration hooks/components
 import { useConversationListControlRegistration } from "./chat/control/ConversationList";
@@ -72,7 +72,6 @@ export const LiteChat: React.FC = () => {
       setLoadedMods: state.setLoadedMods,
     })),
   );
-  // Use correct action name from ProviderStore
   const { loadInitialData: loadProviderData } = useProviderStore(
     useShallow((state) => ({
       loadInitialData: state.loadInitialData,
@@ -138,6 +137,39 @@ export const LiteChat: React.FC = () => {
     loadSettings,
   ]);
 
+  // --- History Construction Helper ---
+  const buildHistoryMessages = (
+    historyInteractions: Interaction[],
+  ): CoreMessage[] => {
+    return historyInteractions.flatMap((i): CoreMessage[] => {
+      const msgs: CoreMessage[] = [];
+      // Add user message if it exists and is string
+      if (i.prompt?.content && typeof i.prompt.content === "string") {
+        msgs.push({ role: "user", content: i.prompt.content });
+      }
+      // Add assistant message (text part)
+      if (i.response && typeof i.response === "string") {
+        msgs.push({ role: "assistant", content: i.response });
+      }
+      // Add tool calls and results from metadata if they exist
+      if (i.metadata?.toolCalls && Array.isArray(i.metadata.toolCalls)) {
+        msgs.push({
+          role: "assistant",
+          content: i.metadata.toolCalls, // Pass the array of tool calls
+        });
+      }
+      if (i.metadata?.toolResults && Array.isArray(i.metadata.toolResults)) {
+        i.metadata.toolResults.forEach((result: ToolResultPart) => {
+          msgs.push({
+            role: "tool",
+            content: [result], // Wrap individual result in an array as per CoreMessage spec
+          });
+        });
+      }
+      return msgs;
+    });
+  };
+
   // --- Prompt Submission Handler ---
   const handlePromptSubmit = useCallback(
     async (turnData: PromptTurnObject) => {
@@ -148,7 +180,7 @@ export const LiteChat: React.FC = () => {
         try {
           currentConvId = await addConversation({ title: "New Chat" });
           selectConversation(currentConvId);
-          await new Promise((resolve) => setTimeout(resolve, 0));
+          await new Promise((resolve) => setTimeout(resolve, 0)); // Allow state update
           console.log(
             `LiteChat: New conversation created and selected: ${currentConvId}`,
           );
@@ -165,46 +197,38 @@ export const LiteChat: React.FC = () => {
           `LiteChat: Syncing InteractionStore to conversation ${currentConvId}`,
         );
         setCurrentConversationId(currentConvId);
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0)); // Allow state update
       }
 
+      // Get the latest interactions for history building
       const currentHistory = useInteractionStore.getState().interactions;
-      // Corrected mapping: Ensure only valid CoreMessages are included
-      const messages: CoreMessage[] = currentHistory
-        .filter(
-          (i) =>
-            i.type === "message.user_assistant" && i.status === "COMPLETED",
-        )
-        .flatMap((i): CoreMessage[] => {
-          // Return CoreMessage[] explicitly
-          const msgs: CoreMessage[] = [];
-          // Ensure prompt content is string before adding user message
-          if (i.prompt?.content && typeof i.prompt.content === "string") {
-            msgs.push({ role: "user", content: i.prompt.content });
-          }
-          // Ensure response is string before adding assistant message
-          if (i.response && typeof i.response === "string") {
-            msgs.push({ role: "assistant", content: i.response });
-          }
-          // TODO: Handle non-string/complex assistant responses if needed
-          return msgs;
-        }); // No need for filter(Boolean) after flatMap if logic is correct
+      // Filter for completed interactions to build history
+      const completedHistory = currentHistory.filter(
+        (i) => i.status === "COMPLETED",
+      );
+      const messages: CoreMessage[] = buildHistoryMessages(completedHistory);
 
       // Add the current user turn to the messages
+      // TODO: Handle multi-modal turnData.content properly
       if (typeof turnData.content === "string" && turnData.content.trim()) {
         messages.push({ role: "user", content: turnData.content });
       } else if (typeof turnData.content === "object") {
         console.warn("Multi-modal content in turnData not fully handled yet.");
-        messages.push({ role: "user", content: "[User provided content]" });
+        // Placeholder for multi-modal content
+        messages.push({
+          role: "user",
+          content: [{ type: "text", text: "[User provided content]" }],
+        });
       }
 
       const systemPrompt = globalSystemPrompt;
 
       const aiPayload: PromptObject = {
         system: systemPrompt,
-        messages: messages, // Use the correctly typed array
+        messages: messages,
         parameters: turnData.parameters,
         metadata: turnData.metadata,
+        // toolChoice: 'auto', // Example: Let AI decide if tools are available
       };
 
       emitter.emit("prompt:finalised", { prompt: aiPayload });
@@ -226,6 +250,7 @@ export const LiteChat: React.FC = () => {
       selectConversation,
       setCurrentConversationId,
       globalSystemPrompt,
+      buildHistoryMessages, // Add helper to dependencies
     ],
   );
 
@@ -246,29 +271,33 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
+      // History should go up to the index *before* the one being regenerated
       const historyUpToIndex = targetInteraction.index;
-      const historyUpToParent = interactionStore.interactions.filter(
-        (i) => i.index < historyUpToIndex,
+      // Get completed interactions before the target index
+      const historyInteractions = interactionStore.interactions
+        .filter((i) => i.index < historyUpToIndex && i.status === "COMPLETED")
+        // Ensure we only include the latest completed version for each index
+        .reduce(
+          (acc, i) => {
+            const existing = acc[i.index];
+            if (
+              !existing ||
+              (i.startedAt &&
+                existing.startedAt &&
+                i.startedAt > existing.startedAt)
+            ) {
+              acc[i.index] = i;
+            }
+            return acc;
+          },
+          {} as Record<number, Interaction>,
+        );
+
+      const messages: CoreMessage[] = buildHistoryMessages(
+        Object.values(historyInteractions).sort((a, b) => a.index - b.index),
       );
 
-      // Corrected mapping
-      const messages: CoreMessage[] = historyUpToParent
-        .filter(
-          (i) =>
-            i.type === "message.user_assistant" && i.status === "COMPLETED",
-        )
-        .flatMap((i): CoreMessage[] => {
-          // Return CoreMessage[] explicitly
-          const msgs: CoreMessage[] = [];
-          if (i.prompt?.content && typeof i.prompt.content === "string") {
-            msgs.push({ role: "user", content: i.prompt.content });
-          }
-          if (i.response && typeof i.response === "string") {
-            msgs.push({ role: "assistant", content: i.response });
-          }
-          return msgs;
-        }); // No need for filter
-
+      // Add the user prompt from the interaction being regenerated
       if (
         targetInteraction.prompt?.content &&
         typeof targetInteraction.prompt.content === "string"
@@ -278,6 +307,7 @@ export const LiteChat: React.FC = () => {
           content: targetInteraction.prompt.content,
         });
       } else {
+        // Handle potential multi-modal prompt content if necessary
         console.error(
           `LiteChat: Cannot regenerate - missing or invalid user prompt content in interaction ${interactionId}.`,
         );
@@ -287,14 +317,16 @@ export const LiteChat: React.FC = () => {
 
       const systemPrompt = useSettingsStore.getState().globalSystemPrompt;
 
+      // Use the original turn data's parameters and metadata, but mark as regeneration
       const aiPayload: PromptObject = {
         system: systemPrompt,
-        messages: messages, // Use correctly typed array
+        messages: messages,
         parameters: targetInteraction.prompt.parameters,
         metadata: {
           ...targetInteraction.prompt.metadata,
-          regeneratedFromId: interactionId,
+          regeneratedFromId: interactionId, // Mark the source
         },
+        // toolChoice: 'auto', // Consider tool choice for regeneration
       };
 
       emitter.emit("prompt:finalised", { prompt: aiPayload });
@@ -304,6 +336,7 @@ export const LiteChat: React.FC = () => {
       );
 
       try {
+        // Pass the original PromptTurnObject as the initiating data for the new interaction
         await AIService.startInteraction(aiPayload, targetInteraction.prompt);
         console.log(
           `LiteChat: AIService regeneration interaction started for ${interactionId}.`,
@@ -316,7 +349,7 @@ export const LiteChat: React.FC = () => {
         toast.error("Failed to start regeneration.");
       }
     },
-    [globalSystemPrompt],
+    [globalSystemPrompt, buildHistoryMessages], // Add helper to dependencies
   );
 
   // --- Stop Handler ---
@@ -358,15 +391,15 @@ export const LiteChat: React.FC = () => {
           className="flex items-center justify-end p-2 border-b bg-card flex-shrink-0"
         />
 
-        {/* Chat Canvas - Remove unused allInteractions prop */}
+        {/* Chat Canvas - Pass allInteractions */}
         <ChatCanvas
           conversationId={selectedConversationId}
           interactions={interactions}
-          interactionRenderer={(interaction /* Removed allInteractions */) => (
+          interactionRenderer={(interaction, allInteractions) => (
             <InteractionCard
               key={interaction.id}
               interaction={interaction}
-              // allInteractions={allInteractions} // Removed
+              allInteractions={allInteractions} // Pass down all interactions
               onRegenerate={onRegenerateInteraction}
             />
           )}
