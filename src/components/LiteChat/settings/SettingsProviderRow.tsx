@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import { toast } from "sonner";
-// Removed Dnd/Sortable imports
 import { ProviderRowViewMode } from "./SettingsProviderRowView";
 import { ProviderRowEditMode } from "./SettingsProviderRowEdit";
 import { useProviderStore } from "@/store/provider.store";
@@ -44,15 +43,10 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     );
   }, [rawAvailableModels]);
 
-  // Removed orderedEnabledModels and orderedEnabledModelIds memos
-  // Removed handleDragEnd callback
-
   useEffect(() => {
     if (isEditing) {
       const models = getAllAvailableModelDefsForProvider(provider.id);
       setRawAvailableModels(models);
-
-      // Initialize editData without modelSortOrder
       setEditData({
         name: provider.name,
         type: provider.type,
@@ -61,7 +55,6 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
         baseURL: provider.baseURL,
         enabledModels: provider.enabledModels ?? [],
         autoFetchModels: provider.autoFetchModels,
-        // modelSortOrder removed
       });
     } else {
       setRawAvailableModels([]);
@@ -76,7 +69,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     provider.baseURL,
     provider.enabledModels,
     provider.autoFetchModels,
-    // provider.modelSortOrder removed
+    provider.fetchedModels,
     getAllAvailableModelDefsForProvider,
   ]);
 
@@ -87,48 +80,47 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     setIsSaving(false);
   };
 
+  // Saves ALL changes from the edit form, including enabledModels
   const handleSave = useCallback(async () => {
     setIsSaving(true);
     try {
-      // Ensure enabledModels is null if empty
+      // Ensure enabledModels is null if empty before saving
       const finalEnabledModels =
         editData.enabledModels && editData.enabledModels.length > 0
           ? editData.enabledModels
           : null;
-      // finalSortOrder removed
 
-      // Include model lists in the final data
-      const finalEditData: Partial<DbProviderConfig> = {
+      const finalChanges: Partial<DbProviderConfig> = {
         name: editData.name,
         type: editData.type,
         isEnabled: editData.isEnabled,
         apiKeyId: editData.apiKeyId,
         baseURL: editData.baseURL,
         autoFetchModels: editData.autoFetchModels,
-        enabledModels: finalEnabledModels,
-        // modelSortOrder removed
+        enabledModels: finalEnabledModels, // Include enabledModels in save
       };
 
-      Object.keys(finalEditData).forEach((key) => {
-        if (finalEditData[key as keyof typeof finalEditData] === undefined) {
-          delete finalEditData[key as keyof typeof finalEditData];
+      Object.keys(finalChanges).forEach((key) => {
+        if (finalChanges[key as keyof typeof finalChanges] === undefined) {
+          delete finalChanges[key as keyof typeof finalChanges];
         }
       });
 
-      await onUpdate(provider.id, finalEditData);
+      await onUpdate(provider.id, finalChanges);
       setIsEditing(false);
       setEditData({});
       toast.success(
-        `Provider "${finalEditData.name || provider.name}" updated.`,
+        `Provider "${finalChanges.name || provider.name}" updated.`,
       );
     } catch (error) {
       console.error("Failed to save provider update:", error);
-      // Toast handled by store action or caller
+      toast.error("Failed to save provider configuration.");
     } finally {
       setIsSaving(false);
     }
   }, [editData, onUpdate, provider.id, provider.name]);
 
+  // Handles changes to the editData state
   const handleChange = useCallback(
     (
       field: keyof DbProviderConfig,
@@ -142,38 +134,14 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     [],
   );
 
-  const handleEnabledModelChange = useCallback(
-    (modelId: string, checked: boolean) => {
-      setEditData((prev: Partial<DbProviderConfig>) => {
-        const currentEnabledSet = new Set(prev.enabledModels ?? []);
-        if (checked) {
-          currentEnabledSet.add(modelId);
-        } else {
-          currentEnabledSet.delete(modelId);
-        }
-        const newEnabledModels = Array.from(currentEnabledSet);
-
-        // No need to update sort order here anymore
-        return {
-          ...prev,
-          enabledModels: newEnabledModels,
-        };
-      });
-    },
-    [],
-  );
-
   const handleDelete = useCallback(async () => {
     if (window.confirm(`Delete provider "${provider.name}"?`)) {
       setIsDeleting(true);
       try {
         await onDelete(provider.id);
-        // Toast handled by store action or caller
       } catch (error) {
-        // Error handled by store action or caller
-        setIsDeleting(false); // Ensure state resets on error
+        setIsDeleting(false);
       }
-      // No finally needed if success leads to unmount
     }
   }, [onDelete, provider.id, provider.name]);
 
@@ -191,7 +159,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   ]);
 
   return (
-    <div className="border-b border-border p-4 space-y-3">
+    <div className="border-b border-border p-4 space-y-3 bg-card rounded-md shadow-sm">
       {isEditing ? (
         <ProviderRowEditMode
           providerId={provider.id}
@@ -200,10 +168,9 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
           allAvailableModels={allAvailableModels}
           isSaving={isSaving}
           onCancel={handleCancel}
-          onSave={handleSave}
-          onChange={handleChange}
-          onEnabledModelChange={handleEnabledModelChange}
-          // onDragEnd removed
+          onSave={handleSave} // Saves all changes
+          onChange={handleChange} // Updates local editData
+          onUpdate={onUpdate} // Still needed for potential future direct updates
         />
       ) : (
         <ProviderRowViewMode
@@ -212,6 +179,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
           onEdit={handleEdit}
           onDelete={handleDelete}
           onFetchModels={handleFetchModels}
+          onUpdate={onUpdate} // Pass onUpdate for immediate toggle save
           fetchStatus={fetchStatus}
           isDeleting={isDeleting}
         />
