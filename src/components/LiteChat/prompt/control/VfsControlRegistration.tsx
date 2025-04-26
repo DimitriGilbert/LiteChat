@@ -10,6 +10,7 @@ import {
   DialogTrigger,
   DialogFooter,
   DialogClose,
+  DialogDescription, // Import DialogDescription
 } from "@/components/ui/dialog";
 import {
   Tooltip,
@@ -29,8 +30,6 @@ import { toast } from "sonner";
 
 const CONTROL_ID = "core-vfs-control";
 
-// --- VFS Prompt Control Component ---
-// VfsPromptControl component remains the same...
 const VfsPromptControl: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -102,11 +101,9 @@ const VfsPromptControl: React.FC = () => {
   }, [selectedVfsNodes, setSelectedFiles, mapToInputStoreFormat]);
 
   const handleDialogClose = useCallback(() => {
-    // Only clear VFS store selection if dialog is closed *without* confirming
     if (selectedFileIds.size > 0) {
       clearSelection();
     }
-    // Always clear InputStore selection on close, as it reflects the *intended* attachment
     clearSelectedFiles();
     setIsDialogOpen(false);
   }, [clearSelection, clearSelectedFiles, selectedFileIds.size]);
@@ -151,7 +148,7 @@ const VfsPromptControl: React.FC = () => {
       open={isDialogOpen}
       onOpenChange={(open) => {
         if (!open) {
-          handleDialogClose(); // Use the close handler
+          handleDialogClose();
         } else {
           setIsDialogOpen(true);
         }
@@ -194,6 +191,11 @@ const VfsPromptControl: React.FC = () => {
       <DialogContent className="max-w-3xl h-[70vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>File Manager</DialogTitle>
+          {/* Add DialogDescription */}
+          <DialogDescription>
+            Manage files in the virtual filesystem. Select files and click
+            "Attach Selected" to add them to your prompt.
+          </DialogDescription>
         </DialogHeader>
         <div className="flex-grow overflow-hidden">
           <FileManager />
@@ -216,7 +218,6 @@ const VfsPromptControl: React.FC = () => {
   );
 };
 
-// --- Registration Hook ---
 export const useVfsControlRegistration = () => {
   const registerControl = useControlRegistryStore(
     (state) => state.registerPromptControl,
@@ -230,14 +231,11 @@ export const useVfsControlRegistration = () => {
   useEffect(() => {
     const control: PromptControl = {
       id: CONTROL_ID,
-      // Removed status property
       triggerRenderer: () => <VfsPromptControl />,
       show: () => enableVfs,
       getMetadata: () => {
         const selected = useInputStore.getState().selectedVfsFiles;
-        // Return undefined instead of null
         if (selected.length === 0) return undefined;
-        // Filter out files without a path before returning metadata
         const validFiles = selected
           .filter((f): f is typeof f & { path: string } => !!f.path)
           .map((f) => ({ id: f.id, path: f.path }));
@@ -246,10 +244,7 @@ export const useVfsControlRegistration = () => {
           : undefined;
       },
       clearOnSubmit: () => {
-        // Clear InputStore selection unconditionally after submit
         useInputStore.getState().clearSelectedFiles();
-
-        // Only clear VFS store selection if it's not empty
         const vfsStore = useVfsStore.getState();
         if (vfsStore.selectedFileIds.size > 0) {
           vfsStore.clearSelection();

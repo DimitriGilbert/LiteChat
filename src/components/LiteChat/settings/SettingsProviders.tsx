@@ -2,29 +2,24 @@
 import React, { useState, useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
-import type {
-  DbProviderConfig,
-  DbProviderType,
-  // Removed unused DbApiKey import
-} from "@/types/litechat/provider"; // Correct path
+import type { DbProviderConfig } from "@/types/litechat/provider";
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ProviderRow } from "./SettingsProviderRow";
 import { AddProviderForm } from "./AddProviderForm";
-// REMOVED incorrect import for useChatStorage
-import { DEFAULT_MODELS } from "@/lib/litechat/provider-helpers";
+// GlobalModelOrganizer removed
 import { Skeleton } from "@/components/ui/skeleton";
+// Separator removed
 
+// This component now focuses solely on the list and adding providers
 const SettingsProvidersComponent: React.FC = () => {
-  // Fetch actions AND data directly from ProviderStore
   const {
     addDbProviderConfig,
     updateDbProviderConfig,
     deleteDbProviderConfig,
     fetchModels,
     providerFetchStatus,
-    // Fetch data directly from the store state
     dbProviderConfigs,
     apiKeys,
     isLoading,
@@ -35,37 +30,16 @@ const SettingsProvidersComponent: React.FC = () => {
       deleteDbProviderConfig: state.deleteProviderConfig,
       fetchModels: state.fetchModels,
       providerFetchStatus: state.providerFetchStatus,
-      // Select data directly from the store state
       dbProviderConfigs: state.dbProviderConfigs,
-      apiKeys: state.dbApiKeys, // Use dbApiKeys from state
+      apiKeys: state.dbApiKeys,
       isLoading: state.isLoading,
     })),
-  );
-
-  // getAllAvailableModelDefs remains the same, using data from the store state
-  const getAllAvailableModelDefs = useCallback(
-    (providerConfigId: string): { id: string; name: string }[] => {
-      const config = (dbProviderConfigs || []).find(
-        (p: DbProviderConfig) => p.id === providerConfigId,
-      );
-      const getDefaultModels = (
-        type: DbProviderType,
-      ): { id: string; name: string }[] => {
-        return DEFAULT_MODELS[type] || [];
-      };
-      if (!config) return [];
-      return config.fetchedModels && config.fetchedModels.length > 0
-        ? config.fetchedModels
-        : getDefaultModels(config.type);
-    },
-    [dbProviderConfigs], // Dependency is the data from the store
   );
 
   const [isAdding, setIsAdding] = useState(false);
   const handleAddNew = () => setIsAdding(true);
   const handleCancelNew = useCallback(() => setIsAdding(false), []);
 
-  // handleFetchModels remains the same
   const handleFetchModels = useCallback(
     async (providerId: string): Promise<void> => {
       await fetchModels(providerId);
@@ -74,12 +48,20 @@ const SettingsProvidersComponent: React.FC = () => {
   );
 
   return (
-    <div className="p-4 space-y-4 flex flex-col h-full">
+    // Removed outer flex container, adjusted padding/spacing
+    // The parent component (SettingsModal) now handles layout
+    <div className="space-y-4 h-full flex flex-col">
+      {/* Global Model Organizer REMOVED */}
+      {/* Separator REMOVED */}
+
+      {/* Provider Configuration Section */}
       <div>
-        <h3 className="text-lg font-bold text-white">AI Provider Settings</h3>
-        <p className="text-sm text-gray-400">
-          Configure connections to AI providers. Select models to enable and
-          define their display order for the chat dropdown.
+        <h3 className="text-lg font-semibold text-card-foreground">
+          Provider Configuration
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Add, remove, or configure connections to AI providers. Enable models
+          within each provider's edit section.
         </p>
       </div>
 
@@ -88,50 +70,53 @@ const SettingsProvidersComponent: React.FC = () => {
         {!isAdding ? (
           <Button
             onClick={handleAddNew}
+            variant="outline"
             className="w-full"
             disabled={isLoading}
           >
-            <PlusIcon className="h-4 w-4 mr-1" /> Add Provider
+            <PlusIcon className="h-4 w-4 mr-1" /> Add Provider Configuration
           </Button>
         ) : (
           <AddProviderForm
-            apiKeys={apiKeys || []} // Use data from store
+            apiKeys={apiKeys || []}
             onAddProvider={addDbProviderConfig}
             onCancel={handleCancelNew}
           />
         )}
       </div>
 
-      {/* Provider List */}
-      <ScrollArea className="flex-grow pr-3 -mr-3 border-t border-border pt-4 mt-4">
-        <div className="space-y-2">
-          {isLoading ? (
-            <>
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-            </>
-          ) : (
-            (dbProviderConfigs || []).map((provider: DbProviderConfig) => (
-              <ProviderRow
-                key={provider.id}
-                provider={provider}
-                apiKeys={apiKeys || []} // Use data from store
-                onUpdate={updateDbProviderConfig}
-                onDelete={deleteDbProviderConfig}
-                onFetchModels={handleFetchModels}
-                fetchStatus={providerFetchStatus[provider.id] || "idle"}
-                getAllAvailableModelDefs={getAllAvailableModelDefs}
-              />
-            ))
-          )}
-          {!isLoading && dbProviderConfigs?.length === 0 && !isAdding && (
-            <p className="text-sm text-gray-500 text-center py-4">
-              No providers configured yet. Click "Add Provider" above.
-            </p>
-          )}
-        </div>
-      </ScrollArea>
+      {/* Provider List - Takes remaining space */}
+      <div className="flex-grow overflow-hidden border-t border-border pt-4 mt-4">
+        <ScrollArea className="h-full pr-3 -mr-3">
+          <div className="space-y-2">
+            {isLoading && !isAdding ? (
+              <>
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+              </>
+            ) : (
+              (dbProviderConfigs || []).map((provider: DbProviderConfig) => (
+                <ProviderRow
+                  key={provider.id}
+                  provider={provider}
+                  apiKeys={apiKeys || []}
+                  onUpdate={updateDbProviderConfig}
+                  onDelete={deleteDbProviderConfig}
+                  onFetchModels={handleFetchModels}
+                  fetchStatus={providerFetchStatus[provider.id] || "idle"}
+                />
+              ))
+            )}
+            {!isLoading && dbProviderConfigs?.length === 0 && !isAdding && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No providers configured yet. Click "Add Provider Configuration"
+                above.
+              </p>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
     </div>
   );
 };

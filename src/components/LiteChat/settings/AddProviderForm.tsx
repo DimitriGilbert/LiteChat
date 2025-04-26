@@ -40,24 +40,22 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
   onCancel,
 }) => {
   const [isSavingNew, setIsSavingNew] = useState(false);
-  // Initialize with definite default values to avoid uncontrolled state
   const [newProviderData, setNewProviderData] = useState<
     Partial<DbProviderConfig> & {
       type: DbProviderType;
       isEnabled: boolean;
       autoFetchModels: boolean;
-    } // Ensure required fields have defaults
+    }
   >({
     name: "",
-    type: "openai", // Default type
-    isEnabled: true, // Default enabled state
+    type: "openai",
+    isEnabled: true,
     apiKeyId: null,
     baseURL: null,
-    enabledModels: null,
-    autoFetchModels: true, // Default auto-fetch (will be updated based on type)
+    enabledModels: null, // Initialize as null
+    autoFetchModels: true,
     fetchedModels: null,
     modelsLastFetchedAt: null,
-    modelSortOrder: null,
   });
 
   const handleNewChange = useCallback(
@@ -67,17 +65,13 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
     ) => {
       setNewProviderData((prev) => {
         const updated = { ...prev, [field]: value };
-        // Reset dependent fields when type changes
         if (field === "type") {
           const newType = value as DbProviderType;
           updated.apiKeyId = null;
           updated.baseURL = null;
-          // Ensure autoFetchModels is always boolean
           updated.autoFetchModels = supportsModelFetching(newType);
-          updated.enabledModels = null;
-          updated.modelSortOrder = null;
+          updated.enabledModels = null; // Reset enabled models on type change
         }
-        // Ensure boolean fields are always boolean
         if (field === "isEnabled" || field === "autoFetchModels") {
           updated[field] = !!value;
         }
@@ -95,7 +89,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
     setIsSavingNew(true);
     try {
       const type = newProviderData.type!;
-      // Ensure autoFetch is boolean
       const autoFetch =
         newProviderData.autoFetchModels ?? supportsModelFetching(type);
 
@@ -105,20 +98,20 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
       > = {
         name: newProviderData.name,
         type: type,
-        isEnabled: newProviderData.isEnabled ?? true, // Ensure boolean
+        isEnabled: newProviderData.isEnabled ?? true,
         apiKeyId: newProviderData.apiKeyId ?? null,
         baseURL: newProviderData.baseURL ?? null,
-        enabledModels: null,
-        autoFetchModels: autoFetch, // Ensure boolean
+        enabledModels: null, // Add enabledModels explicitly (initially null)
+        autoFetchModels: autoFetch,
         fetchedModels: null,
         modelsLastFetchedAt: null,
-        modelSortOrder: null,
       };
 
       await onAddProvider(configToAdd);
       onCancel();
     } catch (error) {
       console.error("Failed to add provider (from form component):", error);
+      // Toast handled by store action or caller
     } finally {
       setIsSavingNew(false);
     }
@@ -142,7 +135,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
           aria-label="Provider Name"
         />
         <Select
-          // Ensure value is never undefined
           value={newProviderData.type ?? "openai"}
           onValueChange={(value) =>
             handleNewChange("type", value as DbProviderType)
@@ -165,7 +157,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
         <div className="flex items-center space-x-2">
           <Switch
             id="new-enabled"
-            // Ensure checked is always boolean
             checked={newProviderData.isEnabled ?? true}
             onCheckedChange={(checked) => handleNewChange("isEnabled", checked)}
             disabled={isSavingNew}
@@ -207,7 +198,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
       <div className="flex items-center space-x-2">
         <Switch
           id="new-autofetch"
-          // Ensure checked is always boolean
           checked={newProviderData.autoFetchModels ?? false}
           onCheckedChange={(checked) =>
             handleNewChange("autoFetchModels", checked)
@@ -224,8 +214,7 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
         </Label>
       </div>
       <p className="text-xs text-muted-foreground">
-        You can select/order specific models after adding the provider and
-        fetching its models (if supported).
+        Models fetched will appear in the global organizer above after fetching.
       </p>
       {/* Action Buttons */}
       <div className="flex justify-end space-x-2">

@@ -15,24 +15,35 @@ import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { loadMods } from "@/modding/loader";
 import { Toaster } from "@/components/ui/sonner";
-// Removed unused ToolCallPart import
-import type { CoreMessage, ToolResultPart } from "ai"; // Import tool types
+import type { CoreMessage, ToolResultPart } from "ai";
 import { InputArea } from "./prompt/InputArea";
 import { useShallow } from "zustand/react/shallow";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { cn } from "@/lib/utils";
-// Removed unused InteractionCard import
 import { toast } from "sonner";
-import type { Interaction } from "@/types/litechat/interaction"; // Import Interaction type
+import type { Interaction } from "@/types/litechat/interaction";
 
 // Import control registration hooks/components
 import { useConversationListControlRegistration } from "./chat/control/ConversationList";
-
 import { useSettingsControlRegistration } from "./chat/control/Settings";
-import { useModelProviderControlRegistration } from "./prompt/control/ModelProvider";
+// Import the CORRECT registration hook
+import { useGlobalModelSelectorRegistration } from "./prompt/control/GlobalModelSelectorRegistration"; // Corrected import path
 import { useParameterControlRegistration } from "./prompt/control/ParameterControlRegistration";
 import { useFileControlRegistration } from "./prompt/control/FileControlRegistration";
 import { useVfsControlRegistration } from "./prompt/control/VfsControlRegistration";
+
+// Helper to split combined ID - needed for regeneration
+const splitModelId = (
+  combinedId: string | null,
+): { providerId: string | null; modelId: string | null } => {
+  if (!combinedId || !combinedId.includes(":")) {
+    return { providerId: null, modelId: null };
+  }
+  const parts = combinedId.split(":");
+  const providerId = parts[0];
+  const modelId = parts.slice(1).join(":");
+  return { providerId, modelId };
+};
 
 export const LiteChat: React.FC = () => {
   // --- Store Hooks ---
@@ -89,7 +100,7 @@ export const LiteChat: React.FC = () => {
   // --- Register Core Controls ---
   useConversationListControlRegistration();
   useSettingsControlRegistration();
-  useModelProviderControlRegistration();
+  useGlobalModelSelectorRegistration(); // Use the correct registration hook
   useParameterControlRegistration();
   useFileControlRegistration();
   useVfsControlRegistration();
@@ -140,49 +151,55 @@ export const LiteChat: React.FC = () => {
   ]);
 
   // --- History Construction Helper ---
-  const buildHistoryMessages = (
-    historyInteractions: Interaction[],
-  ): CoreMessage[] => {
-    return historyInteractions.flatMap((i): CoreMessage[] => {
-      const msgs: CoreMessage[] = [];
-      // Add user message if it exists and is string
-      if (i.prompt?.content && typeof i.prompt.content === "string") {
-        msgs.push({ role: "user", content: i.prompt.content });
-      }
-      // Add assistant message (text part)
-      if (i.response && typeof i.response === "string") {
-        msgs.push({ role: "assistant", content: i.response });
-      }
-      // Add tool calls and results from metadata if they exist
-      if (i.metadata?.toolCalls && Array.isArray(i.metadata.toolCalls)) {
-        msgs.push({
-          role: "assistant",
-          content: i.metadata.toolCalls, // Pass the array of tool calls
-        });
-      }
-      if (i.metadata?.toolResults && Array.isArray(i.metadata.toolResults)) {
-        i.metadata.toolResults.forEach((result: ToolResultPart) => {
+  const buildHistoryMessages = useCallback(
+    (historyInteractions: Interaction[]): CoreMessage[] => {
+      return historyInteractions.flatMap((i): CoreMessage[] => {
+        const msgs: CoreMessage[] = [];
+        if (i.prompt?.content && typeof i.prompt.content === "string") {
+          msgs.push({ role: "user", content: i.prompt.content });
+        }
+        if (i.response && typeof i.response === "string") {
+          msgs.push({ role: "assistant", content: i.response });
+        }
+        if (i.metadata?.toolCalls && Array.isArray(i.metadata.toolCalls)) {
           msgs.push({
-            role: "tool",
-            content: [result], // Wrap individual result in an array as per CoreMessage spec
+            role: "assistant",
+            content: i.metadata.toolCalls,
           });
-        });
-      }
-      return msgs;
-    });
-  };
+        }
+        if (i.metadata?.toolResults && Array.isArray(i.metadata.toolResults)) {
+          i.metadata.toolResults.forEach((result: ToolResultPart) => {
+            msgs.push({
+              role: "tool",
+              content: [result],
+            });
+          });
+        }
+        return msgs;
+      });
+    },
+    [],
+  );
 
   // --- Prompt Submission Handler ---
   const handlePromptSubmit = useCallback(
     async (turnData: PromptTurnObject) => {
       let currentConvId = selectedConversationId;
 
+      // Ensure a model is selected (uses combined ID)
+      const selectedModelCombinedId =
+        useProviderStore.getState().selectedModelId;
+      if (!selectedModelCombinedId) {
+        toast.error("Please select a model before sending a message.");
+        return;
+      }
+
       if (!currentConvId) {
         console.log("LiteChat: No conversation selected, creating new one...");
         try {
           currentConvId = await addConversation({ title: "New Chat" });
           selectConversation(currentConvId);
-          await new Promise((resolve) => setTimeout(resolve, 0)); // Allow state update
+          await new Promise((resolve) => setTimeout(resolve, 0));
           console.log(
             `LiteChat: New conversation created and selected: ${currentConvId}`,
           );
@@ -199,24 +216,19 @@ export const LiteChat: React.FC = () => {
           `LiteChat: Syncing InteractionStore to conversation ${currentConvId}`,
         );
         setCurrentConversationId(currentConvId);
-        await new Promise((resolve) => setTimeout(resolve, 0)); // Allow state update
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
 
-      // Get the latest interactions for history building
       const currentHistory = useInteractionStore.getState().interactions;
-      // Filter for completed interactions to build history
       const completedHistory = currentHistory.filter(
         (i) => i.status === "COMPLETED",
       );
       const messages: CoreMessage[] = buildHistoryMessages(completedHistory);
 
-      // Add the current user turn to the messages
-      // TODO: Handle multi-modal turnData.content properly
       if (typeof turnData.content === "string" && turnData.content.trim()) {
         messages.push({ role: "user", content: turnData.content });
       } else if (typeof turnData.content === "object") {
         console.warn("Multi-modal content in turnData not fully handled yet.");
-        // Placeholder for multi-modal content
         messages.push({
           role: "user",
           content: [{ type: "text", text: "[User provided content]" }],
@@ -225,12 +237,12 @@ export const LiteChat: React.FC = () => {
 
       const systemPrompt = globalSystemPrompt || undefined;
 
+      // Metadata from turnData already contains simple providerId/modelId
       const aiPayload: PromptObject = {
         system: systemPrompt,
         messages: messages,
         parameters: turnData.parameters,
         metadata: turnData.metadata,
-        // toolChoice: 'auto', // Example: Let AI decide if tools are available
       };
 
       emitter.emit("prompt:finalised", { prompt: aiPayload });
@@ -252,7 +264,7 @@ export const LiteChat: React.FC = () => {
       selectConversation,
       setCurrentConversationId,
       globalSystemPrompt,
-      buildHistoryMessages, // Add helper to dependencies
+      buildHistoryMessages,
     ],
   );
 
@@ -273,12 +285,23 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
-      // History should go up to the index *before* the one being regenerated
+      // Ensure a model is selected (uses combined ID)
+      const selectedModelCombinedId =
+        useProviderStore.getState().selectedModelId;
+      if (!selectedModelCombinedId) {
+        toast.error("Please select a model before regenerating.");
+        return;
+      }
+      // Extract simple IDs for metadata
+      const { providerId, modelId } = splitModelId(selectedModelCombinedId);
+      if (!providerId || !modelId) {
+        toast.error("Invalid model selection for regeneration.");
+        return;
+      }
+
       const historyUpToIndex = targetInteraction.index;
-      // Get completed interactions before the target index
       const historyInteractions = interactionStore.interactions
         .filter((i) => i.index < historyUpToIndex && i.status === "COMPLETED")
-        // Ensure we only include the latest completed version for each index
         .reduce(
           (acc, i) => {
             const existing = acc[i.index];
@@ -299,7 +322,6 @@ export const LiteChat: React.FC = () => {
         Object.values(historyInteractions).sort((a, b) => a.index - b.index),
       );
 
-      // Add the user prompt from the interaction being regenerated
       if (
         targetInteraction.prompt?.content &&
         typeof targetInteraction.prompt.content === "string"
@@ -309,7 +331,6 @@ export const LiteChat: React.FC = () => {
           content: targetInteraction.prompt.content,
         });
       } else {
-        // Handle potential multi-modal prompt content if necessary
         console.error(
           `LiteChat: Cannot regenerate - missing or invalid user prompt content in interaction ${interactionId}.`,
         );
@@ -320,16 +341,19 @@ export const LiteChat: React.FC = () => {
       const systemPrompt =
         useSettingsStore.getState().globalSystemPrompt || undefined;
 
-      // Use the original turn data's parameters and metadata, but mark as regeneration
+      // Use original parameters, but updated metadata (current model selection)
+      const currentMetadata = {
+        ...targetInteraction.prompt.metadata,
+        regeneratedFromId: interactionId,
+        providerId: providerId, // Use current simple ID
+        modelId: modelId, // Use current simple ID
+      };
+
       const aiPayload: PromptObject = {
         system: systemPrompt,
         messages: messages,
         parameters: targetInteraction.prompt.parameters,
-        metadata: {
-          ...targetInteraction.prompt.metadata,
-          regeneratedFromId: interactionId, // Mark the source
-        },
-        // toolChoice: 'auto', // Consider tool choice for regeneration
+        metadata: currentMetadata,
       };
 
       emitter.emit("prompt:finalised", { prompt: aiPayload });
@@ -339,7 +363,6 @@ export const LiteChat: React.FC = () => {
       );
 
       try {
-        // Pass the original PromptTurnObject as the initiating data for the new interaction
         await AIService.startInteraction(aiPayload, targetInteraction.prompt);
         console.log(
           `LiteChat: AIService regeneration interaction started for ${interactionId}.`,
@@ -352,7 +375,7 @@ export const LiteChat: React.FC = () => {
         toast.error("Failed to start regeneration.");
       }
     },
-    [buildHistoryMessages], // Add helper to dependencies
+    [buildHistoryMessages],
   );
 
   // --- Stop Handler ---
@@ -394,12 +417,10 @@ export const LiteChat: React.FC = () => {
           className="flex items-center justify-end p-2 border-b bg-card flex-shrink-0"
         />
 
-        {/* Chat Canvas - Pass allInteractions */}
-        {/* Line 398 */}
+        {/* Chat Canvas */}
         <ChatCanvas
           conversationId={selectedConversationId}
           interactions={interactions}
-          // interactionRenderer prop removed as ChatCanvas handles rendering internally
           onRegenerateInteraction={onRegenerateInteraction}
           streamingInteractionsRenderer={(ids) => (
             <StreamingInteractionRenderer

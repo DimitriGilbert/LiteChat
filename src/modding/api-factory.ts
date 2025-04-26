@@ -17,15 +17,25 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { toast } from "sonner";
 import type { z } from "zod";
 
+// Helper to split combined ID - needed for context snapshot
+const splitModelId = (
+  combinedId: string | null,
+): { providerId: string | null; modelId: string | null } => {
+  if (!combinedId || !combinedId.includes(":")) {
+    return { providerId: null, modelId: null };
+  }
+  const parts = combinedId.split(":");
+  const providerId = parts[0];
+  const modelId = parts.slice(1).join(":");
+  return { providerId, modelId };
+};
+
 export function createModApi(mod: DbMod): LiteChatModApi {
   const modId = mod.id;
   const modName = mod.name;
   const controlStoreActions = useControlRegistryStore.getState();
   const modStoreActions = useModStore.getState();
   const unsubscribers: (() => void)[] = [];
-
-  // TODO: Implement a proper cleanup mechanism that calls all unsubscribers
-  // when the mod is unloaded or the application closes.
 
   const api: LiteChatModApi = {
     modId,
@@ -46,9 +56,8 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       implementation?: ToolImplementation<P>,
     ) => {
       console.log(`[${modName}] Registering tool: ${toolName}`);
-      // Call the store action to register the tool
       const u = controlStoreActions.registerTool(
-        modId, // Pass modId for tracking
+        modId,
         toolName,
         definition,
         implementation,
@@ -78,18 +87,18 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       const cS = useConversationStore.getState();
       const sS = useSettingsStore.getState();
       const pS = useProviderStore.getState();
-      // Create a frozen snapshot of relevant state parts
+      // Extract providerId from selectedModelId
+      const { providerId } = splitModelId(pS.selectedModelId);
       return Object.freeze({
         selectedConversationId: cS.selectedConversationId,
-        // Deep freeze interactions array and its objects
         interactions: Object.freeze(
           iS.currentConversationId === cS.selectedConversationId
             ? iS.interactions.map((i) => Object.freeze({ ...i }))
             : [],
         ),
         isStreaming: iS.status === "streaming",
-        selectedProviderId: pS.selectedProviderId,
-        selectedModelId: pS.selectedModelId,
+        selectedProviderId: providerId, // Get providerId from split
+        selectedModelId: pS.selectedModelId, // Keep combined model ID
         activeSystemPrompt: sS.globalSystemPrompt,
         temperature: sS.temperature,
         maxTokens: sS.maxTokens,

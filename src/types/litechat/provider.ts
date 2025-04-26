@@ -12,7 +12,7 @@ export type DbProviderType =
 export interface DbApiKey extends DbBase {
   name: string;
   value: string; // Encrypt this!
-  providerId: string; // Added: Intended provider type/ID for context
+  providerId: string; // Intended provider type/ID for context
 }
 
 // Stored in DB for Provider Configurations
@@ -22,28 +22,30 @@ export interface DbProviderConfig extends DbBase {
   isEnabled: boolean;
   apiKeyId: string | null;
   baseURL: string | null;
-  enabledModels: string[] | null;
+  enabledModels: string[] | null; // Models enabled FOR THIS PROVIDER
   autoFetchModels: boolean;
   fetchedModels: { id: string; name: string }[] | null;
   modelsLastFetchedAt: Date | null;
-  modelSortOrder: string[] | null;
+  // modelSortOrder: string[] | null; // REMOVED - Order is global now
 }
 
 // Runtime representation of a Model
 export interface AiModelConfig {
-  id: string;
-  name: string;
-  instance: any;
+  id: string; // Combined ID: "providerId:modelId"
+  name: string; // Display name, e.g., "GPT-4o"
+  providerId: string; // ID of the provider config
+  providerName: string; // Name of the provider config
+  instance: any; // The actual AI SDK instance
   contextWindow?: number;
   supportsImageGeneration?: boolean;
   supportsToolCalling?: boolean;
 }
 
-// Runtime representation of a Provider
+// Runtime representation of a Provider (Less critical for selection)
 export interface AiProviderConfig {
   id: string;
   name: string;
   type: DbProviderType;
-  models: AiModelConfig[]; // Currently usable models
-  allAvailableModels: { id: string; name: string }[]; // All known models
+  // models removed - handled globally
+  allAvailableModels: { id: string; name: string }[]; // All known models for this provider
 }

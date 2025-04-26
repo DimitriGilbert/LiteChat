@@ -57,18 +57,34 @@ async function runMiddleware<H extends ModMiddlewareHookName>(
   return currentPayload as ModMiddlewareReturnMap[H];
 }
 
-// Helper to get context snapshot (remains the same)
+// Helper to split combined ID - needed for context snapshot
+const splitModelId = (
+  combinedId: string | null,
+): { providerId: string | null; modelId: string | null } => {
+  if (!combinedId || !combinedId.includes(":")) {
+    return { providerId: null, modelId: null };
+  }
+  const parts = combinedId.split(":");
+  const providerId = parts[0];
+  const modelId = parts.slice(1).join(":");
+  return { providerId, modelId };
+};
+
+// Helper to get context snapshot
 function getContextSnapshot(): ReadonlyChatContextSnapshot {
   const iS = useInteractionStore.getState();
   const pS = useProviderStore.getState();
   const sS = useSettingsStore.getState();
 
+  // Extract providerId from selectedModelId
+  const { providerId } = splitModelId(pS.selectedModelId);
+
   const snapshot: ReadonlyChatContextSnapshot = {
     selectedConversationId: iS.currentConversationId,
     interactions: iS.interactions,
     isStreaming: iS.status === "streaming",
-    selectedProviderId: pS.selectedProviderId,
-    selectedModelId: pS.selectedModelId,
+    selectedProviderId: providerId, // Use extracted providerId
+    selectedModelId: pS.selectedModelId, // Keep combined model ID
     activeSystemPrompt: sS.globalSystemPrompt,
     temperature: sS.temperature,
     maxTokens: sS.maxTokens,
@@ -109,7 +125,6 @@ export class AIService {
     const abortController = new AbortController();
     this.activeStreams.set(interactionId, abortController);
 
-    // --- Create the initial interaction object locally ---
     const currentInteractions = interactionStore.interactions;
     const newIndex =
       currentInteractions.reduce((max, i) => Math.max(max, i.index), -1) + 1;
@@ -118,14 +133,13 @@ export class AIService {
         ? currentInteractions[currentInteractions.length - 1].id
         : null;
 
-    // This object will be mutated locally during the stream
     const currentInteractionData: Interaction = {
       id: interactionId,
       conversationId: conversationId,
       type: "message.user_assistant",
       prompt: { ...initiatingTurnData },
       response: null,
-      status: "STREAMING", // Start as STREAMING
+      status: "STREAMING",
       startedAt: new Date(),
       endedAt: null,
       metadata: { ...finalPayload.metadata },
@@ -133,11 +147,9 @@ export class AIService {
       parentId: parentId,
     };
 
-    // --- State Update 1: Add interaction synchronously ---
     interactionStore._addInteractionToState(currentInteractionData);
     interactionStore._addStreamingId(interactionId);
 
-    // --- Persistence 1: Save initial state asynchronously ---
     PersistenceService.saveInteraction({ ...currentInteractionData }).catch(
       (e) => {
         console.error(
@@ -192,7 +204,6 @@ export class AIService {
         messages: finalPayload.messages as CoreMessage[],
         signal: abortController.signal,
         ...(Object.keys(toolsForSdk).length > 0 && { tools: toolsForSdk }),
-        // Use toolChoice from payload if provided, otherwise default logic
         toolChoice:
           finalPayload.toolChoice ??
           (Object.keys(toolsForSdk).length > 0 ? "auto" : "none"),
@@ -246,7 +257,6 @@ export class AIService {
 
       streamResult = await streamText(streamOptions);
 
-      // Process the stream parts, updating the *local* currentInteractionData
       for await (const part of streamResult.fullStream) {
         if (abortController.signal.aborted) {
           console.log(`AIService: Stream ${interactionId} aborted by signal.`);
@@ -268,10 +278,8 @@ export class AIService {
                   ? chunkResult.chunk
                   : part.textDelta;
 
-              // Update local object
               currentInteractionData.response =
                 String(currentInteractionData.response ?? "") + processedChunk;
-              // --- State Update: Append chunk synchronously ---
               interactionStore.appendInteractionResponseChunk(
                 interactionId,
                 processedChunk,
@@ -355,12 +363,10 @@ export class AIService {
     } finally {
       this.activeStreams.delete(interactionId);
 
-      // --- Final State Update & Persistence ---
-      // Update the local object with final status and metadata
       currentInteractionData.status = finalStatus;
       currentInteractionData.endedAt = new Date();
       currentInteractionData.metadata = {
-        ...currentInteractionData.metadata, // Keep existing
+        ...currentInteractionData.metadata,
         ...(finalUsage && {
           promptTokens: finalUsage.promptTokens,
           completionTokens: finalUsage.completionTokens,
@@ -370,22 +376,18 @@ export class AIService {
           providerMetadata: finalProviderMetadata,
         }),
         ...(finalStatus === "ERROR" && { error: finalErrorMessage }),
-        // Ensure tool calls/results from local object are included
         toolCalls: currentInteractionData.metadata.toolCalls,
         toolResults: currentInteractionData.metadata.toolResults,
       };
 
-      // --- State Update: Update final state synchronously ---
       interactionStore._updateInteractionInState(
         interactionId,
         currentInteractionData,
       );
-      // Remove from streaming list
       interactionStore._removeStreamingId(interactionId);
 
-      // --- Persistence: Save the final state asynchronously ---
       interactionStore
-        .updateInteractionAndPersist({ ...currentInteractionData }) // Pass a copy
+        .updateInteractionAndPersist({ ...currentInteractionData })
         .catch((e) => {
           console.error(
             `AIService: Failed final persistence for ${interactionId}`,
@@ -425,7 +427,6 @@ export class AIService {
         console.warn(
           `AIService: Forcing CANCELLED status for interaction ${interactionId} without active controller.`,
         );
-        // Update state sync and persist async
         const finalCancelledState: Interaction = {
           ...interaction,
           status: "CANCELLED",

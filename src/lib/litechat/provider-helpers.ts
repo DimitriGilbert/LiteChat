@@ -64,7 +64,6 @@ export const DEFAULT_MODELS: Record<
 export const ensureV1Path = (baseUrl: string): string => {
   try {
     const trimmed = baseUrl.replace(/\/+$/, "");
-    // Check if it *already* ends with /v1 or similar version path
     if (/\/(v\d+)$/.test(trimmed)) {
       return trimmed;
     }
@@ -75,9 +74,10 @@ export const ensureV1Path = (baseUrl: string): string => {
   }
 };
 
+// Instantiates the AI SDK model instance
 export function instantiateModelInstance(
   config: DbProviderConfig,
-  modelId: string,
+  modelId: string, // Simple model ID (e.g., "gpt-4o")
   apiKey?: string,
 ): any | null {
   try {
@@ -107,9 +107,10 @@ export function instantiateModelInstance(
   }
 }
 
+// Creates the runtime AiModelConfig object
 export function createAiModelConfig(
   config: DbProviderConfig,
-  modelId: string,
+  modelId: string, // Simple model ID (e.g., "gpt-4o")
   apiKey?: string,
 ): AiModelConfig | undefined {
   const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
@@ -129,73 +130,14 @@ export function createAiModelConfig(
   );
 
   return {
-    id: modelInfo.id,
+    id: `${config.id}:${modelId}`, // Combined ID
     name: modelInfo.name,
+    providerId: config.id,
+    providerName: config.name,
     instance,
     supportsImageGeneration: supportsImageGen,
     supportsToolCalling: supportsTools,
   };
 }
 
-export const getDefaultModelIdForProvider = (
-  providerConfig: DbProviderConfig | undefined,
-): string | null => {
-  if (!providerConfig) return null;
-
-  const providerTypeKey = providerConfig.type as keyof typeof DEFAULT_MODELS;
-  const availableModels =
-    providerConfig.fetchedModels && providerConfig.fetchedModels.length > 0
-      ? providerConfig.fetchedModels
-      : DEFAULT_MODELS[providerTypeKey] || [];
-
-  if (availableModels.length === 0) return null;
-
-  const enabledModelIds = providerConfig.enabledModels ?? [];
-  let potentialModels = [...availableModels]; // Create a mutable copy
-
-  if (enabledModelIds.length > 0) {
-    const filteredByEnabled = potentialModels.filter((m: { id: string }) =>
-      enabledModelIds.includes(m.id),
-    );
-    if (filteredByEnabled.length > 0) {
-      potentialModels = filteredByEnabled;
-    } else {
-      console.warn(
-        `Provider ${providerConfig.id}: enabledModels filter resulted in empty list. Considering all available models.`,
-      );
-      // Keep potentialModels as the copy of all available models
-    }
-  }
-
-  const sortOrder = providerConfig.modelSortOrder ?? [];
-  if (sortOrder.length > 0 && potentialModels.length > 0) {
-    const orderedList: { id: string; name: string }[] = [];
-    const addedIds = new Set<string>();
-    const potentialModelMap = new Map(
-      potentialModels.map((m: { id: string; name: string }) => [m.id, m]),
-    );
-    for (const modelId of sortOrder) {
-      const model = potentialModelMap.get(modelId);
-      if (model && !addedIds.has(modelId)) {
-        orderedList.push(model);
-        addedIds.add(modelId);
-      }
-    }
-    // Create a mutable copy before sorting remaining
-    const remaining = [...potentialModels]
-      .filter((m: { id: string }) => !addedIds.has(m.id))
-      .sort(
-        (a: { name?: string; id: string }, b: { name?: string; id: string }) =>
-          (a.name || a.id).localeCompare(b.name || b.id),
-      );
-    potentialModels = [...orderedList, ...remaining];
-  } else {
-    // Sort the mutable copy
-    potentialModels.sort(
-      (a: { name?: string; id: string }, b: { name?: string; id: string }) =>
-        (a.name || a.id).localeCompare(b.name || b.id),
-    );
-  }
-
-  return potentialModels[0]?.id ?? null;
-};
+// getDefaultModelIdForProvider REMOVED - Default selection is now handled globally in the store

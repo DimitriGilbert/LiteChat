@@ -66,7 +66,6 @@ export const useFileControlRegistration = () => {
           >
             <PaperclipIcon className="h-5 w-5" />
           </Button>
-          modelpro
         </>
       ),
       // No separate renderer needed, PromptForm handles display

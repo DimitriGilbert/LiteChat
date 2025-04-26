@@ -4,7 +4,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVerticalIcon } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils";
 
 interface SortableModelItemProps {
   id: string;
@@ -30,7 +30,6 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 10 : undefined,
-    cursor: disabled ? "not-allowed" : "grab",
     opacity: disabled ? 0.5 : 1,
   };
 
@@ -38,27 +37,27 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
     <div
       ref={setNodeRef}
       style={style}
-      // Use cn for conditional styling
+      {...attributes} // Apply attributes to the main div
+      {...listeners} // Apply listeners to the main div
       className={cn(
-        "flex items-center space-x-2 p-1 rounded bg-muted/50 hover:bg-muted mb-1",
-        isDragging && "shadow-lg", // Add shadow when dragging
+        "flex items-center space-x-2 p-2 rounded border border-transparent bg-muted/50 hover:bg-muted mb-1", // Adjusted padding/bg
+        isDragging && "shadow-lg border-primary bg-card", // Style when dragging
+        !disabled && "cursor-grab active:cursor-grabbing", // Cursor styles
+        disabled && "cursor-not-allowed opacity-50",
       )}
+      aria-label={`Drag to reorder model ${name}`}
     >
-      <button
-        {...attributes}
-        {...listeners}
-        disabled={disabled}
+      <GripVerticalIcon
         className={cn(
-          "p-1 text-muted-foreground",
-          !disabled &&
-            "hover:text-foreground cursor-grab active:cursor-grabbing",
-          disabled && "cursor-not-allowed",
+          "h-5 w-5 text-muted-foreground flex-shrink-0", // Slightly larger icon
+          !disabled && "hover:text-foreground",
         )}
-        aria-label="Drag to reorder model"
+      />
+      <Label
+        className={cn(
+          "text-sm font-normal text-foreground flex-grow truncate pointer-events-none", // Prevent label interfering with drag
+        )}
       >
-        <GripVerticalIcon className="h-4 w-4" />
-      </button>
-      <Label className="text-sm font-normal text-foreground flex-grow truncate">
         {name || id}
       </Label>
     </div>

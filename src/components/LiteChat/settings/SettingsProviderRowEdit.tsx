@@ -27,29 +27,13 @@ import {
   PROVIDER_TYPES,
 } from "@/lib/litechat/provider-helpers";
 import { Separator } from "@/components/ui/separator";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { SortableModelItem } from "@/components/LiteChat/settings/SortableModelItem";
+// Removed Dnd/Sortable imports
 
 interface ProviderRowEditModeProps {
   providerId: string;
   editData: Partial<DbProviderConfig>;
   apiKeys: DbApiKey[];
   allAvailableModels: { id: string; name: string }[];
-  orderedEnabledModels: { id: string; name: string }[];
-  orderedEnabledModelIds: string[];
   isSaving: boolean;
   onCancel: () => void;
   onSave: () => Promise<void>;
@@ -58,7 +42,7 @@ interface ProviderRowEditModeProps {
     value: string | boolean | string[] | null,
   ) => void;
   onEnabledModelChange: (modelId: string, checked: boolean) => void;
-  onDragEnd: (event: DragEndEvent) => void;
+  // onDragEnd prop removed
 }
 
 const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
@@ -66,27 +50,19 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
   editData,
   apiKeys,
   allAvailableModels,
-  orderedEnabledModels,
-  orderedEnabledModelIds,
   isSaving,
   onCancel,
   onSave,
   onChange,
   onEnabledModelChange,
-  onDragEnd,
+  // onDragEnd removed
 }) => {
   const needsKey = requiresApiKey(editData.type ?? null);
   const needsURL = requiresBaseURL(editData.type ?? null);
   const canFetch = supportsModelFetching(editData.type ?? null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  );
+  // sensors removed
 
-  // Ensure boolean fields have defaults for controlled components
   const isEnabled = editData.isEnabled ?? false;
   const autoFetchModels = editData.autoFetchModels ?? false;
 
@@ -107,7 +83,6 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
             aria-label="Provider Name"
           />
           <Select
-            // Ensure value is never undefined
             value={editData.type ?? ""}
             onValueChange={(value) => onChange("type", value as DbProviderType)}
             disabled={isSaving}
@@ -128,7 +103,6 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
           <div className="flex items-center space-x-2">
             <Switch
               id={`edit-enabled-${providerId}`}
-              // Ensure checked is always boolean
               checked={isEnabled}
               onCheckedChange={(checked) => onChange("isEnabled", checked)}
               disabled={isSaving}
@@ -171,7 +145,6 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
         <div className="flex items-center space-x-2">
           <Switch
             id={`edit-autofetch-${providerId}`}
-            // Ensure checked is always boolean
             checked={autoFetchModels}
             onCheckedChange={(checked) => onChange("autoFetchModels", checked)}
             disabled={!canFetch || isSaving}
@@ -195,84 +168,46 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
           Model Management
         </h4>
         {allAvailableModels.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            {/* Available Models Checkbox List */}
-            <div className="space-y-2 border border-border rounded-md p-3 bg-card/80">
-              <Label className="font-medium text-card-foreground">
-                Available Models
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Check models to enable them for use.
-              </p>
-              <ScrollArea className="h-48 w-full rounded-md border border-border p-2 bg-background/50">
-                <div className="space-y-1">
-                  {allAvailableModels.map((model) => (
-                    <div
-                      key={model.id}
-                      className="flex items-center space-x-2 p-1 rounded"
-                    >
-                      <Checkbox
-                        id={`enable-model-${providerId}-${model.id}`}
-                        // Ensure checked is always boolean
-                        checked={(editData.enabledModels ?? []).includes(
-                          model.id,
-                        )}
-                        onCheckedChange={(checked) =>
-                          onEnabledModelChange(model.id, !!checked)
-                        }
-                        className="border-border data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-                        disabled={isSaving}
-                        aria-labelledby={`enable-model-label-${providerId}-${model.id}`}
-                      />
-                      <Label
-                        id={`enable-model-label-${providerId}-${model.id}`}
-                        htmlFor={`enable-model-${providerId}-${model.id}`}
-                        className="text-sm font-normal text-card-foreground flex-grow cursor-pointer"
-                      >
-                        {model.name || model.id}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
-
-            {/* Enabled & Ordered Models List */}
-            <div className="space-y-2 border border-border rounded-md p-3 bg-card/80">
-              <Label className="font-medium text-card-foreground">
-                Enabled & Ordered Models
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Drag to set the display order in the chat dropdown.
-              </p>
-              <ScrollArea className="h-48 w-full rounded-md border border-border p-2 bg-background/50">
-                {orderedEnabledModels.length > 0 ? (
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={onDragEnd}
+          // Only show the Available Models Checkbox List
+          <div className="flex-1 space-y-2 border border-border rounded-md p-3 bg-card/80 min-w-0">
+            <Label className="font-medium text-card-foreground">
+              Available Models
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Check models to enable them for use globally. Order is managed
+              above.
+            </p>
+            <ScrollArea className="h-80 w-full rounded-md border border-border p-2 bg-background/50">
+              <div className="space-y-1">
+                {allAvailableModels.map((model) => (
+                  <div
+                    key={model.id}
+                    className="flex items-center space-x-2 p-1 rounded hover:bg-muted/50"
                   >
-                    <SortableContext
-                      items={orderedEnabledModelIds}
-                      strategy={verticalListSortingStrategy}
+                    <Checkbox
+                      id={`enable-model-${providerId}-${model.id}`}
+                      checked={(editData.enabledModels ?? []).includes(
+                        model.id,
+                      )}
+                      onCheckedChange={(checked) =>
+                        onEnabledModelChange(model.id, !!checked)
+                      }
+                      className="border-border data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                      disabled={isSaving}
+                      aria-labelledby={`enable-model-label-${providerId}-${model.id}`}
+                    />
+                    <Label
+                      id={`enable-model-label-${providerId}-${model.id}`}
+                      htmlFor={`enable-model-${providerId}-${model.id}`}
+                      className="text-sm font-normal text-card-foreground flex-grow cursor-pointer truncate"
+                      title={model.name || model.id}
                     >
-                      {orderedEnabledModels.map((model) => (
-                        <SortableModelItem
-                          key={model.id}
-                          id={model.id}
-                          name={model.name || model.id}
-                          disabled={isSaving}
-                        />
-                      ))}
-                    </SortableContext>
-                  </DndContext>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                    Enable models on the left to order them here.
+                      {model.name || model.id}
+                    </Label>
                   </div>
-                )}
-              </ScrollArea>
-            </div>
+                ))}
+              </div>
+            </ScrollArea>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground italic">

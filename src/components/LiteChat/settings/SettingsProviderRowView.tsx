@@ -1,6 +1,5 @@
 // src/components/LiteChat/settings/SettingsProviderRowView.tsx
-import React from "react";
-// Corrected import path for types
+import React, { useMemo } from "react"; // Added useMemo
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,13 +17,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-// Corrected import path for helpers - Changed from provider-helpers to litechat
 import {
   requiresApiKey,
   requiresBaseURL,
   supportsModelFetching,
-} from "@/lib/litechat/provider-helpers"; // Corrected path
+} from "@/lib/litechat/provider-helpers";
 import { cn } from "@/lib/utils";
+import { useProviderStore } from "@/store/provider.store"; // Import store
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 
@@ -36,10 +35,8 @@ interface ProviderRowViewModeProps {
   onFetchModels: () => Promise<void>;
   fetchStatus: FetchStatus;
   isDeleting: boolean;
-  getAllAvailableModelDefs: () => { id: string; name: string }[];
 }
 
-// Renamed component function
 const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   provider,
   apiKeys,
@@ -48,7 +45,6 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   onFetchModels,
   fetchStatus,
   isDeleting,
-  getAllAvailableModelDefs,
 }) => {
   const needsKey = requiresApiKey(provider.type);
   const needsURL = requiresBaseURL(provider.type);
@@ -57,21 +53,21 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   const isEditButtonDisabled = isDeleting || fetchStatus === "fetching";
   const isDeleteButtonDisabled = isDeleting || fetchStatus === "fetching";
 
-  const allAvailableModels = getAllAvailableModelDefs();
-  const enabledModelsSet = new Set(provider.enabledModels ?? []);
+  const getAllAvailableModelDefsForProvider = useProviderStore(
+    (state) => state.getAllAvailableModelDefsForProvider,
+  );
+  const allAvailableModels = getAllAvailableModelDefsForProvider(provider.id);
+  const enabledModelsSet = useMemo(
+    () => new Set(provider.enabledModels ?? []),
+    [provider.enabledModels],
+  );
 
-  const orderedDisplayModels = (
-    provider.modelSortOrder ??
-    provider.enabledModels ??
-    []
-  )
-    // Add explicit type for modelId
-    .map((modelId: string) => {
-      if (!enabledModelsSet.has(modelId)) return null;
-      const modelDef = allAvailableModels.find((m) => m.id === modelId);
-      return { id: modelId, name: modelDef?.name || modelId };
-    })
-    .filter((m): m is { id: string; name: string } => m !== null);
+  // Display only the models enabled for this provider
+  const enabledDisplayModels = useMemo(() => {
+    return allAvailableModels
+      .filter((m) => enabledModelsSet.has(m.id))
+      .sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id)); // Sort alphabetically for display here
+  }, [allAvailableModels, enabledModelsSet]);
 
   const apiKeyLinked = provider.apiKeyId
     ? apiKeys.some((k) => k.id === provider.apiKeyId)
@@ -196,18 +192,20 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
           )}
         </div>
 
-        {/* Enabled & Ordered Models List */}
-        {orderedDisplayModels.length > 0 && (
+        {/* Enabled Models List */}
+        {enabledDisplayModels.length > 0 && (
           <div className="pt-1">
             <span className="font-medium text-card-foreground">
-              Enabled & Ordered Models ({orderedDisplayModels.length}):
+              Enabled Models ({enabledDisplayModels.length}):
             </span>
             <ScrollArea className="h-16 mt-1 rounded-md border border-border p-2 bg-background/50 text-xs">
-              {orderedDisplayModels.map((model) => (
-                <div key={model.id} className="truncate" title={model.name}>
-                  {model.name}
-                </div>
-              ))}
+              {enabledDisplayModels.map(
+                (model: { id: string; name: string }) => (
+                  <div key={model.id} className="truncate" title={model.name}>
+                    {model.name}
+                  </div>
+                ),
+              )}
             </ScrollArea>
           </div>
         )}
@@ -216,13 +214,12 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
         {allAvailableModels.length > 0 && (
           <div className="pt-1">
             <span className="font-medium text-card-foreground">
-              All Available Models ({allAvailableModels.length}):
+              All Fetched Models ({allAvailableModels.length}):
             </span>
             <ScrollArea className="h-20 mt-1 rounded-md border border-border p-2 bg-background/50 text-xs">
               {allAvailableModels
-                .slice() // Create a copy before sorting
+                .slice()
                 .sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id))
-                // Add explicit type for m
                 .map((m: { id: string; name?: string }) => (
                   <div key={m.id} className="truncate" title={m.name || m.id}>
                     {m.name || m.id}
@@ -233,7 +230,7 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
               <span className="text-xs text-muted-foreground/80">
                 Last fetched:{" "}
                 {provider.modelsLastFetchedAt
-                  ? provider.modelsLastFetchedAt.toLocaleString()
+                  ? new Date(provider.modelsLastFetchedAt).toLocaleString()
                   : "Never"}
               </span>
             )}
@@ -275,5 +272,4 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   );
 };
 
-// Correctly export the memoized component
 export const ProviderRowViewMode = React.memo(ProviderRowViewModeComponent);
