@@ -17,7 +17,7 @@ import {
   GitPullRequestIcon,
   GitMergeIcon,
   InfoIcon,
-  FolderGitIcon,
+  FolderGitIcon, // Use FolderGitIcon
   Loader2Icon,
 } from "lucide-react";
 import {
@@ -41,16 +41,16 @@ interface FileManagerRowProps {
   entry: VfsNode;
   isEditingThis: boolean;
   isChecked: boolean;
-  isGitRepo: boolean;
+  isGitRepo: boolean; // Receive git status
   newName: string;
-  isOperationLoading: boolean;
+  isOperationLoading: boolean; // Combined loading state
   creatingFolder: boolean;
   handleNavigate: (entry: VfsNode) => void;
   handleCheckboxChange: (checked: boolean, path: string) => void;
   startEditing: (entry: VfsNode) => void;
   cancelEditing: () => void;
   handleRename: () => void;
-  handleDownload: (entry: VfsNode) => void; // Should handle both file/folder
+  handleDownload: (entry: VfsNode) => void;
   handleDelete: (entry: VfsNode) => void;
   setNewName: (name: string) => void;
   renameInputRef: React.RefObject<HTMLInputElement | null>;
@@ -66,19 +66,20 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
   entry,
   isEditingThis,
   isChecked,
-  isGitRepo,
+  isGitRepo, // Use git status
   newName,
-  isOperationLoading,
+  isOperationLoading, // Use combined loading
   creatingFolder,
   handleNavigate,
   handleCheckboxChange,
   startEditing,
   cancelEditing,
   handleRename,
-  handleDownload, // Use this prop
+  handleDownload,
   handleDelete,
   setNewName,
   renameInputRef,
+  // Receive git handlers
   handleGitInit,
   handleGitPull,
   handleGitCommit,
@@ -86,7 +87,6 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
   handleGitStatus,
 }) => {
   const handleRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
-    // Prevent navigation when clicking interactive elements
     if (
       (e.target as HTMLElement).closest(
         'input[type="checkbox"], button, input[type="text"], [data-radix-context-menu-trigger]',
@@ -109,6 +109,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
 
   const isDirectory = entry.type === "folder";
 
+  // Use FolderGitIcon if it's a directory and a git repo
   const Icon = isDirectory
     ? isGitRepo
       ? FolderGitIcon
@@ -116,7 +117,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
     : FileIcon;
   const iconColor = isDirectory
     ? isGitRepo
-      ? "text-green-400"
+      ? "text-green-400" // Git repo color
       : "text-yellow-400"
     : "text-blue-400";
 
@@ -150,13 +151,13 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
       <TableCell className="py-1 px-2">
         {isEditingThis ? (
           <Input
-            ref={renameInputRef}
+            ref={renameInputRef as React.RefObject<HTMLInputElement>}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            onBlur={handleRename} // Consider if onBlur is best, maybe explicit save?
+            onBlur={handleRename}
             onKeyDown={handleKeyDown}
             className="h-7 px-2 py-1 text-sm bg-input border-border focus:ring-1 focus:ring-primary w-full"
-            onClick={(e) => e.stopPropagation()} // Prevent row click when editing name
+            onClick={(e) => e.stopPropagation()}
             disabled={isOperationLoading}
           />
         ) : (
@@ -167,7 +168,6 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             )}
             title={entry.name}
             onClick={(e) => {
-              // Allow clicking name to navigate into folder
               if (isDirectory) {
                 e.stopPropagation();
                 handleNavigate(entry);
@@ -190,8 +190,8 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
         <div
           className={cn(
             "flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity",
-            isEditingThis && "opacity-100", // Ensure actions visible when editing
-            isOperationLoading && "opacity-30", // Dim actions when loading
+            isEditingThis && "opacity-100",
+            isOperationLoading && "opacity-30",
           )}
         >
           {isEditingThis ? (
@@ -272,12 +272,12 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
                       className="h-6 w-6 text-muted-foreground hover:text-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDownload(entry); // Call the download handler
+                        handleDownload(entry);
                       }}
                       aria-label={
                         isDirectory ? "Download folder as ZIP" : "Download file"
                       }
-                      disabled={isOperationLoading} // Enable for both types
+                      disabled={isOperationLoading}
                     >
                       <DownloadIcon className="h-3.5 w-3.5" />
                     </Button>
@@ -332,6 +332,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             Open Folder
           </ContextMenuItem>
           <ContextMenuSeparator />
+          {/* Git Actions */}
           {isGitRepo ? (
             <>
               <ContextMenuItem
@@ -373,6 +374,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             </ContextMenuItem>
           )}
           <ContextMenuSeparator />
+          {/* Standard Actions */}
           <ContextMenuItem
             onSelect={() => startEditing(entry)}
             disabled={isOperationLoading}
@@ -381,7 +383,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             Rename
           </ContextMenuItem>
           <ContextMenuItem
-            onSelect={() => handleDownload(entry)} // Add download to context menu
+            onSelect={() => handleDownload(entry)}
             disabled={isOperationLoading}
           >
             <DownloadIcon className="mr-2 h-4 w-4" />

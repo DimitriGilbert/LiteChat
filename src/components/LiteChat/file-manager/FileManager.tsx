@@ -1,49 +1,47 @@
 // src/components/LiteChat/file-manager/FileManager.tsx
-import React, { useState, useEffect, useCallback, useRef, memo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  memo,
+  useMemo, // Import useMemo
+} from "react";
 import { useVfsStore } from "@/store/vfs.store";
-// Removed unused imports: Button, Input, ScrollArea, Table components, Tooltip components
-// Removed unused imports: Checkbox, Lucide icons
 import { useShallow } from "zustand/react/shallow";
-// Removed unused import: VfsFile
 import { VfsNode } from "@/types/litechat/vfs";
-// Removed unused import: formatBytes
 import {
   dirname,
   basename,
-  // Removed unused import: buildPath
-  // Removed unused import: normalizePath
+  buildPath,
 } from "@/lib/litechat/file-manager-utils";
-// Removed unused import: getFileIcon
-// Removed unused import: cn
 import { FileManagerTable } from "./FileManagerTable";
 import { FileManagerToolbar } from "./FileManagerToolbar";
 import { CloneDialog } from "./CloneDialog";
 import { CommitDialog } from "./CommitDialog";
-import * as VfsOps from "@/lib/litechat/vfs-operations"; // Import VFS Ops
+import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { toast } from "sonner";
 
-// This component is now primarily responsible for state management and passing props
 export const FileManager = memo(() => {
   // --- VFS Store State & Actions ---
   const {
     nodes,
     childrenMap,
     currentParentId,
-    // Removed unused state: selectedFileIds
-    loading, // Global VFS loading (init, major fetches)
+    loading,
     error,
     fetchNodes,
     createDirectory,
     uploadFiles,
     deleteNodes,
     renameNode,
-    // Removed unused actions: selectFile, deselectFile
     setCurrentPath,
     initializeVFS,
     rootId,
     fs: fsInstance,
-    // Removed unused action: _setOperationLoading
-    _setError, // Action to set error state
+    _setError,
+    _addNodes,
+    _removeNodes,
   } = useVfsStore(
     useShallow((state) => ({
       nodes: state.nodes,
@@ -65,6 +63,8 @@ export const FileManager = memo(() => {
       fs: state.fs,
       _setOperationLoading: state._setOperationLoading,
       _setError: state._setError,
+      _addNodes: state._addNodes,
+      _removeNodes: state._removeNodes,
     })),
   );
 
@@ -74,8 +74,10 @@ export const FileManager = memo(() => {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [checkedPaths, setCheckedPaths] = useState<Set<string>>(new Set());
-  const [isOperationLoading, setIsOperationLoading] = useState(false); // Local op loading
-  const [gitRepoStatus] = useState<Record<string, boolean>>({});
+  const [isOperationLoading, setIsOperationLoading] = useState(false);
+  const [gitRepoStatus, setGitRepoStatus] = useState<Record<string, boolean>>(
+    {},
+  );
   const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
   const [cloneRepoUrl, setCloneRepoUrl] = useState("");
   const [cloneBranch, setCloneBranch] = useState("");
@@ -84,12 +86,15 @@ export const FileManager = memo(() => {
   const [commitPath, setCommitPath] = useState<string | null>(null);
   const [commitMessage, setCommitMessage] = useState("");
   const [isCommitting, setIsCommitting] = useState(false);
+  const [isGitOpLoading, setIsGitOpLoading] = useState<Record<string, boolean>>(
+    {},
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const archiveInputRef = useRef<HTMLInputElement>(null);
-  const renameInputRef = useRef<HTMLInputElement>(null);
-  const newFolderInputRef = useRef<HTMLInputElement>(null);
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const newFolderInputRef = useRef<HTMLInputElement | null>(null);
 
   // --- Derived State ---
   const currentDirectory = currentParentId ? nodes[currentParentId] : null;
@@ -104,12 +109,18 @@ export const FileManager = memo(() => {
       return a.name.localeCompare(b.name);
     });
 
+  // Memoize the folder paths to stabilize the dependency for checkGitStatus effect
+  const currentFolderPaths = useMemo(() => {
+    return currentNodes.filter((n) => n.type === "folder").map((n) => n.path);
+  }, [currentNodes]);
+
   // Combined loading state for disabling UI elements
-  const isAnyLoading = loading || isOperationLoading;
+  const isAnyLoading =
+    loading || isOperationLoading || isCloning || isCommitting;
 
   // --- Effects ---
   useEffect(() => {
-    const keyToInit = "default_vfs_key"; // Replace with actual key logic later
+    const keyToInit = "default_vfs_key";
     if (!rootId && !loading) {
       initializeVFS(keyToInit);
     }
@@ -147,22 +158,49 @@ export const FileManager = memo(() => {
     }
   }, [creatingFolder]);
 
+  // Effect to check Git status for displayed folders
+  useEffect(() => {
+    const checkGitStatus = async () => {
+      if (!fsInstance || currentFolderPaths.length === 0) return; // Check length too
+      const statusUpdates: Record<string, boolean> = {};
+      let changed = false;
+      for (const path of currentFolderPaths) {
+        try {
+          const isRepo = await VfsOps.isGitRepoOp(path);
+          if (gitRepoStatus[path] !== isRepo) {
+            statusUpdates[path] = isRepo;
+            changed = true;
+          }
+        } catch (e) {
+          console.error(`Error checking git status for ${path}:`, e);
+          if (gitRepoStatus[path] !== false) {
+            statusUpdates[path] = false; // Assume not a repo on error
+            changed = true;
+          }
+        }
+      }
+      // Only update state if something actually changed
+      if (changed) {
+        setGitRepoStatus((prev) => ({ ...prev, ...statusUpdates }));
+      }
+    };
+    checkGitStatus();
+    // Depend on the memoized paths array and fsInstance
+  }, [currentFolderPaths, fsInstance, gitRepoStatus]);
+
   // --- Handlers ---
 
-  // Wrap store actions with local loading state management
   const runOperation = useCallback(
-    async (op: () => Promise<any>) => {
+    async (op: () => Promise<any>, setLoading: boolean = true) => {
       if (isAnyLoading) return;
-      setIsOperationLoading(true);
-      _setError(null); // Clear previous errors
+      if (setLoading) setIsOperationLoading(true);
+      _setError(null);
       try {
         await op();
       } catch (err) {
-        // Errors should ideally be handled and toasted within the specific op or store action
         console.error("[FileManager Operation Error]:", err);
-        // Optionally set a generic error here if needed: _setError("Operation failed");
       } finally {
-        setIsOperationLoading(false);
+        if (setLoading) setIsOperationLoading(false);
       }
     },
     [isAnyLoading, _setError],
@@ -172,8 +210,8 @@ export const FileManager = memo(() => {
     (entry: VfsNode) => {
       if (isAnyLoading || editingPath) return;
       if (entry.type === "folder") {
-        runOperation(() => setCurrentPath(entry.path));
-        setCheckedPaths(new Set()); // Clear selection on navigation
+        runOperation(() => setCurrentPath(entry.path), false);
+        setCheckedPaths(new Set());
       }
     },
     [isAnyLoading, editingPath, setCurrentPath, runOperation],
@@ -182,13 +220,13 @@ export const FileManager = memo(() => {
   const handleNavigateUp = useCallback(() => {
     if (isAnyLoading || currentPath === "/") return;
     const parentPath = dirname(currentPath);
-    runOperation(() => setCurrentPath(parentPath));
+    runOperation(() => setCurrentPath(parentPath), false);
     setCheckedPaths(new Set());
   }, [isAnyLoading, currentPath, setCurrentPath, runOperation]);
 
   const handleNavigateHome = useCallback(() => {
     if (isAnyLoading || currentPath === "/") return;
-    runOperation(() => setCurrentPath("/"));
+    runOperation(() => setCurrentPath("/"), false);
     setCheckedPaths(new Set());
   }, [isAnyLoading, currentPath, setCurrentPath, runOperation]);
 
@@ -274,7 +312,7 @@ export const FileManager = memo(() => {
       const files = e.target.files;
       if (files && files.length > 0) {
         await runOperation(() => uploadFiles(currentParentId, files));
-        if (e.target) e.target.value = ""; // Reset input
+        if (e.target) e.target.value = "";
       }
     },
     [uploadFiles, currentParentId, runOperation],
@@ -286,9 +324,9 @@ export const FileManager = memo(() => {
       if (file) {
         await runOperation(async () => {
           await VfsOps.uploadAndExtractZipOp(file, currentPath);
-          await fetchNodes(currentParentId); // Refresh after extraction
+          await fetchNodes(currentParentId);
         });
-        if (e.target) e.target.value = ""; // Reset input
+        if (e.target) e.target.value = "";
       }
     },
     [currentPath, fetchNodes, currentParentId, runOperation],
@@ -317,7 +355,6 @@ WARNING: This will delete all contents inside`
     [deleteNodes, runOperation],
   );
 
-  // Use VFS Ops directly for download
   const handleDownload = useCallback(
     async (entry: VfsNode) => {
       await runOperation(async () => {
@@ -339,38 +376,104 @@ WARNING: This will delete all contents inside`
     });
   }, [currentPath, currentNodes.length, runOperation]);
 
-  // --- Git Action Handlers (Placeholders) ---
-  const handleGitInit = (path: string) => toast.info(`Git Init on ${path}`);
-  const handleGitPull = (path: string) => toast.info(`Git Pull on ${path}`);
-  const handleGitCommit = (path: string) => {
+  // --- Git Action Handlers ---
+  const runGitOperation = useCallback(
+    async (path: string, op: () => Promise<any>) => {
+      if (isGitOpLoading[path]) return;
+      setIsGitOpLoading((prev) => ({ ...prev, [path]: true }));
+      _setError(null);
+      try {
+        await op();
+      } catch (err) {
+        console.error(`[FileManager Git Op Error @ ${path}]:`, err);
+      } finally {
+        setIsGitOpLoading((prev) => ({ ...prev, [path]: false }));
+      }
+    },
+    [_setError, isGitOpLoading],
+  );
+
+  const handleGitInit = useCallback(
+    (path: string) => {
+      runGitOperation(path, async () => {
+        await VfsOps.gitInitOp(path);
+        setGitRepoStatus((prev) => ({ ...prev, [path]: true }));
+      });
+    },
+    [runGitOperation],
+  );
+
+  const handleGitPull = useCallback(
+    (path: string) => {
+      runGitOperation(path, () => VfsOps.gitPullOp(path));
+    },
+    [runGitOperation],
+  );
+
+  const handleGitCommit = useCallback((path: string) => {
     setCommitPath(path);
     setCommitMessage("");
     setIsCommitDialogOpen(true);
-  };
-  const handleGitPush = (path: string) => toast.info(`Git Push on ${path}`);
-  const handleGitStatus = (path: string) => toast.info(`Git Status on ${path}`);
-  const handleCloneClick = () => {
+  }, []);
+
+  const handleGitPush = useCallback(
+    (path: string) => {
+      runGitOperation(path, () => VfsOps.gitPushOp(path));
+    },
+    [runGitOperation],
+  );
+
+  const handleGitStatus = useCallback(
+    (path: string) => {
+      runGitOperation(path, () => VfsOps.gitStatusOp(path));
+    },
+    [runGitOperation],
+  );
+
+  const handleCloneClick = useCallback(() => {
     setCloneRepoUrl("");
     setCloneBranch("");
     setIsCloneDialogOpen(true);
-  };
-  const onSubmitClone = async () => {
+  }, []);
+
+  const onSubmitClone = useCallback(async () => {
+    if (!cloneRepoUrl.trim()) {
+      toast.error("Repository URL cannot be empty.");
+      return;
+    }
     setIsCloning(true);
-    toast.info(`Cloning ${cloneRepoUrl}... (Placeholder)`);
-    await new Promise((res) => setTimeout(res, 1500)); // Simulate delay
-    setIsCloning(false);
-    setIsCloneDialogOpen(false);
-    handleRefresh(); // Refresh after clone attempt
-  };
-  const onSubmitCommit = async () => {
+    _setError(null);
+    try {
+      await VfsOps.gitCloneOp(
+        currentPath,
+        cloneRepoUrl.trim(),
+        cloneBranch.trim() || undefined,
+      );
+      setIsCloneDialogOpen(false);
+      await handleRefresh();
+    } catch (err) {
+      // Error handled by gitCloneOp
+    } finally {
+      setIsCloning(false);
+    }
+  }, [cloneRepoUrl, cloneBranch, currentPath, _setError, handleRefresh]);
+
+  const onSubmitCommit = useCallback(async () => {
+    if (!commitPath || !commitMessage.trim()) {
+      toast.error("Commit message cannot be empty.");
+      return;
+    }
     setIsCommitting(true);
-    toast.info(
-      `Committing ${commitPath} with "${commitMessage}"... (Placeholder)`,
-    );
-    await new Promise((res) => setTimeout(res, 1500)); // Simulate delay
-    setIsCommitting(false);
-    setIsCommitDialogOpen(false);
-  };
+    _setError(null);
+    try {
+      await VfsOps.gitCommitOp(commitPath, commitMessage.trim());
+      setIsCommitDialogOpen(false);
+    } catch (err) {
+      // Error handled by gitCommitOp
+    } finally {
+      setIsCommitting(false);
+    }
+  }, [commitPath, commitMessage, _setError]);
 
   // --- Render Logic ---
   return (
@@ -378,7 +481,7 @@ WARNING: This will delete all contents inside`
       <FileManagerToolbar
         currentPath={currentPath}
         isAnyLoading={isAnyLoading}
-        isOperationLoading={isOperationLoading} // Pass local operation loading
+        isOperationLoading={isOperationLoading}
         entries={currentNodes}
         editingPath={editingPath}
         creatingFolder={creatingFolder}
@@ -411,7 +514,9 @@ WARNING: This will delete all contents inside`
         creatingFolder={creatingFolder}
         newFolderName={newFolderName}
         checkedPaths={checkedPaths}
-        isOperationLoading={isOperationLoading} // Pass local operation loading
+        isOperationLoading={
+          isOperationLoading || Object.values(isGitOpLoading).some(Boolean)
+        }
         handleNavigate={handleNavigate}
         handleCheckboxChange={handleCheckboxChange}
         startEditing={startEditing}
@@ -419,7 +524,7 @@ WARNING: This will delete all contents inside`
         handleRename={handleRename}
         cancelCreatingFolder={cancelCreatingFolder}
         handleCreateFolder={handleCreateFolder}
-        handleDownload={handleDownload} // Pass the correct handler
+        handleDownload={handleDownload}
         handleDelete={handleDelete}
         setNewName={setNewName}
         setNewFolderName={setNewFolderName}

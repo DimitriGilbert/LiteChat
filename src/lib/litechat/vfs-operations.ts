@@ -2,19 +2,22 @@
 import { fs, configureSingle, type Stats } from "@zenfs/core";
 import { IndexedDB } from "@zenfs/dom";
 import { toast } from "sonner";
-// Corrected import path for types, use FileSystemEntry from vfs.ts
-import type { FileSystemEntry } from "@/types/litechat/vfs"; // Correct path
-// Corrected import path for events
-import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
-import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent from modding types
+import type { FileSystemEntry } from "@/types/litechat/vfs";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { ModEvent } from "@/types/litechat/modding";
 import JSZip from "jszip";
-// Corrected import path for utils
 import {
   normalizePath,
   joinPath,
   dirname,
   basename,
-} from "./file-manager-utils"; // Correct path relative to this file
+} from "./file-manager-utils";
+import git from "isomorphic-git"; // Import isomorphic-git
+import http from "isomorphic-git/http/web"; // Import browser http client
+import { useSettingsStore } from "@/store/settings.store"; // Import settings store
+
+// --- Constants ---
+const CORS_PROXY = "https://cors.isomorphic-git.org"; // Use the public proxy for now
 
 // --- Helper Functions ---
 const createDirectoryRecursive = async (path: string): Promise<void> => {
@@ -34,6 +37,45 @@ const createDirectoryRecursive = async (path: string): Promise<void> => {
       `Error creating directory "${basename(normalized)}": ${err instanceof Error ? err.message : String(err)}`,
     );
     throw err;
+  }
+};
+
+// Helper to ensure Git user config is set
+const ensureGitConfig = async (dir: string): Promise<boolean> => {
+  const { gitUserName, gitUserEmail } = useSettingsStore.getState();
+  if (!gitUserName || !gitUserEmail) {
+    toast.error(
+      "Git user name and email must be configured in Settings before committing.",
+    );
+    return false;
+  }
+  try {
+    const currentName = await git.getConfig({ fs, dir, path: "user.name" });
+    const currentEmail = await git.getConfig({ fs, dir, path: "user.email" });
+
+    if (currentName !== gitUserName) {
+      await git.setConfig({
+        fs,
+        dir,
+        path: "user.name",
+        value: gitUserName,
+      });
+    }
+    if (currentEmail !== gitUserEmail) {
+      await git.setConfig({
+        fs,
+        dir,
+        path: "user.email",
+        value: gitUserEmail,
+      });
+    }
+    return true;
+  } catch (err) {
+    console.error("[VFS Op] Error checking/setting Git config:", err);
+    toast.error(
+      `Failed to configure Git user: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return false;
   }
 };
 
@@ -85,7 +127,6 @@ export const listFilesOp = async (path: string): Promise<FileSystemEntry[]> => {
       },
     );
     const stats = await Promise.all(statsPromises);
-    // Add type guard for s
     return stats.filter((s): s is FileSystemEntry => s !== null);
   } catch (err: unknown) {
     if (err instanceof Error && (err as any).code === "ENOENT") {
@@ -104,7 +145,7 @@ export const readFileOp = async (path: string): Promise<Uint8Array> => {
   const normalizedPath = normalizePath(path);
   try {
     const data = await fs.promises.readFile(normalizedPath);
-    emitter.emit(ModEvent.VFS_FILE_READ, { path: normalizedPath }); // Use emitter
+    emitter.emit(ModEvent.VFS_FILE_READ, { path: normalizedPath });
     return data;
   } catch (err: unknown) {
     console.error(`[VFS Op] Failed to read file ${normalizedPath}:`, err);
@@ -126,7 +167,7 @@ export const writeFileOp = async (
       await createDirectoryRecursive(parentDir);
     }
     await fs.promises.writeFile(normalized, data);
-    emitter.emit(ModEvent.VFS_FILE_WRITTEN, { path: normalized }); // Use emitter
+    emitter.emit(ModEvent.VFS_FILE_WRITTEN, { path: normalized });
   } catch (err: unknown) {
     if (
       !(
@@ -155,10 +196,10 @@ export const deleteItemOp = async (
     const fileStat = await fs.promises.stat(normalized);
     if (fileStat.isDirectory()) {
       await fs.promises.rm(normalized, { recursive });
-      emitter.emit(ModEvent.VFS_FILE_DELETED, { path: normalized }); // Use emitter
+      emitter.emit(ModEvent.VFS_FILE_DELETED, { path: normalized });
     } else {
       await fs.promises.unlink(normalized);
-      emitter.emit(ModEvent.VFS_FILE_DELETED, { path: normalized }); // Use emitter
+      emitter.emit(ModEvent.VFS_FILE_DELETED, { path: normalized });
     }
     toast.success(`"${basename(normalized)}" deleted.`);
   } catch (err: unknown) {
@@ -443,6 +484,183 @@ export const renameOp = async (
     console.error(
       `[VFS Op] Failed to rename ${normalizedOld} to ${normalizedNew}:`,
       err,
+    );
+    throw err;
+  }
+};
+
+// --- Git Operations ---
+
+export const isGitRepoOp = async (path: string): Promise<boolean> => {
+  const normalized = normalizePath(path);
+  const gitDirPath = joinPath(normalized, ".git");
+  try {
+    const stats = await fs.promises.stat(gitDirPath);
+    return stats.isDirectory();
+  } catch (err: unknown) {
+    if (err instanceof Error && (err as any).code === "ENOENT") {
+      return false;
+    }
+    console.error(`[VFS Op] Error checking for .git in ${normalized}:`, err);
+    return false;
+  }
+};
+
+export const gitCloneOp = async (
+  targetPath: string,
+  url: string,
+  branch?: string,
+): Promise<void> => {
+  const normalizedTargetPath = normalizePath(targetPath);
+  const repoName = basename(url.replace(/\.git$/, ""));
+  const dir = joinPath(normalizedTargetPath, repoName);
+
+  try {
+    // Check if target directory already exists
+    try {
+      await fs.promises.stat(dir);
+      toast.error(`Directory "${repoName}" already exists in target location.`);
+      return;
+    } catch (e: any) {
+      if (e.code !== "ENOENT") throw e; // Re-throw unexpected errors
+    }
+
+    // Create the parent directory if it doesn't exist
+    await createDirectoryRecursive(normalizedTargetPath);
+
+    // Perform the clone
+    await git.clone({
+      fs,
+      http,
+      dir,
+      corsProxy: CORS_PROXY,
+      url,
+      ref: branch || undefined, // Use default branch if not specified
+      singleBranch: !!branch,
+      depth: 10, // Limit depth for faster clones initially
+      onProgress: (e) => {
+        // Basic progress logging
+        if (e.phase === "counting objects" && e.total) {
+          console.log(`Clone progress: ${e.phase} ${e.loaded}/${e.total}`);
+        } else if (e.phase === "receiving objects" && e.total) {
+          console.log(`Clone progress: ${e.phase} ${e.loaded}/${e.total}`);
+        } else {
+          console.log(`Clone progress: ${e.phase}`);
+        }
+      },
+    });
+    toast.success(`Repository "${repoName}" cloned successfully.`);
+  } catch (err: unknown) {
+    console.error(`[VFS Op] Git clone failed for ${url}:`, err);
+    toast.error(
+      `Git clone failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    // Attempt to clean up partially created directory on failure
+    try {
+      await fs.promises.rm(dir, { recursive: true });
+    } catch (cleanupErr) {
+      console.warn(
+        `[VFS Op] Failed to cleanup directory ${dir} after clone error:`,
+        cleanupErr,
+      );
+    }
+    throw err; // Re-throw original error
+  }
+};
+
+export const gitInitOp = async (path: string): Promise<void> => {
+  const dir = normalizePath(path);
+  try {
+    await git.init({ fs, dir });
+    toast.success(`Initialized empty Git repository in "${basename(dir)}"`);
+  } catch (err: unknown) {
+    console.error(`[VFS Op] Git init failed for ${dir}:`, err);
+    toast.error(
+      `Git init failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    throw err;
+  }
+};
+
+export const gitCommitOp = async (
+  path: string,
+  message: string,
+): Promise<void> => {
+  const dir = normalizePath(path);
+  try {
+    // Ensure user name/email are configured
+    const configOK = await ensureGitConfig(dir);
+    if (!configOK) {
+      throw new Error("Git user configuration is missing or invalid.");
+    }
+
+    // Stage all changes (equivalent to git add .)
+    const status = await git.statusMatrix({ fs, dir });
+    for (const [filepath, head, workdir] of status) {
+      // 1 = HEAD status, 2 = WORKDIR status, 3 = STAGE status
+      // Add new/modified files (workdir === 2)
+      // head=0, workdir=2 => new
+      // head=1, workdir=2 => modified
+      if (workdir === 2) {
+        await git.add({ fs, dir, filepath });
+      }
+      // Remove deleted files (present in HEAD but absent in WORKDIR)
+      if (head !== 0 && workdir === 0) {
+        await git.remove({ fs, dir, filepath });
+      }
+    }
+
+    // Perform the commit
+    const sha = await git.commit({
+      fs,
+      dir,
+      message,
+      author: {
+        name: useSettingsStore.getState().gitUserName!,
+        email: useSettingsStore.getState().gitUserEmail!,
+      },
+    });
+    toast.success(`Changes committed: ${sha.substring(0, 7)}`);
+  } catch (err: unknown) {
+    console.error(`[VFS Op] Git commit failed for ${dir}:`, err);
+    toast.error(
+      `Git commit failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    throw err;
+  }
+};
+
+// --- Placeholder Git Operations ---
+export const gitPullOp = async (path: string): Promise<void> => {
+  const dir = normalizePath(path);
+  console.log(`[VFS Op] Placeholder: Git Pull on ${dir}`);
+  toast.info(`Git Pull functionality not yet fully implemented for ${dir}.`);
+  // Placeholder implementation:
+  // await git.pull({ fs, http, dir, author: { name: '...', email: '...' }, singleBranch: true });
+};
+
+export const gitPushOp = async (path: string): Promise<void> => {
+  const dir = normalizePath(path);
+  console.log(`[VFS Op] Placeholder: Git Push on ${dir}`);
+  toast.info(`Git Push functionality not yet fully implemented for ${dir}.`);
+  // Placeholder implementation:
+  // await git.push({ fs, http, dir, remote: 'origin', ref: 'main' });
+};
+
+export const gitStatusOp = async (path: string): Promise<void> => {
+  const dir = normalizePath(path);
+  console.log(`[VFS Op] Placeholder: Git Status on ${dir}`);
+  try {
+    const status = await git.statusMatrix({ fs, dir });
+    console.log("Git Status:", status);
+    toast.info(
+      `Git Status for "${basename(dir)}":\n${JSON.stringify(status, null, 2)}`,
+      { duration: 10000 },
+    );
+  } catch (err: unknown) {
+    console.error(`[VFS Op] Git status failed for ${dir}:`, err);
+    toast.error(
+      `Git status failed: ${err instanceof Error ? err.message : String(err)}`,
     );
     throw err;
   }

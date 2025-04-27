@@ -13,6 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
+import { Separator } from "@/components/ui/separator"; // Added Separator
 
 const SettingsGeneralComponent: React.FC = () => {
   const {
@@ -26,6 +27,10 @@ const SettingsGeneralComponent: React.FC = () => {
     setStreamingRenderFPS,
     streamingCodeRenderFPS, // Get code FPS state
     setStreamingCodeRenderFPS, // Get code FPS action
+    gitUserName, // Added
+    setGitUserName, // Added
+    gitUserEmail, // Added
+    setGitUserEmail, // Added
   } = useSettingsStore(
     useShallow((state) => ({
       theme: state.theme,
@@ -38,6 +43,10 @@ const SettingsGeneralComponent: React.FC = () => {
       setStreamingRenderFPS: state.setStreamingRenderFPS,
       streamingCodeRenderFPS: state.streamingCodeRenderFPS, // Select code FPS state
       setStreamingCodeRenderFPS: state.setStreamingCodeRenderFPS, // Select code FPS action
+      gitUserName: state.gitUserName, // Added
+      setGitUserName: state.setGitUserName, // Added
+      gitUserEmail: state.gitUserEmail, // Added
+      setGitUserEmail: state.setGitUserEmail, // Added
     })),
   );
 
@@ -209,6 +218,39 @@ const SettingsGeneralComponent: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <Separator />
+
+      {/* Git Configuration */}
+      <div className="space-y-2">
+        <h3 className="text-lg font-medium">Git Configuration</h3>
+        <p className="text-sm text-muted-foreground">
+          Set your user name and email for Git commits made within the VFS.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg border p-3 shadow-sm">
+          <div className="space-y-1">
+            <Label htmlFor="git-user-name">Git User Name</Label>
+            <Input
+              id="git-user-name"
+              value={gitUserName ?? ""}
+              onChange={(e) => setGitUserName(e.target.value)}
+              placeholder="Your Name"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="git-user-email">Git User Email</Label>
+            <Input
+              id="git-user-email"
+              type="email"
+              value={gitUserEmail ?? ""}
+              onChange={(e) => setGitUserEmail(e.target.value)}
+              placeholder="your.email@example.com"
+            />
+          </div>
+        </div>
+      </div>
+
+      <Separator />
 
       {/* Advanced Settings */}
       <div className="space-y-2">

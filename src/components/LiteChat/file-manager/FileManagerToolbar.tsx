@@ -13,13 +13,13 @@ import {
   Loader2Icon,
   GitBranchIcon,
 } from "lucide-react";
-import type { VfsNode } from "@/types/litechat/vfs"; // Updated path and type
+import type { VfsNode } from "@/types/litechat/vfs";
 
 interface FileManagerToolbarProps {
   currentPath: string;
-  isAnyLoading: boolean;
-  isOperationLoading: boolean;
-  entries: VfsNode[]; // Changed type
+  isAnyLoading: boolean; // Combined loading state
+  isOperationLoading: boolean; // Specific FS operation loading
+  entries: VfsNode[];
   editingPath: string | null;
   creatingFolder: boolean;
   handleNavigateHome: () => void;
@@ -30,7 +30,7 @@ interface FileManagerToolbarProps {
   handleFolderUploadClick: () => void;
   handleArchiveUploadClick: () => void;
   handleDownloadAll: () => void;
-  handleCloneClick: () => void;
+  handleCloneClick: () => void; // Added handler for clone button
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   folderInputRef: React.RefObject<HTMLInputElement | null>;
   archiveInputRef: React.RefObject<HTMLInputElement | null>;
@@ -41,7 +41,7 @@ interface FileManagerToolbarProps {
 export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
   currentPath,
   isAnyLoading,
-  isOperationLoading,
+  isOperationLoading, // Use this for refresh icon specifically
   entries,
   editingPath,
   creatingFolder,
@@ -53,7 +53,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
   handleFolderUploadClick,
   handleArchiveUploadClick,
   handleDownloadAll,
-  handleCloneClick,
+  handleCloneClick, // Destructure clone handler
   fileInputRef,
   folderInputRef,
   archiveInputRef,
@@ -147,11 +147,12 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
               e.stopPropagation();
               handleRefresh();
             }}
-            disabled={isAnyLoading}
+            disabled={isAnyLoading} // Disable on any loading
             title="Refresh current directory"
             className="h-8 w-8"
             type="button"
           >
+            {/* Show spinner only for FS operations, not all loading */}
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 animate-spin" />
             ) : (
@@ -171,6 +172,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             title="Create New Folder"
             type="button"
           >
+            {/* Spinner logic remains the same */}
             {isOperationLoading && creatingFolder ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
             ) : (
@@ -191,6 +193,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             title="Upload Files"
             type="button"
           >
+            {/* Spinner logic remains the same */}
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
             ) : (
@@ -211,6 +214,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             title="Upload Folder"
             type="button"
           >
+            {/* Spinner logic remains the same */}
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
             ) : (
@@ -231,6 +235,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             title="Upload & Extract ZIP"
             type="button"
           >
+            {/* Spinner logic remains the same */}
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
             ) : (
@@ -244,13 +249,14 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              handleCloneClick();
+              handleCloneClick(); // Use the passed handler
             }}
-            disabled={isAnyLoading}
+            disabled={isAnyLoading} // Disable on any loading
             className="h-8"
             title="Clone Git Repository"
             type="button"
           >
+            {/* Spinner logic remains the same */}
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
             ) : (
@@ -271,6 +277,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             title="Download Current Directory as ZIP"
             type="button"
           >
+            {/* Spinner logic remains the same */}
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
             ) : (

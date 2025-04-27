@@ -190,7 +190,7 @@ const VfsPromptControl: React.FC = () => {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <DialogContent className="max-w-3xl h-[70vh] flex flex-col">
+      <DialogContent className="max-w-[1200px] h-[85vh] sm:max-w-4xl flex flex-col">
         <DialogHeader>
           <DialogTitle>File Manager</DialogTitle>
           <DialogDescription>

@@ -9,32 +9,33 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { VfsNode } from "@/types/litechat/vfs"; // Updated path and type
-import { NewFolderRow } from "./NewFolderRow"; // Corrected import case
-import { FileManagerRow } from "./FileManagerRow"; // Corrected import case
+import type { VfsNode } from "@/types/litechat/vfs";
+import { NewFolderRow } from "./NewFolderRow";
+import { FileManagerRow } from "./FileManagerRow";
 
 interface FileManagerTableProps {
-  entries: VfsNode[]; // Changed type
+  entries: VfsNode[];
   editingPath: string | null;
   newName: string;
   creatingFolder: boolean;
   newFolderName: string;
   checkedPaths: Set<string>;
-  isOperationLoading: boolean;
-  handleNavigate: (entry: VfsNode) => void; // Changed type
+  isOperationLoading: boolean; // Combined loading state
+  handleNavigate: (entry: VfsNode) => void;
   handleCheckboxChange: (checked: boolean, path: string) => void;
-  startEditing: (entry: VfsNode) => void; // Changed type
+  startEditing: (entry: VfsNode) => void;
   cancelEditing: () => void;
   handleRename: () => void;
   cancelCreatingFolder: () => void;
   handleCreateFolder: () => void;
-  handleDownload: (entry: VfsNode) => void; // Changed type
-  handleDelete: (entry: VfsNode) => void; // Changed type
+  handleDownload: (entry: VfsNode) => void;
+  handleDelete: (entry: VfsNode) => void;
   setNewName: (name: string) => void;
   setNewFolderName: (name: string) => void;
   renameInputRef: React.RefObject<HTMLInputElement | null>;
   newFolderInputRef: React.RefObject<HTMLInputElement | null>;
-  gitRepoStatus: Record<string, boolean>;
+  gitRepoStatus: Record<string, boolean>; // Git status per path
+  // Git action handlers
   handleGitInit: (path: string) => void;
   handleGitPull: (path: string) => void;
   handleGitCommit: (path: string) => void;
@@ -49,7 +50,7 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
   creatingFolder,
   newFolderName,
   checkedPaths,
-  isOperationLoading,
+  isOperationLoading, // Use combined loading state
   handleNavigate,
   handleCheckboxChange,
   startEditing,
@@ -63,7 +64,8 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
   setNewFolderName,
   renameInputRef,
   newFolderInputRef,
-  gitRepoStatus,
+  gitRepoStatus, // Receive git status
+  // Receive git handlers
   handleGitInit,
   handleGitPull,
   handleGitCommit,
@@ -107,7 +109,7 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
           {memoizedEntries.map((entry) => {
             const isEditingThis = editingPath === entry.path;
             const isChecked = checkedPaths.has(entry.path);
-            const isGitRepo = gitRepoStatus[entry.path] ?? false;
+            const isGitRepo = gitRepoStatus[entry.path] ?? false; // Check git status
 
             return (
               <FileManagerRow
@@ -115,9 +117,9 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
                 entry={entry}
                 isEditingThis={isEditingThis}
                 isChecked={isChecked}
-                isGitRepo={isGitRepo}
+                isGitRepo={isGitRepo} // Pass git status
                 newName={isEditingThis ? newName : ""}
-                isOperationLoading={isOperationLoading}
+                isOperationLoading={isOperationLoading} // Pass combined loading
                 creatingFolder={creatingFolder}
                 handleNavigate={handleNavigate}
                 handleCheckboxChange={handleCheckboxChange}
@@ -128,6 +130,7 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
                 handleDelete={handleDelete}
                 setNewName={setNewName}
                 renameInputRef={renameInputRef}
+                // Pass git handlers
                 handleGitInit={handleGitInit}
                 handleGitPull={handleGitPull}
                 handleGitCommit={handleGitCommit}

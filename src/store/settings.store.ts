@@ -16,6 +16,8 @@ interface SettingsState {
   enableStreamingMarkdown: boolean;
   streamingRenderFPS: number; // General FPS
   streamingCodeRenderFPS: number; // FPS specifically for code blocks
+  gitUserName: string | null; // Added
+  gitUserEmail: string | null; // Added
 }
 
 interface SettingsActions {
@@ -31,6 +33,8 @@ interface SettingsActions {
   setEnableStreamingMarkdown: (enabled: boolean) => void;
   setStreamingRenderFPS: (fps: number) => void;
   setStreamingCodeRenderFPS: (fps: number) => void; // Action for code FPS
+  setGitUserName: (name: string | null) => void; // Added
+  setGitUserEmail: (email: string | null) => void; // Added
   loadSettings: () => Promise<void>;
 }
 
@@ -53,6 +57,8 @@ export const useSettingsStore = create(
     enableStreamingMarkdown: true,
     streamingRenderFPS: DEFAULT_STREAMING_FPS,
     streamingCodeRenderFPS: DEFAULT_STREAMING_CODE_FPS, // Initialize code FPS
+    gitUserName: null, // Initialize Git user name
+    gitUserEmail: null, // Initialize Git user email
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -112,6 +118,18 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("streamingCodeRenderFPS", clampedFps); // Use new key
     },
 
+    // Git User Config Actions
+    setGitUserName: (name) => {
+      const trimmedName = name?.trim() || null;
+      set({ gitUserName: trimmedName });
+      PersistenceService.saveSetting("gitUserName", trimmedName);
+    },
+    setGitUserEmail: (email) => {
+      const trimmedEmail = email?.trim() || null;
+      set({ gitUserEmail: trimmedEmail });
+      PersistenceService.saveSetting("gitUserEmail", trimmedEmail);
+    },
+
     loadSettings: async () => {
       try {
         const [
@@ -127,6 +145,8 @@ export const useSettingsStore = create(
           enableStreamingMd,
           streamingFps,
           streamingCodeFps, // Load code FPS setting
+          gitUserName, // Load Git user name
+          gitUserEmail, // Load Git user email
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -161,6 +181,8 @@ export const useSettingsStore = create(
             "streamingCodeRenderFPS", // Use new key
             DEFAULT_STREAMING_CODE_FPS, // Default code FPS value
           ),
+          PersistenceService.loadSetting<string | null>("gitUserName", null), // Load Git user name
+          PersistenceService.loadSetting<string | null>("gitUserEmail", null), // Load Git user email
         ]);
 
         set({
@@ -176,6 +198,8 @@ export const useSettingsStore = create(
           enableStreamingMarkdown: enableStreamingMd,
           streamingRenderFPS: streamingFps,
           streamingCodeRenderFPS: streamingCodeFps, // Set loaded code FPS value
+          gitUserName, // Set loaded Git user name
+          gitUserEmail, // Set loaded Git user email
         });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);
