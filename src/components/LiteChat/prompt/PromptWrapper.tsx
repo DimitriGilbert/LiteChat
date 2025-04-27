@@ -23,7 +23,6 @@ import type {
   ModMiddlewareReturnMap,
 } from "@/types/litechat/modding";
 import { cn } from "@/lib/utils";
-// Use correct store and types
 import { useInputStore, type AttachedFileMetadata } from "@/store/input.store";
 import { Badge } from "@/components/ui/badge";
 import { formatBytes } from "@/lib/litechat/file-manager-utils";
@@ -113,8 +112,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         return;
       }
 
-      // Read the *current* state of attached files metadata from the store
-      // This ensures we capture the content that was read asynchronously
       const currentAttachedFilesMetadata =
         useInputStore.getState().attachedFilesMetadata;
 
@@ -128,8 +125,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
 
       setIsSubmitting(true);
 
-      // Create a deep copy of the metadata including content for the turn object
-      // This is crucial as this object snapshot is saved with the interaction
       const fileMetadataForTurn: AttachedFileMetadata[] = JSON.parse(
         JSON.stringify(currentAttachedFilesMetadata),
       );
@@ -139,22 +134,18 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         content: trimmedInput,
         parameters: {},
         metadata: {
-          // Include the metadata with content here
           attachedFiles: fileMetadataForTurn,
         },
       };
 
       // --- Collect parameters and metadata from controls ---
-      const currentControls = useControlRegistryStore.getState().promptControls;
-      const currentActiveControls = Object.values(currentControls)
-        .filter((c) => (c.show ? c.show() : true))
-        .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
-
-      for (const control of currentActiveControls) {
+      for (const control of activeControls) {
         if (control.getParameters) {
           try {
             const p = await control.getParameters();
-            if (p) turnData.parameters = { ...turnData.parameters, ...p };
+            if (p && typeof p === "object") {
+              turnData.parameters = { ...turnData.parameters, ...p };
+            }
           } catch (err) {
             console.error(
               `Error getting parameters from control ${control.id}:`,
@@ -165,12 +156,16 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         if (control.getMetadata) {
           try {
             const m = await control.getMetadata();
-            if (m) {
-              // Merge control metadata, ensuring attachedFiles isn't overwritten
+            if (m && typeof m === "object") {
+              const { attachedFiles: controlFiles, ...otherMeta } = m;
+              if (controlFiles) {
+                console.warn(
+                  `Control ${control.id} tried to overwrite attachedFiles metadata. Ignoring.`,
+                );
+              }
               turnData.metadata = {
                 ...turnData.metadata,
-                ...m,
-                // Explicitly keep the attachedFiles we already processed
+                ...otherMeta,
                 attachedFiles: turnData.metadata.attachedFiles,
               };
             }
@@ -203,9 +198,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
           : turnData;
 
       try {
-        // Pass the final turn data (which includes file content in metadata)
         await onSubmit(finalTurnData);
-        handleClearInputs(); // Clear input store state after successful submission
+        handleClearInputs();
       } catch (err) {
         console.error("Error during final prompt submission:", err);
         toast.error(
@@ -220,7 +214,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       onSubmit,
       isStreaming,
       handleClearInputs,
-      // No need to depend on attachedFilesMetadata here, we read it fresh inside
+      activeControls, // Depend on activeControls
     ],
   );
 
@@ -235,7 +229,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   const hasPanelControls = activeControls.some((c) => !!c.renderer);
   const hasTriggerControls = activeControls.some((c) => !!c.triggerRenderer);
 
-  // Effect to clear file input store if component unmounts
   useEffect(() => {
     return () => {
       clearAttachedFiles();
@@ -256,7 +249,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         </div>
       )}
 
-      {/* Display Attached Files from InputStore */}
       {attachedFilesMetadata.length > 0 && (
         <div className="px-3 md:px-4 pt-2 border-b border-border/50 max-h-24 overflow-y-auto">
           <div className="flex flex-wrap gap-1.5 pb-1.5">

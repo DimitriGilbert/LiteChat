@@ -26,6 +26,7 @@ import { useConversationStore } from "@/store/conversation.store";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const SettingsGitSyncReposComponent: React.FC = () => {
+  // Use loadSyncRepos to ensure data is fresh if needed, though loadSidebarItems should handle it
   const { syncRepos, addSyncRepo, updateSyncRepo, deleteSyncRepo, isLoading } =
     useConversationStore(
       useShallow((state) => ({
@@ -33,7 +34,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
         addSyncRepo: state.addSyncRepo,
         updateSyncRepo: state.updateSyncRepo,
         deleteSyncRepo: state.deleteSyncRepo,
-        isLoading: state.isLoading, // Use conversation store loading for now
+        isLoading: state.isLoading,
       })),
     );
 
@@ -53,7 +54,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
     setFormData({ name: "", remoteUrl: "", branch: "main" });
     setIsAdding(false);
     setEditingId(null);
-    setIsSaving(false);
+    setIsSaving(false); // Ensure saving state is reset
   }, []);
 
   const handleInputChange = useCallback(
@@ -83,10 +84,13 @@ const SettingsGitSyncReposComponent: React.FC = () => {
           branch: formData.branch?.trim() || "main",
         });
       }
-      resetForm();
+      resetForm(); // Reset form after successful save
     } catch (error) {
       // Error toast handled by store action
+      console.error("Failed to save sync repo:", error);
+      // Do not reset form on error, allow user to correct
     } finally {
+      // Reset saving state regardless of success/failure
       setIsSaving(false);
     }
   }, [formData, editingId, addSyncRepo, updateSyncRepo, resetForm]);

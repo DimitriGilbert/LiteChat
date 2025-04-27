@@ -33,7 +33,8 @@ import { cn } from "@/lib/utils";
 
 const GitSyncControlComponent: React.FC = () => {
   const {
-    selectedConversationId,
+    selectedItemId, // Use selectedItemId
+    selectedItemType, // Use selectedItemType
     conversations,
     syncRepos,
     conversationSyncStatus,
@@ -41,7 +42,8 @@ const GitSyncControlComponent: React.FC = () => {
     syncConversation,
   } = useConversationStore(
     useShallow((state) => ({
-      selectedConversationId: state.selectedConversationId,
+      selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType,
       conversations: state.conversations,
       syncRepos: state.syncRepos,
       conversationSyncStatus: state.conversationSyncStatus,
@@ -50,24 +52,28 @@ const GitSyncControlComponent: React.FC = () => {
     })),
   );
 
+  // Determine the current conversation ID only if a conversation is selected
+  const currentConversationId =
+    selectedItemType === "conversation" ? selectedItemId : null;
+
   const currentConversation = conversations.find(
-    (c) => c.id === selectedConversationId,
+    (c) => c.id === currentConversationId,
   );
   const currentRepoId = currentConversation?.syncRepoId;
   const currentRepo = syncRepos.find((r) => r.id === currentRepoId);
-  const currentStatus: SyncStatus = selectedConversationId
-    ? (conversationSyncStatus[selectedConversationId] ?? "idle")
+  const currentStatus: SyncStatus = currentConversationId
+    ? (conversationSyncStatus[currentConversationId] ?? "idle")
     : "idle";
 
   const handleLinkRepo = (repoId: string | null) => {
-    if (selectedConversationId) {
-      linkConversationToRepo(selectedConversationId, repoId);
+    if (currentConversationId) {
+      linkConversationToRepo(currentConversationId, repoId);
     }
   };
 
   const handleSyncClick = () => {
-    if (selectedConversationId && currentRepoId) {
-      syncConversation(selectedConversationId);
+    if (currentConversationId && currentRepoId) {
+      syncConversation(currentConversationId);
     }
   };
 
@@ -118,13 +124,15 @@ const GitSyncControlComponent: React.FC = () => {
   };
 
   const statusInfo = currentRepo ? getStatusInfo() : null;
+  const isButtonDisabled = !currentConversationId; // Disable if no conversation selected
 
   return (
     <DropdownMenu>
       <TooltipProvider delayDuration={100}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>
+            {/* Ensure DropdownMenuTrigger wraps the Button */}
+            <DropdownMenuTrigger asChild disabled={isButtonDisabled}>
               <Button
                 type="button"
                 variant="ghost"
@@ -133,9 +141,10 @@ const GitSyncControlComponent: React.FC = () => {
                   "h-10 w-10 rounded-full relative",
                   !currentRepo && "text-muted-foreground hover:text-foreground",
                   statusInfo?.colorClass,
+                  isButtonDisabled && "opacity-50 cursor-not-allowed", // Style when disabled
                 )}
                 aria-label="Conversation Git Sync Status"
-                disabled={!selectedConversationId} // Disable if no conversation selected
+                // disabled prop is handled by the trigger now
               >
                 <FolderSyncIcon className="h-5 w-5" />
                 {statusInfo && (
@@ -147,13 +156,16 @@ const GitSyncControlComponent: React.FC = () => {
             </DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent side="top">
-            {currentRepo
-              ? statusInfo?.tooltip
-              : "Link conversation to sync repository"}
+            {isButtonDisabled
+              ? "Select a conversation to manage sync"
+              : currentRepo
+                ? statusInfo?.tooltip
+                : "Link conversation to sync repository"}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
 
+      {/* Content is only rendered when the trigger is clicked */}
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Conversation Sync</DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -161,7 +173,7 @@ const GitSyncControlComponent: React.FC = () => {
           <DropdownMenuItem
             key={repo.id}
             onClick={() => handleLinkRepo(repo.id)}
-            disabled={!selectedConversationId || currentStatus === "syncing"}
+            disabled={!currentConversationId || currentStatus === "syncing"}
           >
             {currentRepoId === repo.id && (
               <CheckCircle2Icon className="mr-2 h-4 w-4 text-green-500" />
@@ -172,7 +184,7 @@ const GitSyncControlComponent: React.FC = () => {
         {currentRepoId && (
           <DropdownMenuItem
             onClick={() => handleLinkRepo(null)}
-            disabled={!selectedConversationId || currentStatus === "syncing"}
+            disabled={!currentConversationId || currentStatus === "syncing"}
           >
             <XIcon className="mr-2 h-4 w-4 text-muted-foreground" />
             Unlink Repository
@@ -185,7 +197,7 @@ const GitSyncControlComponent: React.FC = () => {
         <DropdownMenuItem
           onClick={handleSyncClick}
           disabled={
-            !selectedConversationId ||
+            !currentConversationId ||
             !currentRepoId ||
             currentStatus === "syncing"
           }
@@ -210,20 +222,19 @@ export const useGitSyncControlRegistration = () => {
   const register = useControlRegistryStore(
     (state) => state.registerPromptControl,
   );
-  // Add dependency on syncRepos length to re-register if repos change
   const syncRepoCount = useConversationStore((state) => state.syncRepos.length);
 
   React.useEffect(() => {
     const control: PromptControl = {
       id: "core-git-sync-control",
       triggerRenderer: () => <GitSyncControlComponent />,
-      show: () => true, // Always show the control
+      show: () => true,
       order: 50,
     };
 
     const unregister = register(control);
     return unregister;
-  }, [register, syncRepoCount]); // Re-register if repo count changes
+  }, [register, syncRepoCount]);
 
   return null;
 };

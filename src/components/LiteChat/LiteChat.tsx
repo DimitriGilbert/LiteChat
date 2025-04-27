@@ -1,5 +1,5 @@
 // src/components/LiteChat/LiteChat.tsx
-import React, { useEffect, useCallback /* useRef removed */ } from "react";
+import React, { useEffect, useCallback } from "react";
 import { PromptWrapper } from "./prompt/PromptWrapper";
 import { ChatCanvas } from "./canvas/ChatCanvas";
 import { ChatControlWrapper } from "./chat/ChatControlWrapper";
@@ -21,13 +21,10 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Interaction } from "@/types/litechat/interaction";
-// Button removed as it's now handled by a control
-// Icons PanelLeftCloseIcon, PanelRightCloseIcon removed
 
 // Import control registration hooks/components
 import { useConversationListControlRegistration } from "./chat/control/ConversationList";
 import { useSettingsControlRegistration } from "./chat/control/Settings";
-// Import the new toggle control registration
 import { useSidebarToggleControlRegistration } from "./chat/control/SidebarToggleControl";
 import { useGlobalModelSelectorRegistration } from "./prompt/control/GlobalModelSelectorRegistration";
 import { useParameterControlRegistration } from "./prompt/control/ParameterControlRegistration";
@@ -51,16 +48,20 @@ const splitModelId = (
 export const LiteChat: React.FC = () => {
   // --- Store Hooks ---
   const {
-    selectedConversationId,
-    loadConversations,
+    selectedItemId, // Use selectedItemId
+    selectedItemType, // Use selectedItemType
+    loadSidebarItems, // Use loadSidebarItems
     addConversation,
-    selectConversation,
+    selectItem, // Use selectItem
+    getProjectById, // Get project selector
   } = useConversationStore(
     useShallow((state) => ({
-      selectedConversationId: state.selectedConversationId,
-      loadConversations: state.loadConversations,
+      selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType,
+      loadSidebarItems: state.loadSidebarItems,
       addConversation: state.addConversation,
-      selectConversation: state.selectConversation,
+      selectItem: state.selectItem,
+      getProjectById: state.getProjectById,
     })),
   );
   const {
@@ -74,12 +75,10 @@ export const LiteChat: React.FC = () => {
       setCurrentConversationId: state.setCurrentConversationId,
     })),
   );
-  // Get sidebar state only, toggle action is handled by the control
   const { globalError, isSidebarCollapsed } = useUIStateStore(
     useShallow((state) => ({
       globalError: state.globalError,
       isSidebarCollapsed: state.isSidebarCollapsed,
-      // toggleSidebar removed
     })),
   );
   const registeredChatControls = useControlRegistryStore(
@@ -110,14 +109,14 @@ export const LiteChat: React.FC = () => {
   // --- Register Core Controls ---
   useConversationListControlRegistration();
   useSettingsControlRegistration();
-  useSidebarToggleControlRegistration(); // Register the new control
+  useSidebarToggleControlRegistration();
   useGlobalModelSelectorRegistration();
   useParameterControlRegistration();
   useFileControlRegistration();
   useVfsControlRegistration();
   useGitSyncControlRegistration();
 
-  // --- Initialization Effect --- (remains the same)
+  // --- Initialization Effect ---
   useEffect(() => {
     let isMounted = true;
     const initialize = async () => {
@@ -129,8 +128,8 @@ export const LiteChat: React.FC = () => {
       await loadProviderData();
       console.log("LiteChat: Provider data loaded.");
       if (!isMounted) return;
-      await loadConversations();
-      console.log("LiteChat: Conversations loaded.");
+      await loadSidebarItems(); // Use loadSidebarItems
+      console.log("LiteChat: Sidebar items loaded.");
       if (!isMounted) return;
       await loadDbMods();
       console.log("LiteChat: DB Mods loaded.");
@@ -155,7 +154,7 @@ export const LiteChat: React.FC = () => {
       console.log("LiteChat: Unmounting, initialization cancelled if pending.");
     };
   }, [
-    loadConversations,
+    loadSidebarItems, // Use loadSidebarItems
     loadDbMods,
     setLoadedMods,
     loadProviderData,
@@ -193,11 +192,21 @@ export const LiteChat: React.FC = () => {
     [],
   );
 
-  // --- Prompt Submission Handler --- (remains the same)
+  // --- Prompt Submission Handler ---
   const handlePromptSubmit = useCallback(
     async (turnData: PromptTurnObject) => {
-      let currentConvId = selectedConversationId;
-      const setFocusInputFlag = useUIStateStore.getState().setFocusInputFlag; // Get action directly
+      let currentConvId =
+        selectedItemType === "conversation" ? selectedItemId : null;
+      const currentProjectId =
+        selectedItemType === "project"
+          ? selectedItemId
+          : selectedItemType === "conversation"
+            ? (useConversationStore
+                .getState()
+                .getConversationById(selectedItemId)?.projectId ?? null)
+            : null;
+
+      const setFocusInputFlag = useUIStateStore.getState().setFocusInputFlag;
 
       const selectedModelCombinedId =
         useProviderStore.getState().selectedModelId;
@@ -209,11 +218,13 @@ export const LiteChat: React.FC = () => {
       if (!currentConvId) {
         console.log("LiteChat: No conversation selected, creating new one...");
         try {
-          currentConvId = await addConversation({ title: "New Chat" });
-          selectConversation(currentConvId);
-          // Delay setting the flag slightly
+          currentConvId = await addConversation({
+            title: "New Chat",
+            projectId: currentProjectId, // Add to current project if any
+          });
+          selectItem(currentConvId, "conversation"); // Use selectItem
           setTimeout(() => setFocusInputFlag(true), 0);
-          await new Promise((resolve) => setTimeout(resolve, 0)); // Ensure state updates propagate
+          await new Promise((resolve) => setTimeout(resolve, 0));
           console.log(
             `LiteChat: New conversation created and selected: ${currentConvId}`,
           );
@@ -230,9 +241,8 @@ export const LiteChat: React.FC = () => {
           `LiteChat: Syncing InteractionStore to conversation ${currentConvId}`,
         );
         setCurrentConversationId(currentConvId);
-        // Delay setting the flag slightly when switching
         setTimeout(() => setFocusInputFlag(true), 0);
-        await new Promise((resolve) => setTimeout(resolve, 0)); // Ensure state updates propagate
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
 
       const currentHistory = useInteractionStore.getState().interactions;
@@ -247,12 +257,17 @@ export const LiteChat: React.FC = () => {
         console.warn("LiteChat: Submitting prompt without text content.");
       }
 
-      const systemPrompt = globalSystemPrompt || undefined;
+      // Determine system prompt: Project > Global
+      const project = getProjectById(currentProjectId);
+      const systemPrompt =
+        project?.systemPrompt ?? globalSystemPrompt ?? undefined;
+
+      // TODO: Determine model/parameters: Project > Global
 
       const aiPayload: PromptObject = {
         system: systemPrompt,
         messages: messages,
-        parameters: turnData.parameters,
+        parameters: turnData.parameters, // TODO: Merge with project/global defaults
         metadata: turnData.metadata,
       };
 
@@ -270,16 +285,18 @@ export const LiteChat: React.FC = () => {
       }
     },
     [
-      selectedConversationId,
+      selectedItemId,
+      selectedItemType,
       addConversation,
-      selectConversation,
+      selectItem,
       setCurrentConversationId,
       globalSystemPrompt,
       buildHistoryMessages,
+      getProjectById,
     ],
   );
 
-  // --- Regeneration Handler --- (remains the same)
+  // --- Regeneration Handler --- (Needs update for project context)
   const onRegenerateInteraction = useCallback(
     async (interactionId: string) => {
       console.log(`LiteChat: Regenerating interaction ${interactionId}`);
@@ -304,6 +321,16 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
+      // --- Get current conversation and project context ---
+      const currentConversation = useConversationStore
+        .getState()
+        .getConversationById(targetInteraction.conversationId);
+      const currentProjectId = currentConversation?.projectId ?? null;
+      const project = getProjectById(currentProjectId);
+      // ---
+
+      // --- Determine Model ---
+      // TODO: Use Project setting -> Global setting
       const selectedModelCombinedId =
         useProviderStore.getState().selectedModelId;
       if (!selectedModelCombinedId) {
@@ -315,11 +342,13 @@ export const LiteChat: React.FC = () => {
         toast.error("Invalid model selection for regeneration.");
         return;
       }
+      // ---
 
       const historyUpToIndex = targetInteraction.index;
       const historyInteractions = interactionStore.interactions
         .filter(
           (i) =>
+            i.conversationId === targetInteraction.conversationId && // Ensure history is from the same conversation
             i.index < historyUpToIndex &&
             i.status === "COMPLETED" &&
             i.type === "message.user_assistant",
@@ -344,8 +373,13 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
+      // Determine system prompt: Project > Global
       const systemPrompt =
-        useSettingsStore.getState().globalSystemPrompt || undefined;
+        project?.systemPrompt ??
+        useSettingsStore.getState().globalSystemPrompt ??
+        undefined;
+
+      // TODO: Determine parameters: Project > Global > Interaction snapshot
 
       const currentMetadata = {
         ...targetInteraction.prompt.metadata,
@@ -357,7 +391,7 @@ export const LiteChat: React.FC = () => {
       const aiPayload: PromptObject = {
         system: systemPrompt,
         messages: messages,
-        parameters: targetInteraction.prompt.parameters,
+        parameters: targetInteraction.prompt.parameters, // TODO: Merge with project/global
         metadata: currentMetadata,
       };
 
@@ -368,6 +402,7 @@ export const LiteChat: React.FC = () => {
       );
 
       try {
+        // Pass the original prompt turn object for snapshotting
         await AIService.startInteraction(aiPayload, targetInteraction.prompt);
         console.log(
           `LiteChat: AIService regeneration interaction started for ${interactionId}.`,
@@ -380,7 +415,7 @@ export const LiteChat: React.FC = () => {
         toast.error("Failed to start regeneration.");
       }
     },
-    [buildHistoryMessages],
+    [buildHistoryMessages, getProjectById],
   );
 
   // --- Stop Handler --- (remains the same)
@@ -404,6 +439,10 @@ export const LiteChat: React.FC = () => {
     (c) => c.id === "core-settings-trigger",
   )?.settingsRenderer;
 
+  // Determine the current conversation ID for ChatCanvas
+  const currentConversationIdForCanvas =
+    selectedItemType === "conversation" ? selectedItemId : null;
+
   return (
     <>
       {/* Main Chat Layout */}
@@ -416,7 +455,6 @@ export const LiteChat: React.FC = () => {
         <div
           className={cn(
             "hidden md:flex flex-col border-r border-[--border] bg-card",
-            // Restore transition, but only for width
             "transition-[width] duration-300 ease-in-out",
             "flex-shrink-0 overflow-hidden",
             isSidebarCollapsed ? "w-16" : "w-64",
@@ -430,7 +468,7 @@ export const LiteChat: React.FC = () => {
                 controls={sidebarControls}
                 panelId="sidebar"
                 renderMode="full"
-                className="h-full"
+                className="h-full" // Ensure wrapper takes height
               />
             </div>
             <div className={cn(isSidebarCollapsed ? "block" : "hidden")}>
@@ -451,7 +489,6 @@ export const LiteChat: React.FC = () => {
                 : "flex items-center justify-between",
             )}
           >
-            {/* Restore dynamic renderMode for footer */}
             <ChatControlWrapper
               controls={sidebarFooterControls}
               panelId="sidebar-footer"
@@ -477,7 +514,7 @@ export const LiteChat: React.FC = () => {
 
           {/* Chat Canvas */}
           <ChatCanvas
-            conversationId={selectedConversationId}
+            conversationId={currentConversationIdForCanvas} // Pass the derived ID
             interactions={interactions}
             onRegenerateInteraction={onRegenerateInteraction}
             onStopInteraction={onStopInteraction}

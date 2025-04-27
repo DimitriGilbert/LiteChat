@@ -7,11 +7,13 @@ import type { PromptObject } from "./prompt";
 // Conversation and SidebarItemType remain the same
 export interface Conversation extends DbBase {
   title: string;
+  projectId: string | null; // Link to parent project - ADDED
   metadata?: Record<string, any>;
   syncRepoId?: string | null; // ID of the SyncRepo this convo is linked to
   lastSyncedAt?: Date | null; // Timestamp of the last successful sync
 }
-export type SidebarItemType = "conversation" | "project" | "folder";
+// Updated SidebarItemType
+export type SidebarItemType = "conversation" | "project";
 
 // ChatControl remains the same
 export type ChatControlStatus = "loading" | "ready" | "error";

@@ -5,6 +5,7 @@ import type { Interaction } from "@/types/litechat/interaction";
 import type { DbMod } from "@/types/litechat/modding";
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import type { SyncRepo } from "@/types/litechat/sync";
+import type { Project } from "@/types/litechat/project"; // Import Project type
 
 export class PersistenceService {
   // Conversations
@@ -19,11 +20,12 @@ export class PersistenceService {
 
   static async saveConversation(c: Conversation): Promise<string> {
     try {
-      // Ensure sync fields have default values if missing
+      // Ensure sync and project fields have default values if missing
       const conversationToSave: Conversation = {
         ...c,
         syncRepoId: c.syncRepoId ?? null,
         lastSyncedAt: c.lastSyncedAt ?? null,
+        projectId: c.projectId ?? null, // Ensure projectId has default
       };
       return await db.conversations.put(conversationToSave);
     } catch (error) {
@@ -41,7 +43,7 @@ export class PersistenceService {
     }
   }
 
-  // Interactions
+  // Interactions (no changes needed)
   static async loadInteractionsForConversation(
     id: string,
   ): Promise<Interaction[]> {
@@ -88,7 +90,7 @@ export class PersistenceService {
     }
   }
 
-  // Mods
+  // Mods (no changes needed)
   static async loadMods(): Promise<DbMod[]> {
     try {
       return await db.mods.orderBy("loadOrder").toArray();
@@ -116,7 +118,7 @@ export class PersistenceService {
     }
   }
 
-  // App State (Settings)
+  // App State (Settings) (no changes needed)
   static async saveSetting(key: string, value: any): Promise<string> {
     try {
       return await db.appState.put({ key: `settings:${key}`, value });
@@ -136,7 +138,7 @@ export class PersistenceService {
     }
   }
 
-  // Provider Configs
+  // Provider Configs (no changes needed)
   static async loadProviderConfigs(): Promise<DbProviderConfig[]> {
     try {
       return (await db.providerConfigs?.toArray()) ?? [];
@@ -170,7 +172,7 @@ export class PersistenceService {
     }
   }
 
-  // API Keys
+  // API Keys (no changes needed)
   static async loadApiKeys(): Promise<DbApiKey[]> {
     try {
       return (await db.apiKeys?.toArray()) ?? [];
@@ -214,7 +216,7 @@ export class PersistenceService {
     }
   }
 
-  // --- Sync Repos ---
+  // Sync Repos (no changes needed)
   static async loadSyncRepos(): Promise<SyncRepo[]> {
     try {
       return await db.syncRepos.toArray();
@@ -235,7 +237,6 @@ export class PersistenceService {
 
   static async deleteSyncRepo(id: string): Promise<void> {
     try {
-      // Unlink from conversations within a transaction
       await db.transaction("rw", [db.syncRepos, db.conversations], async () => {
         const convosToUpdate = await db.conversations
           .where("syncRepoId")
@@ -258,6 +259,67 @@ export class PersistenceService {
     }
   }
 
+  // --- Projects ---
+  static async loadProjects(): Promise<Project[]> {
+    try {
+      return await db.projects.orderBy("updatedAt").reverse().toArray();
+    } catch (error) {
+      console.error("PersistenceService: Error loading projects:", error);
+      throw error;
+    }
+  }
+
+  static async saveProject(p: Project): Promise<string> {
+    try {
+      return await db.projects.put(p);
+    } catch (error) {
+      console.error("PersistenceService: Error saving project:", error);
+      throw error;
+    }
+  }
+
+  static async deleteProject(id: string): Promise<void> {
+    try {
+      // Recursively delete child projects and unlink conversations
+      const deleteRecursive = async (projectId: string) => {
+        // Find and delete child projects
+        const childProjects = await db.projects
+          .where("parentId")
+          .equals(projectId)
+          .toArray();
+        for (const child of childProjects) {
+          await deleteRecursive(child.id); // Recursive call
+        }
+
+        // Find and unlink conversations associated with this project
+        const convosToUnlink = await db.conversations
+          .where("projectId")
+          .equals(projectId)
+          .toArray();
+        if (convosToUnlink.length > 0) {
+          const updates = convosToUnlink.map((convo) =>
+            db.conversations.update(convo.id, { projectId: null }),
+          );
+          await Promise.all(updates);
+          console.log(
+            `PersistenceService: Unlinked Project ${projectId} from ${convosToUnlink.length} conversations.`,
+          );
+        }
+
+        // Delete the project itself
+        await db.projects.delete(projectId);
+        console.log(`PersistenceService: Deleted Project ${projectId}`);
+      };
+
+      await db.transaction("rw", [db.projects, db.conversations], async () => {
+        await deleteRecursive(id);
+      });
+    } catch (error) {
+      console.error("PersistenceService: Error deleting project:", error);
+      throw error;
+    }
+  }
+
   // --- Clear All Data ---
   static async clearAllData(): Promise<void> {
     try {
@@ -270,16 +332,18 @@ export class PersistenceService {
           db.appState,
           db.providerConfigs,
           db.apiKeys,
-          db.syncRepos, // Add syncRepos table
+          db.syncRepos,
+          db.projects, // Add projects table
         ],
         async () => {
           await db.interactions.clear();
           await db.conversations.clear();
+          await db.projects.clear(); // Clear projects table
           await db.mods.clear();
           await db.appState.clear();
           await db.providerConfigs.clear();
           await db.apiKeys.clear();
-          await db.syncRepos.clear(); // Clear syncRepos table
+          await db.syncRepos.clear();
         },
       );
       console.log("PersistenceService: All data cleared.");
