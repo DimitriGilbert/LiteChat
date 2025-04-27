@@ -17,6 +17,7 @@ import { SettingsDataManagement } from "./SettingsDataManagement";
 import { SettingsMods } from "./SettingsMods";
 import { SettingsProviders } from "./SettingsProviders";
 import { GlobalModelOrganizer } from "./GlobalModelOrganizer";
+import { SettingsGit } from "./SettingsGit"; // Import the new Git settings component
 import type { CustomSettingTab } from "@/types/litechat/modding";
 
 import { useShallow } from "zustand/react/shallow";
@@ -70,7 +71,6 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      {/* Ensure DialogContent uses flex-col and has defined height */}
       <DialogContent className="sm:max-w-[1200px] w-[90vw] h-[80vh] min-h-[550px] max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="p-6 pb-4 flex-shrink-0">
           <DialogTitle>Settings</DialogTitle>
@@ -80,12 +80,10 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Outer Tabs for main sections - Allow flex-grow */}
         <Tabs
           defaultValue="general"
-          className="flex-grow flex flex-col overflow-hidden px-6" // Add padding here
+          className="flex-grow flex flex-col overflow-hidden px-6"
         >
-          {/* Keep TabsList sticky */}
           <TabsList className="flex-shrink-0 sticky top-0 bg-background z-10 mb-4 flex-wrap h-auto justify-start border-b gap-1 p-1 -mx-6 px-6">
             <TabsTrigger value="general" className={tabTriggerClass}>
               General
@@ -98,6 +96,10 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
                 Assistant
               </TabsTrigger>
             )}
+            {/* Add Git Tab Trigger */}
+            <TabsTrigger value="git" className={tabTriggerClass}>
+              Git
+            </TabsTrigger>
             <TabsTrigger value="data" className={tabTriggerClass}>
               Data
             </TabsTrigger>
@@ -115,25 +117,16 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
             ))}
           </TabsList>
 
-          {/* Content Area with scroll */}
-          {/* Make this div the primary scroll container */}
           <div className="flex-grow overflow-y-auto pb-6 pr-2 -mr-2">
             <TabsContent value="general">
               <SettingsGeneral />
             </TabsContent>
 
-            {/* Providers Tab Content */}
             <TabsContent
               value="providers"
-              // Remove h-full, let content dictate height within scroll parent
               className="flex flex-col data-[state=inactive]:hidden"
             >
-              {/* Nested Tabs for Provider Sub-sections */}
-              <Tabs
-                defaultValue="model-order"
-                // Remove flex-grow and overflow-hidden here
-                className="flex flex-col"
-              >
+              <Tabs defaultValue="model-order" className="flex flex-col">
                 <TabsList className="flex-shrink-0 gap-1 p-1">
                   <TabsTrigger value="model-order" className={tabTriggerClass}>
                     Global Model Order
@@ -150,14 +143,10 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
                     </TabsTrigger>
                   )}
                 </TabsList>
-                {/* Content for nested tabs - NO internal scroll here */}
                 <div className="mt-4">
-                  {" "}
-                  {/* Removed flex-grow */}
                   <TabsContent value="model-order">
                     <GlobalModelOrganizer />
                   </TabsContent>
-                  {/* SettingsProviders will now naturally expand */}
                   <TabsContent value="provider-list">
                     <SettingsProviders />
                   </TabsContent>
@@ -175,6 +164,10 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
                 <SettingsAssistant />
               </TabsContent>
             )}
+            {/* Add Git Tab Content */}
+            <TabsContent value="git" className="h-full">
+              <SettingsGit />
+            </TabsContent>
             <TabsContent value="data">
               <SettingsDataManagement />
             </TabsContent>
@@ -193,7 +186,6 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
           </div>
         </Tabs>
 
-        {/* Keep Footer sticky */}
         <DialogFooter className="flex-shrink-0 border-t p-6 pt-4 mt-auto">
           <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Close

@@ -33,6 +33,7 @@ import { useGlobalModelSelectorRegistration } from "./prompt/control/GlobalModel
 import { useParameterControlRegistration } from "./prompt/control/ParameterControlRegistration";
 import { useFileControlRegistration } from "./prompt/control/FileControlRegistration";
 import { useVfsControlRegistration } from "./prompt/control/VfsControlRegistration";
+import { useGitSyncControlRegistration } from "./prompt/control/GitSyncControlRegistration";
 
 // Helper to split combined ID remains the same
 const splitModelId = (
@@ -114,6 +115,7 @@ export const LiteChat: React.FC = () => {
   useParameterControlRegistration();
   useFileControlRegistration();
   useVfsControlRegistration();
+  useGitSyncControlRegistration();
 
   // --- Initialization Effect --- (remains the same)
   useEffect(() => {

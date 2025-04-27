@@ -104,18 +104,39 @@ export const useVfsStore = create(
         }
       });
     },
-    _addNodes: (nodes) => {
+    _addNodes: (nodesToAdd) => {
       set((state) => {
-        nodes.forEach((node) => {
+        const parentUpdates: Record<string, string[]> = {};
+
+        nodesToAdd.forEach((node) => {
+          // Add/update the node itself
           state.nodes[node.id] = node;
+
+          // Group children by parent
           const parentIdKey = node.parentId ?? state.rootId ?? "";
-          if (!state.childrenMap[parentIdKey]) {
-            state.childrenMap[parentIdKey] = [];
+          if (!parentUpdates[parentIdKey]) {
+            // Initialize with existing children if not already processed in this batch
+            parentUpdates[parentIdKey] = state.childrenMap[parentIdKey]
+              ? [...state.childrenMap[parentIdKey]]
+              : [];
           }
-          if (!state.childrenMap[parentIdKey].includes(node.id)) {
-            state.childrenMap[parentIdKey].push(node.id);
+          // Add new child ID if not already present
+          if (!parentUpdates[parentIdKey].includes(node.id)) {
+            parentUpdates[parentIdKey].push(node.id);
           }
         });
+
+        // Apply updates to childrenMap only if changed
+        for (const parentIdKey in parentUpdates) {
+          // Check if the new list is different from the old one before assigning
+          if (
+            !state.childrenMap[parentIdKey] ||
+            JSON.stringify(state.childrenMap[parentIdKey].sort()) !==
+              JSON.stringify(parentUpdates[parentIdKey].sort())
+          ) {
+            state.childrenMap[parentIdKey] = parentUpdates[parentIdKey];
+          }
+        }
       });
     },
     _updateNode: (id, changes) => {
@@ -321,31 +342,55 @@ export const useVfsStore = create(
         const pathToFetch = parentNode ? parentNode.path : "/";
         const fetchedEntries = await VfsOps.listFilesOp(pathToFetch);
 
-        // Add type FileSystemEntry to entry
-        const vfsNodes = fetchedEntries.map(
-          (entry: FileSystemEntry): VfsNode => ({
-            id: nanoid(),
-            parentId: parentId,
-            name: entry.name,
-            path: entry.path,
-            type: entry.isDirectory ? "folder" : "file",
-            size: entry.size,
-            createdAt: entry.lastModified.getTime(),
-            lastModified: entry.lastModified.getTime(),
-            mimeType: entry.isDirectory ? undefined : (entry as any).mimeType,
-          }),
+        const parentKey = parentId ?? rootId ?? "";
+        const existingChildIds = new Set(get().childrenMap[parentKey] || []);
+        const fetchedPaths = new Set(fetchedEntries.map((e) => e.path));
+
+        // 1. Identify nodes to remove (exist in state but not in fetched results)
+        const idsToRemove = Object.values(nodes)
+          .filter((n) => n.parentId === parentId && !fetchedPaths.has(n.path))
+          .map((n) => n.id);
+
+        if (idsToRemove.length > 0) {
+          get()._removeNodes(idsToRemove);
+        }
+
+        // 2. Identify or create nodes to add/update
+        const nodesToAddOrUpdate: VfsNode[] = fetchedEntries.map(
+          (entry: FileSystemEntry): VfsNode => {
+            // Try to find existing node by path to reuse ID
+            const existingNode = Object.values(nodes).find(
+              (n) => n.path === entry.path,
+            );
+            const now = Date.now();
+            return {
+              id: existingNode?.id || nanoid(), // Reuse ID if found
+              parentId: parentId,
+              name: entry.name,
+              path: entry.path,
+              type: entry.isDirectory ? "folder" : "file",
+              size: entry.size,
+              createdAt: existingNode?.createdAt ?? now, // Keep original creation time
+              lastModified: entry.lastModified.getTime(),
+              mimeType: entry.isDirectory ? undefined : (entry as any).mimeType,
+            };
+          },
         );
 
-        const parentKey = parentId ?? rootId ?? "";
-        set((state) => {
-          state.childrenMap[parentKey] = [];
-        });
-        const oldChildIds = Object.values(nodes)
-          .filter((n: VfsNode) => n.parentId === parentId)
-          .map((n) => n.id);
-        get()._removeNodes(oldChildIds);
+        // 3. Add/Update nodes (this will handle childrenMap update)
+        _addNodes(nodesToAddOrUpdate);
 
-        _addNodes(vfsNodes);
+        // Ensure childrenMap only contains current children
+        set((state) => {
+          const finalChildIds = nodesToAddOrUpdate.map((n) => n.id);
+          if (
+            !state.childrenMap[parentKey] ||
+            JSON.stringify(state.childrenMap[parentKey].sort()) !==
+              JSON.stringify(finalChildIds.sort())
+          ) {
+            state.childrenMap[parentKey] = finalChildIds;
+          }
+        });
       } catch (err) {
         console.error("Failed to fetch VFS nodes:", err);
         _setError("Failed to load directory contents.");
