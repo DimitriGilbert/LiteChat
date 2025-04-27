@@ -1,42 +1,22 @@
 // src/components/LiteChat/common/CodeBlockRenderer.tsx
 import React, { useState, useEffect, useRef } from "react";
-import hljs from "highlight.js/lib/core"; // Import core hljs
-// Import specific languages needed to reduce bundle size
-import javascript from "highlight.js/lib/languages/javascript";
-import typescript from "highlight.js/lib/languages/typescript";
-import python from "highlight.js/lib/languages/python";
-import bash from "highlight.js/lib/languages/bash";
-import json from "highlight.js/lib/languages/json";
-import css from "highlight.js/lib/languages/css";
-import html from "highlight.js/lib/languages/xml"; // html is often under xml
-import markdown from "highlight.js/lib/languages/markdown";
-import diff from "highlight.js/lib/languages/diff";
-import go from "highlight.js/lib/languages/go";
-import yaml from "highlight.js/lib/languages/yaml";
-import rust from "highlight.js/lib/languages/rust";
-import sql from "highlight.js/lib/languages/sql";
-// Add other languages as needed
+import Prism from "prismjs";
+// Import only needed Prism language components to minimize bundle size
+import "prismjs/components/prism-typescript";
+import "prismjs/components/prism-python";
+import "prismjs/components/prism-bash";
+import "prismjs/components/prism-json";
+import "prismjs/components/prism-markdown";
+import "prismjs/components/prism-diff";
+import "prismjs/components/prism-go";
+import "prismjs/components/prism-yaml";
+import "prismjs/components/prism-rust";
+import "prismjs/components/prism-sql";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { CheckIcon, ClipboardIcon } from "lucide-react"; // Removed Loader2
+import { CheckIcon, ClipboardIcon } from "lucide-react";
 import { toast } from "sonner";
-
-// Register the imported languages
-hljs.registerLanguage("javascript", javascript);
-hljs.registerLanguage("typescript", typescript);
-hljs.registerLanguage("python", python);
-hljs.registerLanguage("bash", bash);
-hljs.registerLanguage("json", json);
-hljs.registerLanguage("css", css);
-hljs.registerLanguage("html", html);
-hljs.registerLanguage("xml", html); // Alias xml to html
-hljs.registerLanguage("markdown", markdown);
-hljs.registerLanguage("diff", diff);
-hljs.registerLanguage("go", go);
-hljs.registerLanguage("yaml", yaml);
-hljs.registerLanguage("rust", rust);
-hljs.registerLanguage("sql", sql);
 
 interface CodeBlockRendererProps {
   lang: string | undefined;
@@ -48,23 +28,23 @@ export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
   code,
 }) => {
   const [isCopied, setIsCopied] = useState(false);
-  const codeRef = useRef<HTMLElement>(null); // Ref for the <code> element
+  const codeRef = useRef<HTMLElement>(null);
 
-  // Highlight the code block when component mounts or code/lang changes
+  // Highlight the code block whenever the code or language changes
   useEffect(() => {
     if (codeRef.current && code) {
       try {
-        hljs.highlightElement(codeRef.current);
+        Prism.highlightElement(codeRef.current);
       } catch (error) {
-        console.error("Highlight.js error:", error);
-        // Fallback: display raw code if highlighting fails
+        console.error("Prism highlight error:", error);
+        // Fallback to raw code if highlighting fails
         codeRef.current.textContent = code;
       }
     } else if (codeRef.current) {
-      // Clear content if code is empty
+      // Clear content if there's no code
       codeRef.current.textContent = "";
     }
-  }, [code, lang]); // Re-run effect if code or lang changes
+  }, [code, lang]);
 
   const handleCopy = async () => {
     try {
@@ -78,7 +58,6 @@ export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
     }
   };
 
-  // Determine the language class for hljs
   const languageClass = lang ? `language-${lang}` : "language-plaintext";
 
   return (
@@ -99,11 +78,9 @@ export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
           )}
         </Button>
       </div>
-      {/* Use standard pre > code structure for hljs */}
-      {/* The themes in index.css target `.hljs` */}
-      <pre className="code-block-content hljs">
-        <code ref={codeRef} className={cn(languageClass, "hljs")}>
-          {/* Render raw code initially, useEffect will highlight it */}
+      {/* Use standard pre > code structure for Prism */}
+      <pre className="code-block-content">
+        <code ref={codeRef} className={cn(languageClass)}>
           {code}
         </code>
       </pre>

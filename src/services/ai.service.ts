@@ -18,6 +18,8 @@ import {
   CoreMessage,
   LanguageModelUsage,
   ProviderMetadata,
+  ToolCallPart,
+  ToolResultPart,
 } from "ai";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { useProviderStore } from "@/store/provider.store";
@@ -25,7 +27,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { PersistenceService } from "@/services/persistence.service";
 
-// Middleware runner (remains the same)
+// Middleware runner remains the same
 async function runMiddleware<H extends ModMiddlewareHookName>(
   hookName: H,
   initialPayload: ModMiddlewarePayloadMap[H],
@@ -57,7 +59,7 @@ async function runMiddleware<H extends ModMiddlewareHookName>(
   return currentPayload as ModMiddlewareReturnMap[H];
 }
 
-// Helper to split combined ID - needed for context snapshot
+// Helper to split combined ID remains the same
 const splitModelId = (
   combinedId: string | null,
 ): { providerId: string | null; modelId: string | null } => {
@@ -70,21 +72,18 @@ const splitModelId = (
   return { providerId, modelId };
 };
 
-// Helper to get context snapshot
+// Helper to get context snapshot remains the same
 function getContextSnapshot(): ReadonlyChatContextSnapshot {
   const iS = useInteractionStore.getState();
   const pS = useProviderStore.getState();
   const sS = useSettingsStore.getState();
-
-  // Extract providerId from selectedModelId
   const { providerId } = splitModelId(pS.selectedModelId);
-
   const snapshot: ReadonlyChatContextSnapshot = {
     selectedConversationId: iS.currentConversationId,
     interactions: iS.interactions,
     isStreaming: iS.status === "streaming",
-    selectedProviderId: providerId, // Use extracted providerId
-    selectedModelId: pS.selectedModelId, // Keep combined model ID
+    selectedProviderId: providerId,
+    selectedModelId: pS.selectedModelId,
     activeSystemPrompt: sS.globalSystemPrompt,
     temperature: sS.temperature,
     maxTokens: sS.maxTokens,
@@ -100,10 +99,13 @@ export class AIService {
     aiPayload: PromptObject,
     initiatingTurnData: PromptTurnObject,
   ): Promise<string | null> {
-    const interactionStore = useInteractionStore.getState();
-    const conversationId = interactionStore.currentConversationId;
+    // Get the entire state/actions object once using getState()
+    const interactionStoreStateAndActions = useInteractionStore.getState();
+
+    const conversationId =
+      interactionStoreStateAndActions.currentConversationId;
     if (!conversationId) {
-      interactionStore.setError("No active conversation.");
+      interactionStoreStateAndActions.setError("No active conversation.");
       toast.error("Cannot start interaction: No active conversation.");
       return null;
     }
@@ -125,15 +127,21 @@ export class AIService {
     const abortController = new AbortController();
     this.activeStreams.set(interactionId, abortController);
 
-    const currentInteractions = interactionStore.interactions;
+    // Calculate index and parentId based on current state
+    const currentInteractions = interactionStoreStateAndActions.interactions;
+    const conversationInteractions = currentInteractions.filter(
+      (i) => i.conversationId === conversationId,
+    );
     const newIndex =
-      currentInteractions.reduce((max, i) => Math.max(max, i.index), -1) + 1;
+      conversationInteractions.reduce((max, i) => Math.max(max, i.index), -1) +
+      1;
     const parentId =
-      currentInteractions.length > 0
-        ? currentInteractions[currentInteractions.length - 1].id
+      conversationInteractions.length > 0
+        ? conversationInteractions[conversationInteractions.length - 1].id
         : null;
 
-    const currentInteractionData: Interaction = {
+    // --- Create ONE Interaction object for the turn ---
+    const interactionData: Interaction = {
       id: interactionId,
       conversationId: conversationId,
       type: "message.user_assistant",
@@ -147,25 +155,23 @@ export class AIService {
       parentId: parentId,
     };
 
-    interactionStore._addInteractionToState(currentInteractionData);
-    interactionStore._addStreamingId(interactionId);
+    // Add the single interaction to state and mark as streaming
+    // Use the actions obtained from getState()
+    interactionStoreStateAndActions._addInteractionToState(interactionData);
+    interactionStoreStateAndActions._addStreamingId(interactionId); // Initializes buffer
 
-    PersistenceService.saveInteraction({ ...currentInteractionData }).catch(
-      (e) => {
-        console.error(
-          `AIService: Failed initial persistence for ${interactionId}`,
-          e,
-        );
-        interactionStore.setError(
-          `Failed to save interaction ${interactionId}`,
-        );
-      },
-    );
+    // Persist initial state (fire-and-forget)
+    PersistenceService.saveInteraction({ ...interactionData }).catch((e) => {
+      console.error(
+        `AIService: Failed initial persistence for ${interactionId}`,
+        e,
+      );
+    });
 
     emitter.emit("interaction:started", {
       interactionId,
       conversationId,
-      type: currentInteractionData.type,
+      type: interactionData.type,
     });
 
     console.log(
@@ -174,11 +180,13 @@ export class AIService {
     );
 
     let streamResult: StreamTextResult<any, any> | undefined;
-    let finalStatus: Interaction["status"] = "ERROR";
+    let finalStatus: Interaction["status"] = "ERROR"; // Default to error
     let finalErrorMessage: string | undefined = undefined;
     let finalUsage: LanguageModelUsage | undefined = undefined;
     let finalProviderMetadata: ProviderMetadata | undefined = undefined;
     let streamFinishedSuccessfully = false;
+    let currentToolCalls: ToolCallPart[] = [];
+    let currentToolResults: ToolResultPart[] = [];
 
     try {
       const modelInstance = useProviderStore
@@ -277,13 +285,10 @@ export class AIService {
                 "chunk" in chunkResult
                   ? chunkResult.chunk
                   : part.textDelta;
-
-              currentInteractionData.response =
-                String(currentInteractionData.response ?? "") + processedChunk;
-              interactionStore.appendInteractionResponseChunk(
-                interactionId,
-                processedChunk,
-              );
+              // Use action from getState()
+              useInteractionStore
+                .getState()
+                .appendInteractionResponseChunk(interactionId, processedChunk);
               emitter.emit("interaction:stream_chunk", {
                 interactionId,
                 chunk: processedChunk,
@@ -292,20 +297,14 @@ export class AIService {
             break;
           }
           case "tool-call":
-            currentInteractionData.metadata.toolCalls = [
-              ...(currentInteractionData.metadata.toolCalls || []),
-              part,
-            ];
+            currentToolCalls.push(part);
             console.log(
               `[AIService] Tool call observed: ${part.toolName}`,
               part.args,
             );
             break;
           case "tool-result":
-            currentInteractionData.metadata.toolResults = [
-              ...(currentInteractionData.metadata.toolResults || []),
-              part,
-            ];
+            currentToolResults.push(part);
             console.log(
               `[AIService] Tool result observed for ${part.toolName} (Call ID: ${part.toolCallId})`,
               part.result,
@@ -361,42 +360,79 @@ export class AIService {
         toast.error(`AI Interaction Error: ${finalErrorMessage}`);
       }
     } finally {
+      // --- Finalization ---
       this.activeStreams.delete(interactionId);
 
-      currentInteractionData.status = finalStatus;
-      currentInteractionData.endedAt = new Date();
-      currentInteractionData.metadata = {
-        ...currentInteractionData.metadata,
-        ...(finalUsage && {
-          promptTokens: finalUsage.promptTokens,
-          completionTokens: finalUsage.completionTokens,
-          totalTokens: finalUsage.totalTokens,
-        }),
-        ...(finalProviderMetadata && {
-          providerMetadata: finalProviderMetadata,
-        }),
-        ...(finalStatus === "ERROR" && { error: finalErrorMessage }),
-        toolCalls: currentInteractionData.metadata.toolCalls,
-        toolResults: currentInteractionData.metadata.toolResults,
+      // Get the final content from the buffer *before* removing the streaming ID
+      // Use getState() inside finally to ensure we have the latest buffer content
+      const finalBufferedContent =
+        useInteractionStore.getState().activeStreamBuffers[interactionId] || "";
+
+      // --- CENTRALIZED FINAL UPDATE ---
+      // Prepare a single consolidated update object
+      const finalUpdates: Partial<Interaction> = {
+        status: finalStatus,
+        endedAt: new Date(),
+        response: finalBufferedContent, // Set the final response content here
+        metadata: {
+          // Start with existing metadata from the store state if possible
+          // Get the *current* state inside finally
+          ...(useInteractionStore
+            .getState()
+            .interactions.find((i) => i.id === interactionId)?.metadata ||
+            interactionData.metadata), // Use initial data as fallback
+          ...(finalUsage && {
+            promptTokens: finalUsage.promptTokens,
+            completionTokens: finalUsage.completionTokens,
+            totalTokens: finalUsage.totalTokens,
+          }),
+          ...(finalProviderMetadata && {
+            providerMetadata: finalProviderMetadata,
+          }),
+          ...(finalStatus === "ERROR" && { error: finalErrorMessage }),
+          ...(currentToolCalls.length > 0 && { toolCalls: currentToolCalls }),
+          ...(currentToolResults.length > 0 && {
+            toolResults: currentToolResults,
+          }),
+        },
       };
 
-      interactionStore._updateInteractionInState(
-        interactionId,
-        currentInteractionData,
-      );
-      interactionStore._removeStreamingId(interactionId);
+      // Apply the consolidated update to the store state synchronously
+      // Use action from getState()
+      useInteractionStore
+        .getState()
+        ._updateInteractionInState(interactionId, finalUpdates);
 
-      interactionStore
-        .updateInteractionAndPersist({ ...currentInteractionData })
-        .catch((e) => {
-          console.error(
-            `AIService: Failed final persistence for ${interactionId}`,
-            e,
-          );
-          interactionStore.setError(
-            `Failed to save interaction ${interactionId}`,
-          );
-        });
+      // Remove the streaming ID and clean up the buffer *after* state update
+      // Use action from getState()
+      useInteractionStore.getState()._removeStreamingId(interactionId);
+      // --- END CENTRALIZED FINAL UPDATE ---
+
+      // Get the fully updated interaction object from the store *after* the update
+      // Use getState() again to ensure we have the state *after* the update
+      const finalInteractionState = useInteractionStore
+        .getState()
+        .interactions.find((i) => i.id === interactionId);
+
+      // Persist the final state
+      if (finalInteractionState) {
+        // IMPORTANT: Pass a *copy* of the state to the async persistence function
+        // Use action from getState()
+        useInteractionStore
+          .getState()
+          .updateInteractionAndPersist({ ...finalInteractionState })
+          .catch((e) => {
+            console.error(
+              `AIService: Failed final persistence for ${interactionId}`,
+              e,
+            );
+          });
+      } else {
+        // This error should be investigated if it still occurs
+        console.error(
+          `AIService: CRITICAL - Could not find final state for interaction ${interactionId} to persist after updates. State might be inconsistent.`,
+        );
+      }
 
       emitter.emit("interaction:completed", {
         interactionId,
@@ -412,39 +448,65 @@ export class AIService {
 
   static stopInteraction(interactionId: string) {
     const controller = this.activeStreams.get(interactionId);
+    // Get actions via getState() inside the method
+    const interactionStoreActions = useInteractionStore.getState();
+
     if (controller && !controller.signal.aborted) {
       console.log(`AIService: Aborting interaction ${interactionId}...`);
       controller.abort();
+      // The 'finally' block in startInteraction will handle cleanup and status update.
     } else {
       console.log(
-        `AIService: No active controller found or already aborted for interaction ${interactionId}.`,
+        `AIService: No active controller found or already aborted for interaction ${interactionId}. Attempting store cleanup if needed.`,
       );
-      const interactionStore = useInteractionStore.getState();
-      const interaction = interactionStore.interactions.find(
+      // Use getState() to check the current state
+      const interaction = interactionStoreActions.interactions.find(
         (i) => i.id === interactionId,
       );
-      if (interaction && interaction.status === "STREAMING") {
+      // Force cleanup ONLY if it's somehow still marked as streaming in the store
+      // AND the stream is not active (controller is missing or already aborted)
+      if (
+        interaction &&
+        interaction.status === "STREAMING" &&
+        (!controller || controller.signal.aborted)
+      ) {
         console.warn(
-          `AIService: Forcing CANCELLED status for interaction ${interactionId} without active controller.`,
+          `AIService: Forcing CANCELLED status for interaction ${interactionId} without active controller or already aborted.`,
         );
-        const finalCancelledState: Interaction = {
-          ...interaction,
+
+        const finalBufferedContent =
+          interactionStoreActions.activeStreamBuffers[interactionId] || "";
+
+        const finalUpdates: Partial<Interaction> = {
           status: "CANCELLED",
           endedAt: new Date(),
+          response: finalBufferedContent,
         };
-        interactionStore._updateInteractionInState(
+
+        // Use actions obtained from getState()
+        interactionStoreActions._updateInteractionInState(
           interactionId,
-          finalCancelledState,
+          finalUpdates,
         );
-        interactionStore._removeStreamingId(interactionId);
-        interactionStore
-          .updateInteractionAndPersist({ ...finalCancelledState })
-          .catch((e) => {
-            console.error(
-              `AIService: Failed persistence for forced cancel of ${interactionId}`,
-              e,
-            );
-          });
+        interactionStoreActions._removeStreamingId(interactionId); // Clean buffer/list
+
+        // Get the state *after* the update for persistence
+        // Use getState() again to get the latest state
+        const finalInteractionState = useInteractionStore
+          .getState()
+          .interactions.find((i) => i.id === interactionId);
+        if (finalInteractionState) {
+          // Pass a copy for persistence
+          // Use action obtained from getState()
+          interactionStoreActions
+            .updateInteractionAndPersist({ ...finalInteractionState })
+            .catch((e) => {
+              console.error(
+                `AIService: Failed persistence for forced cancel of ${interactionId}`,
+                e,
+              );
+            });
+        }
       }
     }
   }

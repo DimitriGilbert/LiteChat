@@ -3,7 +3,6 @@ import React, { useEffect, useCallback } from "react";
 import { PromptWrapper } from "./prompt/PromptWrapper";
 import { ChatCanvas } from "./canvas/ChatCanvas";
 import { ChatControlWrapper } from "./chat/ChatControlWrapper";
-import { StreamingInteractionRenderer } from "./canvas/StreamingInteractionRenderer";
 import { useConversationStore } from "@/store/conversation.store";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useUIStateStore } from "@/store/ui.store";
@@ -26,13 +25,12 @@ import type { Interaction } from "@/types/litechat/interaction";
 // Import control registration hooks/components
 import { useConversationListControlRegistration } from "./chat/control/ConversationList";
 import { useSettingsControlRegistration } from "./chat/control/Settings";
-// Import the CORRECT registration hook
-import { useGlobalModelSelectorRegistration } from "./prompt/control/GlobalModelSelectorRegistration"; // Corrected import path
+import { useGlobalModelSelectorRegistration } from "./prompt/control/GlobalModelSelectorRegistration";
 import { useParameterControlRegistration } from "./prompt/control/ParameterControlRegistration";
 import { useFileControlRegistration } from "./prompt/control/FileControlRegistration";
 import { useVfsControlRegistration } from "./prompt/control/VfsControlRegistration";
 
-// Helper to split combined ID - needed for regeneration
+// Helper to split combined ID remains the same
 const splitModelId = (
   combinedId: string | null,
 ): { providerId: string | null; modelId: string | null } => {
@@ -46,7 +44,7 @@ const splitModelId = (
 };
 
 export const LiteChat: React.FC = () => {
-  // --- Store Hooks ---
+  // --- Store Hooks --- (remain the same)
   const {
     selectedConversationId,
     loadConversations,
@@ -97,15 +95,15 @@ export const LiteChat: React.FC = () => {
     })),
   );
 
-  // --- Register Core Controls ---
+  // --- Register Core Controls --- (remains the same)
   useConversationListControlRegistration();
   useSettingsControlRegistration();
-  useGlobalModelSelectorRegistration(); // Use the correct registration hook
+  useGlobalModelSelectorRegistration();
   useParameterControlRegistration();
   useFileControlRegistration();
   useVfsControlRegistration();
 
-  // --- Initialization Effect ---
+  // --- Initialization Effect --- (remains the same)
   useEffect(() => {
     let isMounted = true;
     const initialize = async () => {
@@ -150,23 +148,27 @@ export const LiteChat: React.FC = () => {
     loadSettings,
   ]);
 
-  // --- History Construction Helper ---
+  // --- History Construction Helper --- (remains the same)
   const buildHistoryMessages = useCallback(
     (historyInteractions: Interaction[]): CoreMessage[] => {
       return historyInteractions.flatMap((i): CoreMessage[] => {
         const msgs: CoreMessage[] = [];
+        // Add user message if it exists in the interaction's prompt
         if (i.prompt?.content && typeof i.prompt.content === "string") {
           msgs.push({ role: "user", content: i.prompt.content });
         }
+        // Add assistant response if it exists
         if (i.response && typeof i.response === "string") {
           msgs.push({ role: "assistant", content: i.response });
         }
+        // Add tool calls if they exist in metadata
         if (i.metadata?.toolCalls && Array.isArray(i.metadata.toolCalls)) {
           msgs.push({
             role: "assistant",
             content: i.metadata.toolCalls,
           });
         }
+        // Add tool results if they exist in metadata
         if (i.metadata?.toolResults && Array.isArray(i.metadata.toolResults)) {
           i.metadata.toolResults.forEach((result: ToolResultPart) => {
             msgs.push({
@@ -186,7 +188,6 @@ export const LiteChat: React.FC = () => {
     async (turnData: PromptTurnObject) => {
       let currentConvId = selectedConversationId;
 
-      // Ensure a model is selected (uses combined ID)
       const selectedModelCombinedId =
         useProviderStore.getState().selectedModelId;
       if (!selectedModelCombinedId) {
@@ -219,36 +220,45 @@ export const LiteChat: React.FC = () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       }
 
+      // --- REMOVED: User interaction creation block ---
+
+      // Now prepare the AI payload using history *before* the current turn
+      // Fetch history *before* this turn starts
       const currentHistory = useInteractionStore.getState().interactions;
+      // Filter for completed interactions only to build history
       const completedHistory = currentHistory.filter(
-        (i) => i.status === "COMPLETED",
+        (i) => i.status === "COMPLETED" && i.type === "message.user_assistant",
       );
       const messages: CoreMessage[] = buildHistoryMessages(completedHistory);
 
-      if (typeof turnData.content === "string" && turnData.content.trim()) {
+      // Add the current user message from turnData to the history for the AI call
+      if (turnData.content) {
         messages.push({ role: "user", content: turnData.content });
-      } else if (typeof turnData.content === "object") {
-        console.warn("Multi-modal content in turnData not fully handled yet.");
-        messages.push({
-          role: "user",
-          content: [{ type: "text", text: "[User provided content]" }],
-        });
+        // TODO: Handle potential file content addition to messages if needed by SDK
+      } else {
+        // Handle cases where there might be only files/VFS data?
+        // This might require adding a placeholder or specific handling based on SDK.
+        console.warn("LiteChat: Submitting prompt without text content.");
+        // Potentially add a placeholder user message if required by the model
+        // messages.push({ role: 'user', content: '[User submitted files/data]' });
       }
 
       const systemPrompt = globalSystemPrompt || undefined;
 
-      // Metadata from turnData already contains simple providerId/modelId
       const aiPayload: PromptObject = {
         system: systemPrompt,
-        messages: messages,
+        messages: messages, // History now includes the latest user message
         parameters: turnData.parameters,
-        metadata: turnData.metadata,
+        metadata: turnData.metadata, // Metadata from controls
+        // tools and toolChoice will be added by AIService based on registry
       };
 
       emitter.emit("prompt:finalised", { prompt: aiPayload });
       console.log("LiteChat: Submitting prompt to AIService:", aiPayload);
 
       try {
+        // Start the AI interaction, passing the original turnData
+        // AIService will now create the single Interaction object
         await AIService.startInteraction(aiPayload, turnData);
         console.log("LiteChat: AIService interaction started.");
       } catch (e) {
@@ -273,6 +283,7 @@ export const LiteChat: React.FC = () => {
     async (interactionId: string) => {
       console.log(`LiteChat: Regenerating interaction ${interactionId}`);
       const interactionStore = useInteractionStore.getState();
+      // Find the interaction to regenerate FROM (this interaction contains the prompt)
       const targetInteraction = interactionStore.interactions.find(
         (i) => i.id === interactionId,
       );
@@ -285,14 +296,21 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
-      // Ensure a model is selected (uses combined ID)
+      // Ensure it's a user_assistant type interaction we're regenerating
+      if (targetInteraction.type !== "message.user_assistant") {
+        console.error(
+          `LiteChat: Cannot regenerate non-user_assistant interaction: ${interactionId}`,
+        );
+        toast.error("Can only regenerate from a user message interaction.");
+        return;
+      }
+
       const selectedModelCombinedId =
         useProviderStore.getState().selectedModelId;
       if (!selectedModelCombinedId) {
         toast.error("Please select a model before regenerating.");
         return;
       }
-      // Extract simple IDs for metadata
       const { providerId, modelId } = splitModelId(selectedModelCombinedId);
       if (!providerId || !modelId) {
         toast.error("Invalid model selection for regeneration.");
@@ -300,28 +318,20 @@ export const LiteChat: React.FC = () => {
       }
 
       const historyUpToIndex = targetInteraction.index;
+      // Fetch history *before* the interaction being regenerated
+      // Filter for completed interactions only
       const historyInteractions = interactionStore.interactions
-        .filter((i) => i.index < historyUpToIndex && i.status === "COMPLETED")
-        .reduce(
-          (acc, i) => {
-            const existing = acc[i.index];
-            if (
-              !existing ||
-              (i.startedAt &&
-                existing.startedAt &&
-                i.startedAt > existing.startedAt)
-            ) {
-              acc[i.index] = i;
-            }
-            return acc;
-          },
-          {} as Record<number, Interaction>,
-        );
+        .filter(
+          (i) =>
+            i.index < historyUpToIndex &&
+            i.status === "COMPLETED" &&
+            i.type === "message.user_assistant", // Ensure we only take completed turns
+        )
+        .sort((a, b) => a.index - b.index); // Sort by index
 
-      const messages: CoreMessage[] = buildHistoryMessages(
-        Object.values(historyInteractions).sort((a, b) => a.index - b.index),
-      );
+      const messages: CoreMessage[] = buildHistoryMessages(historyInteractions);
 
+      // Add the user prompt content *from the interaction being regenerated*
       if (
         targetInteraction.prompt?.content &&
         typeof targetInteraction.prompt.content === "string"
@@ -330,6 +340,7 @@ export const LiteChat: React.FC = () => {
           role: "user",
           content: targetInteraction.prompt.content,
         });
+        // TODO: Handle potential file content from targetInteraction.prompt if needed
       } else {
         console.error(
           `LiteChat: Cannot regenerate - missing or invalid user prompt content in interaction ${interactionId}.`,
@@ -341,17 +352,17 @@ export const LiteChat: React.FC = () => {
       const systemPrompt =
         useSettingsStore.getState().globalSystemPrompt || undefined;
 
-      // Use original parameters, but updated metadata (current model selection)
+      // Use original parameters/metadata from the prompt object within the interaction
       const currentMetadata = {
         ...targetInteraction.prompt.metadata,
-        regeneratedFromId: interactionId,
-        providerId: providerId, // Use current simple ID
-        modelId: modelId, // Use current simple ID
+        regeneratedFromId: interactionId, // Link to the interaction ID being regenerated
+        providerId: providerId, // Use current selection
+        modelId: modelId, // Use current selection
       };
 
       const aiPayload: PromptObject = {
         system: systemPrompt,
-        messages: messages,
+        messages: messages, // History includes the user message being regenerated
         parameters: targetInteraction.prompt.parameters,
         metadata: currentMetadata,
       };
@@ -363,6 +374,9 @@ export const LiteChat: React.FC = () => {
       );
 
       try {
+        // Start interaction, passing the original prompt data (PromptTurnObject)
+        // AIService will create a *new* interaction object for this regeneration attempt,
+        // linked via parentId implicitly by the history calculation.
         await AIService.startInteraction(aiPayload, targetInteraction.prompt);
         console.log(
           `LiteChat: AIService regeneration interaction started for ${interactionId}.`,
@@ -375,10 +389,10 @@ export const LiteChat: React.FC = () => {
         toast.error("Failed to start regeneration.");
       }
     },
-    [buildHistoryMessages],
+    [buildHistoryMessages], // Dependencies might need adjustment
   );
 
-  // --- Stop Handler ---
+  // --- Stop Handler --- (remains the same)
   const onStopInteraction = useCallback((interactionId: string) => {
     console.log(`LiteChat: Stopping interaction ${interactionId}`);
     AIService.stopInteraction(interactionId);
@@ -396,55 +410,53 @@ export const LiteChat: React.FC = () => {
   )?.settingsRenderer;
 
   return (
-    <div
-      className={cn(
-        "flex h-full w-full border rounded-lg overflow-hidden bg-background text-foreground",
-      )}
-    >
-      {/* Sidebar */}
-      <ChatControlWrapper
-        controls={sidebarControls}
-        panelId="sidebar"
-        className="w-64 border-r hidden md:flex flex-col bg-card"
-      />
-
-      {/* Main Chat Area */}
-      <div className="flex flex-col flex-grow min-w-0">
-        {/* Header Area */}
-        <ChatControlWrapper
-          controls={chatControls}
-          panelId="header"
-          className="flex items-center justify-end p-2 border-b bg-card flex-shrink-0"
-        />
-
-        {/* Chat Canvas */}
-        <ChatCanvas
-          conversationId={selectedConversationId}
-          interactions={interactions}
-          onRegenerateInteraction={onRegenerateInteraction}
-          streamingInteractionsRenderer={(ids) => (
-            <StreamingInteractionRenderer
-              interactionIds={ids}
-              onStop={onStopInteraction}
-            />
-          )}
-          status={interactionStatus}
-          className="flex-grow overflow-y-auto p-4 space-y-4"
-        />
-
-        {/* Global Error Display */}
-        {globalError && (
-          <div className="p-2 bg-destructive text-destructive-foreground text-sm text-center">
-            Error: {globalError}
-          </div>
+    <>
+      {/* Main Chat Layout */}
+      <div
+        className={cn(
+          "flex h-full w-full border rounded-lg overflow-hidden bg-background text-foreground",
         )}
-
-        {/* Prompt Input Area */}
-        <PromptWrapper
-          InputAreaRenderer={(props) => <InputArea {...props} />}
-          onSubmit={handlePromptSubmit}
-          className="border-t bg-card flex-shrink-0"
+      >
+        {/* Sidebar */}
+        <ChatControlWrapper
+          controls={sidebarControls}
+          panelId="sidebar"
+          className="w-64 border-r hidden md:flex flex-col bg-card"
         />
+
+        {/* Main Chat Area */}
+        <div className="flex flex-col flex-grow min-w-0">
+          {/* Header Area */}
+          <ChatControlWrapper
+            controls={chatControls}
+            panelId="header"
+            className="flex items-center justify-end p-2 border-b bg-card flex-shrink-0"
+          />
+
+          {/* Chat Canvas */}
+          <ChatCanvas
+            conversationId={selectedConversationId}
+            interactions={interactions} // Pass the full interactions list
+            onRegenerateInteraction={onRegenerateInteraction}
+            onStopInteraction={onStopInteraction} // Pass the handler
+            status={interactionStatus}
+            className="flex-grow overflow-y-auto p-4 space-y-4"
+          />
+
+          {/* Global Error Display */}
+          {globalError && (
+            <div className="p-2 bg-destructive text-destructive-foreground text-sm text-center">
+              Error: {globalError}
+            </div>
+          )}
+
+          {/* Prompt Input Area */}
+          <PromptWrapper
+            InputAreaRenderer={(props) => <InputArea {...props} />}
+            onSubmit={handlePromptSubmit}
+            className="border-t bg-card flex-shrink-0"
+          />
+        </div>
       </div>
 
       {/* Render the Settings Modal */}
@@ -452,6 +464,6 @@ export const LiteChat: React.FC = () => {
 
       {/* Toast Notifications */}
       <Toaster richColors position="top-right" />
-    </div>
+    </>
   );
 };

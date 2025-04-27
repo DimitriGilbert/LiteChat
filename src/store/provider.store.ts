@@ -6,7 +6,6 @@ import type {
   DbApiKey,
   AiProviderConfig,
   AiModelConfig,
-  DbProviderType,
 } from "@/types/litechat/provider";
 import { PersistenceService } from "@/services/persistence.service";
 import {
@@ -292,8 +291,6 @@ export const useProviderStore = create(
 
         // --- Update Global Sort Order & Selection ---
         const currentOrder = get().globalModelSortOrder;
-        const allEnabledModels = get().getGloballyEnabledAndOrderedModels(); // Gets currently valid enabled models
-        const allEnabledIdsSet = new Set(allEnabledModels.map((m) => m.id));
 
         let newOrder = [...currentOrder];
         let selectionNeedsValidation = false;

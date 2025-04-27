@@ -19,7 +19,6 @@ import {
 import {
   useMarkdownParser,
   type ParsedContent,
-  type CodeBlockData,
 } from "@/lib/litechat/useMarkdownParser";
 // Import the new CodeBlockRenderer
 import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
@@ -41,18 +40,20 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
   const [revisionIndex, setRevisionIndex] = useState(0);
 
   const revisions = useMemo(() => {
+    // Filter for completed assistant responses within the same index group
     return allInteractionsInGroup
       .filter(
         (i) =>
           i.type === "message.user_assistant" &&
-          i.status !== "STREAMING" &&
-          i.response !== null,
+          i.status === "COMPLETED" && // Only show completed revisions
+          i.prompt === null, // Ensure it's an assistant response
       )
       .sort(
         (a, b) => (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0),
       );
   }, [allInteractionsInGroup]);
 
+  // Display the selected revision, or the main interaction if no revisions exist/selected
   const displayedInteraction = revisions[revisionIndex] || interaction;
 
   // Use the new parser hook
@@ -62,6 +63,7 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
       : null,
   );
 
+  // Can regenerate only if it's the latest completed response (revisionIndex 0)
   const canRegenerate =
     displayedInteraction.status === "COMPLETED" &&
     typeof onRegenerate === "function" &&
@@ -69,15 +71,16 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
 
   const handleRegenerateClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onRegenerate) {
-      const userInteraction = allInteractionsInGroup.find(
-        (i) => i.type === "message.user_assistant" && i.prompt !== null,
+    // onRegenerate expects the ID of the interaction containing the prompt to regenerate
+    // In the new model, this is the ID of the interaction being displayed itself,
+    // as it contains the original prompt.
+    if (onRegenerate && displayedInteraction.prompt) {
+      onRegenerate(displayedInteraction.id);
+    } else {
+      console.error(
+        "Could not regenerate: No callback or prompt data found in the interaction.",
+        displayedInteraction,
       );
-      if (userInteraction) {
-        onRegenerate(userInteraction.id);
-      } else {
-        console.error("Could not find user interaction to regenerate from.");
-      }
     }
   };
 

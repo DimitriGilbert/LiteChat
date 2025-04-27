@@ -1,36 +1,21 @@
 // src/lib/litechat/useMarkdownParser.ts
 import { useMemo } from "react";
-// Import Remarkable class only
-import { Remarkable } from "remarkable";
-import { linkify } from "remarkable/linkify";
-import type { Token } from "remarkable/lib";
+import MarkdownIt from "markdown-it";
 
 export interface CodeBlockData {
   type: "code";
   lang: string | undefined;
-  code: string; // Pass raw code content
+  code: string;
 }
 
 export type ParsedContent = (string | CodeBlockData)[];
 
-const remarkableOptions: Remarkable.Options = {
-  html: false, // Keep HTML rendering disabled for security
-  xhtmlOut: false,
-  breaks: true,
-  langPrefix: "",
-  typographer: false,
-  quotes: "“”‘’",
-  highlight: undefined,
-};
-
-// Create the instance
-const md = new Remarkable(remarkableOptions).use(linkify);
-
-function isFenceToken(
-  token: Token,
-): token is Token & { type: "fence"; params: string; content: string } {
-  return token.type === "fence";
-}
+// Create a MarkdownIt parser instance with desired options
+const md = new MarkdownIt({
+  html: false, // disable HTML for security
+  linkify: true, // auto-link URLs
+  breaks: true, // convert '\n' in paragraphs into <br>
+});
 
 export function useMarkdownParser(
   markdownString: string | null | undefined,
@@ -40,60 +25,61 @@ export function useMarkdownParser(
       return [];
     }
     try {
-      const env = { references: {} };
-      const tokens = md.parse(markdownString, env);
+      // Parse the markdown string into tokens
+      const tokens = md.parse(markdownString, {});
       const result: ParsedContent = [];
       let currentHtmlBuffer = "";
-      let currentTokenIndex = 0;
+      let index = 0;
 
-      while (currentTokenIndex < tokens.length) {
-        const token = tokens[currentTokenIndex];
+      while (index < tokens.length) {
+        const token = tokens[index] as any;
 
-        if (isFenceToken(token)) {
-          // Push any accumulated HTML before the code block
+        if (token.type === "fence") {
+          // If there's accumulated HTML, flush it as a string
           if (currentHtmlBuffer) {
             result.push(currentHtmlBuffer);
             currentHtmlBuffer = "";
           }
-          // Push the code block data with raw content
+          // Extract language from the fence info
+          const lang = token.info?.split(" ")[0] || undefined;
+          // Push the code block content as a CodeBlockData object
           result.push({
             type: "code",
-            lang: token.params?.split(" ")[0] || undefined,
-            code: token.content, // Pass raw code content, DO NOT unescape here
+            lang: lang,
+            code: token.content,
           });
-          currentTokenIndex++;
+          index++;
         } else {
-          // Accumulate tokens to be rendered as HTML
-          const nonFenceTokens: Token[] = [];
+          // Accumulate non-code tokens
+          const nonFenceTokens: any[] = [];
           while (
-            currentTokenIndex < tokens.length &&
-            !isFenceToken(tokens[currentTokenIndex])
+            index < tokens.length &&
+            (tokens[index] as any).type !== "fence"
           ) {
-            nonFenceTokens.push(tokens[currentTokenIndex]);
-            currentTokenIndex++;
+            nonFenceTokens.push(tokens[index]);
+            index++;
           }
-          // Render the accumulated non-fence tokens to HTML
           if (nonFenceTokens.length > 0) {
+            // Render the non-code tokens to HTML and append
             currentHtmlBuffer += md.renderer.render(
               nonFenceTokens,
-              remarkableOptions,
-              env,
+              md.options,
+              {},
             );
           }
         }
       }
 
-      // Push any remaining HTML buffer
+      // Flush any remaining HTML content
       if (currentHtmlBuffer) {
         result.push(currentHtmlBuffer);
       }
 
       return result;
     } catch (error) {
-      console.error("Remarkable parsing error:", error);
-      // Fallback: Render the raw input string within a <pre> tag for basic display
+      console.error("Markdown parsing error:", error);
+      // Fallback: escape and wrap in <pre>
       const safeMarkdownString = String(markdownString ?? "");
-      // Basic manual escaping for safety, avoiding Remarkable.utils
       const escapedString = safeMarkdownString
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")

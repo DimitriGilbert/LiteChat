@@ -2,18 +2,16 @@
 import type React from "react";
 import type { Interaction } from "./interaction";
 import type { DbBase } from "./common";
-import type { PromptObject } from "./prompt"; // Final AI payload type
+import type { PromptObject } from "./prompt";
 
-// Represents a conversation thread in the DB
+// Conversation and SidebarItemType remain the same
 export interface Conversation extends DbBase {
   title: string;
   metadata?: Record<string, any>;
 }
-
-// Simple type for items that might appear in a sidebar (adjust as needed)
 export type SidebarItemType = "conversation" | "project" | "folder";
 
-// --- Chat Control ---
+// ChatControl remains the same
 export type ChatControlStatus = "loading" | "ready" | "error";
 type AIPayload = PromptObject;
 type AIResponse = Interaction["response"];
@@ -32,7 +30,6 @@ export interface ChatControl {
   settingsRenderer?: () => React.ReactElement | null;
   onSettingSubmit?: (settingsData: any) => void | Promise<void>;
   aiInteractionMiddleware?: {
-    // Less common, but possible
     before?: (payload: AIPayload) => AIPayload | Promise<AIPayload> | false;
     after?: (response: AIResponse) => AIResponse | Promise<AIResponse> | false;
   };
@@ -43,16 +40,13 @@ export interface ChatControl {
 export interface ChatCanvasProps {
   conversationId: string | null;
   interactions: Interaction[];
-  // Make interactionRenderer optional as ChatCanvas handles rendering internally now
   interactionRenderer?: (
     interaction: Interaction,
     allInteractions: Interaction[],
-  ) => React.ReactElement | null;
-  streamingInteractionsRenderer?: (
-    streamingIds: string[],
   ) => React.ReactElement | null;
   status: "idle" | "loading" | "streaming" | "error";
   className?: string;
   onRegenerateInteraction?: (interactionId: string) => void;
   onEditInteraction?: (interactionId: string) => void;
+  onStopInteraction?: (interactionId: string) => void; // Add this prop
 }

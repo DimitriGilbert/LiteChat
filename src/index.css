@@ -254,112 +254,24 @@
     .code-block-content {
         @apply overflow-x-auto text-sm;
     }
-    .code-block-content code.hljs {
+    .code-block-content code {
         @apply p-4 block;
     }
-
-    /* --- EMBEDDED HIGHLIGHT.JS THEMES --- */
-
-    /* Tokyo Night Light Theme (Base) */
-    /* Extracted from highlight.js/styles/tokyo-night-light.css */
-    .hljs {
-        color: #343b58; /* Base text color for light theme */
-        background: #e1e2e7; /* Base background for light theme */
-    }
-    .hljs-comment,
-    .hljs-meta {
-        color: #a0a8cd;
-    }
-    .hljs-number,
-    .hljs-regexp,
-    .hljs-variable,
-    .hljs-template-variable,
-    .hljs-link,
-    .hljs-selector-id,
-    .hljs-selector-class {
-        color: #ff9e64;
-    }
-    .hljs-literal {
-        color: #ff9e64;
-    }
-    .hljs-keyword,
-    .hljs-selector-tag,
-    .hljs-section,
-    .hljs-type,
-    .hljs-name {
-        color: #8c73cc;
-    }
-    .hljs-symbol,
-    .hljs-bullet,
-    .hljs-attribute,
-    .hljs-built_in,
-    .hljs-addition,
-    .hljs-code,
-    .hljs-string,
-    .hljs-selector-attr,
-    .hljs-selector-pseudo {
-        color: #769949;
-    }
-    .hljs-title,
-    .hljs-deletion {
-        color: #2e7de9;
-    }
-    .hljs-emphasis {
-        font-style: italic;
-    }
-    .hljs-strong {
-        font-weight: bold;
+    .litechat-streaming-portal-container {
+        /* Styles are set inline in LiteChat.tsx, but you could add more here */
+        /* Example: Add a subtle background for debugging */
+        /* background-color: rgba(255, 0, 0, 0.1); */
     }
 
-    /* Tokyo Night Dark Theme (Scoped under .dark) */
-    /* Extracted from highlight.js/styles/tokyo-night-dark.css */
-    .dark .hljs {
-        color: #a9b1d6; /* Base text color for dark theme */
-        background: #1a1b26; /* Base background for dark theme */
+    .litechat-streaming-interaction-portal {
+        /* Ensure individual portals take width and allow interaction */
+        width: 100%;
+        pointer-events: auto; /* Allow interaction with content inside this div */
     }
-    .dark .hljs-comment,
-    .dark .hljs-meta {
-        color: #565f89;
-    }
-    .dark .hljs-number,
-    .dark .hljs-regexp,
-    .dark .hljs-variable,
-    .dark .hljs-template-variable,
-    .dark .hljs-link,
-    .dark .hljs-selector-id,
-    .dark .hljs-selector-class {
-        color: #ff9e64;
-    }
-    .dark .hljs-literal {
-        color: #ff9e64;
-    }
-    .dark .hljs-keyword,
-    .dark .hljs-selector-tag,
-    .dark .hljs-section,
-    .dark .hljs-type,
-    .dark .hljs-name {
-        color: #bb9af7;
-    }
-    .dark .hljs-symbol,
-    .dark .hljs-bullet,
-    .dark .hljs-attribute,
-    .dark .hljs-built_in,
-    .dark .hljs-addition,
-    .dark .hljs-code,
-    .dark .hljs-string,
-    .dark .hljs-selector-attr,
-    .dark .hljs-selector-pseudo {
-        color: #9ece6a;
-    }
-    .dark .hljs-title,
-    .dark .hljs-deletion {
-        color: #7aa2f7;
-    }
-    .dark .hljs-emphasis {
-        font-style: italic;
-    }
-    .dark .hljs-strong {
-        font-weight: bold;
+
+    /* Ensure the content *inside* the portal card is interactive */
+    .litechat-streaming-interaction-portal > div {
+        pointer-events: auto;
     }
 } /* End @layer utilities */
 
