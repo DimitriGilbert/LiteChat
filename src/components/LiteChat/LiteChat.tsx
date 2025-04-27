@@ -413,51 +413,59 @@ export const LiteChat: React.FC = () => {
         {/* Sidebar */}
         <div
           className={cn(
-            // Hide on small screens, flex on medium+
-            "hidden md:flex flex-col border-r border-[--border] bg-card transition-all duration-300 ease-in-out flex-shrink-0",
-            // Apply width based on collapsed state
+            "hidden md:flex flex-col border-r border-[--border] bg-card",
+            // Restore transition, but only for width
+            "transition-[width] duration-300 ease-in-out",
+            "flex-shrink-0 overflow-hidden",
             isSidebarCollapsed ? "w-16" : "w-64",
           )}
         >
-          {/* Main sidebar content - hide when collapsed */}
+          {/* Main sidebar content area */}
           <div className={cn("flex-grow overflow-y-auto overflow-x-hidden")}>
-            {!isSidebarCollapsed && (
+            {/* Always render the wrapper, control visibility with classes */}
+            <div className={cn(isSidebarCollapsed ? "hidden" : "block")}>
               <ChatControlWrapper
                 controls={sidebarControls}
                 panelId="sidebar"
-                className="h-full" // Ensure it takes full height if needed
+                renderMode="full"
+                className="h-full"
               />
-            )}
-            {/* Optionally render icons-only version when collapsed */}
-            {/* {isSidebarCollapsed && <CollapsedSidebarControls />} */}
+            </div>
+            <div className={cn(isSidebarCollapsed ? "block" : "hidden")}>
+              <ChatControlWrapper
+                controls={sidebarControls}
+                panelId="sidebar"
+                renderMode="icon"
+                className="flex flex-col items-center gap-2 p-2"
+              />
+            </div>
           </div>
-          {/* Footer - adjust layout when collapsed */}
+          {/* Footer */}
           <div
             className={cn(
               "flex-shrink-0 border-t border-[--border] p-2",
-              // Center items vertically when collapsed, space-between otherwise
               isSidebarCollapsed
                 ? "flex flex-col items-center gap-2"
-                : "flex items-center justify-between", // Use justify-between when expanded
+                : "flex items-center justify-between",
             )}
           >
+            {/* Restore dynamic renderMode for footer */}
             <ChatControlWrapper
               controls={sidebarFooterControls}
               panelId="sidebar-footer"
+              renderMode={isSidebarCollapsed ? "icon" : "full"}
               className={cn(
                 "flex",
-                // Stack vertically with gap when collapsed, otherwise default flex row
                 isSidebarCollapsed ? "flex-col gap-2" : "items-center gap-1",
               )}
             />
           </div>
         </div>
 
-        {/* Main Chat Area */}
+        {/* Main Chat Area - Should shrink/grow */}
         <div className="flex flex-col flex-grow min-w-0">
-          {/* Header - Removed the toggle button */}
+          {/* Header */}
           <div className="flex items-center justify-end p-2 border-b border-[--border] bg-card flex-shrink-0">
-            {/* Header Controls */}
             <ChatControlWrapper
               controls={chatControls}
               panelId="header"
@@ -484,10 +492,9 @@ export const LiteChat: React.FC = () => {
 
           {/* Prompt Input Area */}
           <PromptWrapper
-            InputAreaRenderer={InputArea} // Pass the component itself
+            InputAreaRenderer={InputArea}
             onSubmit={handlePromptSubmit}
             className="border-t border-[--border] bg-card flex-shrink-0"
-            // inputRef removed
           />
         </div>
       </div>

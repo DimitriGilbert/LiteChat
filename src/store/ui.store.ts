@@ -47,6 +47,7 @@ export const useUIStateStore = create(
 
     // Action to toggle sidebar
     toggleSidebar: (isCollapsed) => {
+      console.log("toggleSidebar called :", isCollapsed);
       set((state) => {
         state.isSidebarCollapsed = isCollapsed ?? !state.isSidebarCollapsed;
       });

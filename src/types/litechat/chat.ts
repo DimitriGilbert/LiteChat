@@ -19,6 +19,7 @@ export interface ChatControl {
   id: string;
   status: () => ChatControlStatus;
   renderer?: () => React.ReactElement | null;
+  iconRenderer?: () => React.ReactElement | null; // Added icon renderer
   panel?: string;
   show?: () => boolean;
   settingsConfig?: {

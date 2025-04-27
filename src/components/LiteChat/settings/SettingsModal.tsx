@@ -17,14 +17,13 @@ import { SettingsDataManagement } from "./SettingsDataManagement";
 import { SettingsMods } from "./SettingsMods";
 import { SettingsProviders } from "./SettingsProviders";
 import { GlobalModelOrganizer } from "./GlobalModelOrganizer";
-// Separator is no longer needed here
 import type { CustomSettingTab } from "@/types/litechat/modding";
 
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
 import { useProviderStore, type ProviderState } from "@/store/provider.store";
 import { useModStore } from "@/store/mod.store";
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -57,10 +56,9 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
     }
   };
 
-  // Common classes for tab triggers
   const tabTriggerClass = cn(
     "px-3 py-1.5 text-sm font-medium rounded-md",
-    "text-muted-foreground", 
+    "text-muted-foreground",
     "border border-transparent",
     "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
     "data-[state=active]:bg-primary/10 data-[state=active]:text-primary",
@@ -72,8 +70,9 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[1200px] w-[90vw] h-[80vh] min-h-[550px] max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      {/* Ensure DialogContent uses flex-col and has defined height */}
+      <DialogContent className="sm:max-w-[1200px] w-[90vw] h-[80vh] min-h-[550px] max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="p-6 pb-4 flex-shrink-0">
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
             Manage application settings, AI behavior, API keys, providers, and
@@ -81,12 +80,13 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Outer Tabs for main sections */}
+        {/* Outer Tabs for main sections - Allow flex-grow */}
         <Tabs
           defaultValue="general"
-          className="flex-grow flex flex-col overflow-hidden"
+          className="flex-grow flex flex-col overflow-hidden px-6" // Add padding here
         >
-          <TabsList className="flex-shrink-0 sticky top-0 bg-background z-10 mb-4 flex-wrap h-auto justify-start border-b gap-1 p-1">
+          {/* Keep TabsList sticky */}
+          <TabsList className="flex-shrink-0 sticky top-0 bg-background z-10 mb-4 flex-wrap h-auto justify-start border-b gap-1 p-1 -mx-6 px-6">
             <TabsTrigger value="general" className={tabTriggerClass}>
               General
             </TabsTrigger>
@@ -116,17 +116,23 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
           </TabsList>
 
           {/* Content Area with scroll */}
-          <div className="flex-grow overflow-y-auto pr-2 -mr-2">
+          {/* Make this div the primary scroll container */}
+          <div className="flex-grow overflow-y-auto pb-6 pr-2 -mr-2">
             <TabsContent value="general">
               <SettingsGeneral />
             </TabsContent>
 
-            {/* Providers Tab Content - Now contains nested tabs */}
-            <TabsContent value="providers" className="h-full flex flex-col">
+            {/* Providers Tab Content */}
+            <TabsContent
+              value="providers"
+              // Remove h-full, let content dictate height within scroll parent
+              className="flex flex-col data-[state=inactive]:hidden"
+            >
               {/* Nested Tabs for Provider Sub-sections */}
               <Tabs
-                defaultValue="model-order" // Default to model order tab
-                className="flex-grow flex flex-col overflow-hidden"
+                defaultValue="model-order"
+                // Remove flex-grow and overflow-hidden here
+                className="flex flex-col"
               >
                 <TabsList className="flex-shrink-0 gap-1 p-1">
                   <TabsTrigger value="model-order" className={tabTriggerClass}>
@@ -144,13 +150,15 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
                     </TabsTrigger>
                   )}
                 </TabsList>
-                {/* Content for nested tabs */}
-                <div className="flex-grow overflow-y-auto mt-4">
+                {/* Content for nested tabs - NO internal scroll here */}
+                <div className="mt-4">
+                  {" "}
+                  {/* Removed flex-grow */}
                   <TabsContent value="model-order">
-                    {/* Global Organizer is now inside its own tab */}
                     <GlobalModelOrganizer />
                   </TabsContent>
-                  <TabsContent value="provider-list" className="h-full">
+                  {/* SettingsProviders will now naturally expand */}
+                  <TabsContent value="provider-list">
                     <SettingsProviders />
                   </TabsContent>
                   {enableApiKeyManagement && (
@@ -185,7 +193,8 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
           </div>
         </Tabs>
 
-        <DialogFooter className="flex-shrink-0 border-t pt-4 mt-4">
+        {/* Keep Footer sticky */}
+        <DialogFooter className="flex-shrink-0 border-t p-6 pt-4 mt-auto">
           <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Close
           </Button>

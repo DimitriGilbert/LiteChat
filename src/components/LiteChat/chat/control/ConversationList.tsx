@@ -1,16 +1,21 @@
 // src/components/LiteChat/chat/control/ConversationList.tsx
-// (No changes needed here, the previous application of variables was correct)
 import React from "react";
 import { useConversationStore } from "@/store/conversation.store";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import { PlusIcon, Trash2Icon } from "lucide-react"; // MessageSquareIcon removed
 import { useShallow } from "zustand/react/shallow";
 import type { ChatControl } from "@/types/litechat/chat";
 import { useControlRegistryStore } from "@/store/control.store";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUIStateStore } from "@/store/ui.store";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export const ConversationListControlComponent: React.FC = () => {
   const {
@@ -121,7 +126,48 @@ export const ConversationListControlComponent: React.FC = () => {
   );
 };
 
-// Registration Hook/Component (no changes needed here)
+// Icon-only renderer for collapsed sidebar
+export const ConversationListIconRenderer: React.FC = () => {
+  const { addConversation, selectConversation } = useConversationStore(
+    useShallow((state) => ({
+      addConversation: state.addConversation,
+      selectConversation: state.selectConversation,
+    })),
+  );
+  const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
+
+  const handleNewChat = async () => {
+    try {
+      const newId = await addConversation({ title: "New Chat" });
+      selectConversation(newId);
+      setTimeout(() => setFocusInputFlag(true), 0);
+    } catch (error) {
+      console.error("Failed to create new chat:", error);
+    }
+  };
+
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleNewChat}
+            className="h-8 w-8"
+            aria-label="New Chat"
+          >
+            <PlusIcon className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="right">New Chat</TooltipContent>
+      </Tooltip>
+      {/* MessageSquareIcon removed */}
+    </TooltipProvider>
+  );
+};
+
+// Registration Hook/Component
 export const useConversationListControlRegistration = () => {
   const register = useControlRegistryStore(
     (state) => state.registerChatControl,
@@ -134,6 +180,7 @@ export const useConversationListControlRegistration = () => {
       status: () => (isLoading ? "loading" : "ready"),
       panel: "sidebar",
       renderer: () => <ConversationListControlComponent />,
+      iconRenderer: () => <ConversationListIconRenderer />,
       show: () => true,
       order: 10,
     };

@@ -1,16 +1,15 @@
 // src/components/LiteChat/settings/SettingsProviders.tsx
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react"; // Added useMemo
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
 import type { DbProviderConfig } from "@/types/litechat/provider";
 import { Button } from "@/components/ui/button";
+// Input and SearchIcon removed
 import { PlusIcon } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+// ScrollArea removed
 import { ProviderRow } from "./SettingsProviderRow";
 import { AddProviderForm } from "./AddProviderForm";
-// GlobalModelOrganizer removed
 import { Skeleton } from "@/components/ui/skeleton";
-// Separator removed
 
 // This component now focuses solely on the list and adding providers
 const SettingsProvidersComponent: React.FC = () => {
@@ -37,6 +36,8 @@ const SettingsProvidersComponent: React.FC = () => {
   );
 
   const [isAdding, setIsAdding] = useState(false);
+  // filterText state removed
+
   const handleAddNew = () => setIsAdding(true);
   const handleCancelNew = useCallback(() => setIsAdding(false), []);
 
@@ -47,13 +48,15 @@ const SettingsProvidersComponent: React.FC = () => {
     [fetchModels],
   );
 
-  return (
-    // Removed outer flex container, adjusted padding/spacing
-    // The parent component (SettingsModal) now handles layout
-    <div className="space-y-4 h-full flex flex-col">
-      {/* Global Model Organizer REMOVED */}
-      {/* Separator REMOVED */}
+  // filteredProviders logic removed, use dbProviderConfigs directly
+  const providersToDisplay = useMemo(
+    () => dbProviderConfigs || [],
+    [dbProviderConfigs],
+  );
 
+  return (
+    // Ensure this component uses flex-col and h-full to occupy space correctly
+    <div className="space-y-4 h-full flex flex-col">
       {/* Provider Configuration Section */}
       <div>
         <h3 className="text-lg font-semibold text-card-foreground">
@@ -85,37 +88,39 @@ const SettingsProvidersComponent: React.FC = () => {
         )}
       </div>
 
-      {/* Provider List - Takes remaining space */}
+      {/* Filter Input REMOVED */}
+
+      {/* Provider List - Takes remaining space, NO internal ScrollArea */}
+      {/* The parent div in SettingsModal handles scrolling */}
       <div className="flex-grow overflow-hidden border-t border-border pt-4 mt-4">
-        <ScrollArea className="h-full pr-3 -mr-3">
-          <div className="space-y-2">
-            {isLoading && !isAdding ? (
-              <>
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-              </>
-            ) : (
-              (dbProviderConfigs || []).map((provider: DbProviderConfig) => (
-                <ProviderRow
-                  key={provider.id}
-                  provider={provider}
-                  apiKeys={apiKeys || []}
-                  onUpdate={updateDbProviderConfig}
-                  onDelete={deleteDbProviderConfig}
-                  onFetchModels={handleFetchModels}
-                  fetchStatus={providerFetchStatus[provider.id] || "idle"}
-                />
-              ))
-            )}
-            {!isLoading && dbProviderConfigs?.length === 0 && !isAdding && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No providers configured yet. Click "Add Provider Configuration"
-                above.
-              </p>
-            )}
-          </div>
-        </ScrollArea>
+        <div className="space-y-2">
+          {isLoading && !isAdding ? (
+            <>
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </>
+          ) : (
+            // Use providersToDisplay (which is just dbProviderConfigs now)
+            providersToDisplay.map((provider: DbProviderConfig) => (
+              <ProviderRow
+                key={provider.id}
+                provider={provider}
+                apiKeys={apiKeys || []}
+                onUpdate={updateDbProviderConfig}
+                onDelete={deleteDbProviderConfig}
+                onFetchModels={handleFetchModels}
+                fetchStatus={providerFetchStatus[provider.id] || "idle"}
+              />
+            ))
+          )}
+          {!isLoading && providersToDisplay.length === 0 && !isAdding && (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No providers configured yet. Click "Add Provider Configuration"
+              above.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

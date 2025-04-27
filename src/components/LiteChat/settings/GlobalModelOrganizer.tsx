@@ -1,11 +1,13 @@
 // src/components/LiteChat/settings/GlobalModelOrganizer.tsx
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react"; // Added useState
 import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input"; // Added Input
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SearchIcon } from "lucide-react"; // Added SearchIcon
 import {
   DndContext,
   closestCenter,
@@ -43,6 +45,8 @@ export const GlobalModelOrganizer: React.FC = () => {
     })),
   );
 
+  const [filterText, setFilterText] = useState(""); // State for filter
+
   // Get the models already enabled and ordered by the store selector
   // This memo now correctly depends on the underlying data
   const enabledAndOrderedModels = useMemo(
@@ -51,53 +55,66 @@ export const GlobalModelOrganizer: React.FC = () => {
         ? getGloballyEnabledAndOrderedModels()
         : [],
     // Depend on the actual data that the selector uses
-    [
-      getGloballyEnabledAndOrderedModels,
-      dbProviderConfigs,
-      globalModelSortOrder,
-    ],
+    [getGloballyEnabledAndOrderedModels],
   );
 
-  // The IDs for SortableContext are derived from the already ordered models
+  // Filter the models based on filterText
+  const filteredAndOrderedModels = useMemo(() => {
+    if (!filterText.trim()) {
+      return enabledAndOrderedModels;
+    }
+    const lowerCaseFilter = filterText.toLowerCase();
+    return enabledAndOrderedModels.filter(
+      (model) =>
+        model.name.toLowerCase().includes(lowerCaseFilter) ||
+        model.providerName.toLowerCase().includes(lowerCaseFilter) ||
+        model.id.toLowerCase().includes(lowerCaseFilter),
+    );
+  }, [enabledAndOrderedModels, filterText]);
+
+  // The IDs for SortableContext are derived from the *filtered* models
   const orderedCombinedIds = useMemo(
-    () => enabledAndOrderedModels.map((m) => m.id),
-    [enabledAndOrderedModels],
+    () => filteredAndOrderedModels.map((m) => m.id),
+    [filteredAndOrderedModels],
   );
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
       if (over && active.id !== over.id) {
-        const oldIndex = globalModelSortOrder.indexOf(active.id as string);
-        const newIndex = globalModelSortOrder.indexOf(over.id as string);
+        // IMPORTANT: We need to modify the *original* globalModelSortOrder
+        // based on the indices within the *currently displayed* (filtered) list.
+        const currentFullOrder = getGloballyEnabledAndOrderedModels
+          ? getGloballyEnabledAndOrderedModels().map((m) => m.id)
+          : [];
 
-        if (oldIndex !== -1 && newIndex !== -1) {
-          const newOrder = arrayMove(globalModelSortOrder, oldIndex, newIndex);
-          // Update the state, which will trigger re-render and useMemo recalculation
-          setGlobalModelSortOrder(newOrder);
-        } else {
-          console.warn(
-            "Dragged item indices not found in current globalModelSortOrder state. Using displayed order as base.",
+        const activeId = active.id as string;
+        const overId = over.id as string;
+
+        // Find indices in the full, unfiltered list
+        const oldIndexInFull = currentFullOrder.indexOf(activeId);
+        const newIndexInFull = currentFullOrder.indexOf(overId);
+
+        if (oldIndexInFull !== -1 && newIndexInFull !== -1) {
+          const newOrder = arrayMove(
+            currentFullOrder,
+            oldIndexInFull,
+            newIndexInFull,
           );
-          const displayOrderIds = enabledAndOrderedModels.map((m) => m.id);
-          const displayOldIndex = displayOrderIds.indexOf(active.id as string);
-          const displayNewIndex = displayOrderIds.indexOf(over.id as string);
-          if (displayOldIndex !== -1 && displayNewIndex !== -1) {
-            const newOrder = arrayMove(
-              displayOrderIds,
-              displayOldIndex,
-              displayNewIndex,
-            );
-            setGlobalModelSortOrder(newOrder);
-          } else {
-            console.error(
-              "Failed to calculate new order even from displayed items.",
-            );
-          }
+          setGlobalModelSortOrder(newOrder);
+          // Reset filter after reordering? Optional.
+          // setFilterText("");
+        } else {
+          console.error(
+            "Failed to find dragged items in the full model order. Cannot reorder.",
+          );
         }
       }
     },
-    [globalModelSortOrder, enabledAndOrderedModels, setGlobalModelSortOrder],
+    [
+      getGloballyEnabledAndOrderedModels, // Use the selector function directly
+      setGlobalModelSortOrder,
+    ],
   );
 
   const sensors = useSensors(
@@ -124,26 +141,41 @@ export const GlobalModelOrganizer: React.FC = () => {
       </h3>
       <p className="text-sm text-muted-foreground">
         Drag and drop the globally enabled models (set per provider below) to
-        define their display order in the chat input selector.
+        define their display order in the chat input selector. Filtering only
+        affects the view below, not the actual order saved.
       </p>
       <Separator />
       <div className="space-y-3">
         <Label className="text-base font-medium text-card-foreground">
           Enabled & Ordered Models
         </Label>
+
+        {/* Filter Input */}
+        <div className="relative">
+          <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Filter models by name or provider..."
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            className="pl-8 w-full"
+            disabled={isLoading}
+          />
+        </div>
+
         <ScrollArea className="h-80 w-full rounded-md border border-border p-3 bg-background/50">
-          {enabledAndOrderedModels.length > 0 ? (
+          {filteredAndOrderedModels.length > 0 ? (
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
               onDragEnd={handleDragEnd}
             >
               <SortableContext
-                items={orderedCombinedIds} // Use IDs from the ordered list
+                items={orderedCombinedIds} // Use IDs from the filtered list
                 strategy={verticalListSortingStrategy}
               >
-                {/* Render based on the reactive enabledAndOrderedModels */}
-                {enabledAndOrderedModels.map((model) => (
+                {/* Render based on the filtered models */}
+                {filteredAndOrderedModels.map((model) => (
                   <SortableModelItem
                     key={model.id}
                     id={model.id}
@@ -154,8 +186,9 @@ export const GlobalModelOrganizer: React.FC = () => {
             </DndContext>
           ) : (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-              No models enabled globally. Enable models within provider
-              configurations below.
+              {filterText.trim()
+                ? "No models match your filter."
+                : "No models enabled globally. Enable models within provider configurations below."}
             </div>
           )}
         </ScrollArea>

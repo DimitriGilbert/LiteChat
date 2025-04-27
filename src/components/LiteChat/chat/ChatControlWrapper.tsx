@@ -6,12 +6,14 @@ import { cn } from "@/lib/utils"; // Import cn
 interface ChatControlWrapperProps {
   controls: ChatControl[];
   panelId: string;
+  renderMode?: "full" | "icon"; // Added renderMode prop
   className?: string;
 }
 
 export const ChatControlWrapper: React.FC<ChatControlWrapperProps> = ({
   controls,
   panelId,
+  renderMode = "full", // Default to full rendering
   className,
 }) => {
   // Filter controls based on panelId and the show condition
@@ -29,12 +31,16 @@ export const ChatControlWrapper: React.FC<ChatControlWrapperProps> = ({
 
   return (
     <div className={cn(className)}>
-      {relevantControls.map((c) => (
+      {relevantControls.map((c) => {
+        // Choose the renderer based on renderMode
+        const renderer = renderMode === "icon" ? c.iconRenderer : c.renderer;
         // Render the control's renderer function inside a Fragment with a key
-        <React.Fragment key={c.id}>
-          {c.renderer ? c.renderer() : null}
-        </React.Fragment>
-      ))}
+        return (
+          <React.Fragment key={c.id}>
+            {renderer ? renderer() : null}
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 };
