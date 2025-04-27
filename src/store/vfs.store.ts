@@ -343,7 +343,6 @@ export const useVfsStore = create(
         const fetchedEntries = await VfsOps.listFilesOp(pathToFetch);
 
         const parentKey = parentId ?? rootId ?? "";
-        const existingChildIds = new Set(get().childrenMap[parentKey] || []);
         const fetchedPaths = new Set(fetchedEntries.map((e) => e.path));
 
         // 1. Identify nodes to remove (exist in state but not in fetched results)

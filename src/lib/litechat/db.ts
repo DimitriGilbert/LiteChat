@@ -34,7 +34,7 @@ export class LiteChatDatabase extends Dexie {
         apiKeys: "++id, &name",
         syncRepos: "++id, &name, remoteUrl", // Added SyncRepo store definition
       })
-      .upgrade((tx) => {
+      .upgrade(() => {
         console.log("Upgrading DB to version 2, adding syncRepos table.");
         // Migration logic if needed:
         // If you need to add default values for syncRepoId/lastSyncedAt to existing conversations:

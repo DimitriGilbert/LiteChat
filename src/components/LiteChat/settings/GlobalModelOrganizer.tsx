@@ -27,11 +27,11 @@ import { SortableModelItem } from "@/components/LiteChat/settings/SortableModelI
 
 export const GlobalModelOrganizer: React.FC = () => {
   const {
-    globalModelSortOrder,
     setGlobalModelSortOrder,
     getGloballyEnabledAndOrderedModels,
     isLoading,
-    // Add dbProviderConfigs to dependencies for reactivity
+    // @ts-expect-error Add dbProviderConfigs to dependencies for reactivity
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     dbProviderConfigs,
   } = useProviderStore(
     useShallow((state) => ({

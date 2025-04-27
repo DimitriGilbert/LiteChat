@@ -10,11 +10,7 @@ import React, {
 import { useVfsStore } from "@/store/vfs.store";
 import { useShallow } from "zustand/react/shallow";
 import { VfsNode } from "@/types/litechat/vfs";
-import {
-  dirname,
-  basename,
-  buildPath,
-} from "@/lib/litechat/file-manager-utils";
+import { dirname, basename } from "@/lib/litechat/file-manager-utils";
 import { FileManagerTable } from "./FileManagerTable";
 import { FileManagerToolbar } from "./FileManagerToolbar";
 import { CloneDialog } from "./CloneDialog";
@@ -40,8 +36,6 @@ export const FileManager = memo(() => {
     rootId,
     fs: fsInstance,
     _setError,
-    _addNodes,
-    _removeNodes,
   } = useVfsStore(
     useShallow((state) => ({
       nodes: state.nodes,

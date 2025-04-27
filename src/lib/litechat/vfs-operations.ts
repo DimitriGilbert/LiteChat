@@ -657,12 +657,16 @@ export const gitPullOp = async (path: string): Promise<void> => {
     if (!configOK) {
       throw new Error("Git user configuration is missing or invalid.");
     }
+    const curBranch = await git.currentBranch({ fs, dir });
+    if (!curBranch) {
+      throw new Error("Current branch not found.");
+    }
     await git.pull({
       fs,
       http,
       dir,
       corsProxy: CORS_PROXY,
-      ref: await git.currentBranch({ fs, dir }), // Pull current branch
+      ref: curBranch,
       singleBranch: true,
       author: {
         name: useSettingsStore.getState().gitUserName!,
@@ -699,7 +703,7 @@ export const gitPushOp = async (path: string): Promise<void> => {
     if (result.ok) {
       toast.success(`Pushed changes successfully for "${basename(dir)}"`);
     } else {
-      throw new Error(result.errors?.join("\n") || "Push failed");
+      throw new Error(result.error || "Push failed");
     }
   } catch (err: unknown) {
     console.error(`[VFS Op] Git push failed for ${dir}:`, err);
@@ -743,3 +747,5 @@ export const gitStatusOp = async (path: string): Promise<void> => {
     throw err;
   }
 };
+
+export const VFS = fs;

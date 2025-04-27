@@ -13,7 +13,7 @@ import {
 import { useControlRegistryStore } from "@/store/control.store";
 import { useConversationStore } from "@/store/conversation.store";
 import type { PromptControl } from "@/types/litechat/prompt";
-import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
+import type { SyncStatus } from "@/types/litechat/sync";
 import {
   Tooltip,
   TooltipContent,

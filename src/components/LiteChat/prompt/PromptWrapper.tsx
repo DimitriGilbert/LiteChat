@@ -3,11 +3,9 @@ import React, {
   useState,
   useCallback,
   useMemo,
-  useEffect,
   RefObject, // Import RefObject
 } from "react";
 import type {
-  InputAreaRenderer,
   PromptTurnObject,
   InputAreaRendererProps, // Import props type for renderer
 } from "@/types/litechat/prompt";
