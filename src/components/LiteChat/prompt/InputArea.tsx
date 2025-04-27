@@ -1,65 +1,99 @@
 // src/components/LiteChat/prompt/InputArea.tsx
-import React from "react";
+import React, {
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  useEffect,
+} from "react";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils"; // Import cn for potential class merging
+import { cn } from "@/lib/utils";
+import { useUIStateStore } from "@/store/ui.store";
+import { useShallow } from "zustand/react/shallow";
 
-// Define the props interface directly within the component file
 interface InputAreaProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
   disabled?: boolean;
   placeholder?: string;
-  // Allow any other props to be passed down
   [key: string]: any;
 }
 
-export const InputArea: React.FC<InputAreaProps> = ({
-  value,
-  onChange,
-  onSubmit,
-  disabled,
-}) => {
-  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+// forwardRef is kept in case other features need it, but not used for this focus logic.
+export const InputArea = forwardRef<HTMLTextAreaElement, InputAreaProps>(
+  (
+    {
+      value,
+      onChange,
+      onSubmit,
+      disabled,
+      placeholder = "Type message... (Shift+Enter for new line)",
+    },
+    ref,
+  ) => {
+    const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
+    useImperativeHandle(ref, () => internalTextareaRef.current!, []);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey && !disabled) {
-      e.preventDefault();
-      onSubmit();
-    }
-  };
+    const { focusInputOnNextRender, setFocusInputFlag } = useUIStateStore(
+      useShallow((state) => ({
+        focusInputOnNextRender: state.focusInputOnNextRender,
+        setFocusInputFlag: state.setFocusInputFlag,
+      })),
+    );
 
-  // This handler receives the full event
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    // Call the passed onChange prop with the extracted value
-    onChange(e.target.value);
-  };
+    // Effect to focus the textarea when the flag becomes true
+    useEffect(() => {
+      if (focusInputOnNextRender && internalTextareaRef.current) {
+        // Reset the flag *before* focusing
+        setFocusInputFlag(false);
+        // Use rAF to ensure focus happens after paint
+        requestAnimationFrame(() => {
+          internalTextareaRef.current?.focus();
+        });
+      }
+      // Intentionally only run when focusInputOnNextRender changes to true
+    }, [focusInputOnNextRender]); // Dependency array ensures this runs only when the flag changes
 
-  // Auto-resize effect
-  React.useEffect(() => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      textarea.style.height = "auto"; // Reset height
-      const scrollHeight = textarea.scrollHeight;
-      const maxHeight = 200; // Define a max height
-      textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
-    }
-  }, [value]); // Re-run when the value changes
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey && !disabled) {
+        e.preventDefault();
+        onSubmit();
+      }
+    };
 
-  return (
-    <Textarea
-      ref={textareaRef}
-      value={value}
-      // Use the internal handler for the Textarea's onChange
-      onChange={handleTextareaChange}
-      onKeyDown={handleKeyDown}
-      disabled={disabled}
-      placeholder="Type message... (Shift+Enter for new line)"
-      rows={1}
-      className={cn(
-        "w-full p-2 border rounded bg-input text-foreground resize-none focus:ring-2 focus:ring-primary outline-none disabled:opacity-50 overflow-y-auto min-h-[40px] max-h-[200px]", // Use overflow-y-auto
-      )}
-      aria-label="Chat input" // Add accessibility label
-    />
-  );
-};
+    const handleTextareaChange = (
+      e: React.ChangeEvent<HTMLTextAreaElement>,
+    ) => {
+      onChange(e.target.value);
+    };
+
+    // Auto-resize effect
+    useEffect(() => {
+      const textarea = internalTextareaRef.current;
+      if (textarea) {
+        textarea.style.height = "auto";
+        const scrollHeight = textarea.scrollHeight;
+        const maxHeight = 250;
+        textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+      }
+    }, [value]);
+
+    return (
+      <Textarea
+        ref={internalTextareaRef}
+        value={value}
+        onChange={handleTextareaChange}
+        onKeyDown={handleKeyDown}
+        disabled={disabled}
+        placeholder={placeholder}
+        rows={2}
+        className={cn(
+          "w-full p-3 border border-[--border] rounded bg-input text-foreground resize-none focus:ring-2 focus:ring-[--primary] outline-none disabled:opacity-50 overflow-y-auto min-h-[60px] max-h-[250px]",
+        )}
+        aria-label="Chat input"
+      />
+    );
+  },
+);
+
+InputArea.displayName = "InputArea";

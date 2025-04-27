@@ -6,10 +6,9 @@ import { SettingsIcon } from "lucide-react";
 import type { ChatControl } from "@/types/litechat/chat";
 import { useControlRegistryStore } from "@/store/control.store";
 import { SettingsModal } from "@/components/LiteChat/settings/SettingsModal";
-import { useShallow } from "zustand/react/shallow"; // Import useShallow
+import { useShallow } from "zustand/react/shallow";
 
 export const SettingsControlComponent: React.FC = () => {
-  // Use a stable callback reference
   const toggleSettingsModal = useUIStateStore(
     (state) => state.toggleChatControlPanel,
   );
@@ -24,6 +23,7 @@ export const SettingsControlComponent: React.FC = () => {
       size="icon"
       onClick={handleClick}
       aria-label="Open Settings"
+      className="h-8 w-8" // Consistent size
     >
       <SettingsIcon className="h-4 w-4" />
     </Button>
@@ -35,10 +35,9 @@ export const useSettingsControlRegistration = () => {
   const register = useControlRegistryStore(
     (state) => state.registerChatControl,
   );
-  // Select multiple states with useShallow
   const { isModalOpen, toggleModal } = useUIStateStore(
     useShallow((state) => ({
-      isModalOpen: state.isChatControlPanelOpen["settingsModal"] ?? false, // Default to false
+      isModalOpen: state.isChatControlPanelOpen["settingsModal"] ?? false,
       toggleModal: state.toggleChatControlPanel,
     })),
   );
@@ -46,28 +45,23 @@ export const useSettingsControlRegistration = () => {
   React.useEffect(() => {
     const control: ChatControl = {
       id: "core-settings-trigger",
-      status: () => "ready", // Settings trigger is always ready
-      panel: "header", // Example: Render trigger in header
+      status: () => "ready",
+      panel: "sidebar-footer", // Changed panel ID
       renderer: () => <SettingsControlComponent />,
-      show: () => true, // Always show the trigger
-      order: 100, // Example order, place it appropriately
-      // Define how settings are displayed (e.g., a modal)
+      show: () => true,
+      order: 100,
       settingsConfig: { tabId: "mainSettingsModal", title: "Settings" },
-      // The actual modal component, controlled by UI state
-      // Render the modal conditionally based on isModalOpen
       settingsRenderer: () =>
         isModalOpen ? (
           <SettingsModal
             isOpen={isModalOpen}
-            onClose={() => toggleModal("settingsModal", false)} // Ensure it closes
+            onClose={() => toggleModal("settingsModal", false)}
           />
         ) : null,
     };
     const unregister = register(control);
     return unregister;
-    // Re-register if modal state logic changes how it's rendered/controlled
   }, [register, isModalOpen, toggleModal]);
 
-  // This hook doesn't render anything itself
   return null;
 };

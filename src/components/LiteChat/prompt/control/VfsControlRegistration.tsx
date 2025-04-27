@@ -1,7 +1,8 @@
 // src/components/LiteChat/prompt/control/VfsControlRegistration.tsx
 import React, { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Paperclip } from "lucide-react";
+// Changed icon from Paperclip to FolderOpen
+import { FolderOpenIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +11,7 @@ import {
   DialogTrigger,
   DialogFooter,
   DialogClose,
-  DialogDescription, // Import DialogDescription
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Tooltip,
@@ -172,7 +173,8 @@ const VfsPromptControl: React.FC = () => {
                   )}
                   aria-label={`Attach files from VFS (${attachedVfsCount} selected)`}
                 >
-                  <Paperclip className="h-5 w-5" />
+                  {/* Changed Icon */}
+                  <FolderOpenIcon className="h-5 w-5" />
                   {attachedVfsCount > 0 && (
                     <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-xs text-white">
                       {attachedVfsCount}
@@ -191,7 +193,6 @@ const VfsPromptControl: React.FC = () => {
       <DialogContent className="max-w-3xl h-[70vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>File Manager</DialogTitle>
-          {/* Add DialogDescription */}
           <DialogDescription>
             Manage files in the virtual filesystem. Select files and click
             "Attach Selected" to add them to your prompt.

@@ -7,8 +7,9 @@ import { PlusIcon, Trash2Icon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { ChatControl } from "@/types/litechat/chat";
 import { useControlRegistryStore } from "@/store/control.store";
-import { cn } from "@/lib/utils"; // Import cn
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
+import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useUIStateStore } from "@/store/ui.store";
 
 export const ConversationListControlComponent: React.FC = () => {
   const {
@@ -17,7 +18,7 @@ export const ConversationListControlComponent: React.FC = () => {
     selectedConversationId,
     addConversation,
     deleteConversation,
-    isLoading, // Get loading state
+    isLoading,
   } = useConversationStore(
     useShallow((state) => ({
       conversations: state.conversations,
@@ -25,54 +26,64 @@ export const ConversationListControlComponent: React.FC = () => {
       selectedConversationId: state.selectedConversationId,
       addConversation: state.addConversation,
       deleteConversation: state.deleteConversation,
-      isLoading: state.isLoading, // Select loading state
+      isLoading: state.isLoading,
     })),
   );
+  const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
 
   const handleNewChat = async () => {
     try {
       const newId = await addConversation({ title: "New Chat" });
       selectConversation(newId);
+      // Delay setting the flag slightly to allow the conversation selection
+      // render cycle to proceed first.
+      setTimeout(() => setFocusInputFlag(true), 0);
     } catch (error) {
       console.error("Failed to create new chat:", error);
-      // Optionally show a toast error
     }
   };
 
+  const handleSelectChat = (id: string) => {
+    if (id === selectedConversationId) return; // Don't re-trigger if already selected
+
+    selectConversation(id);
+    // Delay setting the flag slightly
+    setTimeout(() => setFocusInputFlag(true), 0);
+  };
+
   const handleDelete = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent selection when clicking delete
+    e.stopPropagation();
     if (window.confirm("Delete this conversation? This cannot be undone.")) {
       deleteConversation(id).catch((error) => {
         console.error("Failed to delete conversation:", error);
-        // Optionally show a toast error
       });
     }
   };
 
   return (
-    <div className="p-2 border rounded bg-card text-card-foreground h-full flex flex-col">
-      <div className="flex justify-between items-center mb-2 flex-shrink-0">
-        <h3 className="text-sm font-semibold pl-1">Conversations</h3>
+    <div className="p-2 border-r border-[--border] bg-card text-card-foreground h-full flex flex-col">
+      <div className="flex justify-between items-center mb-2 flex-shrink-0 px-1">
+        <h3 className="text-sm font-semibold">Conversations</h3>
         <Button
           size="sm"
           variant="ghost"
           onClick={handleNewChat}
           aria-label="New Chat"
-          disabled={isLoading} // Disable button while loading
+          disabled={isLoading}
+          className="h-7 w-7 p-0"
         >
           <PlusIcon className="h-4 w-4" />
         </Button>
       </div>
       <ScrollArea className="flex-grow">
         {isLoading ? (
-          // Show skeleton loaders while loading
           <div className="space-y-1 p-1">
-            <Skeleton className="h-7 w-full" />
-            <Skeleton className="h-7 w-full" />
-            <Skeleton className="h-7 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
           </div>
         ) : conversations.length === 0 ? (
-          <p className="text-xs text-muted-foreground p-2">
+          <p className="text-xs text-muted-foreground p-2 text-center">
             No conversations yet.
           </p>
         ) : (
@@ -81,10 +92,13 @@ export const ConversationListControlComponent: React.FC = () => {
               <li
                 key={c.id}
                 className={cn(
-                  "flex justify-between items-center group p-1.5 text-xs rounded cursor-pointer hover:bg-muted",
-                  c.id === selectedConversationId ? "bg-muted font-medium" : "",
+                  "flex justify-between items-center group p-1.5 text-xs rounded cursor-pointer",
+                  "hover:bg-[--selection-muted-background] hover:text-[--selection-foreground]",
+                  c.id === selectedConversationId
+                    ? "bg-[--selection-background] text-[--selection-foreground] font-medium border border-[--selection-border]"
+                    : "border border-transparent",
                 )}
-                onClick={() => selectConversation(c.id)}
+                onClick={() => handleSelectChat(c.id)}
               >
                 <span className="truncate pr-1">{c.title || "Untitled"}</span>
                 <Button
@@ -105,26 +119,25 @@ export const ConversationListControlComponent: React.FC = () => {
   );
 };
 
-// Registration Hook/Component
+// Registration Hook/Component (no changes needed here)
 export const useConversationListControlRegistration = () => {
   const register = useControlRegistryStore(
     (state) => state.registerChatControl,
   );
-  const isLoading = useConversationStore((state) => state.isLoading); // For status
+  const isLoading = useConversationStore((state) => state.isLoading);
 
   React.useEffect(() => {
     const control: ChatControl = {
       id: "core-conversation-list",
-      status: () => (isLoading ? "loading" : "ready"), // Status based on loading state
-      panel: "sidebar", // Render in the sidebar
+      status: () => (isLoading ? "loading" : "ready"),
+      panel: "sidebar",
       renderer: () => <ConversationListControlComponent />,
-      show: () => true, // Always show
-      order: 10, // Define an order
+      show: () => true,
+      order: 10,
     };
     const unregister = register(control);
     return unregister;
-  }, [register, isLoading]); // Re-register if loading state changes
+  }, [register, isLoading]);
 
-  // This hook doesn't render anything itself
   return null;
 };

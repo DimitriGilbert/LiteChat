@@ -1,16 +1,16 @@
 // src/store/input.store.ts
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import type { VfsFileObject } from "@/types/litechat/vfs"; // Import the new type
+import type { VfsFileObject } from "@/types/litechat/vfs";
 
 export interface InputState {
-  promptInputValue: string;
+  // promptInputValue: string; // REMOVED - Handled locally in PromptWrapper
   attachedFiles: File[]; // Files attached for the *next* submission
   selectedVfsFiles: VfsFileObject[]; // Renamed from selectedVfsPaths for clarity
 }
 
 export interface InputActions {
-  setPromptInputValue: (value: string) => void;
+  // setPromptInputValue: (value: string) => void; // REMOVED
   // Attached File Actions
   addAttachedFile: (file: File) => void;
   removeAttachedFile: (fileName: string) => void;
@@ -25,14 +25,14 @@ export interface InputActions {
 export const useInputStore = create(
   immer<InputState & InputActions>((set) => ({
     // Initial State
-    promptInputValue: "",
+    // promptInputValue: "", // REMOVED
     attachedFiles: [],
     selectedVfsFiles: [], // Renamed
 
     // Actions
-    setPromptInputValue: (value) => {
-      set({ promptInputValue: value });
-    },
+    // setPromptInputValue: (value) => { // REMOVED
+    //   set({ promptInputValue: value });
+    // },
 
     // Attached File Actions
     addAttachedFile: (file) => {
@@ -69,7 +69,7 @@ export const useInputStore = create(
     // Combined Clear Action (used after successful submission)
     clearAllInput: () => {
       set({
-        promptInputValue: "",
+        // promptInputValue: "", // REMOVED
         attachedFiles: [],
         selectedVfsFiles: [], // Renamed
       });

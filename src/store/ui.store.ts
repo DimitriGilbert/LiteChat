@@ -3,19 +3,21 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
 interface UIState {
-  // Records to store open state for panels, keyed by ID
   isChatControlPanelOpen: Record<string, boolean>;
   isPromptControlPanelOpen: Record<string, boolean>;
-  globalLoading: boolean; // General loading indicator for app-wide processes
-  globalError: string | null; // For displaying critical app-wide errors
+  isSidebarCollapsed: boolean;
+  globalLoading: boolean;
+  globalError: string | null;
+  focusInputOnNextRender: boolean; // Flag to trigger focus
 }
 
 interface UIActions {
-  // Toggle functions accept an optional explicit state
   toggleChatControlPanel: (panelId: string, isOpen?: boolean) => void;
   togglePromptControlPanel: (controlId: string, isOpen?: boolean) => void;
+  toggleSidebar: (isCollapsed?: boolean) => void;
   setGlobalLoading: (loading: boolean) => void;
   setGlobalError: (error: string | null) => void;
+  setFocusInputFlag: (focus: boolean) => void; // Action to set the flag
 }
 
 export const useUIStateStore = create(
@@ -23,13 +25,14 @@ export const useUIStateStore = create(
     // Initial State
     isChatControlPanelOpen: {},
     isPromptControlPanelOpen: {},
-    globalLoading: false, // Start not loading
-    globalError: null, // Start with no error
+    isSidebarCollapsed: false,
+    globalLoading: false,
+    globalError: null,
+    focusInputOnNextRender: false, // Initialize flag
 
     // Actions
     toggleChatControlPanel: (panelId, isOpen) => {
       set((state) => {
-        // If isOpen is provided, use it; otherwise, toggle the current state
         state.isChatControlPanelOpen[panelId] =
           isOpen ?? !state.isChatControlPanelOpen[panelId];
       });
@@ -37,9 +40,14 @@ export const useUIStateStore = create(
 
     togglePromptControlPanel: (controlId, isOpen) => {
       set((state) => {
-        // If isOpen is provided, use it; otherwise, toggle the current state
         state.isPromptControlPanelOpen[controlId] =
           isOpen ?? !state.isPromptControlPanelOpen[controlId];
+      });
+    },
+
+    toggleSidebar: (isCollapsed) => {
+      set((state) => {
+        state.isSidebarCollapsed = isCollapsed ?? !state.isSidebarCollapsed;
       });
     },
 
@@ -49,6 +57,11 @@ export const useUIStateStore = create(
 
     setGlobalError: (error) => {
       set({ globalError: error });
+    },
+
+    // Action to set the focus flag
+    setFocusInputFlag: (focus) => {
+      set({ focusInputOnNextRender: focus });
     },
   })),
 );
