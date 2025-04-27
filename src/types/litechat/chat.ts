@@ -8,6 +8,8 @@ import type { PromptObject } from "./prompt";
 export interface Conversation extends DbBase {
   title: string;
   metadata?: Record<string, any>;
+  syncRepoId?: string | null; // ID of the SyncRepo this convo is linked to
+  lastSyncedAt?: Date | null; // Timestamp of the last successful sync
 }
 export type SidebarItemType = "conversation" | "project" | "folder";
 

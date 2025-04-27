@@ -1,92 +1,208 @@
 // src/components/LiteChat/prompt/control/GitSyncControlRegistration.tsx
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { GitBranchIcon, AlertCircleIcon } from "lucide-react"; // Example icons
+import {
+  AlertCircleIcon,
+  CheckCircle2Icon,
+  RefreshCwIcon,
+  Loader2,
+  Settings2Icon,
+  XIcon,
+  FolderSyncIcon,
+} from "lucide-react";
 import { useControlRegistryStore } from "@/store/control.store";
+import { useConversationStore } from "@/store/conversation.store";
 import type { PromptControl } from "@/types/litechat/prompt";
+import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { toast } from "sonner";
-
-// Placeholder state - replace with actual logic later
-const useSyncState = () => {
-  // Example: Replace with actual store selector or logic
-  const isSyncEnabled = false; // Placeholder
-  const needsSync = true; // Placeholder
-  const repoName = "my-sync-repo"; // Placeholder
-  return { isSyncEnabled, needsSync, repoName };
-};
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useShallow } from "zustand/react/shallow";
+import { cn } from "@/lib/utils";
 
 const GitSyncControlComponent: React.FC = () => {
-  const { isSyncEnabled, needsSync, repoName } = useSyncState();
+  const {
+    selectedConversationId,
+    conversations,
+    syncRepos,
+    conversationSyncStatus,
+    linkConversationToRepo,
+    syncConversation,
+  } = useConversationStore(
+    useShallow((state) => ({
+      selectedConversationId: state.selectedConversationId,
+      conversations: state.conversations,
+      syncRepos: state.syncRepos,
+      conversationSyncStatus: state.conversationSyncStatus,
+      linkConversationToRepo: state.linkConversationToRepo,
+      syncConversation: state.syncConversation,
+    })),
+  );
+
+  const currentConversation = conversations.find(
+    (c) => c.id === selectedConversationId,
+  );
+  const currentRepoId = currentConversation?.syncRepoId;
+  const currentRepo = syncRepos.find((r) => r.id === currentRepoId);
+  const currentStatus: SyncStatus = selectedConversationId
+    ? (conversationSyncStatus[selectedConversationId] ?? "idle")
+    : "idle";
+
+  const handleLinkRepo = (repoId: string | null) => {
+    if (selectedConversationId) {
+      linkConversationToRepo(selectedConversationId, repoId);
+    }
+  };
 
   const handleSyncClick = () => {
-    // Placeholder action
-    toast.info("Manual sync triggered (placeholder).");
-    // TODO: Implement actual sync logic
+    if (selectedConversationId && currentRepoId) {
+      syncConversation(selectedConversationId);
+    }
   };
 
   const handleConfigureClick = () => {
-    // Placeholder action
-    toast.info("Open sync configuration (placeholder).");
-    // TODO: Implement opening relevant settings tab/modal
+    // TODO: Ideally, open the Settings modal directly to the Git->Sync tab
+    // For now, just inform the user.
+    alert(
+      "Please go to Settings -> Git -> Sync Repositories to configure sync.",
+    );
   };
 
-  if (!isSyncEnabled) {
-    return (
+  const getStatusInfo = (): {
+    icon: React.ReactNode;
+    tooltip: string;
+    colorClass: string;
+  } => {
+    switch (currentStatus) {
+      case "syncing":
+        return {
+          icon: <Loader2 className="h-3 w-3 animate-spin text-blue-500" />,
+          tooltip: `Syncing with ${currentRepo?.name}...`,
+          colorClass: "text-blue-500",
+        };
+      case "error":
+        return {
+          icon: (
+            <AlertCircleIcon className="h-3 w-3 text-destructive fill-destructive/30" />
+          ),
+          tooltip: `Sync error with ${currentRepo?.name}. Check console/logs.`,
+          colorClass: "text-destructive",
+        };
+      case "needs-sync":
+        return {
+          icon: (
+            <AlertCircleIcon className="h-3 w-3 text-orange-500 fill-orange-300" />
+          ),
+          tooltip: `Local changes need sync with ${currentRepo?.name}.`,
+          colorClass: "text-orange-500",
+        };
+      case "idle":
+      default:
+        return {
+          icon: <CheckCircle2Icon className="h-3 w-3 text-green-500" />,
+          tooltip: `Synced with ${currentRepo?.name}.`,
+          colorClass: "text-green-500",
+        };
+    }
+  };
+
+  const statusInfo = currentRepo ? getStatusInfo() : null;
+
+  return (
+    <DropdownMenu>
       <TooltipProvider delayDuration={100}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={handleConfigureClick}
-              className="h-10 w-10 rounded-full text-muted-foreground hover:text-foreground"
-              aria-label="Configure Git Sync"
-            >
-              <GitBranchIcon className="h-5 w-5" />
-            </Button>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-10 w-10 rounded-full relative",
+                  !currentRepo && "text-muted-foreground hover:text-foreground",
+                  statusInfo?.colorClass,
+                )}
+                aria-label="Conversation Git Sync Status"
+                disabled={!selectedConversationId} // Disable if no conversation selected
+              >
+                <FolderSyncIcon className="h-5 w-5" />
+                {statusInfo && (
+                  <span className="absolute top-0 right-0">
+                    {statusInfo.icon}
+                  </span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent side="top">
-            Configure Conversation Sync
+            {currentRepo
+              ? statusInfo?.tooltip
+              : "Link conversation to sync repository"}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-    );
-  }
 
-  return (
-    <TooltipProvider delayDuration={100}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={handleSyncClick}
-            className="h-10 w-10 rounded-full relative"
-            aria-label={`Sync Conversation with ${repoName}`}
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Conversation Sync</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {syncRepos.map((repo) => (
+          <DropdownMenuItem
+            key={repo.id}
+            onClick={() => handleLinkRepo(repo.id)}
+            disabled={!selectedConversationId || currentStatus === "syncing"}
           >
-            <GitBranchIcon className="h-5 w-5" />
-            {needsSync && (
-              <AlertCircleIcon className="absolute top-0 right-0 h-3 w-3 text-orange-500 fill-orange-300" />
+            {currentRepoId === repo.id && (
+              <CheckCircle2Icon className="mr-2 h-4 w-4 text-green-500" />
             )}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="top">
-          {needsSync
-            ? `Sync needed with ${repoName}`
-            : `Synced with ${repoName}`}
-          <br />
-          <span className="text-xs">(Click to sync manually)</span>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+            Link to: {repo.name}
+          </DropdownMenuItem>
+        ))}
+        {currentRepoId && (
+          <DropdownMenuItem
+            onClick={() => handleLinkRepo(null)}
+            disabled={!selectedConversationId || currentStatus === "syncing"}
+          >
+            <XIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+            Unlink Repository
+          </DropdownMenuItem>
+        )}
+        {syncRepos.length === 0 && (
+          <DropdownMenuItem disabled>No sync repos configured</DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={handleSyncClick}
+          disabled={
+            !selectedConversationId ||
+            !currentRepoId ||
+            currentStatus === "syncing"
+          }
+        >
+          {currentStatus === "syncing" ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCwIcon className="mr-2 h-4 w-4" />
+          )}
+          Sync Now
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleConfigureClick}>
+          <Settings2Icon className="mr-2 h-4 w-4" />
+          Configure Repositories...
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
@@ -94,19 +210,20 @@ export const useGitSyncControlRegistration = () => {
   const register = useControlRegistryStore(
     (state) => state.registerPromptControl,
   );
+  // Add dependency on syncRepos length to re-register if repos change
+  const syncRepoCount = useConversationStore((state) => state.syncRepos.length);
 
   React.useEffect(() => {
     const control: PromptControl = {
       id: "core-git-sync-control",
       triggerRenderer: () => <GitSyncControlComponent />,
-      show: () => true, // Always show for now, logic can be added
-      // getMetadata/getParameters can be added later if needed
-      order: 50, // Example order
+      show: () => true, // Always show the control
+      order: 50,
     };
 
     const unregister = register(control);
     return unregister;
-  }, [register]);
+  }, [register, syncRepoCount]); // Re-register if repo count changes
 
   return null;
 };

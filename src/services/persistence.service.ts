@@ -1,9 +1,10 @@
 // src/services/persistence.service.ts
-import { db } from "@/lib/litechat/db"; // Correct path
+import { db } from "@/lib/litechat/db";
 import type { Conversation } from "@/types/litechat/chat";
 import type { Interaction } from "@/types/litechat/interaction";
 import type { DbMod } from "@/types/litechat/modding";
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
+import type { SyncRepo } from "@/types/litechat/sync";
 
 export class PersistenceService {
   // Conversations
@@ -18,7 +19,13 @@ export class PersistenceService {
 
   static async saveConversation(c: Conversation): Promise<string> {
     try {
-      return await db.conversations.put(c);
+      // Ensure sync fields have default values if missing
+      const conversationToSave: Conversation = {
+        ...c,
+        syncRepoId: c.syncRepoId ?? null,
+        lastSyncedAt: c.lastSyncedAt ?? null,
+      };
+      return await db.conversations.put(conversationToSave);
     } catch (error) {
       console.error("PersistenceService: Error saving conversation:", error);
       throw error;
@@ -184,9 +191,7 @@ export class PersistenceService {
 
   static async deleteApiKey(id: string): Promise<void> {
     try {
-      // Pass tables as an array in the second argument
       await db.transaction("rw", [db.apiKeys, db.providerConfigs], async () => {
-        // Use db.table directly inside the transaction
         const configsToUpdate = await db.providerConfigs
           .where("apiKeyId")
           .equals(id)
@@ -209,9 +214,53 @@ export class PersistenceService {
     }
   }
 
+  // --- Sync Repos ---
+  static async loadSyncRepos(): Promise<SyncRepo[]> {
+    try {
+      return await db.syncRepos.toArray();
+    } catch (error) {
+      console.error("PersistenceService: Error loading sync repos:", error);
+      throw error;
+    }
+  }
+
+  static async saveSyncRepo(repo: SyncRepo): Promise<string> {
+    try {
+      return await db.syncRepos.put(repo);
+    } catch (error) {
+      console.error("PersistenceService: Error saving sync repo:", error);
+      throw error;
+    }
+  }
+
+  static async deleteSyncRepo(id: string): Promise<void> {
+    try {
+      // Unlink from conversations within a transaction
+      await db.transaction("rw", [db.syncRepos, db.conversations], async () => {
+        const convosToUpdate = await db.conversations
+          .where("syncRepoId")
+          .equals(id)
+          .toArray();
+        if (convosToUpdate.length > 0) {
+          const updates = convosToUpdate.map((convo) =>
+            db.conversations.update(convo.id, { syncRepoId: null }),
+          );
+          await Promise.all(updates);
+          console.log(
+            `PersistenceService: Unlinked SyncRepo ${id} from ${convosToUpdate.length} conversations.`,
+          );
+        }
+        await db.syncRepos.delete(id);
+      });
+    } catch (error) {
+      console.error("PersistenceService: Error deleting sync repo:", error);
+      throw error;
+    }
+  }
+
+  // --- Clear All Data ---
   static async clearAllData(): Promise<void> {
     try {
-      // Pass ALL table instances involved in the clear operation as an array
       await db.transaction(
         "rw",
         [
@@ -221,17 +270,16 @@ export class PersistenceService {
           db.appState,
           db.providerConfigs,
           db.apiKeys,
-          // Add other tables here if they exist and need clearing
+          db.syncRepos, // Add syncRepos table
         ],
         async () => {
-          // Use db.table.clear() within the transaction
           await db.interactions.clear();
           await db.conversations.clear();
           await db.mods.clear();
           await db.appState.clear();
           await db.providerConfigs.clear();
           await db.apiKeys.clear();
-          // Add clear calls for other tables here
+          await db.syncRepos.clear(); // Clear syncRepos table
         },
       );
       console.log("PersistenceService: All data cleared.");

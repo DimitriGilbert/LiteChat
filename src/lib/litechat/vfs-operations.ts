@@ -12,12 +12,12 @@ import {
   dirname,
   basename,
 } from "./file-manager-utils";
-import git from "isomorphic-git"; // Import isomorphic-git
-import http from "isomorphic-git/http/web"; // Import browser http client
-import { useSettingsStore } from "@/store/settings.store"; // Import settings store
+import git from "isomorphic-git";
+import http from "isomorphic-git/http/web";
+import { useSettingsStore } from "@/store/settings.store";
 
 // --- Constants ---
-const CORS_PROXY = "https://cors.isomorphic-git.org"; // Use the public proxy for now
+const CORS_PROXY = "https://cors.isomorphic-git.org";
 
 // --- Helper Functions ---
 const createDirectoryRecursive = async (path: string): Promise<void> => {
@@ -40,7 +40,6 @@ const createDirectoryRecursive = async (path: string): Promise<void> => {
   }
 };
 
-// Helper to ensure Git user config is set
 const ensureGitConfig = async (dir: string): Promise<boolean> => {
   const { gitUserName, gitUserEmail } = useSettingsStore.getState();
   if (!gitUserName || !gitUserEmail) {
@@ -77,6 +76,26 @@ const ensureGitConfig = async (dir: string): Promise<boolean> => {
     );
     return false;
   }
+};
+
+// --- Authentication Callbacks (Placeholders) ---
+// TODO: Implement proper UI/storage for credentials
+const onAuth = (url: string): any => {
+  console.warn(
+    `[VFS Op] Git Auth requested for ${url}. No credentials configured.`,
+  );
+  // Return null or prompt user in a real implementation
+  // Example: return { username: 'myuser', password: 'mypassword' };
+  // Example: return { oauth2format: 'github', token: 'ghp_...' };
+  return null;
+};
+const onAuthFailure = (url: string, auth: any): any => {
+  console.error(`[VFS Op] Git Auth FAILED for ${url}`, auth);
+  toast.error(`Authentication failed for ${url}`);
+  return null; // Or re-prompt
+};
+const onAuthSuccess = (url: string, auth: any): void => {
+  console.log(`[VFS Op] Git Auth SUCCESS for ${url}`, auth);
 };
 
 // --- Exported VFS Operation Functions ---
@@ -392,6 +411,8 @@ export const downloadAllAsZipOp = async (
 
       for (const entry of entries) {
         if (entry.isDirectory) {
+          // Skip .git directory during export
+          if (entry.name === ".git") continue;
           const subFolder = zipFolder.folder(entry.name);
           if (subFolder) {
             await addFolderToZip(entry.path, subFolder);
@@ -507,13 +528,14 @@ export const isGitRepoOp = async (path: string): Promise<boolean> => {
 };
 
 export const gitCloneOp = async (
-  targetPath: string,
+  targetPath: string, // Path where the repo folder should be created
   url: string,
   branch?: string,
 ): Promise<void> => {
   const normalizedTargetPath = normalizePath(targetPath);
-  const repoName = basename(url.replace(/\.git$/, ""));
-  const dir = joinPath(normalizedTargetPath, repoName);
+  // Extract repo name correctly, handling potential trailing slashes or .git
+  const repoName = basename(url.replace(/\/$/, "").replace(/\.git$/, ""));
+  const dir = joinPath(normalizedTargetPath, repoName); // Final directory for the clone
 
   try {
     // Check if target directory already exists
@@ -532,14 +554,16 @@ export const gitCloneOp = async (
     await git.clone({
       fs,
       http,
-      dir,
+      dir, // Use the calculated final directory
       corsProxy: CORS_PROXY,
       url,
-      ref: branch || undefined, // Use default branch if not specified
+      ref: branch || undefined,
       singleBranch: !!branch,
-      depth: 10, // Limit depth for faster clones initially
+      depth: 10,
+      onAuth,
+      onAuthFailure,
+      onAuthSuccess,
       onProgress: (e) => {
-        // Basic progress logging
         if (e.phase === "counting objects" && e.total) {
           console.log(`Clone progress: ${e.phase} ${e.loaded}/${e.total}`);
         } else if (e.phase === "receiving objects" && e.total) {
@@ -549,22 +573,18 @@ export const gitCloneOp = async (
         }
       },
     });
-    toast.success(`Repository "${repoName}" cloned successfully.`);
+    toast.success(`Repository "${repoName}" cloned successfully into ${dir}.`);
   } catch (err: unknown) {
     console.error(`[VFS Op] Git clone failed for ${url}:`, err);
     toast.error(
       `Git clone failed: ${err instanceof Error ? err.message : String(err)}`,
     );
-    // Attempt to clean up partially created directory on failure
     try {
-      await fs.promises.rm(dir, { recursive: true });
+      await fs.promises.rm(dir, { recursive: true, force: true });
     } catch (cleanupErr) {
-      console.warn(
-        `[VFS Op] Failed to cleanup directory ${dir} after clone error:`,
-        cleanupErr,
-      );
+      console.warn(`[VFS Op] Failed cleanup ${dir}:`, cleanupErr);
     }
-    throw err; // Re-throw original error
+    throw err;
   }
 };
 
@@ -588,29 +608,29 @@ export const gitCommitOp = async (
 ): Promise<void> => {
   const dir = normalizePath(path);
   try {
-    // Ensure user name/email are configured
     const configOK = await ensureGitConfig(dir);
     if (!configOK) {
       throw new Error("Git user configuration is missing or invalid.");
     }
 
-    // Stage all changes (equivalent to git add .)
     const status = await git.statusMatrix({ fs, dir });
+    let staged = false;
     for (const [filepath, head, workdir] of status) {
-      // 1 = HEAD status, 2 = WORKDIR status, 3 = STAGE status
-      // Add new/modified files (workdir === 2)
-      // head=0, workdir=2 => new
-      // head=1, workdir=2 => modified
       if (workdir === 2) {
         await git.add({ fs, dir, filepath });
+        staged = true;
       }
-      // Remove deleted files (present in HEAD but absent in WORKDIR)
       if (head !== 0 && workdir === 0) {
         await git.remove({ fs, dir, filepath });
+        staged = true;
       }
     }
 
-    // Perform the commit
+    if (!staged) {
+      toast.info("No changes detected to commit.");
+      return; // Don't commit if nothing changed
+    }
+
     const sha = await git.commit({
       fs,
       dir,
@@ -630,32 +650,90 @@ export const gitCommitOp = async (
   }
 };
 
-// --- Placeholder Git Operations ---
 export const gitPullOp = async (path: string): Promise<void> => {
   const dir = normalizePath(path);
-  console.log(`[VFS Op] Placeholder: Git Pull on ${dir}`);
-  toast.info(`Git Pull functionality not yet fully implemented for ${dir}.`);
-  // Placeholder implementation:
-  // await git.pull({ fs, http, dir, author: { name: '...', email: '...' }, singleBranch: true });
+  try {
+    const configOK = await ensureGitConfig(dir); // Ensure author info for merge commit
+    if (!configOK) {
+      throw new Error("Git user configuration is missing or invalid.");
+    }
+    await git.pull({
+      fs,
+      http,
+      dir,
+      corsProxy: CORS_PROXY,
+      ref: await git.currentBranch({ fs, dir }), // Pull current branch
+      singleBranch: true,
+      author: {
+        name: useSettingsStore.getState().gitUserName!,
+        email: useSettingsStore.getState().gitUserEmail!,
+      },
+      onAuth,
+      onAuthFailure,
+      onAuthSuccess,
+    });
+    toast.success(`Pulled latest changes for "${basename(dir)}"`);
+  } catch (err: unknown) {
+    console.error(`[VFS Op] Git pull failed for ${dir}:`, err);
+    toast.error(
+      `Git pull failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    throw err;
+  }
 };
 
 export const gitPushOp = async (path: string): Promise<void> => {
   const dir = normalizePath(path);
-  console.log(`[VFS Op] Placeholder: Git Push on ${dir}`);
-  toast.info(`Git Push functionality not yet fully implemented for ${dir}.`);
-  // Placeholder implementation:
-  // await git.push({ fs, http, dir, remote: 'origin', ref: 'main' });
+  try {
+    const result = await git.push({
+      fs,
+      http,
+      dir,
+      corsProxy: CORS_PROXY,
+      // remote: 'origin', // Assumes remote is 'origin'
+      // ref: await git.currentBranch({ fs, dir }), // Push current branch
+      onAuth,
+      onAuthFailure,
+      onAuthSuccess,
+    });
+    if (result.ok) {
+      toast.success(`Pushed changes successfully for "${basename(dir)}"`);
+    } else {
+      throw new Error(result.errors?.join("\n") || "Push failed");
+    }
+  } catch (err: unknown) {
+    console.error(`[VFS Op] Git push failed for ${dir}:`, err);
+    toast.error(
+      `Git push failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    throw err;
+  }
 };
 
 export const gitStatusOp = async (path: string): Promise<void> => {
   const dir = normalizePath(path);
-  console.log(`[VFS Op] Placeholder: Git Status on ${dir}`);
+  console.log(`[VFS Op] Git Status on ${dir}`);
   try {
     const status = await git.statusMatrix({ fs, dir });
     console.log("Git Status:", status);
+    // Format status for better readability in toast
+    const formattedStatus = status
+      .map(([file, head, workdir, stage]) => {
+        let statusText = "";
+        if (workdir === 0) statusText = "deleted";
+        else if (head === 0 && workdir === 2) statusText = "new file";
+        else if (head === 1 && workdir === 2) statusText = "modified";
+        else if (head === 1 && workdir === 1)
+          statusText = "unmodified"; // Should not appear often with matrix
+        else statusText = `h:${head} w:${workdir} s:${stage}`; // Fallback
+
+        return `${file}: ${statusText}`;
+      })
+      .join("\n");
+
     toast.info(
-      `Git Status for "${basename(dir)}":\n${JSON.stringify(status, null, 2)}`,
-      { duration: 10000 },
+      `Git Status for "${basename(dir)}":\n${formattedStatus || "No changes"}`,
+      { duration: 15000 },
     );
   } catch (err: unknown) {
     console.error(`[VFS Op] Git status failed for ${dir}:`, err);
