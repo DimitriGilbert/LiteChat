@@ -6,14 +6,16 @@ import { Button } from "@/components/ui/button";
 import {
   PlusIcon,
   Trash2Icon,
-  GitBranchIcon, // Import Git icon
-  Loader2, // Import Loader
-  AlertCircleIcon, // Import Alert icon
-  CheckCircle2Icon, // Import Check icon
+  GitBranchIcon,
+  Loader2,
+  AlertCircleIcon,
+  CheckCircle2Icon,
+  DownloadIcon, // Added Download Icon
+  MoreHorizontalIcon, // Added More Icon
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { ChatControl } from "@/types/litechat/chat";
-import type { SyncStatus } from "@/types/litechat/sync"; // Import SyncStatus
+import type { SyncStatus } from "@/types/litechat/sync";
 import { useControlRegistryStore } from "@/store/control.store";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,13 +26,22 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+// Added DropdownMenu imports
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner"; // Added toast
 
-// Helper to get sync icon and tooltip
+// Helper to get sync icon and tooltip (remains the same)
 const getSyncIndicator = (
   status: SyncStatus | undefined,
   repoName: string | undefined,
 ): React.ReactNode => {
-  if (!repoName) return null; // No indicator if not linked
+  if (!repoName) return null;
 
   let IconComponent: React.ElementType = GitBranchIcon;
   let className = "text-muted-foreground/70";
@@ -52,7 +63,7 @@ const getSyncIndicator = (
       className = "text-orange-500";
       tooltipText = `Needs sync with ${repoName}`;
       break;
-    case "idle": // Synced successfully
+    case "idle":
       IconComponent = CheckCircle2Icon;
       className = "text-green-500";
       tooltipText = `Synced with ${repoName}`;
@@ -80,9 +91,10 @@ export const ConversationListControlComponent: React.FC = () => {
     selectedConversationId,
     addConversation,
     deleteConversation,
+    exportConversation, // Added export action
     isLoading,
-    syncRepos, // Get sync repos
-    conversationSyncStatus, // Get sync statuses
+    syncRepos,
+    conversationSyncStatus,
   } = useConversationStore(
     useShallow((state) => ({
       conversations: state.conversations,
@@ -90,9 +102,10 @@ export const ConversationListControlComponent: React.FC = () => {
       selectedConversationId: state.selectedConversationId,
       addConversation: state.addConversation,
       deleteConversation: state.deleteConversation,
+      exportConversation: state.exportConversation, // Select export action
       isLoading: state.isLoading,
-      syncRepos: state.syncRepos, // Select sync repos
-      conversationSyncStatus: state.conversationSyncStatus, // Select sync statuses
+      syncRepos: state.syncRepos,
+      conversationSyncStatus: state.conversationSyncStatus,
     })),
   );
   const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
@@ -118,11 +131,26 @@ export const ConversationListControlComponent: React.FC = () => {
     if (window.confirm("Delete this conversation? This cannot be undone.")) {
       deleteConversation(id).catch((error) => {
         console.error("Failed to delete conversation:", error);
+        toast.error("Failed to delete conversation."); // Add user feedback
       });
     }
   };
 
-  // Map repo IDs to names for quick lookup
+  // Handle Export
+  const handleExport = async (
+    id: string,
+    format: "json" | "md",
+    e: React.MouseEvent,
+  ) => {
+    e.stopPropagation();
+    try {
+      await exportConversation(id, format);
+    } catch (error) {
+      // Error toast handled by store action
+      console.error(`Failed to export conversation as ${format}:`, error);
+    }
+  };
+
   const repoNameMap = React.useMemo(() => {
     return new Map(syncRepos.map((r) => [r.id, r.name]));
   }, [syncRepos]);
@@ -179,18 +207,50 @@ export const ConversationListControlComponent: React.FC = () => {
                     <span className="truncate pr-1">
                       {c.title || "Untitled"}
                     </span>
-                    {/* Render Sync Indicator */}
                     {syncIndicator}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5 opacity-0 group-hover:opacity-100 text-destructive hover:bg-destructive/10 flex-shrink-0"
-                    onClick={(e) => handleDelete(c.id, e)}
-                    aria-label={`Delete conversation ${c.title || "Untitled"}`}
-                  >
-                    <Trash2Icon className="h-3 w-3" />
-                  </Button>
+                  {/* Action Buttons */}
+                  <div className="flex items-center flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* More Options Dropdown */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                          onClick={(e) => e.stopPropagation()} // Prevent row click
+                          aria-label={`More options for ${c.title || "Untitled"}`}
+                        >
+                          <MoreHorizontalIcon className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        onClick={(e) => e.stopPropagation()} // Prevent closing on item click sometimes
+                        align="end"
+                      >
+                        <DropdownMenuItem
+                          onClick={(e) => handleExport(c.id, "json", e)}
+                        >
+                          <DownloadIcon className="mr-2 h-3 w-3" />
+                          Export as JSON
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => handleExport(c.id, "md", e)}
+                        >
+                          <DownloadIcon className="mr-2 h-3 w-3" />
+                          Export as Markdown
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                          onClick={(e) => handleDelete(c.id, e)}
+                        >
+                          <Trash2Icon className="mr-2 h-3 w-3" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </li>
               );
             })}
@@ -201,7 +261,7 @@ export const ConversationListControlComponent: React.FC = () => {
   );
 };
 
-// Icon-only renderer for collapsed sidebar
+// Icon-only renderer remains the same
 export const ConversationListIconRenderer: React.FC = () => {
   const { addConversation, selectConversation } = useConversationStore(
     useShallow((state) => ({
@@ -241,7 +301,7 @@ export const ConversationListIconRenderer: React.FC = () => {
   );
 };
 
-// Registration Hook/Component
+// Registration Hook remains the same
 export const useConversationListControlRegistration = () => {
   const register = useControlRegistryStore(
     (state) => state.registerChatControl,

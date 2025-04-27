@@ -5,6 +5,7 @@ import type { CoreMessage, Tool } from "ai";
 /**
  * Represents the data captured from the user's input turn via the PromptWrapper.
  * This includes the text content, parameters derived from controls, and metadata.
+ * File content (text or base64) is stored directly here for persistence.
  */
 export interface PromptTurnObject {
   /** Unique ID for this specific turn attempt */
@@ -15,17 +16,17 @@ export interface PromptTurnObject {
   parameters: Record<string, any>;
   /** Metadata collected from active PromptControls (e.g., selected model ID, file references) */
   metadata: Record<string, any> & {
+    // Unified attachedFiles metadata structure including content
     attachedFiles?: {
-      id?: string; // <-- Made 'id' optional here
+      id: string; // Unique attachment ID for this prompt instance
+      source: "direct" | "vfs";
       name: string;
-      type: string;
+      type: string; // MIME type
       size: number;
-    }[];
-    selectedVfsFiles?: {
-      id: string;
-      name: string;
-      path: string;
-      type: string;
+      path?: string; // Path if source is 'vfs'
+      // Content is stored here for persistence
+      contentText?: string;
+      contentBase64?: string;
     }[];
   };
 }
@@ -33,6 +34,7 @@ export interface PromptTurnObject {
 /**
  * Represents the complete object prepared for submission to the AIService.
  * This is constructed from the PromptTurnObject and conversation history/context.
+ * File content is processed into the messages array, not stored in metadata here.
  */
 export interface PromptObject {
   /** The system prompt string, if any */
@@ -49,8 +51,18 @@ export interface PromptObject {
     | { type: "tool"; toolName: string };
   /** Final combined parameters for the AI call */
   parameters: Record<string, any>;
-  /** Final combined metadata for the AI call */
-  metadata: Record<string, any>;
+  /** Final combined metadata for the AI call (file content is NOT included here) */
+  metadata: Record<string, any> & {
+    // Only basic file info needed here, content is processed into messages
+    attachedFiles?: {
+      id: string;
+      source: "direct" | "vfs";
+      name: string;
+      type: string;
+      size: number;
+      path?: string;
+    }[];
+  };
   // Add any other fields required by the specific AI SDK or service
 }
 

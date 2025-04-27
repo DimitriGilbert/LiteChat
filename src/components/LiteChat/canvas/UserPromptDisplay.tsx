@@ -7,7 +7,7 @@ import {
   ClipboardIcon,
   CheckIcon,
   ChevronsUpDownIcon,
-  EditIcon, // Placeholder for future edit
+  EditIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { FilePreviewRenderer } from "@/components/LiteChat/common/FilePreviewRenderer";
+// Import the type directly, no need for store here
+import type { AttachedFileMetadata } from "@/store/input.store";
 
 interface UserPromptDisplayProps {
   interaction: Interaction;
@@ -34,42 +37,48 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
     interaction.prompt?.content &&
     typeof interaction.prompt.content === "string"
       ? interaction.prompt.content
-      : "[User content unavailable]";
+      : "";
+
+  // Get file metadata directly from the interaction's prompt snapshot
+  // Ensure it's treated as the correct type, including content fields
+  const attachedFiles = (interaction.prompt?.metadata?.attachedFiles ||
+    []) as AttachedFileMetadata[];
+
+  const hasContent = userContent || attachedFiles.length > 0;
 
   const handleCopy = useCallback(async () => {
-    if (!userContent || userContent === "[User content unavailable]") return;
+    if (!userContent) return;
     try {
       await navigator.clipboard.writeText(userContent);
       setIsCopied(true);
-      toast.success("Prompt copied to clipboard!");
+      toast.success("Prompt text copied to clipboard!");
       setTimeout(() => setIsCopied(false), 1500);
     } catch (err) {
-      toast.error("Failed to copy prompt.");
+      toast.error("Failed to copy prompt text.");
       console.error("Clipboard copy failed:", err);
     }
   }, [userContent]);
 
   const toggleFold = () => setIsFolded((prev) => !prev);
 
-  // Get first few lines for folded preview
   const foldedPreviewText = useMemo(() => {
     if (!userContent) return "";
-    return userContent.split("\n").slice(0, 3).join("\n");
+    return userContent
+      .split(
+        `
+`,
+      )
+      .slice(0, 3).join(`
+`);
   }, [userContent]);
 
   return (
-    // Add group class here
     <div className={cn("flex items-start gap-3 my-2 group", className)}>
-      {/* Avatar */}
       <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary/20 text-primary flex items-center justify-center mt-1">
         <UserIcon className="h-5 w-5" />
       </div>
-
-      {/* Bubble Container */}
       <div className="p-3 border rounded-md shadow-sm bg-muted/50 flex-grow min-w-0 relative">
-        {/* Action Buttons Container - Use the sticky class */}
         <div className="interaction-card-actions-sticky">
-          {/* Fold/Unfold Button */}
           <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -79,6 +88,7 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
                   className="h-6 w-6 text-muted-foreground hover:text-foreground"
                   onClick={toggleFold}
                   aria-label={isFolded ? "Unfold prompt" : "Fold prompt"}
+                  disabled={!hasContent}
                 >
                   <ChevronsUpDownIcon className="h-3.5 w-3.5" />
                 </Button>
@@ -88,8 +98,6 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-
-          {/* Copy Button */}
           <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -98,10 +106,8 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
                   size="icon"
                   className="h-6 w-6 text-muted-foreground hover:text-foreground"
                   onClick={handleCopy}
-                  aria-label="Copy prompt"
-                  disabled={
-                    !userContent || userContent === "[User content unavailable]"
-                  }
+                  aria-label="Copy prompt text"
+                  disabled={!userContent}
                 >
                   {isCopied ? (
                     <CheckIcon className="h-3.5 w-3.5 text-green-500" />
@@ -110,11 +116,9 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
                   )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="top">Copy</TooltipContent>
+              <TooltipContent side="top">Copy Text</TooltipContent>
             </Tooltip>
           </TooltipProvider>
-
-          {/* Edit Button (Placeholder) */}
           <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -132,35 +136,56 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
             </Tooltip>
           </TooltipProvider>
         </div>
-
-        {/* Content inside the bubble */}
         <div className="text-sm">
           {isFolded ? (
-            // Folded Preview
-            <div className="folded-content-preview" onClick={toggleFold}>
-              <pre className="whitespace-pre-wrap break-words text-muted-foreground">
-                {foldedPreviewText}
-              </pre>
+            <div
+              className="folded-content-preview cursor-pointer"
+              onClick={toggleFold}
+            >
+              {userContent ? (
+                <pre className="whitespace-pre-wrap break-words text-muted-foreground">
+                  {foldedPreviewText}
+                </pre>
+              ) : (
+                <span className="text-muted-foreground italic">
+                  [No text content]
+                </span>
+              )}
+              {attachedFiles.length > 0 && (
+                <span className="text-muted-foreground text-xs ml-1">
+                  (+{attachedFiles.length} file(s))
+                </span>
+              )}
             </div>
           ) : (
-            // Full Content
-            <pre className="whitespace-pre-wrap break-words">{userContent}</pre>
+            <>
+              {userContent ? (
+                <pre className="whitespace-pre-wrap break-words mb-2">
+                  {userContent}
+                </pre>
+              ) : (
+                !attachedFiles.length && (
+                  <span className="text-muted-foreground italic">
+                    [No text content]
+                  </span>
+                )
+              )}
+              {attachedFiles.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {attachedFiles.map((fileMeta) => (
+                    // Pass the full metadata from the interaction's prompt
+                    <FilePreviewRenderer
+                      key={fileMeta.id}
+                      fileMeta={fileMeta} // This now includes contentText/contentBase64
+                      isReadOnly={true}
+                      // onRemove is not needed for read-only
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
-
-        {/* Display attached files or other metadata if needed */}
-        {interaction.prompt?.metadata?.attachedFileCount > 0 && (
-          <div className="text-xs text-muted-foreground mt-1">
-            ({interaction.prompt?.metadata.attachedFileCount} file(s))
-          </div>
-        )}
-        {interaction.prompt?.metadata?.selectedVfsFiles &&
-          interaction.prompt.metadata.selectedVfsFiles.length > 0 && (
-            <div className="text-xs text-muted-foreground mt-1">
-              ({interaction.prompt.metadata.selectedVfsFiles.length} VFS
-              file(s))
-            </div>
-          )}
       </div>
     </div>
   );

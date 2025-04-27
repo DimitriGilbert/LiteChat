@@ -45,3 +45,35 @@ export interface FileSystemEntry {
   size: number;
   lastModified: Date;
 }
+
+// --- Added Text Detection Logic ---
+export const COMMON_TEXT_EXTENSIONS_VFS = [
+  ".txt",
+  ".md",
+  ".json",
+  ".js",
+  ".ts",
+  ".jsx",
+  ".tsx",
+  ".html",
+  ".css",
+  ".py",
+  ".java",
+  ".c",
+  ".cpp",
+  ".h",
+  ".cs",
+  ".go",
+  ".php",
+  ".rb",
+  ".swift",
+  ".kt",
+  ".rs",
+  ".toml",
+  ".yaml",
+  ".yml",
+  ".xml",
+  ".sh",
+  ".bat",
+  ".ps1",
+];

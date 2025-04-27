@@ -19,10 +19,12 @@ interface FileManagerTableProps {
   newName: string;
   creatingFolder: boolean;
   newFolderName: string;
-  checkedPaths: Set<string>;
-  isOperationLoading: boolean; // Combined loading state
+  // Replace checkedPaths with selectedFileIds from store
+  selectedFileIds: Set<string>;
+  isOperationLoading: boolean;
   handleNavigate: (entry: VfsNode) => void;
-  handleCheckboxChange: (checked: boolean, path: string) => void;
+  // Update checkbox handler signature
+  handleCheckboxChange: (checked: boolean, nodeId: string) => void;
   startEditing: (entry: VfsNode) => void;
   cancelEditing: () => void;
   handleRename: () => void;
@@ -34,8 +36,7 @@ interface FileManagerTableProps {
   setNewFolderName: (name: string) => void;
   renameInputRef: React.RefObject<HTMLInputElement | null>;
   newFolderInputRef: React.RefObject<HTMLInputElement | null>;
-  gitRepoStatus: Record<string, boolean>; // Git status per path
-  // Git action handlers
+  gitRepoStatus: Record<string, boolean>;
   handleGitInit: (path: string) => void;
   handleGitPull: (path: string) => void;
   handleGitCommit: (path: string) => void;
@@ -49,8 +50,9 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
   newName,
   creatingFolder,
   newFolderName,
-  checkedPaths,
-  isOperationLoading, // Use combined loading state
+  // Use selectedFileIds from props
+  selectedFileIds,
+  isOperationLoading,
   handleNavigate,
   handleCheckboxChange,
   startEditing,
@@ -64,8 +66,7 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
   setNewFolderName,
   renameInputRef,
   newFolderInputRef,
-  gitRepoStatus, // Receive git status
-  // Receive git handlers
+  gitRepoStatus,
   handleGitInit,
   handleGitPull,
   handleGitCommit,
@@ -108,21 +109,22 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
           )}
           {memoizedEntries.map((entry) => {
             const isEditingThis = editingPath === entry.path;
-            const isChecked = checkedPaths.has(entry.path);
-            const isGitRepo = gitRepoStatus[entry.path] ?? false; // Check git status
+            // Check if the node ID is in the selectedFileIds set
+            const isChecked = selectedFileIds.has(entry.id);
+            const isGitRepo = gitRepoStatus[entry.path] ?? false;
 
             return (
               <FileManagerRow
-                key={entry.path}
+                key={entry.id} // Use node ID as key
                 entry={entry}
                 isEditingThis={isEditingThis}
-                isChecked={isChecked}
-                isGitRepo={isGitRepo} // Pass git status
+                isChecked={isChecked} // Pass checked status based on store
+                isGitRepo={isGitRepo}
                 newName={isEditingThis ? newName : ""}
-                isOperationLoading={isOperationLoading} // Pass combined loading
+                isOperationLoading={isOperationLoading}
                 creatingFolder={creatingFolder}
                 handleNavigate={handleNavigate}
-                handleCheckboxChange={handleCheckboxChange}
+                handleCheckboxChange={handleCheckboxChange} // Pass updated handler
                 startEditing={startEditing}
                 cancelEditing={cancelEditing}
                 handleRename={handleRename}
@@ -130,7 +132,6 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
                 handleDelete={handleDelete}
                 setNewName={setNewName}
                 renameInputRef={renameInputRef}
-                // Pass git handlers
                 handleGitInit={handleGitInit}
                 handleGitPull={handleGitPull}
                 handleGitCommit={handleGitCommit}

@@ -20,12 +20,18 @@ import {
   ProviderMetadata,
   ToolCallPart,
   ToolResultPart,
+  UserContent,
+  TextPart,
+  ImagePart,
+  CoreUserMessage,
 } from "ai";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { useProviderStore } from "@/store/provider.store";
 import { toast } from "sonner";
 import { z } from "zod";
 import { PersistenceService } from "@/services/persistence.service";
+import { type AttachedFileMetadata } from "@/store/input.store";
+import * as VfsOps from "@/lib/litechat/vfs-operations";
 
 // Middleware runner remains the same
 async function runMiddleware<H extends ModMiddlewareHookName>(
@@ -92,16 +98,111 @@ function getContextSnapshot(): ReadonlyChatContextSnapshot {
   return snapshot;
 }
 
+// Helper function to convert base64 string to Uint8Array (remains the same)
+function base64ToUint8Array(base64: string): Uint8Array {
+  try {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+  } catch (e) {
+    console.error("Error decoding base64 string:", e);
+    throw new Error("Invalid base64 string for file content.");
+  }
+}
+
+// --- Improved File Content Processing ---
+const COMMON_TEXT_EXTENSIONS = [
+  ".txt",
+  ".md",
+  ".json",
+  ".js",
+  ".ts",
+  ".jsx",
+  ".tsx",
+  ".html",
+  ".css",
+  ".py",
+  ".java",
+  ".c",
+  ".cpp",
+  ".h",
+  ".cs",
+  ".go",
+  ".php",
+  ".rb",
+  ".swift",
+  ".kt",
+  ".rs",
+  ".toml",
+  ".yaml",
+  ".yml",
+  ".xml",
+  ".sh",
+  ".bat",
+  ".ps1",
+];
+
+function processFileMetaToUserContent(
+  fileMeta: AttachedFileMetadata,
+): TextPart | ImagePart | null {
+  try {
+    const mimeType = fileMeta.type || "application/octet-stream";
+    const fileNameLower = fileMeta.name.toLowerCase();
+    const isLikelyText =
+      mimeType.startsWith("text/") ||
+      mimeType === "application/json" || // Treat JSON as text
+      COMMON_TEXT_EXTENSIONS.some((ext) => fileNameLower.endsWith(ext));
+    const isImage = mimeType.startsWith("image/");
+
+    if (isLikelyText && fileMeta.contentText !== undefined) {
+      return { type: "text", text: fileMeta.contentText };
+    } else if (isImage && fileMeta.contentBase64 !== undefined) {
+      const buffer = base64ToUint8Array(fileMeta.contentBase64);
+      return { type: "image", image: buffer, mimeType: mimeType };
+    } else if (!isLikelyText && fileMeta.contentBase64 !== undefined) {
+      // Handle other non-text, non-image types (e.g., audio, video, pdf)
+      // For now, just send a note. Future: could support specific types if model allows.
+      console.warn(
+        `AIService: Unsupported file type "${mimeType}" for direct inclusion. Sending note.`,
+      );
+      return {
+        type: "text",
+        text: `[Attached file: ${fileMeta.name} (${mimeType})]`,
+      };
+    } else {
+      // Content is missing or type is ambiguous without content
+      throw new Error(
+        `Missing content or unable to determine type for file: ${fileMeta.name}`,
+      );
+    }
+  } catch (error) {
+    console.error(
+      `AIService: Failed to process content for ${fileMeta.name}:`,
+      error,
+    );
+    toast.error(
+      `Failed to process file "${fileMeta.name}": ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return {
+      type: "text",
+      text: `[Error processing file: ${fileMeta.name}]`,
+    };
+  }
+}
+// --- End Improved File Content Processing ---
+
 export class AIService {
   private static activeStreams = new Map<string, AbortController>();
 
   static async startInteraction(
-    aiPayload: PromptObject,
-    initiatingTurnData: PromptTurnObject,
+    aiPayload: PromptObject, // Metadata here might lack content if modified by middleware
+    initiatingTurnData: PromptTurnObject, // This *must* have the content
   ): Promise<string | null> {
-    // Get the entire state/actions object once using getState()
     const interactionStoreStateAndActions = useInteractionStore.getState();
-
     const conversationId =
       interactionStoreStateAndActions.currentConversationId;
     if (!conversationId) {
@@ -110,6 +211,7 @@ export class AIService {
       return null;
     }
 
+    // Run middleware on the AI payload (which lacks file content in metadata)
     const startMiddlewareResult = await runMiddleware(
       "middleware:interaction:beforeStart",
       { prompt: aiPayload, conversationId },
@@ -127,7 +229,6 @@ export class AIService {
     const abortController = new AbortController();
     this.activeStreams.set(interactionId, abortController);
 
-    // Calculate index and parentId based on current state
     const currentInteractions = interactionStoreStateAndActions.interactions;
     const conversationInteractions = currentInteractions.filter(
       (i) => i.conversationId === conversationId,
@@ -140,27 +241,86 @@ export class AIService {
         ? conversationInteractions[conversationInteractions.length - 1].id
         : null;
 
-    // --- Create ONE Interaction object for the turn ---
+    // --- Prepare final messages including file content ---
+    const finalMessages: CoreMessage[] = [...finalPayload.messages];
+    let lastUserMessageIndex = -1;
+    for (let i = finalMessages.length - 1; i >= 0; i--) {
+      if (finalMessages[i].role === "user") {
+        lastUserMessageIndex = i;
+        break;
+      }
+    }
+
+    if (
+      lastUserMessageIndex !== -1 &&
+      initiatingTurnData.metadata?.attachedFiles &&
+      initiatingTurnData.metadata.attachedFiles.length > 0
+    ) {
+      const userMessage = finalMessages[
+        lastUserMessageIndex
+      ] as CoreUserMessage;
+
+      const fileContents = (
+        initiatingTurnData.metadata.attachedFiles as AttachedFileMetadata[]
+      )
+        .map(processFileMetaToUserContent)
+        .filter((content): content is TextPart | ImagePart => content !== null);
+
+      let userMessageContentParts: (TextPart | ImagePart)[] = [];
+      if (typeof userMessage.content === "string") {
+        userMessageContentParts.push({
+          type: "text",
+          text: userMessage.content,
+        });
+      } else if (Array.isArray(userMessage.content)) {
+        userMessageContentParts = (userMessage.content as any[]).filter(
+          (part): part is TextPart | ImagePart =>
+            part &&
+            typeof part === "object" &&
+            "type" in part &&
+            (part.type === "text" || part.type === "image"),
+        );
+      }
+
+      finalMessages[lastUserMessageIndex] = {
+        ...userMessage,
+        content: [...fileContents, ...userMessageContentParts],
+      };
+      console.log(
+        `AIService: Added ${fileContents.length} file(s) to user message content.`,
+      );
+    }
+    // --- End message preparation ---
+
+    // Create interaction data snapshot using the initiating turn data (with content)
     const interactionData: Interaction = {
       id: interactionId,
       conversationId: conversationId,
       type: "message.user_assistant",
+      // Save the initiating turn data snapshot, which includes file content
       prompt: { ...initiatingTurnData },
       response: null,
       status: "STREAMING",
       startedAt: new Date(),
       endedAt: null,
-      metadata: { ...finalPayload.metadata },
+      // Metadata from the final payload (after middleware)
+      // This metadata is for quick reference and should NOT contain full file content
+      metadata: {
+        ...finalPayload.metadata,
+        // Ensure attachedFiles here only contains basic info (NO content)
+        // We map over the initiatingTurnData's files to get the basic info
+        // because finalPayload.metadata.attachedFiles might have been altered by middleware
+        attachedFiles: initiatingTurnData.metadata.attachedFiles?.map(
+          ({ contentBase64, contentText, ...rest }) => rest, // eslint-disable-line @typescript-eslint/no-unused-vars
+        ),
+      },
       index: newIndex,
       parentId: parentId,
     };
 
-    // Add the single interaction to state and mark as streaming
-    // Use the actions obtained from getState()
+    // Add interaction to state and persist (initial save)
     interactionStoreStateAndActions._addInteractionToState(interactionData);
-    interactionStoreStateAndActions._addStreamingId(interactionId); // Initializes buffer
-
-    // Persist initial state (fire-and-forget)
+    interactionStoreStateAndActions._addStreamingId(interactionId);
     PersistenceService.saveInteraction({ ...interactionData }).catch((e) => {
       console.error(
         `AIService: Failed initial persistence for ${interactionId}`,
@@ -175,12 +335,13 @@ export class AIService {
     });
 
     console.log(
-      `AIService: Starting AI call for interaction: ${interactionId} with payload:`,
-      finalPayload,
+      `AIService: Starting AI call for interaction: ${interactionId} with final messages:`,
+      JSON.stringify(finalMessages, null, 2),
     );
 
+    // --- AI Call and Streaming Logic ---
     let streamResult: StreamTextResult<any, any> | undefined;
-    let finalStatus: Interaction["status"] = "ERROR"; // Default to error
+    let finalStatus: Interaction["status"] = "ERROR";
     let finalErrorMessage: string | undefined = undefined;
     let finalUsage: LanguageModelUsage | undefined = undefined;
     let finalProviderMetadata: ProviderMetadata | undefined = undefined;
@@ -209,7 +370,7 @@ export class AIService {
 
       const streamOptions: any = {
         model: modelInstance as LanguageModelV1,
-        messages: finalPayload.messages as CoreMessage[],
+        messages: finalMessages, // Use messages with processed file content
         signal: abortController.signal,
         ...(Object.keys(toolsForSdk).length > 0 && { tools: toolsForSdk }),
         toolChoice:
@@ -285,7 +446,6 @@ export class AIService {
                 "chunk" in chunkResult
                   ? chunkResult.chunk
                   : part.textDelta;
-              // Use action from getState()
               useInteractionStore
                 .getState()
                 .appendInteractionResponseChunk(interactionId, processedChunk);
@@ -360,27 +520,25 @@ export class AIService {
         toast.error(`AI Interaction Error: ${finalErrorMessage}`);
       }
     } finally {
-      // --- Finalization ---
       this.activeStreams.delete(interactionId);
-
-      // Get the final content from the buffer *before* removing the streaming ID
-      // Use getState() inside finally to ensure we have the latest buffer content
       const finalBufferedContent =
         useInteractionStore.getState().activeStreamBuffers[interactionId] || "";
 
-      // --- CENTRALIZED FINAL UPDATE ---
-      // Prepare a single consolidated update object
+      // Get the latest metadata from the store *before* updating
+      // This includes the basic attachedFiles info (without content)
+      const currentInteractionMetadata =
+        useInteractionStore
+          .getState()
+          .interactions.find((i) => i.id === interactionId)?.metadata ||
+        interactionData.metadata;
+
       const finalUpdates: Partial<Interaction> = {
         status: finalStatus,
         endedAt: new Date(),
-        response: finalBufferedContent, // Set the final response content here
+        response: finalBufferedContent,
+        // Update the top-level metadata, ensuring attachedFiles has no content
         metadata: {
-          // Start with existing metadata from the store state if possible
-          // Get the *current* state inside finally
-          ...(useInteractionStore
-            .getState()
-            .interactions.find((i) => i.id === interactionId)?.metadata ||
-            interactionData.metadata), // Use initial data as fallback
+          ...currentInteractionMetadata, // Start with existing metadata
           ...(finalUsage && {
             promptTokens: finalUsage.promptTokens,
             completionTokens: finalUsage.completionTokens,
@@ -394,30 +552,31 @@ export class AIService {
           ...(currentToolResults.length > 0 && {
             toolResults: currentToolResults,
           }),
+          // Ensure attachedFiles metadata *without* content is preserved/updated
+          // We use the metadata from the *initial* interaction data here
+          // as it reliably contains the basic file info before any middleware modification
+          attachedFiles: interactionData.metadata.attachedFiles?.map(
+            // @ts-expect-error i don't care about any
+            ({ contentBase64, contentText, ...rest }) => rest, // eslint-disable-line @typescript-eslint/no-unused-vars
+          ),
         },
+        // IMPORTANT: The `prompt` field (PromptTurnObject snapshot) is NOT updated here.
+        // It remains as it was when the interaction was created, preserving the original input including file content.
       };
 
-      // Apply the consolidated update to the store state synchronously
-      // Use action from getState()
+      // Update the interaction state synchronously
       useInteractionStore
         .getState()
         ._updateInteractionInState(interactionId, finalUpdates);
-
-      // Remove the streaming ID and clean up the buffer *after* state update
-      // Use action from getState()
       useInteractionStore.getState()._removeStreamingId(interactionId);
-      // --- END CENTRALIZED FINAL UPDATE ---
 
-      // Get the fully updated interaction object from the store *after* the update
-      // Use getState() again to ensure we have the state *after* the update
+      // Fetch the final state *after* synchronous updates for persistence
       const finalInteractionState = useInteractionStore
         .getState()
         .interactions.find((i) => i.id === interactionId);
 
-      // Persist the final state
       if (finalInteractionState) {
-        // IMPORTANT: Pass a *copy* of the state to the async persistence function
-        // Use action from getState()
+        // Persist the final state (including the original prompt snapshot)
         useInteractionStore
           .getState()
           .updateInteractionAndPersist({ ...finalInteractionState })
@@ -428,7 +587,6 @@ export class AIService {
             );
           });
       } else {
-        // This error should be investigated if it still occurs
         console.error(
           `AIService: CRITICAL - Could not find final state for interaction ${interactionId} to persist after updates. State might be inconsistent.`,
         );
@@ -446,25 +604,21 @@ export class AIService {
     return interactionId;
   }
 
+  // stopInteraction remains the same
   static stopInteraction(interactionId: string) {
     const controller = this.activeStreams.get(interactionId);
-    // Get actions via getState() inside the method
     const interactionStoreActions = useInteractionStore.getState();
 
     if (controller && !controller.signal.aborted) {
       console.log(`AIService: Aborting interaction ${interactionId}...`);
       controller.abort();
-      // The 'finally' block in startInteraction will handle cleanup and status update.
     } else {
       console.log(
         `AIService: No active controller found or already aborted for interaction ${interactionId}. Attempting store cleanup if needed.`,
       );
-      // Use getState() to check the current state
       const interaction = interactionStoreActions.interactions.find(
         (i) => i.id === interactionId,
       );
-      // Force cleanup ONLY if it's somehow still marked as streaming in the store
-      // AND the stream is not active (controller is missing or already aborted)
       if (
         interaction &&
         interaction.status === "STREAMING" &&
@@ -483,21 +637,16 @@ export class AIService {
           response: finalBufferedContent,
         };
 
-        // Use actions obtained from getState()
         interactionStoreActions._updateInteractionInState(
           interactionId,
           finalUpdates,
         );
-        interactionStoreActions._removeStreamingId(interactionId); // Clean buffer/list
+        interactionStoreActions._removeStreamingId(interactionId);
 
-        // Get the state *after* the update for persistence
-        // Use getState() again to get the latest state
         const finalInteractionState = useInteractionStore
           .getState()
           .interactions.find((i) => i.id === interactionId);
         if (finalInteractionState) {
-          // Pass a copy for persistence
-          // Use action obtained from getState()
           interactionStoreActions
             .updateInteractionAndPersist({ ...finalInteractionState })
             .catch((e) => {

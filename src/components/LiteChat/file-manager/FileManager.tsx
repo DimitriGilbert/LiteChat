@@ -5,7 +5,7 @@ import React, {
   useCallback,
   useRef,
   memo,
-  useMemo, // Import useMemo
+  useMemo,
 } from "react";
 import { useVfsStore } from "@/store/vfs.store";
 import { useShallow } from "zustand/react/shallow";
@@ -36,12 +36,16 @@ export const FileManager = memo(() => {
     rootId,
     fs: fsInstance,
     _setError,
+    // Add selection actions
+    selectFile,
+    deselectFile,
+    selectedFileIds, // Get selected IDs for table rows
   } = useVfsStore(
     useShallow((state) => ({
       nodes: state.nodes,
       childrenMap: state.childrenMap,
       currentParentId: state.currentParentId,
-      selectedFileIds: state.selectedFileIds,
+      selectedFileIds: state.selectedFileIds, // Select this
       loading: state.loading,
       error: state.error,
       fetchNodes: state.fetchNodes,
@@ -49,8 +53,8 @@ export const FileManager = memo(() => {
       uploadFiles: state.uploadFiles,
       deleteNodes: state.deleteNodes,
       renameNode: state.renameNode,
-      selectFile: state.selectFile,
-      deselectFile: state.deselectFile,
+      selectFile: state.selectFile, // Select this
+      deselectFile: state.deselectFile, // Select this
       setCurrentPath: state.setCurrentPath,
       initializeVFS: state.initializeVFS,
       rootId: state.rootId,
@@ -67,7 +71,7 @@ export const FileManager = memo(() => {
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const [checkedPaths, setCheckedPaths] = useState<Set<string>>(new Set());
+  // checkedPaths state removed - use selectedFileIds from store
   const [isOperationLoading, setIsOperationLoading] = useState(false);
   const [gitRepoStatus, setGitRepoStatus] = useState<Record<string, boolean>>(
     {},
@@ -103,12 +107,10 @@ export const FileManager = memo(() => {
       return a.name.localeCompare(b.name);
     });
 
-  // Memoize the folder paths to stabilize the dependency for checkGitStatus effect
   const currentFolderPaths = useMemo(() => {
     return currentNodes.filter((n) => n.type === "folder").map((n) => n.path);
   }, [currentNodes]);
 
-  // Combined loading state for disabling UI elements
   const isAnyLoading =
     loading || isOperationLoading || isCloning || isCommitting;
 
@@ -152,10 +154,9 @@ export const FileManager = memo(() => {
     }
   }, [creatingFolder]);
 
-  // Effect to check Git status for displayed folders
   useEffect(() => {
     const checkGitStatus = async () => {
-      if (!fsInstance || currentFolderPaths.length === 0) return; // Check length too
+      if (!fsInstance || currentFolderPaths.length === 0) return;
       const statusUpdates: Record<string, boolean> = {};
       let changed = false;
       for (const path of currentFolderPaths) {
@@ -168,18 +169,16 @@ export const FileManager = memo(() => {
         } catch (e) {
           console.error(`Error checking git status for ${path}:`, e);
           if (gitRepoStatus[path] !== false) {
-            statusUpdates[path] = false; // Assume not a repo on error
+            statusUpdates[path] = false;
             changed = true;
           }
         }
       }
-      // Only update state if something actually changed
       if (changed) {
         setGitRepoStatus((prev) => ({ ...prev, ...statusUpdates }));
       }
     };
     checkGitStatus();
-    // Depend on the memoized paths array and fsInstance
   }, [currentFolderPaths, fsInstance, gitRepoStatus]);
 
   // --- Handlers ---
@@ -205,7 +204,7 @@ export const FileManager = memo(() => {
       if (isAnyLoading || editingPath) return;
       if (entry.type === "folder") {
         runOperation(() => setCurrentPath(entry.path), false);
-        setCheckedPaths(new Set());
+        // No need to clear checkedPaths, store handles selection
       }
     },
     [isAnyLoading, editingPath, setCurrentPath, runOperation],
@@ -215,31 +214,35 @@ export const FileManager = memo(() => {
     if (isAnyLoading || currentPath === "/") return;
     const parentPath = dirname(currentPath);
     runOperation(() => setCurrentPath(parentPath), false);
-    setCheckedPaths(new Set());
   }, [isAnyLoading, currentPath, setCurrentPath, runOperation]);
 
   const handleNavigateHome = useCallback(() => {
     if (isAnyLoading || currentPath === "/") return;
     runOperation(() => setCurrentPath("/"), false);
-    setCheckedPaths(new Set());
   }, [isAnyLoading, currentPath, setCurrentPath, runOperation]);
 
   const handleRefresh = useCallback(() => {
     runOperation(() => fetchNodes(currentParentId));
-    setCheckedPaths(new Set());
   }, [runOperation, fetchNodes, currentParentId]);
 
-  const handleCheckboxChange = useCallback((checked: boolean, path: string) => {
-    setCheckedPaths((prev) => {
-      const next = new Set(prev);
-      if (checked) {
-        next.add(path);
-      } else {
-        next.delete(path);
+  // Modified checkbox handler to use store actions
+  const handleCheckboxChange = useCallback(
+    (checked: boolean, nodeId: string) => {
+      const node = nodes[nodeId];
+      // Only allow selecting files
+      if (node && node.type === "file") {
+        if (checked) {
+          selectFile(nodeId);
+        } else {
+          deselectFile(nodeId);
+        }
+      } else if (node && node.type === "folder") {
+        // Optionally provide feedback that folders can't be selected
+        toast.info("Folders cannot be attached to the prompt.");
       }
-      return next;
-    });
-  }, []);
+    },
+    [selectFile, deselectFile, nodes], // Add store actions and nodes to dependencies
+  );
 
   const startEditing = useCallback(
     (entry: VfsNode) => {
@@ -339,11 +342,7 @@ WARNING: This will delete all contents inside`
       );
       if (confirmation) {
         await runOperation(() => deleteNodes([entry.id]));
-        setCheckedPaths((prev) => {
-          const next = new Set(prev);
-          next.delete(entry.path);
-          return next;
-        });
+        // No need to manage checkedPaths locally
       }
     },
     [deleteNodes, runOperation],
@@ -507,12 +506,13 @@ WARNING: This will delete all contents inside`
         newName={newName}
         creatingFolder={creatingFolder}
         newFolderName={newFolderName}
-        checkedPaths={checkedPaths}
+        // Pass selectedFileIds from store instead of local checkedPaths
+        selectedFileIds={selectedFileIds}
         isOperationLoading={
           isOperationLoading || Object.values(isGitOpLoading).some(Boolean)
         }
         handleNavigate={handleNavigate}
-        handleCheckboxChange={handleCheckboxChange}
+        handleCheckboxChange={handleCheckboxChange} // Pass the updated handler
         startEditing={startEditing}
         cancelEditing={cancelEditing}
         handleRename={handleRename}

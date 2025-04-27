@@ -17,7 +17,7 @@ import {
   GitPullRequestIcon,
   GitMergeIcon,
   InfoIcon,
-  FolderGitIcon, // Use FolderGitIcon
+  FolderGitIcon,
   Loader2Icon,
 } from "lucide-react";
 import {
@@ -40,13 +40,14 @@ import type { VfsNode } from "@/types/litechat/vfs";
 interface FileManagerRowProps {
   entry: VfsNode;
   isEditingThis: boolean;
-  isChecked: boolean;
-  isGitRepo: boolean; // Receive git status
+  isChecked: boolean; // Keep this prop, value comes from FileManagerTable
+  isGitRepo: boolean;
   newName: string;
-  isOperationLoading: boolean; // Combined loading state
+  isOperationLoading: boolean;
   creatingFolder: boolean;
   handleNavigate: (entry: VfsNode) => void;
-  handleCheckboxChange: (checked: boolean, path: string) => void;
+  // Update handler signature to pass node ID
+  handleCheckboxChange: (checked: boolean, nodeId: string) => void;
   startEditing: (entry: VfsNode) => void;
   cancelEditing: () => void;
   handleRename: () => void;
@@ -54,7 +55,6 @@ interface FileManagerRowProps {
   handleDelete: (entry: VfsNode) => void;
   setNewName: (name: string) => void;
   renameInputRef: React.RefObject<HTMLInputElement | null>;
-  // Git actions
   handleGitInit: (path: string) => void;
   handleGitPull: (path: string) => void;
   handleGitCommit: (path: string) => void;
@@ -66,9 +66,9 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
   entry,
   isEditingThis,
   isChecked,
-  isGitRepo, // Use git status
+  isGitRepo,
   newName,
-  isOperationLoading, // Use combined loading
+  isOperationLoading,
   creatingFolder,
   handleNavigate,
   handleCheckboxChange,
@@ -79,7 +79,6 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
   handleDelete,
   setNewName,
   renameInputRef,
-  // Receive git handlers
   handleGitInit,
   handleGitPull,
   handleGitCommit,
@@ -109,7 +108,6 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
 
   const isDirectory = entry.type === "folder";
 
-  // Use FolderGitIcon if it's a directory and a git repo
   const Icon = isDirectory
     ? isGitRepo
       ? FolderGitIcon
@@ -117,13 +115,13 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
     : FileIcon;
   const iconColor = isDirectory
     ? isGitRepo
-      ? "text-green-400" // Git repo color
+      ? "text-green-400"
       : "text-yellow-400"
     : "text-blue-400";
 
   const rowContent = (
     <TableRow
-      key={entry.path}
+      key={entry.id} // Use node ID as key
       className={cn(
         "group hover:bg-muted/50",
         isEditingThis && "bg-muted ring-1 ring-primary",
@@ -138,11 +136,13 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
         <Checkbox
           checked={isChecked}
           onCheckedChange={(checked) =>
-            handleCheckboxChange(!!checked, entry.path)
+            // Pass node ID to handler
+            handleCheckboxChange(!!checked, entry.id)
           }
           aria-label={`Select ${entry.name}`}
           className="border-border data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-          disabled={isOperationLoading}
+          // Disable checkbox for folders or when loading
+          disabled={isOperationLoading || isDirectory}
         />
       </TableCell>
       <TableCell className="px-2 py-1">
@@ -314,10 +314,9 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
     </TableRow>
   );
 
-  // Context Menu for Folders
   if (isDirectory) {
     return (
-      <ContextMenu key={entry.path}>
+      <ContextMenu key={entry.id}>
         <ContextMenuTrigger
           disabled={isEditingThis || isOperationLoading}
           asChild
@@ -332,7 +331,6 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             Open Folder
           </ContextMenuItem>
           <ContextMenuSeparator />
-          {/* Git Actions */}
           {isGitRepo ? (
             <>
               <ContextMenuItem
@@ -374,7 +372,6 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             </ContextMenuItem>
           )}
           <ContextMenuSeparator />
-          {/* Standard Actions */}
           <ContextMenuItem
             onSelect={() => startEditing(entry)}
             disabled={isOperationLoading}
@@ -401,7 +398,6 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
       </ContextMenu>
     );
   } else {
-    // Files don't have the extended context menu for now
     return rowContent;
   }
 };

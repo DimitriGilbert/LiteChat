@@ -3,17 +3,18 @@ import React, {
   useState,
   useCallback,
   useMemo,
-  RefObject, // Import RefObject
+  RefObject,
+  useEffect,
 } from "react";
 import type {
   PromptTurnObject,
-  InputAreaRendererProps, // Import props type for renderer
+  InputAreaRendererProps,
 } from "@/types/litechat/prompt";
 import { PromptControlWrapper } from "./PromptControlWrapper";
 import { Button } from "@/components/ui/button";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useInteractionStore } from "@/store/interaction.store";
-import { SendHorizonalIcon } from "lucide-react";
+import { SendHorizonalIcon, XIcon } from "lucide-react";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
 import type {
@@ -22,7 +23,11 @@ import type {
   ModMiddlewareReturnMap,
 } from "@/types/litechat/modding";
 import { cn } from "@/lib/utils";
-import { useInputStore } from "@/store/input.store";
+// Use correct store and types
+import { useInputStore, type AttachedFileMetadata } from "@/store/input.store";
+import { Badge } from "@/components/ui/badge";
+import { formatBytes } from "@/lib/litechat/file-manager-utils";
+import { toast } from "sonner";
 
 // Middleware runner remains the same
 async function runMiddleware<H extends ModMiddlewareHookName>(
@@ -57,23 +62,23 @@ async function runMiddleware<H extends ModMiddlewareHookName>(
 }
 
 interface PromptWrapperProps {
-  // Ensure InputAreaRenderer type accepts the ref
   InputAreaRenderer: React.ForwardRefExoticComponent<
     InputAreaRendererProps & React.RefAttributes<HTMLTextAreaElement>
   >;
   onSubmit: (turnData: PromptTurnObject) => Promise<void>;
   className?: string;
-  inputRef?: RefObject<HTMLTextAreaElement>; // Accept the ref again
+  inputRef?: RefObject<HTMLTextAreaElement>;
 }
 
 export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   InputAreaRenderer,
   onSubmit,
   className,
-  inputRef, // Receive the ref
+  inputRef,
 }) => {
   const [inputValue, setInputValue] = useState("");
-  const { attachedFiles, selectedVfsFiles, clearAllInput } = useInputStore();
+  const { attachedFilesMetadata, clearAttachedFiles, removeAttachedFile } =
+    useInputStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const registeredControls = useControlRegistryStore(
     (state) => state.promptControls,
@@ -92,11 +97,11 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
 
   const handleClearInputs = useCallback(() => {
     setInputValue("");
-    clearAllInput();
+    clearAttachedFiles();
     activeControls.forEach((c) => {
       if (c.clearOnSubmit) c.clearOnSubmit();
     });
-  }, [activeControls, clearAllInput]);
+  }, [activeControls, clearAttachedFiles]);
 
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
@@ -108,8 +113,13 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         return;
       }
 
+      // Read the *current* state of attached files metadata from the store
+      // This ensures we capture the content that was read asynchronously
+      const currentAttachedFilesMetadata =
+        useInputStore.getState().attachedFilesMetadata;
+
       const hasContent =
-        trimmedInput || attachedFiles.length > 0 || selectedVfsFiles.length > 0;
+        trimmedInput || currentAttachedFilesMetadata.length > 0;
 
       if (!hasContent) {
         console.warn("Submit prevented: No content provided.");
@@ -118,8 +128,10 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
 
       setIsSubmitting(true);
 
-      const validSelectedVfsFiles = selectedVfsFiles.filter(
-        (f): f is typeof f & { path: string } => typeof f.path === "string",
+      // Create a deep copy of the metadata including content for the turn object
+      // This is crucial as this object snapshot is saved with the interaction
+      const fileMetadataForTurn: AttachedFileMetadata[] = JSON.parse(
+        JSON.stringify(currentAttachedFilesMetadata),
       );
 
       let turnData: PromptTurnObject = {
@@ -127,20 +139,12 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         content: trimmedInput,
         parameters: {},
         metadata: {
-          attachedFiles: attachedFiles.map((f) => ({
-            name: f.name,
-            type: f.type,
-            size: f.size,
-          })),
-          selectedVfsFiles: validSelectedVfsFiles.map((f) => ({
-            id: f.id,
-            name: f.name,
-            path: f.path,
-            type: f.type,
-          })),
+          // Include the metadata with content here
+          attachedFiles: fileMetadataForTurn,
         },
       };
 
+      // --- Collect parameters and metadata from controls ---
       const currentControls = useControlRegistryStore.getState().promptControls;
       const currentActiveControls = Object.values(currentControls)
         .filter((c) => (c.show ? c.show() : true))
@@ -161,7 +165,15 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         if (control.getMetadata) {
           try {
             const m = await control.getMetadata();
-            if (m) turnData.metadata = { ...turnData.metadata, ...m };
+            if (m) {
+              // Merge control metadata, ensuring attachedFiles isn't overwritten
+              turnData.metadata = {
+                ...turnData.metadata,
+                ...m,
+                // Explicitly keep the attachedFiles we already processed
+                attachedFiles: turnData.metadata.attachedFiles,
+              };
+            }
           } catch (err) {
             console.error(
               `Error getting metadata from control ${control.id}:`,
@@ -170,6 +182,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
           }
         }
       }
+      // --- End Control Data Collection ---
 
       emitter.emit("prompt:submitted", { turnData });
 
@@ -190,10 +203,14 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
           : turnData;
 
       try {
+        // Pass the final turn data (which includes file content in metadata)
         await onSubmit(finalTurnData);
-        handleClearInputs();
+        handleClearInputs(); // Clear input store state after successful submission
       } catch (err) {
         console.error("Error during final prompt submission:", err);
+        toast.error(
+          `Submission failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
       } finally {
         setIsSubmitting(false);
       }
@@ -203,8 +220,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       onSubmit,
       isStreaming,
       handleClearInputs,
-      attachedFiles,
-      selectedVfsFiles,
+      // No need to depend on attachedFilesMetadata here, we read it fresh inside
     ],
   );
 
@@ -218,6 +234,13 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
 
   const hasPanelControls = activeControls.some((c) => !!c.renderer);
   const hasTriggerControls = activeControls.some((c) => !!c.triggerRenderer);
+
+  // Effect to clear file input store if component unmounts
+  useEffect(() => {
+    return () => {
+      clearAttachedFiles();
+    };
+  }, [clearAttachedFiles]);
 
   return (
     <form
@@ -233,11 +256,43 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         </div>
       )}
 
+      {/* Display Attached Files from InputStore */}
+      {attachedFilesMetadata.length > 0 && (
+        <div className="px-3 md:px-4 pt-2 border-b border-border/50 max-h-24 overflow-y-auto">
+          <div className="flex flex-wrap gap-1.5 pb-1.5">
+            {attachedFilesMetadata.map((fileMeta) => (
+              <Badge
+                key={fileMeta.id}
+                variant="secondary"
+                className="flex items-center gap-1.5 pl-1.5 pr-0.5 py-0.5 text-xs"
+              >
+                <span className="truncate max-w-[150px]" title={fileMeta.name}>
+                  {fileMeta.name}
+                </span>
+                <span className="text-muted-foreground/80">
+                  ({formatBytes(fileMeta.size)})
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-4 w-4 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => removeAttachedFile(fileMeta.id)}
+                  aria-label={`Remove ${fileMeta.name}`}
+                  disabled={isSubmitting || isStreaming}
+                >
+                  <XIcon className="h-3 w-3" />
+                </Button>
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="p-3 md:p-4 flex items-end gap-2">
         <div className="flex-grow">
-          {/* Pass the ref down to the renderer */}
           <InputAreaRenderer
-            ref={inputRef} // Pass the ref here
+            ref={inputRef}
             value={inputValue}
             onChange={handleInputChange}
             onSubmit={handleInputSubmit}
@@ -251,9 +306,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
             disabled={
               isSubmitting ||
               isStreaming ||
-              (!inputValue.trim() &&
-                attachedFiles.length === 0 &&
-                selectedVfsFiles.length === 0)
+              (!inputValue.trim() && attachedFilesMetadata.length === 0)
             }
             size="icon"
             className="h-10 w-10 rounded-full"
@@ -265,12 +318,10 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       </div>
 
       {hasTriggerControls && (
-        // Make this outer div grow and allow wrapping inside
         <div className="px-3 md:px-4 pb-2 pt-1 flex-grow">
           <PromptControlWrapper
             controls={activeControls}
             area="trigger"
-            // Apply flex-wrap here, ensure items don't shrink
             className="flex flex-wrap items-center gap-1 [&>*]:flex-shrink-0"
           />
         </div>

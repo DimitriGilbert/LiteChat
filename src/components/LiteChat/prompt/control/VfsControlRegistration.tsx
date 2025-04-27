@@ -1,8 +1,7 @@
 // src/components/LiteChat/prompt/control/VfsControlRegistration.tsx
 import React, { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-// Changed icon from Paperclip to FolderOpen
-import { FolderOpenIcon } from "lucide-react";
+import { FolderOpenIcon, Loader2Icon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -25,14 +24,37 @@ import { useVfsStore } from "@/store/vfs.store";
 import { useInputStore } from "@/store/input.store";
 import { cn } from "@/lib/utils";
 import type { PromptControl } from "@/types/litechat/prompt";
-import type { VfsFile, VfsFileObject } from "@/types/litechat/vfs";
+import type { VfsFile } from "@/types/litechat/vfs";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
+import * as VfsOps from "@/lib/litechat/vfs-operations";
+import { COMMON_TEXT_EXTENSIONS_VFS } from "@/types/litechat/vfs";
 
 const CONTROL_ID = "core-vfs-control";
 
+// Helper function to convert ArrayBuffer to Base64 (remains the same)
+const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+};
+
+const isLikelyTextFile = (name: string, mimeType?: string): boolean => {
+  const fileNameLower = name.toLowerCase();
+  if (mimeType?.startsWith("text/") || mimeType === "application/json") {
+    return true;
+  }
+  return COMMON_TEXT_EXTENSIONS_VFS.some((ext) => fileNameLower.endsWith(ext));
+};
+// --- End Text Detection Logic ---
+
 const VfsPromptControl: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAttaching, setIsAttaching] = useState(false);
 
   const { nodes, selectedFileIds, clearSelection, uploadFiles } = useVfsStore(
     useShallow((state) => ({
@@ -44,14 +66,12 @@ const VfsPromptControl: React.FC = () => {
     })),
   );
 
-  const { setSelectedFiles, selectedVfsFiles, clearSelectedFiles } =
-    useInputStore(
-      useShallow((state) => ({
-        setSelectedFiles: state.setSelectedFiles,
-        selectedVfsFiles: state.selectedVfsFiles,
-        clearSelectedFiles: state.clearSelectedFiles,
-      })),
-    );
+  const { addAttachedFile, attachedFilesMetadata } = useInputStore(
+    useShallow((state) => ({
+      addAttachedFile: state.addAttachedFile,
+      attachedFilesMetadata: state.attachedFilesMetadata,
+    })),
+  );
 
   const selectedVfsNodes: VfsFile[] = React.useMemo(() => {
     return Array.from(selectedFileIds)
@@ -59,57 +79,87 @@ const VfsPromptControl: React.FC = () => {
       .filter((node): node is VfsFile => !!node && node.type === "file");
   }, [selectedFileIds, nodes]);
 
-  const mapToInputStoreFormat = useCallback(
-    (vfsNodes: VfsFile[]): VfsFileObject[] => {
-      return vfsNodes.map((node) => ({
-        id: node.id,
-        name: node.name,
-        size: node.size,
-        type: node.mimeType || "application/octet-stream",
-        path: node.path,
-      }));
+  // Attach selected VFS files to the InputStore, reading content first
+  const handleFileSelectConfirm = useCallback(async () => {
+    if (selectedVfsNodes.length === 0 || isAttaching) return;
+
+    setIsAttaching(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    const processingPromises = selectedVfsNodes.map(async (node) => {
+      try {
+        // Read content as ArrayBuffer first
+        const buffer = await VfsOps.readFileOp(node.path);
+        const mimeType = node.mimeType || "application/octet-stream";
+        // Use the helper to determine if it's likely text
+        const isText = isLikelyTextFile(node.name, mimeType);
+
+        // Prepare the data object for addAttachedFile
+        const fileDataToAdd: Omit<AttachedFileMetadata, "id"> = {
+          source: "vfs",
+          name: node.name,
+          type: mimeType,
+          size: node.size,
+          path: node.path,
+        };
+
+        if (isText) {
+          // Decode as text and add contentText
+          fileDataToAdd.contentText = new TextDecoder().decode(buffer);
+        } else {
+          // Convert to base64 and add contentBase64
+          fileDataToAdd.contentBase64 = arrayBufferToBase64(buffer);
+        }
+
+        // Add the file metadata *with* the content to the input store
+        addAttachedFile(fileDataToAdd);
+        successCount++;
+      } catch (error) {
+        errorCount++;
+        console.error(`Failed to read VFS file ${node.path}:`, error);
+        toast.error(
+          `Failed to attach "${node.name}": ${error instanceof Error ? error.message : "Read error"}`,
+        );
+      }
+    });
+
+    await Promise.all(processingPromises);
+
+    if (successCount > 0) {
+      toast.success(`${successCount} file(s) attached from VFS.`);
+    }
+    if (errorCount > 0) {
+      toast.warning(`${errorCount} file(s) could not be attached.`);
+    }
+
+    clearSelection();
+    setIsAttaching(false);
+    setIsDialogOpen(false);
+  }, [selectedVfsNodes, addAttachedFile, clearSelection, isAttaching]);
+
+  // --- Other handlers remain the same ---
+  const handleDialogClose = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        if (selectedFileIds.size > 0) {
+          clearSelection();
+        }
+        setIsDialogOpen(false);
+      } else {
+        setIsDialogOpen(true);
+      }
     },
-    [],
+    [clearSelection, selectedFileIds.size],
   );
 
-  useEffect(() => {
-    if (isDialogOpen) {
-      const inputStoreFiles = mapToInputStoreFormat(selectedVfsNodes);
-      if (
-        inputStoreFiles.length !== selectedVfsFiles.length ||
-        JSON.stringify(inputStoreFiles) !== JSON.stringify(selectedVfsFiles)
-      ) {
-        setSelectedFiles(inputStoreFiles);
-      }
-    }
-  }, [
-    isDialogOpen,
-    selectedVfsNodes,
-    setSelectedFiles,
-    selectedVfsFiles,
-    mapToInputStoreFormat,
-  ]);
-
-  const handleFileSelectConfirm = useCallback(() => {
-    const inputStoreFiles = mapToInputStoreFormat(selectedVfsNodes);
-    setSelectedFiles(inputStoreFiles);
-    console.log(
-      "Files attached from VFS:",
-      inputStoreFiles.map((f) => f.path),
-    );
-    toast.success(`${inputStoreFiles.length} file(s) attached from VFS.`);
-    setIsDialogOpen(false);
-  }, [selectedVfsNodes, setSelectedFiles, mapToInputStoreFormat]);
-
-  const handleDialogClose = useCallback(() => {
-    if (selectedFileIds.size > 0) {
-      clearSelection();
-    }
-    clearSelectedFiles();
-    setIsDialogOpen(false);
-  }, [clearSelection, clearSelectedFiles, selectedFileIds.size]);
-
   const getCurrentParentId = useVfsStore.getState().currentParentId;
+  const getCurrentPath = () => {
+    const parentNode = getCurrentParentId
+      ? useVfsStore.getState().nodes[getCurrentParentId]
+      : useVfsStore.getState().nodes[useVfsStore.getState().rootId || ""];
+    return parentNode?.path || "/";
+  };
 
   const handleFileDrop = useCallback(
     async (event: React.DragEvent<HTMLDivElement>) => {
@@ -120,16 +170,15 @@ const VfsPromptControl: React.FC = () => {
         try {
           await uploadFiles(getCurrentParentId, files);
           toast.success(
-            `${files.length} file(s) added to VFS. Select them in the manager.`,
+            `${files.length} file(s) added to VFS at ${getCurrentPath()}. Select them in the manager.`,
           );
-          setIsDialogOpen(true);
         } catch (error) {
           console.error("Error adding files via drop:", error);
           toast.error("Failed to add dropped files.");
         }
       }
     },
-    [uploadFiles, getCurrentParentId, setIsDialogOpen],
+    [uploadFiles, getCurrentParentId],
   );
 
   const handleDragOver = useCallback(
@@ -140,21 +189,12 @@ const VfsPromptControl: React.FC = () => {
     [],
   );
 
-  const attachedVfsCount = useInputStore(
-    (state) => state.selectedVfsFiles.length,
-  );
+  const attachedVfsCount = attachedFilesMetadata.filter(
+    (f) => f.source === "vfs",
+  ).length;
 
   return (
-    <Dialog
-      open={isDialogOpen}
-      onOpenChange={(open) => {
-        if (!open) {
-          handleDialogClose();
-        } else {
-          setIsDialogOpen(true);
-        }
-      }}
-    >
+    <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -173,7 +213,6 @@ const VfsPromptControl: React.FC = () => {
                   )}
                   aria-label={`Attach files from VFS (${attachedVfsCount} selected)`}
                 >
-                  {/* Changed Icon */}
                   <FolderOpenIcon className="h-5 w-5" />
                   {attachedVfsCount > 0 && (
                     <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-xs text-white">
@@ -203,15 +242,20 @@ const VfsPromptControl: React.FC = () => {
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline" onClick={handleDialogClose}>
+            <Button variant="outline" onClick={() => handleDialogClose(false)}>
               Cancel
             </Button>
           </DialogClose>
           <Button
             onClick={handleFileSelectConfirm}
-            disabled={selectedVfsNodes.length === 0}
+            disabled={selectedVfsNodes.length === 0 || isAttaching} // Disable while attaching
           >
-            Attach Selected ({selectedVfsNodes.length})
+            {isAttaching && (
+              <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+            )}
+            {isAttaching
+              ? "Attaching..."
+              : `Attach Selected (${selectedVfsNodes.length})`}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -219,6 +263,7 @@ const VfsPromptControl: React.FC = () => {
   );
 };
 
+// Registration hook remains the same
 export const useVfsControlRegistration = () => {
   const registerControl = useControlRegistryStore(
     (state) => state.registerPromptControl,
@@ -234,23 +279,6 @@ export const useVfsControlRegistration = () => {
       id: CONTROL_ID,
       triggerRenderer: () => <VfsPromptControl />,
       show: () => enableVfs,
-      getMetadata: () => {
-        const selected = useInputStore.getState().selectedVfsFiles;
-        if (selected.length === 0) return undefined;
-        const validFiles = selected
-          .filter((f): f is typeof f & { path: string } => !!f.path)
-          .map((f) => ({ id: f.id, path: f.path }));
-        return validFiles.length > 0
-          ? { attachedVfsFiles: validFiles }
-          : undefined;
-      },
-      clearOnSubmit: () => {
-        useInputStore.getState().clearSelectedFiles();
-        const vfsStore = useVfsStore.getState();
-        if (vfsStore.selectedFileIds.size > 0) {
-          vfsStore.clearSelection();
-        }
-      },
       order: 40,
     };
 

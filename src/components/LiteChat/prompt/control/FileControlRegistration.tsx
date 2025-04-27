@@ -1,53 +1,120 @@
 // src/components/LiteChat/prompt/control/FileControlRegistration.tsx
-import React, { useRef } from "react";
+// (Content verified - no changes needed from previous correct version)
+import React, { useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { PaperclipIcon } from "lucide-react";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useInputStore } from "@/store/input.store";
 import type { PromptControl } from "@/types/litechat/prompt";
-import { useShallow } from "zustand/react/shallow";
-// Removed unused toast import
+import { toast } from "sonner";
+import { COMMON_TEXT_EXTENSIONS_VFS } from "@/types/litechat/vfs";
+// Helper function to read file as base64
+const readFileAsBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        const base64Content = reader.result.split(",")[1];
+        if (base64Content) {
+          resolve(base64Content);
+        } else {
+          reject(new Error("Failed to extract base64 content from data URL."));
+        }
+      } else {
+        reject(new Error("FileReader result is not a string."));
+      }
+    };
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(file);
+  });
+};
+
+// Helper function to read file as text
+const readFileAsText = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("FileReader result is not a string."));
+      }
+    };
+    reader.onerror = (error) => reject(error);
+    reader.readAsText(file);
+  });
+};
 
 export const useFileControlRegistration = () => {
   const register = useControlRegistryStore(
     (state) => state.registerPromptControl,
   );
-  // Get actions and state needed for the control logic
-  const { addAttachedFile, clearAttachedFiles } = useInputStore(
-    useShallow((state) => ({
-      addAttachedFile: state.addAttachedFile,
-      clearAttachedFiles: state.clearAttachedFiles,
-      // attachedFiles: state.attachedFiles, // Removed unused state selector
-    })),
-  );
+  const addAttachedFile = useInputStore((state) => state.addAttachedFile);
 
-  // Ref for the hidden file input
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleAttachClick = () => {
+  const handleAttachClick = useCallback(() => {
     fileInputRef.current?.click();
-  };
+  }, []);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files) {
-      for (let i = 0; i < files.length; i++) {
-        addAttachedFile(files[i]); // Use action from store
+  const handleFileChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = event.target.files;
+      if (files) {
+        const processingPromises = Array.from(files).map(async (file) => {
+          try {
+            const mimeType = file.type || "application/octet-stream";
+            // Use a more robust check for text files
+            const fileNameLower = file.name.toLowerCase();
+            const isText =
+              mimeType.startsWith("text/") ||
+              mimeType === "application/json" ||
+              COMMON_TEXT_EXTENSIONS_VFS.some((ext) =>
+                fileNameLower.endsWith(ext),
+              );
+
+            if (isText) {
+              const textContent = await readFileAsText(file);
+              addAttachedFile({
+                source: "direct",
+                name: file.name,
+                type: mimeType,
+                size: file.size,
+                contentText: textContent,
+              });
+            } else {
+              const base64Content = await readFileAsBase64(file);
+              addAttachedFile({
+                source: "direct",
+                name: file.name,
+                type: mimeType,
+                size: file.size,
+                contentBase64: base64Content,
+              });
+            }
+          } catch (error) {
+            console.error(`Error reading file ${file.name}:`, error);
+            toast.error(
+              `Failed to read file "${file.name}": ${error instanceof Error ? error.message : "Unknown error"}`,
+            );
+          }
+        });
+
+        await Promise.all(processingPromises);
+
+        if (event.target) {
+          event.target.value = "";
+        }
       }
-      // Reset input value to allow selecting the same file again
-      if (event.target) {
-        event.target.value = "";
-      }
-    }
-  };
+    },
+    [addAttachedFile],
+  );
 
   React.useEffect(() => {
     const control: PromptControl = {
       id: "core-file-control",
-      // Removed status property
       triggerRenderer: () => (
         <>
-          {/* Hidden file input */}
           <input
             type="file"
             ref={fileInputRef}
@@ -55,37 +122,25 @@ export const useFileControlRegistration = () => {
             className="hidden"
             multiple
           />
-          {/* Visible trigger button */}
           <Button
             type="button"
             variant="ghost"
             size="icon"
             onClick={handleAttachClick}
             className="h-10 w-10 rounded-full"
-            aria-label="Attach file"
+            aria-label="Attach file(s)"
           >
             <PaperclipIcon className="h-5 w-5" />
           </Button>
         </>
       ),
-      // No separate renderer needed, PromptForm handles display
-      show: () => true, // Always show the attach button
-      getMetadata: () => {
-        // Provide count as metadata, actual files handled by PromptForm/Wrapper
-        const count = useInputStore.getState().attachedFiles.length;
-        // Return undefined instead of null
-        return count > 0 ? { attachedFileCount: count } : undefined;
-      },
-      clearOnSubmit: () => {
-        clearAttachedFiles(); // Use action from store
-      },
-      order: 30, // Example order
+      show: () => true,
+      order: 30,
     };
 
     const unregister = register(control);
     return unregister;
-    // Re-register if actions change (unlikely but good practice)
-  }, [register, addAttachedFile, clearAttachedFiles, handleFileChange]);
+  }, [register, addAttachedFile, handleAttachClick, handleFileChange]);
 
-  return null; // This hook doesn't render anything itself
+  return null;
 };

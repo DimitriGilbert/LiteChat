@@ -3,19 +3,26 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { Conversation } from "@/types/litechat/chat";
 import type { Interaction } from "@/types/litechat/interaction";
-import type { SyncRepo, SyncStatus } from "@/types/litechat/sync"; // Import sync types
+import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
 import { useInteractionStore } from "./interaction.store";
 import { PersistenceService } from "@/services/persistence.service";
-import * as VfsOps from "@/lib/litechat/vfs-operations"; // Import VFS Ops
+import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
-import { joinPath, normalizePath } from "@/lib/litechat/file-manager-utils"; // Import path utils
+// Import formatBytes and path utils correctly
+import {
+  joinPath,
+  normalizePath,
+  dirname,
+  formatBytes,
+} from "@/lib/litechat/file-manager-utils";
+import { format } from "date-fns";
 
 interface ConversationState {
   conversations: Conversation[];
   selectedConversationId: string | null;
-  syncRepos: SyncRepo[]; // Add sync repo state
-  conversationSyncStatus: Record<string, SyncStatus>; // Track status per convo
+  syncRepos: SyncRepo[];
+  conversationSyncStatus: Record<string, SyncStatus>;
   isLoading: boolean;
   error: string | null;
 }
@@ -24,7 +31,7 @@ interface ConversationActions {
   addConversation: (
     conversationData: Partial<Omit<Conversation, "id" | "createdAt">> & {
       title: string;
-    }, // Ensure title is required
+    },
   ) => Promise<string>;
   updateConversation: (
     id: string,
@@ -33,8 +40,11 @@ interface ConversationActions {
   deleteConversation: (id: string) => Promise<void>;
   selectConversation: (id: string | null) => void;
   importConversation: (file: File) => Promise<void>;
+  exportConversation: (
+    conversationId: string,
+    format: "json" | "md",
+  ) => Promise<void>;
   exportAllConversations: () => Promise<void>;
-  // Sync Repo Actions
   loadSyncRepos: () => Promise<void>;
   addSyncRepo: (
     repoData: Omit<SyncRepo, "id" | "createdAt" | "updatedAt">,
@@ -44,7 +54,6 @@ interface ConversationActions {
     updates: Partial<Omit<SyncRepo, "id" | "createdAt">>,
   ) => Promise<void>;
   deleteSyncRepo: (id: string) => Promise<void>;
-  // Conversation Sync Actions
   linkConversationToRepo: (
     conversationId: string,
     repoId: string | null,
@@ -57,14 +66,87 @@ interface ConversationActions {
   ) => void;
 }
 
-const CONVERSATION_DIR = ".litechat/conversations"; // Directory within repo
+const CONVERSATION_DIR = ".litechat/conversations";
+
+// Helper function to format interactions to Markdown
+const formatInteractionsToMarkdown = (
+  conversation: Conversation,
+  interactions: Interaction[],
+): string => {
+  let mdString = `# ${conversation.title}\n\n`;
+  mdString += `*Conversation ID: ${conversation.id}*\n`;
+  mdString += `*Created: ${format(conversation.createdAt, "yyyy-MM-dd HH:mm:ss")}*\n`;
+  mdString += `*Last Updated: ${format(conversation.updatedAt, "yyyy-MM-dd HH:mm:ss")}*\n\n`;
+  mdString += "---\n\n";
+
+  interactions
+    .filter((i) => i.type === "message.user_assistant")
+    .sort((a, b) => a.index - b.index)
+    .forEach((interaction) => {
+      if (
+        interaction.prompt?.content ||
+        interaction.prompt?.metadata?.attachedFiles?.length
+      ) {
+        mdString += `## User (Index: ${interaction.index})\n\n`;
+        // Include file metadata if present
+        if (
+          interaction.prompt.metadata?.attachedFiles &&
+          interaction.prompt.metadata.attachedFiles.length > 0
+        ) {
+          mdString += "**Attached Files:**\n";
+          interaction.prompt.metadata.attachedFiles.forEach((f: any) => {
+            // Use formatBytes directly
+            mdString += `- ${f.name} (${f.type}, ${formatBytes(f.size)}) ${f.source === "vfs" ? `(VFS: ${f.path})` : "(Direct Upload)"}\n`;
+          });
+          mdString += "\n";
+        }
+        if (interaction.prompt.content) {
+          mdString += `${interaction.prompt.content}\n\n`;
+        }
+      }
+      if (interaction.response) {
+        mdString += `## Assistant (Index: ${interaction.index})\n\n`;
+        if (interaction.metadata?.modelId) {
+          mdString += `*Model: ${interaction.metadata.modelId}*\n\n`;
+        }
+        if (typeof interaction.response === "string") {
+          mdString += `${interaction.response}\n\n`;
+        } else {
+          mdString += "```json\n";
+          mdString += `${JSON.stringify(interaction.response, null, 2)}\n`;
+          mdString += "```\n\n";
+        }
+        if (
+          interaction.metadata?.promptTokens ||
+          interaction.metadata?.completionTokens
+        ) {
+          mdString += `*Tokens: ${interaction.metadata.promptTokens ?? "?"} (prompt) / ${interaction.metadata.completionTokens ?? "?"} (completion)*\n\n`;
+        }
+      }
+      mdString += "---\n\n";
+    });
+
+  return mdString;
+};
+
+// Helper function to trigger browser download
+const triggerDownload = (blob: Blob, filename: string): void => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
 export const useConversationStore = create(
   immer<ConversationState & ConversationActions>((set, get) => ({
     conversations: [],
     selectedConversationId: null,
-    syncRepos: [], // Initialize sync repo state
-    conversationSyncStatus: {}, // Initialize sync status
+    syncRepos: [],
+    conversationSyncStatus: {},
     isLoading: false,
     error: null,
 
@@ -73,10 +155,9 @@ export const useConversationStore = create(
       try {
         const dbConvos = await PersistenceService.loadConversations();
         set({ conversations: dbConvos, isLoading: false });
-        // Initialize sync status for loaded convos
         const initialStatus: Record<string, SyncStatus> = {};
         dbConvos.forEach((c) => {
-          initialStatus[c.id] = "idle"; // Assume idle initially
+          initialStatus[c.id] = "idle";
         });
         set({ conversationSyncStatus: initialStatus });
       } catch (e) {
@@ -92,7 +173,7 @@ export const useConversationStore = create(
         id: newId,
         createdAt: now,
         updatedAt: now,
-        title: conversationData.title, // Ensure title is set
+        title: conversationData.title,
         metadata: conversationData.metadata ?? {},
         syncRepoId: conversationData.syncRepoId ?? null,
         lastSyncedAt: conversationData.lastSyncedAt ?? null,
@@ -100,7 +181,7 @@ export const useConversationStore = create(
       set((state) => {
         if (!state.conversations.some((c) => c.id === newConversation.id)) {
           state.conversations.unshift(newConversation);
-          state.conversationSyncStatus[newId] = "idle"; // Set initial sync status
+          state.conversationSyncStatus[newId] = "idle";
         }
       });
       try {
@@ -130,14 +211,11 @@ export const useConversationStore = create(
         const index = state.conversations.findIndex((c) => c.id === id);
         if (index !== -1) {
           originalConversation = { ...state.conversations[index] };
-          // Check if sync-relevant data changed (title, metadata, etc.)
           if (
             updates.title !== undefined ||
             updates.metadata !== undefined ||
             updates.syncRepoId !== undefined
-            // Add other fields that should trigger 'needs-sync'
           ) {
-            // Only mark as needs-sync if it's currently linked to a repo
             if (state.conversations[index].syncRepoId) {
               needsSync = true;
             }
@@ -151,7 +229,6 @@ export const useConversationStore = create(
           state.conversations.sort(
             (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
           );
-          // Update sync status if needed
           if (needsSync && state.conversationSyncStatus[id] === "idle") {
             state.conversationSyncStatus[id] = "needs-sync";
           }
@@ -174,7 +251,6 @@ export const useConversationStore = create(
               state.conversations.sort(
                 (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
               );
-              // Revert sync status if needed
               if (needsSync) {
                 state.conversationSyncStatus[id] = "idle";
               }
@@ -205,7 +281,6 @@ export const useConversationStore = create(
       try {
         await PersistenceService.deleteConversation(id);
         await PersistenceService.deleteInteractionsForConversation(id);
-        // TODO: Delete conversation file from Git repo if synced? (Complex)
 
         if (currentSelectedId === id) {
           useInteractionStore.getState().setCurrentConversationId(null);
@@ -218,7 +293,7 @@ export const useConversationStore = create(
             state.conversations.sort(
               (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
             );
-            state.conversationSyncStatus[id] = "idle"; // Reset status on revert
+            state.conversationSyncStatus[id] = "idle";
           }
           if (currentSelectedId === id) {
             state.selectedConversationId = id;
@@ -242,20 +317,32 @@ export const useConversationStore = create(
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        if (!data.conversation || !data.interactions) {
-          throw new Error("Invalid import file format.");
+        if (
+          !data ||
+          typeof data !== "object" ||
+          !data.conversation ||
+          !Array.isArray(data.interactions)
+        ) {
+          throw new Error(
+            "Invalid import file format. Expected { conversation: {}, interactions: [] }.",
+          );
         }
         const importedConversation: Conversation = data.conversation;
         const importedInteractions: Interaction[] = data.interactions;
-
+        if (
+          !importedConversation.id ||
+          !importedConversation.title ||
+          !importedConversation.createdAt ||
+          !importedConversation.updatedAt
+        ) {
+          throw new Error("Invalid conversation data in import file.");
+        }
         const newId = await get().addConversation({
           title: importedConversation.title || "Imported Chat",
           metadata: importedConversation.metadata,
-          // Do not import sync status from file
           syncRepoId: null,
           lastSyncedAt: null,
         });
-
         const interactionPromises = importedInteractions.map((i) =>
           PersistenceService.saveInteraction({
             ...i,
@@ -264,7 +351,6 @@ export const useConversationStore = create(
           }),
         );
         await Promise.all(interactionPromises);
-
         get().selectConversation(newId);
         toast.success("Conversation imported successfully.");
       } catch (error) {
@@ -276,27 +362,62 @@ export const useConversationStore = create(
       }
     },
 
+    exportConversation: async (conversationId, format) => {
+      try {
+        const conversation = get().conversations.find(
+          (c) => c.id === conversationId,
+        );
+        if (!conversation) {
+          throw new Error("Conversation not found.");
+        }
+        const interactions =
+          await PersistenceService.loadInteractionsForConversation(
+            conversationId,
+          );
+        let blob: Blob;
+        let filename: string;
+        const safeTitle =
+          conversation.title.replace(/[^a-z0-9]/gi, "_").toLowerCase() ||
+          "conversation";
+        if (format === "json") {
+          const exportData = { conversation, interactions };
+          const jsonString = JSON.stringify(exportData, null, 2);
+          blob = new Blob([jsonString], { type: "application/json" });
+          filename = `litechat_${safeTitle}_${conversationId.substring(0, 6)}.json`;
+        } else if (format === "md") {
+          const mdString = formatInteractionsToMarkdown(
+            conversation,
+            interactions,
+          );
+          blob = new Blob([mdString], { type: "text/markdown" });
+          filename = `litechat_${safeTitle}_${conversationId.substring(0, 6)}.md`;
+        } else {
+          throw new Error("Invalid export format specified.");
+        }
+        triggerDownload(blob, filename);
+        toast.success(`Conversation exported as ${format.toUpperCase()}.`);
+      } catch (error) {
+        console.error("ConversationStore: Error exporting conversation", error);
+        toast.error(
+          `Export failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw error;
+      }
+    },
+
     exportAllConversations: async () => {
       try {
-        const conversations = await PersistenceService.loadConversations();
+        const conversations = get().conversations;
         const exportData = [];
-
         for (const convo of conversations) {
           const interactions =
             await PersistenceService.loadInteractionsForConversation(convo.id);
           exportData.push({ conversation: convo, interactions });
         }
-
         const jsonString = JSON.stringify(exportData, null, 2);
         const blob = new Blob([jsonString], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `litechat_export_${new Date().toISOString().split("T")[0]}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        const filename = `litechat_all_export_${new Date().toISOString().split("T")[0]}.json`;
+        triggerDownload(blob, filename);
         toast.success("All conversations exported.");
       } catch (error) {
         console.error(
@@ -310,7 +431,6 @@ export const useConversationStore = create(
       }
     },
 
-    // --- Sync Repo Actions ---
     loadSyncRepos: async () => {
       set({ isLoading: true, error: null });
       try {
@@ -369,10 +489,6 @@ export const useConversationStore = create(
       if (updatedRepo) {
         try {
           await PersistenceService.saveSyncRepo(updatedRepo);
-          // @ts-expect-error immer set not properly typed, @AI FIX !
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const _ = updatedRepo;
-          // @ts-expect-error immer set not properly typed, @AI FIX !
           toast.success(`Sync repository "${updatedRepo.name}" updated.`);
         } catch (e) {
           console.error("ConversationStore: Error updating sync repo", e);
@@ -394,7 +510,6 @@ export const useConversationStore = create(
 
       set((state) => ({
         syncRepos: state.syncRepos.filter((r) => r.id !== id),
-        // Unlink conversations - handled by persistence service transaction now
       }));
 
       try {
@@ -405,7 +520,6 @@ export const useConversationStore = create(
         set((state) => {
           if (repoToDelete) {
             state.syncRepos.push(repoToDelete);
-            // Re-linking conversations is complex, might require manual action
           }
           state.error = "Failed to delete sync repository";
         });
@@ -413,13 +527,11 @@ export const useConversationStore = create(
       }
     },
 
-    // --- Conversation Sync Actions ---
     linkConversationToRepo: async (conversationId, repoId) => {
       await get().updateConversation(conversationId, {
         syncRepoId: repoId,
-        lastSyncedAt: null, // Reset sync time on link/unlink
+        lastSyncedAt: null,
       });
-      // Reset sync status
       get()._setConversationSyncStatus(conversationId, "idle");
       toast.info(
         `Conversation ${repoId ? "linked to" : "unlinked from"} sync repository.`,
@@ -430,7 +542,6 @@ export const useConversationStore = create(
       set((state) => {
         state.conversationSyncStatus[conversationId] = status;
         if (status === "error" && error) {
-          // Optionally store error message per conversation if needed
           console.error(`Sync error for ${conversationId}: ${error}`);
         }
       });
@@ -460,7 +571,7 @@ export const useConversationStore = create(
       }
 
       _setConversationSyncStatus(conversationId, "syncing");
-      const repoDir = normalizePath(`/sync_repos/${repo.id}`); // Use unique dir per repo
+      const repoDir = normalizePath(`/synced_convos/${repo.id}`);
       const convoFilePath = joinPath(
         repoDir,
         CONVERSATION_DIR,
@@ -468,19 +579,22 @@ export const useConversationStore = create(
       );
 
       try {
-        // 1. Ensure repo exists locally or clone/pull
         let repoExists = false;
         try {
           await VfsOps.VFS.promises.stat(joinPath(repoDir, ".git"));
           repoExists = true;
         } catch (e: any) {
-          if (e.code !== "ENOENT") throw e; // Re-throw unexpected errors
+          if (e.code !== "ENOENT") throw e;
         }
 
         if (!repoExists) {
           toast.info(`Cloning repository "${repo.name}" for first sync...`);
-          await VfsOps.gitCloneOp("/", repo.remoteUrl, repo.branch); // Clone into root, it creates subdir
-          // Verify clone created the expected directory
+          // Use dirname correctly
+          await VfsOps.gitCloneOp(
+            dirname(repoDir),
+            repo.remoteUrl,
+            repo.branch,
+          );
           try {
             await VfsOps.VFS.promises.stat(joinPath(repoDir, ".git"));
           } catch (verifyError) {
@@ -490,10 +604,9 @@ export const useConversationStore = create(
           }
         } else {
           toast.info(`Pulling latest changes for "${repo.name}"...`);
-          await VfsOps.gitPullOp(repoDir); // Pull changes
+          await VfsOps.gitPullOp(repoDir);
         }
 
-        // 2. Load remote conversation data (if exists)
         let remoteConvoData: {
           conversation: Conversation;
           interactions: Interaction[];
@@ -518,23 +631,22 @@ export const useConversationStore = create(
           }
         }
 
-        // 3. Compare timestamps and decide action
         const localTimestamp = conversation.updatedAt.getTime();
         const lastSyncTimestamp = conversation.lastSyncedAt?.getTime() ?? 0;
 
         if (
           !remoteConvoData ||
           localTimestamp > (remoteTimestamp ?? 0) ||
-          localTimestamp > lastSyncTimestamp // Also push if local changed since last sync
+          localTimestamp > lastSyncTimestamp
         ) {
-          // Push local changes
           toast.info("Local changes detected. Pushing to remote...");
           const interactions =
             await PersistenceService.loadInteractionsForConversation(
               conversationId,
             );
+          const conversationToSave = { ...conversation, lastSyncedAt: null };
           const localData = JSON.stringify(
-            { conversation, interactions },
+            { conversation: conversationToSave, interactions },
             null,
             2,
           );
@@ -547,15 +659,15 @@ export const useConversationStore = create(
           await updateConversation(conversationId, {
             lastSyncedAt: new Date(),
           });
-          _setConversationSyncStatus(conversationId, "idle"); // Synced
+          _setConversationSyncStatus(conversationId, "idle");
           toast.success("Conversation synced successfully (pushed).");
         } else if (remoteTimestamp && remoteTimestamp > localTimestamp) {
-          // Pull remote changes
           toast.info("Remote changes detected. Updating local conversation...");
-          // Update local conversation and interactions
-          await PersistenceService.saveConversation(
-            remoteConvoData!.conversation,
-          );
+          const syncedConversation = {
+            ...remoteConvoData!.conversation,
+            lastSyncedAt: new Date(),
+          };
+          await PersistenceService.saveConversation(syncedConversation);
           await PersistenceService.deleteInteractionsForConversation(
             conversationId,
           );
@@ -564,30 +676,27 @@ export const useConversationStore = create(
           );
           await Promise.all(interactionPromises);
 
-          // Update store state
           set((state) => {
             const index = state.conversations.findIndex(
               (c) => c.id === conversationId,
             );
             if (index !== -1) {
-              state.conversations[index] = remoteConvoData!.conversation;
+              state.conversations[index] = syncedConversation;
             }
             state.conversations.sort(
               (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
             );
           });
-          // Reload interactions if it's the selected conversation
           if (get().selectedConversationId === conversationId) {
             useInteractionStore.getState().loadInteractions(conversationId);
           }
-          _setConversationSyncStatus(conversationId, "idle"); // Synced
+          _setConversationSyncStatus(conversationId, "idle");
           toast.success("Conversation synced successfully (pulled).");
         } else {
-          // Already in sync
           toast.info("Conversation already up-to-date.");
           await updateConversation(conversationId, {
             lastSyncedAt: new Date(),
-          }); // Update timestamp even if no data change
+          });
           _setConversationSyncStatus(conversationId, "idle");
         }
       } catch (error: any) {
