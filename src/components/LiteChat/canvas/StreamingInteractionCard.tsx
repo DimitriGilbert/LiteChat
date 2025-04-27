@@ -45,6 +45,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       <div
         key={interactionId} // Use interactionId as key
         className={cn(
+          // Add group class
           "p-3 my-2 border rounded-md shadow-sm bg-card border-dashed relative group",
         )}
       >
@@ -58,7 +59,8 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
             </span>
             {modelId && <span className="ml-1 text-blue-400">({modelId})</span>}
           </span>
-          <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Use the sticky class for the stop button container */}
+          <div className="interaction-card-actions-sticky">
             <StopButton interactionId={interactionId} onStop={onStop} />
           </div>
         </div>

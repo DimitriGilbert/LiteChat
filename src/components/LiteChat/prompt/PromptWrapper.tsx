@@ -202,7 +202,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     },
     [
       inputValue,
-      activeControls,
       onSubmit,
       isStreaming,
       handleClearInputs,
@@ -268,8 +267,14 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       </div>
 
       {hasTriggerControls && (
-        <div className="px-3 md:px-4 pb-2 pt-1 flex flex-wrap gap-1">
-          <PromptControlWrapper controls={activeControls} area="trigger" />
+        // Make this outer div grow and allow wrapping inside
+        <div className="px-3 md:px-4 pb-2 pt-1 flex-grow">
+          <PromptControlWrapper
+            controls={activeControls}
+            area="trigger"
+            // Apply flex-wrap here, ensure items don't shrink
+            className="flex flex-wrap items-center gap-1 [&>*]:flex-shrink-0"
+          />
         </div>
       )}
     </form>

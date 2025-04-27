@@ -1,4 +1,5 @@
 // src/components/LiteChat/chat/control/ConversationList.tsx
+// (No changes needed here, the previous application of variables was correct)
 import React from "react";
 import { useConversationStore } from "@/store/conversation.store";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -93,10 +94,11 @@ export const ConversationListControlComponent: React.FC = () => {
                 key={c.id}
                 className={cn(
                   "flex justify-between items-center group p-1.5 text-xs rounded cursor-pointer",
-                  "hover:bg-[--selection-muted-background] hover:text-[--selection-foreground]",
+                  "border border-transparent",
+                  "hover:bg-muted/50 hover:text-primary/80",
                   c.id === selectedConversationId
-                    ? "bg-[--selection-background] text-[--selection-foreground] font-medium border border-[--selection-border]"
-                    : "border border-transparent",
+                    ? "bg-primary/10 text-primary font-medium border-primary dark:bg-primary/20 dark:border-primary/70"
+                    : "",
                 )}
                 onClick={() => handleSelectChat(c.id)}
               >

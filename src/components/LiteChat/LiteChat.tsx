@@ -21,12 +21,14 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Interaction } from "@/types/litechat/interaction";
-import { Button } from "@/components/ui/button";
-import { PanelLeftCloseIcon, PanelRightCloseIcon } from "lucide-react";
+// Button removed as it's now handled by a control
+// Icons PanelLeftCloseIcon, PanelRightCloseIcon removed
 
 // Import control registration hooks/components
 import { useConversationListControlRegistration } from "./chat/control/ConversationList";
 import { useSettingsControlRegistration } from "./chat/control/Settings";
+// Import the new toggle control registration
+import { useSidebarToggleControlRegistration } from "./chat/control/SidebarToggleControl";
 import { useGlobalModelSelectorRegistration } from "./prompt/control/GlobalModelSelectorRegistration";
 import { useParameterControlRegistration } from "./prompt/control/ParameterControlRegistration";
 import { useFileControlRegistration } from "./prompt/control/FileControlRegistration";
@@ -71,12 +73,12 @@ export const LiteChat: React.FC = () => {
       setCurrentConversationId: state.setCurrentConversationId,
     })),
   );
-  // Focus flag state is no longer needed here for the effect
-  const { globalError, isSidebarCollapsed, toggleSidebar } = useUIStateStore(
+  // Get sidebar state only, toggle action is handled by the control
+  const { globalError, isSidebarCollapsed } = useUIStateStore(
     useShallow((state) => ({
       globalError: state.globalError,
       isSidebarCollapsed: state.isSidebarCollapsed,
-      toggleSidebar: state.toggleSidebar,
+      // toggleSidebar removed
     })),
   );
   const registeredChatControls = useControlRegistryStore(
@@ -104,12 +106,10 @@ export const LiteChat: React.FC = () => {
     })),
   );
 
-  // Ref removed
-  // const promptInputRef = useRef<HTMLTextAreaElement>(null);
-
   // --- Register Core Controls ---
   useConversationListControlRegistration();
   useSettingsControlRegistration();
+  useSidebarToggleControlRegistration(); // Register the new control
   useGlobalModelSelectorRegistration();
   useParameterControlRegistration();
   useFileControlRegistration();
@@ -160,8 +160,6 @@ export const LiteChat: React.FC = () => {
     loadSettings,
   ]);
 
-  // --- Effect to focus input removed ---
-
   // --- History Construction Helper --- (remains the same)
   const buildHistoryMessages = useCallback(
     (historyInteractions: Interaction[]): CoreMessage[] => {
@@ -193,7 +191,7 @@ export const LiteChat: React.FC = () => {
     [],
   );
 
-  // --- Prompt Submission Handler ---
+  // --- Prompt Submission Handler --- (remains the same)
   const handlePromptSubmit = useCallback(
     async (turnData: PromptTurnObject) => {
       let currentConvId = selectedConversationId;
@@ -415,23 +413,32 @@ export const LiteChat: React.FC = () => {
         {/* Sidebar */}
         <div
           className={cn(
+            // Hide on small screens, flex on medium+
             "hidden md:flex flex-col border-r border-[--border] bg-card transition-all duration-300 ease-in-out flex-shrink-0",
+            // Apply width based on collapsed state
             isSidebarCollapsed ? "w-16" : "w-64",
           )}
         >
+          {/* Main sidebar content - hide when collapsed */}
           <div className={cn("flex-grow overflow-y-auto overflow-x-hidden")}>
             {!isSidebarCollapsed && (
               <ChatControlWrapper
                 controls={sidebarControls}
                 panelId="sidebar"
-                className="h-full"
+                className="h-full" // Ensure it takes full height if needed
               />
             )}
+            {/* Optionally render icons-only version when collapsed */}
+            {/* {isSidebarCollapsed && <CollapsedSidebarControls />} */}
           </div>
+          {/* Footer - adjust layout when collapsed */}
           <div
             className={cn(
               "flex-shrink-0 border-t border-[--border] p-2",
-              isSidebarCollapsed ? "flex flex-col items-center" : "",
+              // Center items vertically when collapsed, space-between otherwise
+              isSidebarCollapsed
+                ? "flex flex-col items-center gap-2"
+                : "flex items-center justify-between", // Use justify-between when expanded
             )}
           >
             <ChatControlWrapper
@@ -439,7 +446,8 @@ export const LiteChat: React.FC = () => {
               panelId="sidebar-footer"
               className={cn(
                 "flex",
-                isSidebarCollapsed ? "flex-col gap-2" : "justify-end",
+                // Stack vertically with gap when collapsed, otherwise default flex row
+                isSidebarCollapsed ? "flex-col gap-2" : "items-center gap-1",
               )}
             />
           </div>
@@ -447,21 +455,9 @@ export const LiteChat: React.FC = () => {
 
         {/* Main Chat Area */}
         <div className="flex flex-col flex-grow min-w-0">
-          <div className="flex items-center justify-between p-2 border-b border-[--border] bg-card flex-shrink-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => toggleSidebar()}
-              className="h-8 w-8 md:hidden"
-              aria-label={isSidebarCollapsed ? "Open sidebar" : "Close sidebar"}
-            >
-              {isSidebarCollapsed ? (
-                <PanelRightCloseIcon className="h-4 w-4" />
-              ) : (
-                <PanelLeftCloseIcon className="h-4 w-4" />
-              )}
-            </Button>
-            <div className="flex-grow"></div> {/* Spacer */}
+          {/* Header - Removed the toggle button */}
+          <div className="flex items-center justify-end p-2 border-b border-[--border] bg-card flex-shrink-0">
+            {/* Header Controls */}
             <ChatControlWrapper
               controls={chatControls}
               panelId="header"
@@ -469,6 +465,7 @@ export const LiteChat: React.FC = () => {
             />
           </div>
 
+          {/* Chat Canvas */}
           <ChatCanvas
             conversationId={selectedConversationId}
             interactions={interactions}
@@ -478,13 +475,14 @@ export const LiteChat: React.FC = () => {
             className="flex-grow overflow-y-auto p-4 space-y-4"
           />
 
+          {/* Global Error Display */}
           {globalError && (
             <div className="p-2 bg-destructive text-destructive-foreground text-sm text-center">
               Error: {globalError}
             </div>
           )}
 
-          {/* Ref prop removed */}
+          {/* Prompt Input Area */}
           <PromptWrapper
             InputAreaRenderer={InputArea} // Pass the component itself
             onSubmit={handlePromptSubmit}

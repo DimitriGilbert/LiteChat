@@ -58,6 +58,7 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
   }, [userContent]);
 
   return (
+    // Add group class here
     <div className={cn("flex items-start gap-3 my-2 group", className)}>
       {/* Avatar */}
       <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary/20 text-primary flex items-center justify-center mt-1">
@@ -66,7 +67,7 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
 
       {/* Bubble Container */}
       <div className="p-3 border rounded-md shadow-sm bg-muted/50 flex-grow min-w-0 relative">
-        {/* Action Buttons Container - Sticky */}
+        {/* Action Buttons Container - Use the sticky class */}
         <div className="interaction-card-actions-sticky">
           {/* Fold/Unfold Button */}
           <TooltipProvider delayDuration={100}>

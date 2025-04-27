@@ -22,8 +22,9 @@ import type { CustomSettingTab } from "@/types/litechat/modding";
 
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
-import { useModStore } from "@/store/mod.store";
 import { useProviderStore, type ProviderState } from "@/store/provider.store";
+import { useModStore } from "@/store/mod.store";
+import { cn } from "@/lib/utils"; // Import cn
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -56,6 +57,19 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
     }
   };
 
+  // Common classes for tab triggers
+  const tabTriggerClass = cn(
+    "px-3 py-1.5 text-sm font-medium rounded-md",
+    "text-muted-foreground", 
+    "border border-transparent",
+    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+    "data-[state=active]:bg-primary/10 data-[state=active]:text-primary",
+    "data-[state=active]:border-primary",
+    "dark:data-[state=active]:bg-primary/20 dark:data-[state=active]:text-primary",
+    "dark:data-[state=active]:border-primary/70",
+    "hover:bg-muted/50 hover:text-primary/80",
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[1200px] w-[90vw] h-[80vh] min-h-[550px] max-h-[90vh] flex flex-col">
@@ -72,16 +86,30 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
           defaultValue="general"
           className="flex-grow flex flex-col overflow-hidden"
         >
-          <TabsList className="flex-shrink-0 sticky top-0 bg-background z-10 mb-4 flex-wrap h-auto justify-start border-b">
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="providers">Providers & Models</TabsTrigger>
+          <TabsList className="flex-shrink-0 sticky top-0 bg-background z-10 mb-4 flex-wrap h-auto justify-start border-b gap-1 p-1">
+            <TabsTrigger value="general" className={tabTriggerClass}>
+              General
+            </TabsTrigger>
+            <TabsTrigger value="providers" className={tabTriggerClass}>
+              Providers & Models
+            </TabsTrigger>
             {enableAdvancedSettings && (
-              <TabsTrigger value="assistant">Assistant</TabsTrigger>
+              <TabsTrigger value="assistant" className={tabTriggerClass}>
+                Assistant
+              </TabsTrigger>
             )}
-            <TabsTrigger value="data">Data</TabsTrigger>
-            <TabsTrigger value="mods">Mods</TabsTrigger>
+            <TabsTrigger value="data" className={tabTriggerClass}>
+              Data
+            </TabsTrigger>
+            <TabsTrigger value="mods" className={tabTriggerClass}>
+              Mods
+            </TabsTrigger>
             {customSettingsTabs.map((tab: CustomSettingTab) => (
-              <TabsTrigger key={tab.id} value={tab.id}>
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                className={tabTriggerClass}
+              >
                 {tab.title}
               </TabsTrigger>
             ))}
@@ -100,15 +128,20 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = ({
                 defaultValue="model-order" // Default to model order tab
                 className="flex-grow flex flex-col overflow-hidden"
               >
-                <TabsList className="flex-shrink-0">
-                  <TabsTrigger value="model-order">
+                <TabsList className="flex-shrink-0 gap-1 p-1">
+                  <TabsTrigger value="model-order" className={tabTriggerClass}>
                     Global Model Order
                   </TabsTrigger>
-                  <TabsTrigger value="provider-list">
+                  <TabsTrigger
+                    value="provider-list"
+                    className={tabTriggerClass}
+                  >
                     Provider List & Config
                   </TabsTrigger>
                   {enableApiKeyManagement && (
-                    <TabsTrigger value="api-keys">API Keys</TabsTrigger>
+                    <TabsTrigger value="api-keys" className={tabTriggerClass}>
+                      API Keys
+                    </TabsTrigger>
                   )}
                 </TabsList>
                 {/* Content for nested tabs */}

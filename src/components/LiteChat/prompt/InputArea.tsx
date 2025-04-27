@@ -73,7 +73,8 @@ export const InputArea = forwardRef<HTMLTextAreaElement, InputAreaProps>(
       if (textarea) {
         textarea.style.height = "auto";
         const scrollHeight = textarea.scrollHeight;
-        const maxHeight = 250;
+        const maxHeight = 250; // Keep max height
+        // Set height based on scroll height, but ensure it respects min-h
         textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
       }
     }, [value]);
@@ -86,9 +87,11 @@ export const InputArea = forwardRef<HTMLTextAreaElement, InputAreaProps>(
         onKeyDown={handleKeyDown}
         disabled={disabled}
         placeholder={placeholder}
-        rows={2}
+        rows={3} // Increase default rows
         className={cn(
-          "w-full p-3 border border-[--border] rounded bg-input text-foreground resize-none focus:ring-2 focus:ring-[--primary] outline-none disabled:opacity-50 overflow-y-auto min-h-[60px] max-h-[250px]",
+          "w-full p-3 border border-[--border] rounded bg-input text-foreground resize-none focus:ring-2 focus:ring-[--primary] outline-none disabled:opacity-50 overflow-y-auto",
+          // Set min and max height
+          "min-h-[80px] max-h-[250px]",
         )}
         aria-label="Chat input"
       />

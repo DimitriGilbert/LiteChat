@@ -49,14 +49,17 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
         (i) =>
           i.type === "message.user_assistant" &&
           i.status === "COMPLETED" &&
-          i.prompt === null,
+          i.prompt === null, // Filter only assistant responses for revisions
       )
       .sort(
         (a, b) => (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0),
       );
   }, [allInteractionsInGroup]);
 
-  const displayedInteraction = revisions[revisionIndex] || interaction;
+  // Ensure displayedInteraction is always an assistant response if revisions exist
+  const displayedInteraction =
+    revisions.length > 0 ? revisions[revisionIndex] : interaction;
+
   const responseText =
     typeof displayedInteraction.response === "string"
       ? displayedInteraction.response
@@ -64,19 +67,22 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
 
   const parsedContent: ParsedContent = useMarkdownParser(responseText);
 
+  // Can only regenerate if the *original* interaction had a prompt
   const canRegenerate =
+    interaction.prompt && // Check original interaction for prompt
     displayedInteraction.status === "COMPLETED" &&
     typeof onRegenerate === "function" &&
-    revisionIndex === 0;
+    revisionIndex === 0; // Only allow regenerating from the latest revision
 
   const handleRegenerateClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onRegenerate && displayedInteraction.prompt) {
-      onRegenerate(displayedInteraction.id);
+    // Use the ID of the original interaction that had the prompt
+    if (onRegenerate && interaction.prompt) {
+      onRegenerate(interaction.id);
     } else {
       console.error(
-        "Could not regenerate: No callback or prompt data found in the interaction.",
-        displayedInteraction,
+        "Could not regenerate: No callback or prompt data found in the original interaction.",
+        interaction,
       );
     }
   };
@@ -116,9 +122,21 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
     return responseText.split("\n").slice(0, 3).join("\n");
   }, [responseText]);
 
+  // Calculate generation time
+  const generationTime = useMemo(() => {
+    if (displayedInteraction.startedAt && displayedInteraction.endedAt) {
+      const diff =
+        displayedInteraction.endedAt.getTime() -
+        displayedInteraction.startedAt.getTime();
+      return (diff / 1000).toFixed(2); // Time in seconds
+    }
+    return null;
+  }, [displayedInteraction.startedAt, displayedInteraction.endedAt]);
+
   return (
     <div
       className={cn(
+        // Add group class here
         "p-3 my-2 border rounded-md shadow-sm bg-card relative group",
         className,
       )}
@@ -133,7 +151,7 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
             </span>
           )}
         </span>
-        {/* Action Buttons Container - Now Sticky */}
+        {/* Action Buttons Container - Use the sticky class */}
         <div className="interaction-card-actions-sticky">
           {/* Fold/Unfold Button */}
           <TooltipProvider delayDuration={100}>
@@ -273,6 +291,25 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
           })
         )}
       </div>
+
+      {/* Footer for Metadata */}
+      {!isFolded &&
+        (displayedInteraction.metadata?.promptTokens ||
+          displayedInteraction.metadata?.completionTokens ||
+          generationTime) && (
+          // Change justify-end to justify-start
+          <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground flex justify-start gap-3">
+            {generationTime && <span>Time: {generationTime}s</span>}
+            {(displayedInteraction.metadata?.promptTokens ||
+              displayedInteraction.metadata?.completionTokens) && (
+              <span>
+                Tokens: {displayedInteraction.metadata?.promptTokens ?? "?"}{" "}
+                (in) / {displayedInteraction.metadata?.completionTokens ?? "?"}{" "}
+                (out)
+              </span>
+            )}
+          </div>
+        )}
 
       {/* Error Display */}
       {displayedInteraction.status === "ERROR" &&
