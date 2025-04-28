@@ -1,8 +1,8 @@
 // src/components/LiteChat/LiteChat.tsx
 import React, { useEffect, useCallback } from "react";
-import { PromptWrapper } from "./prompt/PromptWrapper";
-import { ChatCanvas } from "./canvas/ChatCanvas";
-import { ChatControlWrapper } from "./chat/ChatControlWrapper";
+import { PromptWrapper } from "@/components/LiteChat/prompt/PromptWrapper";
+import { ChatCanvas } from "@/components/LiteChat/canvas/ChatCanvas";
+import { ChatControlWrapper } from "@/components/LiteChat/chat/ChatControlWrapper";
 import { useConversationStore } from "@/store/conversation.store";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useUIStateStore } from "@/store/ui.store";
@@ -15,7 +15,7 @@ import { useSettingsStore } from "@/store/settings.store";
 import { loadMods } from "@/modding/loader";
 import { Toaster } from "@/components/ui/sonner";
 import type { CoreMessage, ToolResultPart } from "ai";
-import { InputArea } from "./prompt/InputArea";
+import { InputArea } from "@/components/LiteChat/prompt/InputArea";
 import { useShallow } from "zustand/react/shallow";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { cn } from "@/lib/utils";
@@ -23,14 +23,14 @@ import { toast } from "sonner";
 import type { Interaction } from "@/types/litechat/interaction";
 
 // Import control registration hooks/components
-import { useConversationListControlRegistration } from "./chat/control/ConversationList";
-import { useSettingsControlRegistration } from "./chat/control/Settings";
-import { useSidebarToggleControlRegistration } from "./chat/control/SidebarToggleControl";
-import { useGlobalModelSelectorRegistration } from "./prompt/control/GlobalModelSelectorRegistration";
-import { useParameterControlRegistration } from "./prompt/control/ParameterControlRegistration";
-import { useFileControlRegistration } from "./prompt/control/FileControlRegistration";
-import { useVfsControlRegistration } from "./prompt/control/VfsControlRegistration";
-import { useGitSyncControlRegistration } from "./prompt/control/GitSyncControlRegistration";
+import { useConversationListControlRegistration } from "@/hooks/litechat/useConversationListControl";
+import { useSettingsControlRegistration } from "@/components/LiteChat/chat/control/Settings";
+import { useSidebarToggleControlRegistration } from "@/components/LiteChat/chat/control/SidebarToggleControl";
+import { useGlobalModelSelectorRegistration } from "@/components/LiteChat/prompt/control/GlobalModelSelectorRegistration";
+import { useParameterControlRegistration } from "@/components/LiteChat/prompt/control/ParameterControlRegistration";
+import { useFileControlRegistration } from "@/components/LiteChat/prompt/control/FileControlRegistration";
+import { useVfsControlRegistration } from "@/components/LiteChat/prompt/control/VfsControlRegistration";
+import { useGitSyncControlRegistration } from "@/components/LiteChat/prompt/control/GitSyncControlRegistration";
 
 // Helper to split combined ID remains the same
 const splitModelId = (
