@@ -1,11 +1,5 @@
 // src/components/LiteChat/chat/control/ConversationList.tsx
-import React, {
-  useMemo,
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-} from "react";
+import React, { useMemo } from "react";
 import {
   useConversationStore,
   type SidebarItem,
@@ -15,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { PlusIcon, FolderPlusIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { SidebarItemType } from "@/types/litechat/chat";
-import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUIStateStore } from "@/store/ui.store";
 import {
