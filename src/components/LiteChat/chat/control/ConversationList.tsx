@@ -1,5 +1,5 @@
 // src/components/LiteChat/chat/control/ConversationList.tsx
-import React, { useMemo, useState, useCallback, useRef } from "react"; // Added useRef
+import React, { useMemo, useState, useCallback } from "react"; // Added useRef
 import {
   useConversationStore,
   type SidebarItem,
