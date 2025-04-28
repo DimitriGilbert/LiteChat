@@ -14,7 +14,7 @@ import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { loadMods } from "@/modding/loader";
 import { Toaster } from "@/components/ui/sonner";
-import type { CoreMessage, ToolResultPart } from "ai";
+import type { CoreMessage, ToolResultPart, ToolCallPart } from "ai"; // Import necessary types
 import { InputArea } from "@/components/LiteChat/prompt/InputArea";
 import { useShallow } from "zustand/react/shallow";
 import { emitter } from "@/lib/litechat/event-emitter";
@@ -54,6 +54,7 @@ export const LiteChat: React.FC = () => {
     addConversation,
     selectItem,
     getProjectById,
+    getConversationById, // Added for convenience
   } = useConversationStore(
     useShallow((state) => ({
       selectedItemId: state.selectedItemId,
@@ -62,6 +63,7 @@ export const LiteChat: React.FC = () => {
       addConversation: state.addConversation,
       selectItem: state.selectItem,
       getProjectById: state.getProjectById,
+      getConversationById: state.getConversationById, // Added
     })),
   );
   const {
@@ -166,30 +168,109 @@ export const LiteChat: React.FC = () => {
   ]);
 
   // --- History Construction Helper ---
+  // Updated to handle tool calls and results correctly
   const buildHistoryMessages = useCallback(
     (historyInteractions: Interaction[]): CoreMessage[] => {
       return historyInteractions.flatMap((i): CoreMessage[] => {
         const msgs: CoreMessage[] = [];
+
+        // Add user message (if it exists)
+        // Note: File content is handled by AIService before the call
         if (i.prompt?.content && typeof i.prompt.content === "string") {
+          // For history, we only need the text part. Files are handled in the *current* turn.
           msgs.push({ role: "user", content: i.prompt.content });
+        } else if (
+          i.prompt?.metadata?.attachedFiles &&
+          i.prompt.metadata.attachedFiles.length > 0 &&
+          !i.prompt?.content // Handle case where only files were attached
+        ) {
+          // Add a placeholder or summary if needed, but often just the assistant response is enough context
+          // For simplicity, we might omit the user turn if it was *only* files and no text.
+          // Or, add a generic placeholder:
+          // msgs.push({ role: 'user', content: '[Files attached]' });
         }
+
+        // Add assistant response (text part)
         if (i.response && typeof i.response === "string") {
           msgs.push({ role: "assistant", content: i.response });
         }
+
+        // Add assistant tool calls (parse from stored strings)
         if (i.metadata?.toolCalls && Array.isArray(i.metadata.toolCalls)) {
-          msgs.push({
-            role: "assistant",
-            content: i.metadata.toolCalls,
+          const validToolCalls: ToolCallPart[] = [];
+          i.metadata.toolCalls.forEach((callStr) => {
+            try {
+              const parsedCall = JSON.parse(callStr);
+              // Basic validation for ToolCallPart structure
+              if (
+                parsedCall &&
+                parsedCall.type === "tool-call" &&
+                parsedCall.toolCallId &&
+                parsedCall.toolName &&
+                parsedCall.args !== undefined
+              ) {
+                validToolCalls.push(parsedCall as ToolCallPart);
+              } else {
+                console.warn(
+                  "[LiteChat] buildHistory: Invalid tool call structure after parsing:",
+                  callStr,
+                );
+              }
+            } catch (e) {
+              console.error(
+                "[LiteChat] buildHistory: Failed to parse tool call string:",
+                callStr,
+                e,
+              );
+            }
           });
+          if (validToolCalls.length > 0) {
+            // Add a single message with an array of tool calls
+            msgs.push({
+              role: "assistant",
+              content: validToolCalls, // Assign the array of ToolCallPart
+            });
+          }
         }
+
+        // Add tool results (parse from stored strings)
         if (i.metadata?.toolResults && Array.isArray(i.metadata.toolResults)) {
-          i.metadata.toolResults.forEach((result: ToolResultPart) => {
+          const validToolResults: ToolResultPart[] = [];
+          i.metadata.toolResults.forEach((resultStr) => {
+            try {
+              const parsedResult = JSON.parse(resultStr);
+              // Basic validation for ToolResultPart structure
+              if (
+                parsedResult &&
+                parsedResult.type === "tool-result" &&
+                parsedResult.toolCallId &&
+                parsedResult.toolName &&
+                parsedResult.result !== undefined
+              ) {
+                validToolResults.push(parsedResult as ToolResultPart);
+              } else {
+                console.warn(
+                  "[LiteChat] buildHistory: Invalid tool result structure after parsing:",
+                  resultStr,
+                );
+              }
+            } catch (e) {
+              console.error(
+                "[LiteChat] buildHistory: Failed to parse tool result string:",
+                resultStr,
+                e,
+              );
+            }
+          });
+          if (validToolResults.length > 0) {
+            // Add a single message with an array of tool results
             msgs.push({
               role: "tool",
-              content: [result],
+              content: validToolResults, // Assign the array of ToolResultPart
             });
-          });
+          }
         }
+
         return msgs;
       });
     },
@@ -205,9 +286,7 @@ export const LiteChat: React.FC = () => {
         selectedItemType === "project"
           ? selectedItemId
           : selectedItemType === "conversation"
-            ? (useConversationStore
-                .getState()
-                .getConversationById(selectedItemId)?.projectId ?? null)
+            ? (getConversationById(selectedItemId)?.projectId ?? null)
             : null;
 
       const setFocusInputFlag = useUIStateStore.getState().setFocusInputFlag;
@@ -253,29 +332,40 @@ export const LiteChat: React.FC = () => {
       const completedHistory = currentHistory.filter(
         (i) => i.status === "COMPLETED" && i.type === "message.user_assistant",
       );
+      // Use the updated buildHistoryMessages
       const messages: CoreMessage[] = buildHistoryMessages(completedHistory);
 
+      // Add the current user input as the last message
+      // AIService will handle injecting file content into this message if needed
       if (turnData.content) {
         messages.push({ role: "user", content: turnData.content });
+      } else if (turnData.metadata?.attachedFiles?.length) {
+        // If only files are attached, add an empty user message for AIService to populate
+        messages.push({ role: "user", content: "" });
       } else {
-        console.warn("LiteChat: Submitting prompt without text content.");
+        // This case should be prevented by PromptWrapper's submit check, but handle defensively
+        console.error("LiteChat: Attempting to submit with no content.");
+        toast.error("Cannot send an empty message.");
+        return;
       }
 
       const project = getProjectById(currentProjectId);
       const systemPrompt =
         project?.systemPrompt ?? globalSystemPrompt ?? undefined;
 
+      // Construct the initial AI payload. File content processing happens in AIService.
       const aiPayload: PromptObject = {
         system: systemPrompt,
-        messages: messages,
+        messages: messages, // Now includes the current user message text
         parameters: turnData.parameters,
-        metadata: turnData.metadata,
+        metadata: turnData.metadata, // Pass metadata (including basic file info)
       };
 
       emitter.emit("prompt:finalised", { prompt: aiPayload });
       console.log("LiteChat: Submitting prompt to AIService:", aiPayload);
 
       try {
+        // Pass the original turnData (with file content) to AIService
         await AIService.startInteraction(aiPayload, turnData);
         console.log("LiteChat: AIService interaction started.");
       } catch (e) {
@@ -292,8 +382,9 @@ export const LiteChat: React.FC = () => {
       selectItem,
       setCurrentConversationId,
       globalSystemPrompt,
-      buildHistoryMessages,
+      buildHistoryMessages, // Use updated helper
       getProjectById,
+      getConversationById, // Added dependency
     ],
   );
 
@@ -322,9 +413,9 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
-      const currentConversation = useConversationStore
-        .getState()
-        .getConversationById(targetInteraction.conversationId);
+      const currentConversation = getConversationById(
+        targetInteraction.conversationId,
+      );
       const currentProjectId = currentConversation?.projectId ?? null;
       const project = getProjectById(currentProjectId);
 
@@ -340,6 +431,7 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
+      // Fetch history up to the interaction *before* the one being regenerated
       const historyUpToIndex = targetInteraction.index;
       const historyInteractions = interactionStore.interactions
         .filter(
@@ -351,8 +443,10 @@ export const LiteChat: React.FC = () => {
         )
         .sort((a, b) => a.index - b.index);
 
+      // Use the updated buildHistoryMessages
       const messages: CoreMessage[] = buildHistoryMessages(historyInteractions);
 
+      // Add the user message content from the interaction being regenerated
       if (
         targetInteraction.prompt?.content &&
         typeof targetInteraction.prompt.content === "string"
@@ -361,6 +455,9 @@ export const LiteChat: React.FC = () => {
           role: "user",
           content: targetInteraction.prompt.content,
         });
+      } else if (targetInteraction.prompt?.metadata?.attachedFiles?.length) {
+        // If only files were attached in the original prompt
+        messages.push({ role: "user", content: "" });
       } else {
         console.error(
           `LiteChat: Cannot regenerate - missing or invalid user prompt content in interaction ${interactionId}.`,
@@ -374,16 +471,19 @@ export const LiteChat: React.FC = () => {
         useSettingsStore.getState().globalSystemPrompt ??
         undefined;
 
+      // Metadata for the AI payload (not the interaction itself yet)
       const currentMetadata = {
         ...targetInteraction.prompt.metadata,
         regeneratedFromId: interactionId,
-        providerId: providerId,
+        providerId: providerId, // Ensure provider/model are set for this specific call
         modelId: modelId,
+        // Remove attachedFiles from metadata sent to AI, AIService handles it
+        attachedFiles: undefined,
       };
 
       const aiPayload: PromptObject = {
         system: systemPrompt,
-        messages: messages,
+        messages: messages, // History + current user message text
         parameters: targetInteraction.prompt.parameters,
         metadata: currentMetadata,
       };
@@ -395,6 +495,7 @@ export const LiteChat: React.FC = () => {
       );
 
       try {
+        // Pass the original PromptTurnObject (targetInteraction.prompt)
         await AIService.startInteraction(aiPayload, targetInteraction.prompt);
         console.log(
           `LiteChat: AIService regeneration interaction started for ${interactionId}.`,
@@ -407,7 +508,7 @@ export const LiteChat: React.FC = () => {
         toast.error("Failed to start regeneration.");
       }
     },
-    [buildHistoryMessages, getProjectById],
+    [buildHistoryMessages, getProjectById, getConversationById], // Use updated helper
   );
 
   // --- Stop Handler ---

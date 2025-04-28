@@ -7,10 +7,10 @@ import type {
   ModMiddlewareHookName,
   ModMiddlewarePayloadMap,
   ModMiddlewareReturnMap,
-  Tool,
   ToolImplementation,
 } from "@/types/litechat/modding";
 import type { z } from "zod";
+import { Tool } from "ai";
 
 interface RegisteredMiddleware<H extends ModMiddlewareHookName> {
   modId: string;

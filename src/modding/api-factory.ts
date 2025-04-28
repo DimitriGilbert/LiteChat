@@ -4,9 +4,9 @@ import type {
   LiteChatModApi,
   ReadonlyChatContextSnapshot,
   CustomSettingTab,
-  Tool,
   ToolImplementation,
 } from "@/types/litechat/modding";
+import { Tool } from "ai";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useConversationStore } from "@/store/conversation.store";
@@ -50,6 +50,7 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       unsubscribers.push(u);
       return u;
     },
+    // Use the imported Tool type
     registerTool: <P extends z.ZodSchema<any>>(
       toolName: string,
       definition: Tool<P>,

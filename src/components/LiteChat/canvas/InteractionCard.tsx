@@ -12,6 +12,9 @@ import {
   CheckIcon,
   ChevronsUpDownIcon, // Icon for fold/unfold
   CopyIcon, // Added CopyIcon
+  WrenchIcon, // Icon for tool calls
+  CheckCircle2Icon, // Icon for tool results
+  Loader2, // Icon for tool in progress
 } from "lucide-react";
 import {
   Tooltip,
@@ -26,6 +29,7 @@ import {
 import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
 import { memo } from "react";
 import { toast } from "sonner"; // For copy feedback
+import type { ToolCallPart, ToolResultPart } from "ai"; // Import AI SDK types for parsing
 
 interface InteractionCardProps {
   interaction: Interaction;
@@ -33,6 +37,111 @@ interface InteractionCardProps {
   onRegenerate?: (id: string) => void;
   className?: string;
 }
+
+// Helper to render tool calls/results (Parses strings)
+const ToolDisplay: React.FC<{
+  toolCallStrings?: string[];
+  toolResultStrings?: string[];
+}> = ({ toolCallStrings, toolResultStrings }) => {
+  if (!toolCallStrings || toolCallStrings.length === 0) {
+    return null;
+  }
+
+  // Parse the strings into objects
+  const parsedCalls: ToolCallPart[] = [];
+  const parsedResults: ToolResultPart[] = [];
+
+  toolCallStrings.forEach((callStr) => {
+    try {
+      const parsed = JSON.parse(callStr);
+      // Add validation if needed
+      parsedCalls.push(parsed as ToolCallPart);
+    } catch (e) {
+      console.error(
+        "Failed to parse tool call string for display:",
+        callStr,
+        e,
+      );
+    }
+  });
+
+  (toolResultStrings ?? []).forEach((resultStr) => {
+    try {
+      const parsed = JSON.parse(resultStr);
+      // Add validation if needed
+      parsedResults.push(parsed as ToolResultPart);
+    } catch (e) {
+      console.error(
+        "Failed to parse tool result string for display:",
+        resultStr,
+        e,
+      );
+    }
+  });
+
+  const resultsMap = new Map(parsedResults.map((r) => [r.toolCallId, r]));
+
+  return (
+    <div className="mt-2 space-y-2 border-t border-border/50 pt-2">
+      {parsedCalls.map((call) => {
+        const result = resultsMap.get(call.toolCallId);
+        // Safely check for error property
+        const errorText =
+          result &&
+          typeof result.result === "object" &&
+          result.result !== null &&
+          "error" in result.result
+            ? String(result.result.error)
+            : null;
+        const status = result ? (errorText ? "error" : "completed") : "pending";
+        const resultText = result
+          ? JSON.stringify(result.result, null, 2)
+          : "Waiting for result...";
+
+        return (
+          <div
+            key={call.toolCallId}
+            className="p-2 border rounded bg-muted/30 text-xs"
+          >
+            <div className="flex items-center gap-1.5 font-medium mb-1">
+              {status === "pending" && (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+              )}
+              {status === "completed" && (
+                <CheckCircle2Icon className="h-3.5 w-3.5 text-green-500" />
+              )}
+              {status === "error" && (
+                <AlertCircleIcon className="h-3.5 w-3.5 text-destructive" />
+              )}
+              <WrenchIcon className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>Tool Call: {call.toolName}</span>
+            </div>
+            <div className="pl-5 space-y-1">
+              <div>
+                <span className="font-semibold">Args:</span>
+                <pre className="text-[11px] bg-background/50 p-1 rounded mt-0.5 whitespace-pre-wrap break-words">
+                  {JSON.stringify(call.args, null, 2)}
+                </pre>
+              </div>
+              <div>
+                <span className="font-semibold">Result:</span>
+                {errorText ? (
+                  <pre className="text-[11px] bg-destructive/10 text-destructive p-1 rounded mt-0.5 whitespace-pre-wrap break-words">
+                    Error: {errorText}
+                  </pre>
+                ) : (
+                  <pre className="text-[11px] bg-background/50 p-1 rounded mt-0.5 whitespace-pre-wrap break-words">
+                    {resultText}
+                  </pre>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 const InteractionCardComponent: React.FC<InteractionCardProps> = ({
   interaction,
@@ -153,6 +262,9 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
     }
     return null;
   }, [displayedInteraction.startedAt, displayedInteraction.endedAt]);
+
+  const hasToolActivity =
+    (displayedInteraction.metadata?.toolCalls?.length ?? 0) > 0;
 
   return (
     <div
@@ -308,30 +420,40 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
       <div className="text-sm markdown-content">
         {isFolded ? (
           // Folded Preview
-          <div className="folded-content-preview" onClick={toggleFold}>
+          <div
+            className="folded-content-preview cursor-pointer"
+            onClick={toggleFold}
+          >
             {/* Render first few lines as plain text or simple markdown */}
             <pre className="whitespace-pre-wrap break-words text-muted-foreground">
-              {foldedPreviewText}
+              {foldedPreviewText || (hasToolActivity ? "[Tool Activity]" : "")}
             </pre>
           </div>
         ) : (
           // Full Content
-          parsedContent.map((part, index) => {
-            if (typeof part === "string") {
-              return (
-                <div key={index} dangerouslySetInnerHTML={{ __html: part }} />
-              );
-            } else if (part.type === "code") {
-              return (
-                <CodeBlockRenderer
-                  key={index}
-                  lang={part.lang}
-                  code={part.code}
-                />
-              );
-            }
-            return null;
-          })
+          <>
+            {parsedContent.map((part, index) => {
+              if (typeof part === "string") {
+                return (
+                  <div key={index} dangerouslySetInnerHTML={{ __html: part }} />
+                );
+              } else if (part.type === "code") {
+                return (
+                  <CodeBlockRenderer
+                    key={index}
+                    lang={part.lang}
+                    code={part.code}
+                  />
+                );
+              }
+              return null;
+            })}
+            {/* Render Tool Calls/Results if they exist (pass string arrays) */}
+            <ToolDisplay
+              toolCallStrings={displayedInteraction.metadata?.toolCalls}
+              toolResultStrings={displayedInteraction.metadata?.toolResults}
+            />
+          </>
         )}
       </div>
 

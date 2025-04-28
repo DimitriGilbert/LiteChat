@@ -4,6 +4,7 @@ import type { z } from "zod";
 import type { PromptTurnObject, PromptControl, PromptObject } from "./prompt";
 import type { ChatControl } from "./chat";
 import type { Interaction } from "./interaction";
+import type { ToolCallPart, ToolResultPart, Tool } from "ai"; // Import AI SDK types including Tool
 
 // --- Base Mod Types ---
 export interface DbMod {
@@ -43,14 +44,7 @@ export interface ReadonlyChatContextSnapshot {
 }
 
 // --- Tooling ---
-export interface Tool<P extends z.ZodSchema<any> = z.ZodSchema<any>> {
-  description?: string;
-  parameters: P;
-  execute?: (
-    args: z.infer<P>,
-    context: ReadonlyChatContextSnapshot,
-  ) => Promise<any>;
-}
+// Use the Tool type directly from 'ai'
 export type ToolImplementation<P extends z.ZodSchema<any> = z.ZodSchema<any>> =
   (args: z.infer<P>, context: ReadonlyChatContextSnapshot) => Promise<any>;
 
@@ -97,6 +91,8 @@ export interface ModEventPayloadMap {
     interactionId: string;
     status: Interaction["status"];
     error?: string;
+    toolCalls?: ToolCallPart[]; // Add tool info to event
+    toolResults?: ToolResultPart[]; // Add tool info to event
   };
   [ModEvent.PROMPT_SUBMITTED]: { turnData: PromptTurnObject };
   // Use PromptObject here
@@ -160,6 +156,7 @@ export interface LiteChatModApi {
   registerChatControl: (control: ChatControl) => () => void;
   registerSettingsTab: (tab: CustomSettingTab) => () => void;
 
+  // Use the imported Tool type from 'ai'
   registerTool: <P extends z.ZodSchema<any>>(
     toolName: string,
     definition: Tool<P>,

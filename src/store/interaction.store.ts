@@ -78,38 +78,55 @@ export const useInteractionStore = create(
 
     // --- Synchronous State Updates ONLY ---
     _addInteractionToState: (interaction) => {
-      set((state) => {
-        if (!state.interactions.some((i) => i.id === interaction.id)) {
-          const newInteractions = [...state.interactions, interaction];
-          newInteractions.sort((a, b) => a.index - b.index);
-          state.interactions = newInteractions; // Update using immer
-        } else {
-          console.warn(
-            `InteractionStore: Interaction ${interaction.id} already exists in state.`,
-          );
-        }
-      });
+      const currentInteractions = get().interactions;
+      // Check if it already exists before adding
+      if (!currentInteractions.some((i) => i.id === interaction.id)) {
+        // Create the new array OUTSIDE the set call
+        const updatedInteractions = [...currentInteractions, interaction];
+        // Sort the new array
+        updatedInteractions.sort((a, b) => a.index - b.index);
+        // Assign the new sorted array back to the state
+        set({ interactions: updatedInteractions });
+      } else {
+        console.warn(
+          `InteractionStore: Interaction ${interaction.id} already exists in state.`,
+        );
+      }
     },
 
     _updateInteractionInState: (id, updates) => {
       set((state) => {
         const index = state.interactions.findIndex((i) => i.id === id);
         if (index !== -1) {
-          // Get the existing interaction
           const existingInteraction = state.interactions[index];
 
-          // Merge updates into the existing interaction object
-          // Use Object.assign for top-level properties
-          Object.assign(existingInteraction, updates);
-
-          // Explicitly handle metadata merge to avoid issues with undefined
+          // --- Construct the new metadata object separately ---
+          let newMetadata = { ...(existingInteraction.metadata || {}) };
           if (updates.metadata) {
-            existingInteraction.metadata = {
-              ...(existingInteraction.metadata || {}), // Ensure existing metadata is an object
-              ...updates.metadata,
-            };
+            newMetadata = { ...newMetadata, ...updates.metadata };
+
+            // Ensure toolCalls and toolResults are correctly formed arrays (of strings now)
+            if (updates.metadata.toolCalls !== undefined) {
+              newMetadata.toolCalls = [
+                ...(updates.metadata.toolCalls as string[]), // Expecting string[]
+              ];
+            }
+            if (updates.metadata.toolResults !== undefined) {
+              newMetadata.toolResults = [
+                ...(updates.metadata.toolResults as string[]), // Expecting string[]
+              ];
+            }
           }
-          // Ensure other potentially nested objects are handled if necessary
+          // --- End metadata construction ---
+
+          // Assign top-level updates (excluding metadata initially)
+          Object.assign(existingInteraction, {
+            ...updates,
+            metadata: undefined, // Avoid assigning metadata directly here
+          });
+
+          // Assign the pre-constructed metadata object
+          existingInteraction.metadata = newMetadata;
         } else {
           console.warn(
             `InteractionStore: Interaction ${id} not found for sync state update.`,
@@ -134,9 +151,12 @@ export const useInteractionStore = create(
     },
 
     _removeInteractionFromState: (id) => {
-      set((state) => {
-        state.interactions = state.interactions.filter((i) => i.id !== id);
-      });
+      // Create the new array OUTSIDE the set call
+      const currentInteractions = get().interactions;
+      const updatedInteractions = currentInteractions.filter(
+        (i) => i.id !== id,
+      );
+      set({ interactions: updatedInteractions });
     },
 
     // --- Async Actions ---

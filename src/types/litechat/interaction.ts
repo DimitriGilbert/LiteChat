@@ -1,5 +1,7 @@
+// src/types/litechat/interaction.ts
 import type { PromptTurnObject } from "./prompt"; // Input turn data snapshot
 import type { Metadata } from "./common";
+// Remove direct import of ToolCallPart/ToolResultPart from here
 
 export type InteractionType =
   | "message.user_assistant"
@@ -25,9 +27,30 @@ export interface Interaction {
   index: number;
   parentId: string | null; // ID of the interaction this follows/revises
   prompt: Readonly<PromptTurnObject> | null; // Snapshot of the user input turn data
-  response: any | null; // Result content
+  response: any | null; // Result content (usually string, but could be other for non-assistant)
   status: InteractionStatus;
   startedAt: Date | null;
   endedAt: Date | null;
-  metadata: Metadata; // Tokens, timings, model, feedback, control data, errors
+  metadata: Metadata & {
+    // Add specific metadata fields
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+    modelId?: string; // Combined ID
+    providerId?: string;
+    error?: string;
+    regeneratedFromId?: string;
+    // Store tool calls/results as JSON strings
+    toolCalls?: string[]; // Array of JSON strings representing ToolCallPart
+    toolResults?: string[]; // Array of JSON strings representing ToolResultPart
+    // Basic file info (no content) for display/reference
+    attachedFiles?: {
+      id: string;
+      source: "direct" | "vfs";
+      name: string;
+      type: string;
+      size: number;
+      path?: string;
+    }[];
+  };
 }

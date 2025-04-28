@@ -5,6 +5,7 @@ import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
 import { StopButton } from "@/components/LiteChat/common/StopButton";
 import { StreamingContentView } from "./StreamingContentView"; // Import the content view
+import { WrenchIcon, Loader2 } from "lucide-react"; // Import icons for tool call
 
 interface StreamingInteractionCardProps {
   interactionId: string;
@@ -26,6 +27,8 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
               index: interaction.index,
               type: interaction.type,
               modelId: interaction.metadata?.modelId,
+              // Check if there are tool calls in metadata
+              hasToolCalls: (interaction.metadata?.toolCalls?.length ?? 0) > 0,
             }
           : null;
       }),
@@ -39,7 +42,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       return null;
     }
 
-    const { index, type, modelId } = interactionShellData;
+    const { index, type, modelId, hasToolCalls } = interactionShellData;
 
     return (
       <div
@@ -58,6 +61,13 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
               <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
             </span>
             {modelId && <span className="ml-1 text-blue-400">({modelId})</span>}
+            {/* Display indicator if tool calls are present */}
+            {hasToolCalls && (
+              <span className="ml-2 flex items-center gap-1 text-orange-400">
+                <WrenchIcon className="h-3 w-3" />
+                (Using Tools...)
+              </span>
+            )}
           </span>
           {/* Use the sticky class for the stop button container */}
           <div className="interaction-card-actions-sticky">
@@ -66,6 +76,16 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
         </div>
         {/* Content Area - Render the dedicated streaming view component */}
         <StreamingContentView interactionId={interactionId} />
+        {/* Optionally show a placeholder if tools are being called but no text is streaming yet */}
+        {hasToolCalls &&
+          !useInteractionStore.getState().activeStreamBuffers[
+            interactionId
+          ] && (
+            <div className="mt-2 text-xs text-muted-foreground italic flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Executing tools...
+            </div>
+          )}
       </div>
     );
   });

@@ -18,11 +18,12 @@ import {
   CoreMessage,
   LanguageModelUsage,
   ProviderMetadata,
-  ToolCallPart,
-  ToolResultPart,
+  ToolCallPart, // Still need the type for receiving from SDK
+  ToolResultPart, // Still need the type for receiving from SDK
   TextPart,
   ImagePart,
   CoreUserMessage,
+  Tool,
 } from "ai";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { useProviderStore } from "@/store/provider.store";
@@ -193,6 +194,101 @@ function processFileMetaToUserContent(
 }
 // --- End Improved File Content Processing ---
 
+// --- History Builder Helper ---
+export function buildHistoryMessages(
+  historyInteractions: Interaction[],
+): CoreMessage[] {
+  return historyInteractions.flatMap((i): CoreMessage[] => {
+    const msgs: CoreMessage[] = [];
+    // Add user message (if it exists)
+    if (i.prompt?.content && typeof i.prompt.content === "string") {
+      msgs.push({ role: "user", content: i.prompt.content });
+    }
+
+    // Add assistant response (text part)
+    if (i.response && typeof i.response === "string") {
+      msgs.push({ role: "assistant", content: i.response });
+    }
+
+    // Add assistant tool calls (parse from stored strings)
+    if (i.metadata?.toolCalls && Array.isArray(i.metadata.toolCalls)) {
+      const validToolCalls: ToolCallPart[] = [];
+      i.metadata.toolCalls.forEach((callStr) => {
+        try {
+          const parsedCall = JSON.parse(callStr);
+          // Basic validation
+          if (
+            parsedCall &&
+            parsedCall.type === "tool-call" &&
+            parsedCall.toolCallId &&
+            parsedCall.toolName &&
+            parsedCall.args !== undefined
+          ) {
+            validToolCalls.push(parsedCall as ToolCallPart);
+          } else {
+            console.warn(
+              "[AIService] buildHistory: Invalid tool call structure after parsing:",
+              callStr,
+            );
+          }
+        } catch (e) {
+          console.error(
+            "[AIService] buildHistory: Failed to parse tool call string:",
+            callStr,
+            e,
+          );
+        }
+      });
+      if (validToolCalls.length > 0) {
+        msgs.push({
+          role: "assistant",
+          content: validToolCalls,
+        });
+      }
+    }
+
+    // Add tool results (parse from stored strings)
+    if (i.metadata?.toolResults && Array.isArray(i.metadata.toolResults)) {
+      const validToolResults: ToolResultPart[] = [];
+      i.metadata.toolResults.forEach((resultStr) => {
+        try {
+          const parsedResult = JSON.parse(resultStr);
+          // Basic validation
+          if (
+            parsedResult &&
+            parsedResult.type === "tool-result" &&
+            parsedResult.toolCallId &&
+            parsedResult.toolName &&
+            parsedResult.result !== undefined
+          ) {
+            validToolResults.push(parsedResult as ToolResultPart);
+          } else {
+            console.warn(
+              "[AIService] buildHistory: Invalid tool result structure after parsing:",
+              resultStr,
+            );
+          }
+        } catch (e) {
+          console.error(
+            "[AIService] buildHistory: Failed to parse tool result string:",
+            resultStr,
+            e,
+          );
+        }
+      });
+      if (validToolResults.length > 0) {
+        msgs.push({
+          role: "tool",
+          content: validToolResults,
+        });
+      }
+    }
+
+    return msgs;
+  });
+}
+// --- End History Builder Helper ---
+
 export class AIService {
   private static activeStreams = new Map<string, AbortController>();
 
@@ -311,6 +407,9 @@ export class AIService {
         attachedFiles: initiatingTurnData.metadata.attachedFiles?.map(
           ({ contentBase64, contentText, ...rest }) => rest, // eslint-disable-line @typescript-eslint/no-unused-vars
         ),
+        // Initialize tool call/result arrays (as string arrays)
+        toolCalls: [],
+        toolResults: [],
       },
       index: newIndex,
       parentId: parentId,
@@ -344,8 +443,9 @@ export class AIService {
     let finalUsage: LanguageModelUsage | undefined = undefined;
     let finalProviderMetadata: ProviderMetadata | undefined = undefined;
     let streamFinishedSuccessfully = false;
-    const currentToolCalls: ToolCallPart[] = []; // Use const
-    const currentToolResults: ToolResultPart[] = []; // Use const
+    // Store stringified versions during the stream
+    const currentToolCallStrings: string[] = [];
+    const currentToolResultStrings: string[] = [];
 
     try {
       const modelInstance = useProviderStore
@@ -355,51 +455,65 @@ export class AIService {
         throw new Error("Selected model instance not available.");
       }
 
+      // Get registered tools from the store
       const registeredTools = useControlRegistryStore
         .getState()
         .getRegisteredTools();
+
+      // Prepare tools for the AI SDK - Pass definitions directly
       const toolsForSdk = Object.entries(registeredTools).reduce(
         (acc, [name, toolInfo]) => {
+          // Pass the definition object directly
           acc[name] = toolInfo.definition;
           return acc;
         },
-        {} as Record<string, any>,
+        {} as Record<string, Tool<any>>, // Use the Tool type here
       );
+
+      // Prepare tool executors - Adjust signature
+      const toolExecutors = Object.entries(registeredTools)
+        .filter(([_, toolInfo]) => !!toolInfo.implementation)
+        .reduce(
+          (acc, [name, toolInfo]) => {
+            // Executor function only receives 'args'
+            acc[name] = async (args: any) => {
+              try {
+                const parsedArgs = toolInfo.definition.parameters.parse(args);
+                // Pass context snapshot to the implementation
+                return await toolInfo.implementation!(
+                  parsedArgs,
+                  getContextSnapshot(),
+                );
+              } catch (e) {
+                console.error(`[AIService] Error executing tool ${name}:`, e);
+                const toolError = e instanceof Error ? e.message : String(e);
+                if (e instanceof z.ZodError) {
+                  return {
+                    error: `Invalid arguments: ${e.errors.map((err) => `${err.path.join(".")} (${err.message})`).join(", ")}`,
+                  };
+                }
+                return { error: toolError };
+              }
+            };
+            return acc;
+          },
+          // The type expected by streamText is Record<string, (args: any) => Promise<any>>
+          {} as Record<string, (args: any) => Promise<any>>,
+        );
 
       const streamOptions: any = {
         model: modelInstance as LanguageModelV1,
         messages: finalMessages, // Use messages with processed file content
         signal: abortController.signal,
+        // Pass tools and executors if they exist
         ...(Object.keys(toolsForSdk).length > 0 && { tools: toolsForSdk }),
+        ...(Object.keys(toolExecutors).length > 0 && {
+          toolExecutors: toolExecutors,
+        }),
+        // Allow overriding toolChoice via prompt metadata
         toolChoice:
-          finalPayload.toolChoice ??
+          finalPayload.metadata?.toolChoice ??
           (Object.keys(toolsForSdk).length > 0 ? "auto" : "none"),
-        toolExecutors: Object.entries(registeredTools)
-          .filter(([_, toolInfo]) => !!toolInfo.implementation)
-          .reduce(
-            (acc, [name, toolInfo]) => {
-              acc[name] = async (args: any) => {
-                try {
-                  const parsedArgs = toolInfo.definition.parameters.parse(args);
-                  return await toolInfo.implementation!(
-                    parsedArgs,
-                    getContextSnapshot(),
-                  );
-                } catch (e) {
-                  console.error(`[AIService] Error executing tool ${name}:`, e);
-                  const toolError = e instanceof Error ? e.message : String(e);
-                  if (e instanceof z.ZodError) {
-                    return {
-                      error: `Invalid arguments: ${e.errors.map((err) => `${err.path.join(".")} (${err.message})`).join(", ")}`,
-                    };
-                  }
-                  return { error: toolError };
-                }
-              };
-              return acc;
-            },
-            {} as Record<string, (args: any) => Promise<any>>,
-          ),
       };
 
       if (finalPayload.system) {
@@ -454,20 +568,46 @@ export class AIService {
             }
             break;
           }
-          case "tool-call":
-            currentToolCalls.push(part);
+          case "tool-call": {
+            const callString = JSON.stringify(part); // Stringify the part
+            currentToolCallStrings.push(callString);
+            // Update interaction state immediately with the stringified call
+            useInteractionStore
+              .getState()
+              ._updateInteractionInState(interactionId, {
+                metadata: {
+                  ...useInteractionStore
+                    .getState()
+                    .interactions.find((i) => i.id === interactionId)?.metadata,
+                  toolCalls: [...currentToolCallStrings], // Update with the new string
+                },
+              });
             console.log(
               `[AIService] Tool call observed: ${part.toolName}`,
               part.args,
             );
             break;
-          case "tool-result":
-            currentToolResults.push(part);
+          }
+          case "tool-result": {
+            const resultString = JSON.stringify(part); // Stringify the part
+            currentToolResultStrings.push(resultString);
+            // Update interaction state immediately with the stringified result
+            useInteractionStore
+              .getState()
+              ._updateInteractionInState(interactionId, {
+                metadata: {
+                  ...useInteractionStore
+                    .getState()
+                    .interactions.find((i) => i.id === interactionId)?.metadata,
+                  toolResults: [...currentToolResultStrings], // Update with the new string
+                },
+              });
             console.log(
               `[AIService] Tool result observed for ${part.toolName} (Call ID: ${part.toolCallId})`,
               part.result,
             );
             break;
+          }
           case "finish":
             console.log("[AIService] Stream finished part:", part);
             finalUsage = part.usage;
@@ -546,10 +686,9 @@ export class AIService {
             providerMetadata: finalProviderMetadata,
           }),
           ...(finalStatus === "ERROR" && { error: finalErrorMessage }),
-          ...(currentToolCalls.length > 0 && { toolCalls: currentToolCalls }),
-          ...(currentToolResults.length > 0 && {
-            toolResults: currentToolResults,
-          }),
+          // Ensure final tool calls/results (as strings) are included
+          toolCalls: currentToolCallStrings,
+          toolResults: currentToolResultStrings,
           // Ensure attachedFiles metadata *without* content is preserved/updated
           // We use the metadata from the *initial* interaction data here
           // as it reliably contains the basic file info before any middleware modification
@@ -590,10 +729,25 @@ export class AIService {
         );
       }
 
+      // Parse strings back to objects for the event emitter
+      let parsedToolCalls: ToolCallPart[] = [];
+      let parsedToolResults: ToolResultPart[] = [];
+      try {
+        parsedToolCalls = currentToolCallStrings.map((s) => JSON.parse(s));
+        parsedToolResults = currentToolResultStrings.map((s) => JSON.parse(s));
+      } catch (e) {
+        console.error(
+          `[AIService] Failed to parse tool strings for event emitter:`,
+          e,
+        );
+      }
+
       emitter.emit("interaction:completed", {
         interactionId,
         status: finalStatus,
         error: finalErrorMessage ?? undefined,
+        toolCalls: parsedToolCalls, // Emit parsed objects
+        toolResults: parsedToolResults, // Emit parsed objects
       });
       console.log(
         `AIService: Finalized interaction ${interactionId} with status ${finalStatus}.`,
