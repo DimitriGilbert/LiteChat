@@ -235,11 +235,8 @@ export const deleteItemOp = async (
 };
 
 export const createDirectoryOp = async (path: string): Promise<void> => {
-  try {
-    await createDirectoryRecursive(path);
-  } catch (err: unknown) {
-    throw err;
-  }
+  // Removed unnecessary try/catch
+  await createDirectoryRecursive(path);
 };
 
 export const downloadFileOp = async (
@@ -721,22 +718,22 @@ export const gitStatusOp = async (path: string): Promise<void> => {
     const status = await git.statusMatrix({ fs, dir });
     console.log("Git Status:", status);
     // Format status for better readability in toast
-    const formattedStatus = status
-      .map(([file, head, workdir, stage]) => {
-        let statusText = "";
-        if (workdir === 0) statusText = "deleted";
-        else if (head === 0 && workdir === 2) statusText = "new file";
-        else if (head === 1 && workdir === 2) statusText = "modified";
-        else if (head === 1 && workdir === 1)
-          statusText = "unmodified"; // Should not appear often with matrix
-        else statusText = `h:${head} w:${workdir} s:${stage}`; // Fallback
+    const formattedStatus = status.map(([file, head, workdir, stage]) => {
+      let statusText = "";
+      if (workdir === 0) statusText = "deleted";
+      else if (head === 0 && workdir === 2) statusText = "new file";
+      else if (head === 1 && workdir === 2) statusText = "modified";
+      else if (head === 1 && workdir === 1)
+        statusText = "unmodified"; // Should not appear often with matrix
+      else statusText = `h:${head} w:${workdir} s:${stage}`; // Fallback
 
-        return `${file}: ${statusText}`;
-      })
-      .join("\n");
+      return `${file}: ${statusText}`;
+    }).join(`
+`);
 
     toast.info(
-      `Git Status for "${basename(dir)}":\n${formattedStatus || "No changes"}`,
+      `Git Status for "${basename(dir)}":
+${formattedStatus || "No changes"}`,
       { duration: 15000 },
     );
   } catch (err: unknown) {

@@ -52,7 +52,7 @@ export const InputArea = forwardRef<HTMLTextAreaElement, InputAreaProps>(
         });
       }
       // Intentionally only run when focusInputOnNextRender changes to true
-    }, [focusInputOnNextRender]); // Dependency array ensures this runs only when the flag changes
+    }, [focusInputOnNextRender, setFocusInputFlag]); // Added setFocusInputFlag
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Enter" && !e.shiftKey && !disabled) {

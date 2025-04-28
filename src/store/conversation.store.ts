@@ -976,7 +976,10 @@ export const useConversationStore = create(
           );
           try {
             await VfsOps.VFS.promises.stat(joinPath(repoDir, ".git"));
-          } catch (verifyError) {
+          } catch (
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            verifyError
+          ) {
             throw new Error(
               `Clone seemed successful but repo dir "${repoDir}" not found.`,
             );

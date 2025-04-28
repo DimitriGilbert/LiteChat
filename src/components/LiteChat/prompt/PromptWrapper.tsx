@@ -129,7 +129,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         JSON.stringify(currentAttachedFilesMetadata),
       );
 
-      let turnData: PromptTurnObject = {
+      // Use const for initial assignment
+      let collectedTurnData: PromptTurnObject = {
         id: nanoid(),
         content: trimmedInput,
         parameters: {},
@@ -144,7 +145,10 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
           try {
             const p = await control.getParameters();
             if (p && typeof p === "object") {
-              turnData.parameters = { ...turnData.parameters, ...p };
+              collectedTurnData.parameters = {
+                ...collectedTurnData.parameters,
+                ...p,
+              };
             }
           } catch (err) {
             console.error(
@@ -163,10 +167,10 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
                   `Control ${control.id} tried to overwrite attachedFiles metadata. Ignoring.`,
                 );
               }
-              turnData.metadata = {
-                ...turnData.metadata,
+              collectedTurnData.metadata = {
+                ...collectedTurnData.metadata,
                 ...otherMeta,
-                attachedFiles: turnData.metadata.attachedFiles,
+                attachedFiles: collectedTurnData.metadata.attachedFiles,
               };
             }
           } catch (err) {
@@ -179,11 +183,11 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       }
       // --- End Control Data Collection ---
 
-      emitter.emit("prompt:submitted", { turnData });
+      emitter.emit("prompt:submitted", { turnData: collectedTurnData });
 
       const middlewareResult = await runMiddleware(
         "middleware:prompt:turnFinalize",
-        { turnData },
+        { turnData: collectedTurnData },
       );
 
       if (middlewareResult === false) {
@@ -192,10 +196,11 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         return;
       }
 
+      // Assign the final result (potentially modified by middleware)
       const finalTurnData =
         middlewareResult && typeof middlewareResult === "object"
           ? (middlewareResult as { turnData: PromptTurnObject }).turnData
-          : turnData;
+          : collectedTurnData;
 
       try {
         await onSubmit(finalTurnData);

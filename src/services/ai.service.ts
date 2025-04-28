@@ -344,8 +344,8 @@ export class AIService {
     let finalUsage: LanguageModelUsage | undefined = undefined;
     let finalProviderMetadata: ProviderMetadata | undefined = undefined;
     let streamFinishedSuccessfully = false;
-    let currentToolCalls: ToolCallPart[] = [];
-    let currentToolResults: ToolResultPart[] = [];
+    const currentToolCalls: ToolCallPart[] = []; // Use const
+    const currentToolResults: ToolResultPart[] = []; // Use const
 
     try {
       const modelInstance = useProviderStore

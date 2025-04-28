@@ -112,8 +112,8 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
       toast.success(
         `Provider "${finalChanges.name || provider.name}" updated.`,
       );
-    } catch (error) {
-      console.error("Failed to save provider update:", error);
+    } catch (_error) {
+      console.error("Failed to save provider update:", _error);
       toast.error("Failed to save provider configuration.");
     } finally {
       setIsSaving(false);
@@ -140,8 +140,10 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
       try {
         await onDelete(provider.id);
       } catch (error) {
+        console.error("Failed to delete provider:", error);
         setIsDeleting(false);
       }
+      // No finally needed, state is reset on success or error catch
     }
   }, [onDelete, provider.id, provider.name]);
 

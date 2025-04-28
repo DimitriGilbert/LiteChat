@@ -51,11 +51,12 @@ export async function fetchModelsForProvider(
     // Determine the correct API endpoint URL based on provider type
     try {
       switch (config.type) {
-        case "openai":
+        case "openai": {
           if (!apiKey) throw new Error("API Key required for OpenAI");
           url = "https://api.openai.com/v1/models";
           break;
-        case "openrouter":
+        }
+        case "openrouter": {
           if (!apiKey) throw new Error("API Key required for OpenRouter");
           url = "https://openrouter.ai/api/v1/models";
           // Add OpenRouter specific headers
@@ -63,7 +64,8 @@ export async function fetchModelsForProvider(
             globalThis.location?.origin || "http://localhost:3000"; // Use a reasonable fallback
           headers["X-Title"] = "LiteChat"; // Optional: Identify your app
           break;
-        case "ollama":
+        }
+        case "ollama": {
           // Use default localhost if baseURL is not provided or empty
           const ollamaBase =
             config.baseURL?.replace(/\/$/, "") || "http://localhost:11434";
@@ -71,7 +73,8 @@ export async function fetchModelsForProvider(
           // No Authorization header typically needed for local Ollama
           delete headers["Authorization"];
           break;
-        case "openai-compatible":
+        }
+        case "openai-compatible": {
           if (!config.baseURL)
             throw new Error("Base URL required for OpenAI-Compatible");
           // Ensure the base URL includes the /v1 path expected by many compatible APIs
@@ -83,12 +86,14 @@ export async function fetchModelsForProvider(
           ).toString();
           // Keep Authorization header if apiKey was provided, as many compatible APIs use it
           break;
+        }
         case "google": // Google Gemini models are often hardcoded or managed differently
-        default:
+        default: {
           console.log(
             `[ModelFetcher] Model fetching not supported via API for type: ${config.type}. Returning empty list.`,
           );
           return []; // Return empty array for unsupported types
+        }
       }
     } catch (urlError) {
       // Handle errors during URL construction (e.g., invalid baseURL)

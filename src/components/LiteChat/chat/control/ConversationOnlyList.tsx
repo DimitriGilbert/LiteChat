@@ -1,4 +1,4 @@
-// src/components/LiteChat/chat/control/ConversationList.tsx
+// src/components/LiteChat/chat/control/ConversationOnlyList.tsx
 import React from "react";
 import { useConversationStore } from "@/store/conversation.store";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -35,7 +35,10 @@ import {
 import { toast } from "sonner";
 
 // Helper to get sync icon and tooltip (remains the same)
-const getSyncIndicator = (
+// NOTE: This function is likely duplicated from SyncIndicator.tsx
+// It's kept here to fix the lint error in *this* file, but should ideally be removed
+// and imported from the dedicated component if this file is kept.
+const getSyncIndicatorInternal = (
   status: SyncStatus | undefined,
   repoName: string | undefined,
 ): React.ReactNode => {
@@ -195,7 +198,10 @@ export const ConversationListControlComponent: React.FC = () => {
               const repoName = c.syncRepoId
                 ? repoNameMap.get(c.syncRepoId)
                 : undefined;
-              const syncIndicator = getSyncIndicator(syncStatus, repoName);
+              const syncIndicator = getSyncIndicatorInternal(
+                syncStatus,
+                repoName,
+              );
 
               return (
                 <li
@@ -287,7 +293,8 @@ export const ConversationListControlComponent: React.FC = () => {
 };
 
 // Icon-only renderer needs update for projects too
-export const ConversationListIconRenderer: React.FC = () => {
+// Removed export
+const ConversationListIconRenderer: React.FC = () => {
   const { addConversation, selectItem } = useConversationStore(
     useShallow((state) => ({
       addConversation: state.addConversation,

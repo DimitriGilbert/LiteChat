@@ -14,10 +14,10 @@ function throttle(func: () => void, limit: number) {
   let inThrottle: boolean;
   let lastFunc: NodeJS.Timeout;
   let lastRan: number;
-  return function (this: any) {
-    const context = this;
+  return function () {
+    // Removed unused 'context' variable
     if (!inThrottle) {
-      func.apply(context);
+      func(); // Call func directly
       lastRan = Date.now();
       inThrottle = true;
     } else {
@@ -25,7 +25,7 @@ function throttle(func: () => void, limit: number) {
       lastFunc = setTimeout(
         () => {
           if (Date.now() - lastRan >= limit) {
-            func.apply(context);
+            func(); // Call func directly
             lastRan = Date.now();
           }
         },

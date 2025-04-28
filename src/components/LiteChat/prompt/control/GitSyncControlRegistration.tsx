@@ -31,6 +31,7 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
 
+// Removed export
 const GitSyncControlComponent: React.FC = () => {
   const {
     selectedItemId, // Use selectedItemId

@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/control/GlobalModelSelector.tsx
-import React from "react";
+import React, { useMemo } from "react"; // Import useMemo
 import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import { Combobox } from "@/components/ui/combobox";
@@ -21,10 +21,12 @@ export const GlobalModelSelector: React.FC = () => {
     })),
   );
 
-  // Get the globally enabled and ordered models
-  const enabledModels = getGloballyEnabledAndOrderedModels
-    ? getGloballyEnabledAndOrderedModels()
-    : [];
+  // Get the globally enabled and ordered models using useMemo
+  const enabledModels = useMemo(() => {
+    return getGloballyEnabledAndOrderedModels
+      ? getGloballyEnabledAndOrderedModels()
+      : [];
+  }, [getGloballyEnabledAndOrderedModels]); // Depend on the selector function
 
   const options = React.useMemo(
     () =>

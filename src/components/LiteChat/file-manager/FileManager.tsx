@@ -444,7 +444,7 @@ WARNING: This will delete all contents inside`
       );
       setIsCloneDialogOpen(false);
       await handleRefresh();
-    } catch (err) {
+    } catch (_err) {
       // Error handled by gitCloneOp
     } finally {
       setIsCloning(false);
@@ -461,7 +461,7 @@ WARNING: This will delete all contents inside`
     try {
       await VfsOps.gitCommitOp(commitPath, commitMessage.trim());
       setIsCommitDialogOpen(false);
-    } catch (err) {
+    } catch (_err) {
       // Error handled by gitCommitOp
     } finally {
       setIsCommitting(false);

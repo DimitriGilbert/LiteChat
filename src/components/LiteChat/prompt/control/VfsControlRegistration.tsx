@@ -53,6 +53,7 @@ const isLikelyTextFile = (name: string, mimeType?: string): boolean => {
 };
 // --- End Text Detection Logic ---
 
+// Removed export
 const VfsPromptControl: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAttaching, setIsAttaching] = useState(false);
@@ -155,12 +156,12 @@ const VfsPromptControl: React.FC = () => {
   );
 
   const getCurrentParentId = useVfsStore.getState().currentParentId;
-  const getCurrentPath = () => {
+  const getCurrentPath = useCallback(() => {
     const parentNode = getCurrentParentId
       ? useVfsStore.getState().nodes[getCurrentParentId]
       : useVfsStore.getState().nodes[useVfsStore.getState().rootId || ""];
     return parentNode?.path || "/";
-  };
+  }, [getCurrentParentId]); // Added dependency
 
   const handleFileDrop = useCallback(
     async (event: React.DragEvent<HTMLDivElement>) => {
@@ -179,7 +180,7 @@ const VfsPromptControl: React.FC = () => {
         }
       }
     },
-    [uploadFiles, getCurrentParentId],
+    [uploadFiles, getCurrentParentId, getCurrentPath], // Added getCurrentPath dependency
   );
 
   const handleDragOver = useCallback(

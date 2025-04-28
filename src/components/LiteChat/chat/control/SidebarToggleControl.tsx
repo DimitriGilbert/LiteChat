@@ -35,7 +35,8 @@ const ToggleButton: React.FC<{ isCollapsed: boolean; onClick: () => void }> = ({
 );
 
 // Full renderer (might not be strictly needed if only used in footer)
-export const SidebarToggleControlComponent: React.FC = () => {
+// Removed export
+const SidebarToggleControlComponent: React.FC = () => {
   const { isSidebarCollapsed, toggleSidebar } = useUIStateStore(
     useShallow((state) => ({
       isSidebarCollapsed: state.isSidebarCollapsed,
@@ -49,7 +50,8 @@ export const SidebarToggleControlComponent: React.FC = () => {
 };
 
 // Icon-only renderer for collapsed sidebar
-export const SidebarToggleIconRenderer: React.FC = () => {
+// Removed export
+const SidebarToggleIconRenderer: React.FC = () => {
   const { isSidebarCollapsed, toggleSidebar } = useUIStateStore(
     useShallow((state) => ({
       isSidebarCollapsed: state.isSidebarCollapsed,

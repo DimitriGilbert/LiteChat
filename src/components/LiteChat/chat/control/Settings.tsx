@@ -14,7 +14,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"; // Added Tooltip
 
-export const SettingsControlComponent: React.FC = () => {
+// Removed export
+const SettingsControlComponent: React.FC = () => {
   const toggleSettingsModal = useUIStateStore(
     (state) => state.toggleChatControlPanel,
   );
@@ -37,7 +38,8 @@ export const SettingsControlComponent: React.FC = () => {
 };
 
 // Icon-only renderer for collapsed sidebar
-export const SettingsIconRenderer: React.FC = () => {
+// Removed export
+const SettingsIconRenderer: React.FC = () => {
   const toggleSettingsModal = useUIStateStore(
     (state) => state.toggleChatControlPanel,
   );

@@ -85,9 +85,9 @@ const SettingsGitSyncReposComponent: React.FC = () => {
         });
       }
       resetForm(); // Reset form after successful save
-    } catch (error) {
+    } catch (_error) {
       // Error toast handled by store action
-      console.error("Failed to save sync repo:", error);
+      console.error("Failed to save sync repo:", _error);
       // Do not reset form on error, allow user to correct
     } finally {
       // Reset saving state regardless of success/failure
@@ -120,6 +120,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
           }
         } catch (error) {
           // Error toast handled by store action
+          console.error("Failed to delete sync repo:", error);
         } finally {
           setIsDeleting((prev) => ({ ...prev, [id]: false }));
         }

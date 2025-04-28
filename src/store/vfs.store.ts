@@ -410,7 +410,7 @@ export const useVfsStore = create(
     setCurrentPath: async (path) => {
       const { findNodeByPath, fetchNodes, rootId } = get();
       const normalizedPath = normalizePath(path);
-      let targetNode = findNodeByPath(normalizedPath);
+      const targetNode = findNodeByPath(normalizedPath); // Use const
 
       if (targetNode && targetNode.type === "folder") {
         set((state) => {
