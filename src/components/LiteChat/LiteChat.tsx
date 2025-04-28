@@ -67,7 +67,7 @@ export const LiteChat: React.FC = () => {
     selectItem,
     getProjectById,
     getConversationById, // Added for convenience
-    isLoading: isConversationLoading, // Get loading state
+    // isLoading: isConversationLoading, // Get loading state
   } = useConversationStore(
     useShallow((state) => ({
       selectedItemId: state.selectedItemId,
@@ -111,7 +111,7 @@ export const LiteChat: React.FC = () => {
   const {
     loadDbMods,
     setLoadedMods,
-    isLoading: isModLoading, // Get loading state
+    // isLoading: isModLoading, // Get loading state
   } = useModStore(
     useShallow((state) => ({
       loadDbMods: state.loadDbMods,
@@ -121,7 +121,7 @@ export const LiteChat: React.FC = () => {
   );
   const {
     loadInitialData: loadProviderData,
-    isLoading: isProviderLoading, // Get loading state
+    // isLoading: isProviderLoading, // Get loading state
   } = useProviderStore(
     useShallow((state) => ({
       loadInitialData: state.loadInitialData,

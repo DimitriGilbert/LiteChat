@@ -50,6 +50,8 @@ const ToolDisplay: React.FC<{
     new Set(),
   );
   const [parsedCalls, setParsedCalls] = useState<ToolCallPart[]>([]);
+  // @ts-expect-error needed
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [parsedResults, setParsedResults] = useState<ToolResultPart[]>([]);
   const [resultsMap, setResultsMap] = useState<Map<string, ToolResultPart>>(
     new Map(),
