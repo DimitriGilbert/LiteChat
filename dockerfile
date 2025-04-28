@@ -8,7 +8,7 @@ RUN apk add --no-cache curl unzip
 
 # Download and extract the latest LiteChat release
 RUN curl -L https://litechat.dbuild.dev/release/latest.zip -o litechat.zip && \
-    unzip litechat.zip && \
+    unzip -o litechat.zip && \
     rm litechat.zip
 
 # Copy nginx configuration for SPA and potential API proxy
