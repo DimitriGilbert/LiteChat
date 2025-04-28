@@ -1,12 +1,13 @@
 // src/components/LiteChat/chat/control/ConversationList.tsx
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react"; // Added useState
 import {
   useConversationStore,
   type SidebarItem,
 } from "@/store/conversation.store";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { PlusIcon, FolderPlusIcon } from "lucide-react";
+import { Input } from "@/components/ui/input"; // Added Input
+import { PlusIcon, FolderPlusIcon, SearchIcon } from "lucide-react"; // Added SearchIcon
 import { useShallow } from "zustand/react/shallow";
 import type { SidebarItemType } from "@/types/litechat/chat";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -68,6 +69,7 @@ export const ConversationListControlComponent: React.FC = () => {
   const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(
     new Set(),
   );
+  const [filterText, setFilterText] = useState(""); // State for filter text
 
   // --- Use the Item Editing Hook ---
   const {
@@ -223,28 +225,44 @@ export const ConversationListControlComponent: React.FC = () => {
     return new Map(syncRepos.map((r) => [r.id, r.name]));
   }, [syncRepos]);
 
+  // --- Updated getChildren function ---
   const getChildren = useMemo(() => {
-    // Memoize the function itself
     return (
       parentId: string | null,
+      filter: string, // Added filter parameter
     ): {
       projects: Project[];
       conversations: Conversation[];
     } => {
-      const childProjects = projects.filter((p) => p.parentId === parentId);
-      const childConversations = conversations.filter(
-        (c) => c.projectId === parentId,
-      );
+      const lowerCaseFilter = filter.toLowerCase();
+      const childProjects = projects
+        .filter((p) => p.parentId === parentId)
+        .filter(
+          (p) => !filter || p.name.toLowerCase().includes(lowerCaseFilter), // Apply filter
+        );
+      const childConversations = conversations
+        .filter((c) => c.projectId === parentId)
+        .filter(
+          (c) => !filter || c.title.toLowerCase().includes(lowerCaseFilter), // Apply filter
+        );
       return { projects: childProjects, conversations: childConversations };
     };
   }, [projects, conversations]); // Dependencies are the raw data arrays
 
+  // --- Updated rootItems calculation ---
   const rootItems = useMemo(() => {
+    const lowerCaseFilter = filterText.toLowerCase();
     const rootProjects = projects
       .filter((p) => p.parentId === null)
+      .filter(
+        (p) => !filterText || p.name.toLowerCase().includes(lowerCaseFilter), // Apply filter
+      )
       .sort((a, b) => a.name.localeCompare(b.name));
     const rootConversations = conversations
       .filter((c) => c.projectId === null)
+      .filter(
+        (c) => !filterText || c.title.toLowerCase().includes(lowerCaseFilter), // Apply filter
+      )
       .sort((a, b) => a.title.localeCompare(b.title));
     return [
       ...rootProjects.map((p): SidebarItem => ({ ...p, itemType: "project" })),
@@ -252,10 +270,11 @@ export const ConversationListControlComponent: React.FC = () => {
         (c): SidebarItem => ({ ...c, itemType: "conversation" }),
       ),
     ];
-  }, [projects, conversations]);
+  }, [projects, conversations, filterText]); // Added filterText dependency
 
   return (
     <div className="p-2 border-r border-[--border] bg-card text-card-foreground h-full flex flex-col">
+      {/* Header */}
       <div className="flex justify-between items-center mb-2 flex-shrink-0 px-1">
         <h3 className="text-sm font-semibold">Workspace</h3>
         <div className="flex items-center">
@@ -295,6 +314,21 @@ export const ConversationListControlComponent: React.FC = () => {
           </TooltipProvider>
         </div>
       </div>
+
+      {/* Filter Input */}
+      <div className="relative mb-2 px-1 flex-shrink-0">
+        <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder="Filter..."
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+          className="h-8 text-xs pl-8" // Added padding for icon
+          disabled={isLoading}
+        />
+      </div>
+
+      {/* List Area */}
       <ScrollArea className="flex-grow">
         {isLoading ? (
           <div className="space-y-1 p-1">
@@ -304,7 +338,10 @@ export const ConversationListControlComponent: React.FC = () => {
           </div>
         ) : rootItems.length === 0 ? (
           <p className="text-xs text-muted-foreground p-2 text-center">
-            Workspace is empty.
+            {/* Updated empty state message */}
+            {filterText.trim() !== ""
+              ? "No items match your filter."
+              : "Workspace is empty."}
           </p>
         ) : (
           <ul className="space-y-0.5 p-1">
@@ -323,6 +360,7 @@ export const ConversationListControlComponent: React.FC = () => {
                 expandedProjects={expandedProjects}
                 toggleProjectExpansion={toggleProjectExpansion}
                 getChildren={getChildren}
+                filterText={filterText} // Pass filter text down
                 // Pass editing state and handlers from the hook
                 editingItemId={editingItemId}
                 editingItemType={editingItemType}

@@ -44,10 +44,14 @@ interface ConversationItemProps {
   ) => void;
   expandedProjects: Set<string>;
   toggleProjectExpansion: (projectId: string) => void;
-  getChildren: (parentId: string | null) => {
+  getChildren: (
+    parentId: string | null,
+    filterText: string, // Added filterText
+  ) => {
     projects: Project[];
     conversations: Conversation[];
   };
+  filterText: string; // Added filterText prop
   // Inline Editing Props
   editingItemId: string | null;
   editingItemType: SidebarItemType | null;
@@ -73,6 +77,7 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
   expandedProjects,
   toggleProjectExpansion,
   getChildren,
+  filterText, // Destructure filterText
   // Inline Editing Props
   editingItemId,
   editingItemType,
@@ -92,8 +97,11 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
   // Correctly determine if the current project item is expanded
   const isExpanded = isProject && expandedProjects.has(item.id);
 
+  // --- Fetch children using filterText ---
   const { projects: childProjects, conversations: childConversations } =
-    isProject ? getChildren(item.id) : { projects: [], conversations: [] };
+    isProject
+      ? getChildren(item.id, filterText) // Pass filterText here
+      : { projects: [], conversations: [] };
   const hasChildren = childProjects.length > 0 || childConversations.length > 0;
 
   const syncStatus =
@@ -355,6 +363,7 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
                 expandedProjects={expandedProjects}
                 toggleProjectExpansion={toggleProjectExpansion}
                 getChildren={getChildren}
+                filterText={filterText} // Pass filter text down
                 editingItemId={editingItemId}
                 editingItemType={editingItemType}
                 editingName={editingName}
@@ -383,6 +392,7 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
                 expandedProjects={expandedProjects}
                 toggleProjectExpansion={toggleProjectExpansion}
                 getChildren={getChildren}
+                filterText={filterText} // Pass filter text down
                 editingItemId={editingItemId}
                 editingItemType={editingItemType}
                 editingName={editingName}
