@@ -1,4 +1,4 @@
-// src/components/LiteChat/prompt/control/GitSyncControlRegistration.tsx
+// src/hooks/litechat/useGitSyncControlRegistration.tsx
 import React from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,11 +31,10 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
 
-// Removed export
 const GitSyncControlComponent: React.FC = () => {
   const {
-    selectedItemId, // Use selectedItemId
-    selectedItemType, // Use selectedItemType
+    selectedItemId,
+    selectedItemType,
     conversations,
     syncRepos,
     conversationSyncStatus,
@@ -53,7 +52,6 @@ const GitSyncControlComponent: React.FC = () => {
     })),
   );
 
-  // Determine the current conversation ID only if a conversation is selected
   const currentConversationId =
     selectedItemType === "conversation" ? selectedItemId : null;
 
@@ -79,8 +77,6 @@ const GitSyncControlComponent: React.FC = () => {
   };
 
   const handleConfigureClick = () => {
-    // TODO: Ideally, open the Settings modal directly to the Git->Sync tab
-    // For now, just inform the user.
     alert(
       "Please go to Settings -> Git -> Sync Repositories to configure sync.",
     );
@@ -125,14 +121,13 @@ const GitSyncControlComponent: React.FC = () => {
   };
 
   const statusInfo = currentRepo ? getStatusInfo() : null;
-  const isButtonDisabled = !currentConversationId; // Disable if no conversation selected
+  const isButtonDisabled = !currentConversationId;
 
   return (
     <DropdownMenu>
       <TooltipProvider delayDuration={100}>
         <Tooltip>
           <TooltipTrigger asChild>
-            {/* Ensure DropdownMenuTrigger wraps the Button */}
             <DropdownMenuTrigger asChild disabled={isButtonDisabled}>
               <Button
                 type="button"
@@ -142,10 +137,9 @@ const GitSyncControlComponent: React.FC = () => {
                   "h-10 w-10 rounded-full relative",
                   !currentRepo && "text-muted-foreground hover:text-foreground",
                   statusInfo?.colorClass,
-                  isButtonDisabled && "opacity-50 cursor-not-allowed", // Style when disabled
+                  isButtonDisabled && "opacity-50 cursor-not-allowed",
                 )}
                 aria-label="Conversation Git Sync Status"
-                // disabled prop is handled by the trigger now
               >
                 <FolderSyncIcon className="h-5 w-5" />
                 {statusInfo && (
@@ -166,7 +160,6 @@ const GitSyncControlComponent: React.FC = () => {
         </Tooltip>
       </TooltipProvider>
 
-      {/* Content is only rendered when the trigger is clicked */}
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Conversation Sync</DropdownMenuLabel>
         <DropdownMenuSeparator />

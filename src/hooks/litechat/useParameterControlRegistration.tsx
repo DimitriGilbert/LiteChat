@@ -1,4 +1,4 @@
-// src/components/LiteChat/prompt/control/ParameterControlRegistration.tsx
+// src/hooks/litechat/useParameterControlRegistration.tsx
 import React from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,7 +7,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { SlidersHorizontalIcon } from "lucide-react";
-import { ParameterControlComponent } from "./ParameterControlComponent"; // Import the component
+import { ParameterControlComponent } from "@/components/LiteChat/prompt/control/ParameterControlComponent";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useSettingsStore } from "@/store/settings.store";
 import type { PromptControl } from "@/types/litechat/prompt";
@@ -27,20 +27,19 @@ export const useParameterControlRegistration = () => {
     frequencyPenalty,
   } = useSettingsStore(
     useShallow((state) => ({
-      enableAdvancedSettings: state.enableAdvancedSettings, // Now exists
-      temperature: state.temperature, // Now exists
-      maxTokens: state.maxTokens, // Now exists
-      topP: state.topP, // Now exists
-      topK: state.topK, // Now exists
-      presencePenalty: state.presencePenalty, // Now exists
-      frequencyPenalty: state.frequencyPenalty, // Now exists
+      enableAdvancedSettings: state.enableAdvancedSettings,
+      temperature: state.temperature,
+      maxTokens: state.maxTokens,
+      topP: state.topP,
+      topK: state.topK,
+      presencePenalty: state.presencePenalty,
+      frequencyPenalty: state.frequencyPenalty,
     })),
   );
 
   React.useEffect(() => {
     const control: PromptControl = {
       id: "core-parameter-control",
-      // Removed status property
       triggerRenderer: () => (
         <Popover>
           <PopoverTrigger asChild>
@@ -58,32 +57,27 @@ export const useParameterControlRegistration = () => {
           </PopoverContent>
         </Popover>
       ),
-      show: () => enableAdvancedSettings, // Show based on global setting
+      show: () => enableAdvancedSettings,
       getParameters: () => {
-        // Fetch latest values directly from store state inside the function
         const latestSettings = useSettingsStore.getState();
         const params: Record<string, any> = {};
-        // Use the correct default value for temperature comparison
         if (latestSettings.temperature !== 0.7)
           params.temperature = latestSettings.temperature;
         if (latestSettings.maxTokens !== null)
           params.max_tokens = latestSettings.maxTokens;
         if (latestSettings.topP !== null) params.top_p = latestSettings.topP;
         if (latestSettings.topK !== null) params.top_k = latestSettings.topK;
-        // Use the correct default value for penalty comparison
         if (latestSettings.presencePenalty !== 0.0)
           params.presence_penalty = latestSettings.presencePenalty;
         if (latestSettings.frequencyPenalty !== 0.0)
           params.frequency_penalty = latestSettings.frequencyPenalty;
-        // Return undefined instead of null if empty
         return Object.keys(params).length > 0 ? params : undefined;
       },
-      order: 20, // Example order
+      order: 20,
     };
 
     const unregister = register(control);
     return unregister;
-    // Re-register if enableAdvancedSettings changes or if parameter defaults change (less likely)
   }, [
     register,
     enableAdvancedSettings,
@@ -95,5 +89,5 @@ export const useParameterControlRegistration = () => {
     frequencyPenalty,
   ]);
 
-  return null; // This hook doesn't render anything itself
+  return null;
 };

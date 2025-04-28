@@ -1,5 +1,5 @@
 // src/components/LiteChat/chat/control/ConversationList.tsx
-import React, { useMemo, useState, useCallback } from "react"; // Added useRef
+import React, { useMemo, useState, useCallback } from "react";
 import {
   useConversationStore,
   type SidebarItem,
@@ -22,9 +22,10 @@ import { toast } from "sonner";
 import { Project } from "@/types/litechat/project";
 import { Conversation } from "@/types/litechat/chat";
 import { ConversationItemRenderer } from "@/components/LiteChat/chat/control/conversation-list/ItemRenderer";
-import { useItemEditing } from "@/hooks/litechat/useItemEditing";
+import { useItemEditing } from "@/hooks/litechat/useItemEditing"; // Import the hook
 
 // --- Recursive Filtering Helper ---
+// (Helper function remains the same)
 const itemMatchesFilterOrHasMatchingDescendant = (
   itemId: string,
   itemType: SidebarItemType,
@@ -34,9 +35,9 @@ const itemMatchesFilterOrHasMatchingDescendant = (
   projectsById: Map<string, Project>,
   conversationsByProjectId: Map<string | null, Conversation[]>,
   projectsByParentId: Map<string | null, Project[]>,
-  memo: Record<string, boolean>, // Memoization cache
+  memo: Record<string, boolean>,
 ): boolean => {
-  if (!lowerCaseFilter) return true; // No filter means everything matches
+  if (!lowerCaseFilter) return true;
 
   const cacheKey = `${itemType}-${itemId}`;
   if (memo[cacheKey] !== undefined) {
@@ -47,11 +48,9 @@ const itemMatchesFilterOrHasMatchingDescendant = (
   if (itemType === "project") {
     const project = projectsById.get(itemId);
     if (project) {
-      // Check if project name matches
       if (project.name.toLowerCase().includes(lowerCaseFilter)) {
         matches = true;
       } else {
-        // Check children recursively
         const childProjects = projectsByParentId.get(itemId) || [];
         const childConversations = conversationsByProjectId.get(itemId) || [];
 
@@ -84,7 +83,6 @@ const itemMatchesFilterOrHasMatchingDescendant = (
       }
     }
   } else {
-    // Conversation
     const conversation = allConversations.find((c) => c.id === itemId);
     if (
       conversation &&
@@ -94,7 +92,7 @@ const itemMatchesFilterOrHasMatchingDescendant = (
     }
   }
 
-  memo[cacheKey] = matches; // Store result in memo cache
+  memo[cacheKey] = matches;
   return matches;
 };
 // --- End Recursive Filtering Helper ---
@@ -114,7 +112,7 @@ export const ConversationListControlComponent: React.FC = () => {
     updateProject,
     deleteProject,
     exportConversation,
-    exportProject, // Added project export action
+    exportProject,
     isLoading,
     syncRepos,
     conversationSyncStatus,
@@ -134,7 +132,7 @@ export const ConversationListControlComponent: React.FC = () => {
       updateProject: state.updateProject,
       deleteProject: state.deleteProject,
       exportConversation: state.exportConversation,
-      exportProject: state.exportProject, // Get project export action
+      exportProject: state.exportProject,
       isLoading: state.isLoading,
       syncRepos: state.syncRepos,
       conversationSyncStatus: state.conversationSyncStatus,
@@ -152,15 +150,16 @@ export const ConversationListControlComponent: React.FC = () => {
   const {
     editingItemId,
     editingItemType,
-    editingName, // Original name
-    localEditingName, // Input value state
-    setLocalEditingName, // Setter for input value
+    editingName,
+    localEditingName,
+    setLocalEditingName,
     isSavingEdit,
     editInputRef,
     handleStartEditing,
     handleSaveEdit,
     handleCancelEdit,
   } = useItemEditing({
+    // Use the imported hook
     updateProject,
     updateConversation,
     deleteProject,
@@ -243,13 +242,12 @@ export const ConversationListControlComponent: React.FC = () => {
             parentId: parentProjectId,
             createdAt: new Date(),
             updatedAt: new Date(),
-            path: `/New Project`, // Placeholder path
+            path: `/New Project`,
           });
         }
       }, 50);
     } catch (error) {
       console.error("Failed to create new project:", error);
-      // Error toast handled by store action if it's a name collision
     }
   }, [
     editingItemId,
@@ -265,7 +263,6 @@ export const ConversationListControlComponent: React.FC = () => {
     (id: string, type: SidebarItemType) => {
       if (id === editingItemId) return;
       if (editingItemId && id !== editingItemId) {
-        // Attempt to save if name is valid and changed, otherwise cancel
         if (
           localEditingName.trim() &&
           localEditingName.trim() !== editingName
@@ -315,7 +312,6 @@ export const ConversationListControlComponent: React.FC = () => {
   const handleDeleteProject = useCallback(
     (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
-      // Confirmation is handled within the ItemRenderer now
       deleteProject(id).catch((error) => {
         console.error("Failed to delete project:", error);
         toast.error("Failed to delete project.");
@@ -332,7 +328,6 @@ export const ConversationListControlComponent: React.FC = () => {
         await exportConversation(id, format);
       } catch (error) {
         console.error(`Failed to export conversation as ${format}:`, error);
-        // Toast handled by store action
       }
     },
     [exportConversation],
@@ -346,7 +341,6 @@ export const ConversationListControlComponent: React.FC = () => {
         await exportProject(id);
       } catch (error) {
         console.error("Failed to export project:", error);
-        // Toast handled by store action
       }
     },
     [exportProject],
@@ -393,7 +387,7 @@ export const ConversationListControlComponent: React.FC = () => {
       conversations: Conversation[];
     } => {
       const lowerCaseFilter = filter.toLowerCase();
-      const memoCache: Record<string, boolean> = {}; // Cache for this specific call
+      const memoCache: Record<string, boolean> = {};
 
       const childProjects = (projectsByParentId.get(parentId) || []).filter(
         (p) =>
@@ -414,7 +408,6 @@ export const ConversationListControlComponent: React.FC = () => {
         conversationsByProjectId.get(parentId) || []
       ).filter((c) => c.title.toLowerCase().includes(lowerCaseFilter));
 
-      // Sort children by date descending (already done in precomputed maps, but can re-sort if needed)
       childProjects.sort(
         (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
       );
@@ -436,7 +429,7 @@ export const ConversationListControlComponent: React.FC = () => {
   // --- Updated rootItems calculation (uses filtering helper) ---
   const rootItems = useMemo(() => {
     const lowerCaseFilter = filterText.toLowerCase();
-    const memoCache: Record<string, boolean> = {}; // Cache for this calculation
+    const memoCache: Record<string, boolean> = {};
 
     const rootProjects = (projectsByParentId.get(null) || []).filter((p) =>
       itemMatchesFilterOrHasMatchingDescendant(
@@ -456,7 +449,6 @@ export const ConversationListControlComponent: React.FC = () => {
       (c) => c.title.toLowerCase().includes(lowerCaseFilter),
     );
 
-    // Combine and sort the combined list by date descending
     const combined = [
       ...rootProjects.map((p): SidebarItem => ({ ...p, itemType: "project" })),
       ...rootConversations.map(
@@ -472,7 +464,7 @@ export const ConversationListControlComponent: React.FC = () => {
     projectsById,
     conversationsByProjectId,
     projectsByParentId,
-  ]); // Added map dependencies
+  ]);
 
   return (
     <div className="p-2 border-r border-[--border] bg-card text-card-foreground h-full flex flex-col">
@@ -561,9 +553,8 @@ export const ConversationListControlComponent: React.FC = () => {
                 onExportProject={handleExportProject}
                 expandedProjects={expandedProjects}
                 toggleProjectExpansion={toggleProjectExpansion}
-                getChildren={getChildren} // Pass the memoized getChildren
+                getChildren={getChildren}
                 filterText={filterText}
-                // Pass editing state and handlers from the hook
                 editingItemId={editingItemId}
                 editingItemType={editingItemType}
                 editingName={editingName}

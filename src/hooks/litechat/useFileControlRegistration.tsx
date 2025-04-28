@@ -1,5 +1,4 @@
-// src/components/LiteChat/prompt/control/FileControlRegistration.tsx
-// (Content verified - no changes needed from previous correct version)
+// src/hooks/litechat/useFileControlRegistration.tsx
 import React, { useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { PaperclipIcon } from "lucide-react";
@@ -8,7 +7,7 @@ import { useInputStore } from "@/store/input.store";
 import type { PromptControl } from "@/types/litechat/prompt";
 import { toast } from "sonner";
 import { COMMON_TEXT_EXTENSIONS_VFS } from "@/types/litechat/vfs";
-// Helper function to read file as base64
+
 const readFileAsBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -29,7 +28,6 @@ const readFileAsBase64 = (file: File): Promise<string> => {
   });
 };
 
-// Helper function to read file as text
 const readFileAsText = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -64,7 +62,6 @@ export const useFileControlRegistration = () => {
         const processingPromises = Array.from(files).map(async (file) => {
           try {
             const mimeType = file.type || "application/octet-stream";
-            // Use a more robust check for text files
             const fileNameLower = file.name.toLowerCase();
             const isText =
               mimeType.startsWith("text/") ||

@@ -1,4 +1,4 @@
-// src/components/LiteChat/chat/control/SidebarToggleControl.tsx
+// src/hooks/litechat/useSidebarToggleControlRegistration.tsx
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { PanelLeftCloseIcon, PanelRightCloseIcon } from "lucide-react";
@@ -11,9 +11,8 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"; // Added Tooltip
+} from "@/components/ui/tooltip";
 
-// Component to render the button (used by both renderers)
 const ToggleButton: React.FC<{ isCollapsed: boolean; onClick: () => void }> = ({
   isCollapsed,
   onClick,
@@ -21,9 +20,8 @@ const ToggleButton: React.FC<{ isCollapsed: boolean; onClick: () => void }> = ({
   <Button
     variant="ghost"
     size="icon"
-    // Ensure the event object is not passed to the store action
     onClick={() => onClick()}
-    className="h-8 w-8" // Consistent size
+    className="h-8 w-8"
     aria-label={isCollapsed ? "Open sidebar" : "Close sidebar"}
   >
     {isCollapsed ? (
@@ -34,8 +32,6 @@ const ToggleButton: React.FC<{ isCollapsed: boolean; onClick: () => void }> = ({
   </Button>
 );
 
-// Full renderer (might not be strictly needed if only used in footer)
-// Removed export
 const SidebarToggleControlComponent: React.FC = () => {
   const { isSidebarCollapsed, toggleSidebar } = useUIStateStore(
     useShallow((state) => ({
@@ -49,8 +45,6 @@ const SidebarToggleControlComponent: React.FC = () => {
   );
 };
 
-// Icon-only renderer for collapsed sidebar
-// Removed export
 const SidebarToggleIconRenderer: React.FC = () => {
   const { isSidebarCollapsed, toggleSidebar } = useUIStateStore(
     useShallow((state) => ({
@@ -76,7 +70,6 @@ const SidebarToggleIconRenderer: React.FC = () => {
   );
 };
 
-// Registration Hook/Component
 export const useSidebarToggleControlRegistration = () => {
   const register = useControlRegistryStore(
     (state) => state.registerChatControl,
@@ -86,11 +79,11 @@ export const useSidebarToggleControlRegistration = () => {
     const control: ChatControl = {
       id: "core-sidebar-toggle",
       status: () => "ready",
-      panel: "sidebar-footer", // Place in the sidebar footer
+      panel: "sidebar-footer",
       renderer: () => <SidebarToggleControlComponent />,
-      iconRenderer: () => <SidebarToggleIconRenderer />, // Add icon renderer
-      show: () => true, // Always show
-      order: 10, // Place it before settings
+      iconRenderer: () => <SidebarToggleIconRenderer />,
+      show: () => true,
+      order: 10,
     };
     const unregister = register(control);
     return unregister;

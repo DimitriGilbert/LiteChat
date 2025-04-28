@@ -1,4 +1,4 @@
-// src/components/LiteChat/chat/control/Settings.tsx
+// src/hooks/litechat/useSettingsControlRegistration.tsx
 import React from "react";
 import { useUIStateStore } from "@/store/ui.store";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,8 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"; // Added Tooltip
+} from "@/components/ui/tooltip";
 
-// Removed export
 const SettingsControlComponent: React.FC = () => {
   const toggleSettingsModal = useUIStateStore(
     (state) => state.toggleChatControlPanel,
@@ -37,8 +36,6 @@ const SettingsControlComponent: React.FC = () => {
   );
 };
 
-// Icon-only renderer for collapsed sidebar
-// Removed export
 const SettingsIconRenderer: React.FC = () => {
   const toggleSettingsModal = useUIStateStore(
     (state) => state.toggleChatControlPanel,
@@ -68,7 +65,6 @@ const SettingsIconRenderer: React.FC = () => {
   );
 };
 
-// Registration Hook/Component
 export const useSettingsControlRegistration = () => {
   const register = useControlRegistryStore(
     (state) => state.registerChatControl,
@@ -84,9 +80,9 @@ export const useSettingsControlRegistration = () => {
     const control: ChatControl = {
       id: "core-settings-trigger",
       status: () => "ready",
-      panel: "sidebar-footer", // Changed panel ID
+      panel: "sidebar-footer",
       renderer: () => <SettingsControlComponent />,
-      iconRenderer: () => <SettingsIconRenderer />, // Add icon renderer
+      iconRenderer: () => <SettingsIconRenderer />,
       show: () => true,
       order: 100,
       settingsConfig: { tabId: "mainSettingsModal", title: "Settings" },

@@ -1,4 +1,4 @@
-// src/components/LiteChat/prompt/control/VfsControlRegistration.tsx
+// src/hooks/litechat/useVfsControlRegistration.tsx
 import React, { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { FolderOpenIcon, Loader2Icon } from "lucide-react";
@@ -33,7 +33,6 @@ import type { AttachedFileMetadata } from "@/store/input.store";
 
 const CONTROL_ID = "core-vfs-control";
 
-// Helper function to convert ArrayBuffer to Base64 (remains the same)
 const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
   let binary = "";
   const bytes = new Uint8Array(buffer);
@@ -51,9 +50,7 @@ const isLikelyTextFile = (name: string, mimeType?: string): boolean => {
   }
   return COMMON_TEXT_EXTENSIONS_VFS.some((ext) => fileNameLower.endsWith(ext));
 };
-// --- End Text Detection Logic ---
 
-// Removed export
 const VfsPromptControl: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAttaching, setIsAttaching] = useState(false);
@@ -81,7 +78,6 @@ const VfsPromptControl: React.FC = () => {
       .filter((node): node is VfsFile => !!node && node.type === "file");
   }, [selectedFileIds, nodes]);
 
-  // Attach selected VFS files to the InputStore, reading content first
   const handleFileSelectConfirm = useCallback(async () => {
     if (selectedVfsNodes.length === 0 || isAttaching) return;
 
@@ -91,13 +87,10 @@ const VfsPromptControl: React.FC = () => {
 
     const processingPromises = selectedVfsNodes.map(async (node) => {
       try {
-        // Read content as ArrayBuffer first
         const buffer = await VfsOps.readFileOp(node.path);
         const mimeType = node.mimeType || "application/octet-stream";
-        // Use the helper to determine if it's likely text
         const isText = isLikelyTextFile(node.name, mimeType);
 
-        // Prepare the data object for addAttachedFile
         const fileDataToAdd: Omit<AttachedFileMetadata, "id"> = {
           source: "vfs",
           name: node.name,
@@ -107,14 +100,11 @@ const VfsPromptControl: React.FC = () => {
         };
 
         if (isText) {
-          // Decode as text and add contentText
           fileDataToAdd.contentText = new TextDecoder().decode(buffer);
         } else {
-          // Convert to base64 and add contentBase64
           fileDataToAdd.contentBase64 = arrayBufferToBase64(buffer);
         }
 
-        // Add the file metadata *with* the content to the input store
         addAttachedFile(fileDataToAdd);
         successCount++;
       } catch (error) {
@@ -140,7 +130,6 @@ const VfsPromptControl: React.FC = () => {
     setIsDialogOpen(false);
   }, [selectedVfsNodes, addAttachedFile, clearSelection, isAttaching]);
 
-  // --- Other handlers remain the same ---
   const handleDialogClose = useCallback(
     (open: boolean) => {
       if (!open) {
@@ -161,7 +150,7 @@ const VfsPromptControl: React.FC = () => {
       ? useVfsStore.getState().nodes[getCurrentParentId]
       : useVfsStore.getState().nodes[useVfsStore.getState().rootId || ""];
     return parentNode?.path || "/";
-  }, [getCurrentParentId]); // Added dependency
+  }, [getCurrentParentId]);
 
   const handleFileDrop = useCallback(
     async (event: React.DragEvent<HTMLDivElement>) => {
@@ -180,7 +169,7 @@ const VfsPromptControl: React.FC = () => {
         }
       }
     },
-    [uploadFiles, getCurrentParentId, getCurrentPath], // Added getCurrentPath dependency
+    [uploadFiles, getCurrentParentId, getCurrentPath],
   );
 
   const handleDragOver = useCallback(
@@ -250,7 +239,7 @@ const VfsPromptControl: React.FC = () => {
           </DialogClose>
           <Button
             onClick={handleFileSelectConfirm}
-            disabled={selectedVfsNodes.length === 0 || isAttaching} // Disable while attaching
+            disabled={selectedVfsNodes.length === 0 || isAttaching}
           >
             {isAttaching && (
               <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
@@ -265,7 +254,6 @@ const VfsPromptControl: React.FC = () => {
   );
 };
 
-// Registration hook remains the same
 export const useVfsControlRegistration = () => {
   const registerControl = useControlRegistryStore(
     (state) => state.registerPromptControl,
