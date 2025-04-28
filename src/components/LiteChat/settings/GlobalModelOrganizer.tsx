@@ -53,6 +53,7 @@ export const GlobalModelOrganizer: React.FC = () => {
       ? getGloballyEnabledAndOrderedModels()
       : [];
   }, [
+    // not an error, needed to update and prevent render loop from hell
     getGloballyEnabledAndOrderedModels,
     dbProviderConfigs,
     globalModelSortOrder,

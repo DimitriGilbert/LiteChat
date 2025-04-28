@@ -158,7 +158,7 @@ const SettingsGeneralComponent: React.FC = () => {
           />
         </div>
         {/* General Streaming FPS Setting */}
-        <div className="rounded-lg border p-3 shadow-sm space-y-2">
+        <div className="rounded-lg border p-3 shadow-sm space-y-2 hidden">
           <div>
             <Label htmlFor="streaming-fps-slider" className="font-medium">
               General Streaming Update Rate ({localFps} FPS)
@@ -191,7 +191,7 @@ const SettingsGeneralComponent: React.FC = () => {
           </div>
         </div>
         {/* Code Block Streaming FPS Setting */}
-        <div className="rounded-lg border p-3 shadow-sm space-y-2">
+        <div className="rounded-lg border p-3 shadow-sm space-y-2 hidden">
           <div>
             <Label htmlFor="streaming-code-fps-slider" className="font-medium">
               Code Block Streaming Update Rate ({localCodeFps} FPS)
@@ -228,7 +228,7 @@ const SettingsGeneralComponent: React.FC = () => {
 
       {/* Advanced Settings */}
       <Separator />
-      <div className="space-y-2">
+      <div className="space-y-2 hidden">
         <h3 className="text-lg font-medium">Advanced Settings</h3>
         <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
           <div>
