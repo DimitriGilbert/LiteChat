@@ -94,6 +94,7 @@ export const ConversationListControlComponent: React.FC = () => {
   });
   // --- End Item Editing Hook ---
 
+  // Wrap toggleProjectExpansion in useCallback
   const toggleProjectExpansion = useCallback((projectId: string) => {
     setExpandedProjects((prev) => {
       const next = new Set(prev);
@@ -106,6 +107,7 @@ export const ConversationListControlComponent: React.FC = () => {
     });
   }, []);
 
+  // Wrap getParentProjectId in useCallback
   const getParentProjectId = useCallback(() => {
     if (selectedItemType === "project") {
       return selectedItemId;
@@ -116,6 +118,7 @@ export const ConversationListControlComponent: React.FC = () => {
     return null;
   }, [selectedItemId, selectedItemType, getConversationById]);
 
+  // Wrap handleNewChat in useCallback
   const handleNewChat = useCallback(async () => {
     if (editingItemId) return;
     try {
@@ -138,6 +141,7 @@ export const ConversationListControlComponent: React.FC = () => {
     setFocusInputFlag,
   ]);
 
+  // Wrap handleNewProject in useCallback
   const handleNewProject = useCallback(async () => {
     if (editingItemId) return;
     try {
@@ -181,6 +185,7 @@ export const ConversationListControlComponent: React.FC = () => {
     handleStartEditing,
   ]);
 
+  // Wrap handleSelectItem in useCallback
   const handleSelectItem = useCallback(
     (id: string, type: SidebarItemType) => {
       if (id === editingItemId) return;
@@ -217,6 +222,7 @@ export const ConversationListControlComponent: React.FC = () => {
     ],
   );
 
+  // Wrap handleDeleteConversation in useCallback
   const handleDeleteConversation = useCallback(
     (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
@@ -230,6 +236,7 @@ export const ConversationListControlComponent: React.FC = () => {
     [deleteConversation],
   );
 
+  // Wrap handleDeleteProject in useCallback
   const handleDeleteProject = useCallback(
     (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
@@ -242,6 +249,7 @@ export const ConversationListControlComponent: React.FC = () => {
     [deleteProject],
   );
 
+  // Wrap handleExportConversation in useCallback
   const handleExportConversation = useCallback(
     async (id: string, format: "json" | "md", e: React.MouseEvent) => {
       e.stopPropagation();
@@ -255,7 +263,7 @@ export const ConversationListControlComponent: React.FC = () => {
     [exportConversation],
   );
 
-  // Added project export handler
+  // Wrap handleExportProject in useCallback
   const handleExportProject = useCallback(
     async (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
@@ -274,8 +282,9 @@ export const ConversationListControlComponent: React.FC = () => {
   }, [syncRepos]);
 
   // --- Updated getChildren function ---
-  const getChildren = useMemo(() => {
-    return (
+  // Wrap getChildren definition in useCallback
+  const getChildren = useCallback(
+    (
       parentId: string | null,
       filter: string,
     ): {
@@ -298,8 +307,9 @@ export const ConversationListControlComponent: React.FC = () => {
         // Sort children by date descending
         .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
       return { projects: childProjects, conversations: childConversations };
-    };
-  }, [projects, conversations]); // Dependencies are the raw data arrays
+    },
+    [projects, conversations],
+  ); // Dependencies are the raw data arrays
 
   // --- Updated rootItems calculation ---
   const rootItems = useMemo(() => {

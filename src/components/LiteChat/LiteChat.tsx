@@ -1,5 +1,5 @@
 // src/components/LiteChat/LiteChat.tsx
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect, useCallback, useMemo } from "react"; // Added useMemo
 import { PromptWrapper } from "@/components/LiteChat/prompt/PromptWrapper";
 import { ChatCanvas } from "@/components/LiteChat/canvas/ChatCanvas";
 import { ChatControlWrapper } from "@/components/LiteChat/chat/ChatControlWrapper";
@@ -75,16 +75,23 @@ export const LiteChat: React.FC = () => {
       setCurrentConversationId: state.setCurrentConversationId,
     })),
   );
+  // Only select the state needed for layout, not the modal open state itself
   const { globalError, isSidebarCollapsed } = useUIStateStore(
     useShallow((state) => ({
       globalError: state.globalError,
       isSidebarCollapsed: state.isSidebarCollapsed,
     })),
   );
+  // Select the modal open state separately for the modal renderer
+  const isSettingsModalOpen = useUIStateStore(
+    (state) => state.isChatControlPanelOpen["settingsModal"] ?? false,
+  );
+
   const registeredChatControls = useControlRegistryStore(
     (state) => state.chatControls,
   );
-  const chatControls = React.useMemo(
+  // Memoize the derived control lists
+  const chatControls = useMemo(
     () => Object.values(registeredChatControls),
     [registeredChatControls],
   );
@@ -424,20 +431,43 @@ export const LiteChat: React.FC = () => {
     AIService.stopInteraction(interactionId);
   }, []);
 
-  // --- Render Logic ---
-  const sidebarControls = chatControls
-    .filter(
-      (c) => (c.panel ?? "main") === "sidebar" && (c.show ? c.show() : true),
-    )
-    .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
+  // --- Memoize Control Lists ---
+  const sidebarControls = useMemo(
+    () =>
+      chatControls
+        .filter(
+          (c) =>
+            (c.panel ?? "main") === "sidebar" && (c.show ? c.show() : true),
+        )
+        .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity)),
+    [chatControls],
+  );
 
-  const sidebarFooterControls = chatControls
-    .filter((c) => c.panel === "sidebar-footer" && (c.show ? c.show() : true))
-    .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
+  const sidebarFooterControls = useMemo(
+    () =>
+      chatControls
+        .filter(
+          (c) => c.panel === "sidebar-footer" && (c.show ? c.show() : true),
+        )
+        .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity)),
+    [chatControls],
+  );
 
-  const settingsModalRenderer = chatControls.find(
-    (c) => c.id === "core-settings-trigger",
-  )?.settingsRenderer;
+  const headerControls = useMemo(
+    () =>
+      chatControls
+        .filter((c) => c.panel === "header" && (c.show ? c.show() : true))
+        .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity)),
+    [chatControls],
+  );
+
+  // Find the settings modal renderer once
+  const settingsModalRenderer = useMemo(
+    () =>
+      chatControls.find((c) => c.id === "core-settings-trigger")
+        ?.settingsRenderer,
+    [chatControls],
+  );
 
   // Determine the current conversation ID for ChatCanvas
   const currentConversationIdForCanvas =
@@ -506,7 +536,7 @@ export const LiteChat: React.FC = () => {
           {/* Header */}
           <div className="flex items-center justify-end p-2 border-b border-[--border] bg-card flex-shrink-0">
             <ChatControlWrapper
-              controls={chatControls}
+              controls={headerControls} // Use memoized header controls
               panelId="header"
               className="flex items-center justify-end gap-1"
             />
@@ -538,8 +568,8 @@ export const LiteChat: React.FC = () => {
         </div>
       </div>
 
-      {/* Render the Settings Modal */}
-      {settingsModalRenderer && settingsModalRenderer()}
+      {/* Render the Settings Modal only when needed */}
+      {isSettingsModalOpen && settingsModalRenderer && settingsModalRenderer()}
 
       {/* Toast Notifications */}
       <Toaster richColors position="top-right" />
