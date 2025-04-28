@@ -1,5 +1,10 @@
 // src/components/LiteChat/LiteChat.tsx
-import React, { useEffect, useCallback, useMemo } from "react";
+import React, {
+  useEffect,
+  useCallback,
+  useMemo,
+  useState, // Added useState for loading
+} from "react";
 import { PromptWrapper } from "@/components/LiteChat/prompt/PromptWrapper";
 import { ChatCanvas } from "@/components/LiteChat/canvas/ChatCanvas";
 import { ChatControlWrapper } from "@/components/LiteChat/chat/ChatControlWrapper";
@@ -21,6 +26,7 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Interaction } from "@/types/litechat/interaction";
+import { Loader2 } from "lucide-react"; // Added Loader2
 
 // Import control registration hooks/components from their new locations
 import { useConversationListControlRegistration } from "@/hooks/litechat/useConversationListControl";
@@ -49,6 +55,9 @@ const splitModelId = (
 };
 
 export const LiteChat: React.FC = () => {
+  // --- Loading State ---
+  const [isInitializing, setIsInitializing] = useState(true); // Added loading state
+
   // --- Store Hooks ---
   const {
     selectedItemId,
@@ -58,6 +67,7 @@ export const LiteChat: React.FC = () => {
     selectItem,
     getProjectById,
     getConversationById, // Added for convenience
+    isLoading: isConversationLoading, // Get loading state
   } = useConversationStore(
     useShallow((state) => ({
       selectedItemId: state.selectedItemId,
@@ -67,6 +77,7 @@ export const LiteChat: React.FC = () => {
       selectItem: state.selectItem,
       getProjectById: state.getProjectById,
       getConversationById: state.getConversationById, // Added
+      isLoading: state.isLoading, // Get loading state
     })),
   );
   const {
@@ -97,15 +108,24 @@ export const LiteChat: React.FC = () => {
     () => Object.values(registeredChatControls),
     [registeredChatControls],
   );
-  const { loadDbMods, setLoadedMods } = useModStore(
+  const {
+    loadDbMods,
+    setLoadedMods,
+    isLoading: isModLoading, // Get loading state
+  } = useModStore(
     useShallow((state) => ({
       loadDbMods: state.loadDbMods,
       setLoadedMods: state.setLoadedMods,
+      isLoading: state.isLoading, // Get loading state
     })),
   );
-  const { loadInitialData: loadProviderData } = useProviderStore(
+  const {
+    loadInitialData: loadProviderData,
+    isLoading: isProviderLoading, // Get loading state
+  } = useProviderStore(
     useShallow((state) => ({
       loadInitialData: state.loadInitialData,
+      isLoading: state.isLoading, // Get loading state
     })),
   );
   const { loadSettings, globalSystemPrompt } = useSettingsStore(
@@ -133,6 +153,7 @@ export const LiteChat: React.FC = () => {
     let isMounted = true;
     const initialize = async () => {
       console.log("LiteChat: Starting initialization...");
+      setIsInitializing(true); // Start loading
       if (!isMounted) return;
       await loadSettings();
       console.log("LiteChat: Settings loaded.");
@@ -158,19 +179,23 @@ export const LiteChat: React.FC = () => {
       } catch (error) {
         console.error("LiteChat: Failed to load mods:", error);
       }
-      if (isMounted) console.log("LiteChat: Initialization complete.");
+      if (isMounted) {
+        console.log("LiteChat: Initialization complete.");
+        setIsInitializing(false); // Finish loading
+      }
     };
     initialize();
     return () => {
       isMounted = false;
       console.log("LiteChat: Unmounting, initialization cancelled if pending.");
     };
+    // Only run once on mount
   }, [
+    loadSettings,
+    loadProviderData,
     loadSidebarItems,
     loadDbMods,
     setLoadedMods,
-    loadProviderData,
-    loadSettings,
   ]);
 
   // --- History Construction Helper ---
@@ -567,6 +592,20 @@ export const LiteChat: React.FC = () => {
 
   const currentConversationIdForCanvas =
     selectedItemType === "conversation" ? selectedItemId : null;
+
+  // --- Loading Screen Logic ---
+  if (isInitializing) {
+    return (
+      <div className="flex items-center justify-center h-screen w-screen bg-background text-foreground">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-lg text-muted-foreground">
+            Initializing LiteChat...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

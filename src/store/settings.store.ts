@@ -19,6 +19,7 @@ interface SettingsState {
   streamingCodeRenderFPS: number; // FPS specifically for code blocks
   gitUserName: string | null; // Added
   gitUserEmail: string | null; // Added
+  toolMaxSteps: number; // Added for max tool steps
 }
 
 interface SettingsActions {
@@ -36,6 +37,7 @@ interface SettingsActions {
   setStreamingCodeRenderFPS: (fps: number) => void; // Action for code FPS
   setGitUserName: (name: string | null) => void; // Added
   setGitUserEmail: (email: string | null) => void; // Added
+  setToolMaxSteps: (steps: number) => void; // Added setter for max steps
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>; // Added reset action
 }
@@ -55,6 +57,7 @@ const DEFAULT_STREAMING_FPS = 30;
 const DEFAULT_STREAMING_CODE_FPS = 10;
 const DEFAULT_GIT_USER_NAME = null;
 const DEFAULT_GIT_USER_EMAIL = null;
+const DEFAULT_TOOL_MAX_STEPS = 5; // Default max steps
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set) => ({
@@ -73,6 +76,7 @@ export const useSettingsStore = create(
     streamingCodeRenderFPS: DEFAULT_STREAMING_CODE_FPS,
     gitUserName: DEFAULT_GIT_USER_NAME,
     gitUserEmail: DEFAULT_GIT_USER_EMAIL,
+    toolMaxSteps: DEFAULT_TOOL_MAX_STEPS, // Initialize max steps
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -142,6 +146,13 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("gitUserEmail", trimmedEmail);
     },
 
+    // Setter for max tool steps
+    setToolMaxSteps: (steps) => {
+      const clampedSteps = Math.max(1, Math.min(20, steps)); // Clamp between 1 and 20
+      set({ toolMaxSteps: clampedSteps });
+      PersistenceService.saveSetting("toolMaxSteps", clampedSteps);
+    },
+
     loadSettings: async () => {
       try {
         const [
@@ -159,6 +170,7 @@ export const useSettingsStore = create(
           streamingCodeFps,
           gitUserName,
           gitUserEmail,
+          toolMaxSteps, // Load max steps
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -210,6 +222,11 @@ export const useSettingsStore = create(
             "gitUserEmail",
             DEFAULT_GIT_USER_EMAIL,
           ),
+          // Load max steps setting
+          PersistenceService.loadSetting<number>(
+            "toolMaxSteps",
+            DEFAULT_TOOL_MAX_STEPS,
+          ),
         ]);
 
         set({
@@ -227,6 +244,7 @@ export const useSettingsStore = create(
           streamingCodeRenderFPS: streamingCodeFps,
           gitUserName,
           gitUserEmail,
+          toolMaxSteps, // Set loaded max steps
         });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);

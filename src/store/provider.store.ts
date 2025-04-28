@@ -75,7 +75,7 @@ export interface ProviderActions {
   getAllAvailableModelDefsForProvider: (
     // Needed for provider edit UI
     providerConfigId: string,
-  ) => { id: string; name: string }[];
+  ) => { id: string; name: string; metadata?: Record<string, any> }[]; // Include metadata
   _setProviderFetchStatus: (providerId: string, status: FetchStatus) => void;
   setEnableApiKeyManagement: (enabled: boolean) => void;
 }
@@ -498,7 +498,7 @@ export const useProviderStore = create(
             id: c.id,
             name: c.name,
             type: c.type,
-            allAvailableModels: allAvailable,
+            allAvailableModels: allAvailable, // Include metadata here
           };
         });
     },
@@ -533,6 +533,7 @@ export const useProviderStore = create(
               name: modelDef.name || modelId,
               providerId: config.id,
               providerName: config.name,
+              metadata: modelDef.metadata, // Include metadata
               // Add other non-instance properties if needed later
             });
           }
@@ -571,10 +572,10 @@ export const useProviderStore = create(
       );
       if (!config) return [];
       const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
-      // Ensure a copy is returned
+      // Ensure a copy is returned, including metadata
       return [
         ...(config.fetchedModels ?? (DEFAULT_MODELS[providerTypeKey] || [])),
-      ];
+      ].map((m) => ({ ...m })); // Create shallow copies
     },
   })),
 );

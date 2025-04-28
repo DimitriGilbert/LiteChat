@@ -102,6 +102,11 @@ interface ConversationActions {
     itemId: string | null,
     itemType: SidebarItemType | null,
   ) => string | null;
+  // Action to update tool settings for the current conversation
+  updateCurrentConversationToolSettings: (settings: {
+    enabledTools?: string[];
+    toolMaxStepsOverride?: number | null;
+  }) => Promise<void>;
 }
 
 const CONVERSATION_DIR = ".litechat/conversations";
@@ -257,7 +262,12 @@ export const useConversationStore = create(
         updatedAt: now,
         title: conversationData.title,
         projectId: conversationData.projectId ?? null,
-        metadata: conversationData.metadata ?? {},
+        // Initialize tool metadata for new conversations
+        metadata: {
+          ...(conversationData.metadata ?? {}),
+          enabledTools: [], // Start with no tools enabled
+          toolMaxStepsOverride: null, // Start with no override
+        },
         syncRepoId: conversationData.syncRepoId ?? null,
         lastSyncedAt: conversationData.lastSyncedAt ?? null,
       };
@@ -302,15 +312,27 @@ export const useConversationStore = create(
       set((state) => {
         const index = state.conversations.findIndex((c) => c.id === id);
         if (index !== -1) {
+          // Merge metadata carefully
+          const existingMeta = state.conversations[index].metadata ?? {};
+          const updateMeta = updates.metadata ?? {};
+          const mergedMeta = { ...existingMeta, ...updateMeta };
+
           Object.assign(state.conversations[index], {
             ...updates,
+            metadata: mergedMeta, // Assign merged metadata
             updatedAt: new Date(),
           });
+
+          // Check if sync status needs update (only if relevant fields changed)
+          const relevantFieldsChanged = [
+            "title",
+            "metadata",
+            "syncRepoId",
+            "projectId",
+          ].some((field) => field in updates);
+
           if (
-            (updates.title !== undefined ||
-              updates.metadata !== undefined ||
-              updates.syncRepoId !== undefined ||
-              updates.projectId !== undefined) &&
+            relevantFieldsChanged &&
             state.conversations[index].syncRepoId &&
             state.conversationSyncStatus[id] === "idle"
           ) {
@@ -1119,6 +1141,42 @@ export const useConversationStore = create(
         currentProject = parent;
       }
       return currentProject?.id ?? null;
+    },
+
+    // --- New Action ---
+    updateCurrentConversationToolSettings: async (settings) => {
+      const { selectedItemId, selectedItemType, updateConversation } = get();
+
+      if (selectedItemType !== "conversation" || !selectedItemId) {
+        console.warn("Cannot update tool settings: No conversation selected.");
+        return;
+      }
+
+      const currentConversation = get().getConversationById(selectedItemId);
+      if (!currentConversation) {
+        console.warn(
+          "Cannot update tool settings: Selected conversation not found.",
+        );
+        return;
+      }
+
+      const currentMeta = currentConversation.metadata ?? {};
+      const newMeta = { ...currentMeta };
+
+      if (settings.enabledTools !== undefined) {
+        newMeta.enabledTools = settings.enabledTools;
+      }
+      if (settings.toolMaxStepsOverride !== undefined) {
+        newMeta.toolMaxStepsOverride = settings.toolMaxStepsOverride;
+      }
+
+      // Only update if metadata actually changed
+      if (
+        JSON.stringify(newMeta) !== JSON.stringify(currentMeta) ||
+        !currentConversation.metadata // Update if metadata was previously undefined
+      ) {
+        await updateConversation(selectedItemId, { metadata: newMeta });
+      }
     },
   })),
 );

@@ -4,99 +4,117 @@ import React, {
   useImperativeHandle,
   useRef,
   useEffect,
+  useState, // Added useState for internal value management
+  memo,
 } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useUIStateStore } from "@/store/ui.store";
 import { useShallow } from "zustand/react/shallow";
 
+// Define the Ref handle type
+export interface InputAreaRef {
+  getValue: () => string;
+  focus: () => void;
+}
+
 interface InputAreaProps {
-  value: string;
-  onChange: (value: string) => void;
+  // value prop removed - managed internally
+  // onChange prop removed - managed internally, value exposed via ref
+  initialValue?: string; // Optional initial value
   onSubmit: () => void;
   disabled?: boolean;
   placeholder?: string;
   [key: string]: any;
 }
 
-// forwardRef is kept in case other features need it, but not used for this focus logic.
-export const InputArea = forwardRef<HTMLTextAreaElement, InputAreaProps>(
-  (
-    {
-      value,
-      onChange,
-      onSubmit,
-      disabled,
-      placeholder = "Type message... (Shift+Enter for new line)",
-    },
-    ref,
-  ) => {
-    const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
-    useImperativeHandle(ref, () => internalTextareaRef.current!, []);
-
-    const { focusInputOnNextRender, setFocusInputFlag } = useUIStateStore(
-      useShallow((state) => ({
-        focusInputOnNextRender: state.focusInputOnNextRender,
-        setFocusInputFlag: state.setFocusInputFlag,
-      })),
-    );
-
-    // Effect to focus the textarea when the flag becomes true
-    useEffect(() => {
-      if (focusInputOnNextRender && internalTextareaRef.current) {
-        // Reset the flag *before* focusing
-        setFocusInputFlag(false);
-        // Use rAF to ensure focus happens after paint
-        requestAnimationFrame(() => {
-          internalTextareaRef.current?.focus();
-        });
-      }
-      // Intentionally only run when focusInputOnNextRender changes to true
-    }, [focusInputOnNextRender, setFocusInputFlag]); // Added setFocusInputFlag
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !e.shiftKey && !disabled) {
-        e.preventDefault();
-        onSubmit();
-      }
-    };
-
-    const handleTextareaChange = (
-      e: React.ChangeEvent<HTMLTextAreaElement>,
+export const InputArea = memo(
+  forwardRef<InputAreaRef, InputAreaProps>(
+    (
+      {
+        initialValue = "",
+        onSubmit,
+        disabled,
+        placeholder = "Type message... (Shift+Enter for new line)",
+      },
+      ref,
     ) => {
-      onChange(e.target.value);
-    };
+      const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
+      // Internal state for the input value
+      const [internalValue, setInternalValue] = useState(initialValue);
 
-    // Auto-resize effect
-    useEffect(() => {
-      const textarea = internalTextareaRef.current;
-      if (textarea) {
-        textarea.style.height = "auto";
-        const scrollHeight = textarea.scrollHeight;
-        const maxHeight = 250; // Keep max height
-        // Set height based on scroll height, but ensure it respects min-h
-        textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
-      }
-    }, [value]);
+      // Expose methods via ref
+      useImperativeHandle(ref, () => ({
+        getValue: () => internalValue,
+        focus: () => internalTextareaRef.current?.focus(),
+      }));
 
-    return (
-      <Textarea
-        ref={internalTextareaRef}
-        value={value}
-        onChange={handleTextareaChange}
-        onKeyDown={handleKeyDown}
-        disabled={disabled}
-        placeholder={placeholder}
-        rows={3} // Increase default rows
-        className={cn(
-          "w-full p-3 border border-[--border] rounded bg-input text-foreground resize-none focus:ring-2 focus:ring-[--primary] outline-none disabled:opacity-50 overflow-y-auto",
-          // Set min and max height
-          "min-h-[80px] max-h-[250px]",
-        )}
-        aria-label="Chat input"
-      />
-    );
-  },
+      const { focusInputOnNextRender, setFocusInputFlag } = useUIStateStore(
+        useShallow((state) => ({
+          focusInputOnNextRender: state.focusInputOnNextRender,
+          setFocusInputFlag: state.setFocusInputFlag,
+        })),
+      );
+
+      // Effect to focus the textarea when the flag becomes true
+      useEffect(() => {
+        if (focusInputOnNextRender && internalTextareaRef.current) {
+          setFocusInputFlag(false);
+          requestAnimationFrame(() => {
+            internalTextareaRef.current?.focus();
+          });
+        }
+      }, [focusInputOnNextRender, setFocusInputFlag]);
+
+      const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === "Enter" && !e.shiftKey && !disabled) {
+          e.preventDefault();
+          onSubmit(); // Trigger submit
+        }
+      };
+
+      // Update internal state on change
+      const handleTextareaChange = (
+        e: React.ChangeEvent<HTMLTextAreaElement>,
+      ) => {
+        setInternalValue(e.target.value);
+      };
+
+      // Auto-resize effect based on internal value
+      useEffect(() => {
+        const textarea = internalTextareaRef.current;
+        if (textarea) {
+          textarea.style.height = "auto";
+          const scrollHeight = textarea.scrollHeight;
+          const maxHeight = 250;
+          textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+        }
+      }, [internalValue]); // Depend on internalValue
+
+      // Effect to reset internal value if initialValue changes externally (e.g., after submit clear)
+      // This might not be strictly necessary if PromptWrapper clears via ref, but good practice.
+      useEffect(() => {
+        setInternalValue(initialValue);
+      }, [initialValue]);
+
+      return (
+        <Textarea
+          ref={internalTextareaRef}
+          value={internalValue} // Use internal state
+          onChange={handleTextareaChange} // Use internal handler
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
+          placeholder={placeholder}
+          rows={3}
+          className={cn(
+            "w-full p-3 border border-[--border] rounded bg-input text-foreground resize-none focus:ring-2 focus:ring-[--primary] outline-none disabled:opacity-50 overflow-y-auto",
+            "min-h-[80px] max-h-[250px]",
+          )}
+          aria-label="Chat input"
+        />
+      );
+    },
+  ),
 );
 
 InputArea.displayName = "InputArea";

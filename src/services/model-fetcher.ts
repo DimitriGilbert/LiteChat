@@ -3,10 +3,11 @@ import type { DbProviderConfig } from "@/types/litechat/provider"; // Corrected 
 import { toast } from "sonner";
 import { ensureV1Path } from "@/lib/litechat/provider-helpers"; // Corrected path
 
-// Define the structure for fetched model information
+// Define the structure for fetched model information including metadata
 interface FetchedModel {
   id: string;
   name: string;
+  metadata?: Record<string, any>; // Add optional metadata field
 }
 
 // Simple in-memory cache for fetched models
@@ -143,11 +144,12 @@ export async function fetchModelsForProvider(
       // Extract model data based on expected response structure for each provider type
       let models: FetchedModel[] = [];
       if (config.type === "ollama") {
-        // Ollama returns { models: [{ name: ..., ... }, ...] }
+        // Ollama returns { models: [{ name: ..., details: {...} }, ...] }
         if (data.models && Array.isArray(data.models)) {
           models = data.models.map((m: any) => ({
             id: m.name, // Ollama uses 'name' as the ID
             name: m.name, // Use 'name' for display as well
+            metadata: m.details ?? {}, // Store details object as metadata
           }));
         } else {
           console.warn(
@@ -155,15 +157,39 @@ export async function fetchModelsForProvider(
             data,
           );
         }
+      } else if (config.type === "openrouter") {
+        // OpenRouter returns { data: [{ id: ..., name: ..., ... }, ...] }
+        const modelList = data.data || data;
+        if (Array.isArray(modelList)) {
+          models = modelList.map((m: any) => {
+            // Extract known metadata fields, put others in metadata object
+            const { id, name, ...rest } = m;
+            return {
+              id: id,
+              name: name || id,
+              metadata: rest, // Store all other fields in metadata
+            };
+          });
+        } else {
+          console.warn(
+            `[ModelFetcher] Unexpected response structure for ${config.name} (Type: ${config.type}):`,
+            data,
+          );
+        }
       } else {
-        // OpenAI, OpenRouter, OpenAI-Compatible often return { data: [{ id: ..., ... }, ...] }
+        // OpenAI, OpenAI-Compatible often return { data: [{ id: ..., ... }, ...] }
         // Or sometimes just the array [{ id: ..., ... }]
         const modelList = data.data || data; // Handle both structures
         if (Array.isArray(modelList)) {
-          models = modelList.map((m: any) => ({
-            id: m.id,
-            name: m.name || m.id, // Use 'name' if available, otherwise 'id'
-          }));
+          models = modelList.map((m: any) => {
+            // Extract known metadata fields, put others in metadata object
+            const { id, name, ...rest } = m;
+            return {
+              id: id,
+              name: name || id, // Use 'name' if available, otherwise 'id'
+              metadata: rest, // Store other fields in metadata
+            };
+          });
         } else {
           console.warn(
             `[ModelFetcher] Unexpected response structure for ${config.name} (Type: ${config.type}):`,

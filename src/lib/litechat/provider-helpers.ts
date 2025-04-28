@@ -47,7 +47,7 @@ export const REQUIRES_API_KEY_TYPES: DbProviderType[] = [
 
 export const DEFAULT_MODELS: Record<
   DbProviderType,
-  { id: string; name: string }[]
+  { id: string; name: string; metadata?: Record<string, any> }[] // Add metadata
 > = {
   openai: [{ id: "gpt-4o", name: "GPT-4o" }],
   google: [
@@ -137,6 +137,7 @@ export function createAiModelConfig(
     instance,
     supportsImageGeneration: supportsImageGen,
     supportsToolCalling: supportsTools,
+    metadata: modelInfo.metadata, // Include metadata
   };
 }
 

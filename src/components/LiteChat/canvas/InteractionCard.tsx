@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/InteractionCard.tsx
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react"; // Added useEffect
 import type { Interaction } from "@/types/litechat/interaction";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import {
   WrenchIcon, // Icon for tool calls
   CheckCircle2Icon, // Icon for tool results
   Loader2, // Icon for tool in progress
+  ChevronDown, // Icon for folding tool display
+  ChevronRight, // Icon for unfolding tool display
 } from "lucide-react";
 import {
   Tooltip,
@@ -43,69 +45,107 @@ const ToolDisplay: React.FC<{
   toolCallStrings?: string[];
   toolResultStrings?: string[];
 }> = ({ toolCallStrings, toolResultStrings }) => {
-  if (!toolCallStrings || toolCallStrings.length === 0) {
+  // State for folding individual tool calls
+  const [foldedToolCalls, setFoldedToolCalls] = useState<Set<string>>(
+    new Set(),
+  );
+  const [parsedCalls, setParsedCalls] = useState<ToolCallPart[]>([]);
+  const [parsedResults, setParsedResults] = useState<ToolResultPart[]>([]);
+  const [resultsMap, setResultsMap] = useState<Map<string, ToolResultPart>>(
+    new Map(),
+  );
+
+  // Effect to parse and initialize fold state only when strings change
+  useEffect(() => {
+    const calls: ToolCallPart[] = [];
+    const results: ToolResultPart[] = [];
+    const initialFolded = new Set<string>();
+
+    (toolCallStrings ?? []).forEach((callStr) => {
+      try {
+        const parsed = JSON.parse(callStr);
+        if (
+          parsed &&
+          parsed.type === "tool-call" &&
+          parsed.toolCallId &&
+          parsed.toolName &&
+          parsed.args !== undefined
+        ) {
+          calls.push(parsed as ToolCallPart);
+          initialFolded.add(parsed.toolCallId); // Initialize as folded
+        } else {
+          console.warn("Skipping invalid tool call string:", callStr);
+        }
+      } catch (e) {
+        console.error(
+          "Failed to parse tool call string for display:",
+          callStr,
+          e,
+        );
+      }
+    });
+
+    (toolResultStrings ?? []).forEach((resultStr) => {
+      try {
+        const parsed = JSON.parse(resultStr);
+        if (
+          parsed &&
+          parsed.type === "tool-result" &&
+          parsed.toolCallId &&
+          parsed.toolName &&
+          parsed.result !== undefined
+        ) {
+          results.push(parsed as ToolResultPart);
+        } else {
+          console.warn("Skipping invalid tool result string:", resultStr);
+        }
+      } catch (e) {
+        console.error(
+          "Failed to parse tool result string for display:",
+          resultStr,
+          e,
+        );
+      }
+    });
+
+    setParsedCalls(calls);
+    setParsedResults(results);
+    setResultsMap(new Map(results.map((r) => [r.toolCallId, r])));
+    setFoldedToolCalls(initialFolded);
+    // Depend only on the input strings
+  }, [toolCallStrings, toolResultStrings]);
+
+  const toggleToolCallFold = (toolCallId: string) => {
+    setFoldedToolCalls((prev) => {
+      const next = new Set(prev);
+      if (next.has(toolCallId)) {
+        next.delete(toolCallId);
+      } else {
+        next.add(toolCallId);
+      }
+      return next;
+    });
+  };
+
+  if (parsedCalls.length === 0) {
     return null;
   }
 
-  // Parse the strings into objects
-  const parsedCalls: ToolCallPart[] = [];
-  const parsedResults: ToolResultPart[] = [];
-
-  toolCallStrings.forEach((callStr) => {
-    try {
-      const parsed = JSON.parse(callStr);
-      // Add validation if needed
-      if (
-        parsed &&
-        parsed.type === "tool-call" &&
-        parsed.toolCallId &&
-        parsed.toolName &&
-        parsed.args !== undefined
-      ) {
-        parsedCalls.push(parsed as ToolCallPart);
-      } else {
-        console.warn("Skipping invalid tool call string:", callStr);
-      }
-    } catch (e) {
-      console.error(
-        "Failed to parse tool call string for display:",
-        callStr,
-        e,
-      );
-    }
-  });
-
-  (toolResultStrings ?? []).forEach((resultStr) => {
-    try {
-      const parsed = JSON.parse(resultStr);
-      // Add validation if needed
-      if (
-        parsed &&
-        parsed.type === "tool-result" &&
-        parsed.toolCallId &&
-        parsed.toolName &&
-        parsed.result !== undefined
-      ) {
-        parsedResults.push(parsed as ToolResultPart);
-      } else {
-        console.warn("Skipping invalid tool result string:", resultStr);
-      }
-    } catch (e) {
-      console.error(
-        "Failed to parse tool result string for display:",
-        resultStr,
-        e,
-      );
-    }
-  });
-
-  const resultsMap = new Map(parsedResults.map((r) => [r.toolCallId, r]));
-
   return (
     <div className="mt-2 space-y-2 border-t border-border/50 pt-2">
-      {parsedCalls.map((call) => {
+      {/* Tool Display Header */}
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <WrenchIcon className="h-3.5 w-3.5" />
+          <span>Tool Activity ({parsedCalls.length} calls)</span>
+        </div>
+        {/* Optional: Add button to fold/unfold ALL tool calls */}
+      </div>
+
+      {/* Render individual tool calls */}
+      {parsedCalls.map((call, index) => {
+        const isFolded = foldedToolCalls.has(call.toolCallId);
         const result = resultsMap.get(call.toolCallId);
-        // Check if the result indicates an error (based on the convention in AIService)
         const isErrorResult =
           result &&
           typeof result.result === "object" &&
@@ -119,7 +159,6 @@ const ToolDisplay: React.FC<{
             ? "error"
             : "completed"
           : "pending";
-        // Display the structured result, handling potential errors
         const resultDisplay = result
           ? isErrorResult
             ? `Error: ${errorText}`
@@ -131,40 +170,73 @@ const ToolDisplay: React.FC<{
             key={call.toolCallId}
             className="p-2 border rounded bg-muted/30 text-xs"
           >
-            <div className="flex items-center gap-1.5 font-medium mb-1">
-              {status === "pending" && (
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
-              )}
-              {status === "completed" && (
-                <CheckCircle2Icon className="h-3.5 w-3.5 text-green-500" />
-              )}
-              {status === "error" && (
-                <AlertCircleIcon className="h-3.5 w-3.5 text-destructive" />
-              )}
-              <WrenchIcon className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>Tool Call: {call.toolName}</span>
-            </div>
-            <div className="pl-5 space-y-1">
-              <div>
-                <span className="font-semibold">Args:</span>
-                <pre className="text-[11px] bg-background/50 p-1 rounded mt-0.5 whitespace-pre-wrap break-words">
-                  {JSON.stringify(call.args, null, 2)}
-                </pre>
+            {/* Tool Call Header with Fold Button */}
+            <div className="flex items-center justify-between gap-1.5 font-medium mb-1">
+              <div className="flex items-center gap-1.5">
+                {status === "pending" && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+                )}
+                {status === "completed" && (
+                  <CheckCircle2Icon className="h-3.5 w-3.5 text-green-500" />
+                )}
+                {status === "error" && (
+                  <AlertCircleIcon className="h-3.5 w-3.5 text-destructive" />
+                )}
+                <WrenchIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>
+                  Tool Call #{index + 1}: {call.toolName}
+                </span>
               </div>
-              <div>
-                <span className="font-semibold">Result:</span>
-                <pre
-                  className={cn(
-                    "text-[11px] p-1 rounded mt-0.5 whitespace-pre-wrap break-words",
-                    isErrorResult
-                      ? "bg-destructive/10 text-destructive"
-                      : "bg-background/50",
-                  )}
-                >
-                  {resultDisplay}
-                </pre>
-              </div>
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                      onClick={() => toggleToolCallFold(call.toolCallId)}
+                      aria-label={
+                        isFolded ? "Expand tool call" : "Collapse tool call"
+                      }
+                    >
+                      {isFolded ? (
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {isFolded ? "Expand" : "Collapse"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
+
+            {/* Conditionally render details */}
+            {!isFolded && (
+              <div className="pl-5 space-y-1 mt-1">
+                <div>
+                  <span className="font-semibold">Args:</span>
+                  <pre className="text-[11px] bg-background/50 p-1 rounded mt-0.5 whitespace-pre-wrap break-words">
+                    {JSON.stringify(call.args, null, 2)}
+                  </pre>
+                </div>
+                <div>
+                  <span className="font-semibold">Result:</span>
+                  <pre
+                    className={cn(
+                      "text-[11px] p-1 rounded mt-0.5 whitespace-pre-wrap break-words",
+                      isErrorResult
+                        ? "bg-destructive/10 text-destructive"
+                        : "bg-background/50",
+                    )}
+                  >
+                    {resultDisplay}
+                  </pre>
+                </div>
+              </div>
+            )}
           </div>
         );
       })}
@@ -179,7 +251,7 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
   className,
 }) => {
   const [revisionIndex, setRevisionIndex] = useState(0);
-  const [isFolded, setIsFolded] = useState(false); // State for folding
+  const [isFolded, setIsFolded] = useState(false); // State for folding main content
   const [isCopied, setIsCopied] = useState(false); // State for copy button
   const [isIdCopied, setIsIdCopied] = useState(false); // State for copy ID button
 

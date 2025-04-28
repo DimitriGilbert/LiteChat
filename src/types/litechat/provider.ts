@@ -24,9 +24,15 @@ export interface DbProviderConfig extends DbBase {
   baseURL: string | null;
   enabledModels: string[] | null; // Models enabled FOR THIS PROVIDER
   autoFetchModels: boolean;
-  fetchedModels: { id: string; name: string }[] | null;
+  // Update fetchedModels to include optional metadata
+  fetchedModels:
+    | {
+        id: string;
+        name: string;
+        metadata?: Record<string, any>; // Add optional metadata field
+      }[]
+    | null;
   modelsLastFetchedAt: Date | null;
-  // modelSortOrder: string[] | null; // REMOVED - Order is global now
 }
 
 // Runtime representation of a Model
@@ -39,6 +45,8 @@ export interface AiModelConfig {
   contextWindow?: number;
   supportsImageGeneration?: boolean;
   supportsToolCalling?: boolean;
+  // Add optional metadata field to runtime representation as well
+  metadata?: Record<string, any>;
 }
 
 // Runtime representation of a Provider (Less critical for selection)
@@ -47,5 +55,10 @@ export interface AiProviderConfig {
   name: string;
   type: DbProviderType;
   // models removed - handled globally
-  allAvailableModels: { id: string; name: string }[]; // All known models for this provider
+  // Update allAvailableModels to include optional metadata
+  allAvailableModels: {
+    id: string;
+    name: string;
+    metadata?: Record<string, any>;
+  }[];
 }

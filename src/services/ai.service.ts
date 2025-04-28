@@ -510,13 +510,18 @@ export class AIService {
       );
       // --- End Tool Preparation ---
 
+      // Get maxSteps: prioritize parameter, fallback to global setting
+      const maxSteps =
+        finalPayload.parameters?.maxSteps ??
+        useSettingsStore.getState().toolMaxSteps;
+
       // Define the type for streamOptions using the inferred type
       const streamOptions: StreamTextParameters = {
         model: modelInstance as LanguageModelV1,
         messages: finalMessages, // Use messages with processed file content
         abortSignal: abortController.signal,
-        // --- ADD maxSteps ---
-        maxSteps: 5, // Allow up to 5 steps (tool call -> result -> LLM call = 1 step)
+        // --- Use potentially overridden maxSteps ---
+        maxSteps: maxSteps,
       };
 
       // Conditionally add tools
@@ -535,6 +540,7 @@ export class AIService {
       if (finalPayload.parameters) {
         if (finalPayload.parameters.temperature !== undefined)
           streamOptions.temperature = finalPayload.parameters.temperature;
+        // Do not pass maxSteps here, it's handled above
         if (finalPayload.parameters.max_tokens !== undefined)
           streamOptions.maxTokens = finalPayload.parameters.max_tokens;
         if (finalPayload.parameters.top_p !== undefined)

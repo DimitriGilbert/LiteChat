@@ -8,7 +8,11 @@ import type { PromptObject } from "./prompt";
 export interface Conversation extends DbBase {
   title: string;
   projectId: string | null; // Link to parent project - ADDED
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any> & {
+    // Add specific metadata fields here
+    enabledTools?: string[]; // Store as array for JSON compatibility
+    toolMaxStepsOverride?: number | null;
+  };
   syncRepoId?: string | null; // ID of the SyncRepo this convo is linked to
   lastSyncedAt?: Date | null; // Timestamp of the last successful sync
 }
