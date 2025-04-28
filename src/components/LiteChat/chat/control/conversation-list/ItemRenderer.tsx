@@ -14,6 +14,7 @@ import {
   MessageSquareIcon,
   DownloadIcon,
   Loader2,
+  FileJsonIcon,
 } from "lucide-react";
 import {
   Tooltip,
@@ -42,21 +43,23 @@ interface ConversationItemProps {
     format: "json" | "md",
     e: React.MouseEvent,
   ) => void;
+  onExportProject: (id: string, e: React.MouseEvent) => void;
   expandedProjects: Set<string>;
   toggleProjectExpansion: (projectId: string) => void;
   getChildren: (
     parentId: string | null,
-    filterText: string, // Added filterText
+    filterText: string,
   ) => {
     projects: Project[];
     conversations: Conversation[];
   };
-  filterText: string; // Added filterText prop
-  // Inline Editing Props
+  filterText: string;
+  // Inline Editing Props - Updated
   editingItemId: string | null;
   editingItemType: SidebarItemType | null;
-  editingName: string;
-  setEditingName: (name: string) => void;
+  editingName: string; // Original name (read-only display while editing)
+  localEditingName: string; // Value for the input field
+  setLocalEditingName: (name: string) => void; // Setter for the input field
   handleStartEditing: (item: SidebarItem) => void;
   handleSaveEdit: () => Promise<void>;
   handleCancelEdit: (isNewProject?: boolean) => void;
@@ -74,15 +77,17 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
   onDeleteConversation,
   onDeleteProject,
   onExportConversation,
+  onExportProject,
   expandedProjects,
   toggleProjectExpansion,
   getChildren,
-  filterText, // Destructure filterText
-  // Inline Editing Props
+  filterText,
+  // Inline Editing Props - Destructure new props
   editingItemId,
   editingItemType,
-  editingName,
-  setEditingName,
+  editingName, // Original name
+  localEditingName, // Input value
+  setLocalEditingName, // Input setter
   handleStartEditing,
   handleSaveEdit,
   handleCancelEdit,
@@ -94,13 +99,11 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
   const isEditingThis =
     item.id === editingItemId && item.itemType === editingItemType;
 
-  // Correctly determine if the current project item is expanded
   const isExpanded = isProject && expandedProjects.has(item.id);
 
-  // --- Fetch children using filterText ---
   const { projects: childProjects, conversations: childConversations } =
     isProject
-      ? getChildren(item.id, filterText) // Pass filterText here
+      ? getChildren(item.id, filterText) // getChildren now returns sorted lists
       : { projects: [], conversations: [] };
   const hasChildren = childProjects.length > 0 || childConversations.length > 0;
 
@@ -115,11 +118,9 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
 
   const handleItemClick = () => {
     if (isEditingThis) return;
-    // Only toggle expansion if it's a project *and* has children
     if (isProject && hasChildren) {
       toggleProjectExpansion(item.id);
     }
-    // Always select the item
     onSelectItem(item.id, item.itemType);
   };
 
@@ -134,6 +135,7 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
         onDeleteProject(item.id, e);
       }
     } else {
+      // Confirmation for conversation deletion can be added here if desired
       onDeleteConversation(item.id, e);
     }
   };
@@ -148,18 +150,7 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
       e.preventDefault();
       handleSaveEdit();
     } else if (e.key === "Escape") {
-      // Pass flag if it was a new project being edited
-      handleCancelEdit(isProject && item.name === "New Project");
-    }
-  };
-
-  const handleInputBlur = () => {
-    // Save on blur only if not currently saving and name is not empty
-    if (!isSavingEdit && editingName.trim()) {
-      handleSaveEdit();
-    } else if (!editingName.trim()) {
-      // If name is empty on blur, cancel the edit
-      handleCancelEdit(isProject && item.name === "New Project");
+      handleCancelEdit(isProject && editingName === "New Project");
     }
   };
 
@@ -170,7 +161,7 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
     }
   }, [isEditingThis, editInputRef]);
 
-  // Determine display name correctly
+  // Determine display name correctly (uses original name from item prop)
   const displayName = isProject ? item.name : item.title;
 
   return (
@@ -213,17 +204,19 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
             <MessageSquareIcon className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
           )}
           {isEditingThis ? (
+            // Use localEditingName and setLocalEditingName for the Input
             <Input
               ref={editInputRef as React.RefObject<HTMLInputElement>}
-              value={editingName}
-              onChange={(e) => setEditingName(e.target.value)}
+              value={localEditingName} // Use local state for value
+              onChange={(e) => setLocalEditingName(e.target.value)} // Update local state
               onKeyDown={handleInputKeyDown}
-              onBlur={handleInputBlur}
+              // Removed onBlur handler
               className="h-6 px-1 py-0 text-xs flex-grow min-w-0"
               onClick={(e) => e.stopPropagation()}
               disabled={isSavingEdit}
             />
           ) : (
+            // Display the original name when not editing
             <span className="truncate pr-1">{displayName}</span>
           )}
           {syncIndicator}
@@ -240,7 +233,12 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
                   e.stopPropagation();
                   handleSaveEdit();
                 }}
-                disabled={isSavingEdit || !editingName.trim()}
+                // Disable save if saving, name is empty, or name hasn't changed from original
+                disabled={
+                  isSavingEdit ||
+                  !localEditingName.trim() ||
+                  localEditingName.trim() === editingName
+                }
                 aria-label="Save changes"
               >
                 {isSavingEdit ? (
@@ -255,8 +253,8 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
                 className="h-5 w-5 text-muted-foreground hover:text-foreground"
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Pass flag if it was a new project being edited
-                  handleCancelEdit(isProject && item.name === "New Project");
+                  // Pass whether it's a new project based on the *original* name
+                  handleCancelEdit(isProject && editingName === "New Project");
                 }}
                 disabled={isSavingEdit}
                 aria-label="Cancel edit"
@@ -283,19 +281,41 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
                 </Tooltip>
               </TooltipProvider>
 
-              {!isProject && (
+              {/* Export Buttons */}
+              {isProject ? (
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                        onClick={(e) => onExportProject(item.id, e)}
+                        aria-label={`Export project ${displayName}`}
+                      >
+                        <FileJsonIcon className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Export Project (JSON)
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
                 <div className="relative group/export">
                   <TooltipProvider delayDuration={100}>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
-                          className="p-1 rounded hover:bg-muted cursor-pointer" // Make container clickable
+                          className="p-1 rounded hover:bg-muted cursor-pointer"
                           aria-label={`Export ${displayName}`}
                         >
                           <DownloadIcon className="h-3 w-3 text-muted-foreground group-hover/export:text-foreground" />
                         </div>
                       </TooltipTrigger>
-                      <TooltipContent side="top">Export</TooltipContent>
+                      <TooltipContent side="top">
+                        Export Conversation
+                      </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                   <div
@@ -323,6 +343,7 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
                 </div>
               )}
 
+              {/* Delete Button */}
               <TooltipProvider delayDuration={100}>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -347,7 +368,7 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
       {isProject && isExpanded && (
         <>
           {childProjects
-            .sort((a, b) => a.name.localeCompare(b.name))
+            .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
             .map((child) => (
               <ConversationItemRenderer
                 key={child.id}
@@ -360,14 +381,17 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
                 onDeleteConversation={onDeleteConversation}
                 onDeleteProject={onDeleteProject}
                 onExportConversation={onExportConversation}
+                onExportProject={onExportProject}
                 expandedProjects={expandedProjects}
                 toggleProjectExpansion={toggleProjectExpansion}
                 getChildren={getChildren}
-                filterText={filterText} // Pass filter text down
+                filterText={filterText}
+                // Pass down editing props
                 editingItemId={editingItemId}
                 editingItemType={editingItemType}
                 editingName={editingName}
-                setEditingName={setEditingName}
+                localEditingName={localEditingName}
+                setLocalEditingName={setLocalEditingName}
                 handleStartEditing={handleStartEditing}
                 handleSaveEdit={handleSaveEdit}
                 handleCancelEdit={handleCancelEdit}
@@ -376,7 +400,7 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
               />
             ))}
           {childConversations
-            .sort((a, b) => a.title.localeCompare(b.title))
+            .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
             .map((child) => (
               <ConversationItemRenderer
                 key={child.id}
@@ -389,14 +413,17 @@ export const ConversationItemRenderer: React.FC<ConversationItemProps> = ({
                 onDeleteConversation={onDeleteConversation}
                 onDeleteProject={onDeleteProject}
                 onExportConversation={onExportConversation}
+                onExportProject={onExportProject}
                 expandedProjects={expandedProjects}
                 toggleProjectExpansion={toggleProjectExpansion}
                 getChildren={getChildren}
-                filterText={filterText} // Pass filter text down
+                filterText={filterText}
+                // Pass down editing props
                 editingItemId={editingItemId}
                 editingItemType={editingItemType}
                 editingName={editingName}
-                setEditingName={setEditingName}
+                localEditingName={localEditingName}
+                setLocalEditingName={setLocalEditingName}
                 handleStartEditing={handleStartEditing}
                 handleSaveEdit={handleSaveEdit}
                 handleCancelEdit={handleCancelEdit}

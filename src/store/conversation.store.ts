@@ -24,6 +24,17 @@ export type SidebarItem =
   | (Conversation & { itemType: "conversation" })
   | (Project & { itemType: "project" });
 
+// Structure for project export
+interface ProjectExportNode {
+  project: Project;
+  children: (ProjectExportNode | ConversationExportNode)[];
+}
+
+interface ConversationExportNode {
+  conversation: Conversation;
+  interactions: Interaction[];
+}
+
 interface ConversationState {
   conversations: Conversation[];
   projects: Project[];
@@ -64,6 +75,7 @@ interface ConversationActions {
     conversationId: string,
     format: "json" | "md",
   ) => Promise<void>;
+  exportProject: (projectId: string) => Promise<void>; // Added project export
   exportAllConversations: () => Promise<void>;
   loadSyncRepos: () => Promise<void>;
   addSyncRepo: (
@@ -99,14 +111,23 @@ const formatInteractionsToMarkdown = (
   conversation: Conversation,
   interactions: Interaction[],
 ): string => {
-  let mdString = `# ${conversation.title}\n\n`;
-  mdString += `*Conversation ID: ${conversation.id}*\n`;
-  mdString += `*Created: ${format(conversation.createdAt, "yyyy-MM-dd HH:mm:ss")}*\n`;
-  mdString += `*Last Updated: ${format(conversation.updatedAt, "yyyy-MM-dd HH:mm:ss")}*\n`;
+  let mdString = `# ${conversation.title}
+
+`;
+  mdString += `*Conversation ID: ${conversation.id}*
+`;
+  mdString += `*Created: ${format(conversation.createdAt, "yyyy-MM-dd HH:mm:ss")}*
+`;
+  mdString += `*Last Updated: ${format(conversation.updatedAt, "yyyy-MM-dd HH:mm:ss")}*
+`;
   if (conversation.projectId) {
-    mdString += `*Project ID: ${conversation.projectId}*\n`;
+    mdString += `*Project ID: ${conversation.projectId}*
+`;
   }
-  mdString += `\n---\n\n`;
+  mdString += `
+---
+
+`;
 
   interactions
     .filter((i) => i.type === "message.user_assistant")
@@ -116,41 +137,62 @@ const formatInteractionsToMarkdown = (
         interaction.prompt?.content ||
         interaction.prompt?.metadata?.attachedFiles?.length
       ) {
-        mdString += `## User (Index: ${interaction.index})\n\n`;
+        mdString += `## User (Index: ${interaction.index})
+
+`;
         if (
           interaction.prompt.metadata?.attachedFiles &&
           interaction.prompt.metadata.attachedFiles.length > 0
         ) {
-          mdString += `**Attached Files:**\n`;
+          mdString += `**Attached Files:**
+`;
           interaction.prompt.metadata.attachedFiles.forEach((f: any) => {
-            mdString += `- ${f.name} (${f.type}, ${formatBytes(f.size)}) ${f.source === "vfs" ? `(VFS: ${f.path})` : "(Direct Upload)"}\n`;
+            mdString += `- ${f.name} (${f.type}, ${formatBytes(f.size)}) ${f.source === "vfs" ? `(VFS: ${f.path})` : "(Direct Upload)"}
+`;
           });
-          mdString += `\n`;
+          mdString += `
+`;
         }
         if (interaction.prompt.content) {
-          mdString += `${interaction.prompt.content}\n\n`;
+          mdString += `${interaction.prompt.content}
+
+`;
         }
       }
       if (interaction.response) {
-        mdString += `## Assistant (Index: ${interaction.index})\n\n`;
+        mdString += `## Assistant (Index: ${interaction.index})
+
+`;
         if (interaction.metadata?.modelId) {
-          mdString += `*Model: ${interaction.metadata.modelId}*\n\n`;
+          mdString += `*Model: ${interaction.metadata.modelId}*
+
+`;
         }
         if (typeof interaction.response === "string") {
-          mdString += `${interaction.response}\n\n`;
+          mdString += `${interaction.response}
+
+`;
         } else {
-          mdString += `\`\`\`json\n`;
-          mdString += `${JSON.stringify(interaction.response, null, 2)}\n`;
-          mdString += `\`\`\`\n\n`;
+          mdString += `\`\`\`json
+`;
+          mdString += `${JSON.stringify(interaction.response, null, 2)}
+`;
+          mdString += `\`\`\`
+
+`;
         }
         if (
           interaction.metadata?.promptTokens ||
           interaction.metadata?.completionTokens
         ) {
-          mdString += `*Tokens: ${interaction.metadata.promptTokens ?? "?"} (prompt) / ${interaction.metadata.completionTokens ?? "?"} (completion)*\n\n`;
+          mdString += `*Tokens: ${interaction.metadata.promptTokens ?? "?"} (prompt) / ${interaction.metadata.completionTokens ?? "?"} (completion)*
+
+`;
         }
       }
-      mdString += `---\n\n`;
+      mdString += `---
+
+`;
     });
 
   return mdString;
@@ -274,9 +316,7 @@ export const useConversationStore = create(
           ) {
             state.conversationSyncStatus[id] = "needs-sync";
           }
-          state.conversations.sort(
-            (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-          );
+          // Sort is handled later by selectors/components if needed
         }
       });
 
@@ -293,12 +333,10 @@ export const useConversationStore = create(
             const index = state.conversations.findIndex((c) => c.id === id);
             if (index !== -1) {
               state.conversations[index] = originalConversation;
-              state.conversations.sort(
-                (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-              );
-              if (state.conversationSyncStatus[id] === "needs-sync") {
-                state.conversationSyncStatus[id] = "idle";
-              }
+              // Re-sort might be needed if update affected order
+            }
+            if (state.conversationSyncStatus[id] === "needs-sync") {
+              state.conversationSyncStatus[id] = "idle";
             }
             state.error = "Failed to save conversation update";
           });
@@ -312,12 +350,9 @@ export const useConversationStore = create(
           const index = state.conversations.findIndex((c) => c.id === id);
           if (index !== -1) {
             state.conversations[index] = originalConversation;
-            state.conversations.sort(
-              (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-            );
-            if (state.conversationSyncStatus[id] === "needs-sync") {
-              state.conversationSyncStatus[id] = "idle";
-            }
+          }
+          if (state.conversationSyncStatus[id] === "needs-sync") {
+            state.conversationSyncStatus[id] = "idle";
           }
           state.error = "Failed to save conversation update (state error)";
         });
@@ -362,9 +397,7 @@ export const useConversationStore = create(
         set((state) => {
           if (conversationToDelete) {
             state.conversations.push(conversationToDelete);
-            state.conversations.sort(
-              (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-            );
+            // Re-sort might be needed
             state.conversationSyncStatus[id] = "idle";
           }
           if (
@@ -641,14 +674,14 @@ export const useConversationStore = create(
           const exportData = { conversation, interactions };
           const jsonString = JSON.stringify(exportData, null, 2);
           blob = new Blob([jsonString], { type: "application/json" });
-          filename = `litechat_${safeTitle}_${conversationId.substring(0, 6)}.json`;
+          filename = `litechat_conversation_${safeTitle}_${conversationId.substring(0, 6)}.json`;
         } else if (format === "md") {
           const mdString = formatInteractionsToMarkdown(
             conversation,
             interactions,
           );
           blob = new Blob([mdString], { type: "text/markdown" });
-          filename = `litechat_${safeTitle}_${conversationId.substring(0, 6)}.md`;
+          filename = `litechat_conversation_${safeTitle}_${conversationId.substring(0, 6)}.md`;
         } else {
           throw new Error("Invalid export format specified.");
         }
@@ -658,6 +691,75 @@ export const useConversationStore = create(
         console.error("ConversationStore: Error exporting conversation", error);
         toast.error(
           `Export failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw error;
+      }
+    },
+
+    exportProject: async (projectId) => {
+      try {
+        const rootProject = get().getProjectById(projectId);
+        if (!rootProject) {
+          throw new Error("Project not found.");
+        }
+
+        const allProjects = get().projects;
+        const allConversations = get().conversations;
+
+        const buildExportTree = async (
+          currentProjectId: string,
+        ): Promise<ProjectExportNode> => {
+          const project = allProjects.find((p) => p.id === currentProjectId);
+          if (!project) {
+            throw new Error(`Project ${currentProjectId} not found in state.`);
+          }
+
+          const childProjects = allProjects.filter(
+            (p) => p.parentId === currentProjectId,
+          );
+          const childConversations = allConversations.filter(
+            (c) => c.projectId === currentProjectId,
+          );
+
+          const children: (ProjectExportNode | ConversationExportNode)[] = [];
+
+          // Recursively build child projects
+          for (const childProj of childProjects) {
+            children.push(await buildExportTree(childProj.id));
+          }
+
+          // Build child conversations
+          for (const childConvo of childConversations) {
+            const interactions =
+              await PersistenceService.loadInteractionsForConversation(
+                childConvo.id,
+              );
+            children.push({
+              conversation: childConvo,
+              interactions: interactions,
+            });
+          }
+
+          return {
+            project: project,
+            children: children,
+          };
+        };
+
+        const exportData = await buildExportTree(projectId);
+        const jsonString = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const safeName =
+          rootProject.name.replace(/[^a-z0-9]/gi, "_").toLowerCase() ||
+          "project";
+        const filename = `litechat_project_${safeName}_${projectId.substring(0, 6)}.json`;
+
+        triggerDownload(blob, filename);
+        toast.success(`Project "${rootProject.name}" exported.`);
+      } catch (error) {
+        console.error("ConversationStore: Error exporting project", error);
+        toast.error(
+          `Project export failed: ${error instanceof Error ? error.message : String(error)}`,
         );
         throw error;
       }
@@ -674,7 +776,7 @@ export const useConversationStore = create(
         }
         const jsonString = JSON.stringify(exportData, null, 2);
         const blob = new Blob([jsonString], { type: "application/json" });
-        const filename = `litechat_all_export_${new Date().toISOString().split("T")[0]}.json`;
+        const filename = `litechat_all_conversations_export_${new Date().toISOString().split("T")[0]}.json`;
         triggerDownload(blob, filename);
         toast.success("All conversations exported.");
       } catch (error) {
@@ -960,9 +1062,7 @@ export const useConversationStore = create(
             if (index !== -1) {
               state.conversations[index] = syncedConversation;
             }
-            state.conversations.sort(
-              (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-            );
+            // Sort handled by component
           });
           if (
             get().selectedItemId === conversationId &&

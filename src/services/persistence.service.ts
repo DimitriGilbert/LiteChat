@@ -7,11 +7,27 @@ import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import type { SyncRepo } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project"; // Import Project type
 
+// Helper function to ensure date fields are Date objects
+const ensureDateFields = <T extends { createdAt?: any; updatedAt?: any }>(
+  item: T,
+): T => {
+  return {
+    ...item,
+    ...(item.createdAt && { createdAt: new Date(item.createdAt) }),
+    ...(item.updatedAt && { updatedAt: new Date(item.updatedAt) }),
+  };
+};
+
 export class PersistenceService {
   // Conversations
   static async loadConversations(): Promise<Conversation[]> {
     try {
-      return await db.conversations.orderBy("updatedAt").reverse().toArray();
+      const conversations = await db.conversations
+        .orderBy("updatedAt")
+        .reverse()
+        .toArray();
+      // Ensure createdAt and updatedAt are Date objects
+      return conversations.map(ensureDateFields);
     } catch (error) {
       console.error("PersistenceService: Error loading conversations:", error);
       throw error;
@@ -21,6 +37,7 @@ export class PersistenceService {
   static async saveConversation(c: Conversation): Promise<string> {
     try {
       // Ensure sync and project fields have default values if missing
+      // Dates are already Date objects here, Dexie handles serialization
       const conversationToSave: Conversation = {
         ...c,
         syncRepoId: c.syncRepoId ?? null,
@@ -43,14 +60,20 @@ export class PersistenceService {
     }
   }
 
-  // Interactions (no changes needed)
+  // Interactions (Ensure dates are handled if needed, though less likely to be sorted directly)
   static async loadInteractionsForConversation(
     id: string,
   ): Promise<Interaction[]> {
     try {
-      return await db.interactions
+      const interactions = await db.interactions
         .where({ conversationId: id })
         .sortBy("index");
+      // Ensure startedAt and endedAt are Date objects if they exist
+      return interactions.map((i) => ({
+        ...i,
+        ...(i.startedAt && { startedAt: new Date(i.startedAt) }),
+        ...(i.endedAt && { endedAt: new Date(i.endedAt) }),
+      }));
     } catch (error) {
       console.error(
         "PersistenceService: Error loading interactions for conversation:",
@@ -62,6 +85,7 @@ export class PersistenceService {
 
   static async saveInteraction(i: Interaction): Promise<string> {
     try {
+      // Dates are already Date objects here
       return await db.interactions.put(i);
     } catch (error) {
       console.error("PersistenceService: Error saving interaction:", error);
@@ -90,10 +114,15 @@ export class PersistenceService {
     }
   }
 
-  // Mods (no changes needed)
+  // Mods (Ensure dates are handled)
   static async loadMods(): Promise<DbMod[]> {
     try {
-      return await db.mods.orderBy("loadOrder").toArray();
+      const mods = await db.mods.orderBy("loadOrder").toArray();
+      // Ensure createdAt is a Date object
+      return mods.map((m) => ({
+        ...m,
+        ...(m.createdAt && { createdAt: new Date(m.createdAt) }),
+      }));
     } catch (error) {
       console.error("PersistenceService: Error loading mods:", error);
       throw error;
@@ -102,6 +131,7 @@ export class PersistenceService {
 
   static async saveMod(m: DbMod): Promise<string> {
     try {
+      // Dates are already Date objects here
       return await db.mods.put(m);
     } catch (error) {
       console.error("PersistenceService: Error saving mod:", error);
@@ -138,10 +168,17 @@ export class PersistenceService {
     }
   }
 
-  // Provider Configs (no changes needed)
+  // Provider Configs (Ensure dates are handled)
   static async loadProviderConfigs(): Promise<DbProviderConfig[]> {
     try {
-      return (await db.providerConfigs?.toArray()) ?? [];
+      const configs = (await db.providerConfigs?.toArray()) ?? [];
+      // Ensure date fields are Date objects
+      return configs.map((c) => ({
+        ...ensureDateFields(c),
+        ...(c.modelsLastFetchedAt && {
+          modelsLastFetchedAt: new Date(c.modelsLastFetchedAt),
+        }),
+      }));
     } catch (error) {
       console.error(
         "PersistenceService: Error loading provider configs:",
@@ -153,6 +190,7 @@ export class PersistenceService {
 
   static async saveProviderConfig(c: DbProviderConfig): Promise<string> {
     try {
+      // Dates are already Date objects here
       return await db.providerConfigs.put(c);
     } catch (error) {
       console.error("PersistenceService: Error saving provider config:", error);
@@ -172,10 +210,12 @@ export class PersistenceService {
     }
   }
 
-  // API Keys (no changes needed)
+  // API Keys (Ensure dates are handled)
   static async loadApiKeys(): Promise<DbApiKey[]> {
     try {
-      return (await db.apiKeys?.toArray()) ?? [];
+      const keys = (await db.apiKeys?.toArray()) ?? [];
+      // Ensure date fields are Date objects
+      return keys.map(ensureDateFields);
     } catch (error) {
       console.error("PersistenceService: Error loading API keys:", error);
       throw error;
@@ -184,6 +224,7 @@ export class PersistenceService {
 
   static async saveApiKey(k: DbApiKey): Promise<string> {
     try {
+      // Dates are already Date objects here
       return await db.apiKeys.put(k);
     } catch (error) {
       console.error("PersistenceService: Error saving API key:", error);
@@ -216,10 +257,16 @@ export class PersistenceService {
     }
   }
 
-  // Sync Repos (no changes needed)
+  // Sync Repos (Ensure dates are handled)
   static async loadSyncRepos(): Promise<SyncRepo[]> {
     try {
-      return await db.syncRepos.toArray();
+      const repos = await db.syncRepos.toArray();
+      // Ensure date fields are Date objects
+      return repos.map((r) => ({
+        ...ensureDateFields(r),
+        ...(r.lastPulledAt && { lastPulledAt: new Date(r.lastPulledAt) }),
+        ...(r.lastPushedAt && { lastPushedAt: new Date(r.lastPushedAt) }),
+      }));
     } catch (error) {
       console.error("PersistenceService: Error loading sync repos:", error);
       throw error;
@@ -228,6 +275,7 @@ export class PersistenceService {
 
   static async saveSyncRepo(repo: SyncRepo): Promise<string> {
     try {
+      // Dates are already Date objects here
       return await db.syncRepos.put(repo);
     } catch (error) {
       console.error("PersistenceService: Error saving sync repo:", error);
@@ -262,7 +310,12 @@ export class PersistenceService {
   // --- Projects ---
   static async loadProjects(): Promise<Project[]> {
     try {
-      return await db.projects.orderBy("updatedAt").reverse().toArray();
+      const projects = await db.projects
+        .orderBy("updatedAt")
+        .reverse()
+        .toArray();
+      // Ensure date fields are Date objects
+      return projects.map(ensureDateFields);
     } catch (error) {
       console.error("PersistenceService: Error loading projects:", error);
       throw error;
@@ -272,6 +325,7 @@ export class PersistenceService {
   static async saveProject(p: Project): Promise<string> {
     try {
       // Ensure the object is clean and cloneable, including the path
+      // Dates are already Date objects here
       const projectToSave: Project = {
         id: p.id,
         path: p.path, // Ensure path is included
