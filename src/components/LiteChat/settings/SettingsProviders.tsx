@@ -1,15 +1,13 @@
 // src/components/LiteChat/settings/SettingsProviders.tsx
-import React, { useState, useCallback, useMemo } from "react"; // Added useMemo
+import React, { useState, useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
 import type { DbProviderConfig } from "@/types/litechat/provider";
 import { Button } from "@/components/ui/button";
-// Input and SearchIcon removed
 import { PlusIcon } from "lucide-react";
-// ScrollArea removed
 import { ProviderRow } from "./SettingsProviderRow";
 import { AddProviderForm } from "./AddProviderForm";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 
 // This component now focuses solely on the list and adding providers
 const SettingsProvidersComponent: React.FC = () => {
@@ -36,7 +34,6 @@ const SettingsProvidersComponent: React.FC = () => {
   );
 
   const [isAdding, setIsAdding] = useState(false);
-  // filterText state removed
 
   const handleAddNew = () => setIsAdding(true);
   const handleCancelNew = useCallback(() => setIsAdding(false), []);
@@ -48,7 +45,6 @@ const SettingsProvidersComponent: React.FC = () => {
     [fetchModels],
   );
 
-  // filteredProviders logic removed, use dbProviderConfigs directly
   const providersToDisplay = useMemo(
     () => dbProviderConfigs || [],
     [dbProviderConfigs],
@@ -88,8 +84,6 @@ const SettingsProvidersComponent: React.FC = () => {
         )}
       </div>
 
-      {/* Filter Input REMOVED */}
-
       {/* Provider List - Takes remaining space, NO internal ScrollArea */}
       {/* The parent div in SettingsModal handles scrolling */}
       <div className="flex-grow overflow-hidden border-t border-border pt-4 mt-4">
@@ -101,7 +95,6 @@ const SettingsProvidersComponent: React.FC = () => {
               <Skeleton className="h-24 w-full" />
             </>
           ) : (
-            // Use providersToDisplay (which is just dbProviderConfigs now)
             providersToDisplay.map((provider: DbProviderConfig) => (
               <ProviderRow
                 key={provider.id}

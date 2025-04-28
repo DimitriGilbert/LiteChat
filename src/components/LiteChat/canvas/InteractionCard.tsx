@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/InteractionCard.tsx
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback } from "react"; // Added useCallback
 import type { Interaction } from "@/types/litechat/interaction";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   ClipboardIcon,
   CheckIcon,
   ChevronsUpDownIcon, // Icon for fold/unfold
+  CopyIcon, // Added CopyIcon
 } from "lucide-react";
 import {
   Tooltip,
@@ -42,6 +43,7 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
   const [revisionIndex, setRevisionIndex] = useState(0);
   const [isFolded, setIsFolded] = useState(false); // State for folding
   const [isCopied, setIsCopied] = useState(false); // State for copy button
+  const [isIdCopied, setIsIdCopied] = useState(false); // State for copy ID button
 
   const revisions = useMemo(() => {
     return allInteractionsInGroup
@@ -110,6 +112,19 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
     }
   }, [responseText]);
 
+  // Callback to copy the interaction ID
+  const handleCopyId = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(displayedInteraction.id);
+      setIsIdCopied(true);
+      toast.success("Interaction ID copied to clipboard!");
+      setTimeout(() => setIsIdCopied(false), 1500);
+    } catch (err) {
+      toast.error("Failed to copy interaction ID.");
+      console.error("Clipboard copy failed:", err);
+    }
+  }, [displayedInteraction.id]);
+
   const toggleFold = () => setIsFolded((prev) => !prev);
 
   const hasRevisions = revisions.length > 1;
@@ -119,7 +134,13 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
   // Get first few lines for folded preview
   const foldedPreviewText = useMemo(() => {
     if (!responseText) return "";
-    return responseText.split("\n").slice(0, 3).join("\n");
+    return responseText
+      .split(
+        `
+`,
+      )
+      .slice(0, 3).join(`
+`);
   }, [responseText]);
 
   // Calculate generation time
@@ -215,6 +236,28 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
               </TooltipProvider>
             </div>
           )}
+
+          {/* Copy ID Button */}
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  onClick={handleCopyId}
+                  aria-label="Copy interaction ID"
+                >
+                  {isIdCopied ? (
+                    <CheckIcon className="h-3.5 w-3.5 text-green-500" />
+                  ) : (
+                    <CopyIcon className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Copy ID</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
           {/* Copy Button */}
           <TooltipProvider delayDuration={100}>

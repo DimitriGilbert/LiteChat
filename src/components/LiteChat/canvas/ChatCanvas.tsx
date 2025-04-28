@@ -8,6 +8,7 @@ import { UserPromptDisplay } from "./UserPromptDisplay";
 import { StreamingInteractionCard } from "./StreamingInteractionCard";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useShallow } from "zustand/react/shallow";
+import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 
 export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   conversationId,
@@ -85,7 +86,12 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
 
       {/* Loading/Empty States */}
       {status === "loading" && (
-        <div className="p-4 text-center text-muted-foreground">Loading...</div>
+        <div className="p-4 space-y-4">
+          <Skeleton className="h-16 w-3/4 ml-auto rounded-md" />
+          <Skeleton className="h-12 w-3/4 mr-auto rounded-md" />
+          <Skeleton className="h-16 w-3/4 ml-auto rounded-md" />
+          <Skeleton className="h-12 w-3/4 mr-auto rounded-md" />
+        </div>
       )}
       {interactions.length === 0 && status === "idle" && !conversationId && (
         <div className="p-4 text-center text-muted-foreground">

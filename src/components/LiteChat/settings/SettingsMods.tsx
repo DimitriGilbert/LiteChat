@@ -23,7 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 
 import { useShallow } from "zustand/react/shallow";
 import { useModStore } from "@/store/mod.store";
@@ -201,7 +201,8 @@ const SettingsModsComponent: React.FC = () => {
             id="mod-script"
             value={modScript}
             onChange={(e) => setModScript(e.target.value)}
-            placeholder="/* Paste your mod script here */\n// Example: modApi.log('log', 'My Mod Loaded!');"
+            placeholder="/* Paste your mod script here */
+// Example: modApi.log('log', 'My Mod Loaded!');"
             className="min-h-[100px] font-mono text-xs"
             disabled={isAdding || !!modUrl.trim()}
           />

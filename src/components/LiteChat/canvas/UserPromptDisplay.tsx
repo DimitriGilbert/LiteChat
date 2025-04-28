@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/UserPromptDisplay.tsx
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react"; // Added useCallback
 import type { Interaction } from "@/types/litechat/interaction";
 import { cn } from "@/lib/utils";
 import {
@@ -8,6 +8,7 @@ import {
   CheckIcon,
   ChevronsUpDownIcon,
   EditIcon,
+  CopyIcon, // Added CopyIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +33,7 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
 }) => {
   const [isFolded, setIsFolded] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isIdCopied, setIsIdCopied] = useState(false); // State for copy ID button
 
   const userContent =
     interaction.prompt?.content &&
@@ -59,6 +61,19 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
     }
   }, [userContent]);
 
+  // Callback to copy the interaction ID
+  const handleCopyId = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(interaction.id);
+      setIsIdCopied(true);
+      toast.success("Interaction ID copied to clipboard!");
+      setTimeout(() => setIsIdCopied(false), 1500);
+    } catch (err) {
+      toast.error("Failed to copy interaction ID.");
+      console.error("Clipboard copy failed:", err);
+    }
+  }, [interaction.id]);
+
   const toggleFold = () => setIsFolded((prev) => !prev);
 
   const foldedPreviewText = useMemo(() => {
@@ -79,6 +94,7 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
       </div>
       <div className="p-3 border rounded-md shadow-sm bg-muted/50 flex-grow min-w-0 relative">
         <div className="interaction-card-actions-sticky">
+          {/* Fold/Unfold Button */}
           <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -98,6 +114,30 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+
+          {/* Copy ID Button */}
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  onClick={handleCopyId}
+                  aria-label="Copy interaction ID"
+                >
+                  {isIdCopied ? (
+                    <CheckIcon className="h-3.5 w-3.5 text-green-500" />
+                  ) : (
+                    <CopyIcon className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Copy ID</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Copy Text Button */}
           <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -119,6 +159,8 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
               <TooltipContent side="top">Copy Text</TooltipContent>
             </Tooltip>
           </TooltipProvider>
+
+          {/* Edit Button */}
           <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>

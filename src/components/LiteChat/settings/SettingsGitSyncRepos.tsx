@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import type { SyncRepo } from "@/types/litechat/sync";
 import { useShallow } from "zustand/react/shallow";
 import { useConversationStore } from "@/store/conversation.store";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 
 const SettingsGitSyncReposComponent: React.FC = () => {
   // Use loadSyncRepos to ensure data is fresh if needed, though loadSidebarItems should handle it
@@ -226,6 +226,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
         <h4 className="text-md font-medium mb-2">Configured Repositories</h4>
         {isLoading && !isAdding && !editingId ? (
           <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
           </div>
