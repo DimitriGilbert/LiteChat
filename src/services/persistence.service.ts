@@ -271,7 +271,20 @@ export class PersistenceService {
 
   static async saveProject(p: Project): Promise<string> {
     try {
-      return await db.projects.put(p);
+      // Ensure the object is clean and cloneable, including the path
+      const projectToSave: Project = {
+        id: p.id,
+        path: p.path, // Ensure path is included
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        name: p.name,
+        parentId: p.parentId ?? null,
+        systemPrompt: p.systemPrompt ?? null,
+        modelId: p.modelId ?? null,
+        temperature: p.temperature ?? null,
+        metadata: p.metadata ? { ...p.metadata } : {},
+      };
+      return await db.projects.put(projectToSave);
     } catch (error) {
       console.error("PersistenceService: Error saving project:", error);
       throw error;

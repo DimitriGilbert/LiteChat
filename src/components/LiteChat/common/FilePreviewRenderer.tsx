@@ -1,5 +1,5 @@
 // src/components/LiteChat/common/FilePreviewRenderer.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FileTextIcon,
   ImageIcon,

@@ -85,7 +85,7 @@ const getSyncIndicator = (
 export const ConversationListControlComponent: React.FC = () => {
   const {
     conversations, // Use combined items later
-    projects, // Use combined items later
+    // projects, // Use combined items later
     selectItem, // Use selectItem
     selectedItemId, // Use selectedItemId
     addConversation,

@@ -29,6 +29,7 @@ import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { COMMON_TEXT_EXTENSIONS_VFS } from "@/types/litechat/vfs";
+import type { AttachedFileMetadata } from "@/store/input.store";
 
 const CONTROL_ID = "core-vfs-control";
 

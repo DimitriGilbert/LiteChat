@@ -1,10 +1,10 @@
 // src/store/conversation.store.ts
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import type { Conversation, SidebarItemType } from "@/types/litechat/chat"; // Import SidebarItemType
+import type { Conversation, SidebarItemType } from "@/types/litechat/chat";
 import type { Interaction } from "@/types/litechat/interaction";
 import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
-import type { Project } from "@/types/litechat/project"; // Import Project type
+import type { Project } from "@/types/litechat/project";
 import { useInteractionStore } from "./interaction.store";
 import { PersistenceService } from "@/services/persistence.service";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
@@ -15,6 +15,7 @@ import {
   normalizePath,
   dirname,
   formatBytes,
+  buildPath, // Import buildPath
 } from "@/lib/litechat/file-manager-utils";
 import { format } from "date-fns";
 
@@ -25,20 +26,20 @@ export type SidebarItem =
 
 interface ConversationState {
   conversations: Conversation[];
-  projects: Project[]; // Add projects state
-  selectedItemId: string | null; // Can be Conversation or Project ID
-  selectedItemType: SidebarItemType | null; // Type of selected item
+  projects: Project[];
+  selectedItemId: string | null;
+  selectedItemType: SidebarItemType | null;
   syncRepos: SyncRepo[];
   conversationSyncStatus: Record<string, SyncStatus>;
   isLoading: boolean;
   error: string | null;
 }
 interface ConversationActions {
-  loadSidebarItems: () => Promise<void>; // Renamed from loadConversations
+  loadSidebarItems: () => Promise<void>;
   addConversation: (
     conversationData: Partial<Omit<Conversation, "id" | "createdAt">> & {
       title: string;
-      projectId?: string | null; // Allow specifying project on creation
+      projectId?: string | null;
     },
   ) => Promise<string>;
   updateConversation: (
@@ -47,17 +48,17 @@ interface ConversationActions {
   ) => Promise<void>;
   deleteConversation: (id: string) => Promise<void>;
   addProject: (
-    projectData: Partial<Omit<Project, "id" | "createdAt">> & {
+    projectData: Partial<Omit<Project, "id" | "createdAt" | "path">> & {
       name: string;
       parentId?: string | null;
     },
   ) => Promise<string>;
   updateProject: (
     id: string,
-    updates: Partial<Omit<Project, "id" | "createdAt">>,
+    updates: Partial<Omit<Project, "id" | "createdAt" | "path">>,
   ) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
-  selectItem: (id: string | null, type: SidebarItemType | null) => void; // Renamed from selectConversation
+  selectItem: (id: string | null, type: SidebarItemType | null) => void;
   importConversation: (file: File) => Promise<void>;
   exportConversation: (
     conversationId: string,
@@ -83,7 +84,6 @@ interface ConversationActions {
     status: SyncStatus,
     error?: string | null,
   ) => void;
-  // Helper selectors
   getProjectById: (id: string | null) => Project | undefined;
   getConversationById: (id: string | null) => Conversation | undefined;
   getTopLevelProjectId: (
@@ -94,28 +94,19 @@ interface ConversationActions {
 
 const CONVERSATION_DIR = ".litechat/conversations";
 
-// Helper function to format interactions to Markdown (remains the same)
+// Helper function to format interactions to Markdown
 const formatInteractionsToMarkdown = (
   conversation: Conversation,
   interactions: Interaction[],
 ): string => {
-  let mdString = `# ${conversation.title}
-
-`;
-  mdString += `*Conversation ID: ${conversation.id}*
-`;
-  mdString += `*Created: ${format(conversation.createdAt, "yyyy-MM-dd HH:mm:ss")}*
-`;
-  mdString += `*Last Updated: ${format(conversation.updatedAt, "yyyy-MM-dd HH:mm:ss")}*
-`;
+  let mdString = `# ${conversation.title}\n\n`;
+  mdString += `*Conversation ID: ${conversation.id}*\n`;
+  mdString += `*Created: ${format(conversation.createdAt, "yyyy-MM-dd HH:mm:ss")}*\n`;
+  mdString += `*Last Updated: ${format(conversation.updatedAt, "yyyy-MM-dd HH:mm:ss")}*\n`;
   if (conversation.projectId) {
-    mdString += `*Project ID: ${conversation.projectId}*
-`;
+    mdString += `*Project ID: ${conversation.projectId}*\n`;
   }
-  mdString += `
----
-
-`;
+  mdString += `\n---\n\n`;
 
   interactions
     .filter((i) => i.type === "message.user_assistant")
@@ -125,64 +116,47 @@ const formatInteractionsToMarkdown = (
         interaction.prompt?.content ||
         interaction.prompt?.metadata?.attachedFiles?.length
       ) {
-        mdString += `## User (Index: ${interaction.index})
-
-`;
+        mdString += `## User (Index: ${interaction.index})\n\n`;
         if (
           interaction.prompt.metadata?.attachedFiles &&
           interaction.prompt.metadata.attachedFiles.length > 0
         ) {
-          // Corrected line: Removed extra newline after the heading
-          mdString += "**Attached Files:**\n";
+          mdString += `**Attached Files:**\n`;
           interaction.prompt.metadata.attachedFiles.forEach((f: any) => {
             mdString += `- ${f.name} (${f.type}, ${formatBytes(f.size)}) ${f.source === "vfs" ? `(VFS: ${f.path})` : "(Direct Upload)"}\n`;
           });
-          mdString += "\n"; // Keep newline after the list
+          mdString += `\n`;
         }
         if (interaction.prompt.content) {
           mdString += `${interaction.prompt.content}\n\n`;
         }
       }
       if (interaction.response) {
-        mdString += `## Assistant (Index: ${interaction.index})
-
-`;
+        mdString += `## Assistant (Index: ${interaction.index})\n\n`;
         if (interaction.metadata?.modelId) {
-          mdString += `*Model: ${interaction.metadata.modelId}*
-
-`;
+          mdString += `*Model: ${interaction.metadata.modelId}*\n\n`;
         }
         if (typeof interaction.response === "string") {
-          mdString += `${interaction.response}
-
-`;
+          mdString += `${interaction.response}\n\n`;
         } else {
-          mdString += `\`\`\`json
-`;
-          mdString += `${JSON.stringify(interaction.response, null, 2)}
-`;
-          mdString += `\`\`\`
-
-`;
+          mdString += `\`\`\`json\n`;
+          mdString += `${JSON.stringify(interaction.response, null, 2)}\n`;
+          mdString += `\`\`\`\n\n`;
         }
         if (
           interaction.metadata?.promptTokens ||
           interaction.metadata?.completionTokens
         ) {
-          mdString += `*Tokens: ${interaction.metadata.promptTokens ?? "?"} (prompt) / ${interaction.metadata.completionTokens ?? "?"} (completion)*
-
-`;
+          mdString += `*Tokens: ${interaction.metadata.promptTokens ?? "?"} (prompt) / ${interaction.metadata.completionTokens ?? "?"} (completion)*\n\n`;
         }
       }
-      mdString += `---
-
-`;
+      mdString += `---\n\n`;
     });
 
   return mdString;
 };
 
-// Helper function to trigger browser download (remains the same)
+// Helper function to trigger browser download
 const triggerDownload = (blob: Blob, filename: string): void => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -197,9 +171,9 @@ const triggerDownload = (blob: Blob, filename: string): void => {
 export const useConversationStore = create(
   immer<ConversationState & ConversationActions>((set, get) => ({
     conversations: [],
-    projects: [], // Initialize projects
-    selectedItemId: null, // Initialize selected item ID
-    selectedItemType: null, // Initialize selected item type
+    projects: [],
+    selectedItemId: null,
+    selectedItemType: null,
     syncRepos: [],
     conversationSyncStatus: {},
     isLoading: false,
@@ -240,7 +214,7 @@ export const useConversationStore = create(
         createdAt: now,
         updatedAt: now,
         title: conversationData.title,
-        projectId: conversationData.projectId ?? null, // Assign project ID
+        projectId: conversationData.projectId ?? null,
         metadata: conversationData.metadata ?? {},
         syncRepoId: conversationData.syncRepoId ?? null,
         lastSyncedAt: conversationData.lastSyncedAt ?? null,
@@ -252,7 +226,12 @@ export const useConversationStore = create(
         }
       });
       try {
-        await PersistenceService.saveConversation(newConversation);
+        const conversationToSave = get().getConversationById(newId);
+        if (conversationToSave) {
+          await PersistenceService.saveConversation(conversationToSave);
+        } else {
+          throw new Error("Failed to retrieve newly added conversation state");
+        }
         return newId;
       } catch (e) {
         console.error("ConversationStore: Error adding conversation", e);
@@ -270,58 +249,54 @@ export const useConversationStore = create(
     },
 
     updateConversation: async (id, updates) => {
-      let originalConversation: Conversation | undefined;
-      let updatedConversation: Conversation | null = null;
-      let needsSync = false;
+      const originalConversation = get().getConversationById(id);
+      if (!originalConversation) {
+        console.warn(
+          `ConversationStore: Conversation ${id} not found for update.`,
+        );
+        return;
+      }
 
       set((state) => {
         const index = state.conversations.findIndex((c) => c.id === id);
         if (index !== -1) {
-          originalConversation = { ...state.conversations[index] };
-          if (
-            updates.title !== undefined ||
-            updates.metadata !== undefined ||
-            updates.syncRepoId !== undefined ||
-            updates.projectId !== undefined // Check if projectId changed
-          ) {
-            if (state.conversations[index].syncRepoId) {
-              needsSync = true;
-            }
-          }
-
           Object.assign(state.conversations[index], {
             ...updates,
             updatedAt: new Date(),
           });
-          updatedConversation = state.conversations[index];
-          // Re-sort based on parent project and then update time? (Complex UI logic)
-          // For now, keep simple sort by update time
-          state.conversations.sort(
-            (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-          );
-          if (needsSync && state.conversationSyncStatus[id] === "idle") {
+          if (
+            (updates.title !== undefined ||
+              updates.metadata !== undefined ||
+              updates.syncRepoId !== undefined ||
+              updates.projectId !== undefined) &&
+            state.conversations[index].syncRepoId &&
+            state.conversationSyncStatus[id] === "idle"
+          ) {
             state.conversationSyncStatus[id] = "needs-sync";
           }
-        } else {
-          console.warn(
-            `ConversationStore: Conversation ${id} not found for update.`,
+          state.conversations.sort(
+            (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
           );
         }
       });
 
-      if (updatedConversation) {
+      const updatedConversationData = get().getConversationById(id);
+
+      if (updatedConversationData) {
         try {
-          await PersistenceService.saveConversation(updatedConversation);
+          // Use deep clone before saving to ensure plain object
+          const plainData = JSON.parse(JSON.stringify(updatedConversationData));
+          await PersistenceService.saveConversation(plainData);
         } catch (e) {
           console.error("ConversationStore: Error updating conversation", e);
           set((state) => {
             const index = state.conversations.findIndex((c) => c.id === id);
-            if (index !== -1 && originalConversation) {
+            if (index !== -1) {
               state.conversations[index] = originalConversation;
               state.conversations.sort(
                 (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
               );
-              if (needsSync) {
+              if (state.conversationSyncStatus[id] === "needs-sync") {
                 state.conversationSyncStatus[id] = "idle";
               }
             }
@@ -329,6 +304,23 @@ export const useConversationStore = create(
           });
           throw e;
         }
+      } else {
+        console.error(
+          "ConversationStore: Failed to retrieve updated conversation state after update.",
+        );
+        set((state) => {
+          const index = state.conversations.findIndex((c) => c.id === id);
+          if (index !== -1) {
+            state.conversations[index] = originalConversation;
+            state.conversations.sort(
+              (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+            );
+            if (state.conversationSyncStatus[id] === "needs-sync") {
+              state.conversationSyncStatus[id] = "idle";
+            }
+          }
+          state.error = "Failed to save conversation update (state error)";
+        });
       }
     },
 
@@ -389,28 +381,55 @@ export const useConversationStore = create(
     },
 
     addProject: async (projectData) => {
+      const parentId = projectData.parentId ?? null;
+      const parentProject = get().getProjectById(parentId);
+      const parentPath = parentProject ? parentProject.path : "/";
+      const projectName = projectData.name.trim();
+      const newPath = buildPath(parentPath, projectName);
+
+      // No need for sibling check here, Dexie's unique index on 'path' handles it
+
       const newId = nanoid();
       const now = new Date();
       const newProject: Project = {
         id: newId,
+        path: newPath, // Add the calculated path
         createdAt: now,
         updatedAt: now,
-        name: projectData.name,
-        parentId: projectData.parentId ?? null,
+        name: projectName,
+        parentId: parentId,
         systemPrompt: projectData.systemPrompt ?? null,
         modelId: projectData.modelId ?? null,
         temperature: projectData.temperature ?? null,
         metadata: projectData.metadata ?? {},
       };
+
       set((state) => {
         state.projects.push(newProject);
-        // Sort projects? Maybe by name within parent?
       });
+
       try {
-        await PersistenceService.saveProject(newProject);
+        // Fetch the newly added project from state *after* set
+        const projectToSave = get().getProjectById(newId);
+        if (projectToSave) {
+          // Use deep clone before saving
+          const plainData = JSON.parse(JSON.stringify(projectToSave));
+          await PersistenceService.saveProject(plainData);
+        } else {
+          throw new Error("Failed to retrieve newly added project state");
+        }
         return newId;
-      } catch (e) {
+      } catch (e: any) {
         console.error("ConversationStore: Error adding project", e);
+        // Check if it's a Dexie ConstraintError (path collision)
+        if (e.name === "ConstraintError") {
+          toast.error(
+            `A project or folder named "${projectName}" already exists in this location.`,
+          );
+        } else {
+          toast.error("Failed to save new project.");
+        }
+        // Revert state
         set((state) => ({
           error: "Failed to save new project",
           projects: state.projects.filter((p) => p.id !== newId),
@@ -420,39 +439,76 @@ export const useConversationStore = create(
     },
 
     updateProject: async (id, updates) => {
-      let originalProject: Project | undefined;
-      let updatedProject: Project | null = null;
+      const originalProject = get().getProjectById(id);
+      if (!originalProject) {
+        console.warn(`ConversationStore: Project ${id} not found.`);
+        return;
+      }
 
+      let newPath = originalProject.path;
+      let newName = originalProject.name;
+
+      // Recalculate path if name is changing
+      if (updates.name !== undefined && updates.name !== originalProject.name) {
+        newName = updates.name.trim();
+        const parentProject = get().getProjectById(originalProject.parentId);
+        const parentPath = parentProject ? parentProject.path : "/";
+        newPath = buildPath(parentPath, newName);
+        // No need for sibling check, Dexie handles path uniqueness
+      }
+
+      // Update state using Immer
       set((state) => {
         const index = state.projects.findIndex((p) => p.id === id);
         if (index !== -1) {
-          originalProject = { ...state.projects[index] };
           Object.assign(state.projects[index], {
             ...updates,
+            name: newName, // Ensure updated name is set
+            path: newPath, // Ensure updated path is set
             updatedAt: new Date(),
           });
-          updatedProject = state.projects[index];
-          // Re-sort?
-        } else {
-          console.warn(`ConversationStore: Project ${id} not found.`);
         }
       });
 
-      if (updatedProject) {
+      // Fetch the updated, plain object *after* the set call
+      const updatedProjectData = get().getProjectById(id);
+
+      if (updatedProjectData) {
         try {
-          await PersistenceService.saveProject(updatedProject);
-        } catch (e) {
+          // Use deep clone before saving
+          const plainData = JSON.parse(JSON.stringify(updatedProjectData));
+          await PersistenceService.saveProject(plainData);
+        } catch (e: any) {
           console.error("ConversationStore: Error updating project", e);
+          // Check if it's a Dexie ConstraintError (path collision)
+          if (e.name === "ConstraintError") {
+            toast.error(
+              `A project or folder named "${newName}" already exists in this location.`,
+            );
+          } else {
+            toast.error("Failed to save project update.");
+          }
+          // Revert state using the original copy
           set((state) => {
             const index = state.projects.findIndex((p) => p.id === id);
-            if (index !== -1 && originalProject) {
-              state.projects[index] = originalProject;
-              // Re-sort?
+            if (index !== -1) {
+              state.projects[index] = originalProject; // Revert
             }
             state.error = "Failed to save project update";
           });
-          throw e;
+          throw e; // Re-throw error after reverting state
         }
+      } else {
+        console.error(
+          "ConversationStore: Failed to retrieve updated project state after update.",
+        );
+        set((state) => {
+          const index = state.projects.findIndex((p) => p.id === id);
+          if (index !== -1) {
+            state.projects[index] = originalProject;
+          }
+          state.error = "Failed to save project update (state error)";
+        });
       }
     },
 
@@ -462,7 +518,6 @@ export const useConversationStore = create(
       const projectToDelete = get().projects.find((p) => p.id === id);
       if (!projectToDelete) return;
 
-      // Need to find all descendant projects and conversations to update state correctly
       const descendantProjectIds = new Set<string>();
       const descendantConversationIds = new Set<string>();
       const findDescendants = (projectId: string) => {
@@ -480,7 +535,7 @@ export const useConversationStore = create(
         projects: state.projects.filter((p) => !descendantProjectIds.has(p.id)),
         conversations: state.conversations.map((c) =>
           descendantConversationIds.has(c.id) ? { ...c, projectId: null } : c,
-        ), // Unlink conversations
+        ),
         selectedItemId: descendantProjectIds.has(currentSelectedId ?? "")
           ? null
           : currentSelectedId,
@@ -490,14 +545,13 @@ export const useConversationStore = create(
       }));
 
       try {
-        await PersistenceService.deleteProject(id); // This handles DB unlinking/deletion
+        await PersistenceService.deleteProject(id);
 
         if (descendantProjectIds.has(currentSelectedId ?? "")) {
           useInteractionStore.getState().setCurrentConversationId(null);
         }
       } catch (e) {
         console.error("ConversationStore: Error deleting project", e);
-        // Reverting state is complex here, might require reloading
         set({ error: "Failed to delete project. Please reload." });
         throw e;
       }
@@ -509,7 +563,6 @@ export const useConversationStore = create(
         if (type === "conversation") {
           useInteractionStore.getState().setCurrentConversationId(id);
         } else {
-          // If a project is selected, clear the interaction view
           useInteractionStore.getState().setCurrentConversationId(null);
         }
       } else {
@@ -541,11 +594,10 @@ export const useConversationStore = create(
         ) {
           throw new Error("Invalid conversation data in import file.");
         }
-        // Import conversation without linking to a project initially
         const newId = await get().addConversation({
           title: importedConversation.title || "Imported Chat",
           metadata: importedConversation.metadata,
-          projectId: null, // Don't assume project context on import
+          projectId: null,
           syncRepoId: null,
           lastSyncedAt: null,
         });
@@ -557,7 +609,7 @@ export const useConversationStore = create(
           }),
         );
         await Promise.all(interactionPromises);
-        get().selectItem(newId, "conversation"); // Use selectItem
+        get().selectItem(newId, "conversation");
         toast.success("Conversation imported successfully.");
       } catch (error) {
         console.error("ConversationStore: Error importing conversation", error);
@@ -638,7 +690,6 @@ export const useConversationStore = create(
     },
 
     loadSyncRepos: async () => {
-      // Avoid setting loading if already loading to prevent state flicker
       if (get().isLoading) return;
       set({ isLoading: true, error: null });
       try {
@@ -659,17 +710,21 @@ export const useConversationStore = create(
         updatedAt: now,
         ...repoData,
       };
-      // Perform optimistic update *before* async operation
       set((state) => {
         state.syncRepos.push(newRepo);
       });
       try {
-        await PersistenceService.saveSyncRepo(newRepo);
+        const repoToSave = get().syncRepos.find((r) => r.id === newId);
+        if (repoToSave) {
+          const plainData = JSON.parse(JSON.stringify(repoToSave));
+          await PersistenceService.saveSyncRepo(plainData);
+        } else {
+          throw new Error("Failed to retrieve newly added sync repo state");
+        }
         toast.success(`Sync repository "${newRepo.name}" added.`);
         return newId;
       } catch (e) {
         console.error("ConversationStore: Error adding sync repo", e);
-        // Revert optimistic update on failure
         set((state) => ({
           error: "Failed to save sync repository",
           syncRepos: state.syncRepos.filter((r) => r.id !== newId),
@@ -679,38 +734,51 @@ export const useConversationStore = create(
     },
 
     updateSyncRepo: async (id, updates) => {
-      let originalRepo: SyncRepo | undefined;
-      let updatedRepo: SyncRepo | null = null;
+      const originalRepo = get().syncRepos.find((r) => r.id === id);
+      if (!originalRepo) {
+        console.warn(`ConversationStore: SyncRepo ${id} not found.`);
+        return;
+      }
 
       set((state) => {
         const index = state.syncRepos.findIndex((r) => r.id === id);
         if (index !== -1) {
-          originalRepo = { ...state.syncRepos[index] };
           Object.assign(state.syncRepos[index], {
             ...updates,
             updatedAt: new Date(),
           });
-          updatedRepo = state.syncRepos[index];
-        } else {
-          console.warn(`ConversationStore: SyncRepo ${id} not found.`);
         }
       });
 
-      if (updatedRepo) {
+      const repoToSave = get().syncRepos.find((r) => r.id === id);
+
+      if (repoToSave) {
         try {
-          await PersistenceService.saveSyncRepo(updatedRepo);
-          toast.success(`Sync repository "${updatedRepo.name}" updated.`);
+          const plainData = JSON.parse(JSON.stringify(repoToSave));
+          await PersistenceService.saveSyncRepo(plainData);
+          toast.success(`Sync repository "${repoToSave.name}" updated.`);
         } catch (e) {
           console.error("ConversationStore: Error updating sync repo", e);
           set((state) => {
             const index = state.syncRepos.findIndex((r) => r.id === id);
-            if (index !== -1 && originalRepo) {
+            if (index !== -1) {
               state.syncRepos[index] = originalRepo;
             }
             state.error = "Failed to save sync repository update";
           });
           throw e;
         }
+      } else {
+        console.error(
+          "ConversationStore: Failed to retrieve updated sync repo state after update.",
+        );
+        set((state) => {
+          const index = state.syncRepos.findIndex((r) => r.id === id);
+          if (index !== -1) {
+            state.syncRepos[index] = originalRepo;
+          }
+          state.error = "Failed to save sync repository update (state error)";
+        });
       }
     },
 
@@ -913,8 +981,11 @@ export const useConversationStore = create(
         }
       } catch (error: any) {
         console.error(`Sync failed for conversation ${conversationId}:`, error);
-        toast.error(`Sync failed: ${error.message}`);
-        _setConversationSyncStatus(conversationId, "error", error.message);
+        // Use type check for error message
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        toast.error(`Sync failed: ${errorMessage}`);
+        _setConversationSyncStatus(conversationId, "error", errorMessage);
       }
     },
 
@@ -932,8 +1003,8 @@ export const useConversationStore = create(
 
       if (itemType === "conversation") {
         const convo = get().getConversationById(itemId);
-        itemId = convo?.projectId ?? null; // Start search from convo's project
-        itemType = "project"; // Now we are looking for a project
+        itemId = convo?.projectId ?? null;
+        itemType = "project";
       }
 
       if (itemType !== "project" || !itemId) return null;
@@ -941,7 +1012,7 @@ export const useConversationStore = create(
       let currentProject = get().getProjectById(itemId);
       while (currentProject?.parentId) {
         const parent = get().getProjectById(currentProject.parentId);
-        if (!parent) return currentProject.id; // Should not happen in consistent state
+        if (!parent) return currentProject.id;
         currentProject = parent;
       }
       return currentProject?.id ?? null;

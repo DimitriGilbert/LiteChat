@@ -89,10 +89,16 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       const pS = useProviderStore.getState();
       // Extract providerId from selectedModelId
       const { providerId } = splitModelId(pS.selectedModelId);
+
+      // Derive selectedConversationId from conversation store state
+      const selectedConversationId =
+        cS.selectedItemType === "conversation" ? cS.selectedItemId : null;
+
       return Object.freeze({
-        selectedConversationId: cS.selectedConversationId,
+        selectedConversationId: selectedConversationId, // Use derived ID
         interactions: Object.freeze(
-          iS.currentConversationId === cS.selectedConversationId
+          // Use derived ID for comparison
+          iS.currentConversationId === selectedConversationId
             ? iS.interactions.map((i) => Object.freeze({ ...i }))
             : [],
         ),

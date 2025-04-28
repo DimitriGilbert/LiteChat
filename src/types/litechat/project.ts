@@ -3,6 +3,7 @@ import type { DbBase } from "./common";
 
 export interface Project extends DbBase {
   name: string;
+  path: string; // Unique, path-like identifier (e.g., /projectA/subB)
   parentId: string | null; // For nesting projects
   // Settings specific to this project (can override global)
   systemPrompt?: string | null;

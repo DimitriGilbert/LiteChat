@@ -1,12 +1,18 @@
 // src/components/LiteChat/chat/control/ConversationList.tsx
-import React, { useMemo, useState, useCallback } from "react"; // Added useState, useCallback
+import React, {
+  useMemo,
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+} from "react";
 import {
   useConversationStore,
   type SidebarItem,
 } from "@/store/conversation.store";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"; // Added Input for inline editing
+import { Input } from "@/components/ui/input";
 import {
   PlusIcon,
   Trash2Icon,
@@ -20,9 +26,9 @@ import {
   FolderPlusIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  Edit2Icon, // Added Edit icon
-  CheckIcon, // Added Check icon for save
-  XIcon, // Added X icon for cancel
+  Edit2Icon,
+  CheckIcon,
+  XIcon,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { ChatControl, SidebarItemType } from "@/types/litechat/chat";
@@ -37,7 +43,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-// DropdownMenu imports removed
 import { toast } from "sonner";
 import { Project } from "@/types/litechat/project";
 import { Conversation } from "@/types/litechat/chat";
@@ -115,8 +120,10 @@ interface SidebarItemProps {
   setEditingName: (name: string) => void;
   handleStartEditing: (item: SidebarItem) => void;
   handleSaveEdit: () => Promise<void>;
-  handleCancelEdit: () => void;
+  handleCancelEdit: (isNewProject?: boolean) => void; // Add flag
   isSavingEdit: boolean;
+  // Allow null for the ref prop type
+  editInputRef: React.RefObject<HTMLInputElement | null>;
 }
 
 const SidebarItemRenderer: React.FC<SidebarItemProps> = ({
@@ -141,18 +148,20 @@ const SidebarItemRenderer: React.FC<SidebarItemProps> = ({
   handleSaveEdit,
   handleCancelEdit,
   isSavingEdit,
+  editInputRef,
 }) => {
   const isSelected = item.id === selectedItemId;
   const isProject = item.itemType === "project";
-  const isExpanded = isProject && expandedProjects.has(item.id);
   const isEditingThis =
     item.id === editingItemId && item.itemType === editingItemType;
+
+  // Correctly determine if the current project item is expanded
+  const isExpanded = isProject && expandedProjects.has(item.id);
 
   const { projects: childProjects, conversations: childConversations } =
     isProject ? getChildren(item.id) : { projects: [], conversations: [] };
   const hasChildren = childProjects.length > 0 || childConversations.length > 0;
 
-  // Conversation specific data
   const syncStatus =
     !isProject && item.syncRepoId ? conversationSyncStatus[item.id] : undefined;
   const repoName =
@@ -163,10 +172,12 @@ const SidebarItemRenderer: React.FC<SidebarItemProps> = ({
     !isProject && repoName ? getSyncIndicator(syncStatus, repoName) : null;
 
   const handleItemClick = () => {
-    if (isEditingThis) return; // Don't select/toggle when editing input
-    if (isProject) {
+    if (isEditingThis) return;
+    // Only toggle expansion if it's a project *and* has children
+    if (isProject && hasChildren) {
       toggleProjectExpansion(item.id);
     }
+    // Always select the item
     onSelectItem(item.id, item.itemType);
   };
 
@@ -192,47 +203,55 @@ const SidebarItemRenderer: React.FC<SidebarItemProps> = ({
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
+      e.preventDefault();
       handleSaveEdit();
     } else if (e.key === "Escape") {
-      handleCancelEdit();
+      // Pass flag if it was a new project being edited
+      handleCancelEdit(isProject && item.name === "New Project");
     }
   };
 
   const handleInputBlur = () => {
-    // Slight delay to allow save button click to register
-    setTimeout(() => {
-      // Check if still editing this item before saving on blur
-      if (
-        useConversationStore.getState().editingItemId === item.id &&
-        !isSavingEdit
-      ) {
-        handleSaveEdit();
-      }
-    }, 100);
+    // Save on blur only if not currently saving and name is not empty
+    if (!isSavingEdit && editingName.trim()) {
+      handleSaveEdit();
+    } else if (!editingName.trim()) {
+      // If name is empty on blur, cancel the edit
+      handleCancelEdit(isProject && item.name === "New Project");
+    }
   };
+
+  useEffect(() => {
+    if (isEditingThis) {
+      editInputRef.current?.focus();
+      editInputRef.current?.select();
+    }
+  }, [isEditingThis, editInputRef]);
+
+  // Determine display name correctly
+  const displayName = isProject ? item.name : item.title;
 
   return (
     <>
       <li
         key={item.id}
         className={cn(
-          "flex justify-between items-center group p-1.5 text-xs rounded", // Removed cursor-pointer here, apply conditionally
+          "flex justify-between items-center group p-1.5 text-xs rounded",
           "border border-transparent",
           !isEditingThis && "hover:bg-muted/50 hover:text-primary/80",
           isSelected && !isEditingThis
             ? "bg-primary/10 text-primary font-medium border-primary dark:bg-primary/20 dark:border-primary/70"
             : "",
           isEditingThis && "bg-muted ring-1 ring-primary",
-          !isEditingThis && "cursor-pointer", // Add cursor only when not editing
+          !isEditingThis && "cursor-pointer",
         )}
         style={{ paddingLeft: `${0.375 + level * 0.75}rem` }}
         onClick={handleItemClick}
       >
-        {/* Item Icon and Name/Input */}
         <div className="flex items-center min-w-0 gap-1 flex-grow mr-1">
           {isProject && hasChildren && (
             <span
-              className="flex-shrink-0 w-3 cursor-pointer"
+              className="flex-shrink-0 w-3 cursor-pointer p-0.5 -ml-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleProjectExpansion(item.id);
@@ -253,26 +272,24 @@ const SidebarItemRenderer: React.FC<SidebarItemProps> = ({
           )}
           {isEditingThis ? (
             <Input
+              // Cast ref type here
+              ref={editInputRef as React.RefObject<HTMLInputElement>}
               value={editingName}
               onChange={(e) => setEditingName(e.target.value)}
               onKeyDown={handleInputKeyDown}
               onBlur={handleInputBlur}
               className="h-6 px-1 py-0 text-xs flex-grow min-w-0"
-              autoFocus
-              onFocus={(e) => e.target.select()}
-              onClick={(e) => e.stopPropagation()} // Prevent row click
+              onClick={(e) => e.stopPropagation()}
               disabled={isSavingEdit}
             />
           ) : (
-            <span className="truncate pr-1">{item.name || item.title}</span>
+            <span className="truncate pr-1">{displayName}</span>
           )}
           {syncIndicator}
         </div>
 
-        {/* Action Buttons Area */}
         <div className="flex items-center flex-shrink-0">
           {isEditingThis ? (
-            // Save/Cancel Buttons
             <>
               <Button
                 variant="ghost"
@@ -297,7 +314,8 @@ const SidebarItemRenderer: React.FC<SidebarItemProps> = ({
                 className="h-5 w-5 text-muted-foreground hover:text-foreground"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleCancelEdit();
+                  // Pass flag if it was a new project being edited
+                  handleCancelEdit(isProject && item.name === "New Project");
                 }}
                 disabled={isSavingEdit}
                 aria-label="Cancel edit"
@@ -306,7 +324,6 @@ const SidebarItemRenderer: React.FC<SidebarItemProps> = ({
               </Button>
             </>
           ) : (
-            // Hover Buttons (Edit, Export, Delete)
             <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
               <TooltipProvider delayDuration={100}>
                 <Tooltip>
@@ -316,7 +333,7 @@ const SidebarItemRenderer: React.FC<SidebarItemProps> = ({
                       size="icon"
                       className="h-5 w-5 text-muted-foreground hover:text-foreground"
                       onClick={handleEditClick}
-                      aria-label={`Edit ${item.name || item.title}`}
+                      aria-label={`Edit ${displayName}`}
                     >
                       <Edit2Icon className="h-3 w-3" />
                     </Button>
@@ -330,24 +347,20 @@ const SidebarItemRenderer: React.FC<SidebarItemProps> = ({
                   <TooltipProvider delayDuration={100}>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                          onClick={(e) => e.stopPropagation()} // Prevent row click, hover handles action
-                          aria-label={`Export ${item.title || "Untitled"}`}
+                        <div
+                          className="p-1 rounded hover:bg-muted cursor-pointer" // Make container clickable
+                          aria-label={`Export ${displayName}`}
                         >
-                          <DownloadIcon className="h-3 w-3" />
-                        </Button>
+                          <DownloadIcon className="h-3 w-3 text-muted-foreground group-hover/export:text-foreground" />
+                        </div>
                       </TooltipTrigger>
                       <TooltipContent side="top">Export</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                  {/* Hover Content for Export */}
                   <div
                     className="absolute right-0 top-full mt-1 hidden group-hover/export:flex
-                                   bg-popover border border-border rounded-md shadow-lg p-1 z-10 gap-0.5"
-                    onClick={(e) => e.stopPropagation()} // Prevent clicks inside closing it immediately
+                                   bg-popover border border-border rounded-md shadow-lg p-0.5 z-10 gap-0.5"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <Button
                       variant="ghost"
@@ -377,7 +390,7 @@ const SidebarItemRenderer: React.FC<SidebarItemProps> = ({
                       size="icon"
                       className="h-5 w-5 text-destructive hover:text-destructive/80"
                       onClick={handleDeleteClick}
-                      aria-label={`Delete ${item.name || item.title}`}
+                      aria-label={`Delete ${displayName}`}
                     >
                       <Trash2Icon className="h-3 w-3" />
                     </Button>
@@ -409,7 +422,6 @@ const SidebarItemRenderer: React.FC<SidebarItemProps> = ({
                 expandedProjects={expandedProjects}
                 toggleProjectExpansion={toggleProjectExpansion}
                 getChildren={getChildren}
-                // Pass editing state down
                 editingItemId={editingItemId}
                 editingItemType={editingItemType}
                 editingName={editingName}
@@ -418,6 +430,7 @@ const SidebarItemRenderer: React.FC<SidebarItemProps> = ({
                 handleSaveEdit={handleSaveEdit}
                 handleCancelEdit={handleCancelEdit}
                 isSavingEdit={isSavingEdit}
+                editInputRef={editInputRef} // Pass ref down
               />
             ))}
           {childConversations
@@ -437,7 +450,6 @@ const SidebarItemRenderer: React.FC<SidebarItemProps> = ({
                 expandedProjects={expandedProjects}
                 toggleProjectExpansion={toggleProjectExpansion}
                 getChildren={getChildren}
-                // Pass editing state down
                 editingItemId={editingItemId}
                 editingItemType={editingItemType}
                 editingName={editingName}
@@ -446,6 +458,7 @@ const SidebarItemRenderer: React.FC<SidebarItemProps> = ({
                 handleSaveEdit={handleSaveEdit}
                 handleCancelEdit={handleCancelEdit}
                 isSavingEdit={isSavingEdit}
+                editInputRef={editInputRef} // Pass ref down
               />
             ))}
         </>
@@ -463,15 +476,17 @@ export const ConversationListControlComponent: React.FC = () => {
     selectedItemId,
     selectedItemType,
     addConversation,
-    updateConversation, // Add update action
+    updateConversation,
     deleteConversation,
     addProject,
-    updateProject, // Add update action
+    updateProject,
     deleteProject,
     exportConversation,
     isLoading,
     syncRepos,
     conversationSyncStatus,
+    getConversationById, // Needed for edit check
+    getProjectById, // Needed for edit check
   } = useConversationStore(
     useShallow((state) => ({
       conversations: state.conversations,
@@ -480,15 +495,17 @@ export const ConversationListControlComponent: React.FC = () => {
       selectedItemId: state.selectedItemId,
       selectedItemType: state.selectedItemType,
       addConversation: state.addConversation,
-      updateConversation: state.updateConversation, // Get update action
+      updateConversation: state.updateConversation,
       deleteConversation: state.deleteConversation,
       addProject: state.addProject,
-      updateProject: state.updateProject, // Get update action
+      updateProject: state.updateProject,
       deleteProject: state.deleteProject,
       exportConversation: state.exportConversation,
       isLoading: state.isLoading,
       syncRepos: state.syncRepos,
       conversationSyncStatus: state.conversationSyncStatus,
+      getConversationById: state.getConversationById,
+      getProjectById: state.getProjectById,
     })),
   );
   const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
@@ -502,26 +519,58 @@ export const ConversationListControlComponent: React.FC = () => {
     useState<SidebarItemType | null>(null);
   const [editingName, setEditingName] = useState<string>("");
   const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+  // Type the ref correctly to allow null initially
+  const editInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleStartEditing = useCallback((item: SidebarItem) => {
     setEditingItemId(item.id);
     setEditingItemType(item.itemType);
+    // Correctly get name or title based on type
     setEditingName(item.itemType === "project" ? item.name : item.title);
     setIsSavingEdit(false);
   }, []);
 
-  const handleCancelEdit = useCallback(() => {
-    setEditingItemId(null);
-    setEditingItemType(null);
-    setEditingName("");
-    setIsSavingEdit(false);
-  }, []);
+  const handleCancelEdit = useCallback(
+    (isNewProject = false) => {
+      const currentEditingId = editingItemId; // Capture before resetting
+      setEditingItemId(null);
+      setEditingItemType(null);
+      setEditingName("");
+      setIsSavingEdit(false);
+
+      // If cancelling edit of a "New Project", delete it
+      if (isNewProject && currentEditingId) {
+        toast.info("Cancelled creating empty project.");
+        deleteProject(currentEditingId).catch((err) => {
+          console.error("Failed to delete cancelled new project", err);
+          toast.error("Failed to clean up cancelled project.");
+        });
+      }
+    },
+    [editingItemId, deleteProject], // Depend on editingItemId and deleteProject
+  );
 
   const handleSaveEdit = useCallback(async () => {
     if (!editingItemId || !editingItemType || !editingName.trim()) {
-      handleCancelEdit(); // Cancel if name is empty
+      handleCancelEdit(); // Cancel if invalid state
       return;
     }
+
+    const originalItem =
+      editingItemType === "project"
+        ? getProjectById(editingItemId)
+        : getConversationById(editingItemId);
+
+    // Check type before accessing name/title
+    const originalName =
+      // @ts-expect-error either fix by properly typing or leave this comment @AI
+      editingItemType === "project" ? originalItem?.name : originalItem?.title;
+
+    if (originalName === editingName.trim()) {
+      handleCancelEdit(); // Cancel if name hasn't changed
+      return;
+    }
+
     setIsSavingEdit(true);
     try {
       if (editingItemType === "project") {
@@ -529,12 +578,13 @@ export const ConversationListControlComponent: React.FC = () => {
       } else {
         await updateConversation(editingItemId, { title: editingName.trim() });
       }
-      handleCancelEdit(); // Reset state on success
+      handleCancelEdit(); // Cancel (reset state) on success
     } catch (error) {
       console.error("Failed to save edit:", error);
-      toast.error("Failed to save changes.");
-      // Keep editing state on error to allow retry
+      // Error toast is handled by the store action (e.g., for name collision)
+      // Keep editing state on error, don't cancel
     } finally {
+      // Ensure saving state is reset even if handleCancelEdit isn't called (on error)
       setIsSavingEdit(false);
     }
   }, [
@@ -544,6 +594,8 @@ export const ConversationListControlComponent: React.FC = () => {
     updateProject,
     updateConversation,
     handleCancelEdit,
+    getProjectById,
+    getConversationById,
   ]);
   // --- End Inline Editing State ---
 
@@ -560,6 +612,7 @@ export const ConversationListControlComponent: React.FC = () => {
   };
 
   const handleNewChat = async () => {
+    if (editingItemId) return;
     try {
       const parentProjectId =
         selectedItemType === "project" ? selectedItemId : null;
@@ -576,34 +629,41 @@ export const ConversationListControlComponent: React.FC = () => {
   };
 
   const handleNewProject = async () => {
-    // No prompt needed now
+    if (editingItemId) return;
     try {
       const parentProjectId =
         selectedItemType === "project" ? selectedItemId : null;
       const newId = await addProject({
-        name: "New Project", // Default name
+        name: "New Project",
         parentId: parentProjectId,
       });
       selectItem(newId, "project");
       setExpandedProjects((prev) => new Set(prev).add(newId));
-      // Immediately start editing the new project
-      handleStartEditing({
-        id: newId,
-        itemType: "project",
-        name: "New Project",
-        // Add other required Project fields with default/dummy values if needed by handleStartEditing
-        parentId: parentProjectId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
+      // Fetch the newly created project to pass to handleStartEditing
+      const newProjectData = getProjectById(newId);
+      if (newProjectData) {
+        handleStartEditing({ ...newProjectData, itemType: "project" });
+      } else {
+        // Fallback if project data isn't immediately available (shouldn't happen)
+        handleStartEditing({
+          id: newId,
+          itemType: "project",
+          name: "New Project",
+          parentId: parentProjectId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          // Add path property with a placeholder or calculated value if possible
+          path: `/New Project`, // Placeholder, actual path is set in store
+        });
+      }
     } catch (error) {
       console.error("Failed to create new project:", error);
-      toast.error("Failed to create new project.");
+      // Error toast handled by store action if it's a name collision
     }
   };
 
   const handleSelectItem = (id: string, type: SidebarItemType) => {
-    if (id === editingItemId) return; // Prevent selection change while editing
+    if (id === editingItemId) return;
     if (id === selectedItemId && type === selectedItemType) return;
     selectItem(id, type);
     if (type === "conversation") {
@@ -685,7 +745,7 @@ export const ConversationListControlComponent: React.FC = () => {
                   variant="ghost"
                   onClick={handleNewProject}
                   aria-label="New Project"
-                  disabled={isLoading || !!editingItemId} // Disable if editing
+                  disabled={isLoading || !!editingItemId}
                   className="h-7 w-7 p-0"
                 >
                   <FolderPlusIcon className="h-4 w-4" />
@@ -702,7 +762,7 @@ export const ConversationListControlComponent: React.FC = () => {
                   variant="ghost"
                   onClick={handleNewChat}
                   aria-label="New Chat"
-                  disabled={isLoading || !!editingItemId} // Disable if editing
+                  disabled={isLoading || !!editingItemId}
                   className="h-7 w-7 p-0"
                 >
                   <PlusIcon className="h-4 w-4" />
@@ -741,7 +801,6 @@ export const ConversationListControlComponent: React.FC = () => {
                 expandedProjects={expandedProjects}
                 toggleProjectExpansion={toggleProjectExpansion}
                 getChildren={getChildren}
-                // Pass editing state/handlers
                 editingItemId={editingItemId}
                 editingItemType={editingItemType}
                 editingName={editingName}
@@ -750,6 +809,7 @@ export const ConversationListControlComponent: React.FC = () => {
                 handleSaveEdit={handleSaveEdit}
                 handleCancelEdit={handleCancelEdit}
                 isSavingEdit={isSavingEdit}
+                editInputRef={editInputRef} // Pass ref
               />
             ))}
           </ul>
@@ -759,7 +819,7 @@ export const ConversationListControlComponent: React.FC = () => {
   );
 };
 
-// Icon-only renderer needs update for projects too
+// Icon-only renderer
 export const ConversationListIconRenderer: React.FC = () => {
   const {
     addConversation,
@@ -767,7 +827,7 @@ export const ConversationListIconRenderer: React.FC = () => {
     selectItem,
     selectedItemId,
     selectedItemType,
-    getConversationById, // Need this selector
+    getConversationById,
   } = useConversationStore(
     useShallow((state) => ({
       addConversation: state.addConversation,
@@ -775,17 +835,16 @@ export const ConversationListIconRenderer: React.FC = () => {
       selectItem: state.selectItem,
       selectedItemId: state.selectedItemId,
       selectedItemType: state.selectedItemType,
-      getConversationById: state.getConversationById, // Get selector
+      getConversationById: state.getConversationById,
     })),
   );
   const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
 
-  // Helper to determine parent project ID based on current selection
   const getParentProjectId = () => {
     if (selectedItemType === "project") {
       return selectedItemId;
     } else if (selectedItemType === "conversation" && selectedItemId) {
-      const convo = getConversationById(selectedItemId); // Use the selector
+      const convo = getConversationById(selectedItemId);
       return convo?.projectId ?? null;
     }
     return null;
@@ -806,7 +865,6 @@ export const ConversationListIconRenderer: React.FC = () => {
   };
 
   const handleNewProject = async () => {
-    // No prompt needed
     try {
       const parentProjectId = getParentProjectId();
       const newId = await addProject({
@@ -814,7 +872,7 @@ export const ConversationListIconRenderer: React.FC = () => {
         parentId: parentProjectId,
       });
       selectItem(newId, "project");
-      // Cannot trigger inline edit from here easily, user needs to expand sidebar
+      // Cannot trigger inline edit from here easily
     } catch (error) {
       console.error("Failed to create new project:", error);
     }

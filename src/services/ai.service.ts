@@ -20,7 +20,6 @@ import {
   ProviderMetadata,
   ToolCallPart,
   ToolResultPart,
-  UserContent,
   TextPart,
   ImagePart,
   CoreUserMessage,
@@ -31,7 +30,6 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { PersistenceService } from "@/services/persistence.service";
 import { type AttachedFileMetadata } from "@/store/input.store";
-import * as VfsOps from "@/lib/litechat/vfs-operations";
 
 // Middleware runner remains the same
 async function runMiddleware<H extends ModMiddlewareHookName>(
