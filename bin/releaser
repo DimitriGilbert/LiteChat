@@ -1,0 +1,70 @@
+#!/bin/bash
+
+# Script to package LiteChat distribution files into release archives
+# Creates both latest.zip and version-specific archives
+# Usage: ./package-release.sh
+
+set -e  # Exit on any error
+
+# Check for required tools
+if ! command -v jq &> /dev/null; then
+    echo "Error: jq is required but not installed. Please install jq first."
+    exit 1
+fi
+
+if ! command -v zip &> /dev/null; then
+    echo "Error: zip is required but not installed. Please install zip first."
+    exit 1
+fi
+
+# Ensure we're in the project root (where package.json is located)
+if [ ! -f "package.json" ]; then
+    echo "Error: package.json not found. Please run this script from the project root directory."
+    exit 1
+fi
+
+# Check if dist directory exists
+if [ ! -d "dist" ]; then
+    echo "Error: dist/ directory not found. Please build the project first."
+    exit 1
+fi
+
+# Create public/release directory if it doesn't exist
+mkdir -p public/release
+
+# Extract version from package.json
+VERSION=$(jq -r .version package.json)
+if [ -z "$VERSION" ] || [ "$VERSION" == "null" ]; then
+    echo "Error: Could not extract version from package.json"
+    exit 1
+fi
+
+echo "Packaging LiteChat v${VERSION}..."
+
+# Create temp directory for packaging
+TEMP_DIR=$(mktemp -d)
+trap 'rm -rf -- "$TEMP_DIR"' EXIT
+
+# Copy distribution files to temp directory
+echo "Copying distribution files..."
+cp -r dist/* "$TEMP_DIR/"
+
+# Create the release zip file
+echo "Creating ZIP archive..."
+cd "$TEMP_DIR"
+zip -r "../latest.zip" ./* -q
+cd - > /dev/null
+
+# Copy the zip files to public/release/
+echo "Copying ZIP archives to public/release/..."
+cp "$TEMP_DIR/../latest.zip" "public/release/latest.zip"
+cp "public/release/latest.zip" "public/release/litechat-${VERSION}.zip"
+
+# Output file sizes
+LATEST_SIZE=$(du -h "public/release/latest.zip" | cut -f1)
+VERSION_SIZE=$(du -h "public/release/litechat-${VERSION}.zip" | cut -f1)
+
+echo "✅ Release packaging complete!"
+echo "📦 Created: public/release/latest.zip (${LATEST_SIZE})"
+echo "📦 Created: public/release/litechat-${VERSION}.zip (${VERSION_SIZE})"
+echo "📋 Version: ${VERSION}"
