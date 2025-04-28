@@ -19,6 +19,8 @@ export interface AttachedFileMetadata {
 export interface InputState {
   // Store metadata about files attached for the *next* submission
   attachedFilesMetadata: AttachedFileMetadata[];
+  // Store tools enabled for the *next* submission
+  enabledTools: Set<string>;
 }
 
 export interface InputActions {
@@ -28,12 +30,15 @@ export interface InputActions {
   removeAttachedFile: (attachmentId: string) => void;
   // Clear all attachments for the next prompt
   clearAttachedFiles: () => void;
+  // Set enabled tools
+  setEnabledTools: (updater: (prev: Set<string>) => Set<string>) => void;
 }
 
 export const useInputStore = create(
   immer<InputState & InputActions>((set) => ({
     // Initial State
     attachedFilesMetadata: [],
+    enabledTools: new Set<string>(), // Initialize enabledTools
 
     // Actions
     addAttachedFile: (fileData) => {
@@ -68,7 +73,14 @@ export const useInputStore = create(
       });
     },
     clearAttachedFiles: () => {
-      set({ attachedFilesMetadata: [] });
+      // Also clear enabled tools when clearing attachments
+      set({ attachedFilesMetadata: [], enabledTools: new Set<string>() });
+    },
+    // Action to set enabled tools
+    setEnabledTools: (updater) => {
+      set((state) => {
+        state.enabledTools = updater(state.enabledTools);
+      });
     },
   })),
 );

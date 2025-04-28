@@ -14,8 +14,8 @@ export function useGitToolsRegistration() {
 
     // --- Git Status Tool ---
     const statusTool = registerTool(
+      "git",
       "git_status",
-      "core",
       {
         description:
           "Get the status of a Git repository within the Virtual File System (VFS). Shows untracked, modified, or deleted files.",
@@ -58,8 +58,8 @@ export function useGitToolsRegistration() {
 
     // --- Git Commit Tool ---
     const commitTool = registerTool(
+      "git",
       "git_commit",
-      "core",
       {
         description:
           "Stage all changes (new, modified, deleted) and commit them to a Git repository within the VFS.",
@@ -85,8 +85,8 @@ export function useGitToolsRegistration() {
 
     // --- Git Pull Tool ---
     const pullTool = registerTool(
+      "git",
       "git_pull",
-      "core",
       {
         description:
           "Fetch changes from the remote repository and merge them into the current branch for a Git repository within the VFS.",
@@ -111,8 +111,8 @@ export function useGitToolsRegistration() {
 
     // --- Git Push Tool ---
     const pushTool = registerTool(
+      "git",
       "git_push",
-      "core",
       {
         description:
           "Push committed changes from the local Git repository within the VFS to the configured remote repository.",
@@ -137,8 +137,8 @@ export function useGitToolsRegistration() {
 
     // --- Git Clone Tool ---
     const cloneTool = registerTool(
+      "git",
       "git_clone",
-      "core",
       {
         description:
           "Clone a remote Git repository into a specified target directory within the VFS.",
@@ -168,8 +168,8 @@ export function useGitToolsRegistration() {
 
     // --- Git Init Tool ---
     const initTool = registerTool(
+      "git",
       "git_init",
-      "core",
       {
         description:
           "Initialize an empty Git repository in the specified directory within the VFS.",

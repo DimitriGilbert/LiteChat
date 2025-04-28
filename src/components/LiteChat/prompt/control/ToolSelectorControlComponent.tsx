@@ -1,6 +1,7 @@
 // src/components/LiteChat/prompt/control/ToolSelectorControlComponent.tsx
 import React, { useState, useMemo, useCallback } from "react";
 import { useControlRegistryStore } from "@/store/control.store";
+import { useInputStore } from "@/store/input.store"; // Import input store
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,16 +9,23 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { SearchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useShallow } from "zustand/react/shallow"; // Import useShallow
 
 interface ToolSelectorControlComponentProps {
-  enabledTools: Set<string>;
-  setEnabledTools: (updater: (prev: Set<string>) => Set<string>) => void;
+  // Props removed - state comes from store
   className?: string;
 }
 
 export const ToolSelectorControlComponent: React.FC<
   ToolSelectorControlComponentProps
-> = ({ enabledTools, setEnabledTools, className }) => {
+> = ({ className }) => {
+  // Get state and actions from InputStore
+  const { enabledTools, setEnabledTools } = useInputStore(
+    useShallow((state) => ({
+      enabledTools: state.enabledTools,
+      setEnabledTools: state.setEnabledTools,
+    })),
+  );
   const allTools = useControlRegistryStore((state) => state.tools);
   const [filterText, setFilterText] = useState("");
 
@@ -46,6 +54,7 @@ export const ToolSelectorControlComponent: React.FC<
 
   const handleToggle = useCallback(
     (toolName: string, checked: boolean) => {
+      // Use the store action
       setEnabledTools((prev) => {
         const next = new Set(prev);
         if (checked) {
@@ -56,11 +65,12 @@ export const ToolSelectorControlComponent: React.FC<
         return next;
       });
     },
-    [setEnabledTools],
+    [setEnabledTools], // Depend on the store action
   );
 
   const handleToggleAll = useCallback(
     (enable: boolean) => {
+      // Use the store action
       setEnabledTools(() => {
         if (enable) {
           return new Set(availableTools.map((t) => t.name));
@@ -69,11 +79,11 @@ export const ToolSelectorControlComponent: React.FC<
         }
       });
     },
-    [availableTools, setEnabledTools],
+    [availableTools, setEnabledTools], // Depend on the store action
   );
 
   return (
-    <div className={cn("p-4 max-w-xl space-y-3", className)}>
+    <div className={cn("p-4 max-h-96 max-w-2xl space-y-3", className)}>
       <h4 className="text-sm font-medium">Available Tools</h4>
       <div className="relative">
         <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -87,7 +97,7 @@ export const ToolSelectorControlComponent: React.FC<
       </div>
       <div className="flex justify-between items-center">
         <Label className="text-xs text-muted-foreground">
-          {filteredTools.length} tools shown
+          {filteredTools.length} tools shown ({enabledTools.size} enabled)
         </Label>
         <div className="space-x-2">
           <Button
@@ -108,7 +118,7 @@ export const ToolSelectorControlComponent: React.FC<
           </Button>
         </div>
       </div>
-      <ScrollArea className="h-64 border rounded-md p-2 bg-background/50">
+      <ScrollArea className="max-h-64 border rounded-md p-2 bg-background/50">
         {availableTools.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             No tools registered.
@@ -122,24 +132,27 @@ export const ToolSelectorControlComponent: React.FC<
             {filteredTools.map((tool) => (
               <div
                 key={tool.name}
-                className="flex items-start p-2 rounded hover:bg-muted"
+                className="flex items-center justify-between p-1.5 rounded hover:bg-muted"
               >
                 <Switch
                   id={`tool-switch-${tool.name}`}
+                  // Read from store state
                   checked={enabledTools.has(tool.name)}
                   onCheckedChange={(checked) =>
                     handleToggle(tool.name, checked)
                   }
-                  className="flex-shrink-0 mt-1"
+                  className="flex-shrink-0"
                 />
-                <div className="flex-grow min-w-0 pl-3">
-                  <div className="text-sm font-medium break-words">
-                    {tool.name}
-                  </div>
-                  <div className="text-xs text-muted-foreground break-words">
+                <Label
+                  htmlFor={`tool-switch-${tool.name}`}
+                  className="text-sm font-normal flex-grow cursor-pointer pl-2"
+                  title={`${tool.name} (from ${tool.modId})`}
+                >
+                  <span className="block font-medium">{tool.name}</span>
+                  <span className="block text-xs text-muted-foreground break-words">
                     {tool.description}
-                  </div>
-                </div>
+                  </span>
+                </Label>
               </div>
             ))}
           </div>

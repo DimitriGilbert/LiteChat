@@ -1,79 +1,80 @@
 // src/hooks/litechat/useToolSelectorControlRegistration.tsx
-import { useEffect } from "react"; // Removed React import
+import { useEffect } from "react";
 import { useControlRegistryStore } from "@/store/control.store";
-import { useUIStateStore } from "@/store/ui.store";
+import { useInputStore } from "@/store/input.store"; // Import input store
+import { WrenchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { WrenchIcon } from "lucide-react";
-// ToolSelectorControlComponent is rendered by PromptWrapper, not directly here
-// import { ToolSelectorControlComponent } from "@/components/LiteChat/prompt/control/ToolSelectorControlComponent";
-// useInputStore is not needed here, PromptWrapper handles metadata
-// import { useInputStore } from "@/store/input.store";
+import { ToolSelectorControlComponent } from "@/components/LiteChat/prompt/control/ToolSelectorControlComponent";
+import { Badge } from "@/components/ui/badge"; // Import Badge
 
 export function useToolSelectorControlRegistration() {
   const registerPromptControl = useControlRegistryStore(
     (state) => state.registerPromptControl,
   );
-  const isPanelOpen = useUIStateStore(
-    (state) => state.isPromptControlPanelOpen["core-tool-selector"] ?? false,
-  );
-  const togglePanel = useUIStateStore(
-    (state) => state.togglePromptControlPanel,
-  );
 
   useEffect(() => {
-    const controlId = "core-tool-selector";
-
     const unregister = registerPromptControl({
-      id: controlId,
-      order: 40, // Adjust order as needed
-      show: () => true, // Always show the trigger
+      id: "core-tool-selector",
+      order: 30, // Adjust order as needed
+      show: () => {
+        // Show only if there are tools registered
+        return Object.keys(useControlRegistryStore.getState().tools).length > 0;
+      },
+      // Trigger renders the button and popover structure
       triggerRenderer: () => {
-        // Access enabledTools from PromptWrapper's state via a prop or context later
-        // For now, just render the trigger
+        // Read enabledTools count directly from the store for the badge
+        const enabledToolsCount = useInputStore.getState().enabledTools.size;
+
         return (
-          <Popover
-            open={isPanelOpen}
-            onOpenChange={(open) => togglePanel(controlId, open)}
-          >
+          <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 px-2 text-xs">
-                <WrenchIcon className="h-3.5 w-3.5 mr-1" />
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 relative" // Add relative positioning for badge
+                aria-label="Select Tools"
+              >
+                <WrenchIcon className="h-4 w-4 mr-1" />
                 Tools
-                {/* Add indicator if tools are enabled */}
+                {enabledToolsCount > 0 && (
+                  <Badge
+                    variant="secondary"
+                    className="absolute -top-1 -right-1 px-1.5 py-0 text-[10px] leading-none rounded-full"
+                  >
+                    {enabledToolsCount}
+                  </Badge>
+                )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent
-              className="w-auto p-0"
-              align="start"
-              side="top"
-              onOpenAutoFocus={(e) => e.preventDefault()} // Prevent focus stealing
-            >
-              {/* ToolSelectorControlComponent will be rendered by PromptWrapper */}
-              {/* We need to pass enabledTools state and setter down */}
-              {/* Placeholder comment: Pass state down here */}
+            <PopoverContent className="w-auto p-0" align="start">
+              {/* The component is rendered inside the PopoverContent */}
+              <ToolSelectorControlComponent />
             </PopoverContent>
           </Popover>
         );
       },
-      // The actual component rendering the list is handled by PromptWrapper
-      // based on the trigger state.
-      // getMetadata needs to be implemented in PromptWrapper to read its local state.
+      // Panel renderer is not needed as the component is in the Popover
+      renderer: undefined,
+      // Get metadata reads from InputStore
       getMetadata: () => {
-        // This needs to be implemented in PromptWrapper to access its state
-        // Return { enabledTools: Array.from(enabledToolsState) }
-        return undefined; // Placeholder
+        const enabledTools = useInputStore.getState().enabledTools;
+        // Return empty array if set is empty, otherwise convert set to array
+        return {
+          enabledTools:
+            enabledTools.size > 0 ? Array.from(enabledTools) : undefined,
+        };
       },
+      // Clear on submit clears the InputStore state
       clearOnSubmit: () => {
-        // Optionally clear selection on submit, or persist it.
-        // For now, do nothing, selection persists until popover closes/remounts.
+        useInputStore.getState().setEnabledTools(() => new Set());
       },
     });
 
-    return unregister;
-  }, [registerPromptControl, isPanelOpen, togglePanel]);
+    return unregister; // Cleanup on unmount
+  }, [registerPromptControl]);
 }
