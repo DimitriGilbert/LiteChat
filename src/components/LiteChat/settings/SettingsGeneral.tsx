@@ -11,9 +11,11 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button"; // Import Button
+import { RotateCcwIcon } from "lucide-react"; // Import reset icon
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
-import { Separator } from "@/components/ui/separator"; // Keep Separator
+import { Separator } from "@/components/ui/separator";
 
 const SettingsGeneralComponent: React.FC = () => {
   const {
@@ -27,7 +29,7 @@ const SettingsGeneralComponent: React.FC = () => {
     setStreamingRenderFPS,
     streamingCodeRenderFPS,
     setStreamingCodeRenderFPS,
-    // Removed Git state/actions
+    resetGeneralSettings, // Import reset action
   } = useSettingsStore(
     useShallow((state) => ({
       theme: state.theme,
@@ -40,7 +42,7 @@ const SettingsGeneralComponent: React.FC = () => {
       setStreamingRenderFPS: state.setStreamingRenderFPS,
       streamingCodeRenderFPS: state.streamingCodeRenderFPS,
       setStreamingCodeRenderFPS: state.setStreamingCodeRenderFPS,
-      // Removed Git state/actions
+      resetGeneralSettings: state.resetGeneralSettings, // Get reset action
     })),
   );
 
@@ -103,6 +105,17 @@ const SettingsGeneralComponent: React.FC = () => {
   useEffect(() => {
     setLocalCodeFps(streamingCodeRenderFPS);
   }, [streamingCodeRenderFPS]);
+
+  // Handler for the reset button
+  const handleResetClick = () => {
+    if (
+      window.confirm(
+        "Are you sure you want to reset Appearance and Streaming settings to their defaults?",
+      )
+    ) {
+      resetGeneralSettings();
+    }
+  };
 
   return (
     <div className="space-y-6 p-1">
@@ -213,9 +226,6 @@ const SettingsGeneralComponent: React.FC = () => {
         </div>
       </div>
 
-      {/* Removed Git Configuration Section */}
-      {/* <Separator /> */}
-
       {/* Advanced Settings */}
       <Separator />
       <div className="space-y-2">
@@ -236,6 +246,15 @@ const SettingsGeneralComponent: React.FC = () => {
             onCheckedChange={setEnableAdvancedSettings}
           />
         </div>
+      </div>
+
+      {/* Reset Button Section */}
+      <Separator />
+      <div className="flex justify-end pt-4">
+        <Button variant="outline" size="sm" onClick={handleResetClick}>
+          <RotateCcwIcon className="mr-2 h-4 w-4" />
+          Reset General Settings
+        </Button>
       </div>
     </div>
   );

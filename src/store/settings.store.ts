@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { PersistenceService } from "@/services/persistence.service";
+import { toast } from "sonner"; // Import toast for feedback
 
 interface SettingsState {
   theme: "light" | "dark" | "system";
@@ -36,29 +37,42 @@ interface SettingsActions {
   setGitUserName: (name: string | null) => void; // Added
   setGitUserEmail: (email: string | null) => void; // Added
   loadSettings: () => Promise<void>;
+  resetGeneralSettings: () => Promise<void>; // Added reset action
 }
 
+// Define default constants
+const DEFAULT_THEME = "system";
 const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant.`;
+const DEFAULT_TEMPERATURE = 0.7;
+const DEFAULT_MAX_TOKENS = null;
+const DEFAULT_TOP_P = null;
+const DEFAULT_TOP_K = null;
+const DEFAULT_PRESENCE_PENALTY = 0.0;
+const DEFAULT_FREQUENCY_PENALTY = 0.0;
+const DEFAULT_ENABLE_ADVANCED_SETTINGS = true;
+const DEFAULT_ENABLE_STREAMING_MARKDOWN = true;
 const DEFAULT_STREAMING_FPS = 30;
-const DEFAULT_STREAMING_CODE_FPS = 10; // Slower default for code blocks
+const DEFAULT_STREAMING_CODE_FPS = 10;
+const DEFAULT_GIT_USER_NAME = null;
+const DEFAULT_GIT_USER_EMAIL = null;
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set) => ({
-    // Initial default values
-    theme: "system",
+    // Initial default values using constants
+    theme: DEFAULT_THEME,
     globalSystemPrompt: DEFAULT_SYSTEM_PROMPT,
-    temperature: 0.7,
-    maxTokens: null,
-    topP: null,
-    topK: null,
-    presencePenalty: 0.0,
-    frequencyPenalty: 0.0,
-    enableAdvancedSettings: true,
-    enableStreamingMarkdown: true,
+    temperature: DEFAULT_TEMPERATURE,
+    maxTokens: DEFAULT_MAX_TOKENS,
+    topP: DEFAULT_TOP_P,
+    topK: DEFAULT_TOP_K,
+    presencePenalty: DEFAULT_PRESENCE_PENALTY,
+    frequencyPenalty: DEFAULT_FREQUENCY_PENALTY,
+    enableAdvancedSettings: DEFAULT_ENABLE_ADVANCED_SETTINGS,
+    enableStreamingMarkdown: DEFAULT_ENABLE_STREAMING_MARKDOWN,
     streamingRenderFPS: DEFAULT_STREAMING_FPS,
-    streamingCodeRenderFPS: DEFAULT_STREAMING_CODE_FPS, // Initialize code FPS
-    gitUserName: null, // Initialize Git user name
-    gitUserEmail: null, // Initialize Git user email
+    streamingCodeRenderFPS: DEFAULT_STREAMING_CODE_FPS,
+    gitUserName: DEFAULT_GIT_USER_NAME,
+    gitUserEmail: DEFAULT_GIT_USER_EMAIL,
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -111,14 +125,12 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("streamingRenderFPS", clampedFps);
     },
 
-    // Action for Code FPS setting
     setStreamingCodeRenderFPS: (fps) => {
-      const clampedFps = Math.max(1, Math.min(60, fps)); // Clamp between 1 and 60 FPS
+      const clampedFps = Math.max(1, Math.min(60, fps));
       set({ streamingCodeRenderFPS: clampedFps });
-      PersistenceService.saveSetting("streamingCodeRenderFPS", clampedFps); // Use new key
+      PersistenceService.saveSetting("streamingCodeRenderFPS", clampedFps);
     },
 
-    // Git User Config Actions
     setGitUserName: (name) => {
       const trimmedName = name?.trim() || null;
       set({ gitUserName: trimmedName });
@@ -144,22 +156,31 @@ export const useSettingsStore = create(
           enableAdvanced,
           enableStreamingMd,
           streamingFps,
-          streamingCodeFps, // Load code FPS setting
-          gitUserName, // Load Git user name
-          gitUserEmail, // Load Git user email
+          streamingCodeFps,
+          gitUserName,
+          gitUserEmail,
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
-            "system",
+            DEFAULT_THEME,
           ),
-          PersistenceService.loadSetting<number>("temperature", 0.7),
-          PersistenceService.loadSetting<number | null>("maxTokens", null),
-          PersistenceService.loadSetting<number | null>("topP", null),
-          PersistenceService.loadSetting<number | null>("topK", null),
-          PersistenceService.loadSetting<number | null>("presencePenalty", 0.0),
+          PersistenceService.loadSetting<number>(
+            "temperature",
+            DEFAULT_TEMPERATURE,
+          ),
+          PersistenceService.loadSetting<number | null>(
+            "maxTokens",
+            DEFAULT_MAX_TOKENS,
+          ),
+          PersistenceService.loadSetting<number | null>("topP", DEFAULT_TOP_P),
+          PersistenceService.loadSetting<number | null>("topK", DEFAULT_TOP_K),
+          PersistenceService.loadSetting<number | null>(
+            "presencePenalty",
+            DEFAULT_PRESENCE_PENALTY,
+          ),
           PersistenceService.loadSetting<number | null>(
             "frequencyPenalty",
-            0.0,
+            DEFAULT_FREQUENCY_PENALTY,
           ),
           PersistenceService.loadSetting<string | null>(
             "globalSystemPrompt",
@@ -167,22 +188,28 @@ export const useSettingsStore = create(
           ),
           PersistenceService.loadSetting<boolean>(
             "enableAdvancedSettings",
-            true,
+            DEFAULT_ENABLE_ADVANCED_SETTINGS,
           ),
           PersistenceService.loadSetting<boolean>(
             "enableStreamingMarkdown",
-            true,
+            DEFAULT_ENABLE_STREAMING_MARKDOWN,
           ),
           PersistenceService.loadSetting<number>(
             "streamingRenderFPS",
             DEFAULT_STREAMING_FPS,
           ),
-          PersistenceService.loadSetting<number>( // Load code FPS setting
-            "streamingCodeRenderFPS", // Use new key
-            DEFAULT_STREAMING_CODE_FPS, // Default code FPS value
+          PersistenceService.loadSetting<number>(
+            "streamingCodeRenderFPS",
+            DEFAULT_STREAMING_CODE_FPS,
           ),
-          PersistenceService.loadSetting<string | null>("gitUserName", null), // Load Git user name
-          PersistenceService.loadSetting<string | null>("gitUserEmail", null), // Load Git user email
+          PersistenceService.loadSetting<string | null>(
+            "gitUserName",
+            DEFAULT_GIT_USER_NAME,
+          ),
+          PersistenceService.loadSetting<string | null>(
+            "gitUserEmail",
+            DEFAULT_GIT_USER_EMAIL,
+          ),
         ]);
 
         set({
@@ -197,12 +224,43 @@ export const useSettingsStore = create(
           enableAdvancedSettings: enableAdvanced,
           enableStreamingMarkdown: enableStreamingMd,
           streamingRenderFPS: streamingFps,
-          streamingCodeRenderFPS: streamingCodeFps, // Set loaded code FPS value
-          gitUserName, // Set loaded Git user name
-          gitUserEmail, // Set loaded Git user email
+          streamingCodeRenderFPS: streamingCodeFps,
+          gitUserName,
+          gitUserEmail,
         });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);
+      }
+    },
+
+    // Added reset action
+    resetGeneralSettings: async () => {
+      try {
+        set({
+          theme: DEFAULT_THEME,
+          enableStreamingMarkdown: DEFAULT_ENABLE_STREAMING_MARKDOWN,
+          streamingRenderFPS: DEFAULT_STREAMING_FPS,
+          streamingCodeRenderFPS: DEFAULT_STREAMING_CODE_FPS,
+        });
+        await Promise.all([
+          PersistenceService.saveSetting("theme", DEFAULT_THEME),
+          PersistenceService.saveSetting(
+            "enableStreamingMarkdown",
+            DEFAULT_ENABLE_STREAMING_MARKDOWN,
+          ),
+          PersistenceService.saveSetting(
+            "streamingRenderFPS",
+            DEFAULT_STREAMING_FPS,
+          ),
+          PersistenceService.saveSetting(
+            "streamingCodeRenderFPS",
+            DEFAULT_STREAMING_CODE_FPS,
+          ),
+        ]);
+        toast.success("General settings reset to defaults.");
+      } catch (error) {
+        console.error("SettingsStore: Error resetting general settings", error);
+        toast.error("Failed to reset general settings.");
       }
     },
   })),
