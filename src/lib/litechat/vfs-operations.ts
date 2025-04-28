@@ -107,9 +107,9 @@ export const initializeFsOp = async (
       backend: IndexedDB,
       name: `litechat_vfs_${vfsKey}`,
     };
-    console.log("[VFS Op] Configuring ZenFS with:", vfsConf);
+    // console.log("[VFS Op] Configuring ZenFS with:", vfsConf);
     await configureSingle(vfsConf);
-    console.log(`[VFS Op] ZenFS configured successfully for key "${vfsKey}".`);
+    // console.log(`[VFS Op] ZenFS configured successfully for key "${vfsKey}".`);
     return fs;
   } catch (error) {
     console.error(
@@ -125,7 +125,7 @@ export const initializeFsOp = async (
 
 export const listFilesOp = async (path: string): Promise<FileSystemEntry[]> => {
   const normalized = normalizePath(path);
-  console.log(`[VFS Op] Listing directory: ${normalized}`); // Log path being listed
+  // console.log(`[VFS Op] Listing directory: ${normalized}`); // Log path being listed
   try {
     // Ensure the directory exists before trying to read it
     try {

@@ -25,6 +25,8 @@ import {
   ImagePart,
   CoreUserMessage,
   Tool,
+  TextStreamPart, // Use TextStreamPart which includes the 'finish' type
+  FinishReason, // Import the correct exported type
 } from "ai";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { useProviderStore } from "@/store/provider.store";
@@ -441,10 +443,13 @@ export class AIService {
 
     // --- AI Call and Streaming Logic ---
     let streamResult: StreamTextResult<any, any> | undefined;
-    let finalStatus: Interaction["status"] = "ERROR";
+    let finalStatus: Interaction["status"] = "ERROR"; // Default to error
     let finalErrorMessage: string | undefined = undefined;
     let finalUsage: LanguageModelUsage | undefined = undefined;
     let finalProviderMetadata: ProviderMetadata | undefined = undefined;
+    // Use the correct EXPORTED type for finishReason
+    let finalFinishReason: FinishReason | undefined = undefined;
+
     // Store stringified versions during the stream
     const currentToolCallStrings: string[] = [];
     const currentToolResultStrings: string[] = [];
@@ -568,9 +573,14 @@ export class AIService {
       // Pass the correctly typed streamOptions
       streamResult = await streamText(streamOptions);
 
-      for await (const part of streamResult.fullStream) {
+      // --- Modified Stream Consumption ---
+      // Use TextStreamPart type for the loop variable
+      for await (const part of streamResult.fullStream as AsyncIterable<
+        TextStreamPart<any>
+      >) {
         if (abortController.signal.aborted) {
           console.log(`AIService: Stream ${interactionId} aborted by signal.`);
+          finalFinishReason = "stop"; // Set reason for finally block
           throw new Error("Stream aborted by user.");
         }
 
@@ -639,87 +649,46 @@ export class AIService {
             break;
           }
           case "finish":
-            // 'finish' might occur after each step in multi-step calls.
-            // We rely on the final result after the loop for the overall status.
-            console.log("[AIService] Stream intermediate finish part:", part);
-            // Accumulate usage if needed, but final usage comes from result
-            // finalUsage = part.usage;
-            // finalProviderMetadata = part.providerMetadata;
+            // Capture the final details from the 'finish' part
+            console.log("[AIService] Stream finish part received:", part);
+            finalFinishReason = part.finishReason;
+            finalUsage = part.usage;
+            finalProviderMetadata = part.providerMetadata;
             break;
           case "error":
             console.error("[AIService] Stream error part:", part.error);
+            finalFinishReason = "error"; // Set reason for finally block
             throw new Error(
               `AI Stream Error: ${part.error instanceof Error ? part.error.message : part.error}`,
             );
+          // Handle other TextStreamPart types if needed (e.g., 'reasoning')
+          case "reasoning":
+          case "reasoning-signature":
+          case "redacted-reasoning":
+          case "source":
+          case "file":
+          case "tool-call-streaming-start":
+          case "tool-call-delta":
+          case "step-start":
+          case "step-finish":
+            // console.log(`[AIService] Received stream part type: ${part.type}`);
+            break;
         }
       }
+      // --- End Modified Stream Consumption ---
 
       if (abortController.signal.aborted) {
+        finalFinishReason = "stop";
         throw new Error("Stream aborted by user.");
       }
 
-      // Check the final result from the SDK after the stream loop
-      // --- GUARD AGAINST UNDEFINED finalResult ---
-      const finalResult = streamResult ? await streamResult.result : undefined;
-      console.log("[AIService] Final stream result:", finalResult);
-
-      // Determine final status based on the overall result's finishReason
-      if (finalResult) {
-        if (
-          finalResult.finishReason === "stop" ||
-          finalResult.finishReason === "length"
-        ) {
-          finalStatus = "COMPLETED";
-          console.log(`AIService: Interaction ${interactionId} completed.`);
-        } else if (finalResult.finishReason === "tool-calls") {
-          // This means the *last* step resulted in tool calls, but the overall interaction might be considered complete.
-          // Check if there's any text content in the final result. If not, it truly ended with tools.
-          if (!finalResult.text?.trim()) {
-            finalStatus = "COMPLETED"; // Consider it complete, UI shows tools
-            console.log(
-              `AIService: Interaction ${interactionId} finished with tool calls as the final step.`,
-            );
-          } else {
-            // If there IS text, it means the LLM generated text *after* the last tool use.
-            finalStatus = "COMPLETED";
-            console.log(
-              `AIService: Interaction ${interactionId} completed with text after final tool calls.`,
-            );
-          }
-        } else if (finalResult.finishReason === "error") {
-          finalStatus = "ERROR";
-          finalErrorMessage =
-            finalResult.error?.message ?? "Unknown stream error";
-          console.error(
-            `AIService: Interaction ${interactionId} finished with error: ${finalErrorMessage}`,
-          );
-        } else if (finalResult.finishReason === "other") {
-          // Handle 'other' finish reasons if necessary
-          finalStatus = "COMPLETED"; // Treat as completed for now
-          console.warn(
-            `AIService: Interaction ${interactionId} finished with reason: 'other'.`,
-          );
-        } else {
-          // Fallback if finishReason is unexpected or missing
-          finalStatus = "ERROR";
-          finalErrorMessage = "Stream finished unexpectedly.";
-          console.warn(
-            `AIService: Stream loop finished for ${interactionId} with unexpected final result:`,
-            finalResult,
-          );
-        }
-        // Update usage and metadata from the final result
-        finalUsage = finalResult.usage;
-        finalProviderMetadata = finalResult.providerMetadata;
-      } else {
-        // Handle the case where finalResult is undefined
-        finalStatus = "WARNING";
-        finalErrorMessage = "Stream ended without a final result object.";
+      // If the loop finishes without a 'finish' part (shouldn't happen with valid streams)
+      if (finalFinishReason === undefined) {
         console.warn(
-          `AIService: Interaction ${interactionId} ended without a final result.`,
+          `[AIService] Stream loop finished for ${interactionId} without receiving a 'finish' part.`,
         );
+        finalFinishReason = "other"; // Treat as 'other' or potentially 'error'
       }
-      // --- END GUARD ---
     } catch (error: unknown) {
       console.error(
         `AIService: Error during interaction ${interactionId}:`,
@@ -727,7 +696,8 @@ export class AIService {
       );
       const isAbort =
         error instanceof Error && error.message === "Stream aborted by user.";
-      finalStatus = isAbort ? "CANCELLED" : "ERROR";
+      // Use the captured finish reason if available, otherwise determine from error
+      finalFinishReason = finalFinishReason ?? (isAbort ? "stop" : "error");
       finalErrorMessage = isAbort
         ? undefined
         : error instanceof Error
@@ -745,8 +715,43 @@ export class AIService {
       const finalBufferedContent =
         useInteractionStore.getState().activeStreamBuffers[interactionId] || "";
 
+      // --- Determine final status based on captured finishReason ---
+      switch (finalFinishReason) {
+        case "stop":
+        case "length":
+        case "tool-calls": // Treat finishing with tool calls as complete
+          finalStatus = "COMPLETED";
+          break;
+          // case "abort":
+          //   finalStatus = "CANCELLED";
+          break;
+        case "error":
+          finalStatus = "ERROR";
+          break;
+        case "other":
+        default:
+          // If reason is 'other' or undefined after the loop, check buffer content
+          if (
+            finalBufferedContent.trim() ||
+            currentToolCallStrings.length > 0
+          ) {
+            finalStatus = "COMPLETED"; // Assume completed if there's content
+            console.warn(
+              `[AIService] Interaction ${interactionId} finished with reason '${finalFinishReason || "unknown"}', but content exists. Marking COMPLETED.`,
+            );
+          } else {
+            finalStatus = "WARNING"; // Mark as warning if no content and reason is unclear
+            finalErrorMessage =
+              finalErrorMessage ?? "Stream ended unexpectedly without output.";
+            console.warn(
+              `[AIService] Interaction ${interactionId} finished with reason '${finalFinishReason || "unknown"}' and no content. Marking WARNING.`,
+            );
+          }
+          break;
+      }
+      // --- End Status Determination ---
+
       // Get the latest metadata from the store *before* updating
-      // This includes the basic attachedFiles info (without content)
       const currentInteractionMetadata =
         useInteractionStore
           .getState()
@@ -768,13 +773,14 @@ export class AIService {
           ...(finalProviderMetadata && {
             providerMetadata: finalProviderMetadata,
           }),
-          ...(finalStatus === "ERROR" && { error: finalErrorMessage }),
+          // Only add error message if status is ERROR or WARNING
+          ...((finalStatus === "ERROR" || finalStatus === "WARNING") && {
+            error: finalErrorMessage,
+          }),
           // Ensure final tool calls/results (as strings) are included
           toolCalls: currentToolCallStrings,
           toolResults: currentToolResultStrings,
           // Ensure attachedFiles metadata *without* content is preserved/updated
-          // We use the metadata from the *initial* interaction data here
-          // as it reliably contains the basic file info before any middleware modification
           attachedFiles: interactionData.metadata.attachedFiles?.map(
             // @ts-expect-error i don't care about any
             ({ contentBase64, contentText, ...rest }) => rest, // eslint-disable-line @typescript-eslint/no-unused-vars
