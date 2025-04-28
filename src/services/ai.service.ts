@@ -6,6 +6,7 @@ import type {
   ModMiddlewarePayloadMap,
   ModMiddlewareReturnMap,
   ReadonlyChatContextSnapshot,
+  ToolImplementation, // Keep this for ToolImplementation type usage
 } from "@/types/litechat/modding";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useControlRegistryStore } from "@/store/control.store";
@@ -24,6 +25,7 @@ import {
   ImagePart,
   CoreUserMessage,
   Tool,
+  // StreamTextOptions removed - no longer exported
 } from "ai";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { useProviderStore } from "@/store/provider.store";
@@ -31,6 +33,9 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { PersistenceService } from "@/services/persistence.service";
 import { type AttachedFileMetadata } from "@/store/input.store";
+
+// Define the options type locally using Parameters
+type StreamTextParameters = Parameters<typeof streamText>[0];
 
 // Middleware runner remains the same
 async function runMiddleware<H extends ModMiddlewareHookName>(
@@ -455,35 +460,34 @@ export class AIService {
         throw new Error("Selected model instance not available.");
       }
 
-      // Get registered tools from the store
-      const registeredTools = useControlRegistryStore
+      // --- Tool Preparation ---
+      const allRegisteredTools = useControlRegistryStore
         .getState()
         .getRegisteredTools();
+      const enabledToolNames = finalPayload.metadata?.enabledTools ?? [];
 
-      // Prepare tools for the AI SDK - Pass definitions directly
-      const toolsForSdk = Object.entries(registeredTools).reduce(
-        (acc, [name, toolInfo]) => {
-          // Pass the definition object directly
-          acc[name] = toolInfo.definition;
+      // Filter tools based on enabled names
+      const enabledToolsForSdk = enabledToolNames.reduce(
+        (acc, name) => {
+          if (allRegisteredTools[name]) {
+            acc[name] = allRegisteredTools[name].definition;
+          }
           return acc;
         },
-        {} as Record<string, Tool<any>>, // Use the Tool type here
+        {} as Record<string, Tool<any>>,
       );
 
-      // Prepare tool executors - Adjust signature
-      const toolExecutors = Object.entries(registeredTools)
-        .filter(([_, toolInfo]) => !!toolInfo.implementation)
-        .reduce(
-          (acc, [name, toolInfo]) => {
-            // Executor function only receives 'args'
+      const enabledToolExecutors = enabledToolNames.reduce(
+        (acc, name) => {
+          const toolInfo = allRegisteredTools[name];
+          if (toolInfo?.implementation) {
             acc[name] = async (args: any) => {
               try {
                 const parsedArgs = toolInfo.definition.parameters.parse(args);
-                // Pass context snapshot to the implementation
-                return await toolInfo.implementation!(
-                  parsedArgs,
-                  getContextSnapshot(),
-                );
+                // Use the imported ToolImplementation type here
+                const implementation: ToolImplementation<any> =
+                  toolInfo.implementation!;
+                return await implementation(parsedArgs, getContextSnapshot());
               } catch (e) {
                 console.error(`[AIService] Error executing tool ${name}:`, e);
                 const toolError = e instanceof Error ? e.message : String(e);
@@ -495,26 +499,80 @@ export class AIService {
                 return { error: toolError };
               }
             };
-            return acc;
-          },
-          // The type expected by streamText is Record<string, (args: any) => Promise<any>>
-          {} as Record<string, (args: any) => Promise<any>>,
-        );
+          }
+          return acc;
+        },
+        {} as Record<string, (args: any) => Promise<any>>,
+      );
+      // --- End Tool Preparation ---
 
-      const streamOptions: any = {
+      // Define the type for streamOptions using the inferred type
+      const streamOptions: StreamTextParameters = {
         model: modelInstance as LanguageModelV1,
         messages: finalMessages, // Use messages with processed file content
-        signal: abortController.signal,
-        // Pass tools and executors if they exist
-        ...(Object.keys(toolsForSdk).length > 0 && { tools: toolsForSdk }),
-        ...(Object.keys(toolExecutors).length > 0 && {
-          toolExecutors: toolExecutors,
-        }),
-        // Allow overriding toolChoice via prompt metadata
-        toolChoice:
-          finalPayload.metadata?.toolChoice ??
-          (Object.keys(toolsForSdk).length > 0 ? "auto" : "none"),
+        abortSignal: abortController.signal,
       };
+
+      // Conditionally add tools and toolExecutors
+      if (Object.keys(enabledToolsForSdk).length > 0) {
+        streamOptions.tools = enabledToolsForSdk;
+      }
+      // The AI SDK expects `toolExecutors` to be part of the main options object
+      // if (Object.keys(enabledToolExecutors).length > 0) {
+      //   streamOptions.toolExecutors = enabledToolExecutors; // This line might be incorrect based on SDK v4 structure
+      // }
+      // Instead, tool execution is handled internally by streamText if tools are provided
+      // and the tools have an `execute` method defined.
+      // Let's adjust the tool definition part to include execute if available.
+
+      // Rebuild enabledToolsForSdk to potentially include execute
+      const toolsWithExecute = enabledToolNames.reduce(
+        (acc, name) => {
+          const toolInfo = allRegisteredTools[name];
+          if (toolInfo) {
+            const toolDefinition: Tool<any> = { ...toolInfo.definition }; // Copy definition
+            if (toolInfo.implementation) {
+              // Add the execute function wrapper
+              toolDefinition.execute = async (args: any) => {
+                try {
+                  const parsedArgs = toolInfo.definition.parameters.parse(args);
+                  const implementation: ToolImplementation<any> =
+                    toolInfo.implementation!;
+                  return await implementation(parsedArgs, getContextSnapshot());
+                } catch (e) {
+                  console.error(
+                    `[AIService] Error executing tool ${name} via SDK:`,
+                    e,
+                  );
+                  const toolError = e instanceof Error ? e.message : String(e);
+                  if (e instanceof z.ZodError) {
+                    // Return a structure indicating error for the SDK
+                    // The exact format might depend on how the SDK handles tool errors internally
+                    // Returning the error message might be sufficient for the SDK to format a ToolResultPart
+                    return {
+                      _isError: true,
+                      error: `Invalid arguments: ${e.errors.map((err) => `${err.path.join(".")} (${err.message})`).join(", ")}`,
+                    };
+                  }
+                  return { _isError: true, error: toolError };
+                }
+              };
+            }
+            acc[name] = toolDefinition;
+          }
+          return acc;
+        },
+        {} as Record<string, Tool<any>>,
+      );
+
+      if (Object.keys(toolsWithExecute).length > 0) {
+        streamOptions.tools = toolsWithExecute;
+      }
+
+      // Assign toolChoice using the type from PromptObject
+      streamOptions.toolChoice =
+        finalPayload.toolChoice ??
+        (Object.keys(toolsWithExecute).length > 0 ? "auto" : "none");
 
       if (finalPayload.system) {
         streamOptions.system = finalPayload.system;
@@ -536,6 +594,7 @@ export class AIService {
             finalPayload.parameters.frequency_penalty;
       }
 
+      // Pass the correctly typed streamOptions
       streamResult = await streamText(streamOptions);
 
       for await (const part of streamResult.fullStream) {
@@ -619,6 +678,14 @@ export class AIService {
             throw new Error(
               `AI Stream Error: ${part.error instanceof Error ? part.error.message : part.error}`,
             );
+          // Handle other part types if necessary (e.g., 'step-start', 'step-finish')
+          // case 'step-start':
+          //   console.log('[AIService] Step start:', part);
+          //   break;
+          // case 'step-finish':
+          //   console.log('[AIService] Step finish:', part);
+          //   // Accumulate usage if needed
+          //   break;
         }
       }
 

@@ -28,6 +28,7 @@ export interface PromptTurnObject {
       contentText?: string;
       contentBase64?: string;
     }[];
+    enabledTools?: string[]; // Added: Names of tools enabled for this turn
   };
 }
 
@@ -43,7 +44,10 @@ export interface PromptObject {
   messages: CoreMessage[];
   /** Tools available for the AI model */
   tools?: Tool[];
-  /** How the model should use tools */
+  /**
+   * How the model should use tools.
+   * Use string literals directly as the generic ToolChoice type is hard to apply here.
+   */
   toolChoice?:
     | "auto"
     | "none"
@@ -53,6 +57,7 @@ export interface PromptObject {
   parameters: Record<string, any>;
   /** Final combined metadata for the AI call (file content is NOT included here) */
   metadata: Record<string, any> & {
+    enabledTools?: string[]; // Added: Names of tools enabled for this turn
     // Only basic file info needed here, content is processed into messages
     attachedFiles?: {
       id: string;

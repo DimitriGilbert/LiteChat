@@ -745,4 +745,61 @@ ${formattedStatus || "No changes"}`,
   }
 };
 
+export const gitCurrentBranchOp = async (path: string): Promise<string> => {
+  const dir = normalizePath(path);
+  try {
+    const branch = await git.currentBranch({ fs, dir, fullname: false });
+    if (!branch) {
+      throw new Error("Could not determine current branch.");
+    }
+    toast.info(`Current branch in "${basename(dir)}": ${branch}`);
+    return branch;
+  } catch (err: unknown) {
+    console.error(`[VFS Op] Git currentBranch failed for ${dir}:`, err);
+    toast.error(
+      `Failed to get current branch: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    throw err;
+  }
+};
+
+export const gitListBranchesOp = async (path: string): Promise<string[]> => {
+  const dir = normalizePath(path);
+  try {
+    const branches = await git.listBranches({ fs, dir });
+    toast.info(
+      `Local branches in "${basename(dir)}":
+${branches.join(", ")}`,
+    );
+    return branches;
+  } catch (err: unknown) {
+    console.error(`[VFS Op] Git listBranches failed for ${dir}:`, err);
+    toast.error(
+      `Failed to list branches: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    throw err;
+  }
+};
+
+export const gitListRemotesOp = async (
+  path: string,
+): Promise<{ remote: string; url: string }[]> => {
+  const dir = normalizePath(path);
+  try {
+    const remotes = await git.listRemotes({ fs, dir });
+    toast.info(
+      `Remotes in "${basename(dir)}":
+${remotes.map((r) => `${r.remote}: ${r.url}`).join(`
+`)}`,
+    );
+    return remotes;
+  } catch (err: unknown) {
+    console.error(`[VFS Op] Git listRemotes failed for ${dir}:`, err);
+    toast.error(
+      `Failed to list remotes: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    throw err;
+  }
+};
+
 export const VFS = fs;

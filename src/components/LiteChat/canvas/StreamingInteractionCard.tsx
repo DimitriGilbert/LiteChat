@@ -21,14 +21,19 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
         const interaction = state.interactions.find(
           (i) => i.id === interactionId,
         );
-        // Return only necessary shell data, or null if not found/not streaming
+        // Check if there are tool calls in metadata (string array)
+        const hasToolCalls =
+          (interaction?.metadata?.toolCalls?.length ?? 0) > 0;
+        // Check if the buffer is empty (or null/undefined)
+        const isBufferEmpty = !state.activeStreamBuffers[interactionId];
+
         return interaction && interaction.status === "STREAMING"
           ? {
               index: interaction.index,
               type: interaction.type,
               modelId: interaction.metadata?.modelId,
-              // Check if there are tool calls in metadata
-              hasToolCalls: (interaction.metadata?.toolCalls?.length ?? 0) > 0,
+              hasToolCalls: hasToolCalls,
+              showToolPlaceholder: hasToolCalls && isBufferEmpty, // New flag
             }
           : null;
       }),
@@ -42,7 +47,8 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       return null;
     }
 
-    const { index, type, modelId, hasToolCalls } = interactionShellData;
+    const { index, type, modelId, hasToolCalls, showToolPlaceholder } =
+      interactionShellData;
 
     return (
       <div
@@ -76,16 +82,13 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
         </div>
         {/* Content Area - Render the dedicated streaming view component */}
         <StreamingContentView interactionId={interactionId} />
-        {/* Optionally show a placeholder if tools are being called but no text is streaming yet */}
-        {hasToolCalls &&
-          !useInteractionStore.getState().activeStreamBuffers[
-            interactionId
-          ] && (
-            <div className="mt-2 text-xs text-muted-foreground italic flex items-center gap-1">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Executing tools...
-            </div>
-          )}
+        {/* Show placeholder if tools are being called but no text is streaming yet */}
+        {showToolPlaceholder && (
+          <div className="mt-2 text-xs text-muted-foreground italic flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Executing tools...
+          </div>
+        )}
       </div>
     );
   });

@@ -55,7 +55,17 @@ const ToolDisplay: React.FC<{
     try {
       const parsed = JSON.parse(callStr);
       // Add validation if needed
-      parsedCalls.push(parsed as ToolCallPart);
+      if (
+        parsed &&
+        parsed.type === "tool-call" &&
+        parsed.toolCallId &&
+        parsed.toolName &&
+        parsed.args !== undefined
+      ) {
+        parsedCalls.push(parsed as ToolCallPart);
+      } else {
+        console.warn("Skipping invalid tool call string:", callStr);
+      }
     } catch (e) {
       console.error(
         "Failed to parse tool call string for display:",
@@ -69,7 +79,17 @@ const ToolDisplay: React.FC<{
     try {
       const parsed = JSON.parse(resultStr);
       // Add validation if needed
-      parsedResults.push(parsed as ToolResultPart);
+      if (
+        parsed &&
+        parsed.type === "tool-result" &&
+        parsed.toolCallId &&
+        parsed.toolName &&
+        parsed.result !== undefined
+      ) {
+        parsedResults.push(parsed as ToolResultPart);
+      } else {
+        console.warn("Skipping invalid tool result string:", resultStr);
+      }
     } catch (e) {
       console.error(
         "Failed to parse tool result string for display:",

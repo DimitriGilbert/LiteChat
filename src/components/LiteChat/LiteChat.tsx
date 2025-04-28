@@ -31,6 +31,9 @@ import { useParameterControlRegistration } from "@/hooks/litechat/useParameterCo
 import { useFileControlRegistration } from "@/hooks/litechat/useFileControlRegistration"; // Updated path
 import { useVfsControlRegistration } from "@/hooks/litechat/useVfsControlRegistration"; // Updated path
 import { useGitSyncControlRegistration } from "@/hooks/litechat/useGitSyncControlRegistration"; // Updated path
+import { useVfsToolsRegistration } from "@/hooks/litechat/useVfsToolsRegistration"; // Added
+import { useGitToolsRegistration } from "@/hooks/litechat/useGitToolsRegistration"; // Added
+import { useToolSelectorControlRegistration } from "@/hooks/litechat/useToolSelectorControlRegistration"; // Added
 
 // Helper to split combined ID remains the same
 const splitModelId = (
@@ -121,6 +124,9 @@ export const LiteChat: React.FC = () => {
   useFileControlRegistration(); // Uses imported hook
   useVfsControlRegistration(); // Uses imported hook
   useGitSyncControlRegistration(); // Uses imported hook
+  useVfsToolsRegistration(); // Added VFS tools registration
+  useGitToolsRegistration(); // Added Git tools registration
+  useToolSelectorControlRegistration(); // Added Tool selector registration
 
   // --- Initialization Effect ---
   useEffect(() => {
@@ -358,7 +364,8 @@ export const LiteChat: React.FC = () => {
         system: systemPrompt,
         messages: messages, // Now includes the current user message text
         parameters: turnData.parameters,
-        metadata: turnData.metadata, // Pass metadata (including basic file info)
+        metadata: turnData.metadata, // Pass metadata (including basic file info and enabledTools)
+        // toolChoice is now derived from parameters in AIService
       };
 
       emitter.emit("prompt:finalised", { prompt: aiPayload });
@@ -472,6 +479,7 @@ export const LiteChat: React.FC = () => {
         undefined;
 
       // Metadata for the AI payload (not the interaction itself yet)
+      // Preserve enabledTools from the original prompt if available
       const currentMetadata = {
         ...targetInteraction.prompt.metadata,
         regeneratedFromId: interactionId,
@@ -479,6 +487,8 @@ export const LiteChat: React.FC = () => {
         modelId: modelId,
         // Remove attachedFiles from metadata sent to AI, AIService handles it
         attachedFiles: undefined,
+        // Preserve enabledTools from original prompt
+        enabledTools: targetInteraction.prompt.metadata?.enabledTools,
       };
 
       const aiPayload: PromptObject = {
@@ -486,6 +496,7 @@ export const LiteChat: React.FC = () => {
         messages: messages, // History + current user message text
         parameters: targetInteraction.prompt.parameters,
         metadata: currentMetadata,
+        // toolChoice is derived from parameters in AIService
       };
 
       emitter.emit("prompt:finalised", { prompt: aiPayload });
