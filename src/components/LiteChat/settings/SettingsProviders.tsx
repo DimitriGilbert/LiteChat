@@ -90,22 +90,26 @@ const SettingsProvidersComponent: React.FC = () => {
         <div className="space-y-2">
           {isLoading && !isAdding ? (
             <>
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+              </div>
             </>
           ) : (
-            providersToDisplay.map((provider: DbProviderConfig) => (
-              <ProviderRow
-                key={provider.id}
-                provider={provider}
-                apiKeys={apiKeys || []}
-                onUpdate={updateDbProviderConfig}
-                onDelete={deleteDbProviderConfig}
-                onFetchModels={handleFetchModels}
-                fetchStatus={providerFetchStatus[provider.id] || "idle"}
-              />
-            ))
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {providersToDisplay.map((provider: DbProviderConfig) => (
+                <ProviderRow
+                  key={provider.id}
+                  provider={provider}
+                  apiKeys={apiKeys || []}
+                  onUpdate={updateDbProviderConfig}
+                  onDelete={deleteDbProviderConfig}
+                  onFetchModels={handleFetchModels}
+                  fetchStatus={providerFetchStatus[provider.id] || "idle"}
+                />
+              ))}
+            </div>
           )}
           {!isLoading && providersToDisplay.length === 0 && !isAdding && (
             <p className="text-sm text-muted-foreground text-center py-4">

@@ -1,13 +1,13 @@
 // src/components/LiteChat/settings/GlobalModelOrganizer.tsx
-import React, { useCallback, useMemo, useState } from "react"; // Added useState
+import React, { useCallback, useMemo, useState } from "react";
 import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input"; // Added Input
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SearchIcon } from "lucide-react"; // Added SearchIcon
+import { SearchIcon } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -26,42 +26,42 @@ import {
 import { SortableModelItem } from "@/components/LiteChat/settings/SortableModelItem";
 
 export const GlobalModelOrganizer: React.FC = () => {
+  // Select underlying data and the selector function
   const {
     setGlobalModelSortOrder,
-    getGloballyEnabledAndOrderedModels,
+    getGloballyEnabledAndOrderedModels, // Select the function
+    dbProviderConfigs, // Select underlying data
+    globalModelSortOrder, // Select underlying data
     isLoading,
-    // @ts-expect-error Add dbProviderConfigs to dependencies for reactivity
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    dbProviderConfigs,
   } = useProviderStore(
     useShallow((state) => ({
-      globalModelSortOrder: state.globalModelSortOrder,
       setGlobalModelSortOrder: state.setGlobalModelSortOrder,
       getGloballyEnabledAndOrderedModels:
-        state.getGloballyEnabledAndOrderedModels,
-      isLoading: state.isLoading,
-      // Select dbProviderConfigs to trigger re-calculation when it changes
+        state.getGloballyEnabledAndOrderedModels, // The selector function
+      // Select the state the selector depends on
       dbProviderConfigs: state.dbProviderConfigs,
+      globalModelSortOrder: state.globalModelSortOrder,
+      isLoading: state.isLoading,
     })),
   );
 
-  const [filterText, setFilterText] = useState(""); // State for filter
+  const [filterText, setFilterText] = useState("");
 
-  // Get the models already enabled and ordered by the store selector
-  // This memo now correctly depends on the underlying data
-  const enabledAndOrderedModels = useMemo(
-    () =>
-      getGloballyEnabledAndOrderedModels
-        ? getGloballyEnabledAndOrderedModels()
-        : [],
-    // Depend on the actual data that the selector uses
-    [getGloballyEnabledAndOrderedModels],
-  );
+  // Call the selector outside the hook and memoize its result
+  const enabledAndOrderedModels = useMemo(() => {
+    return getGloballyEnabledAndOrderedModels
+      ? getGloballyEnabledAndOrderedModels()
+      : [];
+  }, [
+    getGloballyEnabledAndOrderedModels,
+    dbProviderConfigs,
+    globalModelSortOrder,
+  ]);
 
   // Filter the models based on filterText
   const filteredAndOrderedModels = useMemo(() => {
     if (!filterText.trim()) {
-      return enabledAndOrderedModels;
+      return enabledAndOrderedModels; // Use the memoized result
     }
     const lowerCaseFilter = filterText.toLowerCase();
     return enabledAndOrderedModels.filter(
@@ -70,7 +70,7 @@ export const GlobalModelOrganizer: React.FC = () => {
         model.providerName.toLowerCase().includes(lowerCaseFilter) ||
         model.id.toLowerCase().includes(lowerCaseFilter),
     );
-  }, [enabledAndOrderedModels, filterText]);
+  }, [enabledAndOrderedModels, filterText]); // Depend on the memoized result
 
   // The IDs for SortableContext are derived from the *filtered* models
   const orderedCombinedIds = useMemo(
@@ -82,11 +82,8 @@ export const GlobalModelOrganizer: React.FC = () => {
     (event: DragEndEvent) => {
       const { active, over } = event;
       if (over && active.id !== over.id) {
-        // IMPORTANT: We need to modify the *original* globalModelSortOrder
-        // based on the indices within the *currently displayed* (filtered) list.
-        const currentFullOrder = getGloballyEnabledAndOrderedModels
-          ? getGloballyEnabledAndOrderedModels().map((m) => m.id)
-          : [];
+        // Get the *current* full order directly from the memoized result
+        const currentFullOrder = enabledAndOrderedModels.map((m) => m.id);
 
         const activeId = active.id as string;
         const overId = over.id as string;
@@ -101,9 +98,9 @@ export const GlobalModelOrganizer: React.FC = () => {
             oldIndexInFull,
             newIndexInFull,
           );
+          // This call will update the store, triggering a re-render
+          // because globalModelSortOrder changes, which updates enabledAndOrderedModels
           setGlobalModelSortOrder(newOrder);
-          // Reset filter after reordering? Optional.
-          // setFilterText("");
         } else {
           console.error(
             "Failed to find dragged items in the full model order. Cannot reorder.",
@@ -111,10 +108,7 @@ export const GlobalModelOrganizer: React.FC = () => {
         }
       }
     },
-    [
-      getGloballyEnabledAndOrderedModels, // Use the selector function directly
-      setGlobalModelSortOrder,
-    ],
+    [enabledAndOrderedModels, setGlobalModelSortOrder], // Depend on the memoized data
   );
 
   const sensors = useSensors(

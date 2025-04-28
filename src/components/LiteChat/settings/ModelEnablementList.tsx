@@ -1,9 +1,10 @@
 // src/components/LiteChat/settings/ModelEnablementList.tsx
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 
 interface ModelEnablementListProps {
   providerId: string;
@@ -24,6 +25,20 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   disabled = false,
   listHeightClass = "h-48", // Default height
 }) => {
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Filter models based on search query
+  const filteredModels = useMemo(() => {
+    if (!searchQuery) return allAvailableModels;
+
+    const query = searchQuery.toLowerCase();
+    return allAvailableModels.filter(
+      (model) =>
+        model.name.toLowerCase().includes(query) ||
+        model.id.toLowerCase().includes(query),
+    );
+  }, [allAvailableModels, searchQuery]);
+
   if (isLoading) {
     return (
       <div className={`space-y-2 ${listHeightClass}`}>
@@ -43,33 +58,42 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   }
 
   return (
-    <ScrollArea
-      className={`${listHeightClass} w-full rounded-md border border-border p-3 bg-background/50`}
-    >
-      <div className="space-y-2">
-        {allAvailableModels.map((model) => (
-          <div
-            key={model.id}
-            className="flex items-center justify-between space-x-2 p-1.5 rounded hover:bg-muted/50"
-          >
-            <Label
-              htmlFor={`enable-model-${providerId}-${model.id}`}
-              className="text-sm font-normal text-card-foreground flex-grow cursor-pointer truncate"
-              title={model.name || model.id}
+    <div className="space-y-2">
+      <Input
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        placeholder="Search models..."
+        className="h-9 w-full text-xs"
+        type="text"
+      />
+      <ScrollArea
+        className={`${listHeightClass} w-full rounded-md border border-border p-3 bg-background/50`}
+      >
+        <div className="space-y-2">
+          {filteredModels.map((model) => (
+            <div
+              key={model.id}
+              className="flex items-center justify-between space-x-2 p-1.5 rounded hover:bg-muted/50"
             >
-              {model.name || model.id}
-            </Label>
-            <Switch
-              id={`enable-model-${providerId}-${model.id}`}
-              checked={enabledModelIds.has(model.id)}
-              onCheckedChange={(checked) => onToggleModel(model.id, checked)}
-              className="flex-shrink-0"
-              disabled={disabled}
-              aria-label={`Enable model ${model.name || model.id}`}
-            />
-          </div>
-        ))}
-      </div>
-    </ScrollArea>
+              <Label
+                htmlFor={`enable-model-${providerId}-${model.id}`}
+                className="text-sm font-normal text-card-foreground flex-grow cursor-pointer truncate"
+                title={model.name || model.id}
+              >
+                {model.name || model.id}
+              </Label>
+              <Switch
+                id={`enable-model-${providerId}-${model.id}`}
+                checked={enabledModelIds.has(model.id)}
+                onCheckedChange={(checked) => onToggleModel(model.id, checked)}
+                className="flex-shrink-0"
+                disabled={disabled}
+                aria-label={`Enable model ${model.name || model.id}`}
+              />
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
   );
 };

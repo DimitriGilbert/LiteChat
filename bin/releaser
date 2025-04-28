@@ -49,7 +49,7 @@ trap 'rm -rf -- "$TEMP_DIR"' EXIT
 echo "Copying distribution files..."
 cp -r dist/* "$TEMP_DIR/"
 
-rm -rf "release/";
+rm -rf "$TEMP_DIR/release/";
 
 # Create the release zip file
 echo "Creating ZIP archive..."

@@ -1,40 +1,53 @@
 // src/components/LiteChat/prompt/control/GlobalModelSelector.tsx
-import React, { useMemo } from "react"; // Import useMemo
+import React, { useMemo } from "react";
 import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import { Combobox } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const GlobalModelSelector: React.FC = () => {
+  // Select the underlying data and the selector function itself
   const {
-    selectedModelId, // Combined ID
+    selectedModelId,
     selectModel,
-    getGloballyEnabledAndOrderedModels, // Use the correct selector
+    getGloballyEnabledAndOrderedModels, // Select the function
+    dbProviderConfigs, // Select underlying data
+    globalModelSortOrder, // Select underlying data
     isLoading,
   } = useProviderStore(
     useShallow((state) => ({
       selectedModelId: state.selectedModelId,
       selectModel: state.selectModel,
       getGloballyEnabledAndOrderedModels:
-        state.getGloballyEnabledAndOrderedModels, // Use correct selector
+        state.getGloballyEnabledAndOrderedModels, // The selector function
+      // Select the state the selector depends on for memoization
+      dbProviderConfigs: state.dbProviderConfigs,
+      globalModelSortOrder: state.globalModelSortOrder,
       isLoading: state.isLoading,
     })),
   );
 
-  // Get the globally enabled and ordered models using useMemo
-  const enabledModels = useMemo(() => {
+  // Call the selector outside the hook and memoize its result
+  const enabledAndOrderedModels = useMemo(() => {
+    // Ensure the function exists before calling
     return getGloballyEnabledAndOrderedModels
       ? getGloballyEnabledAndOrderedModels()
       : [];
-  }, [getGloballyEnabledAndOrderedModels]); // Depend on the selector function
+    // Dependency array includes the selector function AND the data it uses
+    // eslint error is a mistake, if not included, infinite loop or not loading !
+  }, [
+    getGloballyEnabledAndOrderedModels,
+    dbProviderConfigs,
+    globalModelSortOrder,
+  ]);
 
   const options = React.useMemo(
     () =>
-      enabledModels.map((m) => ({
+      enabledAndOrderedModels.map((m) => ({
         value: m.id, // Combined ID: "providerId:modelId"
         label: `${m.name} (${m.providerName})`, // Display with provider name
       })),
-    [enabledModels],
+    [enabledAndOrderedModels], // Depend on the memoized result
   );
 
   if (isLoading) {
@@ -51,7 +64,8 @@ export const GlobalModelSelector: React.FC = () => {
       emptyText="No models enabled."
       triggerClassName="h-10 w-full min-w-[200px] max-w-[300px] text-xs"
       contentClassName="w-[--radix-popover-trigger-width]"
-      disabled={options.length === 0}
+      // Disable if loading OR if there are no options after loading finishes
+      disabled={isLoading || options.length === 0}
     />
   );
 };
