@@ -25,7 +25,6 @@ import {
   ImagePart,
   CoreUserMessage,
   Tool,
-  // StreamTextOptions removed - no longer exported
 } from "ai";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { useProviderStore } from "@/store/provider.store";
@@ -93,7 +92,7 @@ function getContextSnapshot(): ReadonlyChatContextSnapshot {
     interactions: iS.interactions,
     isStreaming: iS.status === "streaming",
     selectedProviderId: providerId,
-    selectedModelId: pS.selectedModelId,
+    selectedModelId: pS.selectedModelId, // Keep combined model ID
     activeSystemPrompt: sS.globalSystemPrompt,
     temperature: sS.temperature,
     maxTokens: sS.maxTokens,
@@ -367,10 +366,13 @@ export class AIService {
 
       let userMessageContentParts: (TextPart | ImagePart)[] = [];
       if (typeof userMessage.content === "string") {
-        userMessageContentParts.push({
-          type: "text",
-          text: userMessage.content,
-        });
+        // Only add text part if it's not empty
+        if (userMessage.content.trim()) {
+          userMessageContentParts.push({
+            type: "text",
+            text: userMessage.content,
+          });
+        }
       } else if (Array.isArray(userMessage.content)) {
         userMessageContentParts = (userMessage.content as any[]).filter(
           (part): part is TextPart | ImagePart =>
@@ -381,6 +383,7 @@ export class AIService {
         );
       }
 
+      // Combine file contents and existing text/image parts
       finalMessages[lastUserMessageIndex] = {
         ...userMessage,
         content: [...fileContents, ...userMessageContentParts],
@@ -436,18 +439,12 @@ export class AIService {
       type: interactionData.type,
     });
 
-    console.log(
-      `AIService: Starting AI call for interaction: ${interactionId} with final messages:`,
-      JSON.stringify(finalMessages, null, 2),
-    );
-
     // --- AI Call and Streaming Logic ---
     let streamResult: StreamTextResult<any, any> | undefined;
     let finalStatus: Interaction["status"] = "ERROR";
     let finalErrorMessage: string | undefined = undefined;
     let finalUsage: LanguageModelUsage | undefined = undefined;
     let finalProviderMetadata: ProviderMetadata | undefined = undefined;
-    let streamFinishedSuccessfully = false;
     // Store stringified versions during the stream
     const currentToolCallStrings: string[] = [];
     const currentToolResultStrings: string[] = [];
@@ -466,65 +463,6 @@ export class AIService {
         .getRegisteredTools();
       const enabledToolNames = finalPayload.metadata?.enabledTools ?? [];
 
-      // Filter tools based on enabled names
-      const enabledToolsForSdk = enabledToolNames.reduce(
-        (acc, name) => {
-          if (allRegisteredTools[name]) {
-            acc[name] = allRegisteredTools[name].definition;
-          }
-          return acc;
-        },
-        {} as Record<string, Tool<any>>,
-      );
-
-      const enabledToolExecutors = enabledToolNames.reduce(
-        (acc, name) => {
-          const toolInfo = allRegisteredTools[name];
-          if (toolInfo?.implementation) {
-            acc[name] = async (args: any) => {
-              try {
-                const parsedArgs = toolInfo.definition.parameters.parse(args);
-                // Use the imported ToolImplementation type here
-                const implementation: ToolImplementation<any> =
-                  toolInfo.implementation!;
-                return await implementation(parsedArgs, getContextSnapshot());
-              } catch (e) {
-                console.error(`[AIService] Error executing tool ${name}:`, e);
-                const toolError = e instanceof Error ? e.message : String(e);
-                if (e instanceof z.ZodError) {
-                  return {
-                    error: `Invalid arguments: ${e.errors.map((err) => `${err.path.join(".")} (${err.message})`).join(", ")}`,
-                  };
-                }
-                return { error: toolError };
-              }
-            };
-          }
-          return acc;
-        },
-        {} as Record<string, (args: any) => Promise<any>>,
-      );
-      // --- End Tool Preparation ---
-
-      // Define the type for streamOptions using the inferred type
-      const streamOptions: StreamTextParameters = {
-        model: modelInstance as LanguageModelV1,
-        messages: finalMessages, // Use messages with processed file content
-        abortSignal: abortController.signal,
-      };
-
-      // Conditionally add tools and toolExecutors
-      if (Object.keys(enabledToolsForSdk).length > 0) {
-        streamOptions.tools = enabledToolsForSdk;
-      }
-      // The AI SDK expects `toolExecutors` to be part of the main options object
-      // if (Object.keys(enabledToolExecutors).length > 0) {
-      //   streamOptions.toolExecutors = enabledToolExecutors; // This line might be incorrect based on SDK v4 structure
-      // }
-      // Instead, tool execution is handled internally by streamText if tools are provided
-      // and the tools have an `execute` method defined.
-      // Let's adjust the tool definition part to include execute if available.
-
       // Rebuild enabledToolsForSdk to potentially include execute
       const toolsWithExecute = enabledToolNames.reduce(
         (acc, name) => {
@@ -535,10 +473,13 @@ export class AIService {
               // Add the execute function wrapper
               toolDefinition.execute = async (args: any) => {
                 try {
+                  // Ensure context snapshot is fresh for each execution
+                  const contextSnapshot = getContextSnapshot();
                   const parsedArgs = toolInfo.definition.parameters.parse(args);
                   const implementation: ToolImplementation<any> =
                     toolInfo.implementation!;
-                  return await implementation(parsedArgs, getContextSnapshot());
+                  // Pass the fresh context snapshot
+                  return await implementation(parsedArgs, contextSnapshot);
                 } catch (e) {
                   console.error(
                     `[AIService] Error executing tool ${name} via SDK:`,
@@ -547,8 +488,6 @@ export class AIService {
                   const toolError = e instanceof Error ? e.message : String(e);
                   if (e instanceof z.ZodError) {
                     // Return a structure indicating error for the SDK
-                    // The exact format might depend on how the SDK handles tool errors internally
-                    // Returning the error message might be sufficient for the SDK to format a ToolResultPart
                     return {
                       _isError: true,
                       error: `Invalid arguments: ${e.errors.map((err) => `${err.path.join(".")} (${err.message})`).join(", ")}`,
@@ -564,7 +503,18 @@ export class AIService {
         },
         {} as Record<string, Tool<any>>,
       );
+      // --- End Tool Preparation ---
 
+      // Define the type for streamOptions using the inferred type
+      const streamOptions: StreamTextParameters = {
+        model: modelInstance as LanguageModelV1,
+        messages: finalMessages, // Use messages with processed file content
+        abortSignal: abortController.signal,
+        // --- ADD maxSteps ---
+        maxSteps: 5, // Allow up to 5 steps (tool call -> result -> LLM call = 1 step)
+      };
+
+      // Conditionally add tools
       if (Object.keys(toolsWithExecute).length > 0) {
         streamOptions.tools = toolsWithExecute;
       }
@@ -593,6 +543,27 @@ export class AIService {
           streamOptions.frequencyPenalty =
             finalPayload.parameters.frequency_penalty;
       }
+
+      // Log the options just before the call
+      console.log(
+        `AIService: Calling streamText with options for ${interactionId}:`,
+        {
+          model: streamOptions.model, // Log model info if possible
+          messages: JSON.stringify(streamOptions.messages), // Stringify messages for brevity
+          system: streamOptions.system,
+          temperature: streamOptions.temperature,
+          maxTokens: streamOptions.maxTokens,
+          topP: streamOptions.topP,
+          topK: streamOptions.topK,
+          presencePenalty: streamOptions.presencePenalty,
+          frequencyPenalty: streamOptions.frequencyPenalty,
+          toolChoice: streamOptions.toolChoice,
+          tools: streamOptions.tools
+            ? Object.keys(streamOptions.tools)
+            : undefined, // Log tool names
+          maxSteps: streamOptions.maxSteps,
+        },
+      );
 
       // Pass the correctly typed streamOptions
       streamResult = await streamText(streamOptions);
@@ -668,24 +639,18 @@ export class AIService {
             break;
           }
           case "finish":
-            console.log("[AIService] Stream finished part:", part);
-            finalUsage = part.usage;
-            finalProviderMetadata = part.providerMetadata;
-            streamFinishedSuccessfully = true;
+            // 'finish' might occur after each step in multi-step calls.
+            // We rely on the final result after the loop for the overall status.
+            console.log("[AIService] Stream intermediate finish part:", part);
+            // Accumulate usage if needed, but final usage comes from result
+            // finalUsage = part.usage;
+            // finalProviderMetadata = part.providerMetadata;
             break;
           case "error":
             console.error("[AIService] Stream error part:", part.error);
             throw new Error(
               `AI Stream Error: ${part.error instanceof Error ? part.error.message : part.error}`,
             );
-          // Handle other part types if necessary (e.g., 'step-start', 'step-finish')
-          // case 'step-start':
-          //   console.log('[AIService] Step start:', part);
-          //   break;
-          // case 'step-finish':
-          //   console.log('[AIService] Step finish:', part);
-          //   // Accumulate usage if needed
-          //   break;
         }
       }
 
@@ -693,17 +658,68 @@ export class AIService {
         throw new Error("Stream aborted by user.");
       }
 
-      if (streamFinishedSuccessfully) {
-        finalStatus = "COMPLETED";
-        console.log(`AIService: Interaction ${interactionId} completed.`);
+      // Check the final result from the SDK after the stream loop
+      // --- GUARD AGAINST UNDEFINED finalResult ---
+      const finalResult = streamResult ? await streamResult.result : undefined;
+      console.log("[AIService] Final stream result:", finalResult);
+
+      // Determine final status based on the overall result's finishReason
+      if (finalResult) {
+        if (
+          finalResult.finishReason === "stop" ||
+          finalResult.finishReason === "length"
+        ) {
+          finalStatus = "COMPLETED";
+          console.log(`AIService: Interaction ${interactionId} completed.`);
+        } else if (finalResult.finishReason === "tool-calls") {
+          // This means the *last* step resulted in tool calls, but the overall interaction might be considered complete.
+          // Check if there's any text content in the final result. If not, it truly ended with tools.
+          if (!finalResult.text?.trim()) {
+            finalStatus = "COMPLETED"; // Consider it complete, UI shows tools
+            console.log(
+              `AIService: Interaction ${interactionId} finished with tool calls as the final step.`,
+            );
+          } else {
+            // If there IS text, it means the LLM generated text *after* the last tool use.
+            finalStatus = "COMPLETED";
+            console.log(
+              `AIService: Interaction ${interactionId} completed with text after final tool calls.`,
+            );
+          }
+        } else if (finalResult.finishReason === "error") {
+          finalStatus = "ERROR";
+          finalErrorMessage =
+            finalResult.error?.message ?? "Unknown stream error";
+          console.error(
+            `AIService: Interaction ${interactionId} finished with error: ${finalErrorMessage}`,
+          );
+        } else if (finalResult.finishReason === "other") {
+          // Handle 'other' finish reasons if necessary
+          finalStatus = "COMPLETED"; // Treat as completed for now
+          console.warn(
+            `AIService: Interaction ${interactionId} finished with reason: 'other'.`,
+          );
+        } else {
+          // Fallback if finishReason is unexpected or missing
+          finalStatus = "ERROR";
+          finalErrorMessage = "Stream finished unexpectedly.";
+          console.warn(
+            `AIService: Stream loop finished for ${interactionId} with unexpected final result:`,
+            finalResult,
+          );
+        }
+        // Update usage and metadata from the final result
+        finalUsage = finalResult.usage;
+        finalProviderMetadata = finalResult.providerMetadata;
       } else {
+        // Handle the case where finalResult is undefined
+        finalStatus = "WARNING";
+        finalErrorMessage = "Stream ended without a final result object.";
         console.warn(
-          `AIService: Stream loop finished for ${interactionId} but no 'finish' event received.`,
+          `AIService: Interaction ${interactionId} ended without a final result.`,
         );
-        finalStatus = "ERROR";
-        finalErrorMessage =
-          "Stream finished unexpectedly without completion signal.";
       }
+      // --- END GUARD ---
     } catch (error: unknown) {
       console.error(
         `AIService: Error during interaction ${interactionId}:`,

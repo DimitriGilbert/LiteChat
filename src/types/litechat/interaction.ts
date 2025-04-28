@@ -17,6 +17,7 @@ export type InteractionStatus =
   | "STREAMING"
   | "COMPLETED"
   | "ERROR"
+  | "WARNING"
   | "CANCELLED";
 
 // Represents one logical unit in the conversation flow

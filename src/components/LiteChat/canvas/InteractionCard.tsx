@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/InteractionCard.tsx
-import React, { useState, useMemo, useCallback } from "react"; // Added useCallback
+import React, { useState, useMemo, useCallback } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -105,17 +105,25 @@ const ToolDisplay: React.FC<{
     <div className="mt-2 space-y-2 border-t border-border/50 pt-2">
       {parsedCalls.map((call) => {
         const result = resultsMap.get(call.toolCallId);
-        // Safely check for error property
-        const errorText =
+        // Check if the result indicates an error (based on the convention in AIService)
+        const isErrorResult =
           result &&
           typeof result.result === "object" &&
           result.result !== null &&
-          "error" in result.result
-            ? String(result.result.error)
-            : null;
-        const status = result ? (errorText ? "error" : "completed") : "pending";
-        const resultText = result
-          ? JSON.stringify(result.result, null, 2)
+          (result.result as any)._isError === true;
+        const errorText = isErrorResult
+          ? String((result!.result as any).error)
+          : null;
+        const status = result
+          ? isErrorResult
+            ? "error"
+            : "completed"
+          : "pending";
+        // Display the structured result, handling potential errors
+        const resultDisplay = result
+          ? isErrorResult
+            ? `Error: ${errorText}`
+            : JSON.stringify(result.result, null, 2)
           : "Waiting for result...";
 
         return (
@@ -145,15 +153,16 @@ const ToolDisplay: React.FC<{
               </div>
               <div>
                 <span className="font-semibold">Result:</span>
-                {errorText ? (
-                  <pre className="text-[11px] bg-destructive/10 text-destructive p-1 rounded mt-0.5 whitespace-pre-wrap break-words">
-                    Error: {errorText}
-                  </pre>
-                ) : (
-                  <pre className="text-[11px] bg-background/50 p-1 rounded mt-0.5 whitespace-pre-wrap break-words">
-                    {resultText}
-                  </pre>
-                )}
+                <pre
+                  className={cn(
+                    "text-[11px] p-1 rounded mt-0.5 whitespace-pre-wrap break-words",
+                    isErrorResult
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-background/50",
+                  )}
+                >
+                  {resultDisplay}
+                </pre>
               </div>
             </div>
           </div>
@@ -500,6 +509,14 @@ const InteractionCardComponent: React.FC<InteractionCardProps> = ({
       {displayedInteraction.status === "ERROR" &&
         displayedInteraction.metadata?.error && (
           <div className="mt-2 flex items-center gap-1 text-xs text-destructive">
+            <AlertCircleIcon className="h-3.5 w-3.5" />
+            <span>Error: {displayedInteraction.metadata.error}</span>
+          </div>
+        )}
+      {/* Warning Display */}
+      {displayedInteraction.status === "WARNING" &&
+        displayedInteraction.metadata?.error && (
+          <div className="mt-2 flex items-center gap-1 text-xs text-accent">
             <AlertCircleIcon className="h-3.5 w-3.5" />
             <span>Error: {displayedInteraction.metadata.error}</span>
           </div>

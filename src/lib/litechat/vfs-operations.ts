@@ -125,13 +125,33 @@ export const initializeFsOp = async (
 
 export const listFilesOp = async (path: string): Promise<FileSystemEntry[]> => {
   const normalized = normalizePath(path);
+  console.log(`[VFS Op] Listing directory: ${normalized}`); // Log path being listed
   try {
+    // Ensure the directory exists before trying to read it
+    try {
+      await fs.promises.stat(normalized);
+      // console.log(`[VFS Op] Directory ${normalized} exists.`); // Log existence
+    } catch (statErr: any) {
+      if (statErr.code === "ENOENT") {
+        console.warn(
+          `[VFS Op] Directory not found for listing, attempting creation: ${normalized}`,
+        );
+        // Attempt to create it if it doesn't exist (might happen on first load)
+        await createDirectoryRecursive(normalized);
+        return []; // Return empty as it was just created
+      }
+      throw statErr; // Re-throw other stat errors
+    }
+
     const entries = await fs.promises.readdir(normalized);
+    // console.log(`[VFS Op] Raw readdir result for ${normalized}:`, entries); // Log raw result
+
     const statsPromises = entries.map(
       async (name: string): Promise<FileSystemEntry | null> => {
         const fullPath = joinPath(normalized, name);
         try {
           const fileStat: Stats = await fs.promises.stat(fullPath);
+          // console.log(`[VFS Op] Stat success for ${fullPath}:`, fileStat); // Log stat result
           return {
             name,
             path: fullPath,
@@ -141,22 +161,23 @@ export const listFilesOp = async (path: string): Promise<FileSystemEntry[]> => {
           };
         } catch (statErr: unknown) {
           console.error(`[VFS Op] Failed to stat ${fullPath}:`, statErr);
+          // If stat fails (e.g., file deleted concurrently), return null
           return null;
         }
       },
     );
     const stats = await Promise.all(statsPromises);
-    return stats.filter((s): s is FileSystemEntry => s !== null);
+    const filteredStats = stats.filter((s): s is FileSystemEntry => s !== null);
+    // console.log(`[VFS Op] Processed entries for ${normalized}:`, filteredStats); // Log final processed list
+    // Filter out null results (where stat failed)
+    return filteredStats;
   } catch (err: unknown) {
-    if (err instanceof Error && (err as any).code === "ENOENT") {
-      console.warn(`[VFS Op] Directory not found for listing: ${normalized}`);
-      return [];
-    }
+    // Catch errors from readdir or the initial stat check
     console.error(`[VFS Op] Failed to list directory ${normalized}:`, err);
     toast.error(
       `Error listing files: ${err instanceof Error ? err.message : String(err)}`,
     );
-    throw err;
+    throw err; // Re-throw the error for the caller (e.g., store) to handle
   }
 };
 

@@ -1,200 +1,227 @@
 // src/hooks/litechat/useGitToolsRegistration.tsx
 import { useEffect } from "react";
 import { useControlRegistryStore } from "@/store/control.store";
-import * as VfsOps from "@/lib/litechat/vfs-operations";
+import { tool } from "ai";
 import { z } from "zod";
-import git from "isomorphic-git"; // Import git directly
-import { fs } from "@zenfs/core"; // Import fs for type checking
+import * as VfsOps from "@/lib/litechat/vfs-operations";
+import { toast } from "sonner";
+import { normalizePath, basename } from "@/lib/litechat/file-manager-utils";
+import { useSettingsStore } from "@/store/settings.store";
+
+const MOD_ID = "core-git-tools";
 
 export function useGitToolsRegistration() {
-  const registerTool = useControlRegistryStore((state) => state.registerTool);
+  const { registerTool, unregisterTool } = useControlRegistryStore.getState();
 
   useEffect(() => {
-    const unregisterFuncs: (() => void)[] = [];
+    const unregisterFunctions: (() => void)[] = [];
 
-    // --- Git Status Tool ---
-    const statusTool = registerTool(
-      "git",
-      "git_status",
-      {
-        description:
-          "Get the status of a Git repository within the Virtual File System (VFS). Shows untracked, modified, or deleted files.",
-        parameters: z.object({
-          path: z
-            .string()
-            .describe(
-              "The absolute path to the directory within the VFS that is a Git repository.",
-            ),
-        }),
-      },
-      async (args) => {
-        try {
-          // Use git.statusMatrix directly
-          const status = await git.statusMatrix({ fs, dir: args.path });
-          const formattedStatus = status.map(
-            ([file, head, workdir]: [
-              string,
-              number,
-              number,
-              number, // Add type for stage status
-            ]) => {
-              let statusText = "";
-              if (workdir === 0) statusText = "deleted";
-              else if (head === 0 && workdir === 2) statusText = "new file";
-              else if (head === 1 && workdir === 2) statusText = "modified";
-              else if (head === 1 && workdir === 1) statusText = "unmodified";
-              else statusText = `h:${head} w:${workdir}`; // Fallback
-              return `${file}: ${statusText}`;
-            },
-          ).join(`
-`);
-          return formattedStatus || "No changes detected.";
-        } catch (e: any) {
-          return { error: `Failed to get Git status: ${e.message}` };
-        }
-      },
-    );
-    unregisterFuncs.push(statusTool);
-
-    // --- Git Commit Tool ---
-    const commitTool = registerTool(
-      "git",
-      "git_commit",
-      {
-        description:
-          "Stage all changes (new, modified, deleted) and commit them to a Git repository within the VFS.",
-        parameters: z.object({
-          path: z
-            .string()
-            .describe(
-              "The absolute path to the directory within the VFS that is a Git repository.",
-            ),
-          message: z.string().describe("The commit message."),
-        }),
-      },
-      async (args) => {
-        try {
-          await VfsOps.gitCommitOp(args.path, args.message);
-          return "Changes committed successfully.";
-        } catch (e: any) {
-          return { error: `Failed to commit changes: ${e.message}` };
-        }
-      },
-    );
-    unregisterFuncs.push(commitTool);
-
-    // --- Git Pull Tool ---
-    const pullTool = registerTool(
-      "git",
-      "git_pull",
-      {
-        description:
-          "Fetch changes from the remote repository and merge them into the current branch for a Git repository within the VFS.",
-        parameters: z.object({
-          path: z
-            .string()
-            .describe(
-              "The absolute path to the directory within the VFS that is a Git repository.",
-            ),
-        }),
-      },
-      async (args) => {
-        try {
-          await VfsOps.gitPullOp(args.path);
-          return "Pulled latest changes successfully.";
-        } catch (e: any) {
-          return { error: `Failed to pull changes: ${e.message}` };
-        }
-      },
-    );
-    unregisterFuncs.push(pullTool);
-
-    // --- Git Push Tool ---
-    const pushTool = registerTool(
-      "git",
-      "git_push",
-      {
-        description:
-          "Push committed changes from the local Git repository within the VFS to the configured remote repository.",
-        parameters: z.object({
-          path: z
-            .string()
-            .describe(
-              "The absolute path to the directory within the VFS that is a Git repository.",
-            ),
-        }),
-      },
-      async (args) => {
-        try {
-          await VfsOps.gitPushOp(args.path);
-          return "Pushed changes successfully.";
-        } catch (e: any) {
-          return { error: `Failed to push changes: ${e.message}` };
-        }
-      },
-    );
-    unregisterFuncs.push(pushTool);
-
-    // --- Git Clone Tool ---
-    const cloneTool = registerTool(
-      "git",
-      "git_clone",
-      {
-        description:
-          "Clone a remote Git repository into a specified target directory within the VFS.",
-        parameters: z.object({
-          targetPath: z
-            .string()
-            .describe(
-              "The absolute path within the VFS where the repository folder should be created.",
-            ),
-          url: z.string().url().describe("The URL of the remote repository."),
-          branch: z
-            .string()
-            .optional()
-            .describe("The specific branch to clone (optional)."),
-        }),
-      },
-      async (args) => {
-        try {
-          await VfsOps.gitCloneOp(args.targetPath, args.url, args.branch);
-          return `Repository cloned successfully into ${args.targetPath}.`;
-        } catch (e: any) {
-          return { error: `Failed to clone repository: ${e.message}` };
-        }
-      },
-    );
-    unregisterFuncs.push(cloneTool);
-
-    // --- Git Init Tool ---
-    const initTool = registerTool(
-      "git",
-      "git_init",
-      {
-        description:
-          "Initialize an empty Git repository in the specified directory within the VFS.",
-        parameters: z.object({
-          path: z
-            .string()
-            .describe(
-              "The absolute path to the directory within the VFS to initialize.",
-            ),
-        }),
-      },
-      async (args) => {
-        try {
-          await VfsOps.gitInitOp(args.path);
-          return "Git repository initialized successfully.";
-        } catch (e: any) {
-          return { error: `Failed to initialize Git repository: ${e.message}` };
-        }
-      },
-    );
-    unregisterFuncs.push(initTool);
-
-    // Cleanup function
-    return () => {
-      unregisterFuncs.forEach((unregister) => unregister());
+    const checkGitConfig = (): boolean => {
+      const { gitUserName, gitUserEmail } = useSettingsStore.getState();
+      if (!gitUserName || !gitUserEmail) {
+        toast.error(
+          "Git user name and email must be configured in Settings before using Git tools.",
+        );
+        return false;
+      }
+      return true;
     };
-  }, [registerTool]); // Dependency array
+
+    // --- git_clone ---
+    const cloneTool = tool({
+      description:
+        "Clones a remote Git repository into a specified parent directory within the VFS. Creates a new folder named after the repository.",
+      parameters: z.object({
+        parentPath: z
+          .string()
+          .describe(
+            "The absolute path of the directory *where* the new repository folder should be created (e.g., '/', '/projects').",
+          ),
+        repoUrl: z
+          .string()
+          .url()
+          .describe("The HTTPS URL of the remote Git repository to clone."),
+        branch: z
+          .string()
+          .optional()
+          .describe(
+            "Optional specific branch to clone (defaults to the repository's default branch).",
+          ),
+      }),
+      execute: async ({ parentPath, repoUrl, branch }) => {
+        const normalizedParentPath = normalizePath(parentPath);
+        try {
+          await VfsOps.gitCloneOp(normalizedParentPath, repoUrl, branch);
+          const repoName = basename(
+            repoUrl.replace(/\/$/, "").replace(/\.git$/, ""),
+          );
+          const finalPath = normalizePath(
+            `${normalizedParentPath}/${repoName}`,
+          );
+          return { status: "success", path: finalPath }; // Return path of cloned repo
+        } catch (error: any) {
+          const errorMessage =
+            error.message || "An unknown error occurred during clone.";
+          // Toast is handled by gitCloneOp
+          return { status: "error", message: errorMessage };
+        }
+      },
+    });
+    unregisterFunctions.push(registerTool(MOD_ID, "git_clone", cloneTool));
+
+    // --- git_pull ---
+    const pullTool = tool({
+      description:
+        "Pulls the latest changes from the remote repository for a specified local Git repository path within the VFS.",
+      parameters: z.object({
+        path: z
+          .string()
+          .describe(
+            "The absolute path of the local Git repository directory in the VFS.",
+          ),
+      }),
+      execute: async ({ path }) => {
+        if (!checkGitConfig())
+          return {
+            status: "error",
+            message: "Git user config missing.",
+          };
+        const normalizedPath = normalizePath(path);
+        try {
+          await VfsOps.gitPullOp(normalizedPath);
+          return { status: "success", path: normalizedPath };
+        } catch (error: any) {
+          const errorMessage =
+            error.message || "An unknown error occurred during pull.";
+          // Toast handled by gitPullOp
+          return { status: "error", message: errorMessage };
+        }
+      },
+    });
+    unregisterFunctions.push(registerTool(MOD_ID, "git_pull", pullTool));
+
+    // --- git_push ---
+    const pushTool = tool({
+      description:
+        "Pushes local commits from a specified local Git repository path within the VFS to its configured remote repository.",
+      parameters: z.object({
+        path: z
+          .string()
+          .describe(
+            "The absolute path of the local Git repository directory in the VFS.",
+          ),
+      }),
+      execute: async ({ path }) => {
+        const normalizedPath = normalizePath(path);
+        try {
+          await VfsOps.gitPushOp(normalizedPath);
+          return { status: "success", path: normalizedPath };
+        } catch (error: any) {
+          const errorMessage =
+            error.message || "An unknown error occurred during push.";
+          // Toast handled by gitPushOp
+          return { status: "error", message: errorMessage };
+        }
+      },
+    });
+    unregisterFunctions.push(registerTool(MOD_ID, "git_push", pushTool));
+
+    // --- git_commit ---
+    const commitTool = tool({
+      description:
+        "Stages all changes (new, modified, deleted files) and commits them with a message to the specified local Git repository path within the VFS.",
+      parameters: z.object({
+        path: z
+          .string()
+          .describe(
+            "The absolute path of the local Git repository directory in the VFS.",
+          ),
+        message: z.string().describe("The commit message."),
+      }),
+      execute: async ({ path, message }) => {
+        if (!checkGitConfig())
+          return {
+            status: "error",
+            message: "Git user config missing.",
+          };
+        const normalizedPath = normalizePath(path);
+        if (!message.trim()) {
+          return {
+            status: "error",
+            message: "Commit message cannot be empty.",
+          };
+        }
+        try {
+          await VfsOps.gitCommitOp(normalizedPath, message);
+          // CommitOp handles success toast with SHA
+          return { status: "success", path: normalizedPath };
+        } catch (error: any) {
+          const errorMessage =
+            error.message || "An unknown error occurred during commit.";
+          // Toast handled by gitCommitOp
+          return { status: "error", message: errorMessage };
+        }
+      },
+    });
+    unregisterFunctions.push(registerTool(MOD_ID, "git_commit", commitTool));
+
+    // --- git_status ---
+    const statusTool = tool({
+      description:
+        "Shows the working tree status (changes not staged for commit) for a specified local Git repository path within the VFS.",
+      parameters: z.object({
+        path: z
+          .string()
+          .describe(
+            "The absolute path of the local Git repository directory in the VFS.",
+          ),
+      }),
+      execute: async ({ path }) => {
+        const normalizedPath = normalizePath(path);
+        try {
+          // gitStatusOp shows a toast, we just return success/fail here
+          await VfsOps.gitStatusOp(normalizedPath);
+          // We don't return the status matrix itself to the LLM, toast is for user
+          return { status: "success", path: normalizedPath };
+        } catch (error: any) {
+          const errorMessage =
+            error.message || "An unknown error occurred checking status.";
+          // Toast handled by gitStatusOp
+          return { status: "error", message: errorMessage };
+        }
+      },
+    });
+    unregisterFunctions.push(registerTool(MOD_ID, "git_status", statusTool));
+
+    // --- git_init ---
+    const initTool = tool({
+      description:
+        "Initializes a new, empty Git repository at the specified directory path within the VFS.",
+      parameters: z.object({
+        path: z
+          .string()
+          .describe(
+            "The absolute path of the directory to initialize as a Git repository.",
+          ),
+      }),
+      execute: async ({ path }) => {
+        const normalizedPath = normalizePath(path);
+        try {
+          await VfsOps.gitInitOp(normalizedPath);
+          return { status: "success", path: normalizedPath };
+        } catch (error: any) {
+          const errorMessage =
+            error.message || "An unknown error occurred during git init.";
+          // Toast handled by gitInitOp
+          return { status: "error", message: errorMessage };
+        }
+      },
+    });
+    unregisterFunctions.push(registerTool(MOD_ID, "git_init", initTool));
+
+    return () => {
+      unregisterFunctions.forEach((unregister) => unregister());
+      console.log("[useGitToolsRegistration] Git tools unregistered");
+    };
+  }, [registerTool, unregisterTool]); // Ensure dependencies are correct
 }

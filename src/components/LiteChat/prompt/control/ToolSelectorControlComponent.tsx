@@ -83,7 +83,7 @@ export const ToolSelectorControlComponent: React.FC<
   );
 
   return (
-    <div className={cn("p-4 max-h-96 max-w-2xl space-y-3", className)}>
+    <div className={cn("p-4 h-96 max-w-2xl space-y-3", className)}>
       <h4 className="text-sm font-medium">Available Tools</h4>
       <div className="relative">
         <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -118,7 +118,7 @@ export const ToolSelectorControlComponent: React.FC<
           </Button>
         </div>
       </div>
-      <ScrollArea className="max-h-64 border rounded-md p-2 bg-background/50">
+      <ScrollArea className="h-56 border rounded-md p-2 bg-background/50">
         {availableTools.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             No tools registered.

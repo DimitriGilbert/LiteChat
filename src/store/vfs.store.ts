@@ -274,6 +274,7 @@ export const useVfsStore = create(
       _setLoading(true);
       _setError(null);
       _setFsInstance(null);
+      console.log(`[VfsStore] Initializing VFS with key: ${vfsKey}`); // Log key
 
       try {
         const fsInstance = await VfsOps.initializeFsOp(vfsKey);
@@ -282,16 +283,27 @@ export const useVfsStore = create(
         }
         _setFsInstance(fsInstance);
         setConfiguredVfsKey(vfsKey);
+        console.log(`[VfsStore] VFS instance set for key: ${vfsKey}`); // Log success
 
         const stableRootId = "vfs-root";
         let rootNode = get().nodes[stableRootId];
 
         try {
+          // Attempt to stat root, but don't fail if it doesn't exist yet
           await fsInstance.promises.stat("/");
+          console.log("[VfsStore] Root directory '/' exists."); // Log stat success
         } catch (statErr: any) {
-          if (statErr.code !== "ENOENT") throw statErr;
+          if (statErr.code === "ENOENT") {
+            console.log(
+              "[VfsStore] Root directory '/' not found, will be created implicitly.",
+            );
+          } else {
+            // Re-throw other stat errors
+            throw statErr;
+          }
         }
 
+        // Ensure root node exists in state
         if (!rootNode || rootNode.path !== "/") {
           const now = Date.now();
           rootNode = {
@@ -304,12 +316,16 @@ export const useVfsStore = create(
             lastModified: now,
           };
           _addNodes([rootNode]);
+          console.log("[VfsStore] Root node added/updated in state."); // Log node add
         }
 
         set((s) => {
           s.rootId = rootNode!.id;
           s.currentParentId = rootNode!.id;
         });
+        console.log(
+          `[VfsStore] Set rootId and currentParentId to: ${rootNode!.id}`,
+        ); // Log ID set
 
         await get().fetchNodes(rootNode.id);
         // Toast handled by VfsOps
@@ -340,7 +356,11 @@ export const useVfsStore = create(
       try {
         const parentNode = parentId ? nodes[parentId] : nodes[rootId || ""];
         const pathToFetch = parentNode ? parentNode.path : "/";
+        console.log(`[VfsStore] Fetching nodes for path: ${pathToFetch}`); // Log fetch path
         const fetchedEntries = await VfsOps.listFilesOp(pathToFetch);
+        console.log(
+          `[VfsStore] Fetched ${fetchedEntries.length} entries for ${pathToFetch}`,
+        ); // Log fetch result count
 
         const parentKey = parentId ?? rootId ?? "";
         const fetchedPaths = new Set(fetchedEntries.map((e) => e.path));
@@ -351,6 +371,7 @@ export const useVfsStore = create(
           .map((n) => n.id);
 
         if (idsToRemove.length > 0) {
+          console.log(`[VfsStore] Removing ${idsToRemove.length} nodes.`); // Log removal
           get()._removeNodes(idsToRemove);
         }
 
@@ -377,7 +398,12 @@ export const useVfsStore = create(
         );
 
         // 3. Add/Update nodes (this will handle childrenMap update)
-        _addNodes(nodesToAddOrUpdate);
+        if (nodesToAddOrUpdate.length > 0) {
+          console.log(
+            `[VfsStore] Adding/Updating ${nodesToAddOrUpdate.length} nodes.`,
+          ); // Log add/update
+          _addNodes(nodesToAddOrUpdate);
+        }
 
         // Ensure childrenMap only contains current children
         set((state) => {
@@ -388,6 +414,9 @@ export const useVfsStore = create(
               JSON.stringify(finalChildIds.sort())
           ) {
             state.childrenMap[parentKey] = finalChildIds;
+            console.log(
+              `[VfsStore] Updated childrenMap for parent: ${parentKey}`,
+            ); // Log childrenMap update
           }
         });
       } catch (err) {
