@@ -49,16 +49,22 @@ trap 'rm -rf -- "$TEMP_DIR"' EXIT
 echo "Copying distribution files..."
 cp -r dist/* "$TEMP_DIR/"
 
+rm -rf "release/";
+
 # Create the release zip file
 echo "Creating ZIP archive..."
-cd "$TEMP_DIR"
-zip -r "../latest.zip" ./* -q
+cd "$TEMP_DIR";
+zip -r "../litechat-latest.zip" ./* -q
 cd - > /dev/null
 
 # Copy the zip files to public/release/
 echo "Copying ZIP archives to public/release/..."
-cp "$TEMP_DIR/../latest.zip" "public/release/latest.zip"
+rm "public/release/latest.zip"
+cp "$TEMP_DIR/../litechat-latest.zip" "public/release/latest.zip"
+rm "public/release/litechat-${VERSION}.zip"
 cp "public/release/latest.zip" "public/release/litechat-${VERSION}.zip"
+
+rm "$TEMP_DIR/../litechat-latest.zip"
 
 # Output file sizes
 LATEST_SIZE=$(du -h "public/release/latest.zip" | cut -f1)
