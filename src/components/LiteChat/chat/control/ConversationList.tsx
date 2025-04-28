@@ -1,5 +1,5 @@
 // src/components/LiteChat/chat/control/ConversationList.tsx
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useRef } from "react"; // Added useRef
 import {
   useConversationStore,
   type SidebarItem,
@@ -23,6 +23,81 @@ import { Project } from "@/types/litechat/project";
 import { Conversation } from "@/types/litechat/chat";
 import { ConversationItemRenderer } from "@/components/LiteChat/chat/control/conversation-list/ItemRenderer";
 import { useItemEditing } from "@/hooks/litechat/useItemEditing";
+
+// --- Recursive Filtering Helper ---
+const itemMatchesFilterOrHasMatchingDescendant = (
+  itemId: string,
+  itemType: SidebarItemType,
+  lowerCaseFilter: string,
+  allProjects: Project[],
+  allConversations: Conversation[],
+  projectsById: Map<string, Project>,
+  conversationsByProjectId: Map<string | null, Conversation[]>,
+  projectsByParentId: Map<string | null, Project[]>,
+  memo: Record<string, boolean>, // Memoization cache
+): boolean => {
+  if (!lowerCaseFilter) return true; // No filter means everything matches
+
+  const cacheKey = `${itemType}-${itemId}`;
+  if (memo[cacheKey] !== undefined) {
+    return memo[cacheKey];
+  }
+
+  let matches = false;
+  if (itemType === "project") {
+    const project = projectsById.get(itemId);
+    if (project) {
+      // Check if project name matches
+      if (project.name.toLowerCase().includes(lowerCaseFilter)) {
+        matches = true;
+      } else {
+        // Check children recursively
+        const childProjects = projectsByParentId.get(itemId) || [];
+        const childConversations = conversationsByProjectId.get(itemId) || [];
+
+        for (const child of childConversations) {
+          if (child.title.toLowerCase().includes(lowerCaseFilter)) {
+            matches = true;
+            break;
+          }
+        }
+        if (!matches) {
+          for (const child of childProjects) {
+            if (
+              itemMatchesFilterOrHasMatchingDescendant(
+                child.id,
+                "project",
+                lowerCaseFilter,
+                allProjects,
+                allConversations,
+                projectsById,
+                conversationsByProjectId,
+                projectsByParentId,
+                memo,
+              )
+            ) {
+              matches = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+  } else {
+    // Conversation
+    const conversation = allConversations.find((c) => c.id === itemId);
+    if (
+      conversation &&
+      conversation.title.toLowerCase().includes(lowerCaseFilter)
+    ) {
+      matches = true;
+    }
+  }
+
+  memo[cacheKey] = matches; // Store result in memo cache
+  return matches;
+};
+// --- End Recursive Filtering Helper ---
 
 // --- Main Control Component ---
 export const ConversationListControlComponent: React.FC = () => {
@@ -281,8 +356,34 @@ export const ConversationListControlComponent: React.FC = () => {
     return new Map(syncRepos.map((r) => [r.id, r.name]));
   }, [syncRepos]);
 
-  // --- Updated getChildren function ---
-  // Wrap getChildren definition in useCallback
+  // --- Precompute maps for filtering helper ---
+  const { projectsById, conversationsByProjectId, projectsByParentId } =
+    useMemo(() => {
+      const projById = new Map(projects.map((p) => [p.id, p]));
+      const convosByProjId = new Map<string | null, Conversation[]>();
+      conversations.forEach((c) => {
+        const key = c.projectId ?? null;
+        if (!convosByProjId.has(key)) {
+          convosByProjId.set(key, []);
+        }
+        convosByProjId.get(key)!.push(c);
+      });
+      const projByParentId = new Map<string | null, Project[]>();
+      projects.forEach((p) => {
+        const key = p.parentId ?? null;
+        if (!projByParentId.has(key)) {
+          projByParentId.set(key, []);
+        }
+        projByParentId.get(key)!.push(p);
+      });
+      return {
+        projectsById: projById,
+        conversationsByProjectId: convosByProjId,
+        projectsByParentId: projByParentId,
+      };
+    }, [projects, conversations]);
+
+  // --- Updated getChildren function (uses filtering helper) ---
   const getChildren = useCallback(
     (
       parentId: string | null,
@@ -292,42 +393,68 @@ export const ConversationListControlComponent: React.FC = () => {
       conversations: Conversation[];
     } => {
       const lowerCaseFilter = filter.toLowerCase();
-      const childProjects = projects
-        .filter((p) => p.parentId === parentId)
-        .filter(
-          (p) => !filter || p.name.toLowerCase().includes(lowerCaseFilter),
-        )
-        // Sort children by date descending
-        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
-      const childConversations = conversations
-        .filter((c) => c.projectId === parentId)
-        .filter(
-          (c) => !filter || c.title.toLowerCase().includes(lowerCaseFilter),
-        )
-        // Sort children by date descending
-        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      const memoCache: Record<string, boolean> = {}; // Cache for this specific call
+
+      const childProjects = (projectsByParentId.get(parentId) || []).filter(
+        (p) =>
+          itemMatchesFilterOrHasMatchingDescendant(
+            p.id,
+            "project",
+            lowerCaseFilter,
+            projects,
+            conversations,
+            projectsById,
+            conversationsByProjectId,
+            projectsByParentId,
+            memoCache,
+          ),
+      );
+
+      const childConversations = (
+        conversationsByProjectId.get(parentId) || []
+      ).filter((c) => c.title.toLowerCase().includes(lowerCaseFilter));
+
+      // Sort children by date descending (already done in precomputed maps, but can re-sort if needed)
+      childProjects.sort(
+        (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+      );
+      childConversations.sort(
+        (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+      );
+
       return { projects: childProjects, conversations: childConversations };
     },
-    [projects, conversations],
-  ); // Dependencies are the raw data arrays
+    [
+      projects,
+      conversations,
+      projectsById,
+      conversationsByProjectId,
+      projectsByParentId,
+    ],
+  );
 
-  // --- Updated rootItems calculation ---
+  // --- Updated rootItems calculation (uses filtering helper) ---
   const rootItems = useMemo(() => {
     const lowerCaseFilter = filterText.toLowerCase();
-    const rootProjects = projects
-      .filter((p) => p.parentId === null)
-      .filter(
-        (p) => !filterText || p.name.toLowerCase().includes(lowerCaseFilter),
-      )
-      // Sort root projects by date descending
-      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
-    const rootConversations = conversations
-      .filter((c) => c.projectId === null)
-      .filter(
-        (c) => !filterText || c.title.toLowerCase().includes(lowerCaseFilter),
-      )
-      // Sort root conversations by date descending
-      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+    const memoCache: Record<string, boolean> = {}; // Cache for this calculation
+
+    const rootProjects = (projectsByParentId.get(null) || []).filter((p) =>
+      itemMatchesFilterOrHasMatchingDescendant(
+        p.id,
+        "project",
+        lowerCaseFilter,
+        projects,
+        conversations,
+        projectsById,
+        conversationsByProjectId,
+        projectsByParentId,
+        memoCache,
+      ),
+    );
+
+    const rootConversations = (conversationsByProjectId.get(null) || []).filter(
+      (c) => c.title.toLowerCase().includes(lowerCaseFilter),
+    );
 
     // Combine and sort the combined list by date descending
     const combined = [
@@ -338,7 +465,14 @@ export const ConversationListControlComponent: React.FC = () => {
     ];
     combined.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
     return combined;
-  }, [projects, conversations, filterText]); // Added filterText dependency
+  }, [
+    projects,
+    conversations,
+    filterText,
+    projectsById,
+    conversationsByProjectId,
+    projectsByParentId,
+  ]); // Added map dependencies
 
   return (
     <div className="p-2 border-r border-[--border] bg-card text-card-foreground h-full flex flex-col">
