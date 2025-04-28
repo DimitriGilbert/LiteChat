@@ -1,0 +1,142 @@
+<#
+.SYNOPSIS
+    Downloads and serves LiteChat web application
+.DESCRIPTION
+    This script downloads the latest LiteChat release, extracts it, and serves it using a local web server
+.PARAMETER Port
+    The port number to serve the application on (default: 3000)
+.PARAMETER AllowExternalConnections
+    If specified, allows connections from other devices on the network
+.EXAMPLE
+    .\serve-litechat.ps1 8080 -AllowExternalConnections
+#>
+
+param (
+    [Parameter(Position=0)]
+    [int]$Port = 3000,
+
+    [Parameter(Position=1)]
+    [Alias("Host")]
+    [switch]$AllowExternalConnections
+)
+
+# Create temp directory
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$TempDir = Join-Path -Path $ScriptDir -ChildPath "litechat-app"
+
+if (-not (Test-Path -Path $TempDir)) {
+    New-Item -ItemType Directory -Path $TempDir | Out-Null
+}
+
+# Download the zip file
+$ZipPath = Join-Path -Path $TempDir -ChildPath "litechat.zip"
+Write-Host "Downloading LiteChat release..."
+
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -Uri "https://litechat.dbuild.dev/release/latest.zip" -OutFile $ZipPath
+    Write-Host "Download complete. Extracting..."
+
+    # Extract the zip file
+    Expand-Archive -Path $ZipPath -DestinationPath $TempDir -Force
+
+    # Remove the zip file
+    Remove-Item -Path $ZipPath -Force
+    Write-Host "Extraction complete."
+
+    # Create a simple HTML file for routing (in case index.html doesn't exist)
+    if (-not (Test-Path -Path (Join-Path -Path $TempDir -ChildPath "index.html"))) {
+        Write-Host "Warning: index.html not found. Creating a placeholder..."
+        @"
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LiteChat</title>
+</head>
+<body>
+    <h1>LiteChat</h1>
+    <p>The files may not have extracted correctly.</p>
+</body>
+</html>
+"@ | Out-File -FilePath (Join-Path -Path $TempDir -ChildPath "index.html") -Encoding utf8
+    }
+
+    # Create PS web server file
+    $WebServerScript = @"
+    `$listener = New-Object System.Net.HttpListener
+    `$hostAddress = "$(if ($AllowExternalConnections) { '+' } else { 'localhost' })"
+    `$listener.Prefixes.Add("http://`$hostAddress:$Port/")
+    `$listener.Start()
+
+    Write-Host "LiteChat is running at http://$(if ($AllowExternalConnections) { (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notmatch 'Loopback'} | Select-Object -First 1).IPAddress } else { 'localhost' }):$Port $(if ($AllowExternalConnections) { '(accessible from other devices)' } else { '(local access only)' })"
+
+    `$basePath = "$($TempDir.Replace('\', '\\'))"
+
+    try {
+        while (`$listener.IsListening) {
+            `$context = `$listener.GetContext()
+            `$request = `$context.Request
+            `$response = `$context.Response
+
+            `$localPath = `$request.Url.LocalPath
+            if (`$localPath -eq "/") { `$localPath = "/index.html" }
+
+            `$filePath = Join-Path -Path `$basePath -ChildPath `$localPath.TrimStart("/")
+
+            if (Test-Path -Path `$filePath -PathType Leaf) {
+                `$content = [System.IO.File]::ReadAllBytes(`$filePath)
+                `$response.ContentLength64 = `$content.Length
+
+                # Set content type based on file extension
+                `$extension = [System.IO.Path]::GetExtension(`$filePath)
+                switch (`$extension) {
+                    ".html" { `$response.ContentType = "text/html" }
+                    ".css"  { `$response.ContentType = "text/css" }
+                    ".js"   { `$response.ContentType = "application/javascript" }
+                    ".json" { `$response.ContentType = "application/json" }
+                    ".svg"  { `$response.ContentType = "image/svg+xml" }
+                    ".png"  { `$response.ContentType = "image/png" }
+                    ".jpg"  { `$response.ContentType = "image/jpeg" }
+                    ".jpeg" { `$response.ContentType = "image/jpeg" }
+                    ".ico"  { `$response.ContentType = "image/x-icon" }
+                    default { `$response.ContentType = "application/octet-stream" }
+                }
+
+                `$output = `$response.OutputStream
+                `$output.Write(`$content, 0, `$content.Length)
+                `$output.Close()
+            } else {
+                # Serve index.html for SPA routing
+                `$indexPath = Join-Path -Path `$basePath -ChildPath "index.html"
+                if (Test-Path -Path `$indexPath) {
+                    `$content = [System.IO.File]::ReadAllBytes(`$indexPath)
+                    `$response.ContentType = "text/html"
+                    `$response.ContentLength64 = `$content.Length
+                    `$output = `$response.OutputStream
+                    `$output.Write(`$content, 0, `$content.Length)
+                    `$output.Close()
+                } else {
+                    `$response.StatusCode = 404
+                    `$response.Close()
+                }
+            }
+        }
+    }
+    finally {
+        `$listener.Stop()
+    }
+"@
+
+    $WebServerScriptPath = Join-Path -Path $TempDir -ChildPath "webserver.ps1"
+    $WebServerScript | Out-File -FilePath $WebServerScriptPath -Encoding utf8
+
+    # Run the web server
+    Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File `"$WebServerScriptPath`"" -NoNewWindow
+
+} catch {
+    if (Test-Path -Path $ZipPath) {
+        Remove-Item -Path $ZipPath -Force
+    }
+    Write-Host "Error: $_" -ForegroundColor Red
+    exit 1
+}

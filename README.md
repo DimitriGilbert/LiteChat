@@ -23,6 +23,57 @@ LiteChat isn't just another AI chat interface; it's your private, high-performan
 LiteChat is for anyone who values privacy, wants fine-grained control over their AI interactions, and loves to tinker and customize their tools. It's your personal AI workbench.
 
 ---
+## Docker Support
+
+
+### Docker Setup
+
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/DimitriGilbert/LiteChat.git
+   cd LiteChat
+   ```
+
+2. Build the Docker image:
+   ```bash
+   docker build -t litechat .
+   ```
+
+3. Run the container:
+   ```bash
+   docker run -p 8080:80 litechat
+   ```
+
+4. Access LiteChat at `http://localhost:8080`
+
+### Docker Compose
+
+For a more complete setup with CORS proxy configuration:
+
+```yaml
+version: '3'
+
+services:
+  litechat:
+    image: litechat/litechat:latest
+    # or build from local Dockerfile:
+    # build: .
+    ports:
+      - "8080:80"
+    volumes:
+      # Optional: custom NGINX configuration with API proxies
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+```
+
+### CORS Proxy Configuration
+
+Since LiteChat makes direct API calls from the browser, you may need to configure the NGINX server in Docker to act as a reverse proxy for AI providers with restrictive CORS policies.
+
+Edit the included `nginx.conf` and uncomment the proxy section, modifying it for your specific provider endpoints. The Docker setup makes it easy to handle CORS issues without changing your local network configuration.
+
+### Persisting Data
+
+LiteChat stores all data in your browser's IndexedDB. If you want to persist conversations and settings across Docker rebuilds, make sure to use the built-in Git sync functionality to back up your data to a repository.
 
 ## Technical Overview (For Integrators & Power Users)
 
