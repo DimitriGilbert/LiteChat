@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/UserPromptDisplay.tsx
-import React, { useState, useCallback, useMemo } from "react"; // Added useCallback
+import React, { useState, useCallback, useMemo } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { cn } from "@/lib/utils";
 import {
@@ -8,7 +8,7 @@ import {
   CheckIcon,
   ChevronsUpDownIcon,
   EditIcon,
-  CopyIcon, // Added CopyIcon
+  CopyIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,8 +19,13 @@ import {
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { FilePreviewRenderer } from "@/components/LiteChat/common/FilePreviewRenderer";
-// Import the type directly, no need for store here
 import type { AttachedFileMetadata } from "@/store/input.store";
+// Import markdown parser and renderer
+import {
+  useMarkdownParser,
+  type ParsedContent,
+} from "@/lib/litechat/useMarkdownParser";
+import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
 
 interface UserPromptDisplayProps {
   interaction: Interaction;
@@ -33,7 +38,7 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
 }) => {
   const [isFolded, setIsFolded] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [isIdCopied, setIsIdCopied] = useState(false); // State for copy ID button
+  const [isIdCopied, setIsIdCopied] = useState(false);
 
   const userContent =
     interaction.prompt?.content &&
@@ -41,8 +46,9 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
       ? interaction.prompt.content
       : "";
 
-  // Get file metadata directly from the interaction's prompt snapshot
-  // Ensure it's treated as the correct type, including content fields
+  // Parse user content for markdown
+  const parsedUserContent: ParsedContent = useMarkdownParser(userContent);
+
   const attachedFiles = (interaction.prompt?.metadata?.attachedFiles ||
     []) as AttachedFileMetadata[];
 
@@ -61,7 +67,6 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
     }
   }, [userContent]);
 
-  // Callback to copy the interaction ID
   const handleCopyId = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(interaction.id);
@@ -178,13 +183,15 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
             </Tooltip>
           </TooltipProvider>
         </div>
-        <div className="text-sm">
+        {/* Apply markdown-content class for styling */}
+        <div className="text-sm markdown-content">
           {isFolded ? (
             <div
               className="folded-content-preview cursor-pointer"
               onClick={toggleFold}
             >
               {userContent ? (
+                // Render folded preview as plain text (pre preserves whitespace)
                 <pre className="whitespace-pre-wrap break-words text-muted-foreground">
                   {foldedPreviewText}
                 </pre>
@@ -201,26 +208,39 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = ({
             </div>
           ) : (
             <>
-              {userContent ? (
-                <pre className="whitespace-pre-wrap break-words mb-2">
-                  {userContent}
-                </pre>
-              ) : (
-                !attachedFiles.length && (
-                  <span className="text-muted-foreground italic">
-                    [No text content]
-                  </span>
-                )
-              )}
+              {userContent
+                ? // Render parsed markdown content
+                  parsedUserContent.map((part, index) => {
+                    if (typeof part === "string") {
+                      return (
+                        <div
+                          key={index}
+                          dangerouslySetInnerHTML={{ __html: part }}
+                        />
+                      );
+                    } else if (part.type === "code") {
+                      return (
+                        <CodeBlockRenderer
+                          key={index}
+                          lang={part.lang}
+                          code={part.code}
+                        />
+                      );
+                    }
+                    return null;
+                  })
+                : !attachedFiles.length && (
+                    <span className="text-muted-foreground italic">
+                      [No text content]
+                    </span>
+                  )}
               {attachedFiles.length > 0 && (
                 <div className="mt-2 space-y-2">
                   {attachedFiles.map((fileMeta) => (
-                    // Pass the full metadata from the interaction's prompt
                     <FilePreviewRenderer
                       key={fileMeta.id}
-                      fileMeta={fileMeta} // This now includes contentText/contentBase64
+                      fileMeta={fileMeta}
                       isReadOnly={true}
-                      // onRemove is not needed for read-only
                     />
                   ))}
                 </div>

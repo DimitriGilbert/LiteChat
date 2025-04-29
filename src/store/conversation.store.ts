@@ -69,7 +69,11 @@ interface ConversationActions {
     updates: Partial<Omit<Project, "id" | "createdAt" | "path">>,
   ) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
-  selectItem: (id: string | null, type: SidebarItemType | null) => void;
+  // Modified to be async
+  selectItem: (
+    id: string | null,
+    type: SidebarItemType | null,
+  ) => Promise<void>;
   importConversation: (file: File) => Promise<void>;
   exportConversation: (
     conversationId: string,
@@ -412,7 +416,8 @@ export const useConversationStore = create(
           currentSelectedId === id &&
           currentSelectedType === "conversation"
         ) {
-          useInteractionStore.getState().setCurrentConversationId(null);
+          // Await the async call
+          await useInteractionStore.getState().setCurrentConversationId(null);
         }
       } catch (e) {
         console.error("ConversationStore: Error deleting conversation", e);
@@ -603,7 +608,8 @@ export const useConversationStore = create(
         await PersistenceService.deleteProject(id);
 
         if (descendantProjectIds.has(currentSelectedId ?? "")) {
-          useInteractionStore.getState().setCurrentConversationId(null);
+          // Await the async call
+          await useInteractionStore.getState().setCurrentConversationId(null);
         }
       } catch (e) {
         console.error("ConversationStore: Error deleting project", e);
@@ -612,14 +618,14 @@ export const useConversationStore = create(
       }
     },
 
-    selectItem: (id, type) => {
+    // Modified to be async
+    selectItem: async (id, type) => {
       if (get().selectedItemId !== id || get().selectedItemType !== type) {
         set({ selectedItemId: id, selectedItemType: type });
-        if (type === "conversation") {
-          useInteractionStore.getState().setCurrentConversationId(id);
-        } else {
-          useInteractionStore.getState().setCurrentConversationId(null);
-        }
+        // Await the async call to ensure InteractionStore is updated
+        await useInteractionStore
+          .getState()
+          .setCurrentConversationId(type === "conversation" ? id : null);
       } else {
         console.log(`Item ${id} (${type}) already selected.`);
       }
@@ -664,7 +670,8 @@ export const useConversationStore = create(
           }),
         );
         await Promise.all(interactionPromises);
-        get().selectItem(newId, "conversation");
+        // Await the async call
+        await get().selectItem(newId, "conversation");
         toast.success("Conversation imported successfully.");
       } catch (error) {
         console.error("ConversationStore: Error importing conversation", error);
@@ -1093,7 +1100,10 @@ export const useConversationStore = create(
             get().selectedItemId === conversationId &&
             get().selectedItemType === "conversation"
           ) {
-            useInteractionStore.getState().loadInteractions(conversationId);
+            // Await the async call
+            await useInteractionStore
+              .getState()
+              .loadInteractions(conversationId);
           }
           _setConversationSyncStatus(conversationId, "idle");
           toast.success("Conversation synced successfully (pulled).");

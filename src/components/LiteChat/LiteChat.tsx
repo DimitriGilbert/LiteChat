@@ -83,12 +83,12 @@ export const LiteChat: React.FC = () => {
   const {
     interactions,
     status: interactionStatus,
-    setCurrentConversationId,
+    // setCurrentConversationId removed from direct use here
   } = useInteractionStore(
     useShallow((state) => ({
       interactions: state.interactions,
       status: state.status,
-      setCurrentConversationId: state.setCurrentConversationId,
+      // setCurrentConversationId: state.setCurrentConversationId, // No longer needed directly
     })),
   );
   const { globalError, isSidebarCollapsed } = useUIStateStore(
@@ -311,13 +311,20 @@ export const LiteChat: React.FC = () => {
   // --- Prompt Submission Handler ---
   const handlePromptSubmit = useCallback(
     async (turnData: PromptTurnObject) => {
+      // Use local variables for selected item state within this function scope
       let currentConvId =
-        selectedItemType === "conversation" ? selectedItemId : null;
-      const currentProjectId =
-        selectedItemType === "project"
-          ? selectedItemId
-          : selectedItemType === "conversation"
-            ? (getConversationById(selectedItemId)?.projectId ?? null)
+        useConversationStore.getState().selectedItemType === "conversation"
+          ? useConversationStore.getState().selectedItemId
+          : null;
+      let currentProjectId =
+        useConversationStore.getState().selectedItemType === "project"
+          ? useConversationStore.getState().selectedItemId
+          : useConversationStore.getState().selectedItemType === "conversation"
+            ? (useConversationStore
+                .getState()
+                .getConversationById(
+                  useConversationStore.getState().selectedItemId,
+                )?.projectId ?? null)
             : null;
 
       const setFocusInputFlag = useUIStateStore.getState().setFocusInputFlag;
@@ -329,75 +336,82 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
+      // --- Create and select conversation if needed ---
       if (!currentConvId) {
         console.log("LiteChat: No conversation selected, creating new one...");
         try {
-          currentConvId = await addConversation({
+          // Get the current project ID *before* creating the conversation
+          currentProjectId =
+            useConversationStore.getState().selectedItemType === "project"
+              ? useConversationStore.getState().selectedItemId
+              : null;
+
+          const newId = await addConversation({
             title: "New Chat",
             projectId: currentProjectId,
           });
-          selectItem(currentConvId, "conversation");
-          setTimeout(() => setFocusInputFlag(true), 0);
-          await new Promise((resolve) => setTimeout(resolve, 0));
+          // Await the selection process which now includes InteractionStore sync
+          await selectItem(newId, "conversation");
+          // Get the confirmed ID *after* selection
+          currentConvId = useConversationStore.getState().selectedItemId;
+          if (currentConvId !== newId) {
+            // This should ideally not happen if selectItem works correctly
+            console.error(
+              "LiteChat: Mismatch between created ID and selected ID after selection!",
+            );
+            currentConvId = newId; // Fallback to the created ID
+          }
           console.log(
-            `LiteChat: New conversation created and selected: ${currentConvId}`,
+            `LiteChat: New conversation created (${currentConvId}), selected, and InteractionStore synced.`,
           );
+          // Set focus after state updates
+          setTimeout(() => setFocusInputFlag(true), 0);
         } catch (error) {
           console.error("LiteChat: Failed to create new conversation", error);
           toast.error("Failed to start new chat.");
           return;
         }
       }
+      // --- End conversation creation ---
 
-      const interactionState = useInteractionStore.getState();
-      if (interactionState.currentConversationId !== currentConvId) {
-        console.log(
-          `LiteChat: Syncing InteractionStore to conversation ${currentConvId}`,
-        );
-        setCurrentConversationId(currentConvId);
-        setTimeout(() => setFocusInputFlag(true), 0);
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
+      // --- Ensure InteractionStore is synced (redundant check removed) ---
+      // The await selectItem(...) above should handle this now.
+      // We can proceed assuming the InteractionStore is synced to currentConvId.
 
+      // Fetch history *after* ensuring InteractionStore is synced
       const currentHistory = useInteractionStore.getState().interactions;
       const completedHistory = currentHistory.filter(
         (i) => i.status === "COMPLETED" && i.type === "message.user_assistant",
       );
-      // Use the updated buildHistoryMessages
       const messages: CoreMessage[] = buildHistoryMessages(completedHistory);
 
       // Add the current user input as the last message
-      // AIService will handle injecting file content into this message if needed
       if (turnData.content) {
         messages.push({ role: "user", content: turnData.content });
       } else if (turnData.metadata?.attachedFiles?.length) {
-        // If only files are attached, add an empty user message for AIService to populate
         messages.push({ role: "user", content: "" });
       } else {
-        // This case should be prevented by PromptWrapper's submit check, but handle defensively
         console.error("LiteChat: Attempting to submit with no content.");
         toast.error("Cannot send an empty message.");
         return;
       }
 
+      // Get project *after* potential conversation creation
       const project = getProjectById(currentProjectId);
       const systemPrompt =
         project?.systemPrompt ?? globalSystemPrompt ?? undefined;
 
-      // Construct the initial AI payload. File content processing happens in AIService.
       const aiPayload: PromptObject = {
         system: systemPrompt,
-        messages: messages, // Now includes the current user message text
+        messages: messages,
         parameters: turnData.parameters,
-        metadata: turnData.metadata, // Pass metadata (including basic file info and enabledTools)
-        // toolChoice is now derived from parameters in AIService
+        metadata: turnData.metadata,
       };
 
       emitter.emit("prompt:finalised", { prompt: aiPayload });
       console.log("LiteChat: Submitting prompt to AIService:", aiPayload);
 
       try {
-        // Pass the original turnData (with file content) to AIService
         await AIService.startInteraction(aiPayload, turnData);
         console.log("LiteChat: AIService interaction started.");
       } catch (e) {
@@ -408,15 +422,14 @@ export const LiteChat: React.FC = () => {
       }
     },
     [
-      selectedItemId,
-      selectedItemType,
+      // Keep dependencies minimal, rely on getState inside for latest values if needed
       addConversation,
       selectItem,
-      setCurrentConversationId,
+      // setCurrentConversationId removed
       globalSystemPrompt,
-      buildHistoryMessages, // Use updated helper
+      buildHistoryMessages,
       getProjectById,
-      getConversationById, // Added dependency
+      getConversationById,
     ],
   );
 
@@ -675,7 +688,7 @@ export const LiteChat: React.FC = () => {
             onRegenerateInteraction={onRegenerateInteraction}
             onStopInteraction={onStopInteraction}
             status={interactionStatus}
-            className="flex-grow overflow-y-auto p-4 space-y-4"
+            className="flex-grow overflow-y-hidden p-4 space-y-4"
           />
 
           {globalError && (

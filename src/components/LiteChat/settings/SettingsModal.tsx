@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsModal.tsx
-import React, { memo } from "react"; // Import memo
+import React, { memo, useState, useEffect } from "react"; // Import useState, useEffect
 import {
   Dialog,
   DialogContent,
@@ -17,13 +17,15 @@ import { SettingsDataManagement } from "./SettingsDataManagement";
 import { SettingsMods } from "./SettingsMods";
 import { SettingsProviders } from "./SettingsProviders";
 import { GlobalModelOrganizer } from "./GlobalModelOrganizer";
-import { SettingsGit } from "./SettingsGit"; // Import the new Git settings component
+import { SettingsGitConfig } from "./SettingsGitConfig";
+import { SettingsGitSyncRepos } from "./SettingsGitSyncRepos";
 import type { CustomSettingTab } from "@/types/litechat/modding";
 
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
 import { useProviderStore, type ProviderState } from "@/store/provider.store";
 import { useModStore } from "@/store/mod.store";
+import { useUIStateStore } from "@/store/ui.store"; // Import UI store
 import { cn } from "@/lib/utils";
 
 interface SettingsModalProps {
@@ -31,7 +33,6 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-// Wrap the component function with React.memo
 const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
   ({ isOpen, onClose }) => {
     const { enableAdvancedSettings } = useSettingsStore(
@@ -49,11 +50,51 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
         customSettingsTabs: state.modSettingsTabs || [],
       })),
     );
+    // Get initial tab state and clear action from UI store
+    const {
+      initialSettingsTab,
+      initialSettingsSubTab,
+      clearInitialSettingsTabs,
+    } = useUIStateStore(
+      useShallow((state) => ({
+        initialSettingsTab: state.initialSettingsTab,
+        initialSettingsSubTab: state.initialSettingsSubTab,
+        clearInitialSettingsTabs: state.clearInitialSettingsTabs,
+      })),
+    );
+
+    // Local state to manage the active tab, initialized from store
+    const [activeTab, setActiveTab] = useState(initialSettingsTab || "general");
+    const [activeSubTab, setActiveSubTab] = useState(
+      initialSettingsSubTab || "", // Use empty string if no sub-tab initially
+    );
+
+    // Effect to update local state if the initial tab state changes while modal is open
+    useEffect(() => {
+      if (isOpen) {
+        setActiveTab(initialSettingsTab || "general");
+        setActiveSubTab(initialSettingsSubTab || "");
+      }
+    }, [isOpen, initialSettingsTab, initialSettingsSubTab]);
 
     const handleOpenChange = (open: boolean) => {
       if (!open) {
         onClose();
+        // Clear the initial tab state when the dialog is closed
+        clearInitialSettingsTabs();
       }
+    };
+
+    // Update local state when tab changes
+    const handleTabChange = (value: string) => {
+      setActiveTab(value);
+      // Reset sub-tab when main tab changes (optional, depends on desired UX)
+      setActiveSubTab("");
+    };
+
+    // Update local state for sub-tabs
+    const handleSubTabChange = (value: string) => {
+      setActiveSubTab(value);
     };
 
     const tabTriggerClass = cn(
@@ -79,8 +120,11 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
             </DialogDescription>
           </DialogHeader>
 
+          {/* Main Tabs */}
           <Tabs
-            defaultValue="general"
+            // Use local state for value and update on change
+            value={activeTab}
+            onValueChange={handleTabChange}
             className="flex-grow flex flex-col overflow-hidden px-6"
           >
             <TabsList className="flex-shrink-0 sticky top-0 bg-background z-10 mb-4 flex-wrap h-auto justify-start border-b gap-1 p-1 -mx-6 px-6">
@@ -95,7 +139,6 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
                   Assistant
                 </TabsTrigger>
               )}
-              {/* Add Git Tab Trigger */}
               <TabsTrigger value="git" className={tabTriggerClass}>
                 Git
               </TabsTrigger>
@@ -121,11 +164,21 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
                 <SettingsGeneral />
               </TabsContent>
 
+              {/* Providers Sub-Tabs */}
               <TabsContent
                 value="providers"
                 className="flex flex-col data-[state=inactive]:hidden"
               >
-                <Tabs defaultValue="model-order" className="flex flex-col">
+                <Tabs
+                  // Use local sub-tab state, default if needed
+                  value={
+                    activeTab === "providers"
+                      ? activeSubTab || "model-order"
+                      : "model-order"
+                  }
+                  onValueChange={handleSubTabChange}
+                  className="flex flex-col"
+                >
                   <TabsList className="flex-shrink-0 gap-1 p-1">
                     <TabsTrigger
                       value="model-order"
@@ -166,10 +219,36 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
                   <SettingsAssistant />
                 </TabsContent>
               )}
-              {/* Add Git Tab Content */}
+
+              {/* Git Sub-Tabs */}
               <TabsContent value="git" className="h-full">
-                <SettingsGit />
+                <Tabs
+                  // Use local sub-tab state, default if needed
+                  value={
+                    activeTab === "git" ? activeSubTab || "config" : "config"
+                  }
+                  onValueChange={handleSubTabChange}
+                  className="flex flex-col h-full"
+                >
+                  <TabsList className="flex-shrink-0 gap-1 p-1">
+                    <TabsTrigger value="config" className={tabTriggerClass}>
+                      User Config
+                    </TabsTrigger>
+                    <TabsTrigger value="sync" className={tabTriggerClass}>
+                      Sync Repositories
+                    </TabsTrigger>
+                  </TabsList>
+                  <div className="flex-grow mt-4 overflow-y-auto">
+                    <TabsContent value="config">
+                      <SettingsGitConfig />
+                    </TabsContent>
+                    <TabsContent value="sync">
+                      <SettingsGitSyncRepos />
+                    </TabsContent>
+                  </div>
+                </Tabs>
               </TabsContent>
+
               <TabsContent value="data">
                 <SettingsDataManagement />
               </TabsContent>
@@ -198,7 +277,6 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
     );
   },
 );
-// Add display name for React DevTools
 SettingsModalComponent.displayName = "SettingsModalComponent";
 
-export const SettingsModal = SettingsModalComponent; // Export the memoized component
+export const SettingsModal = SettingsModalComponent;

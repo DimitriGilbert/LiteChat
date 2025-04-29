@@ -13,6 +13,7 @@ interface InteractionState {
   status: "idle" | "loading" | "streaming" | "error";
 }
 interface InteractionActions {
+  // Modified to return Promise<void>
   loadInteractions: (conversationId: string) => Promise<void>;
   // --- Synchronous State Updates ONLY ---
   _addInteractionToState: (interaction: Interaction) => void;
@@ -31,7 +32,8 @@ interface InteractionActions {
   updateInteractionAndPersist: (interaction: Interaction) => Promise<void>;
   deleteInteraction: (id: string) => Promise<void>;
   // --- Other Actions ---
-  setCurrentConversationId: (id: string | null) => void;
+  // Modified to be async
+  setCurrentConversationId: (id: string | null) => Promise<void>;
   clearInteractions: () => void;
   setError: (error: string | null) => void;
   setStatus: (status: InteractionState["status"]) => void;
@@ -50,10 +52,11 @@ export const useInteractionStore = create(
     status: "idle",
 
     // --- Async Load ---
+    // Modified to return Promise<void>
     loadInteractions: async (conversationId) => {
       if (!conversationId) {
         get().clearInteractions();
-        return;
+        return; // Return void promise
       }
       set({
         status: "loading",
@@ -241,16 +244,18 @@ export const useInteractionStore = create(
     },
 
     // --- Other Actions ---
-    setCurrentConversationId: (id) => {
+    // Modified to be async and await loadInteractions
+    setCurrentConversationId: async (id) => {
       if (get().currentConversationId !== id) {
         console.log(
           `InteractionStore: Setting current conversation ID to ${id}`,
         );
         if (id) {
-          get().loadInteractions(id); // This clears buffers via set()
+          await get().loadInteractions(id); // Await the loading
         } else {
-          get().clearInteractions(); // This clears buffers
+          get().clearInteractions(); // This is synchronous
         }
+        // State update for currentConversationId happens within loadInteractions or clearInteractions
       } else {
         console.log(
           `InteractionStore: Conversation ID ${id} is already current.`,
