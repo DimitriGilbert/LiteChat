@@ -1,4 +1,5 @@
 // src/components/LiteChat/settings/SettingsModal.tsx
+// Ensure the entire file content is provided
 import React, { memo, useState, useEffect } from "react"; // Import useState, useEffect
 import {
   Dialog,
@@ -12,18 +13,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { SettingsGeneral } from "./SettingsGeneral";
 import { SettingsAssistant } from "./SettingsAssistant";
-import { SettingsApiKeys } from "./SettingsApiKeys";
+// Removed SettingsApiKeys import (now part of SettingsProviders)
 import { SettingsDataManagement } from "./SettingsDataManagement";
 import { SettingsMods } from "./SettingsMods";
 import { SettingsProviders } from "./SettingsProviders";
-import { GlobalModelOrganizer } from "./GlobalModelOrganizer";
-import { SettingsGitConfig } from "./SettingsGitConfig";
-import { SettingsGitSyncRepos } from "./SettingsGitSyncRepos";
+// Removed GlobalModelOrganizer import (now part of SettingsProviders)
+// Removed SettingsGitConfig import (now part of SettingsGit)
+// Removed SettingsGitSyncRepos import (now part of SettingsGit)
+import { SettingsGit } from "./SettingsGit"; // Import the combined Git settings component
 import type { CustomSettingTab } from "@/types/litechat/modding";
 
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
-import { useProviderStore, type ProviderState } from "@/store/provider.store";
+// Removed ProviderStore import (API key check moved)
 import { useModStore } from "@/store/mod.store";
 import { useUIStateStore } from "@/store/ui.store"; // Import UI store
 import { cn } from "@/lib/utils";
@@ -40,11 +42,7 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
         enableAdvancedSettings: state.enableAdvancedSettings,
       })),
     );
-    const { enableApiKeyManagement } = useProviderStore(
-      useShallow((state: ProviderState) => ({
-        enableApiKeyManagement: state.enableApiKeyManagement,
-      })),
-    );
+    // Removed enableApiKeyManagement check here
     const { customSettingsTabs } = useModStore(
       useShallow((state) => ({
         customSettingsTabs: state.modSettingsTabs || [],
@@ -53,7 +51,7 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
     // Get initial tab state and clear action from UI store
     const {
       initialSettingsTab,
-      initialSettingsSubTab,
+      // initialSettingsSubTab, // keep, might need later
       clearInitialSettingsTabs,
     } = useUIStateStore(
       useShallow((state) => ({
@@ -65,17 +63,15 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
 
     // Local state to manage the active tab, initialized from store
     const [activeTab, setActiveTab] = useState(initialSettingsTab || "general");
-    const [activeSubTab, setActiveSubTab] = useState(
-      initialSettingsSubTab || "", // Use empty string if no sub-tab initially
-    );
+    // Removed activeSubTab state as sub-tabs are managed within their parent components now
 
     // Effect to update local state if the initial tab state changes while modal is open
     useEffect(() => {
       if (isOpen) {
         setActiveTab(initialSettingsTab || "general");
-        setActiveSubTab(initialSettingsSubTab || "");
+        // No need to set sub-tab here
       }
-    }, [isOpen, initialSettingsTab, initialSettingsSubTab]);
+    }, [isOpen, initialSettingsTab]);
 
     const handleOpenChange = (open: boolean) => {
       if (!open) {
@@ -88,13 +84,7 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
     // Update local state when tab changes
     const handleTabChange = (value: string) => {
       setActiveTab(value);
-      // Reset sub-tab when main tab changes (optional, depends on desired UX)
-      setActiveSubTab("");
-    };
-
-    // Update local state for sub-tabs
-    const handleSubTabChange = (value: string) => {
-      setActiveSubTab(value);
+      // No need to reset sub-tab here
     };
 
     const tabTriggerClass = cn(
@@ -159,59 +149,18 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
               ))}
             </TabsList>
 
+            {/* Use overflow-y-auto on the container for tab content */}
             <div className="flex-grow overflow-y-auto pb-6 pr-2 -mr-2">
               <TabsContent value="general">
                 <SettingsGeneral />
               </TabsContent>
 
-              {/* Providers Sub-Tabs */}
+              {/* Providers content now directly renders SettingsProviders */}
               <TabsContent
                 value="providers"
-                className="flex flex-col data-[state=inactive]:hidden"
+                className="data-[state=inactive]:hidden" // Keep content mounted but hidden
               >
-                <Tabs
-                  // Use local sub-tab state, default if needed
-                  value={
-                    activeTab === "providers"
-                      ? activeSubTab || "model-order"
-                      : "model-order"
-                  }
-                  onValueChange={handleSubTabChange}
-                  className="flex flex-col"
-                >
-                  <TabsList className="flex-shrink-0 gap-1 p-1">
-                    <TabsTrigger
-                      value="model-order"
-                      className={tabTriggerClass}
-                    >
-                      Global Model Order
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="provider-list"
-                      className={tabTriggerClass}
-                    >
-                      Provider List & Config
-                    </TabsTrigger>
-                    {enableApiKeyManagement && (
-                      <TabsTrigger value="api-keys" className={tabTriggerClass}>
-                        API Keys
-                      </TabsTrigger>
-                    )}
-                  </TabsList>
-                  <div className="mt-4">
-                    <TabsContent value="model-order">
-                      <GlobalModelOrganizer />
-                    </TabsContent>
-                    <TabsContent value="provider-list">
-                      <SettingsProviders />
-                    </TabsContent>
-                    {enableApiKeyManagement && (
-                      <TabsContent value="api-keys">
-                        <SettingsApiKeys />
-                      </TabsContent>
-                    )}
-                  </div>
-                </Tabs>
+                <SettingsProviders />
               </TabsContent>
 
               {enableAdvancedSettings && (
@@ -220,33 +169,9 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
                 </TabsContent>
               )}
 
-              {/* Git Sub-Tabs */}
+              {/* Git content now directly renders SettingsGit */}
               <TabsContent value="git" className="h-full">
-                <Tabs
-                  // Use local sub-tab state, default if needed
-                  value={
-                    activeTab === "git" ? activeSubTab || "config" : "config"
-                  }
-                  onValueChange={handleSubTabChange}
-                  className="flex flex-col h-full"
-                >
-                  <TabsList className="flex-shrink-0 gap-1 p-1">
-                    <TabsTrigger value="config" className={tabTriggerClass}>
-                      User Config
-                    </TabsTrigger>
-                    <TabsTrigger value="sync" className={tabTriggerClass}>
-                      Sync Repositories
-                    </TabsTrigger>
-                  </TabsList>
-                  <div className="flex-grow mt-4 overflow-y-auto">
-                    <TabsContent value="config">
-                      <SettingsGitConfig />
-                    </TabsContent>
-                    <TabsContent value="sync">
-                      <SettingsGitSyncRepos />
-                    </TabsContent>
-                  </div>
-                </Tabs>
+                <SettingsGit />
               </TabsContent>
 
               <TabsContent value="data">
