@@ -13,7 +13,7 @@ import { useModStore } from "@/store/mod.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { loadMods } from "@/modding/loader";
-import { Toaster } from "@/components/ui/sonner"; // Keep this import
+import { Toaster } from "@/components/ui/sonner";
 import type { CoreMessage, ToolResultPart, ToolCallPart } from "ai";
 import { InputArea } from "@/components/LiteChat/prompt/InputArea";
 import { useShallow } from "zustand/react/shallow";
@@ -23,17 +23,18 @@ import { toast } from "sonner";
 import type { Interaction } from "@/types/litechat/interaction";
 import { Loader2 } from "lucide-react";
 
-import { useConversationListControlRegistration } from "@/hooks/litechat/useConversationListControl";
-import { useSettingsControlRegistration } from "@/hooks/litechat/useSettingsControlRegistration";
-import { useSidebarToggleControlRegistration } from "@/hooks/litechat/useSidebarToggleControlRegistration";
-import { useGlobalModelSelectorRegistration } from "@/hooks/litechat/useGlobalModelSelectorRegistration";
-import { useParameterControlRegistration } from "@/hooks/litechat/useParameterControlRegistration";
-import { useFileControlRegistration } from "@/hooks/litechat/useFileControlRegistration";
-import { useVfsControlRegistration } from "@/hooks/litechat/useVfsControlRegistration";
-import { useGitSyncControlRegistration } from "@/hooks/litechat/useGitSyncControlRegistration";
-import { useVfsToolsRegistration } from "@/hooks/litechat/useVfsToolsRegistration";
-import { useGitToolsRegistration } from "@/hooks/litechat/useGitToolsRegistration";
-import { useToolSelectorControlRegistration } from "@/hooks/litechat/useToolSelectorControlRegistration";
+// Import the registration FUNCTIONS
+import { registerConversationListControl } from "@/hooks/litechat/registerConversationListControl";
+import { registerSettingsControl } from "@/hooks/litechat/registerSettingsControl";
+import { registerSidebarToggleControl } from "@/hooks/litechat/registerSidebarToggleControl";
+import { registerGlobalModelSelector } from "@/hooks/litechat/registerGlobalModelSelector";
+import { registerParameterControl } from "@/hooks/litechat/registerParameterControl";
+import { registerFileControl } from "@/hooks/litechat/registerFileControl";
+import { registerVfsControl } from "@/hooks/litechat/registerVfsControl";
+import { registerGitSyncControl } from "@/hooks/litechat/registerGitSyncControl";
+import { registerVfsTools } from "@/hooks/litechat/registerVfsTools";
+import { registerGitTools } from "@/hooks/litechat/registerGitTools";
+import { registerToolSelectorControl } from "@/hooks/litechat/registerToolSelectorControl";
 
 const splitModelId = (
   combinedId: string | null,
@@ -113,24 +114,14 @@ export const LiteChat: React.FC = () => {
     })),
   );
 
-  useConversationListControlRegistration();
-  useSettingsControlRegistration();
-  useSidebarToggleControlRegistration();
-  useGlobalModelSelectorRegistration();
-  useParameterControlRegistration();
-  useFileControlRegistration();
-  useVfsControlRegistration();
-  useGitSyncControlRegistration();
-  useVfsToolsRegistration();
-  useGitToolsRegistration();
-  useToolSelectorControlRegistration();
-
   useEffect(() => {
     let isMounted = true;
     const initialize = async () => {
       console.log("LiteChat: Starting initialization...");
       setIsInitializing(true);
       if (!isMounted) return;
+
+      // 1. Load core data
       await loadSettings();
       console.log("LiteChat: Settings loaded.");
       if (!isMounted) return;
@@ -140,6 +131,24 @@ export const LiteChat: React.FC = () => {
       await loadSidebarItems();
       console.log("LiteChat: Sidebar items loaded.");
       if (!isMounted) return;
+
+      // 2. Register core controls and tools (imperatively)
+      console.log("LiteChat: Registering core controls and tools...");
+      registerConversationListControl();
+      registerSettingsControl();
+      registerSidebarToggleControl();
+      registerGlobalModelSelector();
+      registerParameterControl();
+      registerFileControl();
+      registerVfsControl();
+      registerGitSyncControl();
+      registerVfsTools();
+      registerGitTools();
+      registerToolSelectorControl();
+      console.log("LiteChat: Core controls and tools registered.");
+      if (!isMounted) return;
+
+      // 3. Load mods (which might register more controls/tools)
       await loadDbMods();
       console.log("LiteChat: DB Mods loaded.");
       if (!isMounted) return;
@@ -155,23 +164,22 @@ export const LiteChat: React.FC = () => {
       } catch (error) {
         console.error("LiteChat: Failed to load mods:", error);
       }
+
+      // 4. Finalize initialization
       if (isMounted) {
         console.log("LiteChat: Initialization complete.");
-        setIsInitializing(false);
+        setIsInitializing(false); // Set initializing false AFTER everything
       }
     };
     initialize();
     return () => {
       isMounted = false;
       console.log("LiteChat: Unmounting, initialization cancelled if pending.");
+      // NOTE: Core controls are NOT unregistered here, they persist for app lifetime
     };
-  }, [
-    loadSettings,
-    loadProviderData,
-    loadSidebarItems,
-    loadDbMods,
-    setLoadedMods,
-  ]);
+    // Only run initialization once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const buildHistoryMessages = useCallback(
     (historyInteractions: Interaction[]): CoreMessage[] => {
@@ -536,6 +544,7 @@ export const LiteChat: React.FC = () => {
     selectedItemType === "conversation" ? selectedItemId : null;
 
   if (isInitializing) {
+    // Show loading indicator until initialization is fully complete
     return (
       <div className="flex items-center justify-center h-screen w-screen bg-background text-foreground">
         <div className="flex flex-col items-center gap-4">
