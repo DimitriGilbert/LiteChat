@@ -722,15 +722,14 @@ export const gitStatusOp = async (path: string): Promise<void> => {
     const formattedStatus = status
       .map(([filepath, head, workdir, stage]) => {
         // Determine status based on codes (refer to isomorphic-git docs)
+        // Head: 0=absent, 1=present
+        // Workdir: 0=absent, 1=unmodified, 2=modified
+        // Stage: 0=absent, 1=unmodified, 2=modified, 3=added
         let statusText = "";
+
         // Staging area status
-        if (stage === 1) statusText += "INDEX_Unmodified "; // Should not happen?
         if (stage === 2) statusText += "INDEX_Modified ";
         if (stage === 3) statusText += "INDEX_Added ";
-        if (stage === 4) statusText += "INDEX_Deleted ";
-        if (stage === 5) statusText += "INDEX_Renamed ";
-        if (stage === 6) statusText += "INDEX_Copied ";
-        if (stage === 7) statusText += "INDEX_Updated "; // Unmerged
 
         // Working directory status
         if (head === 0 && workdir === 2)
@@ -739,11 +738,8 @@ export const gitStatusOp = async (path: string): Promise<void> => {
         else if (head === 1 && workdir === 0) statusText += "WT_Deleted";
         else if (head === 1 && workdir === 1 && stage === 0)
           statusText = "Unmodified"; // Only show if nothing staged
-        else if (head === 1 && workdir === 3) statusText += "WT_Renamed ";
-        else if (head === 1 && workdir === 4) statusText += "WT_Copied ";
-        else if (head === 1 && workdir === 5) statusText += "WT_Updated "; // Unmerged
 
-        // Fallback for unexpected combinations
+        // Fallback for unexpected combinations or unmerged states
         if (!statusText || statusText === "INDEX_Unmodified ") {
           statusText = `h:${head} w:${workdir} s:${stage}`;
         }

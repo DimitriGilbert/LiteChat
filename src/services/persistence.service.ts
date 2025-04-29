@@ -25,7 +25,8 @@ const ensureDateFields = <
   if (Array.isArray(otherDateFields)) {
     otherDateFields.forEach((field) => {
       if (item[field] && !(item[field] instanceof Date)) {
-        newItem[field] = new Date(item[field]);
+        // Cast newItem to any to allow indexed assignment
+        (newItem as any)[field] = new Date(item[field]);
       }
     });
   } else {

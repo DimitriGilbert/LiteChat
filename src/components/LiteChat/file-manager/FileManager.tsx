@@ -398,7 +398,10 @@ WARNING: This will delete all contents inside`
 
   const handleGitPull = useCallback(
     (path: string) => {
-      runGitOperation(path, () => VfsOps.gitPullOp(path));
+      // TODO: Need to get branch and credentials for the repo
+      // This requires looking up the SyncRepo config if this VFS is linked
+      // For now, assume default branch and no credentials
+      runGitOperation(path, () => VfsOps.gitPullOp(path, "main"));
     },
     [runGitOperation],
   );
@@ -411,7 +414,8 @@ WARNING: This will delete all contents inside`
 
   const handleGitPush = useCallback(
     (path: string) => {
-      runGitOperation(path, () => VfsOps.gitPushOp(path));
+      // TODO: Need to get branch and credentials for the repo
+      runGitOperation(path, () => VfsOps.gitPushOp(path, "main"));
     },
     [runGitOperation],
   );
@@ -459,6 +463,7 @@ WARNING: This will delete all contents inside`
     setIsCommitting(true);
     _setError(null);
     try {
+      // Pass commit message to gitCommitOp
       await VfsOps.gitCommitOp(commitPath, commitMessage.trim());
       setIsCommitDialogOpen(false);
     } catch (_err) {
@@ -527,7 +532,7 @@ WARNING: This will delete all contents inside`
         gitRepoStatus={gitRepoStatus}
         handleGitInit={handleGitInit}
         handleGitPull={handleGitPull}
-        handleGitCommit={handleGitCommit}
+        handleGitCommit={handleGitCommit} // Pass the handler that opens the dialog
         handleGitPush={handleGitPush}
         handleGitStatus={handleGitStatus}
       />
@@ -551,7 +556,7 @@ WARNING: This will delete all contents inside`
         commitMessage={commitMessage}
         setCommitMessage={setCommitMessage}
         isCommitting={isCommitting}
-        onSubmitCommit={onSubmitCommit}
+        onSubmitCommit={onSubmitCommit} // This now calls the op with the message
       />
     </div>
   );
