@@ -1,5 +1,5 @@
 // src/components/LiteChat/common/FilePreviewRenderer.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react"; // Added useMemo
 import {
   FileTextIcon,
   ImageIcon,
@@ -10,6 +10,7 @@ import {
   AlertCircleIcon,
   UploadCloudIcon,
   XIcon,
+  ChevronsUpDownIcon, // Added for folding
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +34,6 @@ interface FilePreviewRendererProps {
 
 const MAX_TEXT_PREVIEW_SIZE = 1024 * 5; // 5 KB limit for text preview
 
-// Helper to convert base64 string back to Blob URL for media previews
 const base64ToBlobUrl = (base64: string, mimeType: string): string | null => {
   try {
     const byteCharacters = atob(base64);
@@ -50,8 +50,6 @@ const base64ToBlobUrl = (base64: string, mimeType: string): string | null => {
   }
 };
 
-// Helper to reconstruct File object from metadata
-// Ensures content is correctly handled
 const metadataToFile = (meta: AttachedFileMetadata): File | null => {
   let blob: Blob | null = null;
   if (meta.contentText !== undefined) {
@@ -81,7 +79,6 @@ const metadataToFile = (meta: AttachedFileMetadata): File | null => {
   return null;
 };
 
-// --- Added Text Detection Logic ---
 const COMMON_TEXT_EXTENSIONS_PREVIEW = [
   ".txt",
   ".md",
@@ -122,7 +119,6 @@ const isLikelyTextFilePreview = (name: string, mimeType?: string): boolean => {
     fileNameLower.endsWith(ext),
   );
 };
-// --- End Text Detection Logic ---
 
 export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   fileMeta,
@@ -134,18 +130,17 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   );
   const [error, setError] = useState<string | null>(null);
   const [isAddingToVfs, setIsAddingToVfs] = useState(false);
+  const [isFolded, setIsFolded] = useState(false); // State for folding
 
-  // Determine type based on stored metadata and improved logic
   const mimeType = fileMeta.type || "application/octet-stream";
   const isText = isLikelyTextFilePreview(fileMeta.name, mimeType);
   const isImage = mimeType.startsWith("image/");
   const isAudio = mimeType.startsWith("audio/");
   const isVideo = mimeType.startsWith("video/");
 
-  // Effect to generate Blob URL for media types from base64
   useEffect(() => {
     let objectUrl: string | null = null;
-    setError(null); // Reset error on meta change
+    setError(null);
 
     if (!isText && fileMeta.contentBase64) {
       objectUrl = base64ToBlobUrl(fileMeta.contentBase64, mimeType);
@@ -154,19 +149,17 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       }
       setPreviewContentUrl(objectUrl);
     } else {
-      setPreviewContentUrl(null); // Clear URL if it's text or has no base64
+      setPreviewContentUrl(null);
     }
 
-    // Cleanup function
     return () => {
       if (objectUrl) {
         URL.revokeObjectURL(objectUrl);
         setPreviewContentUrl(null);
       }
     };
-  }, [fileMeta.contentBase64, mimeType, isText]); // Depend on base64 content and type
+  }, [fileMeta.contentBase64, mimeType, isText]);
 
-  // Check text size limit using stored content
   useEffect(() => {
     if (
       isText &&
@@ -177,7 +170,6 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
         `Text file too large for preview (${(fileMeta.size / 1024).toFixed(1)} KB).`,
       );
     } else if (isText && fileMeta.contentText === undefined) {
-      // Content should always be present now, but handle defensively
       setError("Text content missing from metadata.");
     }
   }, [fileMeta.contentText, fileMeta.size, isText]);
@@ -187,7 +179,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       toast.info("File is already in VFS.");
       return;
     }
-    const fileToAdd = metadataToFile(fileMeta); // Use the corrected helper
+    const fileToAdd = metadataToFile(fileMeta);
 
     if (!fileToAdd) {
       toast.error("Cannot add to VFS: Failed to reconstruct file data.");
@@ -196,12 +188,9 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
 
     setIsAddingToVfs(true);
     try {
-      // Assuming VFS root for simplicity, adjust if needed
       const targetPath = "/";
       await VfsOps.uploadFilesOp([fileToAdd], targetPath);
       toast.success(`"${fileMeta.name}" added to VFS root.`);
-      // Optionally, update the fileMeta source in the input store if needed
-      // This would require passing an update function from the parent
     } catch (err) {
       console.error("Failed to add file to VFS:", err);
       toast.error(`Failed to add "${fileMeta.name}" to VFS.`);
@@ -209,6 +198,8 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       setIsAddingToVfs(false);
     }
   };
+
+  const toggleFold = () => setIsFolded((prev) => !prev);
 
   const renderIcon = () => {
     if (isText) return <FileTextIcon className="h-5 w-5 text-blue-500" />;
@@ -228,7 +219,6 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       );
     }
 
-    // Render based on type and available content from fileMeta
     if (isText && fileMeta.contentText !== undefined) {
       return (
         <CodeBlockRenderer
@@ -262,13 +252,21 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       );
     }
 
-    // Fallback if no preview could be generated or type not supported
     return (
       <p className="p-2 text-xs text-muted-foreground italic">
         Preview not available for this file type or content missing.
       </p>
     );
   };
+
+  const foldedSummary = useMemo(() => {
+    let typeLabel = "File";
+    if (isText) typeLabel = "Text";
+    else if (isImage) typeLabel = "Image";
+    else if (isAudio) typeLabel = "Audio";
+    else if (isVideo) typeLabel = "Video";
+    return `${typeLabel} (${formatBytes(fileMeta.size)})`;
+  }, [isText, isImage, isAudio, isVideo, fileMeta.size]);
 
   return (
     <div className="border rounded-md overflow-hidden bg-card shadow-sm my-2">
@@ -296,53 +294,84 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
             </TooltipProvider>
           )}
         </div>
-        {!isReadOnly && onRemove && (
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {fileMeta.source === "direct" && (
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Fold/Unfold Button */}
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  onClick={toggleFold}
+                  aria-label={isFolded ? "Unfold preview" : "Fold preview"}
+                >
+                  <ChevronsUpDownIcon className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {isFolded ? "Unfold" : "Fold"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          {!isReadOnly && onRemove && (
+            <>
+              {fileMeta.source === "direct" && (
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={handleAddToVfs}
+                        disabled={isAddingToVfs}
+                        aria-label="Add to VFS"
+                      >
+                        {isAddingToVfs ? (
+                          <Loader2Icon className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <UploadCloudIcon className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Add to VFS</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
               <TooltipProvider delayDuration={100}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
-                      onClick={handleAddToVfs}
-                      disabled={isAddingToVfs}
-                      aria-label="Add to VFS"
+                      className="h-6 w-6 text-destructive hover:text-destructive/80"
+                      onClick={() => onRemove(fileMeta.id)}
+                      aria-label="Remove file"
                     >
-                      {isAddingToVfs ? (
-                        <Loader2Icon className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <UploadCloudIcon className="h-3.5 w-3.5" />
-                      )}
+                      <XIcon className="h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Add to VFS</TooltipContent>
+                  <TooltipContent>Remove from Prompt</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-            )}
-            <TooltipProvider delayDuration={100}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-destructive hover:text-destructive/80"
-                    onClick={() => onRemove(fileMeta.id)}
-                    aria-label="Remove file"
-                  >
-                    <XIcon className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Remove from Prompt</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
-      <div className={cn("p-2 max-h-80 overflow-y-auto")}>
-        {renderPreview()}
-      </div>
+      {/* Conditionally render preview or folded summary */}
+      {!isFolded ? (
+        <div className={cn("p-2 max-h-80 overflow-y-auto")}>
+          {renderPreview()}
+        </div>
+      ) : (
+        <div
+          className="p-2 text-xs text-muted-foreground italic cursor-pointer hover:bg-muted/20"
+          onClick={toggleFold}
+        >
+          {foldedSummary}
+        </div>
+      )}
     </div>
   );
 };

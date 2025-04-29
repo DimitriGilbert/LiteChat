@@ -1,11 +1,13 @@
 /* src/index.css */
 @import "tailwindcss";
 @import "tw-animate-css";
+/* Import the default Prism theme as a fallback */
+@import "prismjs/themes/prism.css";
 
 @custom-variant dark (&:is(.dark *));
 @tailwind utilities;
 
-/* Base Layers (Keep as provided) */
+/* Base Layers */
 @layer base {
     :root {
         --background: 0 0% 100%;
@@ -28,7 +30,6 @@
         --input: 200 30% 85%;
         --ring: 160 48% 45%;
         --radius: 0.5rem;
-        --code-bg: 200 30% 15%; /* Light theme code background */
     }
 
     .dark {
@@ -51,7 +52,6 @@
         --border: 200 30% 30%;
         --input: 200 30% 30%;
         --ring: 160 48% 45%;
-        --code-bg: 200 50% 15%; /* Dark theme code background */
     }
 }
 
@@ -141,8 +141,6 @@
     --sidebar-accent-foreground: oklch(0.2 0.05 230);
     --sidebar-border: oklch(0.8 0.03 230);
     --sidebar-ring: oklch(0.7 0.2 140);
-    --code-bg: oklch(0.15 0.05 230); /* Light theme code background */
-
 }
 
 .dark {
@@ -178,8 +176,6 @@
     --sidebar-accent-foreground: oklch(0.15 0.05 230);
     --sidebar-border: oklch(0.3 0.05 230);
     --sidebar-ring: oklch(0.7 0.2 140);
-    --code-bg: oklch(0.1 0.02 230); /* Dark theme code background */
-
 }
 
 @layer base {
@@ -252,46 +248,24 @@
     .code-block-container {
         @apply relative my-4 overflow-hidden border border-border rounded-lg;
     }
+
+    /* Header styling */
     .code-block-header {
         @apply flex items-center justify-between px-4 py-2
       border-b border-border;
-        background-color: var(--card);
+        background-color: hsl(var(--card));
     }
+
+    /* Code block content - minimal styling to not override external themes */
     .code-block-content {
-        @apply overflow-x-auto text-sm;
-    }
-    .code-block-content code {
-        @apply p-4 block;
-    }
-    .litechat-streaming-portal-container {
-        /* Styles are set inline in LiteChat.tsx, but you could add more here */
-        /* Example: Add a subtle background for debugging */
-        /* background-color: rgba(255, 0, 0, 0.1); */
+        @apply overflow-x-auto text-sm m-0;
     }
 
-    .litechat-streaming-interaction-portal {
-        /* Ensure individual portals take width and allow interaction */
-        width: 100%;
-        pointer-events: auto; /* Allow interaction with content inside this div */
-    }
+    /* .code-block-content code {
+        @apply p-4 block font-mono;
+        background-color: transparent;
+    } */
 
-    /* Ensure the content *inside* the portal card is interactive */
-    .litechat-streaming-interaction-portal > div {
-        pointer-events: auto;
-    }
-
-    /* --- Interaction Card Action Buttons --- */
-    .interaction-card-actions-sticky {
-        /* Use sticky positioning */
-        @apply sticky top-1 right-1 z-10 /* Removed float-right */
-      flex items-center gap-0.5
-      opacity-0 group-hover:opacity-100 transition-opacity
-      bg-card/80 backdrop-blur-sm p-0.5 rounded-md border border-border/50;
-        /* Position relative to the nearest scrolling ancestor or viewport */
-        /* Ensure parent (.group) does not have overflow: hidden */
-    }
-
-    /* --- Folded Content Preview --- */
     .folded-content-preview {
         @apply cursor-pointer text-muted-foreground italic text-xs max-h-20 overflow-hidden relative;
     }
@@ -301,7 +275,7 @@
     }
 } /* End @layer utilities */
 
-/* Custom scrollbar styles (Keep as provided) */
+/* Custom scrollbar styles */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -316,7 +290,7 @@
     @apply bg-muted-foreground/70;
 }
 
-/* Animations (Keep as provided) */
+/* Animations */
 @keyframes fadeIn {
     from {
         opacity: 0;

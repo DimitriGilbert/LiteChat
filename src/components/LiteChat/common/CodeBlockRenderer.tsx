@@ -7,7 +7,6 @@ import React, {
   useCallback,
 } from "react";
 import Prism from "prismjs";
-// Import only needed Prism language components to minimize bundle size
 import "prismjs/components/prism-typescript";
 import "prismjs/components/prism-python";
 import "prismjs/components/prism-bash";
@@ -18,54 +17,150 @@ import "prismjs/components/prism-go";
 import "prismjs/components/prism-yaml";
 import "prismjs/components/prism-rust";
 import "prismjs/components/prism-sql";
+// Import base Prism styles
+import "prismjs/themes/prism.css";
 
-import { cn } from "@/lib/utils";
+// import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { CheckIcon, ClipboardIcon, ChevronsUpDownIcon } from "lucide-react"; // Add ChevronsUpDownIcon
+import { CheckIcon, ClipboardIcon, ChevronsUpDownIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"; // Import Tooltip components
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { useSettingsStore } from "@/store/settings.store";
+import { useShallow } from "zustand/react/shallow";
 
 interface CodeBlockRendererProps {
   lang: string | undefined;
   code: string;
 }
 
+// IDs for theme link elements
+const PRISM_THEME_LINK_ID = "prism-theme-link";
+const DEFAULT_LIGHT_THEME_LINK_ID = "prism-default-light-theme-link";
+const DEFAULT_DARK_THEME_LINK_ID = "prism-default-dark-theme-link";
+
+// Default theme URLs as specified
+const DEFAULT_LIGHT_THEME_URL =
+  "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.5.0/prism-material-light.min.css";
+const DEFAULT_DARK_THEME_URL =
+  "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.5.0/prism-coldark-dark.min.css";
+
+// Helper function to get raw content URL from GitHub
+const getRawGitHubUrl = (url: string): string => {
+  return url
+    .replace("github.com", "raw.githubusercontent.com")
+    .replace("/blob/", "/");
+};
+
 export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
   lang,
   code,
 }) => {
   const [isCopied, setIsCopied] = useState(false);
-  const [isFolded, setIsFolded] = useState(false); // State for folding
+  const [isFolded, setIsFolded] = useState(false);
   const codeRef = useRef<HTMLElement>(null);
+
+  const { prismThemeUrl, theme: appTheme } = useSettingsStore(
+    useShallow((state) => ({
+      prismThemeUrl: state.prismThemeUrl,
+      theme: state.theme,
+    })),
+  );
+
+  // Get the current effective theme (dark/light)
+  const systemTheme = useMemo(() => {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  }, []);
+
+  const currentTheme = appTheme === "system" ? systemTheme : appTheme;
+
+  // Manage theme loading
+  useEffect(() => {
+    // Function to create or update a theme link element
+    const loadTheme = (url: string, id: string): void => {
+      const existingLink = document.getElementById(
+        id,
+      ) as HTMLLinkElement | null;
+
+      if (existingLink) {
+        if (existingLink.href !== url) {
+          existingLink.href = url;
+        }
+      } else {
+        const link = document.createElement("link");
+        link.id = id;
+        link.rel = "stylesheet";
+        link.href = url;
+        document.head.appendChild(link);
+      }
+    };
+
+    // Function to remove a theme link element
+    const removeTheme = (id: string): void => {
+      const existingLink = document.getElementById(id);
+      if (existingLink) {
+        existingLink.remove();
+      }
+    };
+
+    // Handle custom theme if provided
+    if (prismThemeUrl) {
+      loadTheme(prismThemeUrl, PRISM_THEME_LINK_ID);
+      // Remove default themes if custom theme is set
+      removeTheme(DEFAULT_LIGHT_THEME_LINK_ID);
+      removeTheme(DEFAULT_DARK_THEME_LINK_ID);
+    } else {
+      // Remove any custom theme
+      removeTheme(PRISM_THEME_LINK_ID);
+
+      // Load appropriate default theme based on current app theme
+      if (currentTheme === "dark") {
+        loadTheme(
+          getRawGitHubUrl(DEFAULT_DARK_THEME_URL),
+          DEFAULT_DARK_THEME_LINK_ID,
+        );
+        removeTheme(DEFAULT_LIGHT_THEME_LINK_ID);
+      } else {
+        loadTheme(
+          getRawGitHubUrl(DEFAULT_LIGHT_THEME_URL),
+          DEFAULT_LIGHT_THEME_LINK_ID,
+        );
+        removeTheme(DEFAULT_DARK_THEME_LINK_ID);
+      }
+    }
+
+    // Cleanup function
+    return () => {
+      // No cleanup needed for theme links as they should persist
+    };
+  }, [prismThemeUrl, currentTheme]);
 
   const highlightCode = useCallback(() => {
     if (codeRef.current && code) {
       try {
-        // Ensure the content is set before highlighting
         codeRef.current.textContent = code;
+        // Let Prism do the syntax highlighting
         Prism.highlightElement(codeRef.current);
       } catch (error) {
         console.error("Prism highlight error:", error);
-        // Fallback to raw code if highlighting fails
         codeRef.current.textContent = code;
       }
     } else if (codeRef.current) {
-      // Clear content if there's no code
       codeRef.current.textContent = "";
     }
-  }, [code]); // Depend only on code
+  }, [code]);
 
-  // Highlight on initial render and when code/lang changes, but only if not folded
   useEffect(() => {
     if (!isFolded) {
       highlightCode();
     }
-  }, [code, lang, isFolded, highlightCode]); // Add highlightCode dependency
+  }, [code, lang, isFolded, highlightCode]);
 
   const handleCopy = async () => {
     try {
@@ -80,18 +175,15 @@ export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
   };
 
   const toggleFold = () => {
-    const unfolding = isFolded; // Check the state *before* toggling
+    const unfolding = isFolded;
     setIsFolded((prev) => !prev);
     if (unfolding) {
-      // If we were folded and are now unfolding, trigger highlight after state update
-      // Use setTimeout to ensure DOM update happens first
       setTimeout(highlightCode, 0);
     }
   };
 
   const languageClass = lang ? `language-${lang}` : "language-plaintext";
 
-  // Get first few lines for folded preview
   const foldedPreviewText = useMemo(() => {
     if (!code) return "";
     return code.split("\n").slice(0, 3).join("\n");
@@ -102,7 +194,6 @@ export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
       <div className="code-block-header">
         <span className="text-xs text-muted-foreground">{lang || "code"}</span>
         <div className="flex items-center gap-0.5">
-          {/* Fold/Unfold Button */}
           <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -121,7 +212,6 @@ export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          {/* Copy Button */}
           <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -144,22 +234,15 @@ export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
           </TooltipProvider>
         </div>
       </div>
-      {/* Use standard pre > code structure for Prism */}
-      {/* Conditionally render the code block content */}
       {!isFolded && (
-        <pre className={cn("code-block-content")}>
-          <code ref={codeRef} className={cn(languageClass)}>
-            {/* Render code initially for Prism, highlightCode will overwrite */}
+        <pre className="code-block-content">
+          <code ref={codeRef} className={languageClass}>
             {code}
           </code>
         </pre>
       )}
-      {/* Folded Preview */}
       {isFolded && (
-        <div
-          className="folded-content-preview p-4 pt-0" // Add padding consistent with code block
-          onClick={toggleFold}
-        >
+        <div className="folded-content-preview p-4 pt-0" onClick={toggleFold}>
           <pre className="whitespace-pre-wrap break-words text-muted-foreground font-mono text-sm">
             {foldedPreviewText}
           </pre>

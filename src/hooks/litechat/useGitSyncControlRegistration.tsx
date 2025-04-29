@@ -29,7 +29,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
 import type { SyncStatus } from "@/types/litechat/sync";
 
 const GitSyncControlComponent: React.FC = () => {

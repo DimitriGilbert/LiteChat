@@ -18,15 +18,16 @@ import {
   XIcon,
   Loader2,
   PlusIcon,
+  AlertTriangleIcon, // Import warning icon
 } from "lucide-react";
 import { toast } from "sonner";
 import type { SyncRepo } from "@/types/litechat/sync";
 import { useShallow } from "zustand/react/shallow";
 import { useConversationStore } from "@/store/conversation.store";
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Import Alert components
 
 const SettingsGitSyncReposComponent: React.FC = () => {
-  // Use loadSyncRepos to ensure data is fresh if needed, though loadSidebarItems should handle it
   const { syncRepos, addSyncRepo, updateSyncRepo, deleteSyncRepo, isLoading } =
     useConversationStore(
       useShallow((state) => ({
@@ -45,16 +46,24 @@ const SettingsGitSyncReposComponent: React.FC = () => {
   >({
     name: "",
     remoteUrl: "",
-    branch: "main", // Default branch
+    branch: "main",
+    username: "", // Initialize auth fields
+    password: "", // Initialize auth fields
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
 
   const resetForm = useCallback(() => {
-    setFormData({ name: "", remoteUrl: "", branch: "main" });
+    setFormData({
+      name: "",
+      remoteUrl: "",
+      branch: "main",
+      username: "",
+      password: "",
+    });
     setIsAdding(false);
     setEditingId(null);
-    setIsSaving(false); // Ensure saving state is reset
+    setIsSaving(false);
   }, []);
 
   const handleInputChange = useCallback(
@@ -71,26 +80,23 @@ const SettingsGitSyncReposComponent: React.FC = () => {
     }
     setIsSaving(true);
     try {
+      const dataToSave: Omit<SyncRepo, "id" | "createdAt" | "updatedAt"> = {
+        name: formData.name.trim(),
+        remoteUrl: formData.remoteUrl.trim(),
+        branch: formData.branch?.trim() || "main",
+        username: formData.username?.trim() || null,
+        password: formData.password || null, // Store password as is (or null)
+      };
+
       if (editingId) {
-        await updateSyncRepo(editingId, {
-          name: formData.name.trim(),
-          remoteUrl: formData.remoteUrl.trim(),
-          branch: formData.branch?.trim() || "main",
-        });
+        await updateSyncRepo(editingId, dataToSave);
       } else {
-        await addSyncRepo({
-          name: formData.name.trim(),
-          remoteUrl: formData.remoteUrl.trim(),
-          branch: formData.branch?.trim() || "main",
-        });
+        await addSyncRepo(dataToSave);
       }
-      resetForm(); // Reset form after successful save
+      resetForm();
     } catch (_error) {
-      // Error toast handled by store action
       console.error("Failed to save sync repo:", _error);
-      // Do not reset form on error, allow user to correct
     } finally {
-      // Reset saving state regardless of success/failure
       setIsSaving(false);
     }
   }, [formData, editingId, addSyncRepo, updateSyncRepo, resetForm]);
@@ -101,8 +107,10 @@ const SettingsGitSyncReposComponent: React.FC = () => {
       name: repo.name,
       remoteUrl: repo.remoteUrl,
       branch: repo.branch,
+      username: repo.username ?? "",
+      password: repo.password ?? "", // Populate password for editing (masked)
     });
-    setIsAdding(false); // Ensure not in adding mode
+    setIsAdding(false);
   };
 
   const handleDelete = useCallback(
@@ -116,10 +124,9 @@ const SettingsGitSyncReposComponent: React.FC = () => {
         try {
           await deleteSyncRepo(id);
           if (editingId === id) {
-            resetForm(); // Reset form if editing the deleted item
+            resetForm();
           }
         } catch (error) {
-          // Error toast handled by store action
           console.error("Failed to delete sync repo:", error);
         } finally {
           setIsDeleting((prev) => ({ ...prev, [id]: false }));
@@ -134,6 +141,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
       <h4 className="font-semibold text-card-foreground">
         {editingId ? "Edit Sync Repository" : "Add New Sync Repository"}
       </h4>
+      {/* Basic Info */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <Label htmlFor="repo-name">Name</Label>
@@ -173,7 +181,50 @@ const SettingsGitSyncReposComponent: React.FC = () => {
           />
         </div>
       </div>
-      <div className="flex justify-end space-x-2">
+      {/* Authentication */}
+      <div className="pt-2">
+        <Label className="text-sm font-medium">
+          Authentication (Optional - Basic Auth/Token)
+        </Label>
+        <Alert variant="destructive" className="mt-2 mb-3">
+          <AlertTriangleIcon className="h-4 w-4" />
+          <AlertTitle>Security Warning</AlertTitle>
+          <AlertDescription className="text-xs">
+            Storing credentials directly is insecure. Use a Personal Access
+            Token (PAT) as the password if possible. Credentials are required
+            only for private repositories.
+          </AlertDescription>
+        </Alert>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="repo-username">Username</Label>
+            <Input
+              id="repo-username"
+              value={formData.username || ""}
+              onChange={(e) => handleInputChange("username", e.target.value)}
+              placeholder="Git Username (Optional)"
+              className="mt-1"
+              disabled={isSaving}
+              autoComplete="off"
+            />
+          </div>
+          <div>
+            <Label htmlFor="repo-password">Password / Token</Label>
+            <Input
+              id="repo-password"
+              type="password" // Mask the input
+              value={formData.password || ""}
+              onChange={(e) => handleInputChange("password", e.target.value)}
+              placeholder="Password or PAT (Optional)"
+              className="mt-1"
+              disabled={isSaving}
+              autoComplete="new-password"
+            />
+          </div>
+        </div>
+      </div>
+      {/* Actions */}
+      <div className="flex justify-end space-x-2 pt-2">
         <Button
           variant="ghost"
           size="sm"
@@ -243,6 +294,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
                   <TableHead>Name</TableHead>
                   <TableHead>Remote URL</TableHead>
                   <TableHead>Branch</TableHead>
+                  <TableHead>Auth</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -250,6 +302,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
                 {syncRepos.map((repo) => {
                   const isRepoDeleting = isDeleting[repo.id];
                   const isRepoEditing = editingId === repo.id;
+                  const hasAuth = !!repo.username || !!repo.password;
                   return (
                     <TableRow
                       key={repo.id}
@@ -260,6 +313,9 @@ const SettingsGitSyncReposComponent: React.FC = () => {
                         {repo.remoteUrl}
                       </TableCell>
                       <TableCell>{repo.branch}</TableCell>
+                      <TableCell className="text-xs">
+                        {hasAuth ? "Configured" : "None"}
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"

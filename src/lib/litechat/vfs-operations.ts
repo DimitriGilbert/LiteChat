@@ -19,6 +19,14 @@ import { useSettingsStore } from "@/store/settings.store";
 // --- Constants ---
 const CORS_PROXY = "https://cors.isomorphic-git.org";
 
+// --- Session Credentials Store (Simple In-Memory) ---
+// NOTE: This is VERY basic. A more robust solution might use sessionStorage
+// or a dedicated non-persistent store slice. This resets on page reload.
+const sessionCredentials = new Map<
+  string,
+  { username?: string; password?: string }
+>();
+
 // --- Helper Functions ---
 const createDirectoryRecursive = async (path: string): Promise<void> => {
   const normalized = normalizePath(path);
@@ -78,24 +86,82 @@ const ensureGitConfig = async (dir: string): Promise<boolean> => {
   }
 };
 
-// --- Authentication Callbacks (Placeholders) ---
-// TODO: Implement proper UI/storage for credentials
-const onAuth = (url: string): any => {
-  console.warn(
-    `[VFS Op] Git Auth requested for ${url}. No credentials configured.`,
+// --- Authentication Callbacks ---
+const onAuth = async (
+  url: string,
+  storedCreds?: { username?: string | null; password?: string | null },
+): Promise<any> => {
+  const urlOrigin = new URL(url).origin; // Use origin as key for session creds
+  console.log(`[VFS Op] Git Auth requested for ${url}`);
+
+  // 1. Check provided stored credentials first
+  if (storedCreds?.username && storedCreds?.password) {
+    console.log(`[VFS Op] Attempting auth with stored credentials for ${url}`);
+    return {
+      username: storedCreds.username,
+      password: storedCreds.password,
+      // Consider adding oauth2format detection based on URL if needed
+    };
+  }
+
+  // 2. Check session credentials
+  const sessionCred = sessionCredentials.get(urlOrigin);
+  if (sessionCred?.username && sessionCred?.password) {
+    console.log(`[VFS Op] Attempting auth with session credentials for ${url}`);
+    return {
+      username: sessionCred.username,
+      password: sessionCred.password,
+    };
+  }
+
+  // 3. Prompt user if no credentials found
+  console.log(
+    `[VFS Op] No stored or session credentials found for ${url}. Prompting user.`,
   );
-  // Return null or prompt user in a real implementation
-  // Example: return { username: 'myuser', password: 'mypassword' };
-  // Example: return { oauth2format: 'github', token: 'ghp_...' };
-  return null;
+  const username = window.prompt(`Enter username for ${url}`);
+  if (!username) {
+    toast.error("Authentication cancelled: Username not provided.");
+    return null; // Cancel auth if user cancels prompt
+  }
+  const password = window.prompt(
+    `Enter password or token for ${username}@${url}`,
+  );
+  if (!password) {
+    toast.error("Authentication cancelled: Password/token not provided.");
+    return null; // Cancel auth if user cancels prompt
+  }
+
+  // Store prompted credentials in session map
+  sessionCredentials.set(urlOrigin, { username, password });
+  console.log(
+    `[VFS Op] Stored prompted credentials in session for ${urlOrigin}`,
+  );
+
+  return { username, password };
 };
+
 const onAuthFailure = (url: string, auth: any): any => {
+  const urlOrigin = new URL(url).origin;
   console.error(`[VFS Op] Git Auth FAILED for ${url}`, auth);
   toast.error(`Authentication failed for ${url}`);
-  return null; // Or re-prompt
+  // Clear potentially invalid session credentials on failure
+  if (sessionCredentials.has(urlOrigin)) {
+    console.log(
+      `[VFS Op] Clearing failed session credentials for ${urlOrigin}`,
+    );
+    sessionCredentials.delete(urlOrigin);
+  }
+  // Don't re-prompt automatically, let the operation fail
+  return null;
 };
+
 const onAuthSuccess = (url: string, auth: any): void => {
   console.log(`[VFS Op] Git Auth SUCCESS for ${url}`, auth);
+  // Optionally store successful session credentials if they weren't already stored
+  // const urlOrigin = new URL(url).origin;
+  // if (!sessionCredentials.has(urlOrigin) && auth.username && auth.password) {
+  //   sessionCredentials.set(urlOrigin, { username: auth.username, password: auth.password });
+  // }
 };
 
 // --- Exported VFS Operation Functions ---
@@ -107,9 +173,7 @@ export const initializeFsOp = async (
       backend: IndexedDB,
       name: `litechat_vfs_${vfsKey}`,
     };
-    // console.log("[VFS Op] Configuring ZenFS with:", vfsConf);
     await configureSingle(vfsConf);
-    // console.log(`[VFS Op] ZenFS configured successfully for key "${vfsKey}".`);
     return fs;
   } catch (error) {
     console.error(
@@ -125,33 +189,26 @@ export const initializeFsOp = async (
 
 export const listFilesOp = async (path: string): Promise<FileSystemEntry[]> => {
   const normalized = normalizePath(path);
-  // console.log(`[VFS Op] Listing directory: ${normalized}`); // Log path being listed
   try {
-    // Ensure the directory exists before trying to read it
     try {
       await fs.promises.stat(normalized);
-      // console.log(`[VFS Op] Directory ${normalized} exists.`); // Log existence
     } catch (statErr: any) {
       if (statErr.code === "ENOENT") {
         console.warn(
           `[VFS Op] Directory not found for listing, attempting creation: ${normalized}`,
         );
-        // Attempt to create it if it doesn't exist (might happen on first load)
         await createDirectoryRecursive(normalized);
-        return []; // Return empty as it was just created
+        return [];
       }
-      throw statErr; // Re-throw other stat errors
+      throw statErr;
     }
 
     const entries = await fs.promises.readdir(normalized);
-    // console.log(`[VFS Op] Raw readdir result for ${normalized}:`, entries); // Log raw result
-
     const statsPromises = entries.map(
       async (name: string): Promise<FileSystemEntry | null> => {
         const fullPath = joinPath(normalized, name);
         try {
           const fileStat: Stats = await fs.promises.stat(fullPath);
-          // console.log(`[VFS Op] Stat success for ${fullPath}:`, fileStat); // Log stat result
           return {
             name,
             path: fullPath,
@@ -161,23 +218,19 @@ export const listFilesOp = async (path: string): Promise<FileSystemEntry[]> => {
           };
         } catch (statErr: unknown) {
           console.error(`[VFS Op] Failed to stat ${fullPath}:`, statErr);
-          // If stat fails (e.g., file deleted concurrently), return null
           return null;
         }
       },
     );
     const stats = await Promise.all(statsPromises);
     const filteredStats = stats.filter((s): s is FileSystemEntry => s !== null);
-    // console.log(`[VFS Op] Processed entries for ${normalized}:`, filteredStats); // Log final processed list
-    // Filter out null results (where stat failed)
     return filteredStats;
   } catch (err: unknown) {
-    // Catch errors from readdir or the initial stat check
     console.error(`[VFS Op] Failed to list directory ${normalized}:`, err);
     toast.error(
       `Error listing files: ${err instanceof Error ? err.message : String(err)}`,
     );
-    throw err; // Re-throw the error for the caller (e.g., store) to handle
+    throw err;
   }
 };
 
@@ -256,7 +309,6 @@ export const deleteItemOp = async (
 };
 
 export const createDirectoryOp = async (path: string): Promise<void> => {
-  // Removed unnecessary try/catch
   await createDirectoryRecursive(path);
 };
 
@@ -429,7 +481,6 @@ export const downloadAllAsZipOp = async (
 
       for (const entry of entries) {
         if (entry.isDirectory) {
-          // Skip .git directory during export
           if (entry.name === ".git") continue;
           const subFolder = zipFolder.folder(entry.name);
           if (subFolder) {
@@ -546,39 +597,38 @@ export const isGitRepoOp = async (path: string): Promise<boolean> => {
 };
 
 export const gitCloneOp = async (
-  targetPath: string, // Path where the repo folder should be created
+  targetPath: string,
   url: string,
   branch?: string,
+  // Add optional credentials parameter
+  credentials?: { username?: string | null; password?: string | null },
 ): Promise<void> => {
   const normalizedTargetPath = normalizePath(targetPath);
-  // Extract repo name correctly, handling potential trailing slashes or .git
   const repoName = basename(url.replace(/\/$/, "").replace(/\.git$/, ""));
-  const dir = joinPath(normalizedTargetPath, repoName); // Final directory for the clone
+  const dir = joinPath(normalizedTargetPath, repoName);
 
   try {
-    // Check if target directory already exists
     try {
       await fs.promises.stat(dir);
       toast.error(`Directory "${repoName}" already exists in target location.`);
       return;
     } catch (e: any) {
-      if (e.code !== "ENOENT") throw e; // Re-throw unexpected errors
+      if (e.code !== "ENOENT") throw e;
     }
 
-    // Create the parent directory if it doesn't exist
     await createDirectoryRecursive(normalizedTargetPath);
 
-    // Perform the clone
     await git.clone({
       fs,
       http,
-      dir, // Use the calculated final directory
+      dir,
       corsProxy: CORS_PROXY,
       url,
       ref: branch || undefined,
       singleBranch: !!branch,
       depth: 10,
-      onAuth,
+      // Pass stored credentials to onAuth callback factory
+      onAuth: (authUrl) => onAuth(authUrl, credentials),
       onAuthFailure,
       onAuthSuccess,
       onProgress: (e) => {
@@ -646,7 +696,7 @@ export const gitCommitOp = async (
 
     if (!staged) {
       toast.info("No changes detected to commit.");
-      return; // Don't commit if nothing changed
+      return;
     }
 
     const sha = await git.commit({
@@ -668,10 +718,14 @@ export const gitCommitOp = async (
   }
 };
 
-export const gitPullOp = async (path: string): Promise<void> => {
+export const gitPullOp = async (
+  path: string,
+  // Add optional credentials parameter
+  credentials?: { username?: string | null; password?: string | null },
+): Promise<void> => {
   const dir = normalizePath(path);
   try {
-    const configOK = await ensureGitConfig(dir); // Ensure author info for merge commit
+    const configOK = await ensureGitConfig(dir);
     if (!configOK) {
       throw new Error("Git user configuration is missing or invalid.");
     }
@@ -690,7 +744,8 @@ export const gitPullOp = async (path: string): Promise<void> => {
         name: useSettingsStore.getState().gitUserName!,
         email: useSettingsStore.getState().gitUserEmail!,
       },
-      onAuth,
+      // Pass stored credentials to onAuth callback factory
+      onAuth: (authUrl) => onAuth(authUrl, credentials),
       onAuthFailure,
       onAuthSuccess,
     });
@@ -704,7 +759,11 @@ export const gitPullOp = async (path: string): Promise<void> => {
   }
 };
 
-export const gitPushOp = async (path: string): Promise<void> => {
+export const gitPushOp = async (
+  path: string,
+  // Add optional credentials parameter
+  credentials?: { username?: string | null; password?: string | null },
+): Promise<void> => {
   const dir = normalizePath(path);
   try {
     const result = await git.push({
@@ -712,9 +771,8 @@ export const gitPushOp = async (path: string): Promise<void> => {
       http,
       dir,
       corsProxy: CORS_PROXY,
-      // remote: 'origin', // Assumes remote is 'origin'
-      // ref: await git.currentBranch({ fs, dir }), // Push current branch
-      onAuth,
+      // Pass stored credentials to onAuth callback factory
+      onAuth: (authUrl) => onAuth(authUrl, credentials),
       onAuthFailure,
       onAuthSuccess,
     });
@@ -738,15 +796,13 @@ export const gitStatusOp = async (path: string): Promise<void> => {
   try {
     const status = await git.statusMatrix({ fs, dir });
     console.log("Git Status:", status);
-    // Format status for better readability in toast
     const formattedStatus = status.map(([file, head, workdir, stage]) => {
       let statusText = "";
       if (workdir === 0) statusText = "deleted";
       else if (head === 0 && workdir === 2) statusText = "new file";
       else if (head === 1 && workdir === 2) statusText = "modified";
-      else if (head === 1 && workdir === 1)
-        statusText = "unmodified"; // Should not appear often with matrix
-      else statusText = `h:${head} w:${workdir} s:${stage}`; // Fallback
+      else if (head === 1 && workdir === 1) statusText = "unmodified";
+      else statusText = `h:${head} w:${workdir} s:${stage}`;
 
       return `${file}: ${statusText}`;
     }).join(`

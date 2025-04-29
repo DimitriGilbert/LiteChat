@@ -11,8 +11,8 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button"; // Import Button
-import { RotateCcwIcon } from "lucide-react"; // Import reset icon
+import { Button } from "@/components/ui/button";
+import { RotateCcwIcon } from "lucide-react";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
 import { Separator } from "@/components/ui/separator";
@@ -29,7 +29,9 @@ const SettingsGeneralComponent: React.FC = () => {
     setStreamingRenderFPS,
     streamingCodeRenderFPS,
     setStreamingCodeRenderFPS,
-    resetGeneralSettings, // Import reset action
+    prismThemeUrl, // Get Prism theme URL
+    setPrismThemeUrl, // Get setter for Prism theme URL
+    resetGeneralSettings,
   } = useSettingsStore(
     useShallow((state) => ({
       theme: state.theme,
@@ -42,7 +44,9 @@ const SettingsGeneralComponent: React.FC = () => {
       setStreamingRenderFPS: state.setStreamingRenderFPS,
       streamingCodeRenderFPS: state.streamingCodeRenderFPS,
       setStreamingCodeRenderFPS: state.setStreamingCodeRenderFPS,
-      resetGeneralSettings: state.resetGeneralSettings, // Get reset action
+      prismThemeUrl: state.prismThemeUrl, // Get Prism theme URL
+      setPrismThemeUrl: state.setPrismThemeUrl, // Get setter
+      resetGeneralSettings: state.resetGeneralSettings,
     })),
   );
 
@@ -139,6 +143,23 @@ const SettingsGeneralComponent: React.FC = () => {
               <SelectItem value="system">System</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        {/* PrismJS Theme URL */}
+        <div className="rounded-lg border p-3 shadow-sm space-y-1.5">
+          <Label htmlFor="prism-theme-url" className="font-medium">
+            Code Block Theme URL (Optional)
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            Enter the URL of a PrismJS CSS theme file (e.g., from cdnjs). Leave
+            blank to use the default themes.
+          </p>
+          <Input
+            id="prism-theme-url"
+            type="url"
+            placeholder="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css"
+            value={prismThemeUrl ?? ""}
+            onChange={(e) => setPrismThemeUrl(e.target.value)}
+          />
         </div>
         {/* Streaming Markdown Toggle */}
         <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">

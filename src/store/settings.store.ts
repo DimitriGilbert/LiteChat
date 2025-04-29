@@ -17,9 +17,10 @@ interface SettingsState {
   enableStreamingMarkdown: boolean;
   streamingRenderFPS: number; // General FPS
   streamingCodeRenderFPS: number; // FPS specifically for code blocks
-  gitUserName: string | null; // Added
-  gitUserEmail: string | null; // Added
-  toolMaxSteps: number; // Added for max tool steps
+  gitUserName: string | null;
+  gitUserEmail: string | null;
+  toolMaxSteps: number;
+  prismThemeUrl: string | null; // Added for Prism theme URL
 }
 
 interface SettingsActions {
@@ -34,12 +35,13 @@ interface SettingsActions {
   setEnableAdvancedSettings: (enabled: boolean) => void;
   setEnableStreamingMarkdown: (enabled: boolean) => void;
   setStreamingRenderFPS: (fps: number) => void;
-  setStreamingCodeRenderFPS: (fps: number) => void; // Action for code FPS
-  setGitUserName: (name: string | null) => void; // Added
-  setGitUserEmail: (email: string | null) => void; // Added
-  setToolMaxSteps: (steps: number) => void; // Added setter for max steps
+  setStreamingCodeRenderFPS: (fps: number) => void;
+  setGitUserName: (name: string | null) => void;
+  setGitUserEmail: (email: string | null) => void;
+  setToolMaxSteps: (steps: number) => void;
+  setPrismThemeUrl: (url: string | null) => void; // Added setter for Prism theme
   loadSettings: () => Promise<void>;
-  resetGeneralSettings: () => Promise<void>; // Added reset action
+  resetGeneralSettings: () => Promise<void>;
 }
 
 // Define default constants
@@ -57,7 +59,8 @@ const DEFAULT_STREAMING_FPS = 30;
 const DEFAULT_STREAMING_CODE_FPS = 10;
 const DEFAULT_GIT_USER_NAME = null;
 const DEFAULT_GIT_USER_EMAIL = null;
-const DEFAULT_TOOL_MAX_STEPS = 5; // Default max steps
+const DEFAULT_TOOL_MAX_STEPS = 5;
+const DEFAULT_PRISM_THEME_URL = null; // Default Prism theme URL
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set) => ({
@@ -76,7 +79,8 @@ export const useSettingsStore = create(
     streamingCodeRenderFPS: DEFAULT_STREAMING_CODE_FPS,
     gitUserName: DEFAULT_GIT_USER_NAME,
     gitUserEmail: DEFAULT_GIT_USER_EMAIL,
-    toolMaxSteps: DEFAULT_TOOL_MAX_STEPS, // Initialize max steps
+    toolMaxSteps: DEFAULT_TOOL_MAX_STEPS,
+    prismThemeUrl: DEFAULT_PRISM_THEME_URL, // Initialize Prism theme URL
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -146,11 +150,17 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("gitUserEmail", trimmedEmail);
     },
 
-    // Setter for max tool steps
     setToolMaxSteps: (steps) => {
-      const clampedSteps = Math.max(1, Math.min(20, steps)); // Clamp between 1 and 20
+      const clampedSteps = Math.max(1, Math.min(20, steps));
       set({ toolMaxSteps: clampedSteps });
       PersistenceService.saveSetting("toolMaxSteps", clampedSteps);
+    },
+
+    // Setter for Prism theme URL
+    setPrismThemeUrl: (url) => {
+      const trimmedUrl = url?.trim() || null;
+      set({ prismThemeUrl: trimmedUrl });
+      PersistenceService.saveSetting("prismThemeUrl", trimmedUrl);
     },
 
     loadSettings: async () => {
@@ -170,7 +180,8 @@ export const useSettingsStore = create(
           streamingCodeFps,
           gitUserName,
           gitUserEmail,
-          toolMaxSteps, // Load max steps
+          toolMaxSteps,
+          prismThemeUrl, // Load Prism theme URL
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -222,10 +233,14 @@ export const useSettingsStore = create(
             "gitUserEmail",
             DEFAULT_GIT_USER_EMAIL,
           ),
-          // Load max steps setting
           PersistenceService.loadSetting<number>(
             "toolMaxSteps",
             DEFAULT_TOOL_MAX_STEPS,
+          ),
+          // Load Prism theme URL setting
+          PersistenceService.loadSetting<string | null>(
+            "prismThemeUrl",
+            DEFAULT_PRISM_THEME_URL,
           ),
         ]);
 
@@ -244,14 +259,14 @@ export const useSettingsStore = create(
           streamingCodeRenderFPS: streamingCodeFps,
           gitUserName,
           gitUserEmail,
-          toolMaxSteps, // Set loaded max steps
+          toolMaxSteps,
+          prismThemeUrl, // Set loaded Prism theme URL
         });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);
       }
     },
 
-    // Added reset action
     resetGeneralSettings: async () => {
       try {
         set({
@@ -259,6 +274,7 @@ export const useSettingsStore = create(
           enableStreamingMarkdown: DEFAULT_ENABLE_STREAMING_MARKDOWN,
           streamingRenderFPS: DEFAULT_STREAMING_FPS,
           streamingCodeRenderFPS: DEFAULT_STREAMING_CODE_FPS,
+          prismThemeUrl: DEFAULT_PRISM_THEME_URL, // Reset Prism theme URL
         });
         await Promise.all([
           PersistenceService.saveSetting("theme", DEFAULT_THEME),
@@ -273,6 +289,11 @@ export const useSettingsStore = create(
           PersistenceService.saveSetting(
             "streamingCodeRenderFPS",
             DEFAULT_STREAMING_CODE_FPS,
+          ),
+          // Reset Prism theme URL in persistence
+          PersistenceService.saveSetting(
+            "prismThemeUrl",
+            DEFAULT_PRISM_THEME_URL,
           ),
         ]);
         toast.success("General settings reset to defaults.");

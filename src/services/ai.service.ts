@@ -6,7 +6,7 @@ import type {
   ModMiddlewarePayloadMap,
   ModMiddlewareReturnMap,
   ReadonlyChatContextSnapshot,
-  ToolImplementation, // Keep this for ToolImplementation type usage
+  ToolImplementation,
 } from "@/types/litechat/modding";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useControlRegistryStore } from "@/store/control.store";
@@ -19,14 +19,14 @@ import {
   CoreMessage,
   LanguageModelUsage,
   ProviderMetadata,
-  ToolCallPart, // Still need the type for receiving from SDK
-  ToolResultPart, // Still need the type for receiving from SDK
+  ToolCallPart,
+  ToolResultPart,
   TextPart,
   ImagePart,
   CoreUserMessage,
   Tool,
-  TextStreamPart, // Use TextStreamPart which includes the 'finish' type
-  FinishReason, // Import the correct exported type
+  TextStreamPart,
+  FinishReason,
 } from "ai";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { useProviderStore } from "@/store/provider.store";
@@ -34,9 +34,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { PersistenceService } from "@/services/persistence.service";
 import { type AttachedFileMetadata } from "@/store/input.store";
-
-// Define the options type locally using Parameters
-type StreamTextParameters = Parameters<typeof streamText>[0];
+import { splitModelId } from "@/lib/litechat/provider-helpers"; // Import from helpers
 
 // Middleware runner remains the same
 async function runMiddleware<H extends ModMiddlewareHookName>(
@@ -70,31 +68,20 @@ async function runMiddleware<H extends ModMiddlewareHookName>(
   return currentPayload as ModMiddlewareReturnMap[H];
 }
 
-// Helper to split combined ID remains the same
-const splitModelId = (
-  combinedId: string | null,
-): { providerId: string | null; modelId: string | null } => {
-  if (!combinedId || !combinedId.includes(":")) {
-    return { providerId: null, modelId: null };
-  }
-  const parts = combinedId.split(":");
-  const providerId = parts[0];
-  const modelId = parts.slice(1).join(":");
-  return { providerId, modelId };
-};
+// Helper splitModelId REMOVED from here
 
 // Helper to get context snapshot remains the same
 function getContextSnapshot(): ReadonlyChatContextSnapshot {
   const iS = useInteractionStore.getState();
   const pS = useProviderStore.getState();
   const sS = useSettingsStore.getState();
-  const { providerId } = splitModelId(pS.selectedModelId);
+  const { providerId } = splitModelId(pS.selectedModelId); // Use imported helper
   const snapshot: ReadonlyChatContextSnapshot = {
     selectedConversationId: iS.currentConversationId,
     interactions: iS.interactions,
     isStreaming: iS.status === "streaming",
     selectedProviderId: providerId,
-    selectedModelId: pS.selectedModelId, // Keep combined model ID
+    selectedModelId: pS.selectedModelId,
     activeSystemPrompt: sS.globalSystemPrompt,
     temperature: sS.temperature,
     maxTokens: sS.maxTokens,
@@ -103,7 +90,7 @@ function getContextSnapshot(): ReadonlyChatContextSnapshot {
   return snapshot;
 }
 
-// Helper function to convert base64 string to Uint8Array (remains the same)
+// Helper function to convert base64 string to Uint8Array remains the same
 function base64ToUint8Array(base64: string): Uint8Array {
   try {
     const binaryString = atob(base64);
@@ -159,7 +146,7 @@ function processFileMetaToUserContent(
     const fileNameLower = fileMeta.name.toLowerCase();
     const isLikelyText =
       mimeType.startsWith("text/") ||
-      mimeType === "application/json" || // Treat JSON as text
+      mimeType === "application/json" ||
       COMMON_TEXT_EXTENSIONS.some((ext) => fileNameLower.endsWith(ext));
     const isImage = mimeType.startsWith("image/");
 
@@ -169,8 +156,6 @@ function processFileMetaToUserContent(
       const buffer = base64ToUint8Array(fileMeta.contentBase64);
       return { type: "image", image: buffer, mimeType: mimeType };
     } else if (!isLikelyText && fileMeta.contentBase64 !== undefined) {
-      // Handle other non-text, non-image types (e.g., audio, video, pdf)
-      // For now, just send a note. Future: could support specific types if model allows.
       console.warn(
         `AIService: Unsupported file type "${mimeType}" for direct inclusion. Sending note.`,
       );
@@ -179,7 +164,6 @@ function processFileMetaToUserContent(
         text: `[Attached file: ${fileMeta.name} (${mimeType})]`,
       };
     } else {
-      // Content is missing or type is ambiguous without content
       throw new Error(
         `Missing content or unable to determine type for file: ${fileMeta.name}`,
       );
@@ -206,23 +190,19 @@ export function buildHistoryMessages(
 ): CoreMessage[] {
   return historyInteractions.flatMap((i): CoreMessage[] => {
     const msgs: CoreMessage[] = [];
-    // Add user message (if it exists)
     if (i.prompt?.content && typeof i.prompt.content === "string") {
       msgs.push({ role: "user", content: i.prompt.content });
     }
 
-    // Add assistant response (text part)
     if (i.response && typeof i.response === "string") {
       msgs.push({ role: "assistant", content: i.response });
     }
 
-    // Add assistant tool calls (parse from stored strings)
     if (i.metadata?.toolCalls && Array.isArray(i.metadata.toolCalls)) {
       const validToolCalls: ToolCallPart[] = [];
       i.metadata.toolCalls.forEach((callStr) => {
         try {
           const parsedCall = JSON.parse(callStr);
-          // Basic validation
           if (
             parsedCall &&
             parsedCall.type === "tool-call" &&
@@ -253,13 +233,11 @@ export function buildHistoryMessages(
       }
     }
 
-    // Add tool results (parse from stored strings)
     if (i.metadata?.toolResults && Array.isArray(i.metadata.toolResults)) {
       const validToolResults: ToolResultPart[] = [];
       i.metadata.toolResults.forEach((resultStr) => {
         try {
           const parsedResult = JSON.parse(resultStr);
-          // Basic validation
           if (
             parsedResult &&
             parsedResult.type === "tool-result" &&
@@ -299,8 +277,8 @@ export class AIService {
   private static activeStreams = new Map<string, AbortController>();
 
   static async startInteraction(
-    aiPayload: PromptObject, // Metadata here might lack content if modified by middleware
-    initiatingTurnData: PromptTurnObject, // This *must* have the content
+    aiPayload: PromptObject,
+    initiatingTurnData: PromptTurnObject,
   ): Promise<string | null> {
     const interactionStoreStateAndActions = useInteractionStore.getState();
     const conversationId =
@@ -311,7 +289,6 @@ export class AIService {
       return null;
     }
 
-    // Run middleware on the AI payload (which lacks file content in metadata)
     const startMiddlewareResult = await runMiddleware(
       "middleware:interaction:beforeStart",
       { prompt: aiPayload, conversationId },
@@ -341,7 +318,6 @@ export class AIService {
         ? conversationInteractions[conversationInteractions.length - 1].id
         : null;
 
-    // --- Prepare final messages including file content ---
     const finalMessages: CoreMessage[] = [...finalPayload.messages];
     let lastUserMessageIndex = -1;
     for (let i = finalMessages.length - 1; i >= 0; i--) {
@@ -368,7 +344,6 @@ export class AIService {
 
       let userMessageContentParts: (TextPart | ImagePart)[] = [];
       if (typeof userMessage.content === "string") {
-        // Only add text part if it's not empty
         if (userMessage.content.trim()) {
           userMessageContentParts.push({
             type: "text",
@@ -385,7 +360,6 @@ export class AIService {
         );
       }
 
-      // Combine file contents and existing text/image parts
       finalMessages[lastUserMessageIndex] = {
         ...userMessage,
         content: [...fileContents, ...userMessageContentParts],
@@ -394,30 +368,21 @@ export class AIService {
         `AIService: Added ${fileContents.length} file(s) to user message content.`,
       );
     }
-    // --- End message preparation ---
 
-    // Create interaction data snapshot using the initiating turn data (with content)
     const interactionData: Interaction = {
       id: interactionId,
       conversationId: conversationId,
       type: "message.user_assistant",
-      // Save the initiating turn data snapshot, which includes file content
       prompt: { ...initiatingTurnData },
       response: null,
       status: "STREAMING",
       startedAt: new Date(),
       endedAt: null,
-      // Metadata from the final payload (after middleware)
-      // This metadata is for quick reference and should NOT contain full file content
       metadata: {
         ...finalPayload.metadata,
-        // Ensure attachedFiles here only contains basic info (NO content)
-        // We map over the initiatingTurnData's files to get the basic info
-        // because finalPayload.metadata.attachedFiles might have been altered by middleware
         attachedFiles: initiatingTurnData.metadata.attachedFiles?.map(
-          ({ contentBase64, contentText, ...rest }) => rest, // eslint-disable-line @typescript-eslint/no-unused-vars
+          ({ contentBase64, contentText, ...rest }) => rest,
         ),
-        // Initialize tool call/result arrays (as string arrays)
         toolCalls: [],
         toolResults: [],
       },
@@ -425,7 +390,6 @@ export class AIService {
       parentId: parentId,
     };
 
-    // Add interaction to state and persist (initial save)
     interactionStoreStateAndActions._addInteractionToState(interactionData);
     interactionStoreStateAndActions._addStreamingId(interactionId);
     PersistenceService.saveInteraction({ ...interactionData }).catch((e) => {
@@ -441,16 +405,13 @@ export class AIService {
       type: interactionData.type,
     });
 
-    // --- AI Call and Streaming Logic ---
     let streamResult: StreamTextResult<any, any> | undefined;
-    let finalStatus: Interaction["status"] = "ERROR"; // Default to error
+    let finalStatus: Interaction["status"] = "ERROR";
     let finalErrorMessage: string | undefined = undefined;
     let finalUsage: LanguageModelUsage | undefined = undefined;
     let finalProviderMetadata: ProviderMetadata | undefined = undefined;
-    // Use the correct EXPORTED type for finishReason
     let finalFinishReason: FinishReason | undefined = undefined;
 
-    // Store stringified versions during the stream
     const currentToolCallStrings: string[] = [];
     const currentToolResultStrings: string[] = [];
 
@@ -462,28 +423,23 @@ export class AIService {
         throw new Error("Selected model instance not available.");
       }
 
-      // --- Tool Preparation ---
       const allRegisteredTools = useControlRegistryStore
         .getState()
         .getRegisteredTools();
       const enabledToolNames = finalPayload.metadata?.enabledTools ?? [];
 
-      // Rebuild enabledToolsForSdk to potentially include execute
       const toolsWithExecute = enabledToolNames.reduce(
         (acc, name) => {
           const toolInfo = allRegisteredTools[name];
           if (toolInfo) {
-            const toolDefinition: Tool<any> = { ...toolInfo.definition }; // Copy definition
+            const toolDefinition: Tool<any> = { ...toolInfo.definition };
             if (toolInfo.implementation) {
-              // Add the execute function wrapper
               toolDefinition.execute = async (args: any) => {
                 try {
-                  // Ensure context snapshot is fresh for each execution
                   const contextSnapshot = getContextSnapshot();
                   const parsedArgs = toolInfo.definition.parameters.parse(args);
                   const implementation: ToolImplementation<any> =
                     toolInfo.implementation!;
-                  // Pass the fresh context snapshot
                   return await implementation(parsedArgs, contextSnapshot);
                 } catch (e) {
                   console.error(
@@ -492,7 +448,6 @@ export class AIService {
                   );
                   const toolError = e instanceof Error ? e.message : String(e);
                   if (e instanceof z.ZodError) {
-                    // Return a structure indicating error for the SDK
                     return {
                       _isError: true,
                       error: `Invalid arguments: ${e.errors.map((err) => `${err.path.join(".")} (${err.message})`).join(", ")}`,
@@ -508,28 +463,22 @@ export class AIService {
         },
         {} as Record<string, Tool<any>>,
       );
-      // --- End Tool Preparation ---
 
-      // Get maxSteps: prioritize parameter, fallback to global setting
       const maxSteps =
         finalPayload.parameters?.maxSteps ??
         useSettingsStore.getState().toolMaxSteps;
 
-      // Define the type for streamOptions using the inferred type
-      const streamOptions: StreamTextParameters = {
+      const streamOptions: Parameters<typeof streamText>[0] = {
         model: modelInstance as LanguageModelV1,
-        messages: finalMessages, // Use messages with processed file content
+        messages: finalMessages,
         abortSignal: abortController.signal,
-        // --- Use potentially overridden maxSteps ---
         maxSteps: maxSteps,
       };
 
-      // Conditionally add tools
       if (Object.keys(toolsWithExecute).length > 0) {
         streamOptions.tools = toolsWithExecute;
       }
 
-      // Assign toolChoice using the type from PromptObject
       streamOptions.toolChoice =
         finalPayload.toolChoice ??
         (Object.keys(toolsWithExecute).length > 0 ? "auto" : "none");
@@ -540,7 +489,6 @@ export class AIService {
       if (finalPayload.parameters) {
         if (finalPayload.parameters.temperature !== undefined)
           streamOptions.temperature = finalPayload.parameters.temperature;
-        // Do not pass maxSteps here, it's handled above
         if (finalPayload.parameters.max_tokens !== undefined)
           streamOptions.maxTokens = finalPayload.parameters.max_tokens;
         if (finalPayload.parameters.top_p !== undefined)
@@ -555,12 +503,11 @@ export class AIService {
             finalPayload.parameters.frequency_penalty;
       }
 
-      // Log the options just before the call
       console.log(
         `AIService: Calling streamText with options for ${interactionId}:`,
         {
-          model: streamOptions.model, // Log model info if possible
-          messages: JSON.stringify(streamOptions.messages), // Stringify messages for brevity
+          model: streamOptions.model,
+          messages: JSON.stringify(streamOptions.messages),
           system: streamOptions.system,
           temperature: streamOptions.temperature,
           maxTokens: streamOptions.maxTokens,
@@ -571,22 +518,19 @@ export class AIService {
           toolChoice: streamOptions.toolChoice,
           tools: streamOptions.tools
             ? Object.keys(streamOptions.tools)
-            : undefined, // Log tool names
+            : undefined,
           maxSteps: streamOptions.maxSteps,
         },
       );
 
-      // Pass the correctly typed streamOptions
       streamResult = await streamText(streamOptions);
 
-      // --- Modified Stream Consumption ---
-      // Use TextStreamPart type for the loop variable
       for await (const part of streamResult.fullStream as AsyncIterable<
         TextStreamPart<any>
       >) {
         if (abortController.signal.aborted) {
           console.log(`AIService: Stream ${interactionId} aborted by signal.`);
-          finalFinishReason = "stop"; // Set reason for finally block
+          finalFinishReason = "stop";
           throw new Error("Stream aborted by user.");
         }
 
@@ -615,9 +559,8 @@ export class AIService {
             break;
           }
           case "tool-call": {
-            const callString = JSON.stringify(part); // Stringify the part
+            const callString = JSON.stringify(part);
             currentToolCallStrings.push(callString);
-            // Update interaction state immediately with the stringified call
             useInteractionStore
               .getState()
               ._updateInteractionInState(interactionId, {
@@ -625,7 +568,7 @@ export class AIService {
                   ...useInteractionStore
                     .getState()
                     .interactions.find((i) => i.id === interactionId)?.metadata,
-                  toolCalls: [...currentToolCallStrings], // Update with the new string
+                  toolCalls: [...currentToolCallStrings],
                 },
               });
             console.log(
@@ -635,9 +578,8 @@ export class AIService {
             break;
           }
           case "tool-result": {
-            const resultString = JSON.stringify(part); // Stringify the part
+            const resultString = JSON.stringify(part);
             currentToolResultStrings.push(resultString);
-            // Update interaction state immediately with the stringified result
             useInteractionStore
               .getState()
               ._updateInteractionInState(interactionId, {
@@ -645,7 +587,7 @@ export class AIService {
                   ...useInteractionStore
                     .getState()
                     .interactions.find((i) => i.id === interactionId)?.metadata,
-                  toolResults: [...currentToolResultStrings], // Update with the new string
+                  toolResults: [...currentToolResultStrings],
                 },
               });
             console.log(
@@ -655,7 +597,6 @@ export class AIService {
             break;
           }
           case "finish":
-            // Capture the final details from the 'finish' part
             console.log("[AIService] Stream finish part received:", part);
             finalFinishReason = part.finishReason;
             finalUsage = part.usage;
@@ -663,11 +604,10 @@ export class AIService {
             break;
           case "error":
             console.error("[AIService] Stream error part:", part.error);
-            finalFinishReason = "error"; // Set reason for finally block
+            finalFinishReason = "error";
             throw new Error(
               `AI Stream Error: ${part.error instanceof Error ? part.error.message : part.error}`,
             );
-          // Handle other TextStreamPart types if needed (e.g., 'reasoning')
           case "reasoning":
           case "reasoning-signature":
           case "redacted-reasoning":
@@ -677,23 +617,20 @@ export class AIService {
           case "tool-call-delta":
           case "step-start":
           case "step-finish":
-            // console.log(`[AIService] Received stream part type: ${part.type}`);
             break;
         }
       }
-      // --- End Modified Stream Consumption ---
 
       if (abortController.signal.aborted) {
         finalFinishReason = "stop";
         throw new Error("Stream aborted by user.");
       }
 
-      // If the loop finishes without a 'finish' part (shouldn't happen with valid streams)
       if (finalFinishReason === undefined) {
         console.warn(
           `[AIService] Stream loop finished for ${interactionId} without receiving a 'finish' part.`,
         );
-        finalFinishReason = "other"; // Treat as 'other' or potentially 'error'
+        finalFinishReason = "other";
       }
     } catch (error: unknown) {
       console.error(
@@ -702,7 +639,6 @@ export class AIService {
       );
       const isAbort =
         error instanceof Error && error.message === "Stream aborted by user.";
-      // Use the captured finish reason if available, otherwise determine from error
       finalFinishReason = finalFinishReason ?? (isAbort ? "stop" : "error");
       finalErrorMessage = isAbort
         ? undefined
@@ -721,32 +657,27 @@ export class AIService {
       const finalBufferedContent =
         useInteractionStore.getState().activeStreamBuffers[interactionId] || "";
 
-      // --- Determine final status based on captured finishReason ---
       switch (finalFinishReason) {
         case "stop":
         case "length":
-        case "tool-calls": // Treat finishing with tool calls as complete
+        case "tool-calls":
           finalStatus = "COMPLETED";
-          break;
-          // case "abort":
-          //   finalStatus = "CANCELLED";
           break;
         case "error":
           finalStatus = "ERROR";
           break;
         case "other":
         default:
-          // If reason is 'other' or undefined after the loop, check buffer content
           if (
             finalBufferedContent.trim() ||
             currentToolCallStrings.length > 0
           ) {
-            finalStatus = "COMPLETED"; // Assume completed if there's content
+            finalStatus = "COMPLETED";
             console.warn(
               `[AIService] Interaction ${interactionId} finished with reason '${finalFinishReason || "unknown"}', but content exists. Marking COMPLETED.`,
             );
           } else {
-            finalStatus = "WARNING"; // Mark as warning if no content and reason is unclear
+            finalStatus = "WARNING";
             finalErrorMessage =
               finalErrorMessage ?? "Stream ended unexpectedly without output.";
             console.warn(
@@ -755,9 +686,7 @@ export class AIService {
           }
           break;
       }
-      // --- End Status Determination ---
 
-      // Get the latest metadata from the store *before* updating
       const currentInteractionMetadata =
         useInteractionStore
           .getState()
@@ -768,9 +697,8 @@ export class AIService {
         status: finalStatus,
         endedAt: new Date(),
         response: finalBufferedContent,
-        // Update the top-level metadata, ensuring attachedFiles has no content
         metadata: {
-          ...currentInteractionMetadata, // Start with existing metadata
+          ...currentInteractionMetadata,
           ...(finalUsage && {
             promptTokens: finalUsage.promptTokens,
             completionTokens: finalUsage.completionTokens,
@@ -779,36 +707,27 @@ export class AIService {
           ...(finalProviderMetadata && {
             providerMetadata: finalProviderMetadata,
           }),
-          // Only add error message if status is ERROR or WARNING
           ...((finalStatus === "ERROR" || finalStatus === "WARNING") && {
             error: finalErrorMessage,
           }),
-          // Ensure final tool calls/results (as strings) are included
           toolCalls: currentToolCallStrings,
           toolResults: currentToolResultStrings,
-          // Ensure attachedFiles metadata *without* content is preserved/updated
           attachedFiles: interactionData.metadata.attachedFiles?.map(
-            // @ts-expect-error i don't care about any
-            ({ contentBase64, contentText, ...rest }) => rest, // eslint-disable-line @typescript-eslint/no-unused-vars
+            ({ contentBase64, contentText, ...rest }) => rest,
           ),
         },
-        // IMPORTANT: The `prompt` field (PromptTurnObject snapshot) is NOT updated here.
-        // It remains as it was when the interaction was created, preserving the original input including file content.
       };
 
-      // Update the interaction state synchronously
       useInteractionStore
         .getState()
         ._updateInteractionInState(interactionId, finalUpdates);
       useInteractionStore.getState()._removeStreamingId(interactionId);
 
-      // Fetch the final state *after* synchronous updates for persistence
       const finalInteractionState = useInteractionStore
         .getState()
         .interactions.find((i) => i.id === interactionId);
 
       if (finalInteractionState) {
-        // Persist the final state (including the original prompt snapshot)
         useInteractionStore
           .getState()
           .updateInteractionAndPersist({ ...finalInteractionState })
@@ -824,7 +743,6 @@ export class AIService {
         );
       }
 
-      // Parse strings back to objects for the event emitter
       let parsedToolCalls: ToolCallPart[] = [];
       let parsedToolResults: ToolResultPart[] = [];
       try {
@@ -841,8 +759,8 @@ export class AIService {
         interactionId,
         status: finalStatus,
         error: finalErrorMessage ?? undefined,
-        toolCalls: parsedToolCalls, // Emit parsed objects
-        toolResults: parsedToolResults, // Emit parsed objects
+        toolCalls: parsedToolCalls,
+        toolResults: parsedToolResults,
       });
       console.log(
         `AIService: Finalized interaction ${interactionId} with status ${finalStatus}.`,
@@ -851,7 +769,6 @@ export class AIService {
     return interactionId;
   }
 
-  // stopInteraction remains the same
   static stopInteraction(interactionId: string) {
     const controller = this.activeStreams.get(interactionId);
     const interactionStoreActions = useInteractionStore.getState();

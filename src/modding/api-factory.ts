@@ -16,19 +16,9 @@ import { useModStore } from "@/store/mod.store";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { toast } from "sonner";
 import type { z } from "zod";
+import { splitModelId } from "@/lib/litechat/provider-helpers"; // Import from helpers
 
-// Helper to split combined ID - needed for context snapshot
-const splitModelId = (
-  combinedId: string | null,
-): { providerId: string | null; modelId: string | null } => {
-  if (!combinedId || !combinedId.includes(":")) {
-    return { providerId: null, modelId: null };
-  }
-  const parts = combinedId.split(":");
-  const providerId = parts[0];
-  const modelId = parts.slice(1).join(":");
-  return { providerId, modelId };
-};
+// Helper splitModelId REMOVED from here
 
 export function createModApi(mod: DbMod): LiteChatModApi {
   const modId = mod.id;
@@ -50,7 +40,6 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       unsubscribers.push(u);
       return u;
     },
-    // Use the imported Tool type
     registerTool: <P extends z.ZodSchema<any>>(
       toolName: string,
       definition: Tool<P>,
@@ -88,24 +77,21 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       const cS = useConversationStore.getState();
       const sS = useSettingsStore.getState();
       const pS = useProviderStore.getState();
-      // Extract providerId from selectedModelId
-      const { providerId } = splitModelId(pS.selectedModelId);
+      const { providerId } = splitModelId(pS.selectedModelId); // Use imported helper
 
-      // Derive selectedConversationId from conversation store state
       const selectedConversationId =
         cS.selectedItemType === "conversation" ? cS.selectedItemId : null;
 
       return Object.freeze({
-        selectedConversationId: selectedConversationId, // Use derived ID
+        selectedConversationId: selectedConversationId,
         interactions: Object.freeze(
-          // Use derived ID for comparison
           iS.currentConversationId === selectedConversationId
             ? iS.interactions.map((i) => Object.freeze({ ...i }))
             : [],
         ),
         isStreaming: iS.status === "streaming",
-        selectedProviderId: providerId, // Get providerId from split
-        selectedModelId: pS.selectedModelId, // Keep combined model ID
+        selectedProviderId: providerId,
+        selectedModelId: pS.selectedModelId,
         activeSystemPrompt: sS.globalSystemPrompt,
         temperature: sS.temperature,
         maxTokens: sS.maxTokens,

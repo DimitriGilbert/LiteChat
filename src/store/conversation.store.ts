@@ -15,7 +15,7 @@ import {
   normalizePath,
   dirname,
   formatBytes,
-  buildPath, // Import buildPath
+  buildPath,
 } from "@/lib/litechat/file-manager-utils";
 import { format } from "date-fns";
 
@@ -69,7 +69,6 @@ interface ConversationActions {
     updates: Partial<Omit<Project, "id" | "createdAt" | "path">>,
   ) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
-  // Modified to be async
   selectItem: (
     id: string | null,
     type: SidebarItemType | null,
@@ -79,14 +78,16 @@ interface ConversationActions {
     conversationId: string,
     format: "json" | "md",
   ) => Promise<void>;
-  exportProject: (projectId: string) => Promise<void>; // Added project export
+  exportProject: (projectId: string) => Promise<void>;
   exportAllConversations: () => Promise<void>;
   loadSyncRepos: () => Promise<void>;
   addSyncRepo: (
+    // Include new auth fields
     repoData: Omit<SyncRepo, "id" | "createdAt" | "updatedAt">,
   ) => Promise<string>;
   updateSyncRepo: (
     id: string,
+    // Include new auth fields
     updates: Partial<Omit<SyncRepo, "id" | "createdAt">>,
   ) => Promise<void>;
   deleteSyncRepo: (id: string) => Promise<void>;
@@ -106,7 +107,6 @@ interface ConversationActions {
     itemId: string | null,
     itemType: SidebarItemType | null,
   ) => string | null;
-  // Action to update tool settings for the current conversation
   updateCurrentConversationToolSettings: (settings: {
     enabledTools?: string[];
     toolMaxStepsOverride?: number | null;
@@ -266,11 +266,10 @@ export const useConversationStore = create(
         updatedAt: now,
         title: conversationData.title,
         projectId: conversationData.projectId ?? null,
-        // Initialize tool metadata for new conversations
         metadata: {
           ...(conversationData.metadata ?? {}),
-          enabledTools: [], // Start with no tools enabled
-          toolMaxStepsOverride: null, // Start with no override
+          enabledTools: [],
+          toolMaxStepsOverride: null,
         },
         syncRepoId: conversationData.syncRepoId ?? null,
         lastSyncedAt: conversationData.lastSyncedAt ?? null,
@@ -316,18 +315,16 @@ export const useConversationStore = create(
       set((state) => {
         const index = state.conversations.findIndex((c) => c.id === id);
         if (index !== -1) {
-          // Merge metadata carefully
           const existingMeta = state.conversations[index].metadata ?? {};
           const updateMeta = updates.metadata ?? {};
           const mergedMeta = { ...existingMeta, ...updateMeta };
 
           Object.assign(state.conversations[index], {
             ...updates,
-            metadata: mergedMeta, // Assign merged metadata
+            metadata: mergedMeta,
             updatedAt: new Date(),
           });
 
-          // Check if sync status needs update (only if relevant fields changed)
           const relevantFieldsChanged = [
             "title",
             "metadata",
@@ -342,7 +339,6 @@ export const useConversationStore = create(
           ) {
             state.conversationSyncStatus[id] = "needs-sync";
           }
-          // Sort is handled later by selectors/components if needed
         }
       });
 
@@ -350,7 +346,6 @@ export const useConversationStore = create(
 
       if (updatedConversationData) {
         try {
-          // Use deep clone before saving to ensure plain object
           const plainData = JSON.parse(JSON.stringify(updatedConversationData));
           await PersistenceService.saveConversation(plainData);
         } catch (e) {
@@ -359,7 +354,6 @@ export const useConversationStore = create(
             const index = state.conversations.findIndex((c) => c.id === id);
             if (index !== -1) {
               state.conversations[index] = originalConversation;
-              // Re-sort might be needed if update affected order
             }
             if (state.conversationSyncStatus[id] === "needs-sync") {
               state.conversationSyncStatus[id] = "idle";
@@ -416,7 +410,6 @@ export const useConversationStore = create(
           currentSelectedId === id &&
           currentSelectedType === "conversation"
         ) {
-          // Await the async call
           await useInteractionStore.getState().setCurrentConversationId(null);
         }
       } catch (e) {
@@ -424,7 +417,6 @@ export const useConversationStore = create(
         set((state) => {
           if (conversationToDelete) {
             state.conversations.push(conversationToDelete);
-            // Re-sort might be needed
             state.conversationSyncStatus[id] = "idle";
           }
           if (
@@ -447,13 +439,11 @@ export const useConversationStore = create(
       const projectName = projectData.name.trim();
       const newPath = buildPath(parentPath, projectName);
 
-      // No need for sibling check here, Dexie's unique index on 'path' handles it
-
       const newId = nanoid();
       const now = new Date();
       const newProject: Project = {
         id: newId,
-        path: newPath, // Add the calculated path
+        path: newPath,
         createdAt: now,
         updatedAt: now,
         name: projectName,
@@ -469,10 +459,8 @@ export const useConversationStore = create(
       });
 
       try {
-        // Fetch the newly added project from state *after* set
         const projectToSave = get().getProjectById(newId);
         if (projectToSave) {
-          // Use deep clone before saving
           const plainData = JSON.parse(JSON.stringify(projectToSave));
           await PersistenceService.saveProject(plainData);
         } else {
@@ -481,7 +469,6 @@ export const useConversationStore = create(
         return newId;
       } catch (e: any) {
         console.error("ConversationStore: Error adding project", e);
-        // Check if it's a Dexie ConstraintError (path collision)
         if (e.name === "ConstraintError") {
           toast.error(
             `A project or folder named "${projectName}" already exists in this location.`,
@@ -489,7 +476,6 @@ export const useConversationStore = create(
         } else {
           toast.error("Failed to save new project.");
         }
-        // Revert state
         set((state) => ({
           error: "Failed to save new project",
           projects: state.projects.filter((p) => p.id !== newId),
@@ -508,39 +494,33 @@ export const useConversationStore = create(
       let newPath = originalProject.path;
       let newName = originalProject.name;
 
-      // Recalculate path if name is changing
       if (updates.name !== undefined && updates.name !== originalProject.name) {
         newName = updates.name.trim();
         const parentProject = get().getProjectById(originalProject.parentId);
         const parentPath = parentProject ? parentProject.path : "/";
         newPath = buildPath(parentPath, newName);
-        // No need for sibling check, Dexie handles path uniqueness
       }
 
-      // Update state using Immer
       set((state) => {
         const index = state.projects.findIndex((p) => p.id === id);
         if (index !== -1) {
           Object.assign(state.projects[index], {
             ...updates,
-            name: newName, // Ensure updated name is set
-            path: newPath, // Ensure updated path is set
+            name: newName,
+            path: newPath,
             updatedAt: new Date(),
           });
         }
       });
 
-      // Fetch the updated, plain object *after* the set call
       const updatedProjectData = get().getProjectById(id);
 
       if (updatedProjectData) {
         try {
-          // Use deep clone before saving
           const plainData = JSON.parse(JSON.stringify(updatedProjectData));
           await PersistenceService.saveProject(plainData);
         } catch (e: any) {
           console.error("ConversationStore: Error updating project", e);
-          // Check if it's a Dexie ConstraintError (path collision)
           if (e.name === "ConstraintError") {
             toast.error(
               `A project or folder named "${newName}" already exists in this location.`,
@@ -548,15 +528,14 @@ export const useConversationStore = create(
           } else {
             toast.error("Failed to save project update.");
           }
-          // Revert state using the original copy
           set((state) => {
             const index = state.projects.findIndex((p) => p.id === id);
             if (index !== -1) {
-              state.projects[index] = originalProject; // Revert
+              state.projects[index] = originalProject;
             }
             state.error = "Failed to save project update";
           });
-          throw e; // Re-throw error after reverting state
+          throw e;
         }
       } else {
         console.error(
@@ -608,7 +587,6 @@ export const useConversationStore = create(
         await PersistenceService.deleteProject(id);
 
         if (descendantProjectIds.has(currentSelectedId ?? "")) {
-          // Await the async call
           await useInteractionStore.getState().setCurrentConversationId(null);
         }
       } catch (e) {
@@ -618,11 +596,9 @@ export const useConversationStore = create(
       }
     },
 
-    // Modified to be async
     selectItem: async (id, type) => {
       if (get().selectedItemId !== id || get().selectedItemType !== type) {
         set({ selectedItemId: id, selectedItemType: type });
-        // Await the async call to ensure InteractionStore is updated
         await useInteractionStore
           .getState()
           .setCurrentConversationId(type === "conversation" ? id : null);
@@ -670,7 +646,6 @@ export const useConversationStore = create(
           }),
         );
         await Promise.all(interactionPromises);
-        // Await the async call
         await get().selectItem(newId, "conversation");
         toast.success("Conversation imported successfully.");
       } catch (error) {
@@ -752,12 +727,10 @@ export const useConversationStore = create(
 
           const children: (ProjectExportNode | ConversationExportNode)[] = [];
 
-          // Recursively build child projects
           for (const childProj of childProjects) {
             children.push(await buildExportTree(childProj.id));
           }
 
-          // Build child conversations
           for (const childConvo of childConversations) {
             const interactions =
               await PersistenceService.loadInteractionsForConversation(
@@ -839,7 +812,11 @@ export const useConversationStore = create(
         id: newId,
         createdAt: now,
         updatedAt: now,
-        ...repoData,
+        name: repoData.name,
+        remoteUrl: repoData.remoteUrl,
+        branch: repoData.branch,
+        username: repoData.username ?? null, // Handle new fields
+        password: repoData.password ?? null, // Handle new fields
       };
       set((state) => {
         state.syncRepos.push(newRepo);
@@ -996,26 +973,30 @@ export const useConversationStore = create(
           if (e.code !== "ENOENT") throw e;
         }
 
+        // Pass credentials to clone/pull/push operations
+        const credentials = {
+          username: repo.username,
+          password: repo.password,
+        };
+
         if (!repoExists) {
           toast.info(`Cloning repository "${repo.name}" for first sync...`);
           await VfsOps.gitCloneOp(
             dirname(repoDir),
             repo.remoteUrl,
             repo.branch,
+            credentials, // Pass credentials
           );
           try {
             await VfsOps.VFS.promises.stat(joinPath(repoDir, ".git"));
-          } catch (
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            verifyError
-          ) {
+          } catch (verifyError) {
             throw new Error(
               `Clone seemed successful but repo dir "${repoDir}" not found.`,
             );
           }
         } else {
           toast.info(`Pulling latest changes for "${repo.name}"...`);
-          await VfsOps.gitPullOp(repoDir);
+          await VfsOps.gitPullOp(repoDir, credentials); // Pass credentials
         }
 
         let remoteConvoData: {
@@ -1066,7 +1047,7 @@ export const useConversationStore = create(
             repoDir,
             `Sync conversation: ${conversation.title} (${conversationId})`,
           );
-          await VfsOps.gitPushOp(repoDir);
+          await VfsOps.gitPushOp(repoDir, credentials); // Pass credentials
           await updateConversation(conversationId, {
             lastSyncedAt: new Date(),
           });
@@ -1094,13 +1075,11 @@ export const useConversationStore = create(
             if (index !== -1) {
               state.conversations[index] = syncedConversation;
             }
-            // Sort handled by component
           });
           if (
             get().selectedItemId === conversationId &&
             get().selectedItemType === "conversation"
           ) {
-            // Await the async call
             await useInteractionStore
               .getState()
               .loadInteractions(conversationId);
@@ -1116,7 +1095,6 @@ export const useConversationStore = create(
         }
       } catch (error: any) {
         console.error(`Sync failed for conversation ${conversationId}:`, error);
-        // Use type check for error message
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         toast.error(`Sync failed: ${errorMessage}`);
@@ -1124,7 +1102,6 @@ export const useConversationStore = create(
       }
     },
 
-    // --- Selectors ---
     getProjectById: (id) => {
       if (!id) return undefined;
       return get().projects.find((p) => p.id === id);
@@ -1153,7 +1130,6 @@ export const useConversationStore = create(
       return currentProject?.id ?? null;
     },
 
-    // --- New Action ---
     updateCurrentConversationToolSettings: async (settings) => {
       const { selectedItemId, selectedItemType, updateConversation } = get();
 
@@ -1180,10 +1156,9 @@ export const useConversationStore = create(
         newMeta.toolMaxStepsOverride = settings.toolMaxStepsOverride;
       }
 
-      // Only update if metadata actually changed
       if (
         JSON.stringify(newMeta) !== JSON.stringify(currentMeta) ||
-        !currentConversation.metadata // Update if metadata was previously undefined
+        !currentConversation.metadata
       ) {
         await updateConversation(selectedItemId, { metadata: newMeta });
       }

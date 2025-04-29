@@ -11,38 +11,24 @@ import { PersistenceService } from "@/services/persistence.service";
 import {
   createAiModelConfig,
   DEFAULT_MODELS,
-} from "@/lib/litechat/provider-helpers";
+  combineModelId, // Import from helpers
+  splitModelId, // Import from helpers
+} from "@/lib/litechat/provider-helpers"; // Correct import path
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
-const LAST_SELECTION_KEY = "provider:lastModelSelection"; // Combined ID
-const GLOBAL_MODEL_SORT_ORDER_KEY = "provider:globalModelSortOrder"; // Combined IDs
+const LAST_SELECTION_KEY = "provider:lastModelSelection";
+const GLOBAL_MODEL_SORT_ORDER_KEY = "provider:globalModelSortOrder";
 
-// Helper to combine provider and model IDs
-const combineModelId = (providerId: string, modelId: string): string =>
-  `${providerId}:${modelId}`;
-
-// Helper to split combined ID
-const splitModelId = (
-  combinedId: string | null,
-): { providerId: string | null; modelId: string | null } => {
-  if (!combinedId || !combinedId.includes(":")) {
-    return { providerId: null, modelId: null };
-  }
-  const parts = combinedId.split(":");
-  // Handle potential cases where modelId itself contains ':'
-  const providerId = parts[0];
-  const modelId = parts.slice(1).join(":");
-  return { providerId, modelId };
-};
+// Helper functions combineModelId and splitModelId are REMOVED from here
 
 export interface ProviderState {
   dbProviderConfigs: DbProviderConfig[];
   dbApiKeys: DbApiKey[];
-  selectedModelId: string | null; // Combined ID, e.g., "openai:gpt-4o"
-  globalModelSortOrder: string[]; // Array of combined IDs
+  selectedModelId: string | null;
+  globalModelSortOrder: string[];
   providerFetchStatus: Record<string, FetchStatus>;
   isLoading: boolean;
   error: string | null;
@@ -51,7 +37,7 @@ export interface ProviderState {
 
 export interface ProviderActions {
   loadInitialData: () => Promise<void>;
-  selectModel: (combinedId: string | null) => void; // Takes combined ID
+  selectModel: (combinedId: string | null) => void;
   addApiKey: (
     name: string,
     providerId: string,
@@ -71,11 +57,9 @@ export interface ProviderActions {
   getSelectedModel: () => AiModelConfig | undefined;
   getApiKeyForProvider: (providerId: string) => string | undefined;
   getActiveProviders: () => AiProviderConfig[];
-  getGloballyEnabledAndOrderedModels: () => Omit<AiModelConfig, "instance">[]; // Selector for UI
   getAllAvailableModelDefsForProvider: (
-    // Needed for provider edit UI
     providerConfigId: string,
-  ) => { id: string; name: string; metadata?: Record<string, any> }[]; // Include metadata
+  ) => { id: string; name: string; metadata?: Record<string, any> }[];
   _setProviderFetchStatus: (providerId: string, status: FetchStatus) => void;
   setEnableApiKeyManagement: (enabled: boolean) => void;
 }
@@ -118,19 +102,17 @@ export const useProviderStore = create(
             ),
           ]);
 
-        // Set configs and keys first, so selectors can work
         set({
           dbProviderConfigs: configs,
           dbApiKeys: keys,
           enableApiKeyManagement: enableApiMgmt,
         });
 
-        // Calculate currently enabled models based on loaded configs
         const currentGloballyEnabledModels = configs.reduce(
           (acc: string[], provider) => {
             if (provider.isEnabled && provider.enabledModels) {
               provider.enabledModels.forEach((modelId) => {
-                acc.push(combineModelId(provider.id, modelId));
+                acc.push(combineModelId(provider.id, modelId)); // Use imported helper
               });
             }
             return acc;
@@ -138,23 +120,13 @@ export const useProviderStore = create(
           [],
         );
         const enabledSet = new Set(currentGloballyEnabledModels);
-
-        // Filter saved order to only include currently enabled models
         const validSavedOrder = savedOrder.filter((id) => enabledSet.has(id));
 
-        set({
-          globalModelSortOrder: validSavedOrder, // Use filtered order
-        });
-
         let modelToSelect = lastSelectedModelId;
-
-        // Validate saved selection against currently enabled models
         const isValidSelection = modelToSelect && enabledSet.has(modelToSelect);
 
         if (!isValidSelection) {
-          // If saved selection is invalid, try the first in the (valid) sort order
           modelToSelect = validSavedOrder[0] ?? null;
-          // If sort order is empty, try the first overall enabled model
           if (!modelToSelect) {
             modelToSelect = currentGloballyEnabledModels[0] ?? null;
           }
@@ -164,11 +136,11 @@ export const useProviderStore = create(
         }
 
         set({
+          globalModelSortOrder: validSavedOrder,
           selectedModelId: modelToSelect,
           isLoading: false,
         });
 
-        // Save the final validated selection state
         await PersistenceService.saveSetting(LAST_SELECTION_KEY, modelToSelect);
       } catch (e) {
         console.error("ProviderStore: Error loading initial data", e);
@@ -256,7 +228,6 @@ export const useProviderStore = create(
           state.dbProviderConfigs.push(newConfig);
         });
         toast.success(`Provider "${configData.name}" added.`);
-        // No automatic selection needed
         return newId;
       } catch (e) {
         console.error("ProviderStore: Error adding provider config", e);
@@ -289,53 +260,39 @@ export const useProviderStore = create(
           }
         });
 
-        // --- Update Global Sort Order & Selection ---
         const currentOrder = get().globalModelSortOrder;
+        const configs = get().dbProviderConfigs;
 
         let newOrder = [...currentOrder];
         let selectionNeedsValidation = false;
 
-        // Get the set of combined IDs for *all* models associated with this provider
-        const providerModelIds = (
-          updatedConfigData.fetchedModels ??
-          DEFAULT_MODELS[updatedConfigData.type] ??
-          []
-        ).map((m) => combineModelId(id, m.id));
-
-        // Get the set of combined IDs for *enabled* models for this provider
-        const providerEnabledModelIds = new Set(
-          (updatedConfigData.enabledModels ?? []).map((mId) =>
-            combineModelId(id, mId),
-          ),
-        );
-
-        if (changes.isEnabled === false) {
-          // Provider disabled: remove all its models from global order
-          newOrder = newOrder.filter((mId) => !providerModelIds.includes(mId));
-          selectionNeedsValidation = true; // Force re-validation
-        } else if (changes.isEnabled === true || changes.enabledModels) {
-          // Provider enabled or its enabled models changed
-          // 1. Filter out models from this provider that are no longer enabled
-          newOrder = newOrder.filter(
-            (mId) =>
-              !providerModelIds.includes(mId) ||
-              providerEnabledModelIds.has(mId),
-          );
-          // 2. Add newly enabled models (that might not be in the order yet) to the end
-          providerEnabledModelIds.forEach((mId) => {
-            if (!newOrder.includes(mId)) {
-              newOrder.push(mId);
+        const currentGloballyEnabledModels = configs.reduce(
+          (acc: string[], provider) => {
+            if (provider.isEnabled && provider.enabledModels) {
+              provider.enabledModels.forEach((modelId) => {
+                acc.push(combineModelId(provider.id, modelId)); // Use imported helper
+              });
             }
-          });
-          selectionNeedsValidation = true; // Force re-validation
-        }
+            return acc;
+          },
+          [],
+        );
+        const enabledSet = new Set(currentGloballyEnabledModels);
+        newOrder = currentOrder.filter((mId) => enabledSet.has(mId));
 
-        // Persist the potentially updated global order and re-validate selection
+        enabledSet.forEach((mId) => {
+          if (!newOrder.includes(mId)) {
+            newOrder.push(mId);
+          }
+        });
+
+        selectionNeedsValidation = true;
+
         if (
           JSON.stringify(newOrder) !== JSON.stringify(currentOrder) ||
           selectionNeedsValidation
         ) {
-          await get().setGlobalModelSortOrder(newOrder); // This handles persistence and selection validation
+          await get().setGlobalModelSortOrder(newOrder);
         }
       } catch (e) {
         console.error("ProviderStore: Error updating provider config", e);
@@ -354,25 +311,28 @@ export const useProviderStore = create(
       try {
         await PersistenceService.deleteProviderConfig(id);
 
-        // Remove provider's models from global sort order
-        const modelsToRemove = (
-          config.fetchedModels ??
-          DEFAULT_MODELS[config.type] ??
-          []
-        ).map((m) => combineModelId(id, m.id));
-        const currentOrder = get().globalModelSortOrder;
-        const newOrder = currentOrder.filter(
-          (mId) => !modelsToRemove.includes(mId),
-        );
-
-        // Update provider list state FIRST
         set((state) => {
           state.dbProviderConfigs = state.dbProviderConfigs.filter(
             (p) => p.id !== id,
           );
         });
 
-        // Persist the new order and re-validate selection
+        const configs = get().dbProviderConfigs;
+        const currentGloballyEnabledModels = configs.reduce(
+          (acc: string[], provider) => {
+            if (provider.isEnabled && provider.enabledModels) {
+              provider.enabledModels.forEach((modelId) => {
+                acc.push(combineModelId(provider.id, modelId)); // Use imported helper
+              });
+            }
+            return acc;
+          },
+          [],
+        );
+        const enabledSet = new Set(currentGloballyEnabledModels);
+        const currentOrder = get().globalModelSortOrder;
+        const newOrder = currentOrder.filter((mId) => enabledSet.has(mId));
+
         await get().setGlobalModelSortOrder(newOrder);
 
         toast.success(`Provider "${configName}" deleted.`);
@@ -407,7 +367,6 @@ export const useProviderStore = create(
         const apiKey = get().dbApiKeys.find((k) => k.id === apiKeyId)?.value;
         const fetched = await fetchModelsForProvider(config, apiKey);
 
-        // Update fetchedModels, keep existing enabledModels
         await get().updateProviderConfig(providerConfigId, {
           fetchedModels: fetched,
           modelsLastFetchedAt: new Date(),
@@ -418,7 +377,6 @@ export const useProviderStore = create(
       } catch (error) {
         console.error(`Error fetching models for ${config.name}:`, error);
         get()._setProviderFetchStatus(providerConfigId, "error");
-        // FetchModelsForProvider already shows a toast on error
       }
     },
 
@@ -430,26 +388,35 @@ export const useProviderStore = create(
         uniqueIds,
       );
 
-      // Re-validate selection
       const currentSelected = get().selectedModelId;
-      const enabledModels = get().getGloballyEnabledAndOrderedModels(); // Gets currently valid enabled models
-      const enabledIdsSet = new Set(enabledModels.map((m) => m.id));
+      const configs = get().dbProviderConfigs;
+      const currentGloballyEnabledModels = configs.reduce(
+        (acc: string[], provider) => {
+          if (provider.isEnabled && provider.enabledModels) {
+            provider.enabledModels.forEach((modelId) => {
+              acc.push(combineModelId(provider.id, modelId)); // Use imported helper
+            });
+          }
+          return acc;
+        },
+        [],
+      );
+      const enabledIdsSet = new Set(currentGloballyEnabledModels);
 
       if (currentSelected && !enabledIdsSet.has(currentSelected)) {
-        // If current selection is no longer enabled OR not in the new valid order, select a new default
         const firstValid =
           uniqueIds.find((id) => enabledIdsSet.has(id)) ??
-          enabledModels[0]?.id ?? // Fallback to first overall enabled if order is empty/invalid
+          currentGloballyEnabledModels.find((id) => uniqueIds.includes(id)) ??
+          currentGloballyEnabledModels[0] ??
           null;
         console.log(
           `[ProviderStore] Selection ${currentSelected} invalidated by order change. Selecting ${firstValid}`,
         );
         get().selectModel(firstValid);
       } else if (!currentSelected && uniqueIds.length > 0) {
-        // If nothing was selected, select the first valid model from the new order
         const firstValid =
           uniqueIds.find((id) => enabledIdsSet.has(id)) ??
-          enabledModels[0]?.id ?? // Fallback
+          currentGloballyEnabledModels[0] ??
           null;
         console.log(
           `[ProviderStore] No selection, selecting first from new order: ${firstValid}`,
@@ -469,14 +436,13 @@ export const useProviderStore = create(
       const { selectedModelId, dbProviderConfigs, dbApiKeys } = get();
       if (!selectedModelId) return undefined;
 
-      const { providerId, modelId } = splitModelId(selectedModelId);
+      const { providerId, modelId } = splitModelId(selectedModelId); // Use imported helper
       if (!providerId || !modelId) return undefined;
 
       const config = dbProviderConfigs.find((p) => p.id === providerId);
       if (!config) return undefined;
 
       const apiKeyRecord = dbApiKeys.find((k) => k.id === config.apiKeyId);
-      // Pass the simple modelId to createAiModelConfig
       return createAiModelConfig(config, modelId, apiKeyRecord?.value);
     },
 
@@ -486,7 +452,6 @@ export const useProviderStore = create(
     },
 
     getActiveProviders: () => {
-      // Returns basic provider info, mainly for settings UI
       return get()
         .dbProviderConfigs.filter((p: DbProviderConfig) => p.isEnabled)
         .map((c: DbProviderConfig): AiProviderConfig => {
@@ -498,72 +463,9 @@ export const useProviderStore = create(
             id: c.id,
             name: c.name,
             type: c.type,
-            allAvailableModels: allAvailable, // Include metadata here
+            allAvailableModels: allAvailable,
           };
         });
-    },
-
-    getGloballyEnabledAndOrderedModels: () => {
-      const { dbProviderConfigs, globalModelSortOrder } = get();
-
-      const globallyEnabledModelsMap = new Map<
-        string,
-        Omit<AiModelConfig, "instance">
-      >();
-      const enabledCombinedIds = new Set<string>();
-
-      // First pass: collect all enabled models from enabled providers
-      dbProviderConfigs.forEach((config) => {
-        if (!config.isEnabled || !config.enabledModels) return;
-
-        const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
-        const allProviderModels =
-          config.fetchedModels ?? DEFAULT_MODELS[providerTypeKey] ?? [];
-        const providerModelsMap = new Map(
-          allProviderModels.map((m) => [m.id, m]),
-        );
-
-        config.enabledModels.forEach((modelId) => {
-          const combinedId = combineModelId(config.id, modelId);
-          const modelDef = providerModelsMap.get(modelId);
-          if (modelDef) {
-            enabledCombinedIds.add(combinedId);
-            globallyEnabledModelsMap.set(combinedId, {
-              id: combinedId,
-              name: modelDef.name || modelId,
-              providerId: config.id,
-              providerName: config.name,
-              metadata: modelDef.metadata, // Include metadata
-              // Add other non-instance properties if needed later
-            });
-          }
-        });
-      });
-
-      // Second pass: sort according to globalModelSortOrder
-      const sortedModels: Omit<AiModelConfig, "instance">[] = [];
-      const addedIds = new Set<string>();
-
-      globalModelSortOrder.forEach((combinedId) => {
-        if (enabledCombinedIds.has(combinedId)) {
-          const details = globallyEnabledModelsMap.get(combinedId);
-          if (details && !addedIds.has(combinedId)) {
-            sortedModels.push(details);
-            addedIds.add(combinedId);
-          }
-        }
-      });
-
-      // Add any remaining enabled models not present in the sort order (alphabetical)
-      const remainingEnabled = Array.from(enabledCombinedIds)
-        .filter((combinedId) => !addedIds.has(combinedId))
-        .map((combinedId) => globallyEnabledModelsMap.get(combinedId))
-        .filter((details): details is Omit<AiModelConfig, "instance"> =>
-          Boolean(details),
-        )
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      return [...sortedModels, ...remainingEnabled];
     },
 
     getAllAvailableModelDefsForProvider: (providerConfigId) => {
@@ -572,10 +474,9 @@ export const useProviderStore = create(
       );
       if (!config) return [];
       const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
-      // Ensure a copy is returned, including metadata
       return [
         ...(config.fetchedModels ?? (DEFAULT_MODELS[providerTypeKey] || [])),
-      ].map((m) => ({ ...m })); // Create shallow copies
+      ].map((m) => ({ ...m }));
     },
   })),
 );

@@ -10,6 +10,35 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createOllama } from "ollama-ai-provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
+// --- Helper Functions (Moved and Exported) ---
+
+/**
+ * Combines provider and model IDs into a single string.
+ * @param providerId The ID of the provider config.
+ * @param modelId The specific model ID.
+ * @returns A combined string ID.
+ */
+export const combineModelId = (providerId: string, modelId: string): string =>
+  `${providerId}:${modelId}`;
+
+/**
+ * Splits a combined model ID string back into provider and model IDs.
+ * @param combinedId The combined ID string (e.g., "providerId:modelId").
+ * @returns An object containing providerId and modelId (or null if invalid).
+ */
+export const splitModelId = (
+  combinedId: string | null,
+): { providerId: string | null; modelId: string | null } => {
+  if (!combinedId || !combinedId.includes(":")) {
+    return { providerId: null, modelId: null };
+  }
+  const parts = combinedId.split(":");
+  // Handle potential cases where modelId itself contains ':'
+  const providerId = parts[0];
+  const modelId = parts.slice(1).join(":");
+  return { providerId, modelId };
+};
+
 // --- Provider Type Helpers ---
 
 export const requiresApiKey = (type: DbProviderType | null): boolean => {
@@ -47,7 +76,7 @@ export const REQUIRES_API_KEY_TYPES: DbProviderType[] = [
 
 export const DEFAULT_MODELS: Record<
   DbProviderType,
-  { id: string; name: string; metadata?: Record<string, any> }[] // Add metadata
+  { id: string; name: string; metadata?: Record<string, any> }[]
 > = {
   openai: [{ id: "gpt-4o", name: "GPT-4o" }],
   google: [
@@ -74,10 +103,9 @@ export const ensureV1Path = (baseUrl: string): string => {
   }
 };
 
-// Instantiates the AI SDK model instance
 export function instantiateModelInstance(
   config: DbProviderConfig,
-  modelId: string, // Simple model ID (e.g., "gpt-4o")
+  modelId: string,
   apiKey?: string,
 ): any | null {
   try {
@@ -107,10 +135,9 @@ export function instantiateModelInstance(
   }
 }
 
-// Creates the runtime AiModelConfig object
 export function createAiModelConfig(
   config: DbProviderConfig,
-  modelId: string, // Simple model ID (e.g., "gpt-4o")
+  modelId: string,
   apiKey?: string,
 ): AiModelConfig | undefined {
   const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
@@ -130,15 +157,13 @@ export function createAiModelConfig(
   );
 
   return {
-    id: `${config.id}:${modelId}`, // Combined ID
+    id: combineModelId(config.id, modelId), // Use helper here
     name: modelInfo.name,
     providerId: config.id,
     providerName: config.name,
     instance,
     supportsImageGeneration: supportsImageGen,
     supportsToolCalling: supportsTools,
-    metadata: modelInfo.metadata, // Include metadata
+    metadata: modelInfo.metadata,
   };
 }
-
-// getDefaultModelIdForProvider REMOVED - Default selection is now handled globally in the store

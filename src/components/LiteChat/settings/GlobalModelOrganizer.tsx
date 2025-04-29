@@ -24,21 +24,21 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { SortableModelItem } from "@/components/LiteChat/settings/SortableModelItem";
+import type { AiModelConfig } from "@/types/litechat/provider";
+import {
+  combineModelId,
+  DEFAULT_MODELS,
+} from "@/lib/litechat/provider-helpers"; // Import combineModelId from helpers
 
 export const GlobalModelOrganizer: React.FC = () => {
-  // Select underlying data and the selector function
   const {
     setGlobalModelSortOrder,
-    getGloballyEnabledAndOrderedModels, // Select the function
-    dbProviderConfigs, // Select underlying data
-    globalModelSortOrder, // Select underlying data
+    dbProviderConfigs,
+    globalModelSortOrder,
     isLoading,
   } = useProviderStore(
     useShallow((state) => ({
       setGlobalModelSortOrder: state.setGlobalModelSortOrder,
-      getGloballyEnabledAndOrderedModels:
-        state.getGloballyEnabledAndOrderedModels, // The selector function
-      // Select the state the selector depends on
       dbProviderConfigs: state.dbProviderConfigs,
       globalModelSortOrder: state.globalModelSortOrder,
       isLoading: state.isLoading,
@@ -47,22 +47,66 @@ export const GlobalModelOrganizer: React.FC = () => {
 
   const [filterText, setFilterText] = useState("");
 
-  // Call the selector outside the hook and memoize its result
   const enabledAndOrderedModels = useMemo(() => {
-    return getGloballyEnabledAndOrderedModels
-      ? getGloballyEnabledAndOrderedModels()
-      : [];
-  }, [
-    // not an error, needed to update and prevent render loop from hell
-    getGloballyEnabledAndOrderedModels,
-    dbProviderConfigs,
-    globalModelSortOrder,
-  ]);
+    const globallyEnabledModelsMap = new Map<
+      string,
+      Omit<AiModelConfig, "instance">
+    >();
+    const enabledCombinedIds = new Set<string>();
 
-  // Filter the models based on filterText
+    dbProviderConfigs.forEach((config) => {
+      if (!config.isEnabled || !config.enabledModels) return;
+
+      const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
+      const allProviderModels =
+        config.fetchedModels ?? DEFAULT_MODELS[providerTypeKey] ?? [];
+      const providerModelsMap = new Map(
+        allProviderModels.map((m) => [m.id, m]),
+      );
+
+      config.enabledModels.forEach((modelId) => {
+        const combinedId = combineModelId(config.id, modelId); // Use imported helper
+        const modelDef = providerModelsMap.get(modelId);
+        if (modelDef) {
+          enabledCombinedIds.add(combinedId);
+          globallyEnabledModelsMap.set(combinedId, {
+            id: combinedId,
+            name: modelDef.name || modelId,
+            providerId: config.id,
+            providerName: config.name,
+            metadata: modelDef.metadata,
+          });
+        }
+      });
+    });
+
+    const sortedModels: Omit<AiModelConfig, "instance">[] = [];
+    const addedIds = new Set<string>();
+
+    globalModelSortOrder.forEach((combinedId) => {
+      if (enabledCombinedIds.has(combinedId)) {
+        const details = globallyEnabledModelsMap.get(combinedId);
+        if (details && !addedIds.has(combinedId)) {
+          sortedModels.push(details);
+          addedIds.add(combinedId);
+        }
+      }
+    });
+
+    const remainingEnabled = Array.from(enabledCombinedIds)
+      .filter((combinedId) => !addedIds.has(combinedId))
+      .map((combinedId) => globallyEnabledModelsMap.get(combinedId))
+      .filter((details): details is Omit<AiModelConfig, "instance"> =>
+        Boolean(details),
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return [...sortedModels, ...remainingEnabled];
+  }, [dbProviderConfigs, globalModelSortOrder]);
+
   const filteredAndOrderedModels = useMemo(() => {
     if (!filterText.trim()) {
-      return enabledAndOrderedModels; // Use the memoized result
+      return enabledAndOrderedModels;
     }
     const lowerCaseFilter = filterText.toLowerCase();
     return enabledAndOrderedModels.filter(
@@ -71,9 +115,8 @@ export const GlobalModelOrganizer: React.FC = () => {
         model.providerName.toLowerCase().includes(lowerCaseFilter) ||
         model.id.toLowerCase().includes(lowerCaseFilter),
     );
-  }, [enabledAndOrderedModels, filterText]); // Depend on the memoized result
+  }, [enabledAndOrderedModels, filterText]);
 
-  // The IDs for SortableContext are derived from the *filtered* models
   const orderedCombinedIds = useMemo(
     () => filteredAndOrderedModels.map((m) => m.id),
     [filteredAndOrderedModels],
@@ -83,13 +126,9 @@ export const GlobalModelOrganizer: React.FC = () => {
     (event: DragEndEvent) => {
       const { active, over } = event;
       if (over && active.id !== over.id) {
-        // Get the *current* full order directly from the memoized result
         const currentFullOrder = enabledAndOrderedModels.map((m) => m.id);
-
         const activeId = active.id as string;
         const overId = over.id as string;
-
-        // Find indices in the full, unfiltered list
         const oldIndexInFull = currentFullOrder.indexOf(activeId);
         const newIndexInFull = currentFullOrder.indexOf(overId);
 
@@ -99,8 +138,6 @@ export const GlobalModelOrganizer: React.FC = () => {
             oldIndexInFull,
             newIndexInFull,
           );
-          // This call will update the store, triggering a re-render
-          // because globalModelSortOrder changes, which updates enabledAndOrderedModels
           setGlobalModelSortOrder(newOrder);
         } else {
           console.error(
@@ -109,7 +146,7 @@ export const GlobalModelOrganizer: React.FC = () => {
         }
       }
     },
-    [enabledAndOrderedModels, setGlobalModelSortOrder], // Depend on the memoized data
+    [enabledAndOrderedModels, setGlobalModelSortOrder],
   );
 
   const sensors = useSensors(
@@ -145,7 +182,6 @@ export const GlobalModelOrganizer: React.FC = () => {
           Enabled & Ordered Models
         </Label>
 
-        {/* Filter Input */}
         <div className="relative">
           <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -166,10 +202,9 @@ export const GlobalModelOrganizer: React.FC = () => {
               onDragEnd={handleDragEnd}
             >
               <SortableContext
-                items={orderedCombinedIds} // Use IDs from the filtered list
+                items={orderedCombinedIds}
                 strategy={verticalListSortingStrategy}
               >
-                {/* Render based on the filtered models */}
                 {filteredAndOrderedModels.map((model) => (
                   <SortableModelItem
                     key={model.id}

@@ -1,10 +1,5 @@
 // src/components/LiteChat/LiteChat.tsx
-import React, {
-  useEffect,
-  useCallback,
-  useMemo,
-  useState, // Added useState for loading
-} from "react";
+import React, { useEffect, useCallback, useMemo, useState } from "react";
 import { PromptWrapper } from "@/components/LiteChat/prompt/PromptWrapper";
 import { ChatCanvas } from "@/components/LiteChat/canvas/ChatCanvas";
 import { ChatControlWrapper } from "@/components/LiteChat/chat/ChatControlWrapper";
@@ -18,30 +13,28 @@ import { useModStore } from "@/store/mod.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { loadMods } from "@/modding/loader";
-import { Toaster } from "@/components/ui/sonner";
-import type { CoreMessage, ToolResultPart, ToolCallPart } from "ai"; // Import necessary types
+import { Toaster } from "@/components/ui/sonner"; // Keep this import
+import type { CoreMessage, ToolResultPart, ToolCallPart } from "ai";
 import { InputArea } from "@/components/LiteChat/prompt/InputArea";
 import { useShallow } from "zustand/react/shallow";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Interaction } from "@/types/litechat/interaction";
-import { Loader2 } from "lucide-react"; // Added Loader2
+import { Loader2 } from "lucide-react";
 
-// Import control registration hooks/components from their new locations
 import { useConversationListControlRegistration } from "@/hooks/litechat/useConversationListControl";
-import { useSettingsControlRegistration } from "@/hooks/litechat/useSettingsControlRegistration"; // Updated path
-import { useSidebarToggleControlRegistration } from "@/hooks/litechat/useSidebarToggleControlRegistration"; // Updated path
-import { useGlobalModelSelectorRegistration } from "@/hooks/litechat/useGlobalModelSelectorRegistration"; // Updated path
-import { useParameterControlRegistration } from "@/hooks/litechat/useParameterControlRegistration"; // Updated path
-import { useFileControlRegistration } from "@/hooks/litechat/useFileControlRegistration"; // Updated path
-import { useVfsControlRegistration } from "@/hooks/litechat/useVfsControlRegistration"; // Updated path
-import { useGitSyncControlRegistration } from "@/hooks/litechat/useGitSyncControlRegistration"; // Updated path
-import { useVfsToolsRegistration } from "@/hooks/litechat/useVfsToolsRegistration"; // Added
-import { useGitToolsRegistration } from "@/hooks/litechat/useGitToolsRegistration"; // Added
-import { useToolSelectorControlRegistration } from "@/hooks/litechat/useToolSelectorControlRegistration"; // Added
+import { useSettingsControlRegistration } from "@/hooks/litechat/useSettingsControlRegistration";
+import { useSidebarToggleControlRegistration } from "@/hooks/litechat/useSidebarToggleControlRegistration";
+import { useGlobalModelSelectorRegistration } from "@/hooks/litechat/useGlobalModelSelectorRegistration";
+import { useParameterControlRegistration } from "@/hooks/litechat/useParameterControlRegistration";
+import { useFileControlRegistration } from "@/hooks/litechat/useFileControlRegistration";
+import { useVfsControlRegistration } from "@/hooks/litechat/useVfsControlRegistration";
+import { useGitSyncControlRegistration } from "@/hooks/litechat/useGitSyncControlRegistration";
+import { useVfsToolsRegistration } from "@/hooks/litechat/useVfsToolsRegistration";
+import { useGitToolsRegistration } from "@/hooks/litechat/useGitToolsRegistration";
+import { useToolSelectorControlRegistration } from "@/hooks/litechat/useToolSelectorControlRegistration";
 
-// Helper to split combined ID remains the same
 const splitModelId = (
   combinedId: string | null,
 ): { providerId: string | null; modelId: string | null } => {
@@ -55,10 +48,8 @@ const splitModelId = (
 };
 
 export const LiteChat: React.FC = () => {
-  // --- Loading State ---
-  const [isInitializing, setIsInitializing] = useState(true); // Added loading state
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  // --- Store Hooks ---
   const {
     selectedItemId,
     selectedItemType,
@@ -66,8 +57,7 @@ export const LiteChat: React.FC = () => {
     addConversation,
     selectItem,
     getProjectById,
-    getConversationById, // Added for convenience
-    // isLoading: isConversationLoading, // Get loading state
+    getConversationById,
   } = useConversationStore(
     useShallow((state) => ({
       selectedItemId: state.selectedItemId,
@@ -76,19 +66,14 @@ export const LiteChat: React.FC = () => {
       addConversation: state.addConversation,
       selectItem: state.selectItem,
       getProjectById: state.getProjectById,
-      getConversationById: state.getConversationById, // Added
-      isLoading: state.isLoading, // Get loading state
+      getConversationById: state.getConversationById,
+      isLoading: state.isLoading,
     })),
   );
-  const {
-    interactions,
-    status: interactionStatus,
-    // setCurrentConversationId removed from direct use here
-  } = useInteractionStore(
+  const { interactions, status: interactionStatus } = useInteractionStore(
     useShallow((state) => ({
       interactions: state.interactions,
       status: state.status,
-      // setCurrentConversationId: state.setCurrentConversationId, // No longer needed directly
     })),
   );
   const { globalError, isSidebarCollapsed } = useUIStateStore(
@@ -108,24 +93,17 @@ export const LiteChat: React.FC = () => {
     () => Object.values(registeredChatControls),
     [registeredChatControls],
   );
-  const {
-    loadDbMods,
-    setLoadedMods,
-    // isLoading: isModLoading, // Get loading state
-  } = useModStore(
+  const { loadDbMods, setLoadedMods } = useModStore(
     useShallow((state) => ({
       loadDbMods: state.loadDbMods,
       setLoadedMods: state.setLoadedMods,
-      isLoading: state.isLoading, // Get loading state
+      isLoading: state.isLoading,
     })),
   );
-  const {
-    loadInitialData: loadProviderData,
-    // isLoading: isProviderLoading, // Get loading state
-  } = useProviderStore(
+  const { loadInitialData: loadProviderData } = useProviderStore(
     useShallow((state) => ({
       loadInitialData: state.loadInitialData,
-      isLoading: state.isLoading, // Get loading state
+      isLoading: state.isLoading,
     })),
   );
   const { loadSettings, globalSystemPrompt } = useSettingsStore(
@@ -135,25 +113,23 @@ export const LiteChat: React.FC = () => {
     })),
   );
 
-  // --- Register Core Controls ---
   useConversationListControlRegistration();
-  useSettingsControlRegistration(); // Uses imported hook
-  useSidebarToggleControlRegistration(); // Uses imported hook
-  useGlobalModelSelectorRegistration(); // Uses imported hook
-  useParameterControlRegistration(); // Uses imported hook
-  useFileControlRegistration(); // Uses imported hook
-  useVfsControlRegistration(); // Uses imported hook
-  useGitSyncControlRegistration(); // Uses imported hook
-  useVfsToolsRegistration(); // Added VFS tools registration
-  useGitToolsRegistration(); // Added Git tools registration
-  useToolSelectorControlRegistration(); // Added Tool selector registration
+  useSettingsControlRegistration();
+  useSidebarToggleControlRegistration();
+  useGlobalModelSelectorRegistration();
+  useParameterControlRegistration();
+  useFileControlRegistration();
+  useVfsControlRegistration();
+  useGitSyncControlRegistration();
+  useVfsToolsRegistration();
+  useGitToolsRegistration();
+  useToolSelectorControlRegistration();
 
-  // --- Initialization Effect ---
   useEffect(() => {
     let isMounted = true;
     const initialize = async () => {
       console.log("LiteChat: Starting initialization...");
-      setIsInitializing(true); // Start loading
+      setIsInitializing(true);
       if (!isMounted) return;
       await loadSettings();
       console.log("LiteChat: Settings loaded.");
@@ -181,7 +157,7 @@ export const LiteChat: React.FC = () => {
       }
       if (isMounted) {
         console.log("LiteChat: Initialization complete.");
-        setIsInitializing(false); // Finish loading
+        setIsInitializing(false);
       }
     };
     initialize();
@@ -189,7 +165,6 @@ export const LiteChat: React.FC = () => {
       isMounted = false;
       console.log("LiteChat: Unmounting, initialization cancelled if pending.");
     };
-    // Only run once on mount
   }, [
     loadSettings,
     loadProviderData,
@@ -198,41 +173,30 @@ export const LiteChat: React.FC = () => {
     setLoadedMods,
   ]);
 
-  // --- History Construction Helper ---
-  // Updated to handle tool calls and results correctly
   const buildHistoryMessages = useCallback(
     (historyInteractions: Interaction[]): CoreMessage[] => {
       return historyInteractions.flatMap((i): CoreMessage[] => {
         const msgs: CoreMessage[] = [];
 
-        // Add user message (if it exists)
-        // Note: File content is handled by AIService before the call
         if (i.prompt?.content && typeof i.prompt.content === "string") {
-          // For history, we only need the text part. Files are handled in the *current* turn.
           msgs.push({ role: "user", content: i.prompt.content });
         } else if (
           i.prompt?.metadata?.attachedFiles &&
           i.prompt.metadata.attachedFiles.length > 0 &&
-          !i.prompt?.content // Handle case where only files were attached
+          !i.prompt?.content
         ) {
-          // Add a placeholder or summary if needed, but often just the assistant response is enough context
-          // For simplicity, we might omit the user turn if it was *only* files and no text.
-          // Or, add a generic placeholder:
-          // msgs.push({ role: 'user', content: '[Files attached]' });
+          // Omit user turn if only files
         }
 
-        // Add assistant response (text part)
         if (i.response && typeof i.response === "string") {
           msgs.push({ role: "assistant", content: i.response });
         }
 
-        // Add assistant tool calls (parse from stored strings)
         if (i.metadata?.toolCalls && Array.isArray(i.metadata.toolCalls)) {
           const validToolCalls: ToolCallPart[] = [];
           i.metadata.toolCalls.forEach((callStr) => {
             try {
               const parsedCall = JSON.parse(callStr);
-              // Basic validation for ToolCallPart structure
               if (
                 parsedCall &&
                 parsedCall.type === "tool-call" &&
@@ -256,21 +220,18 @@ export const LiteChat: React.FC = () => {
             }
           });
           if (validToolCalls.length > 0) {
-            // Add a single message with an array of tool calls
             msgs.push({
               role: "assistant",
-              content: validToolCalls, // Assign the array of ToolCallPart
+              content: validToolCalls,
             });
           }
         }
 
-        // Add tool results (parse from stored strings)
         if (i.metadata?.toolResults && Array.isArray(i.metadata.toolResults)) {
           const validToolResults: ToolResultPart[] = [];
           i.metadata.toolResults.forEach((resultStr) => {
             try {
               const parsedResult = JSON.parse(resultStr);
-              // Basic validation for ToolResultPart structure
               if (
                 parsedResult &&
                 parsedResult.type === "tool-result" &&
@@ -294,10 +255,9 @@ export const LiteChat: React.FC = () => {
             }
           });
           if (validToolResults.length > 0) {
-            // Add a single message with an array of tool results
             msgs.push({
               role: "tool",
-              content: validToolResults, // Assign the array of ToolResultPart
+              content: validToolResults,
             });
           }
         }
@@ -308,10 +268,8 @@ export const LiteChat: React.FC = () => {
     [],
   );
 
-  // --- Prompt Submission Handler ---
   const handlePromptSubmit = useCallback(
     async (turnData: PromptTurnObject) => {
-      // Use local variables for selected item state within this function scope
       let currentConvId =
         useConversationStore.getState().selectedItemType === "conversation"
           ? useConversationStore.getState().selectedItemId
@@ -336,11 +294,9 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
-      // --- Create and select conversation if needed ---
       if (!currentConvId) {
         console.log("LiteChat: No conversation selected, creating new one...");
         try {
-          // Get the current project ID *before* creating the conversation
           currentProjectId =
             useConversationStore.getState().selectedItemType === "project"
               ? useConversationStore.getState().selectedItemId
@@ -350,21 +306,17 @@ export const LiteChat: React.FC = () => {
             title: "New Chat",
             projectId: currentProjectId,
           });
-          // Await the selection process which now includes InteractionStore sync
           await selectItem(newId, "conversation");
-          // Get the confirmed ID *after* selection
           currentConvId = useConversationStore.getState().selectedItemId;
           if (currentConvId !== newId) {
-            // This should ideally not happen if selectItem works correctly
             console.error(
               "LiteChat: Mismatch between created ID and selected ID after selection!",
             );
-            currentConvId = newId; // Fallback to the created ID
+            currentConvId = newId;
           }
           console.log(
             `LiteChat: New conversation created (${currentConvId}), selected, and InteractionStore synced.`,
           );
-          // Set focus after state updates
           setTimeout(() => setFocusInputFlag(true), 0);
         } catch (error) {
           console.error("LiteChat: Failed to create new conversation", error);
@@ -372,20 +324,13 @@ export const LiteChat: React.FC = () => {
           return;
         }
       }
-      // --- End conversation creation ---
 
-      // --- Ensure InteractionStore is synced (redundant check removed) ---
-      // The await selectItem(...) above should handle this now.
-      // We can proceed assuming the InteractionStore is synced to currentConvId.
-
-      // Fetch history *after* ensuring InteractionStore is synced
       const currentHistory = useInteractionStore.getState().interactions;
       const completedHistory = currentHistory.filter(
         (i) => i.status === "COMPLETED" && i.type === "message.user_assistant",
       );
       const messages: CoreMessage[] = buildHistoryMessages(completedHistory);
 
-      // Add the current user input as the last message
       if (turnData.content) {
         messages.push({ role: "user", content: turnData.content });
       } else if (turnData.metadata?.attachedFiles?.length) {
@@ -396,7 +341,6 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
-      // Get project *after* potential conversation creation
       const project = getProjectById(currentProjectId);
       const systemPrompt =
         project?.systemPrompt ?? globalSystemPrompt ?? undefined;
@@ -422,10 +366,8 @@ export const LiteChat: React.FC = () => {
       }
     },
     [
-      // Keep dependencies minimal, rely on getState inside for latest values if needed
       addConversation,
       selectItem,
-      // setCurrentConversationId removed
       globalSystemPrompt,
       buildHistoryMessages,
       getProjectById,
@@ -433,7 +375,6 @@ export const LiteChat: React.FC = () => {
     ],
   );
 
-  // --- Regeneration Handler ---
   const onRegenerateInteraction = useCallback(
     async (interactionId: string) => {
       console.log(`LiteChat: Regenerating interaction ${interactionId}`);
@@ -476,7 +417,6 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
-      // Fetch history up to the interaction *before* the one being regenerated
       const historyUpToIndex = targetInteraction.index;
       const historyInteractions = interactionStore.interactions
         .filter(
@@ -488,10 +428,8 @@ export const LiteChat: React.FC = () => {
         )
         .sort((a, b) => a.index - b.index);
 
-      // Use the updated buildHistoryMessages
       const messages: CoreMessage[] = buildHistoryMessages(historyInteractions);
 
-      // Add the user message content from the interaction being regenerated
       if (
         targetInteraction.prompt?.content &&
         typeof targetInteraction.prompt.content === "string"
@@ -501,7 +439,6 @@ export const LiteChat: React.FC = () => {
           content: targetInteraction.prompt.content,
         });
       } else if (targetInteraction.prompt?.metadata?.attachedFiles?.length) {
-        // If only files were attached in the original prompt
         messages.push({ role: "user", content: "" });
       } else {
         console.error(
@@ -516,25 +453,20 @@ export const LiteChat: React.FC = () => {
         useSettingsStore.getState().globalSystemPrompt ??
         undefined;
 
-      // Metadata for the AI payload (not the interaction itself yet)
-      // Preserve enabledTools from the original prompt if available
       const currentMetadata = {
         ...targetInteraction.prompt.metadata,
         regeneratedFromId: interactionId,
-        providerId: providerId, // Ensure provider/model are set for this specific call
+        providerId: providerId,
         modelId: modelId,
-        // Remove attachedFiles from metadata sent to AI, AIService handles it
         attachedFiles: undefined,
-        // Preserve enabledTools from original prompt
         enabledTools: targetInteraction.prompt.metadata?.enabledTools,
       };
 
       const aiPayload: PromptObject = {
         system: systemPrompt,
-        messages: messages, // History + current user message text
+        messages: messages,
         parameters: targetInteraction.prompt.parameters,
         metadata: currentMetadata,
-        // toolChoice is derived from parameters in AIService
       };
 
       emitter.emit("prompt:finalised", { prompt: aiPayload });
@@ -544,7 +476,6 @@ export const LiteChat: React.FC = () => {
       );
 
       try {
-        // Pass the original PromptTurnObject (targetInteraction.prompt)
         await AIService.startInteraction(aiPayload, targetInteraction.prompt);
         console.log(
           `LiteChat: AIService regeneration interaction started for ${interactionId}.`,
@@ -557,16 +488,14 @@ export const LiteChat: React.FC = () => {
         toast.error("Failed to start regeneration.");
       }
     },
-    [buildHistoryMessages, getProjectById, getConversationById], // Use updated helper
+    [buildHistoryMessages, getProjectById, getConversationById],
   );
 
-  // --- Stop Handler ---
   const onStopInteraction = useCallback((interactionId: string) => {
     console.log(`LiteChat: Stopping interaction ${interactionId}`);
     AIService.stopInteraction(interactionId);
   }, []);
 
-  // --- Memoize Control Lists ---
   const sidebarControls = useMemo(
     () =>
       chatControls
@@ -606,7 +535,6 @@ export const LiteChat: React.FC = () => {
   const currentConversationIdForCanvas =
     selectedItemType === "conversation" ? selectedItemId : null;
 
-  // --- Loading Screen Logic ---
   if (isInitializing) {
     return (
       <div className="flex items-center justify-center h-screen w-screen bg-background text-foreground">
@@ -707,7 +635,8 @@ export const LiteChat: React.FC = () => {
 
       {isSettingsModalOpen && settingsModalRenderer && settingsModalRenderer()}
 
-      <Toaster richColors position="top-right" />
+      {/* Update Toaster props */}
+      <Toaster richColors position="bottom-left" closeButton />
     </>
   );
 };
