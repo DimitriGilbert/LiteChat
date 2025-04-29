@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import type { Interaction } from "@/types/litechat/interaction";
 import { Loader2 } from "lucide-react";
 
-// Import the registration FUNCTIONS
+// Import the registration FUNCTIONS (keeping the existing pattern for these)
 import { registerConversationListControl } from "@/hooks/litechat/registerConversationListControl";
 import { registerSettingsControl } from "@/hooks/litechat/registerSettingsControl";
 import { registerSidebarToggleControl } from "@/hooks/litechat/registerSidebarToggleControl";
@@ -35,6 +35,8 @@ import { registerGitSyncControl } from "@/hooks/litechat/registerGitSyncControl"
 import { registerVfsTools } from "@/hooks/litechat/registerVfsTools";
 import { registerGitTools } from "@/hooks/litechat/registerGitTools";
 import { registerToolSelectorControl } from "@/hooks/litechat/registerToolSelectorControl";
+// Import the new registration COMPONENT
+import { RegisterProjectSettingsControl } from "@/hooks/litechat/registerProjectSettingsControl";
 
 const splitModelId = (
   combinedId: string | null,
@@ -59,6 +61,7 @@ export const LiteChat: React.FC = () => {
     selectItem,
     getProjectById,
     getConversationById,
+    getEffectiveProjectSettings, // Get the new helper
   } = useConversationStore(
     useShallow((state) => ({
       selectedItemId: state.selectedItemId,
@@ -68,6 +71,7 @@ export const LiteChat: React.FC = () => {
       selectItem: state.selectItem,
       getProjectById: state.getProjectById,
       getConversationById: state.getConversationById,
+      getEffectiveProjectSettings: state.getEffectiveProjectSettings, // Get the new helper
       isLoading: state.isLoading,
     })),
   );
@@ -85,6 +89,10 @@ export const LiteChat: React.FC = () => {
   );
   const isSettingsModalOpen = useUIStateStore(
     (state) => state.isChatControlPanelOpen["settingsModal"] ?? false,
+  );
+  // Get project settings modal state
+  const isProjectSettingsModalOpen = useUIStateStore(
+    (state) => state.isProjectSettingsModalOpen,
   );
 
   const registeredChatControls = useControlRegistryStore(
@@ -107,10 +115,10 @@ export const LiteChat: React.FC = () => {
       isLoading: state.isLoading,
     })),
   );
-  const { loadSettings, globalSystemPrompt } = useSettingsStore(
+  const { loadSettings } = useSettingsStore(
     useShallow((state) => ({
       loadSettings: state.loadSettings,
-      globalSystemPrompt: state.globalSystemPrompt,
+      // No need to get globalSystemPrompt here, use effective settings
     })),
   );
 
@@ -132,7 +140,7 @@ export const LiteChat: React.FC = () => {
       console.log("LiteChat: Sidebar items loaded.");
       if (!isMounted) return;
 
-      // 2. Register core controls and tools (imperatively)
+      // 2. Register core controls and tools (imperatively - KEEPING THIS PATTERN)
       console.log("LiteChat: Registering core controls and tools...");
       registerConversationListControl();
       registerSettingsControl();
@@ -145,6 +153,7 @@ export const LiteChat: React.FC = () => {
       registerVfsTools();
       registerGitTools();
       registerToolSelectorControl();
+      // Project settings control is now handled by the component rendered below
       console.log("LiteChat: Core controls and tools registered.");
       if (!isMounted) return;
 
@@ -295,24 +304,27 @@ export const LiteChat: React.FC = () => {
 
       const setFocusInputFlag = useUIStateStore.getState().setFocusInputFlag;
 
-      const selectedModelCombinedId =
-        useProviderStore.getState().selectedModelId;
-      if (!selectedModelCombinedId) {
+      // --- Determine Effective Settings ---
+      const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
+      const modelToUse =
+        effectiveSettings.modelId ??
+        useProviderStore.getState().selectedModelId; // Fallback to global selection
+
+      if (!modelToUse) {
         toast.error("Please select a model before sending a message.");
         return;
       }
+      // --- End Determine Effective Settings ---
 
       if (!currentConvId) {
         console.log("LiteChat: No conversation selected, creating new one...");
         try {
-          currentProjectId =
-            useConversationStore.getState().selectedItemType === "project"
-              ? useConversationStore.getState().selectedItemId
-              : null;
-
+          // Use the already determined currentProjectId
           const newId = await addConversation({
             title: "New Chat",
             projectId: currentProjectId,
+            // Initial metadata could potentially inherit project defaults here if needed
+            // metadata: { modelId: modelToUse, temperature: effectiveSettings.temperature, ... }
           });
           await selectItem(newId, "conversation");
           currentConvId = useConversationStore.getState().selectedItemId;
@@ -349,15 +361,45 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
-      const project = getProjectById(currentProjectId);
-      const systemPrompt =
-        project?.systemPrompt ?? globalSystemPrompt ?? undefined;
+      // Use effective system prompt
+      const systemPrompt = effectiveSettings.systemPrompt ?? undefined;
+
+      // Merge effective parameters with turn-specific parameters
+      const finalParameters = {
+        temperature:
+          turnData.parameters?.temperature ?? effectiveSettings.temperature,
+        max_tokens:
+          turnData.parameters?.max_tokens ?? effectiveSettings.maxTokens,
+        top_p: turnData.parameters?.top_p ?? effectiveSettings.topP,
+        top_k: turnData.parameters?.top_k ?? effectiveSettings.topK,
+        presence_penalty:
+          turnData.parameters?.presence_penalty ??
+          effectiveSettings.presencePenalty,
+        frequency_penalty:
+          turnData.parameters?.frequency_penalty ??
+          effectiveSettings.frequencyPenalty,
+        // Include any other parameters from turnData
+        ...turnData.parameters,
+      };
+
+      // Clean up null/undefined parameters
+      Object.keys(finalParameters).forEach((key) => {
+        if (
+          finalParameters[key as keyof typeof finalParameters] === null ||
+          finalParameters[key as keyof typeof finalParameters] === undefined
+        ) {
+          delete finalParameters[key as keyof typeof finalParameters];
+        }
+      });
 
       const aiPayload: PromptObject = {
         system: systemPrompt,
         messages: messages,
-        parameters: turnData.parameters,
-        metadata: turnData.metadata,
+        parameters: finalParameters,
+        metadata: {
+          ...turnData.metadata,
+          modelId: modelToUse, // Ensure the final model ID is set
+        },
       };
 
       emitter.emit("prompt:finalised", { prompt: aiPayload });
@@ -376,10 +418,8 @@ export const LiteChat: React.FC = () => {
     [
       addConversation,
       selectItem,
-      globalSystemPrompt,
       buildHistoryMessages,
-      getProjectById,
-      getConversationById,
+      getEffectiveProjectSettings, // Add dependency
     ],
   );
 
@@ -411,19 +451,23 @@ export const LiteChat: React.FC = () => {
         targetInteraction.conversationId,
       );
       const currentProjectId = currentConversation?.projectId ?? null;
-      const project = getProjectById(currentProjectId);
 
-      const selectedModelCombinedId =
-        useProviderStore.getState().selectedModelId;
-      if (!selectedModelCombinedId) {
+      // --- Determine Effective Settings for Regeneration ---
+      const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
+      const modelToUse =
+        effectiveSettings.modelId ??
+        useProviderStore.getState().selectedModelId; // Fallback to global
+
+      if (!modelToUse) {
         toast.error("Please select a model before regenerating.");
         return;
       }
-      const { providerId, modelId } = splitModelId(selectedModelCombinedId);
-      if (!providerId || !modelId) {
+      const { providerId } = splitModelId(modelToUse);
+      if (!providerId) {
         toast.error("Invalid model selection for regeneration.");
         return;
       }
+      // --- End Determine Effective Settings ---
 
       const historyUpToIndex = targetInteraction.index;
       const historyInteractions = interactionStore.interactions
@@ -456,24 +500,53 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
-      const systemPrompt =
-        project?.systemPrompt ??
-        useSettingsStore.getState().globalSystemPrompt ??
-        undefined;
+      // Use effective system prompt
+      const systemPrompt = effectiveSettings.systemPrompt ?? undefined;
+
+      // Merge effective parameters with original prompt parameters
+      const finalParameters = {
+        temperature:
+          targetInteraction.prompt.parameters?.temperature ??
+          effectiveSettings.temperature,
+        max_tokens:
+          targetInteraction.prompt.parameters?.max_tokens ??
+          effectiveSettings.maxTokens,
+        top_p:
+          targetInteraction.prompt.parameters?.top_p ?? effectiveSettings.topP,
+        top_k:
+          targetInteraction.prompt.parameters?.top_k ?? effectiveSettings.topK,
+        presence_penalty:
+          targetInteraction.prompt.parameters?.presence_penalty ??
+          effectiveSettings.presencePenalty,
+        frequency_penalty:
+          targetInteraction.prompt.parameters?.frequency_penalty ??
+          effectiveSettings.frequencyPenalty,
+        // Include any other parameters from original prompt
+        ...targetInteraction.prompt.parameters,
+      };
+      // Clean up null/undefined parameters
+      Object.keys(finalParameters).forEach((key) => {
+        if (
+          finalParameters[key as keyof typeof finalParameters] === null ||
+          finalParameters[key as keyof typeof finalParameters] === undefined
+        ) {
+          delete finalParameters[key as keyof typeof finalParameters];
+        }
+      });
 
       const currentMetadata = {
         ...targetInteraction.prompt.metadata,
         regeneratedFromId: interactionId,
-        providerId: providerId,
-        modelId: modelId,
-        attachedFiles: undefined,
+        providerId: providerId, // Use determined providerId
+        modelId: modelToUse, // Use determined modelId
+        attachedFiles: undefined, // Files are part of the history message now
         enabledTools: targetInteraction.prompt.metadata?.enabledTools,
       };
 
       const aiPayload: PromptObject = {
         system: systemPrompt,
         messages: messages,
-        parameters: targetInteraction.prompt.parameters,
+        parameters: finalParameters, // Use merged parameters
         metadata: currentMetadata,
       };
 
@@ -496,7 +569,7 @@ export const LiteChat: React.FC = () => {
         toast.error("Failed to start regeneration.");
       }
     },
-    [buildHistoryMessages, getProjectById, getConversationById],
+    [buildHistoryMessages, getConversationById, getEffectiveProjectSettings], // Add dependency
   );
 
   const onStopInteraction = useCallback((interactionId: string) => {
@@ -540,6 +613,14 @@ export const LiteChat: React.FC = () => {
     [chatControls],
   );
 
+  // Find the project settings modal renderer
+  const projectSettingsModalRenderer = useMemo(
+    () =>
+      chatControls.find((c) => c.id === "core-project-settings-trigger")
+        ?.settingsRenderer,
+    [chatControls],
+  );
+
   const currentConversationIdForCanvas =
     selectedItemType === "conversation" ? selectedItemId : null;
 
@@ -559,6 +640,9 @@ export const LiteChat: React.FC = () => {
 
   return (
     <>
+      {/* Render the Project Settings registration component */}
+      <RegisterProjectSettingsControl />
+
       <div
         className={cn(
           "flex h-full w-full border border-[--border] rounded-lg overflow-hidden bg-background text-foreground",
@@ -642,7 +726,13 @@ export const LiteChat: React.FC = () => {
         </div>
       </div>
 
+      {/* Render Main Settings Modal */}
       {isSettingsModalOpen && settingsModalRenderer && settingsModalRenderer()}
+
+      {/* Render Project Settings Modal */}
+      {isProjectSettingsModalOpen &&
+        projectSettingsModalRenderer &&
+        projectSettingsModalRenderer()}
 
       {/* Update Toaster props */}
       <Toaster richColors position="bottom-left" closeButton />

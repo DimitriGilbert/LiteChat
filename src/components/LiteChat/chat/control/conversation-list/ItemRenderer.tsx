@@ -15,6 +15,7 @@ import {
   DownloadIcon,
   Loader2,
   FileJsonIcon,
+  CogIcon, // Import Settings Icon
 } from "lucide-react";
 import {
   Tooltip,
@@ -28,6 +29,7 @@ import type { SyncStatus } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project";
 import { Conversation } from "@/types/litechat/chat";
 import { SidebarItem } from "@/store/conversation.store";
+import { useUIStateStore } from "@/store/ui.store"; // Import UI store
 
 interface ConversationItemProps {
   item: SidebarItem;
@@ -121,6 +123,11 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
     const syncIndicator =
       !isProject && repoName ? getSyncIndicator(syncStatus, repoName) : null;
 
+    // Get UI store action
+    const openProjectSettingsModal = useUIStateStore(
+      (state) => state.openProjectSettingsModal,
+    );
+
     const handleItemClick = () => {
       if (isEditingThis) return;
       if (isProject && hasChildren) {
@@ -148,6 +155,14 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
     const handleEditClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       handleStartEditing(item);
+    };
+
+    // Handler for project settings button
+    const handleSettingsClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (isProject) {
+        openProjectSettingsModal(item.id);
+      }
     };
 
     const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -273,6 +288,28 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
               </>
             ) : (
               <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* Project Settings Button */}
+                {isProject && (
+                  <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                          onClick={handleSettingsClick}
+                          aria-label={`Settings for ${displayName}`}
+                        >
+                          <CogIcon className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Project Settings
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+
                 <TooltipProvider delayDuration={100}>
                   <Tooltip>
                     <TooltipTrigger asChild>

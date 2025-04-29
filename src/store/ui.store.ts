@@ -9,8 +9,11 @@ interface UIState {
   globalLoading: boolean;
   globalError: string | null;
   focusInputOnNextRender: boolean;
-  initialSettingsTab: string | null; // Added state for initial tab
-  initialSettingsSubTab: string | null; // Added state for initial sub-tab
+  initialSettingsTab: string | null;
+  initialSettingsSubTab: string | null;
+  // Added state for project settings modal
+  isProjectSettingsModalOpen: boolean;
+  projectSettingsModalTargetId: string | null;
 }
 
 interface UIActions {
@@ -20,9 +23,11 @@ interface UIActions {
   setGlobalLoading: (loading: boolean) => void;
   setGlobalError: (error: string | null) => void;
   setFocusInputFlag: (focus: boolean) => void;
-  // Added action to set initial tabs
   setInitialSettingsTabs: (tab: string | null, subTab?: string | null) => void;
-  clearInitialSettingsTabs: () => void; // Action to clear the initial tabs
+  clearInitialSettingsTabs: () => void;
+  // Added actions for project settings modal
+  openProjectSettingsModal: (projectId: string) => void;
+  closeProjectSettingsModal: () => void;
 }
 
 export const useUIStateStore = create(
@@ -34,15 +39,17 @@ export const useUIStateStore = create(
     globalLoading: false,
     globalError: null,
     focusInputOnNextRender: false,
-    initialSettingsTab: null, // Initialize
-    initialSettingsSubTab: null, // Initialize
+    initialSettingsTab: null,
+    initialSettingsSubTab: null,
+    // Initialize project settings modal state
+    isProjectSettingsModalOpen: false,
+    projectSettingsModalTargetId: null,
 
     // Actions
     toggleChatControlPanel: (panelId, isOpen) => {
       set((state) => {
         state.isChatControlPanelOpen[panelId] =
           isOpen ?? !state.isChatControlPanelOpen[panelId];
-        // Clear initial tabs when closing the settings modal
         if (
           panelId === "settingsModal" &&
           !state.isChatControlPanelOpen[panelId]
@@ -79,14 +86,26 @@ export const useUIStateStore = create(
       set({ focusInputOnNextRender: focus });
     },
 
-    // Action to set initial tabs
     setInitialSettingsTabs: (tab, subTab = null) => {
       set({ initialSettingsTab: tab, initialSettingsSubTab: subTab });
     },
 
-    // Action to clear initial tabs (e.g., when modal closes naturally)
     clearInitialSettingsTabs: () => {
       set({ initialSettingsTab: null, initialSettingsSubTab: null });
+    },
+
+    // Actions for project settings modal
+    openProjectSettingsModal: (projectId) => {
+      set({
+        isProjectSettingsModalOpen: true,
+        projectSettingsModalTargetId: projectId,
+      });
+    },
+    closeProjectSettingsModal: () => {
+      set({
+        isProjectSettingsModalOpen: false,
+        projectSettingsModalTargetId: null,
+      });
     },
   })),
 );

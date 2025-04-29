@@ -9,6 +9,11 @@ export interface Project extends DbBase {
   systemPrompt?: string | null;
   modelId?: string | null; // Combined ID (provider:model)
   temperature?: number | null;
+  maxTokens?: number | null; // Added
+  topP?: number | null; // Added
+  topK?: number | null; // Added
+  presencePenalty?: number | null; // Added
+  frequencyPenalty?: number | null; // Added
   // Add other relevant settings overrides (maxTokens, topP, etc.)
   metadata?: Record<string, any>;
   // VFS key is implicitly derived from the top-level project ID

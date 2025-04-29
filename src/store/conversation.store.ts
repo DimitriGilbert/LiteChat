@@ -24,6 +24,8 @@ import {
 import { useVfsStore } from "./vfs.store"; // Import VFS store
 import type { fs as FsType } from "@zenfs/core"; // Import fs type
 import * as VfsOps from "@/lib/litechat/vfs-operations"; // Import VFS Ops
+import { useSettingsStore } from "./settings.store"; // Import settings store for defaults
+import { useProviderStore } from "./provider.store"; // Import provider store for default model
 
 // Define a union type for items in the sidebar
 export type SidebarItem =
@@ -39,6 +41,18 @@ interface ProjectExportNode {
 interface ConversationExportNode {
   conversation: Conversation;
   interactions: Interaction[];
+}
+
+// Interface for effective project settings
+interface EffectiveProjectSettings {
+  systemPrompt: string | null;
+  modelId: string | null;
+  temperature: number | null;
+  maxTokens: number | null;
+  topP: number | null;
+  topK: number | null;
+  presencePenalty: number | null;
+  frequencyPenalty: number | null;
 }
 
 interface ConversationState {
@@ -119,6 +133,10 @@ interface ConversationActions {
     toolMaxStepsOverride?: number | null;
   }) => Promise<void>;
   _ensureSyncVfsReady: () => Promise<typeof FsType | null>; // Helper action
+  // New helper for effective settings
+  getEffectiveProjectSettings: (
+    projectId: string | null,
+  ) => EffectiveProjectSettings;
 }
 
 // Helper function to format interactions to Markdown (remains the same)
@@ -566,6 +584,11 @@ export const useConversationStore = create(
         systemPrompt: projectData.systemPrompt ?? null,
         modelId: projectData.modelId ?? null,
         temperature: projectData.temperature ?? null,
+        maxTokens: projectData.maxTokens ?? null,
+        topP: projectData.topP ?? null,
+        topK: projectData.topK ?? null,
+        presencePenalty: projectData.presencePenalty ?? null,
+        frequencyPenalty: projectData.frequencyPenalty ?? null,
         metadata: projectData.metadata ?? {},
       };
 
@@ -1232,5 +1255,71 @@ export const useConversationStore = create(
         await updateConversation(selectedItemId, { metadata: newMeta });
       }
     },
+
+    // --- New Helper for Effective Settings ---
+    getEffectiveProjectSettings: (projectId) => {
+      const globalSettings = useSettingsStore.getState();
+      const globalProvider = useProviderStore.getState();
+
+      const defaults: EffectiveProjectSettings = {
+        systemPrompt: globalSettings.globalSystemPrompt,
+        modelId: globalProvider.selectedModelId,
+        temperature: globalSettings.temperature,
+        maxTokens: globalSettings.maxTokens,
+        topP: globalSettings.topP,
+        topK: globalSettings.topK,
+        presencePenalty: globalSettings.presencePenalty,
+        frequencyPenalty: globalSettings.frequencyPenalty,
+      };
+
+      if (!projectId) {
+        return defaults;
+      }
+
+      const projectStack: Project[] = [];
+      let currentId: string | null = projectId;
+      while (currentId) {
+        const project = get().getProjectById(currentId);
+        if (project) {
+          projectStack.unshift(project); // Add to front to process parents first
+          currentId = project.parentId;
+        } else {
+          currentId = null; // Stop if project not found
+        }
+      }
+
+      // Apply settings from the stack, overriding defaults/parents
+      const effectiveSettings = projectStack.reduce((settings, project) => {
+        return {
+          systemPrompt:
+            project.systemPrompt !== undefined
+              ? project.systemPrompt
+              : settings.systemPrompt,
+          modelId:
+            project.modelId !== undefined ? project.modelId : settings.modelId,
+          temperature:
+            project.temperature !== undefined
+              ? project.temperature
+              : settings.temperature,
+          maxTokens:
+            project.maxTokens !== undefined
+              ? project.maxTokens
+              : settings.maxTokens,
+          topP: project.topP !== undefined ? project.topP : settings.topP,
+          topK: project.topK !== undefined ? project.topK : settings.topK,
+          presencePenalty:
+            project.presencePenalty !== undefined
+              ? project.presencePenalty
+              : settings.presencePenalty,
+          frequencyPenalty:
+            project.frequencyPenalty !== undefined
+              ? project.frequencyPenalty
+              : settings.frequencyPenalty,
+        };
+      }, defaults);
+
+      return effectiveSettings;
+    },
+    // --- End New Helper ---
   })),
 );
