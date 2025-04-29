@@ -713,6 +713,8 @@ export class AIService {
           toolCalls: currentToolCallStrings,
           toolResults: currentToolResultStrings,
           attachedFiles: interactionData.metadata.attachedFiles?.map(
+            // @ts-expect-error meeeh me no core type mismatch laaaah
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             ({ contentBase64, contentText, ...rest }) => rest,
           ),
         },

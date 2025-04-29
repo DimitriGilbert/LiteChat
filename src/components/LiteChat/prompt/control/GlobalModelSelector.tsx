@@ -4,68 +4,121 @@ import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import { Combobox } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { AiModelConfig } from "@/types/litechat/provider";
+import {
+  combineModelId,
+  DEFAULT_MODELS,
+} from "@/lib/litechat/provider-helpers"; // Import necessary helpers
 
-export const GlobalModelSelector: React.FC = () => {
-  // Select the underlying data and the selector function itself
-  const {
-    selectedModelId,
-    selectModel,
-    getGloballyEnabledAndOrderedModels, // Select the function
-    dbProviderConfigs, // Select underlying data
-    globalModelSortOrder, // Select underlying data
-    isLoading,
-  } = useProviderStore(
-    useShallow((state) => ({
-      selectedModelId: state.selectedModelId,
-      selectModel: state.selectModel,
-      getGloballyEnabledAndOrderedModels:
-        state.getGloballyEnabledAndOrderedModels, // The selector function
-      // Select the state the selector depends on for memoization
-      dbProviderConfigs: state.dbProviderConfigs,
-      globalModelSortOrder: state.globalModelSortOrder,
-      isLoading: state.isLoading,
-    })),
-  );
+// Define props for the controlled component
+interface GlobalModelSelectorProps {
+  value: string | null;
+  onChange: (value: string | null) => void;
+  disabled?: boolean;
+}
 
-  // Call the selector outside the hook and memoize its result
-  const enabledAndOrderedModels = useMemo(() => {
-    // Ensure the function exists before calling
-    return getGloballyEnabledAndOrderedModels
-      ? getGloballyEnabledAndOrderedModels()
-      : [];
-    // Dependency array includes the selector function AND the data it uses
-    // eslint error is a mistake, if not included, infinite loop or not loading !
-  }, [
-    getGloballyEnabledAndOrderedModels,
-    dbProviderConfigs,
-    globalModelSortOrder,
-  ]);
+export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> = ({
+  value,
+  onChange,
+  disabled = false,
+}) => {
+  // Select the raw data needed to derive the ordered list
+  const { dbProviderConfigs, globalModelSortOrder, isLoading } =
+    useProviderStore(
+      useShallow((state) => ({
+        // Removed getGloballyEnabledAndOrderedModels selector
+        dbProviderConfigs: state.dbProviderConfigs,
+        globalModelSortOrder: state.globalModelSortOrder,
+        isLoading: state.isLoading,
+      })),
+    );
+
+  // --- Re-implement the logic to get enabled and ordered models ---
+  const enabledAndOrderedModels: Omit<AiModelConfig, "instance">[] =
+    useMemo(() => {
+      const globallyEnabledModelsMap = new Map<
+        string,
+        Omit<AiModelConfig, "instance">
+      >();
+      const enabledCombinedIds = new Set<string>();
+
+      dbProviderConfigs.forEach((config) => {
+        if (!config.isEnabled || !config.enabledModels) return;
+
+        const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
+        const allProviderModels =
+          config.fetchedModels ?? DEFAULT_MODELS[providerTypeKey] ?? [];
+        const providerModelsMap = new Map(
+          allProviderModels.map((m) => [m.id, m]),
+        );
+
+        config.enabledModels.forEach((modelId) => {
+          const combinedId = combineModelId(config.id, modelId);
+          const modelDef = providerModelsMap.get(modelId);
+          if (modelDef) {
+            enabledCombinedIds.add(combinedId);
+            globallyEnabledModelsMap.set(combinedId, {
+              id: combinedId,
+              name: modelDef.name || modelId,
+              providerId: config.id,
+              providerName: config.name,
+              metadata: modelDef.metadata,
+            });
+          }
+        });
+      });
+
+      const sortedModels: Omit<AiModelConfig, "instance">[] = [];
+      const addedIds = new Set<string>();
+
+      globalModelSortOrder.forEach((combinedId) => {
+        if (enabledCombinedIds.has(combinedId)) {
+          const details = globallyEnabledModelsMap.get(combinedId);
+          if (details && !addedIds.has(combinedId)) {
+            sortedModels.push(details);
+            addedIds.add(combinedId);
+          }
+        }
+      });
+
+      const remainingEnabled = Array.from(enabledCombinedIds)
+        .filter((combinedId) => !addedIds.has(combinedId))
+        .map((combinedId) => globallyEnabledModelsMap.get(combinedId))
+        .filter((details): details is Omit<AiModelConfig, "instance"> =>
+          Boolean(details),
+        )
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      return [...sortedModels, ...remainingEnabled];
+    }, [dbProviderConfigs, globalModelSortOrder]); // Depend on the raw data
+  // --- End derived logic ---
 
   const options = React.useMemo(
     () =>
       enabledAndOrderedModels.map((m) => ({
-        value: m.id, // Combined ID: "providerId:modelId"
-        label: `${m.name} (${m.providerName})`, // Display with provider name
+        value: m.id,
+        label: `${m.name} (${m.providerName})`,
       })),
-    [enabledAndOrderedModels], // Depend on the memoized result
+    [enabledAndOrderedModels],
   );
 
-  if (isLoading) {
+  if (isLoading && options.length === 0) {
     return <Skeleton className="h-10 w-[250px]" />;
   }
 
   return (
     <Combobox
       options={options}
-      value={selectedModelId ?? ""} // Use combined ID
-      onChange={(value) => selectModel(value || null)} // Pass combined ID
+      value={value ?? ""}
+      onChange={onChange}
       placeholder="Select Model..."
       searchPlaceholder="Search models..."
-      emptyText="No models enabled."
+      emptyText={isLoading ? "Loading models..." : "No models enabled/found."}
       triggerClassName="h-10 w-full min-w-[200px] max-w-[300px] text-xs"
       contentClassName="w-[--radix-popover-trigger-width]"
-      // Disable if loading OR if there are no options after loading finishes
-      disabled={isLoading || options.length === 0}
+      disabled={
+        disabled || (isLoading && options.length === 0) || options.length === 0
+      }
     />
   );
 };

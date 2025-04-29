@@ -4,17 +4,18 @@ import React, {
   useCallback,
   useMemo,
   useEffect,
-  useRef, // Added useRef
+  useRef,
 } from "react";
 import type {
   PromptTurnObject,
   InputAreaRendererProps,
 } from "@/types/litechat/prompt";
-import type { InputAreaRef } from "./InputArea"; // Import ref type
+import type { InputAreaRef } from "./InputArea";
 import { PromptControlWrapper } from "./PromptControlWrapper";
 import { Button } from "@/components/ui/button";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useInteractionStore } from "@/store/interaction.store";
+import { useProviderStore } from "@/store/provider.store"; // Import Provider store
 import { SendHorizonalIcon, XIcon } from "lucide-react";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
@@ -62,14 +63,12 @@ async function runMiddleware<H extends ModMiddlewareHookName>(
 }
 
 interface PromptWrapperProps {
-  // Update InputAreaRenderer type to use the ref handle
   InputAreaRenderer: React.ForwardRefExoticComponent<
-    Omit<InputAreaRendererProps, "value" | "onChange"> & // Omit value/onChange
-      React.RefAttributes<InputAreaRef> // Add ref type
+    Omit<InputAreaRendererProps, "value" | "onChange"> &
+      React.RefAttributes<InputAreaRef>
   >;
   onSubmit: (turnData: PromptTurnObject) => Promise<void>;
   className?: string;
-  // inputRef prop is no longer needed from parent, managed internally
 }
 
 export const PromptWrapper: React.FC<PromptWrapperProps> = ({
@@ -77,10 +76,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   onSubmit,
   className,
 }) => {
-  // Ref for the InputArea component
   const inputAreaRef = useRef<InputAreaRef>(null);
-  // State removed for inputValue
-
   const { attachedFilesMetadata, clearAttachedFiles, removeAttachedFile } =
     useInputStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,6 +86,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   const isStreaming = useInteractionStore(
     (state) => state.status === "streaming",
   );
+  // Removed selectGlobalModel import
 
   const activeControls = useMemo(
     () =>
@@ -100,18 +97,17 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   );
 
   const handleClearInputs = useCallback(() => {
-    // Clear InputArea via ref (if needed, InputArea might clear itself)
-    // inputAreaRef.current?.setValue(''); // Or handle reset within InputArea
     clearAttachedFiles();
     activeControls.forEach((c) => {
       if (c.clearOnSubmit) c.clearOnSubmit();
     });
+    // Reset input area via ref if necessary (InputArea might handle this internally)
+    // inputAreaRef.current?.reset(); // Assuming InputArea has a reset method
   }, [activeControls, clearAttachedFiles]);
 
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
       e?.preventDefault();
-      // Get value from InputArea ref on submit
       const currentInputValue = inputAreaRef.current?.getValue() ?? "";
       const trimmedInput = currentInputValue.trim();
 
@@ -122,7 +118,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
 
       const currentAttachedFilesMetadata =
         useInputStore.getState().attachedFilesMetadata;
-
       const hasContent =
         trimmedInput || currentAttachedFilesMetadata.length > 0;
 
@@ -137,10 +132,9 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         JSON.stringify(currentAttachedFilesMetadata),
       );
 
-      // Use const for initial assignment
       let collectedTurnData: PromptTurnObject = {
         id: nanoid(),
-        content: trimmedInput, // Use value obtained from ref
+        content: trimmedInput,
         parameters: {},
         metadata: {
           attachedFiles: fileMetadataForTurn,
@@ -148,6 +142,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       };
 
       // --- Collect parameters and metadata from controls ---
+      // Variable to store model ID from control removed
       for (const control of activeControls) {
         if (control.getParameters) {
           try {
@@ -175,6 +170,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
                   `Control ${control.id} tried to overwrite attachedFiles metadata. Ignoring.`,
                 );
               }
+              // Metadata is now directly merged. The model selector control's
+              // getMetadata will read the current global state.
               collectedTurnData.metadata = {
                 ...collectedTurnData.metadata,
                 ...otherMeta,
@@ -191,6 +188,21 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       }
       // --- End Control Data Collection ---
 
+      // --- Update Global Model Selection REMOVED ---
+      // The global model selection is now updated directly by the
+      // GlobalModelSelector component via its onChange prop.
+
+      // Ensure the final metadata reflects the current global selection
+      // This might be redundant if getMetadata already reads it, but ensures consistency.
+      collectedTurnData.metadata.modelId =
+        useProviderStore.getState().selectedModelId;
+      if (!collectedTurnData.metadata.modelId) {
+        toast.error("No model selected. Please choose a model.");
+        setIsSubmitting(false);
+        return; // Prevent submission if no model is selected
+      }
+      // --- End Update Global Model Selection ---
+
       emitter.emit("prompt:submitted", { turnData: collectedTurnData });
 
       const middlewareResult = await runMiddleware(
@@ -204,7 +216,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         return;
       }
 
-      // Assign the final result (potentially modified by middleware)
       const finalTurnData =
         middlewareResult && typeof middlewareResult === "object"
           ? (middlewareResult as { turnData: PromptTurnObject }).turnData
@@ -213,8 +224,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       try {
         await onSubmit(finalTurnData);
         handleClearInputs();
-        // Manually clear InputArea after successful submit if needed
-        // setLocalInputValue(''); // This state is removed
       } catch (err) {
         console.error("Error during final prompt submission:", err);
         toast.error(
@@ -224,19 +233,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         setIsSubmitting(false);
       }
     },
-    [
-      // Removed localInputValue dependency
-      onSubmit,
-      isStreaming,
-      handleClearInputs,
-      activeControls, // Depend on activeControls
-    ],
+    [onSubmit, isStreaming, handleClearInputs, activeControls], // Removed selectGlobalModel dependency
   );
-
-  // No longer needed as InputArea manages its own state
-  // const handleInputChange = useCallback((value: string) => {
-  //   setLocalInputValue(value);
-  // }, []);
 
   const handleInputSubmit = useCallback(() => {
     handleSubmit();
@@ -251,16 +249,11 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     };
   }, [clearAttachedFiles]);
 
-  // Determine if submit button should be disabled
-  // Note: We can't easily check the input value here without causing re-renders.
-  // We rely on the InputArea preventing submit via Enter key if empty.
-  // The button disable logic might need adjustment or removal if it causes issues.
   const isSubmitDisabled =
     isSubmitting ||
     isStreaming ||
-    // Cannot reliably check input value here without state/re-render
-    // Rely on InputArea's internal logic or remove this part of check
-    attachedFilesMetadata.length === 0; // Simplified check
+    // Basic check: disable if no files attached (input check is harder here)
+    attachedFilesMetadata.length === 0;
 
   return (
     <form
@@ -311,12 +304,9 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       <div className="p-3 md:p-4 flex items-end gap-2">
         <div className="flex-grow">
           <InputAreaRenderer
-            ref={inputAreaRef} // Pass ref
-            // value prop removed
-            // onChange prop removed
+            ref={inputAreaRef}
             onSubmit={handleInputSubmit}
             disabled={isSubmitting || isStreaming}
-            // Pass initialValue if needed for reset, otherwise InputArea handles it
             initialValue=""
           />
         </div>
@@ -324,7 +314,9 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         <div className="flex-shrink-0">
           <Button
             type="submit"
-            // Updated disabled check (may need further refinement)
+            // A more robust check might involve getting the input value via ref here,
+            // but that could be complex. Relying on InputArea's internal Enter key handling
+            // and this basic check might be sufficient for now.
             disabled={isSubmitDisabled}
             size="icon"
             className="h-10 w-10 rounded-full"

@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/ChatCanvas.tsx
-import React, { useRef, useState, useEffect, useCallback } from "react"; // Added refs/state/effect/callback
+import React, { useRef, useEffect, useCallback } from "react"; // Added refs/state/effect/callback
 import type { Interaction } from "@/types/litechat/interaction";
 import type { ChatCanvasProps } from "@/types/litechat/chat";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   onStopInteraction,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null); // Ref for the scrollable container
-  const [showScrollButton, setShowScrollButton] = useState(false); // State for button visibility
+  // const [showScrollButton, setShowScrollButton] = useState(false); // State for button visibility
 
   const streamingIds = useInteractionStore(
     useShallow((state) => new Set(state.streamingInteractionIds)),
@@ -75,24 +75,24 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   }, [interactions.length, status, scrollToBottom]);
 
   // Effect to handle scroll button visibility
-  useEffect(() => {
-    const scrollElement = scrollRef.current;
-    if (!scrollElement) return;
+  // useEffect(() => {
+  //   const scrollElement = scrollRef.current;
+  //   if (!scrollElement) return;
 
-    const handleScroll = () => {
-      const isNearBottom =
-        scrollElement.scrollHeight -
-          scrollElement.scrollTop -
-          scrollElement.clientHeight <
-        150;
-      setShowScrollButton(!isNearBottom);
-    };
+  //   const handleScroll = () => {
+  //     const isNearBottom =
+  //       scrollElement.scrollHeight -
+  //         scrollElement.scrollTop -
+  //         scrollElement.clientHeight <
+  //       150;
+  //     setShowScrollButton(!isNearBottom);
+  //   };
 
-    scrollElement.addEventListener("scroll", handleScroll);
-    handleScroll(); // Initial check
+  //   scrollElement.addEventListener("scroll", handleScroll);
+  //   handleScroll(); // Initial check
 
-    return () => scrollElement.removeEventListener("scroll", handleScroll);
-  }, []);
+  //   return () => scrollElement.removeEventListener("scroll", handleScroll);
+  // }, []);
 
   return (
     // Added relative positioning for the button
@@ -162,17 +162,17 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
       </div>
 
       {/* Scroll to Bottom Button */}
-      {showScrollButton && (
-        <Button
-          variant="outline"
-          size="icon"
-          className="absolute bottom-4 right-4 h-10 w-10 rounded-full shadow-lg bg-card/80 backdrop-blur-sm hover:bg-muted"
-          onClick={() => scrollToBottom("smooth")}
-          aria-label="Scroll to bottom"
-        >
-          <ArrowDownIcon className="h-5 w-5" />
-        </Button>
-      )}
+      {/* {showScrollButton && ( */}
+      <Button
+        variant="outline"
+        size="icon"
+        className="absolute bottom-4 right-4 h-10 w-10 rounded-full shadow-lg bg-card/80 backdrop-blur-sm hover:bg-muted"
+        onClick={() => scrollToBottom("smooth")}
+        aria-label="Scroll to bottom"
+      >
+        <ArrowDownIcon className="h-5 w-5" />
+      </Button>
+      {/* )} */}
     </div>
   );
 };
