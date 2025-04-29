@@ -1,13 +1,7 @@
 // src/services/ai.service.ts
 import type { PromptObject, PromptTurnObject } from "@/types/litechat/prompt";
 import type { Interaction } from "@/types/litechat/interaction";
-import type {
-  ModMiddlewareHookName,
-  ModMiddlewarePayloadMap,
-  ModMiddlewareReturnMap,
-  ReadonlyChatContextSnapshot,
-  ToolImplementation,
-} from "@/types/litechat/modding";
+import type { ToolImplementation } from "@/types/litechat/modding";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useSettingsStore } from "@/store/settings.store";
@@ -34,244 +28,12 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { PersistenceService } from "@/services/persistence.service";
 import { type AttachedFileMetadata } from "@/store/input.store";
-import { splitModelId } from "@/lib/litechat/provider-helpers"; // Import from helpers
-
-// Middleware runner remains the same
-async function runMiddleware<H extends ModMiddlewareHookName>(
-  hookName: H,
-  initialPayload: ModMiddlewarePayloadMap[H],
-): Promise<ModMiddlewareReturnMap[H]> {
-  const getMiddleware = useControlRegistryStore.getState().getMiddlewareForHook;
-  const middlewareCallbacks = getMiddleware(hookName);
-  let currentPayload = initialPayload;
-
-  for (const middleware of middlewareCallbacks) {
-    try {
-      const result = await middleware.callback(currentPayload as any);
-      if (result === false) {
-        console.log(
-          `Middleware ${middleware.modId} cancelled action for hook ${hookName}`,
-        );
-        return false as ModMiddlewareReturnMap[H];
-      }
-      if (result && typeof result === "object") {
-        currentPayload = result as any;
-      }
-    } catch (error) {
-      console.error(
-        `Middleware error in mod ${middleware.modId} for hook ${hookName}:`,
-        error,
-      );
-      return false as ModMiddlewareReturnMap[H];
-    }
-  }
-  return currentPayload as ModMiddlewareReturnMap[H];
-}
-
-// Helper splitModelId REMOVED from here
-
-// Helper to get context snapshot remains the same
-function getContextSnapshot(): ReadonlyChatContextSnapshot {
-  const iS = useInteractionStore.getState();
-  const pS = useProviderStore.getState();
-  const sS = useSettingsStore.getState();
-  const { providerId } = splitModelId(pS.selectedModelId); // Use imported helper
-  const snapshot: ReadonlyChatContextSnapshot = {
-    selectedConversationId: iS.currentConversationId,
-    interactions: iS.interactions,
-    isStreaming: iS.status === "streaming",
-    selectedProviderId: providerId,
-    selectedModelId: pS.selectedModelId,
-    activeSystemPrompt: sS.globalSystemPrompt,
-    temperature: sS.temperature,
-    maxTokens: sS.maxTokens,
-    theme: sS.theme,
-  };
-  return snapshot;
-}
-
-// Helper function to convert base64 string to Uint8Array remains the same
-function base64ToUint8Array(base64: string): Uint8Array {
-  try {
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-  } catch (e) {
-    console.error("Error decoding base64 string:", e);
-    throw new Error("Invalid base64 string for file content.");
-  }
-}
-
-// --- Improved File Content Processing ---
-const COMMON_TEXT_EXTENSIONS = [
-  ".txt",
-  ".md",
-  ".json",
-  ".js",
-  ".ts",
-  ".jsx",
-  ".tsx",
-  ".html",
-  ".css",
-  ".py",
-  ".java",
-  ".c",
-  ".cpp",
-  ".h",
-  ".cs",
-  ".go",
-  ".php",
-  ".rb",
-  ".swift",
-  ".kt",
-  ".rs",
-  ".toml",
-  ".yaml",
-  ".yml",
-  ".xml",
-  ".sh",
-  ".bat",
-  ".ps1",
-];
-
-function processFileMetaToUserContent(
-  fileMeta: AttachedFileMetadata,
-): TextPart | ImagePart | null {
-  try {
-    const mimeType = fileMeta.type || "application/octet-stream";
-    const fileNameLower = fileMeta.name.toLowerCase();
-    const isLikelyText =
-      mimeType.startsWith("text/") ||
-      mimeType === "application/json" ||
-      COMMON_TEXT_EXTENSIONS.some((ext) => fileNameLower.endsWith(ext));
-    const isImage = mimeType.startsWith("image/");
-
-    if (isLikelyText && fileMeta.contentText !== undefined) {
-      return { type: "text", text: fileMeta.contentText };
-    } else if (isImage && fileMeta.contentBase64 !== undefined) {
-      const buffer = base64ToUint8Array(fileMeta.contentBase64);
-      return { type: "image", image: buffer, mimeType: mimeType };
-    } else if (!isLikelyText && fileMeta.contentBase64 !== undefined) {
-      console.warn(
-        `AIService: Unsupported file type "${mimeType}" for direct inclusion. Sending note.`,
-      );
-      return {
-        type: "text",
-        text: `[Attached file: ${fileMeta.name} (${mimeType})]`,
-      };
-    } else {
-      throw new Error(
-        `Missing content or unable to determine type for file: ${fileMeta.name}`,
-      );
-    }
-  } catch (error) {
-    console.error(
-      `AIService: Failed to process content for ${fileMeta.name}:`,
-      error,
-    );
-    toast.error(
-      `Failed to process file "${fileMeta.name}": ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return {
-      type: "text",
-      text: `[Error processing file: ${fileMeta.name}]`,
-    };
-  }
-}
-// --- End Improved File Content Processing ---
-
-// --- History Builder Helper ---
-export function buildHistoryMessages(
-  historyInteractions: Interaction[],
-): CoreMessage[] {
-  return historyInteractions.flatMap((i): CoreMessage[] => {
-    const msgs: CoreMessage[] = [];
-    if (i.prompt?.content && typeof i.prompt.content === "string") {
-      msgs.push({ role: "user", content: i.prompt.content });
-    }
-
-    if (i.response && typeof i.response === "string") {
-      msgs.push({ role: "assistant", content: i.response });
-    }
-
-    if (i.metadata?.toolCalls && Array.isArray(i.metadata.toolCalls)) {
-      const validToolCalls: ToolCallPart[] = [];
-      i.metadata.toolCalls.forEach((callStr) => {
-        try {
-          const parsedCall = JSON.parse(callStr);
-          if (
-            parsedCall &&
-            parsedCall.type === "tool-call" &&
-            parsedCall.toolCallId &&
-            parsedCall.toolName &&
-            parsedCall.args !== undefined
-          ) {
-            validToolCalls.push(parsedCall as ToolCallPart);
-          } else {
-            console.warn(
-              "[AIService] buildHistory: Invalid tool call structure after parsing:",
-              callStr,
-            );
-          }
-        } catch (e) {
-          console.error(
-            "[AIService] buildHistory: Failed to parse tool call string:",
-            callStr,
-            e,
-          );
-        }
-      });
-      if (validToolCalls.length > 0) {
-        msgs.push({
-          role: "assistant",
-          content: validToolCalls,
-        });
-      }
-    }
-
-    if (i.metadata?.toolResults && Array.isArray(i.metadata.toolResults)) {
-      const validToolResults: ToolResultPart[] = [];
-      i.metadata.toolResults.forEach((resultStr) => {
-        try {
-          const parsedResult = JSON.parse(resultStr);
-          if (
-            parsedResult &&
-            parsedResult.type === "tool-result" &&
-            parsedResult.toolCallId &&
-            parsedResult.toolName &&
-            parsedResult.result !== undefined
-          ) {
-            validToolResults.push(parsedResult as ToolResultPart);
-          } else {
-            console.warn(
-              "[AIService] buildHistory: Invalid tool result structure after parsing:",
-              resultStr,
-            );
-          }
-        } catch (e) {
-          console.error(
-            "[AIService] buildHistory: Failed to parse tool result string:",
-            resultStr,
-            e,
-          );
-        }
-      });
-      if (validToolResults.length > 0) {
-        msgs.push({
-          role: "tool",
-          content: validToolResults,
-        });
-      }
-    }
-
-    return msgs;
-  });
-}
-// --- End History Builder Helper ---
+// Import helpers from the new file
+import {
+  runMiddleware,
+  getContextSnapshot,
+  processFileMetaToUserContent,
+} from "@/lib/litechat/ai-helpers";
 
 export class AIService {
   private static activeStreams = new Map<string, AbortController>();
@@ -318,6 +80,7 @@ export class AIService {
         ? conversationInteractions[conversationInteractions.length - 1].id
         : null;
 
+    // --- Process Files into User Message ---
     const finalMessages: CoreMessage[] = [...finalPayload.messages];
     let lastUserMessageIndex = -1;
     for (let i = finalMessages.length - 1; i >= 0; i--) {
@@ -339,7 +102,7 @@ export class AIService {
       const fileContents = (
         initiatingTurnData.metadata.attachedFiles as AttachedFileMetadata[]
       )
-        .map(processFileMetaToUserContent)
+        .map(processFileMetaToUserContent) // Use helper
         .filter((content): content is TextPart | ImagePart => content !== null);
 
       let userMessageContentParts: (TextPart | ImagePart)[] = [];
@@ -360,6 +123,7 @@ export class AIService {
         );
       }
 
+      // Combine file content parts with existing text/image parts
       finalMessages[lastUserMessageIndex] = {
         ...userMessage,
         content: [...fileContents, ...userMessageContentParts],
@@ -368,28 +132,32 @@ export class AIService {
         `AIService: Added ${fileContents.length} file(s) to user message content.`,
       );
     }
+    // --- End File Processing ---
 
     const interactionData: Interaction = {
       id: interactionId,
       conversationId: conversationId,
       type: "message.user_assistant",
-      prompt: { ...initiatingTurnData },
+      prompt: { ...initiatingTurnData }, // Store the original turn data
       response: null,
       status: "STREAMING",
       startedAt: new Date(),
       endedAt: null,
       metadata: {
-        ...finalPayload.metadata,
+        ...finalPayload.metadata, // Metadata from the final AI payload
+        // Store only basic file info (no content) in interaction metadata
         attachedFiles: initiatingTurnData.metadata.attachedFiles?.map(
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           ({ contentBase64, contentText, ...rest }) => rest,
         ),
-        toolCalls: [],
-        toolResults: [],
+        toolCalls: [], // Initialize as empty arrays
+        toolResults: [], // Initialize as empty arrays
       },
       index: newIndex,
       parentId: parentId,
     };
 
+    // Add interaction to state and persist initial record
     interactionStoreStateAndActions._addInteractionToState(interactionData);
     interactionStoreStateAndActions._addStreamingId(interactionId);
     PersistenceService.saveInteraction({ ...interactionData }).catch((e) => {
@@ -412,6 +180,7 @@ export class AIService {
     let finalProviderMetadata: ProviderMetadata | undefined = undefined;
     let finalFinishReason: FinishReason | undefined = undefined;
 
+    // Store tool calls/results as JSON strings during streaming
     const currentToolCallStrings: string[] = [];
     const currentToolResultStrings: string[] = [];
 
@@ -423,6 +192,7 @@ export class AIService {
         throw new Error("Selected model instance not available.");
       }
 
+      // --- Tool Setup ---
       const allRegisteredTools = useControlRegistryStore
         .getState()
         .getRegisteredTools();
@@ -434,9 +204,10 @@ export class AIService {
           if (toolInfo) {
             const toolDefinition: Tool<any> = { ...toolInfo.definition };
             if (toolInfo.implementation) {
+              // Wrap implementation to handle errors and context
               toolDefinition.execute = async (args: any) => {
                 try {
-                  const contextSnapshot = getContextSnapshot();
+                  const contextSnapshot = getContextSnapshot(); // Use helper
                   const parsedArgs = toolInfo.definition.parameters.parse(args);
                   const implementation: ToolImplementation<any> =
                     toolInfo.implementation!;
@@ -447,12 +218,14 @@ export class AIService {
                     e,
                   );
                   const toolError = e instanceof Error ? e.message : String(e);
+                  // Provide structured error for Zod validation issues
                   if (e instanceof z.ZodError) {
                     return {
                       _isError: true,
                       error: `Invalid arguments: ${e.errors.map((err) => `${err.path.join(".")} (${err.message})`).join(", ")}`,
                     };
                   }
+                  // Return generic error structure
                   return { _isError: true, error: toolError };
                 }
               };
@@ -463,14 +236,16 @@ export class AIService {
         },
         {} as Record<string, Tool<any>>,
       );
+      // --- End Tool Setup ---
 
+      // --- StreamText Options Setup ---
       const maxSteps =
         finalPayload.parameters?.maxSteps ??
         useSettingsStore.getState().toolMaxSteps;
 
       const streamOptions: Parameters<typeof streamText>[0] = {
         model: modelInstance as LanguageModelV1,
-        messages: finalMessages,
+        messages: finalMessages, // Use messages with processed file content
         abortSignal: abortController.signal,
         maxSteps: maxSteps,
       };
@@ -479,10 +254,12 @@ export class AIService {
         streamOptions.tools = toolsWithExecute;
       }
 
+      // Determine toolChoice based on payload or presence of tools
       streamOptions.toolChoice =
         finalPayload.toolChoice ??
         (Object.keys(toolsWithExecute).length > 0 ? "auto" : "none");
 
+      // Add optional parameters
       if (finalPayload.system) {
         streamOptions.system = finalPayload.system;
       }
@@ -502,19 +279,17 @@ export class AIService {
           streamOptions.frequencyPenalty =
             finalPayload.parameters.frequency_penalty;
       }
+      // --- End StreamText Options Setup ---
 
       console.log(
         `AIService: Calling streamText with options for ${interactionId}:`,
         {
-          model: streamOptions.model,
-          messages: JSON.stringify(streamOptions.messages),
-          system: streamOptions.system,
+          // Log relevant options, avoid logging full messages/instance
+          modelId: finalPayload.metadata?.modelId,
+          system: !!streamOptions.system,
+          messageCount: streamOptions?.messages?.length,
           temperature: streamOptions.temperature,
           maxTokens: streamOptions.maxTokens,
-          topP: streamOptions.topP,
-          topK: streamOptions.topK,
-          presencePenalty: streamOptions.presencePenalty,
-          frequencyPenalty: streamOptions.frequencyPenalty,
           toolChoice: streamOptions.toolChoice,
           tools: streamOptions.tools
             ? Object.keys(streamOptions.tools)
@@ -523,6 +298,7 @@ export class AIService {
         },
       );
 
+      // --- Stream Processing Loop ---
       streamResult = await streamText(streamOptions);
 
       for await (const part of streamResult.fullStream as AsyncIterable<
@@ -548,6 +324,7 @@ export class AIService {
                 "chunk" in chunkResult
                   ? chunkResult.chunk
                   : part.textDelta;
+              // Append chunk to buffer in store
               useInteractionStore
                 .getState()
                 .appendInteractionResponseChunk(interactionId, processedChunk);
@@ -559,16 +336,15 @@ export class AIService {
             break;
           }
           case "tool-call": {
+            // Store the raw tool call part as a JSON string
             const callString = JSON.stringify(part);
             currentToolCallStrings.push(callString);
+            // Update interaction metadata in state immediately
             useInteractionStore
               .getState()
               ._updateInteractionInState(interactionId, {
                 metadata: {
-                  ...useInteractionStore
-                    .getState()
-                    .interactions.find((i) => i.id === interactionId)?.metadata,
-                  toolCalls: [...currentToolCallStrings],
+                  toolCalls: [...currentToolCallStrings], // Pass the updated array
                 },
               });
             console.log(
@@ -578,16 +354,15 @@ export class AIService {
             break;
           }
           case "tool-result": {
+            // Store the raw tool result part as a JSON string
             const resultString = JSON.stringify(part);
             currentToolResultStrings.push(resultString);
+            // Update interaction metadata in state immediately
             useInteractionStore
               .getState()
               ._updateInteractionInState(interactionId, {
                 metadata: {
-                  ...useInteractionStore
-                    .getState()
-                    .interactions.find((i) => i.id === interactionId)?.metadata,
-                  toolResults: [...currentToolResultStrings],
+                  toolResults: [...currentToolResultStrings], // Pass the updated array
                 },
               });
             console.log(
@@ -608,6 +383,7 @@ export class AIService {
             throw new Error(
               `AI Stream Error: ${part.error instanceof Error ? part.error.message : part.error}`,
             );
+          // Ignore other part types for now
           case "reasoning":
           case "reasoning-signature":
           case "redacted-reasoning":
@@ -620,17 +396,29 @@ export class AIService {
             break;
         }
       }
+      // --- End Stream Processing Loop ---
 
       if (abortController.signal.aborted) {
         finalFinishReason = "stop";
         throw new Error("Stream aborted by user.");
       }
 
+      // Handle cases where the stream ends without a 'finish' part
       if (finalFinishReason === undefined) {
         console.warn(
-          `[AIService] Stream loop finished for ${interactionId} without receiving a 'finish' part.`,
+          `[AIService] Stream loop finished for ${interactionId} without receiving a 'finish' part. Inferring reason.`,
         );
-        finalFinishReason = "other";
+        // Infer finish reason based on content or tool calls
+        const finalBuffer =
+          useInteractionStore.getState().activeStreamBuffers[interactionId] ||
+          "";
+        if (currentToolCallStrings.length > 0) {
+          finalFinishReason = "tool-calls";
+        } else if (finalBuffer.trim()) {
+          finalFinishReason = "stop"; // Assume normal stop if content exists
+        } else {
+          finalFinishReason = "other"; // Unknown reason if no content/tools
+        }
       }
     } catch (error: unknown) {
       console.error(
@@ -639,9 +427,10 @@ export class AIService {
       );
       const isAbort =
         error instanceof Error && error.message === "Stream aborted by user.";
+      // Set finish reason if not already set by an error part
       finalFinishReason = finalFinishReason ?? (isAbort ? "stop" : "error");
       finalErrorMessage = isAbort
-        ? undefined
+        ? undefined // No error message for user abort
         : error instanceof Error
           ? error.message
           : String(error);
@@ -653,78 +442,90 @@ export class AIService {
         toast.error(`AI Interaction Error: ${finalErrorMessage}`);
       }
     } finally {
+      // --- Finalization Logic ---
       this.activeStreams.delete(interactionId);
       const finalBufferedContent =
         useInteractionStore.getState().activeStreamBuffers[interactionId] || "";
 
+      // Determine final status based on finish reason and content
       switch (finalFinishReason) {
         case "stop":
-        case "length":
-        case "tool-calls":
+        case "length": // Treat length limit as completed
+        case "tool-calls": // Treat tool calls finish as completed
           finalStatus = "COMPLETED";
           break;
         case "error":
           finalStatus = "ERROR";
           break;
-        case "other":
+        case "other": // Handle unknown/other reasons
         default:
+          // If there's content or tool activity, consider it completed but log warning
           if (
             finalBufferedContent.trim() ||
             currentToolCallStrings.length > 0
           ) {
             finalStatus = "COMPLETED";
             console.warn(
-              `[AIService] Interaction ${interactionId} finished with reason '${finalFinishReason || "unknown"}', but content exists. Marking COMPLETED.`,
+              `[AIService] Interaction ${interactionId} finished with reason '${finalFinishReason || "unknown"}', but content/tools exist. Marking COMPLETED.`,
             );
           } else {
+            // If no content/tools and unknown reason, mark as warning
             finalStatus = "WARNING";
             finalErrorMessage =
               finalErrorMessage ?? "Stream ended unexpectedly without output.";
             console.warn(
-              `[AIService] Interaction ${interactionId} finished with reason '${finalFinishReason || "unknown"}' and no content. Marking WARNING.`,
+              `[AIService] Interaction ${interactionId} finished with reason '${finalFinishReason || "unknown"}' and no content/tools. Marking WARNING.`,
             );
           }
           break;
       }
 
+      // Prepare final updates for the interaction object
       const currentInteractionMetadata =
         useInteractionStore
           .getState()
           .interactions.find((i) => i.id === interactionId)?.metadata ||
-        interactionData.metadata;
+        interactionData.metadata; // Fallback to initial metadata
 
       const finalUpdates: Partial<Interaction> = {
         status: finalStatus,
         endedAt: new Date(),
-        response: finalBufferedContent,
+        response: finalBufferedContent, // Set final response from buffer
         metadata: {
-          ...currentInteractionMetadata,
+          ...currentInteractionMetadata, // Start with existing metadata
+          // Add usage info if available
           ...(finalUsage && {
             promptTokens: finalUsage.promptTokens,
             completionTokens: finalUsage.completionTokens,
             totalTokens: finalUsage.totalTokens,
           }),
+          // Add provider metadata if available
           ...(finalProviderMetadata && {
             providerMetadata: finalProviderMetadata,
           }),
+          // Add error message if status is ERROR or WARNING
           ...((finalStatus === "ERROR" || finalStatus === "WARNING") && {
             error: finalErrorMessage,
           }),
+          // Store final tool calls/results as JSON strings
           toolCalls: currentToolCallStrings,
           toolResults: currentToolResultStrings,
+          // Ensure basic file info (without content) is preserved
           attachedFiles: interactionData.metadata.attachedFiles?.map(
-            // @ts-expect-error meeeh me no core type mismatch laaaah
+            // @ts-expect-error Do not remove !
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             ({ contentBase64, contentText, ...rest }) => rest,
           ),
         },
       };
 
+      // Update state synchronously and remove from streaming list/buffer
       useInteractionStore
         .getState()
         ._updateInteractionInState(interactionId, finalUpdates);
       useInteractionStore.getState()._removeStreamingId(interactionId);
 
+      // Persist the final state asynchronously
       const finalInteractionState = useInteractionStore
         .getState()
         .interactions.find((i) => i.id === interactionId);
@@ -767,6 +568,7 @@ export class AIService {
       console.log(
         `AIService: Finalized interaction ${interactionId} with status ${finalStatus}.`,
       );
+      // --- End Finalization Logic ---
     }
     return interactionId;
   }
@@ -777,37 +579,38 @@ export class AIService {
 
     if (controller && !controller.signal.aborted) {
       console.log(`AIService: Aborting interaction ${interactionId}...`);
-      controller.abort();
+      controller.abort(); // This will trigger the finally block in startInteraction
     } else {
       console.log(
         `AIService: No active controller found or already aborted for interaction ${interactionId}. Attempting store cleanup if needed.`,
       );
+      // If the stream was already aborted/finished but the state wasn't cleaned up
       const interaction = interactionStoreActions.interactions.find(
         (i) => i.id === interactionId,
       );
-      if (
-        interaction &&
-        interaction.status === "STREAMING" &&
-        (!controller || controller.signal.aborted)
-      ) {
+      if (interaction && interaction.status === "STREAMING") {
         console.warn(
-          `AIService: Forcing CANCELLED status for interaction ${interactionId} without active controller or already aborted.`,
+          `AIService: Forcing CANCELLED status for interaction ${interactionId} found in STREAMING state without active controller.`,
         );
 
         const finalBufferedContent =
           interactionStoreActions.activeStreamBuffers[interactionId] || "";
 
         const finalUpdates: Partial<Interaction> = {
-          status: "CANCELLED",
+          status: "CANCELLED", // Use CANCELLED status
           endedAt: new Date(),
           response: finalBufferedContent,
+          metadata: {
+            ...(interaction.metadata || {}),
+            error: "Manually stopped (controller missing)",
+          },
         };
 
         interactionStoreActions._updateInteractionInState(
           interactionId,
           finalUpdates,
         );
-        interactionStoreActions._removeStreamingId(interactionId);
+        interactionStoreActions._removeStreamingId(interactionId); // Clean up buffer/list
 
         const finalInteractionState = useInteractionStore
           .getState()

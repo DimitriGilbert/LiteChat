@@ -6,7 +6,7 @@ import { ProviderRowViewMode } from "./SettingsProviderRowView";
 import { ProviderRowEditMode } from "./SettingsProviderRowEdit";
 import { useProviderStore } from "@/store/provider.store";
 
-type FetchStatus = "idle" | "fetching" | "error" | "success";
+export type FetchStatus = "idle" | "fetching" | "error" | "success";
 export interface ProviderRowProps {
   provider: DbProviderConfig;
   apiKeys: DbApiKey[];

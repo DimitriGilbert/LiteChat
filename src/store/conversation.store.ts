@@ -7,17 +7,23 @@ import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project";
 import { useInteractionStore } from "./interaction.store";
 import { PersistenceService } from "@/services/persistence.service";
-import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import {
-  joinPath,
-  normalizePath,
-  dirname,
   formatBytes,
   buildPath,
+  normalizePath, // Import normalizePath
 } from "@/lib/litechat/file-manager-utils";
 import { format } from "date-fns";
+// Import sync logic helpers and the key
+import {
+  initializeOrSyncRepoLogic,
+  syncConversationLogic,
+  SYNC_VFS_KEY, // Import the key
+} from "@/lib/litechat/conversation-sync-logic";
+import { useVfsStore } from "./vfs.store"; // Import VFS store
+import type { fs as FsType } from "@zenfs/core"; // Import fs type
+import * as VfsOps from "@/lib/litechat/vfs-operations"; // Import VFS Ops
 
 // Define a union type for items in the sidebar
 export type SidebarItem =
@@ -42,6 +48,7 @@ interface ConversationState {
   selectedItemType: SidebarItemType | null;
   syncRepos: SyncRepo[];
   conversationSyncStatus: Record<string, SyncStatus>;
+  repoInitializationStatus: Record<string, SyncStatus>; // Track clone/pull status per repo
   isLoading: boolean;
   error: string | null;
 }
@@ -82,12 +89,10 @@ interface ConversationActions {
   exportAllConversations: () => Promise<void>;
   loadSyncRepos: () => Promise<void>;
   addSyncRepo: (
-    // Include new auth fields
     repoData: Omit<SyncRepo, "id" | "createdAt" | "updatedAt">,
   ) => Promise<string>;
   updateSyncRepo: (
     id: string,
-    // Include new auth fields
     updates: Partial<Omit<SyncRepo, "id" | "createdAt">>,
   ) => Promise<void>;
   deleteSyncRepo: (id: string) => Promise<void>;
@@ -96,11 +101,13 @@ interface ConversationActions {
     repoId: string | null,
   ) => Promise<void>;
   syncConversation: (conversationId: string) => Promise<void>;
+  initializeOrSyncRepo: (repoId: string) => Promise<void>;
   _setConversationSyncStatus: (
     conversationId: string,
     status: SyncStatus,
     error?: string | null,
   ) => void;
+  _setRepoInitializationStatus: (repoId: string, status: SyncStatus) => void;
   getProjectById: (id: string | null) => Project | undefined;
   getConversationById: (id: string | null) => Conversation | undefined;
   getTopLevelProjectId: (
@@ -111,11 +118,10 @@ interface ConversationActions {
     enabledTools?: string[];
     toolMaxStepsOverride?: number | null;
   }) => Promise<void>;
+  _ensureSyncVfsReady: () => Promise<typeof FsType | null>; // Helper action
 }
 
-const CONVERSATION_DIR = ".litechat/conversations";
-
-// Helper function to format interactions to Markdown
+// Helper function to format interactions to Markdown (remains the same)
 const formatInteractionsToMarkdown = (
   conversation: Conversation,
   interactions: Interaction[],
@@ -207,7 +213,7 @@ const formatInteractionsToMarkdown = (
   return mdString;
 };
 
-// Helper function to trigger browser download
+// Helper function to trigger browser download (remains the same)
 const triggerDownload = (blob: Blob, filename: string): void => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -219,6 +225,8 @@ const triggerDownload = (blob: Blob, filename: string): void => {
   URL.revokeObjectURL(url);
 };
 
+const SYNC_REPO_BASE_DIR = "/synced_repos"; // Base directory for sync repos
+
 export const useConversationStore = create(
   immer<ConversationState & ConversationActions>((set, get) => ({
     conversations: [],
@@ -227,8 +235,46 @@ export const useConversationStore = create(
     selectedItemType: null,
     syncRepos: [],
     conversationSyncStatus: {},
+    repoInitializationStatus: {},
     isLoading: false,
     error: null,
+
+    // --- Helper to ensure Sync VFS is ready ---
+    _ensureSyncVfsReady: async () => {
+      const vfsStore = useVfsStore.getState();
+      if (
+        vfsStore.fs &&
+        vfsStore.configuredVfsKey === SYNC_VFS_KEY &&
+        !vfsStore.loading
+      ) {
+        return vfsStore.fs; // Already ready
+      }
+
+      console.log(
+        `[ConversationStore] Sync VFS not ready (key: ${vfsStore.configuredVfsKey}, fs: ${!!vfsStore.fs}, loading: ${vfsStore.loading}). Initializing...`,
+      );
+      try {
+        await vfsStore.initializeVFS(SYNC_VFS_KEY);
+        // Re-check state after initialization attempt
+        const updatedVfsStore = useVfsStore.getState();
+        if (
+          updatedVfsStore.fs &&
+          updatedVfsStore.configuredVfsKey === SYNC_VFS_KEY
+        ) {
+          console.log("[ConversationStore] Sync VFS initialized successfully.");
+          return updatedVfsStore.fs;
+        } else {
+          throw new Error("VFS initialization did not complete successfully.");
+        }
+      } catch (error) {
+        console.error("[ConversationStore] Failed to ensure Sync VFS:", error);
+        toast.error(
+          `Filesystem error for sync: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return null;
+      }
+    },
+    // --- End Helper ---
 
     loadSidebarItems: async () => {
       set({ isLoading: true, error: null });
@@ -241,7 +287,23 @@ export const useConversationStore = create(
 
         const initialStatus: Record<string, SyncStatus> = {};
         dbConvos.forEach((c) => {
-          initialStatus[c.id] = "idle";
+          if (c.syncRepoId) {
+            // Check if lastSyncedAt is a valid Date object before calling getTime()
+            const lastSyncTime =
+              c.lastSyncedAt instanceof Date ? c.lastSyncedAt.getTime() : null;
+            const updatedTime =
+              c.updatedAt instanceof Date ? c.updatedAt.getTime() : null;
+
+            if (!lastSyncTime) {
+              initialStatus[c.id] = "needs-sync";
+            } else if (updatedTime && updatedTime > lastSyncTime) {
+              initialStatus[c.id] = "needs-sync";
+            } else {
+              initialStatus[c.id] = "idle";
+            }
+          } else {
+            initialStatus[c.id] = "idle";
+          }
         });
 
         set({
@@ -249,6 +311,7 @@ export const useConversationStore = create(
           projects: dbProjects,
           syncRepos: dbSyncRepos,
           conversationSyncStatus: initialStatus,
+          repoInitializationStatus: {},
           isLoading: false,
         });
       } catch (e) {
@@ -277,7 +340,9 @@ export const useConversationStore = create(
       set((state) => {
         if (!state.conversations.some((c) => c.id === newConversation.id)) {
           state.conversations.unshift(newConversation);
-          state.conversationSyncStatus[newId] = "idle";
+          state.conversationSyncStatus[newId] = newConversation.syncRepoId
+            ? "needs-sync"
+            : "idle";
         }
       });
       try {
@@ -325,19 +390,30 @@ export const useConversationStore = create(
             updatedAt: new Date(),
           });
 
-          const relevantFieldsChanged = [
-            "title",
-            "metadata",
-            "syncRepoId",
-            "projectId",
-          ].some((field) => field in updates);
+          const relevantFieldsChanged = ["title", "metadata", "projectId"].some(
+            (field) => field in updates,
+          );
 
-          if (
+          // Check if lastSyncedAt is a valid Date object before calling getTime()
+          const lastSyncTime =
+            state.conversations[index].lastSyncedAt instanceof Date
+              ? state.conversations[index].lastSyncedAt!.getTime()
+              : null;
+          const updatedTime = state.conversations[index].updatedAt.getTime();
+
+          if ("syncRepoId" in updates) {
+            state.conversationSyncStatus[id] = updates.syncRepoId
+              ? "needs-sync"
+              : "idle";
+          } else if (
             relevantFieldsChanged &&
             state.conversations[index].syncRepoId &&
             state.conversationSyncStatus[id] === "idle"
           ) {
-            state.conversationSyncStatus[id] = "needs-sync";
+            // Also check if updatedTime > lastSyncTime to avoid unnecessary 'needs-sync'
+            if (!lastSyncTime || updatedTime > lastSyncTime) {
+              state.conversationSyncStatus[id] = "needs-sync";
+            }
           }
         }
       });
@@ -346,6 +422,7 @@ export const useConversationStore = create(
 
       if (updatedConversationData) {
         try {
+          // Ensure dates are properly handled before saving
           const plainData = JSON.parse(JSON.stringify(updatedConversationData));
           await PersistenceService.saveConversation(plainData);
         } catch (e) {
@@ -354,9 +431,21 @@ export const useConversationStore = create(
             const index = state.conversations.findIndex((c) => c.id === id);
             if (index !== -1) {
               state.conversations[index] = originalConversation;
-            }
-            if (state.conversationSyncStatus[id] === "needs-sync") {
-              state.conversationSyncStatus[id] = "idle";
+              // Recalculate original status correctly
+              const originalLastSyncTime =
+                originalConversation.lastSyncedAt instanceof Date
+                  ? originalConversation.lastSyncedAt.getTime()
+                  : null;
+              const originalUpdatedTime =
+                originalConversation.updatedAt.getTime();
+              state.conversationSyncStatus[id] =
+                originalConversation.syncRepoId &&
+                originalLastSyncTime &&
+                originalUpdatedTime <= originalLastSyncTime
+                  ? "idle"
+                  : originalConversation.syncRepoId
+                    ? "needs-sync"
+                    : "idle";
             }
             state.error = "Failed to save conversation update";
           });
@@ -370,9 +459,21 @@ export const useConversationStore = create(
           const index = state.conversations.findIndex((c) => c.id === id);
           if (index !== -1) {
             state.conversations[index] = originalConversation;
-          }
-          if (state.conversationSyncStatus[id] === "needs-sync") {
-            state.conversationSyncStatus[id] = "idle";
+            // Recalculate original status correctly
+            const originalLastSyncTime =
+              originalConversation.lastSyncedAt instanceof Date
+                ? originalConversation.lastSyncedAt.getTime()
+                : null;
+            const originalUpdatedTime =
+              originalConversation.updatedAt.getTime();
+            state.conversationSyncStatus[id] =
+              originalConversation.syncRepoId &&
+              originalLastSyncTime &&
+              originalUpdatedTime <= originalLastSyncTime
+                ? "idle"
+                : originalConversation.syncRepoId
+                  ? "needs-sync"
+                  : "idle";
           }
           state.error = "Failed to save conversation update (state error)";
         });
@@ -417,7 +518,21 @@ export const useConversationStore = create(
         set((state) => {
           if (conversationToDelete) {
             state.conversations.push(conversationToDelete);
-            state.conversationSyncStatus[id] = "idle";
+            // Recalculate original status correctly
+            const originalLastSyncTime =
+              conversationToDelete.lastSyncedAt instanceof Date
+                ? conversationToDelete.lastSyncedAt.getTime()
+                : null;
+            const originalUpdatedTime =
+              conversationToDelete.updatedAt.getTime();
+            state.conversationSyncStatus[id] =
+              conversationToDelete.syncRepoId &&
+              originalLastSyncTime &&
+              originalUpdatedTime <= originalLastSyncTime
+                ? "idle"
+                : conversationToDelete.syncRepoId
+                  ? "needs-sync"
+                  : "idle";
           }
           if (
             currentSelectedId === id &&
@@ -814,9 +929,9 @@ export const useConversationStore = create(
         updatedAt: now,
         name: repoData.name,
         remoteUrl: repoData.remoteUrl,
-        branch: repoData.branch,
-        username: repoData.username ?? null, // Handle new fields
-        password: repoData.password ?? null, // Handle new fields
+        branch: repoData.branch || "main", // Default to main if not provided
+        username: repoData.username ?? null,
+        password: repoData.password ?? null,
       };
       set((state) => {
         state.syncRepos.push(newRepo);
@@ -853,6 +968,7 @@ export const useConversationStore = create(
         if (index !== -1) {
           Object.assign(state.syncRepos[index], {
             ...updates,
+            branch: updates.branch || state.syncRepos[index].branch || "main", // Ensure branch defaults
             updatedAt: new Date(),
           });
         }
@@ -894,18 +1010,52 @@ export const useConversationStore = create(
       const repoToDelete = get().syncRepos.find((r) => r.id === id);
       if (!repoToDelete) return;
 
+      const repoDir = normalizePath(`${SYNC_REPO_BASE_DIR}/${id}`);
+
+      // Ensure VFS is ready before attempting deletion
+      const fsInstance = await get()._ensureSyncVfsReady();
+      if (!fsInstance) {
+        toast.error("Filesystem not ready, cannot delete repository folder.");
+        return; // Prevent deletion if VFS isn't ready
+      }
+
       set((state) => ({
         syncRepos: state.syncRepos.filter((r) => r.id !== id),
+        repoInitializationStatus: Object.fromEntries(
+          Object.entries(state.repoInitializationStatus).filter(
+            ([repoId]) => repoId !== id,
+          ),
+        ),
       }));
 
       try {
+        // Delete from DB first
         await PersistenceService.deleteSyncRepo(id);
         toast.success(`Sync repository "${repoToDelete.name}" deleted.`);
+
+        // Then attempt to delete the VFS directory
+        try {
+          console.log(`[ConversationStore] Deleting VFS directory: ${repoDir}`);
+          await VfsOps.deleteItemOp(repoDir, true); // Recursive delete
+          toast.info(`Removed local sync folder for "${repoToDelete.name}".`);
+        } catch (vfsError: any) {
+          // Log VFS deletion error but don't revert DB deletion
+          console.error(
+            `[ConversationStore] Failed to delete VFS directory ${repoDir}:`,
+            vfsError,
+          );
+          if (vfsError.code !== "ENOENT") {
+            // Only show toast if it wasn't a "not found" error
+            toast.warning(
+              `Failed to remove local sync folder: ${vfsError.message}`,
+            );
+          }
+        }
       } catch (e) {
         console.error("ConversationStore: Error deleting sync repo", e);
         set((state) => {
           if (repoToDelete) {
-            state.syncRepos.push(repoToDelete);
+            state.syncRepos.push(repoToDelete); // Re-add to state on DB error
           }
           state.error = "Failed to delete sync repository";
         });
@@ -918,7 +1068,10 @@ export const useConversationStore = create(
         syncRepoId: repoId,
         lastSyncedAt: null,
       });
-      get()._setConversationSyncStatus(conversationId, "idle");
+      get()._setConversationSyncStatus(
+        conversationId,
+        repoId ? "needs-sync" : "idle",
+      );
       toast.info(
         `Conversation ${repoId ? "linked to" : "unlinked from"} sync repository.`,
       );
@@ -933,14 +1086,34 @@ export const useConversationStore = create(
       });
     },
 
+    _setRepoInitializationStatus: (repoId, status) => {
+      set((state) => {
+        state.repoInitializationStatus[repoId] = status;
+      });
+    },
+
+    initializeOrSyncRepo: async (repoId) => {
+      const repo = get().syncRepos.find((r) => r.id === repoId);
+      if (!repo) {
+        toast.error("Sync repository configuration not found.");
+        return;
+      }
+      // Ensure the correct VFS is ready before calling the logic
+      const fsInstance = await get()._ensureSyncVfsReady();
+      if (!fsInstance) {
+        get()._setRepoInitializationStatus(repoId, "error");
+        return; // Error handled by _ensureSyncVfsReady
+      }
+      // Pass the ready fs instance to the logic function
+      await initializeOrSyncRepoLogic(
+        fsInstance,
+        repo,
+        get()._setRepoInitializationStatus,
+      );
+    },
+
     syncConversation: async (conversationId) => {
-      const {
-        conversations,
-        syncRepos,
-        _setConversationSyncStatus,
-        updateConversation,
-      } = get();
-      const conversation = conversations.find((c) => c.id === conversationId);
+      const conversation = get().getConversationById(conversationId);
       if (!conversation) {
         toast.error("Conversation not found for syncing.");
         return;
@@ -949,156 +1122,52 @@ export const useConversationStore = create(
         toast.info("Conversation not linked to a sync repository.");
         return;
       }
-      const repo = syncRepos.find((r) => r.id === conversation.syncRepoId);
+      const repo = get().syncRepos.find(
+        (r) => r.id === conversation.syncRepoId,
+      );
       if (!repo) {
         toast.error("Sync repository configuration not found.");
-        _setConversationSyncStatus(conversationId, "error", "Repo not found");
+        get()._setConversationSyncStatus(
+          conversationId,
+          "error",
+          "Repo not found",
+        );
         return;
       }
 
-      _setConversationSyncStatus(conversationId, "syncing");
-      const repoDir = normalizePath(`/synced_convos/${repo.id}`);
-      const convoFilePath = joinPath(
-        repoDir,
-        CONVERSATION_DIR,
-        `${conversationId}.json`,
+      // Ensure the correct VFS is ready before calling the logic
+      const fsInstance = await get()._ensureSyncVfsReady();
+      if (!fsInstance) {
+        get()._setConversationSyncStatus(
+          conversationId,
+          "error",
+          "Filesystem not ready",
+        );
+        return; // Error handled by _ensureSyncVfsReady
+      }
+
+      // Pass the ready fs instance to the logic function
+      await syncConversationLogic(
+        fsInstance,
+        conversation,
+        repo,
+        get()._setConversationSyncStatus,
+        get().updateConversation,
+        () => get().selectedItemId,
+        () => get().selectedItemType,
       );
 
-      try {
-        let repoExists = false;
-        try {
-          await VfsOps.VFS.promises.stat(joinPath(repoDir, ".git"));
-          repoExists = true;
-        } catch (e: any) {
-          if (e.code !== "ENOENT") throw e;
-        }
-
-        // Pass credentials to clone/pull/push operations
-        const credentials = {
-          username: repo.username,
-          password: repo.password,
-        };
-
-        if (!repoExists) {
-          toast.info(`Cloning repository "${repo.name}" for first sync...`);
-          await VfsOps.gitCloneOp(
-            dirname(repoDir),
-            repo.remoteUrl,
-            repo.branch,
-            credentials, // Pass credentials
+      // Update state after sync logic potentially modified conversation data (e.g., pulled)
+      const potentiallyUpdatedConvo = get().getConversationById(conversationId);
+      if (potentiallyUpdatedConvo) {
+        set((state) => {
+          const index = state.conversations.findIndex(
+            (c) => c.id === conversationId,
           );
-          try {
-            await VfsOps.VFS.promises.stat(joinPath(repoDir, ".git"));
-          } catch (verifyError) {
-            throw new Error(
-              `Clone seemed successful but repo dir "${repoDir}" not found.`,
-            );
+          if (index !== -1) {
+            state.conversations[index] = potentiallyUpdatedConvo;
           }
-        } else {
-          toast.info(`Pulling latest changes for "${repo.name}"...`);
-          await VfsOps.gitPullOp(repoDir, credentials); // Pass credentials
-        }
-
-        let remoteConvoData: {
-          conversation: Conversation;
-          interactions: Interaction[];
-        } | null = null;
-        let remoteTimestamp: number | null = null;
-        try {
-          const fileContent = await VfsOps.readFileOp(convoFilePath);
-          const jsonString = new TextDecoder().decode(fileContent);
-          remoteConvoData = JSON.parse(jsonString);
-          remoteTimestamp = remoteConvoData?.conversation?.updatedAt
-            ? new Date(remoteConvoData.conversation.updatedAt).getTime()
-            : null;
-        } catch (e: any) {
-          if (e.code === "ENOENT") {
-            console.log(
-              `Conversation file ${convoFilePath} not found in repo. Will push local version.`,
-            );
-          } else {
-            throw new Error(
-              `Failed to read remote conversation file: ${e.message}`,
-            );
-          }
-        }
-
-        const localTimestamp = conversation.updatedAt.getTime();
-        const lastSyncTimestamp = conversation.lastSyncedAt?.getTime() ?? 0;
-
-        if (
-          !remoteConvoData ||
-          localTimestamp > (remoteTimestamp ?? 0) ||
-          localTimestamp > lastSyncTimestamp
-        ) {
-          toast.info("Local changes detected. Pushing to remote...");
-          const interactions =
-            await PersistenceService.loadInteractionsForConversation(
-              conversationId,
-            );
-          const conversationToSave = { ...conversation, lastSyncedAt: null };
-          const localData = JSON.stringify(
-            { conversation: conversationToSave, interactions },
-            null,
-            2,
-          );
-          await VfsOps.writeFileOp(convoFilePath, localData);
-          await VfsOps.gitCommitOp(
-            repoDir,
-            `Sync conversation: ${conversation.title} (${conversationId})`,
-          );
-          await VfsOps.gitPushOp(repoDir, credentials); // Pass credentials
-          await updateConversation(conversationId, {
-            lastSyncedAt: new Date(),
-          });
-          _setConversationSyncStatus(conversationId, "idle");
-          toast.success("Conversation synced successfully (pushed).");
-        } else if (remoteTimestamp && remoteTimestamp > localTimestamp) {
-          toast.info("Remote changes detected. Updating local conversation...");
-          const syncedConversation = {
-            ...remoteConvoData!.conversation,
-            lastSyncedAt: new Date(),
-          };
-          await PersistenceService.saveConversation(syncedConversation);
-          await PersistenceService.deleteInteractionsForConversation(
-            conversationId,
-          );
-          const interactionPromises = remoteConvoData!.interactions.map((i) =>
-            PersistenceService.saveInteraction({ ...i, conversationId }),
-          );
-          await Promise.all(interactionPromises);
-
-          set((state) => {
-            const index = state.conversations.findIndex(
-              (c) => c.id === conversationId,
-            );
-            if (index !== -1) {
-              state.conversations[index] = syncedConversation;
-            }
-          });
-          if (
-            get().selectedItemId === conversationId &&
-            get().selectedItemType === "conversation"
-          ) {
-            await useInteractionStore
-              .getState()
-              .loadInteractions(conversationId);
-          }
-          _setConversationSyncStatus(conversationId, "idle");
-          toast.success("Conversation synced successfully (pulled).");
-        } else {
-          toast.info("Conversation already up-to-date.");
-          await updateConversation(conversationId, {
-            lastSyncedAt: new Date(),
-          });
-          _setConversationSyncStatus(conversationId, "idle");
-        }
-      } catch (error: any) {
-        console.error(`Sync failed for conversation ${conversationId}:`, error);
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        toast.error(`Sync failed: ${errorMessage}`);
-        _setConversationSyncStatus(conversationId, "error", errorMessage);
+        });
       }
     },
 

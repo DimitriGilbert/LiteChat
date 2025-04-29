@@ -6,6 +6,7 @@ import {
   Loader2,
   AlertCircleIcon,
   CheckCircle2Icon,
+  AlertTriangleIcon, // Import warning icon
 } from "lucide-react";
 import {
   Tooltip,
@@ -36,7 +37,7 @@ export const getSyncIndicator = (
       tooltipText = `Sync error with ${repoName}`;
       break;
     case "needs-sync":
-      IconComponent = AlertCircleIcon;
+      IconComponent = AlertTriangleIcon; // Use warning icon for needs-sync
       className = "text-orange-500";
       tooltipText = `Needs sync with ${repoName}`;
       break;
@@ -44,6 +45,12 @@ export const getSyncIndicator = (
       IconComponent = CheckCircle2Icon;
       className = "text-green-500";
       tooltipText = `Synced with ${repoName}`;
+      break;
+    default:
+      // Handle undefined or unexpected status gracefully
+      IconComponent = GitBranchIcon;
+      className = "text-muted-foreground/70";
+      tooltipText = `Linked to ${repoName} (Status: ${status ?? "Unknown"})`;
       break;
   }
   return (

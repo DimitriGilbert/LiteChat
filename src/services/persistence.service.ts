@@ -8,14 +8,34 @@ import type { SyncRepo } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project"; // Import Project type
 
 // Helper function to ensure date fields are Date objects
-const ensureDateFields = <T extends { createdAt?: any; updatedAt?: any }>(
+const ensureDateFields = <
+  T extends { createdAt?: any; updatedAt?: any; [key: string]: any },
+>(
   item: T,
+  otherDateFields: string[] = [], // Default value is an empty array
 ): T => {
-  return {
-    ...item,
-    ...(item.createdAt && { createdAt: new Date(item.createdAt) }),
-    ...(item.updatedAt && { updatedAt: new Date(item.updatedAt) }),
-  };
+  const newItem = { ...item };
+  if (item.createdAt && !(item.createdAt instanceof Date)) {
+    newItem.createdAt = new Date(item.createdAt);
+  }
+  if (item.updatedAt && !(item.updatedAt instanceof Date)) {
+    newItem.updatedAt = new Date(item.updatedAt);
+  }
+  // Check if otherDateFields is actually an array before iterating
+  if (Array.isArray(otherDateFields)) {
+    otherDateFields.forEach((field) => {
+      if (item[field] && !(item[field] instanceof Date)) {
+        newItem[field] = new Date(item[field]);
+      }
+    });
+  } else {
+    // Log a warning if it's not an array, though this shouldn't happen with the fix below
+    console.warn(
+      "[ensureDateFields] Expected otherDateFields to be an array, but received:",
+      otherDateFields,
+    );
+  }
+  return newItem;
 };
 
 export class PersistenceService {
@@ -26,8 +46,8 @@ export class PersistenceService {
         .orderBy("updatedAt")
         .reverse()
         .toArray();
-      // Ensure createdAt and updatedAt are Date objects
-      return conversations.map(ensureDateFields);
+      // Ensure createdAt, updatedAt, and lastSyncedAt are Date objects
+      return conversations.map((c) => ensureDateFields(c, ["lastSyncedAt"]));
     } catch (error) {
       console.error("PersistenceService: Error loading conversations:", error);
       throw error;
@@ -69,11 +89,9 @@ export class PersistenceService {
         .where({ conversationId: id })
         .sortBy("index");
       // Ensure startedAt and endedAt are Date objects if they exist
-      return interactions.map((i) => ({
-        ...i,
-        ...(i.startedAt && { startedAt: new Date(i.startedAt) }),
-        ...(i.endedAt && { endedAt: new Date(i.endedAt) }),
-      }));
+      return interactions.map((i) =>
+        ensureDateFields(i, ["startedAt", "endedAt"]),
+      );
     } catch (error) {
       console.error(
         "PersistenceService: Error loading interactions for conversation:",
@@ -119,10 +137,8 @@ export class PersistenceService {
     try {
       const mods = await db.mods.orderBy("loadOrder").toArray();
       // Ensure createdAt is a Date object
-      return mods.map((m) => ({
-        ...m,
-        ...(m.createdAt && { createdAt: new Date(m.createdAt) }),
-      }));
+      // Explicitly pass empty array for otherDateFields
+      return mods.map((m) => ensureDateFields(m, []));
     } catch (error) {
       console.error("PersistenceService: Error loading mods:", error);
       throw error;
@@ -173,12 +189,7 @@ export class PersistenceService {
     try {
       const configs = (await db.providerConfigs?.toArray()) ?? [];
       // Ensure date fields are Date objects
-      return configs.map((c) => ({
-        ...ensureDateFields(c),
-        ...(c.modelsLastFetchedAt && {
-          modelsLastFetchedAt: new Date(c.modelsLastFetchedAt),
-        }),
-      }));
+      return configs.map((c) => ensureDateFields(c, ["modelsLastFetchedAt"]));
     } catch (error) {
       console.error(
         "PersistenceService: Error loading provider configs:",
@@ -215,7 +226,8 @@ export class PersistenceService {
     try {
       const keys = (await db.apiKeys?.toArray()) ?? [];
       // Ensure date fields are Date objects
-      return keys.map(ensureDateFields);
+      // Explicitly pass empty array for otherDateFields
+      return keys.map((k) => ensureDateFields(k, []));
     } catch (error) {
       console.error("PersistenceService: Error loading API keys:", error);
       throw error;
@@ -262,11 +274,9 @@ export class PersistenceService {
     try {
       const repos = await db.syncRepos.toArray();
       // Ensure date fields are Date objects
-      return repos.map((r) => ({
-        ...ensureDateFields(r),
-        ...(r.lastPulledAt && { lastPulledAt: new Date(r.lastPulledAt) }),
-        ...(r.lastPushedAt && { lastPushedAt: new Date(r.lastPushedAt) }),
-      }));
+      return repos.map((r) =>
+        ensureDateFields(r, ["lastPulledAt", "lastPushedAt"]),
+      );
     } catch (error) {
       console.error("PersistenceService: Error loading sync repos:", error);
       throw error;
@@ -315,7 +325,8 @@ export class PersistenceService {
         .reverse()
         .toArray();
       // Ensure date fields are Date objects
-      return projects.map(ensureDateFields);
+      // Explicitly pass empty array for otherDateFields
+      return projects.map((p) => ensureDateFields(p, []));
     } catch (error) {
       console.error("PersistenceService: Error loading projects:", error);
       throw error;

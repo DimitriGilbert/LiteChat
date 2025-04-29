@@ -12,34 +12,36 @@ import {
   dirname,
   basename,
 } from "./file-manager-utils";
-import git from "isomorphic-git";
-import http from "isomorphic-git/http/web";
-import { useSettingsStore } from "@/store/settings.store";
 
-// --- Constants ---
-const CORS_PROXY = "https://cors.isomorphic-git.org";
+// Import Git operations from the separate module
+import {
+  isGitRepoOp as _isGitRepoOp,
+  gitCloneOp as _gitCloneOp,
+  gitInitOp as _gitInitOp,
+  gitCommitOp as _gitCommitOp,
+  gitPullOp as _gitPullOp,
+  gitPushOp as _gitPushOp,
+  gitStatusOp as _gitStatusOp,
+  gitCurrentBranchOp as _gitCurrentBranchOp,
+  gitListBranchesOp as _gitListBranchesOp,
+  gitListRemotesOp as _gitListRemotesOp,
+} from "./vfs-git-operations";
 
-// --- Session Credentials Store (Simple In-Memory) ---
-// NOTE: This is VERY basic. A more robust solution might use sessionStorage
-// or a dedicated non-persistent store slice. This resets on page reload.
-const sessionCredentials = new Map<
-  string,
-  { username?: string; password?: string }
->();
-
-// --- Helper Functions ---
+// --- Helper Functions (Non-Git) ---
 const createDirectoryRecursive = async (path: string): Promise<void> => {
   const normalized = normalizePath(path);
   if (normalized === "/") return;
   try {
     await fs.promises.mkdir(normalized, { recursive: true });
   } catch (err: unknown) {
+    // Ignore EEXIST error, as directory might be created concurrently
     if (err instanceof Error && (err as any).code === "EEXIST") {
       console.warn(
         `[VFS Op] Directory already exists or created concurrently: ${normalized}`,
       );
       return;
     }
+    // Log and re-throw other errors
     console.error(`[VFS Op] Failed to create directory ${normalized}:`, err);
     toast.error(
       `Error creating directory "${basename(normalized)}": ${err instanceof Error ? err.message : String(err)}`,
@@ -48,133 +50,24 @@ const createDirectoryRecursive = async (path: string): Promise<void> => {
   }
 };
 
-const ensureGitConfig = async (dir: string): Promise<boolean> => {
-  const { gitUserName, gitUserEmail } = useSettingsStore.getState();
-  if (!gitUserName || !gitUserEmail) {
-    toast.error(
-      "Git user name and email must be configured in Settings before committing.",
-    );
-    return false;
-  }
-  try {
-    const currentName = await git.getConfig({ fs, dir, path: "user.name" });
-    const currentEmail = await git.getConfig({ fs, dir, path: "user.email" });
+// --- Exported VFS Operation Functions (Non-Git) ---
 
-    if (currentName !== gitUserName) {
-      await git.setConfig({
-        fs,
-        dir,
-        path: "user.name",
-        value: gitUserName,
-      });
-    }
-    if (currentEmail !== gitUserEmail) {
-      await git.setConfig({
-        fs,
-        dir,
-        path: "user.email",
-        value: gitUserEmail,
-      });
-    }
-    return true;
-  } catch (err) {
-    console.error("[VFS Op] Error checking/setting Git config:", err);
-    toast.error(
-      `Failed to configure Git user: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    return false;
-  }
-};
-
-// --- Authentication Callbacks ---
-const onAuth = async (
-  url: string,
-  storedCreds?: { username?: string | null; password?: string | null },
-): Promise<any> => {
-  const urlOrigin = new URL(url).origin; // Use origin as key for session creds
-  console.log(`[VFS Op] Git Auth requested for ${url}`);
-
-  // 1. Check provided stored credentials first
-  if (storedCreds?.username && storedCreds?.password) {
-    console.log(`[VFS Op] Attempting auth with stored credentials for ${url}`);
-    return {
-      username: storedCreds.username,
-      password: storedCreds.password,
-      // Consider adding oauth2format detection based on URL if needed
-    };
-  }
-
-  // 2. Check session credentials
-  const sessionCred = sessionCredentials.get(urlOrigin);
-  if (sessionCred?.username && sessionCred?.password) {
-    console.log(`[VFS Op] Attempting auth with session credentials for ${url}`);
-    return {
-      username: sessionCred.username,
-      password: sessionCred.password,
-    };
-  }
-
-  // 3. Prompt user if no credentials found
-  console.log(
-    `[VFS Op] No stored or session credentials found for ${url}. Prompting user.`,
-  );
-  const username = window.prompt(`Enter username for ${url}`);
-  if (!username) {
-    toast.error("Authentication cancelled: Username not provided.");
-    return null; // Cancel auth if user cancels prompt
-  }
-  const password = window.prompt(
-    `Enter password or token for ${username}@${url}`,
-  );
-  if (!password) {
-    toast.error("Authentication cancelled: Password/token not provided.");
-    return null; // Cancel auth if user cancels prompt
-  }
-
-  // Store prompted credentials in session map
-  sessionCredentials.set(urlOrigin, { username, password });
-  console.log(
-    `[VFS Op] Stored prompted credentials in session for ${urlOrigin}`,
-  );
-
-  return { username, password };
-};
-
-const onAuthFailure = (url: string, auth: any): any => {
-  const urlOrigin = new URL(url).origin;
-  console.error(`[VFS Op] Git Auth FAILED for ${url}`, auth);
-  toast.error(`Authentication failed for ${url}`);
-  // Clear potentially invalid session credentials on failure
-  if (sessionCredentials.has(urlOrigin)) {
-    console.log(
-      `[VFS Op] Clearing failed session credentials for ${urlOrigin}`,
-    );
-    sessionCredentials.delete(urlOrigin);
-  }
-  // Don't re-prompt automatically, let the operation fail
-  return null;
-};
-
-const onAuthSuccess = (url: string, auth: any): void => {
-  console.log(`[VFS Op] Git Auth SUCCESS for ${url}`, auth);
-  // Optionally store successful session credentials if they weren't already stored
-  // const urlOrigin = new URL(url).origin;
-  // if (!sessionCredentials.has(urlOrigin) && auth.username && auth.password) {
-  //   sessionCredentials.set(urlOrigin, { username: auth.username, password: auth.password });
-  // }
-};
-
-// --- Exported VFS Operation Functions ---
+/**
+ * Initializes the ZenFS filesystem with IndexedDB backend.
+ * @param vfsKey A unique key to identify the filesystem instance.
+ * @returns The configured fs instance or null on failure.
+ */
 export const initializeFsOp = async (
   vfsKey: string,
 ): Promise<typeof fs | null> => {
   try {
     const vfsConf = {
       backend: IndexedDB,
-      name: `litechat_vfs_${vfsKey}`,
+      name: `litechat_vfs_${vfsKey}`, // Use key in DB name
     };
+    // Configure the filesystem. This might throw if already configured differently.
     await configureSingle(vfsConf);
-    return fs;
+    return fs; // Return the globally configured fs instance
   } catch (error) {
     console.error(
       `[VFS Op] Failed to initialize VFS for key "${vfsKey}":`,
@@ -187,19 +80,28 @@ export const initializeFsOp = async (
   }
 };
 
+/**
+ * Lists files and directories within a given path.
+ * @param path The directory path to list.
+ * @returns An array of FileSystemEntry objects.
+ * @throws Throws an error if listing fails.
+ */
 export const listFilesOp = async (path: string): Promise<FileSystemEntry[]> => {
   const normalized = normalizePath(path);
   try {
+    // Ensure the directory exists before listing
     try {
       await fs.promises.stat(normalized);
     } catch (statErr: any) {
       if (statErr.code === "ENOENT") {
+        // If directory doesn't exist, create it and return empty list
         console.warn(
           `[VFS Op] Directory not found for listing, attempting creation: ${normalized}`,
         );
         await createDirectoryRecursive(normalized);
-        return [];
+        return []; // Return empty as it was just created
       }
+      // Rethrow other stat errors
       throw statErr;
     }
 
@@ -214,15 +116,17 @@ export const listFilesOp = async (path: string): Promise<FileSystemEntry[]> => {
             path: fullPath,
             isDirectory: fileStat.isDirectory(),
             size: fileStat.size,
-            lastModified: fileStat.mtime,
+            lastModified: fileStat.mtime, // Use mtime (modification time)
           };
         } catch (statErr: unknown) {
+          // Log error but filter out the entry if stat fails
           console.error(`[VFS Op] Failed to stat ${fullPath}:`, statErr);
           return null;
         }
       },
     );
     const stats = await Promise.all(statsPromises);
+    // Filter out null results where stat failed
     const filteredStats = stats.filter((s): s is FileSystemEntry => s !== null);
     return filteredStats;
   } catch (err: unknown) {
@@ -230,10 +134,16 @@ export const listFilesOp = async (path: string): Promise<FileSystemEntry[]> => {
     toast.error(
       `Error listing files: ${err instanceof Error ? err.message : String(err)}`,
     );
-    throw err;
+    throw err; // Re-throw error for caller handling
   }
 };
 
+/**
+ * Reads the content of a file.
+ * @param path The path to the file.
+ * @returns The file content as a Uint8Array.
+ * @throws Throws an error if reading fails.
+ */
 export const readFileOp = async (path: string): Promise<Uint8Array> => {
   const normalizedPath = normalizePath(path);
   try {
@@ -249,6 +159,12 @@ export const readFileOp = async (path: string): Promise<Uint8Array> => {
   }
 };
 
+/**
+ * Writes data to a file, creating parent directories if necessary.
+ * @param path The path to the file.
+ * @param data The data to write (Uint8Array or string).
+ * @throws Throws an error if writing fails.
+ */
 export const writeFileOp = async (
   path: string,
   data: Uint8Array | string,
@@ -256,12 +172,15 @@ export const writeFileOp = async (
   const normalized = normalizePath(path);
   const parentDir = dirname(normalized);
   try {
+    // Ensure parent directory exists
     if (parentDir !== "/") {
       await createDirectoryRecursive(parentDir);
     }
+    // Write the file
     await fs.promises.writeFile(normalized, data);
     emitter.emit(ModEvent.VFS_FILE_WRITTEN, { path: normalized });
   } catch (err: unknown) {
+    // Avoid double-toasting if error came from createDirectoryRecursive
     if (
       !(
         err instanceof Error && err.message.includes("Error creating directory")
@@ -272,10 +191,16 @@ export const writeFileOp = async (
         `Error writing file "${basename(normalized)}": ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-    throw err;
+    throw err; // Re-throw error
   }
 };
 
+/**
+ * Deletes a file or directory.
+ * @param path The path to the item to delete.
+ * @param recursive If true, delete directories recursively (default: false).
+ * @throws Throws an error if deletion fails (except for ENOENT).
+ */
 export const deleteItemOp = async (
   path: string,
   recursive: boolean = false,
@@ -288,48 +213,65 @@ export const deleteItemOp = async (
   try {
     const fileStat = await fs.promises.stat(normalized);
     if (fileStat.isDirectory()) {
+      // Use rm for directories
       await fs.promises.rm(normalized, { recursive });
       emitter.emit(ModEvent.VFS_FILE_DELETED, { path: normalized });
     } else {
+      // Use unlink for files
       await fs.promises.unlink(normalized);
       emitter.emit(ModEvent.VFS_FILE_DELETED, { path: normalized });
     }
     toast.success(`"${basename(normalized)}" deleted.`);
   } catch (err: unknown) {
+    // Ignore "Not Found" errors, maybe already deleted
     if (err instanceof Error && (err as any).code === "ENOENT") {
       console.warn(`[VFS Op] Item not found for deletion: ${normalized}`);
-      return;
+      return; // Don't throw, just return
     }
+    // Handle other errors
     console.error(`[VFS Op] Failed to delete ${normalized}:`, err);
     toast.error(
       `Error deleting "${basename(normalized)}": ${err instanceof Error ? err.message : String(err)}`,
     );
-    throw err;
+    throw err; // Re-throw other errors
   }
 };
 
+/**
+ * Creates a directory, including parent directories if necessary.
+ * @param path The directory path to create.
+ * @throws Throws an error if creation fails.
+ */
 export const createDirectoryOp = async (path: string): Promise<void> => {
-  await createDirectoryRecursive(path);
+  await createDirectoryRecursive(path); // Uses helper with error handling
 };
 
+/**
+ * Initiates a browser download for a file in the VFS.
+ * @param path The path to the file in the VFS.
+ * @param filename Optional filename for the download. Defaults to the file's basename.
+ */
 export const downloadFileOp = async (
   path: string,
   filename?: string,
 ): Promise<void> => {
   try {
-    const data = await readFileOp(path);
+    const data = await readFileOp(path); // Use existing op with error handling
     const blob = new Blob([data]);
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     const normalized = normalizePath(path);
-    link.download = filename || basename(normalized);
+    link.download = filename || basename(normalized); // Use basename helper
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    // Success toast is implicit via readFileOp if it doesn't throw
   } catch (err: unknown) {
+    // Error handling is done within readFileOp, just log context here
     console.error(`[VFS Op] Failed to initiate download for ${path}:`, err);
+    // Avoid double toast if readFileOp already showed one
     if (!(err instanceof Error && err.message.includes("Error reading file"))) {
       toast.error(
         `Download failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -338,6 +280,11 @@ export const downloadFileOp = async (
   }
 };
 
+/**
+ * Uploads multiple files to the specified target directory.
+ * @param files A FileList or array of File objects.
+ * @param targetPath The destination directory path in the VFS.
+ */
 export const uploadFilesOp = async (
   files: FileList | File[],
   targetPath: string,
@@ -345,29 +292,36 @@ export const uploadFilesOp = async (
   const normalizedTargetPath = normalizePath(targetPath);
   let successCount = 0;
   let errorCount = 0;
-  const fileArray = Array.from(files);
+  const fileArray = Array.from(files); // Convert FileList to array if necessary
 
   try {
+    // Ensure target directory exists
     await createDirectoryRecursive(normalizedTargetPath);
 
+    // Process each file
     for (const file of fileArray) {
       const filePath = joinPath(normalizedTargetPath, file.name);
       try {
         const buffer = await file.arrayBuffer();
-        await writeFileOp(filePath, new Uint8Array(buffer));
+        await writeFileOp(filePath, new Uint8Array(buffer)); // Use existing op
         successCount++;
       } catch (err: unknown) {
+        // writeFileOp handles its own toast, just count errors here
         errorCount++;
         console.error(`[VFS Op] Failed to upload ${file.name}:`, err);
       }
     }
   } catch (err: unknown) {
+    // Error creating target directory (handled by createDirectoryRecursive)
+    // Set error count to total files as none could be uploaded
     errorCount = fileArray.length;
     console.error(
       `[VFS Op] Failed to prepare target directory ${normalizedTargetPath} for upload:`,
       err,
     );
+    // Toast handled by createDirectoryRecursive
   } finally {
+    // Provide summary toast based on counts
     if (errorCount > 0 && successCount > 0) {
       toast.warning(
         `Upload complete with issues. ${successCount} succeeded, ${errorCount} failed.`,
@@ -377,11 +331,17 @@ export const uploadFilesOp = async (
         `Successfully uploaded ${successCount} file(s) to ${normalizedTargetPath === "/" ? "root" : basename(normalizedTargetPath)}.`,
       );
     } else if (errorCount > 0 && successCount === 0) {
-      toast.error(`Upload failed. Could not upload any files.`);
+      // Error toast was likely already shown by createDirectoryRecursive or writeFileOp
+      // toast.error(`Upload failed. Could not upload any files.`);
     }
   }
 };
 
+/**
+ * Uploads a ZIP file and extracts its contents into the target directory.
+ * @param file The ZIP file object.
+ * @param targetPath The destination directory path in the VFS.
+ */
 export const uploadAndExtractZipOp = async (
   file: File,
   targetPath: string,
@@ -395,24 +355,30 @@ export const uploadAndExtractZipOp = async (
   let zip: JSZip;
 
   try {
+    // Ensure target directory exists
     await createDirectoryRecursive(normalizedTargetPath);
 
+    // Load the ZIP file
     zip = await JSZip.loadAsync(file);
     const entries = Object.values(zip.files);
 
+    // Process each entry in the ZIP
     const results = await Promise.allSettled(
       entries.map(async (zipEntry) => {
         const fullTargetPath = joinPath(normalizedTargetPath, zipEntry.name);
         if (zipEntry.dir) {
+          // Create directory entry
           await createDirectoryRecursive(fullTargetPath);
         } else {
+          // Write file entry
           const content = await zipEntry.async("uint8array");
-          await writeFileOp(fullTargetPath, content);
+          await writeFileOp(fullTargetPath, content); // Use existing op
         }
         return { name: zipEntry.name, isDir: zipEntry.dir };
       }),
     );
 
+    // Tally results for summary toast
     let successFileCount = 0;
     let successDirCount = 0;
     let failedCount = 0;
@@ -423,10 +389,13 @@ export const uploadAndExtractZipOp = async (
         else successFileCount++;
       } else if (result.status === "rejected") {
         failedCount++;
+        // Log individual item failures
         console.error("[VFS Op] ZIP Extraction item failed:", result.reason);
+        // Individual file write errors are toasted by writeFileOp
       }
     });
 
+    // Show summary toast
     if (failedCount > 0) {
       toast.warning(
         `Finished extracting "${file.name}". ${successFileCount + successDirCount} items succeeded, ${failedCount} failed.`,
@@ -437,6 +406,8 @@ export const uploadAndExtractZipOp = async (
       );
     }
   } catch (err: unknown) {
+    // Catch errors during initial directory creation or ZIP loading
+    // Avoid double-toasting if error came from createDirectoryRecursive
     if (
       !(
         err instanceof Error && err.message.includes("Error creating directory")
@@ -447,18 +418,25 @@ export const uploadAndExtractZipOp = async (
         `ZIP extraction failed: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+    // Do not re-throw here, allow operation to finish
   }
 };
 
+/**
+ * Creates a ZIP archive of a directory's contents and initiates download.
+ * @param filename Optional filename for the downloaded ZIP file.
+ * @param rootPath The directory path in the VFS to archive (defaults to root '/').
+ */
 export const downloadAllAsZipOp = async (
   filename?: string,
   rootPath: string = "/",
 ): Promise<void> => {
   const zip = new JSZip();
   const normalizedRoot = normalizePath(rootPath);
-  const rootDirName = basename(normalizedRoot) || "root";
+  const rootDirName = basename(normalizedRoot) || "root"; // Use 'root' if path is '/'
 
   try {
+    // Verify the root path exists and is a directory
     try {
       const rootStat = await fs.promises.stat(normalizedRoot);
       if (!rootStat.isDirectory()) {
@@ -466,41 +444,54 @@ export const downloadAllAsZipOp = async (
         return;
       }
     } catch (statErr: unknown) {
+      // Handle specific "Not Found" error
       if (statErr instanceof Error && (statErr as any).code === "ENOENT") {
         toast.error(`Cannot export: Path "${rootDirName}" not found.`);
       } else {
+        // Handle other stat errors
         toast.error(
           `Cannot export: Error accessing path "${rootDirName}". ${statErr instanceof Error ? statErr.message : String(statErr)}`,
         );
       }
-      return;
+      return; // Stop if root path is invalid
     }
 
+    // Recursive function to add folder contents to the ZIP
     const addFolderToZip = async (folderPath: string, zipFolder: JSZip) => {
-      const entries = await listFilesOp(folderPath);
+      const entries = await listFilesOp(folderPath); // Use existing op
 
       for (const entry of entries) {
         if (entry.isDirectory) {
+          // Skip .git directory
           if (entry.name === ".git") continue;
+          // Create a new folder within the current zip folder
           const subFolder = zipFolder.folder(entry.name);
           if (subFolder) {
+            // Recursively add contents of the subfolder
             await addFolderToZip(entry.path, subFolder);
           } else {
+            // This should ideally not happen with JSZip
             throw new Error(`Failed to create subfolder ${entry.name} in zip.`);
           }
         } else {
-          const content = await readFileOp(entry.path);
+          // Read file content and add it to the zip folder
+          const content = await readFileOp(entry.path); // Use existing op
           zipFolder.file(entry.name, content);
         }
       }
     };
 
+    // Start the recursive zipping process from the root path
     await addFolderToZip(normalizedRoot, zip);
 
+    // Generate the ZIP blob
     const zipBlob = await zip.generateAsync({ type: "blob" });
+
+    // Trigger the download
     const url = URL.createObjectURL(zipBlob);
     const link = document.createElement("a");
     link.href = url;
+    // Create a default filename if none provided
     const defaultFilename = `vfs_${rootDirName}_export.zip`;
     link.download = filename || defaultFilename;
     document.body.appendChild(link);
@@ -509,13 +500,17 @@ export const downloadAllAsZipOp = async (
     URL.revokeObjectURL(url);
     toast.success(`"${rootDirName}" exported as ${link.download}.`);
   } catch (err: unknown) {
+    // Catch errors during listing, reading, or zipping
     console.error("[VFS Op] Failed to download all as zip:", err);
+    // Avoid double-toasting if error came from listFilesOp or readFileOp
     if (
       !(
-        err instanceof Error &&
-        (err.message.includes("Error listing files") ||
-          err.message.includes("Error reading file") ||
-          err.message.includes("Cannot export"))
+        (
+          err instanceof Error &&
+          (err.message.includes("Error listing files") ||
+            err.message.includes("Error reading file") ||
+            err.message.includes("Cannot export"))
+        ) // Check for specific export errors
       )
     ) {
       toast.error(
@@ -525,6 +520,12 @@ export const downloadAllAsZipOp = async (
   }
 };
 
+/**
+ * Renames a file or directory.
+ * @param oldPath The current path of the item.
+ * @param newPath The desired new path of the item.
+ * @throws Throws an error if renaming fails.
+ */
 export const renameOp = async (
   oldPath: string,
   newPath: string,
@@ -532,351 +533,77 @@ export const renameOp = async (
   const normalizedOld = normalizePath(oldPath);
   const normalizedNew = normalizePath(newPath);
 
+  // Prevent renaming root or renaming to the same path
   if (normalizedOld === "/" || normalizedNew === "/") {
     toast.error("Cannot rename the root directory.");
     throw new Error("Cannot rename the root directory.");
   }
   if (normalizedOld === normalizedNew) {
-    return;
+    return; // No operation needed
   }
 
   try {
+    // Ensure the parent directory of the new path exists
     const parentDir = dirname(normalizedNew);
     if (parentDir !== "/") {
       await createDirectoryRecursive(parentDir);
     }
+
+    // Attempt the rename operation
     await fs.promises.rename(normalizedOld, normalizedNew);
     toast.success(
       `Renamed "${basename(normalizedOld)}" to "${basename(normalizedNew)}"`,
     );
   } catch (err: unknown) {
+    // Handle specific errors for better feedback
     if (err instanceof Error && (err as any).code === "ENOENT") {
+      // Check if the error is from createDirectoryRecursive (already handled)
       if (err.message.includes("Error creating directory")) {
-        // Handled by createDirectoryRecursive
+        // Do nothing, error already toasted
       } else {
+        // Original item not found
         toast.error(
           `Rename failed: Original item "${basename(normalizedOld)}" not found.`,
         );
       }
     } else if (err instanceof Error && (err as any).code === "EEXIST") {
+      // Target name already exists
       toast.error(
         `Rename failed: An item named "${basename(normalizedNew)}" already exists.`,
       );
     } else if (
+      // Avoid double-toasting if error came from createDirectoryRecursive
       !(
         err instanceof Error && err.message.includes("Error creating directory")
       )
     ) {
+      // Handle other generic errors
       toast.error(
         `Rename failed: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+    // Log the error regardless
     console.error(
       `[VFS Op] Failed to rename ${normalizedOld} to ${normalizedNew}:`,
       err,
     );
-    throw err;
+    throw err; // Re-throw error
   }
 };
 
-// --- Git Operations ---
-
-export const isGitRepoOp = async (path: string): Promise<boolean> => {
-  const normalized = normalizePath(path);
-  const gitDirPath = joinPath(normalized, ".git");
-  try {
-    const stats = await fs.promises.stat(gitDirPath);
-    return stats.isDirectory();
-  } catch (err: unknown) {
-    if (err instanceof Error && (err as any).code === "ENOENT") {
-      return false;
-    }
-    console.error(`[VFS Op] Error checking for .git in ${normalized}:`, err);
-    return false;
-  }
+// --- Re-export Git operations ---
+export {
+  _isGitRepoOp as isGitRepoOp,
+  _gitCloneOp as gitCloneOp,
+  _gitInitOp as gitInitOp,
+  _gitCommitOp as gitCommitOp,
+  _gitPullOp as gitPullOp,
+  _gitPushOp as gitPushOp,
+  _gitStatusOp as gitStatusOp,
+  _gitCurrentBranchOp as gitCurrentBranchOp,
+  _gitListBranchesOp as gitListBranchesOp,
+  _gitListRemotesOp as gitListRemotesOp,
 };
 
-export const gitCloneOp = async (
-  targetPath: string,
-  url: string,
-  branch?: string,
-  // Add optional credentials parameter
-  credentials?: { username?: string | null; password?: string | null },
-): Promise<void> => {
-  const normalizedTargetPath = normalizePath(targetPath);
-  const repoName = basename(url.replace(/\/$/, "").replace(/\.git$/, ""));
-  const dir = joinPath(normalizedTargetPath, repoName);
-
-  try {
-    try {
-      await fs.promises.stat(dir);
-      toast.error(`Directory "${repoName}" already exists in target location.`);
-      return;
-    } catch (e: any) {
-      if (e.code !== "ENOENT") throw e;
-    }
-
-    await createDirectoryRecursive(normalizedTargetPath);
-
-    await git.clone({
-      fs,
-      http,
-      dir,
-      corsProxy: CORS_PROXY,
-      url,
-      ref: branch || undefined,
-      singleBranch: !!branch,
-      depth: 10,
-      // Pass stored credentials to onAuth callback factory
-      onAuth: (authUrl) => onAuth(authUrl, credentials),
-      onAuthFailure,
-      onAuthSuccess,
-      onProgress: (e) => {
-        if (e.phase === "counting objects" && e.total) {
-          console.log(`Clone progress: ${e.phase} ${e.loaded}/${e.total}`);
-        } else if (e.phase === "receiving objects" && e.total) {
-          console.log(`Clone progress: ${e.phase} ${e.loaded}/${e.total}`);
-        } else {
-          console.log(`Clone progress: ${e.phase}`);
-        }
-      },
-    });
-    toast.success(`Repository "${repoName}" cloned successfully into ${dir}.`);
-  } catch (err: unknown) {
-    console.error(`[VFS Op] Git clone failed for ${url}:`, err);
-    toast.error(
-      `Git clone failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    try {
-      await fs.promises.rm(dir, { recursive: true, force: true });
-    } catch (cleanupErr) {
-      console.warn(`[VFS Op] Failed cleanup ${dir}:`, cleanupErr);
-    }
-    throw err;
-  }
-};
-
-export const gitInitOp = async (path: string): Promise<void> => {
-  const dir = normalizePath(path);
-  try {
-    await git.init({ fs, dir });
-    toast.success(`Initialized empty Git repository in "${basename(dir)}"`);
-  } catch (err: unknown) {
-    console.error(`[VFS Op] Git init failed for ${dir}:`, err);
-    toast.error(
-      `Git init failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    throw err;
-  }
-};
-
-export const gitCommitOp = async (
-  path: string,
-  message: string,
-): Promise<void> => {
-  const dir = normalizePath(path);
-  try {
-    const configOK = await ensureGitConfig(dir);
-    if (!configOK) {
-      throw new Error("Git user configuration is missing or invalid.");
-    }
-
-    const status = await git.statusMatrix({ fs, dir });
-    let staged = false;
-    for (const [filepath, head, workdir] of status) {
-      if (workdir === 2) {
-        await git.add({ fs, dir, filepath });
-        staged = true;
-      }
-      if (head !== 0 && workdir === 0) {
-        await git.remove({ fs, dir, filepath });
-        staged = true;
-      }
-    }
-
-    if (!staged) {
-      toast.info("No changes detected to commit.");
-      return;
-    }
-
-    const sha = await git.commit({
-      fs,
-      dir,
-      message,
-      author: {
-        name: useSettingsStore.getState().gitUserName!,
-        email: useSettingsStore.getState().gitUserEmail!,
-      },
-    });
-    toast.success(`Changes committed: ${sha.substring(0, 7)}`);
-  } catch (err: unknown) {
-    console.error(`[VFS Op] Git commit failed for ${dir}:`, err);
-    toast.error(
-      `Git commit failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    throw err;
-  }
-};
-
-export const gitPullOp = async (
-  path: string,
-  // Add optional credentials parameter
-  credentials?: { username?: string | null; password?: string | null },
-): Promise<void> => {
-  const dir = normalizePath(path);
-  try {
-    const configOK = await ensureGitConfig(dir);
-    if (!configOK) {
-      throw new Error("Git user configuration is missing or invalid.");
-    }
-    const curBranch = await git.currentBranch({ fs, dir });
-    if (!curBranch) {
-      throw new Error("Current branch not found.");
-    }
-    await git.pull({
-      fs,
-      http,
-      dir,
-      corsProxy: CORS_PROXY,
-      ref: curBranch,
-      singleBranch: true,
-      author: {
-        name: useSettingsStore.getState().gitUserName!,
-        email: useSettingsStore.getState().gitUserEmail!,
-      },
-      // Pass stored credentials to onAuth callback factory
-      onAuth: (authUrl) => onAuth(authUrl, credentials),
-      onAuthFailure,
-      onAuthSuccess,
-    });
-    toast.success(`Pulled latest changes for "${basename(dir)}"`);
-  } catch (err: unknown) {
-    console.error(`[VFS Op] Git pull failed for ${dir}:`, err);
-    toast.error(
-      `Git pull failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    throw err;
-  }
-};
-
-export const gitPushOp = async (
-  path: string,
-  // Add optional credentials parameter
-  credentials?: { username?: string | null; password?: string | null },
-): Promise<void> => {
-  const dir = normalizePath(path);
-  try {
-    const result = await git.push({
-      fs,
-      http,
-      dir,
-      corsProxy: CORS_PROXY,
-      // Pass stored credentials to onAuth callback factory
-      onAuth: (authUrl) => onAuth(authUrl, credentials),
-      onAuthFailure,
-      onAuthSuccess,
-    });
-    if (result.ok) {
-      toast.success(`Pushed changes successfully for "${basename(dir)}"`);
-    } else {
-      throw new Error(result.error || "Push failed");
-    }
-  } catch (err: unknown) {
-    console.error(`[VFS Op] Git push failed for ${dir}:`, err);
-    toast.error(
-      `Git push failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    throw err;
-  }
-};
-
-export const gitStatusOp = async (path: string): Promise<void> => {
-  const dir = normalizePath(path);
-  console.log(`[VFS Op] Git Status on ${dir}`);
-  try {
-    const status = await git.statusMatrix({ fs, dir });
-    console.log("Git Status:", status);
-    const formattedStatus = status.map(([file, head, workdir, stage]) => {
-      let statusText = "";
-      if (workdir === 0) statusText = "deleted";
-      else if (head === 0 && workdir === 2) statusText = "new file";
-      else if (head === 1 && workdir === 2) statusText = "modified";
-      else if (head === 1 && workdir === 1) statusText = "unmodified";
-      else statusText = `h:${head} w:${workdir} s:${stage}`;
-
-      return `${file}: ${statusText}`;
-    }).join(`
-`);
-
-    toast.info(
-      `Git Status for "${basename(dir)}":
-${formattedStatus || "No changes"}`,
-      { duration: 15000 },
-    );
-  } catch (err: unknown) {
-    console.error(`[VFS Op] Git status failed for ${dir}:`, err);
-    toast.error(
-      `Git status failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    throw err;
-  }
-};
-
-export const gitCurrentBranchOp = async (path: string): Promise<string> => {
-  const dir = normalizePath(path);
-  try {
-    const branch = await git.currentBranch({ fs, dir, fullname: false });
-    if (!branch) {
-      throw new Error("Could not determine current branch.");
-    }
-    toast.info(`Current branch in "${basename(dir)}": ${branch}`);
-    return branch;
-  } catch (err: unknown) {
-    console.error(`[VFS Op] Git currentBranch failed for ${dir}:`, err);
-    toast.error(
-      `Failed to get current branch: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    throw err;
-  }
-};
-
-export const gitListBranchesOp = async (path: string): Promise<string[]> => {
-  const dir = normalizePath(path);
-  try {
-    const branches = await git.listBranches({ fs, dir });
-    toast.info(
-      `Local branches in "${basename(dir)}":
-${branches.join(", ")}`,
-    );
-    return branches;
-  } catch (err: unknown) {
-    console.error(`[VFS Op] Git listBranches failed for ${dir}:`, err);
-    toast.error(
-      `Failed to list branches: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    throw err;
-  }
-};
-
-export const gitListRemotesOp = async (
-  path: string,
-): Promise<{ remote: string; url: string }[]> => {
-  const dir = normalizePath(path);
-  try {
-    const remotes = await git.listRemotes({ fs, dir });
-    toast.info(
-      `Remotes in "${basename(dir)}":
-${remotes.map((r) => `${r.remote}: ${r.url}`).join(`
-`)}`,
-    );
-    return remotes;
-  } catch (err: unknown) {
-    console.error(`[VFS Op] Git listRemotes failed for ${dir}:`, err);
-    toast.error(
-      `Failed to list remotes: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    throw err;
-  }
-};
-
+// Export the fs instance for direct use if needed (e.g., in stores)
 export const VFS = fs;
