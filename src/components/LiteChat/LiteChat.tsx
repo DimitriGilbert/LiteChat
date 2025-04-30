@@ -12,31 +12,31 @@ import { AIService } from "@/services/ai.service";
 import { useModStore } from "@/store/mod.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
+import { useVfsStore } from "@/store/vfs.store";
 import { loadMods } from "@/modding/loader";
 import { Toaster } from "@/components/ui/sonner";
-import type { CoreMessage, ToolResultPart, ToolCallPart } from "ai";
+import type { CoreMessage } from "ai";
 import { InputArea } from "@/components/LiteChat/prompt/InputArea";
 import { useShallow } from "zustand/react/shallow";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type { Interaction } from "@/types/litechat/interaction";
 import { Loader2 } from "lucide-react";
 
-// Import the registration FUNCTIONS (keeping the existing pattern for these)
+// Import the registration FUNCTIONS/COMPONENTS
 import { registerConversationListControl } from "@/hooks/litechat/registerConversationListControl";
 import { registerSettingsControl } from "@/hooks/litechat/registerSettingsControl";
 import { registerSidebarToggleControl } from "@/hooks/litechat/registerSidebarToggleControl";
 import { registerGlobalModelSelector } from "@/hooks/litechat/registerGlobalModelSelector";
 import { registerParameterControl } from "@/hooks/litechat/registerParameterControl";
 import { registerFileControl } from "@/hooks/litechat/registerFileControl";
-import { registerVfsControl } from "@/hooks/litechat/registerVfsControl";
+import { RegisterVfsControl } from "@/hooks/litechat/registerVfsControl";
 import { registerGitSyncControl } from "@/hooks/litechat/registerGitSyncControl";
 import { registerVfsTools } from "@/hooks/litechat/registerVfsTools";
 import { registerGitTools } from "@/hooks/litechat/registerGitTools";
 import { registerToolSelectorControl } from "@/hooks/litechat/registerToolSelectorControl";
-// Import the new registration COMPONENT
 import { RegisterProjectSettingsControl } from "@/hooks/litechat/registerProjectSettingsControl";
+import { buildHistoryMessages } from "@/lib/litechat/ai-helpers";
 
 const splitModelId = (
   combinedId: string | null,
@@ -59,9 +59,8 @@ export const LiteChat: React.FC = () => {
     loadSidebarItems,
     addConversation,
     selectItem,
-    getProjectById,
     getConversationById,
-    getEffectiveProjectSettings, // Get the new helper
+    getEffectiveProjectSettings,
   } = useConversationStore(
     useShallow((state) => ({
       selectedItemId: state.selectedItemId,
@@ -71,7 +70,7 @@ export const LiteChat: React.FC = () => {
       selectItem: state.selectItem,
       getProjectById: state.getProjectById,
       getConversationById: state.getConversationById,
-      getEffectiveProjectSettings: state.getEffectiveProjectSettings, // Get the new helper
+      getEffectiveProjectSettings: state.getEffectiveProjectSettings,
       isLoading: state.isLoading,
     })),
   );
@@ -81,19 +80,20 @@ export const LiteChat: React.FC = () => {
       status: state.status,
     })),
   );
-  const { globalError, isSidebarCollapsed } = useUIStateStore(
+  const {
+    globalError,
+    isSidebarCollapsed,
+    isChatControlPanelOpen,
+    isProjectSettingsModalOpen,
+  } = useUIStateStore(
     useShallow((state) => ({
       globalError: state.globalError,
       isSidebarCollapsed: state.isSidebarCollapsed,
+      isChatControlPanelOpen: state.isChatControlPanelOpen,
+      isProjectSettingsModalOpen: state.isProjectSettingsModalOpen,
     })),
   );
-  const isSettingsModalOpen = useUIStateStore(
-    (state) => state.isChatControlPanelOpen["settingsModal"] ?? false,
-  );
-  // Get project settings modal state
-  const isProjectSettingsModalOpen = useUIStateStore(
-    (state) => state.isProjectSettingsModalOpen,
-  );
+  const isVfsPanelOpen = isChatControlPanelOpen["vfs"] ?? false;
 
   const registeredChatControls = useControlRegistryStore(
     (state) => state.chatControls,
@@ -118,10 +118,16 @@ export const LiteChat: React.FC = () => {
   const { loadSettings } = useSettingsStore(
     useShallow((state) => ({
       loadSettings: state.loadSettings,
-      // No need to get globalSystemPrompt here, use effective settings
+    })),
+  );
+  // Only need setVfsKey from VFS store now
+  const { setVfsKey } = useVfsStore(
+    useShallow((state) => ({
+      setVfsKey: state.setVfsKey,
     })),
   );
 
+  // --- Initialization Effect ---
   useEffect(() => {
     let isMounted = true;
     const initialize = async () => {
@@ -140,7 +146,7 @@ export const LiteChat: React.FC = () => {
       console.log("LiteChat: Sidebar items loaded.");
       if (!isMounted) return;
 
-      // 2. Register core controls and tools (imperatively - KEEPING THIS PATTERN)
+      // 2. Register core controls and tools
       console.log("LiteChat: Registering core controls and tools...");
       registerConversationListControl();
       registerSettingsControl();
@@ -148,16 +154,14 @@ export const LiteChat: React.FC = () => {
       registerGlobalModelSelector();
       registerParameterControl();
       registerFileControl();
-      registerVfsControl();
       registerGitSyncControl();
       registerVfsTools();
       registerGitTools();
       registerToolSelectorControl();
-      // Project settings control is now handled by the component rendered below
       console.log("LiteChat: Core controls and tools registered.");
       if (!isMounted) return;
 
-      // 3. Load mods (which might register more controls/tools)
+      // 3. Load mods
       await loadDbMods();
       console.log("LiteChat: DB Mods loaded.");
       if (!isMounted) return;
@@ -177,113 +181,51 @@ export const LiteChat: React.FC = () => {
       // 4. Finalize initialization
       if (isMounted) {
         console.log("LiteChat: Initialization complete.");
-        setIsInitializing(false); // Set initializing false AFTER everything
+        setIsInitializing(false);
       }
     };
     initialize();
     return () => {
       isMounted = false;
       console.log("LiteChat: Unmounting, initialization cancelled if pending.");
-      // NOTE: Core controls are NOT unregistered here, they persist for app lifetime
     };
-    // Only run initialization once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const buildHistoryMessages = useCallback(
-    (historyInteractions: Interaction[]): CoreMessage[] => {
-      return historyInteractions.flatMap((i): CoreMessage[] => {
-        const msgs: CoreMessage[] = [];
-
-        if (i.prompt?.content && typeof i.prompt.content === "string") {
-          msgs.push({ role: "user", content: i.prompt.content });
-        } else if (
-          i.prompt?.metadata?.attachedFiles &&
-          i.prompt.metadata.attachedFiles.length > 0 &&
-          !i.prompt?.content
-        ) {
-          // Omit user turn if only files
-        }
-
-        if (i.response && typeof i.response === "string") {
-          msgs.push({ role: "assistant", content: i.response });
-        }
-
-        if (i.metadata?.toolCalls && Array.isArray(i.metadata.toolCalls)) {
-          const validToolCalls: ToolCallPart[] = [];
-          i.metadata.toolCalls.forEach((callStr) => {
-            try {
-              const parsedCall = JSON.parse(callStr);
-              if (
-                parsedCall &&
-                parsedCall.type === "tool-call" &&
-                parsedCall.toolCallId &&
-                parsedCall.toolName &&
-                parsedCall.args !== undefined
-              ) {
-                validToolCalls.push(parsedCall as ToolCallPart);
-              } else {
-                console.warn(
-                  "[LiteChat] buildHistory: Invalid tool call structure after parsing:",
-                  callStr,
-                );
-              }
-            } catch (e) {
-              console.error(
-                "[LiteChat] buildHistory: Failed to parse tool call string:",
-                callStr,
-                e,
-              );
-            }
-          });
-          if (validToolCalls.length > 0) {
-            msgs.push({
-              role: "assistant",
-              content: validToolCalls,
-            });
-          }
-        }
-
-        if (i.metadata?.toolResults && Array.isArray(i.metadata.toolResults)) {
-          const validToolResults: ToolResultPart[] = [];
-          i.metadata.toolResults.forEach((resultStr) => {
-            try {
-              const parsedResult = JSON.parse(resultStr);
-              if (
-                parsedResult &&
-                parsedResult.type === "tool-result" &&
-                parsedResult.toolCallId &&
-                parsedResult.toolName &&
-                parsedResult.result !== undefined
-              ) {
-                validToolResults.push(parsedResult as ToolResultPart);
-              } else {
-                console.warn(
-                  "[LiteChat] buildHistory: Invalid tool result structure after parsing:",
-                  resultStr,
-                );
-              }
-            } catch (e) {
-              console.error(
-                "[LiteChat] buildHistory: Failed to parse tool result string:",
-                resultStr,
-                e,
-              );
-            }
-          });
-          if (validToolResults.length > 0) {
-            msgs.push({
-              role: "tool",
-              content: validToolResults,
-            });
-          }
-        }
-
-        return msgs;
-      });
-    },
-    [],
-  );
+  // --- VFS Context Management Effect ---
+  // This effect now ONLY reacts to the VFS panel opening/closing
+  // It determines the appropriate key when the panel opens.
+  useEffect(() => {
+    if (isVfsPanelOpen) {
+      let targetVfsKey: string | null = null;
+      if (selectedItemType === "project") {
+        targetVfsKey = selectedItemId;
+      } else if (selectedItemType === "conversation") {
+        const convo = getConversationById(selectedItemId);
+        targetVfsKey = convo?.projectId ?? "orphan";
+      } else {
+        targetVfsKey = "orphan";
+      }
+      console.log(
+        `[LiteChat Effect] VFS Panel Opened. Setting target key: ${targetVfsKey}`,
+      );
+      setVfsKey(targetVfsKey); // Trigger VFS store to potentially initialize/switch
+    } else {
+      // Panel is closed. We don't necessarily change the key here,
+      // as another context (like Project Settings modal) might be active.
+      // The VFS store retains its current key until explicitly changed.
+      console.log("[LiteChat Effect] VFS Panel Closed.");
+      // REMOVED: setIsVfsEnabledForItem(false);
+    }
+  }, [
+    isVfsPanelOpen,
+    selectedItemId,
+    selectedItemType,
+    getConversationById,
+    setVfsKey,
+    // REMOVED: setIsVfsEnabledForItem,
+  ]);
+  // --- End VFS Context Management Effect ---
 
   const handlePromptSubmit = useCallback(
     async (turnData: PromptTurnObject) => {
@@ -291,7 +233,7 @@ export const LiteChat: React.FC = () => {
         useConversationStore.getState().selectedItemType === "conversation"
           ? useConversationStore.getState().selectedItemId
           : null;
-      let currentProjectId =
+      const currentProjectId =
         useConversationStore.getState().selectedItemType === "project"
           ? useConversationStore.getState().selectedItemId
           : useConversationStore.getState().selectedItemType === "conversation"
@@ -304,27 +246,22 @@ export const LiteChat: React.FC = () => {
 
       const setFocusInputFlag = useUIStateStore.getState().setFocusInputFlag;
 
-      // --- Determine Effective Settings ---
       const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
       const modelToUse =
         effectiveSettings.modelId ??
-        useProviderStore.getState().selectedModelId; // Fallback to global selection
+        useProviderStore.getState().selectedModelId;
 
       if (!modelToUse) {
         toast.error("Please select a model before sending a message.");
         return;
       }
-      // --- End Determine Effective Settings ---
 
       if (!currentConvId) {
         console.log("LiteChat: No conversation selected, creating new one...");
         try {
-          // Use the already determined currentProjectId
           const newId = await addConversation({
             title: "New Chat",
             projectId: currentProjectId,
-            // Initial metadata could potentially inherit project defaults here if needed
-            // metadata: { modelId: modelToUse, temperature: effectiveSettings.temperature, ... }
           });
           await selectItem(newId, "conversation");
           currentConvId = useConversationStore.getState().selectedItemId;
@@ -361,10 +298,8 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
-      // Use effective system prompt
       const systemPrompt = effectiveSettings.systemPrompt ?? undefined;
 
-      // Merge effective parameters with turn-specific parameters
       const finalParameters = {
         temperature:
           turnData.parameters?.temperature ?? effectiveSettings.temperature,
@@ -378,11 +313,9 @@ export const LiteChat: React.FC = () => {
         frequency_penalty:
           turnData.parameters?.frequency_penalty ??
           effectiveSettings.frequencyPenalty,
-        // Include any other parameters from turnData
         ...turnData.parameters,
       };
 
-      // Clean up null/undefined parameters
       Object.keys(finalParameters).forEach((key) => {
         if (
           finalParameters[key as keyof typeof finalParameters] === null ||
@@ -398,7 +331,7 @@ export const LiteChat: React.FC = () => {
         parameters: finalParameters,
         metadata: {
           ...turnData.metadata,
-          modelId: modelToUse, // Ensure the final model ID is set
+          modelId: modelToUse,
         },
       };
 
@@ -419,7 +352,7 @@ export const LiteChat: React.FC = () => {
       addConversation,
       selectItem,
       buildHistoryMessages,
-      getEffectiveProjectSettings, // Add dependency
+      getEffectiveProjectSettings,
     ],
   );
 
@@ -452,11 +385,10 @@ export const LiteChat: React.FC = () => {
       );
       const currentProjectId = currentConversation?.projectId ?? null;
 
-      // --- Determine Effective Settings for Regeneration ---
       const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
       const modelToUse =
         effectiveSettings.modelId ??
-        useProviderStore.getState().selectedModelId; // Fallback to global
+        useProviderStore.getState().selectedModelId;
 
       if (!modelToUse) {
         toast.error("Please select a model before regenerating.");
@@ -467,7 +399,6 @@ export const LiteChat: React.FC = () => {
         toast.error("Invalid model selection for regeneration.");
         return;
       }
-      // --- End Determine Effective Settings ---
 
       const historyUpToIndex = targetInteraction.index;
       const historyInteractions = interactionStore.interactions
@@ -500,10 +431,8 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
-      // Use effective system prompt
       const systemPrompt = effectiveSettings.systemPrompt ?? undefined;
 
-      // Merge effective parameters with original prompt parameters
       const finalParameters = {
         temperature:
           targetInteraction.prompt.parameters?.temperature ??
@@ -521,10 +450,8 @@ export const LiteChat: React.FC = () => {
         frequency_penalty:
           targetInteraction.prompt.parameters?.frequency_penalty ??
           effectiveSettings.frequencyPenalty,
-        // Include any other parameters from original prompt
         ...targetInteraction.prompt.parameters,
       };
-      // Clean up null/undefined parameters
       Object.keys(finalParameters).forEach((key) => {
         if (
           finalParameters[key as keyof typeof finalParameters] === null ||
@@ -537,16 +464,16 @@ export const LiteChat: React.FC = () => {
       const currentMetadata = {
         ...targetInteraction.prompt.metadata,
         regeneratedFromId: interactionId,
-        providerId: providerId, // Use determined providerId
-        modelId: modelToUse, // Use determined modelId
-        attachedFiles: undefined, // Files are part of the history message now
+        providerId: providerId,
+        modelId: modelToUse,
+        attachedFiles: undefined,
         enabledTools: targetInteraction.prompt.metadata?.enabledTools,
       };
 
       const aiPayload: PromptObject = {
         system: systemPrompt,
         messages: messages,
-        parameters: finalParameters, // Use merged parameters
+        parameters: finalParameters,
         metadata: currentMetadata,
       };
 
@@ -569,7 +496,7 @@ export const LiteChat: React.FC = () => {
         toast.error("Failed to start regeneration.");
       }
     },
-    [buildHistoryMessages, getConversationById, getEffectiveProjectSettings], // Add dependency
+    [buildHistoryMessages, getConversationById, getEffectiveProjectSettings],
   );
 
   const onStopInteraction = useCallback((interactionId: string) => {
@@ -613,7 +540,6 @@ export const LiteChat: React.FC = () => {
     [chatControls],
   );
 
-  // Find the project settings modal renderer
   const projectSettingsModalRenderer = useMemo(
     () =>
       chatControls.find((c) => c.id === "core-project-settings-trigger")
@@ -625,7 +551,6 @@ export const LiteChat: React.FC = () => {
     selectedItemType === "conversation" ? selectedItemId : null;
 
   if (isInitializing) {
-    // Show loading indicator until initialization is fully complete
     return (
       <div className="flex items-center justify-center h-screen w-screen bg-background text-foreground">
         <div className="flex flex-col items-center gap-4">
@@ -640,9 +565,9 @@ export const LiteChat: React.FC = () => {
 
   return (
     <>
-      {/* Render the Project Settings registration component */}
+      {/* Render the registration components */}
       <RegisterProjectSettingsControl />
-
+      <RegisterVfsControl />
       <div
         className={cn(
           "flex h-full w-full border border-[--border] rounded-lg overflow-hidden bg-background text-foreground",
@@ -725,15 +650,14 @@ export const LiteChat: React.FC = () => {
           />
         </div>
       </div>
-
       {/* Render Main Settings Modal */}
-      {isSettingsModalOpen && settingsModalRenderer && settingsModalRenderer()}
-
+      {isChatControlPanelOpen["settingsModal"] &&
+        settingsModalRenderer &&
+        settingsModalRenderer()}
       {/* Render Project Settings Modal */}
       {isProjectSettingsModalOpen &&
         projectSettingsModalRenderer &&
         projectSettingsModalRenderer()}
-
       {/* Update Toaster props */}
       <Toaster richColors position="bottom-left" closeButton />
     </>

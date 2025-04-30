@@ -2,41 +2,35 @@
 import React, { useEffect } from "react";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useUIStateStore } from "@/store/ui.store";
-import { ProjectSettingsModal } from "@/components/LiteChat/settings/ProjectSettingsModal"; // Import the modal component
-import { useShallow } from "zustand/react/shallow"; // Import useShallow
+import { ProjectSettingsModal } from "@/components/LiteChat/project-settings/ProjectSettingsModal";
+import { useShallow } from "zustand/react/shallow";
 
-/**
- * This component handles the registration and rendering of the Project Settings modal.
- * It registers a ChatControl that doesn't render anything directly in the main UI,
- * but provides the modal component via the `settingsRenderer`.
- */
+// Convert to a component for useEffect registration
 export const RegisterProjectSettingsControl: React.FC = () => {
-  // Hooks are now called within a React component body
   const registerChatControl = useControlRegistryStore(
     (state) => state.registerChatControl,
   );
-  // Use useShallow for the selector
   const {
     isProjectSettingsModalOpen,
-    closeProjectSettingsModal,
     projectSettingsModalTargetId,
+    closeProjectSettingsModal,
   } = useUIStateStore(
     useShallow((state) => ({
       isProjectSettingsModalOpen: state.isProjectSettingsModalOpen,
-      closeProjectSettingsModal: state.closeProjectSettingsModal,
       projectSettingsModalTargetId: state.projectSettingsModalTargetId,
+      closeProjectSettingsModal: state.closeProjectSettingsModal,
     })),
   );
 
   useEffect(() => {
-    console.log("[Function] Registering Core Project Settings Control");
     const unregister = registerChatControl({
-      id: "core-project-settings-trigger",
-      // No direct renderer or trigger needed in the main UI
-      renderer: () => null,
-      iconRenderer: () => null,
-      // Provide the modal component via settingsRenderer
-      // This function closes over the state variables and will use the latest values when called
+      id: "core-project-settings-trigger", // Keep the ID consistent
+      // No direct renderer or trigger needed, only settingsRenderer
+      renderer: undefined,
+      iconRenderer: undefined,
+      panel: undefined, // Not displayed directly in panels
+      show: () => false, // Doesn't show up in standard wrappers
+      // Define the settingsRenderer to render the modal
       settingsRenderer: () => (
         <ProjectSettingsModal
           isOpen={isProjectSettingsModalOpen}
@@ -44,26 +38,22 @@ export const RegisterProjectSettingsControl: React.FC = () => {
           projectId={projectSettingsModalTargetId}
         />
       ),
-      // Define how the control should appear in a settings list (if applicable)
-      settingsConfig: {
-        tabId: "projectSettingsModal", // Unique ID for this settings "area"
-        title: "Project Settings",
-      },
-      // Status can be simple as it just provides the modal
+      order: 1000, // Low priority for standard rendering
       status: () => "ready",
-      // Order can be high as it doesn't render directly
-      order: 9999,
     });
 
     // Cleanup function to unregister the control when the component unmounts
     return () => {
-      console.log("[Function] Unregistering Core Project Settings Control");
       unregister();
     };
-    // Remove state variables from dependencies - registration only needs to happen once.
-    // The settingsRenderer function will access the latest state when invoked.
-  }, [registerChatControl]);
+    // Dependencies ensure registration updates if needed, though likely stable
+  }, [
+    registerChatControl,
+    isProjectSettingsModalOpen,
+    projectSettingsModalTargetId,
+    closeProjectSettingsModal,
+  ]);
 
-  // This component doesn't render anything itself, it just manages registration
+  // This component doesn't render anything itself, it just registers the control
   return null;
 };

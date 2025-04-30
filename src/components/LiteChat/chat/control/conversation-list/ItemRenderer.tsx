@@ -157,11 +157,12 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
       handleStartEditing(item);
     };
 
-    // Handler for project settings button
+    // Handler for project settings button - ENSURE THIS IS CORRECT
     const handleSettingsClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       if (isProject) {
-        openProjectSettingsModal(item.id);
+        console.log(`Opening project settings for: ${item.id}`); // Debug log
+        openProjectSettingsModal(item.id); // Call the action with the project ID
       }
     };
 
@@ -174,6 +175,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
       }
     };
 
+    // Focus input when editing starts
     useEffect(() => {
       if (isEditingThis) {
         editInputRef.current?.focus();
@@ -232,9 +234,9 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                 value={localEditingName} // Use local state for value
                 onChange={(e) => setLocalEditingName(e.target.value)} // Update local state
                 onKeyDown={handleInputKeyDown}
-                // Removed onBlur handler
+                // Removed onBlur handler - rely on Enter/Escape/Save/Cancel buttons
                 className="h-6 px-1 py-0 text-xs flex-grow min-w-0"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()} // Prevent item click when clicking input
                 disabled={isSavingEdit}
               />
             ) : (
@@ -246,6 +248,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
 
           <div className="flex items-center flex-shrink-0">
             {isEditingThis ? (
+              // Edit mode buttons
               <>
                 <Button
                   variant="ghost"
@@ -287,6 +290,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                 </Button>
               </>
             ) : (
+              // View mode buttons (appear on hover)
               <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                 {/* Project Settings Button */}
                 {isProject && (
@@ -297,7 +301,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                           variant="ghost"
                           size="icon"
                           className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                          onClick={handleSettingsClick}
+                          onClick={handleSettingsClick} // Ensure this handler is correct
                           aria-label={`Settings for ${displayName}`}
                         >
                           <CogIcon className="h-3 w-3" />
@@ -367,7 +371,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                     <div
                       className="absolute right-0 top-full mt-1 hidden group-hover/export:flex
                                    bg-popover border border-border rounded-md shadow-lg p-0.5 z-10 gap-0.5"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()} // Prevent item click
                     >
                       <Button
                         variant="ghost"
@@ -416,6 +420,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
         {isProject && isExpanded && (
           <>
             {childProjects
+              // Sort children by updatedAt descending
               .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
               .map((child) => (
                 <ConversationItemRenderer
@@ -448,6 +453,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                 />
               ))}
             {childConversations
+              // Sort children by updatedAt descending
               .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
               .map((child) => (
                 <ConversationItemRenderer
