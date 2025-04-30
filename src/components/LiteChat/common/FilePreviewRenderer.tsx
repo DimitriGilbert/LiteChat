@@ -1,5 +1,6 @@
 // src/components/LiteChat/common/FilePreviewRenderer.tsx
-import React, { useState, useEffect, useMemo } from "react"; // Added useMemo
+// Entire file content provided
+import React, { useState, useEffect, useMemo } from "react";
 import {
   FileTextIcon,
   ImageIcon,
@@ -10,7 +11,8 @@ import {
   AlertCircleIcon,
   UploadCloudIcon,
   XIcon,
-  ChevronsUpDownIcon, // Added for folding
+  ChevronsUpDownIcon,
+  HardDriveIcon, // Import VFS icon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -79,7 +81,8 @@ const metadataToFile = (meta: AttachedFileMetadata): File | null => {
   return null;
 };
 
-const COMMON_TEXT_EXTENSIONS_PREVIEW = [
+// Export this helper function
+export const COMMON_TEXT_EXTENSIONS_PREVIEW = [
   ".txt",
   ".md",
   ".json",
@@ -110,7 +113,11 @@ const COMMON_TEXT_EXTENSIONS_PREVIEW = [
   ".ps1",
 ];
 
-const isLikelyTextFilePreview = (name: string, mimeType?: string): boolean => {
+// Export this helper function
+export const isLikelyTextFilePreview = (
+  name: string,
+  mimeType?: string,
+): boolean => {
   const fileNameLower = name.toLowerCase();
   if (mimeType?.startsWith("text/") || mimeType === "application/json") {
     return true;
@@ -130,38 +137,34 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   );
   const [error, setError] = useState<string | null>(null);
   const [isAddingToVfs, setIsAddingToVfs] = useState(false);
-  const [isFolded, setIsFolded] = useState(false); // State for folding
+  const [isFolded, setIsFolded] = useState(true); // Default to folded
 
   const mimeType = fileMeta.type || "application/octet-stream";
   const isText = isLikelyTextFilePreview(fileMeta.name, mimeType);
   const isImage = mimeType.startsWith("image/");
   const isAudio = mimeType.startsWith("audio/");
   const isVideo = mimeType.startsWith("video/");
+  const isVfsSource = fileMeta.source === "vfs";
 
+  // Effect to handle preview generation for DIRECT uploads
   useEffect(() => {
     let objectUrl: string | null = null;
-    setError(null);
+    setError(null); // Reset error on meta change
 
-    if (!isText && fileMeta.contentBase64) {
+    // Only generate blob URLs for non-text, direct uploads with base64 content
+    if (fileMeta.source === "direct" && !isText && fileMeta.contentBase64) {
       objectUrl = base64ToBlobUrl(fileMeta.contentBase64, mimeType);
       if (!objectUrl) {
         setError("Failed to decode file content for preview.");
       }
       setPreviewContentUrl(objectUrl);
     } else {
-      setPreviewContentUrl(null);
+      setPreviewContentUrl(null); // Clear URL for text or VFS files
     }
 
-    return () => {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-        setPreviewContentUrl(null);
-      }
-    };
-  }, [fileMeta.contentBase64, mimeType, isText]);
-
-  useEffect(() => {
+    // Check for text preview size limit (only for direct uploads)
     if (
+      fileMeta.source === "direct" &&
       isText &&
       fileMeta.contentText &&
       fileMeta.contentText.length > MAX_TEXT_PREVIEW_SIZE
@@ -169,10 +172,31 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       setError(
         `Text file too large for preview (${(fileMeta.size / 1024).toFixed(1)} KB).`,
       );
-    } else if (isText && fileMeta.contentText === undefined) {
+    } else if (
+      fileMeta.source === "direct" &&
+      isText &&
+      fileMeta.contentText === undefined
+    ) {
+      // This should ideally not happen if registerFileControl is correct
       setError("Text content missing from metadata.");
     }
-  }, [fileMeta.contentText, fileMeta.size, isText]);
+
+    // Cleanup function for blob URLs
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        setPreviewContentUrl(null);
+      }
+    };
+    // Depend only on relevant fields for direct uploads
+  }, [
+    fileMeta.id,
+    fileMeta.source,
+    fileMeta.contentBase64,
+    fileMeta.contentText,
+    mimeType,
+    isText,
+  ]);
 
   const handleAddToVfs = async () => {
     if (fileMeta.source === "vfs") {
@@ -202,6 +226,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   const toggleFold = () => setIsFolded((prev) => !prev);
 
   const renderIcon = () => {
+    if (isVfsSource) return <HardDriveIcon className="h-5 w-5 text-cyan-500" />; // Specific VFS icon
     if (isText) return <FileTextIcon className="h-5 w-5 text-blue-500" />;
     if (isImage) return <ImageIcon className="h-5 w-5 text-purple-500" />;
     if (isAudio) return <MusicIcon className="h-5 w-5 text-green-500" />;
@@ -210,6 +235,16 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   };
 
   const renderPreview = () => {
+    // No preview for VFS files in the prompt area
+    if (isVfsSource) {
+      return (
+        <p className="p-2 text-xs text-muted-foreground italic">
+          VFS file attached. Content will be loaded when sent.
+        </p>
+      );
+    }
+
+    // Handle errors first
     if (error) {
       return (
         <div className="p-2 text-xs text-destructive flex items-center gap-1">
@@ -219,6 +254,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       );
     }
 
+    // Render previews for DIRECT uploads based on type and available content
     if (isText && fileMeta.contentText !== undefined) {
       return (
         <CodeBlockRenderer
@@ -252,6 +288,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       );
     }
 
+    // Fallback for direct uploads where content might be missing or type unsupported
     return (
       <p className="p-2 text-xs text-muted-foreground italic">
         Preview not available for this file type or content missing.
@@ -261,15 +298,16 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
 
   const foldedSummary = useMemo(() => {
     let typeLabel = "File";
-    if (isText) typeLabel = "Text";
+    if (isVfsSource) typeLabel = "VFS File";
+    else if (isText) typeLabel = "Text";
     else if (isImage) typeLabel = "Image";
     else if (isAudio) typeLabel = "Audio";
     else if (isVideo) typeLabel = "Video";
     return `${typeLabel} (${formatBytes(fileMeta.size)})`;
-  }, [isText, isImage, isAudio, isVideo, fileMeta.size]);
+  }, [isVfsSource, isText, isImage, isAudio, isVideo, fileMeta.size]);
 
   return (
-    <div className="border rounded-md overflow-hidden bg-card shadow-sm my-2">
+    <div className="border rounded-md overflow-hidden bg-card shadow-sm my-1">
       <div className="flex items-center justify-between p-2 border-b bg-muted/30">
         <div className="flex items-center gap-2 min-w-0">
           {renderIcon()}
@@ -279,11 +317,12 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
           <span className="text-xs text-muted-foreground flex-shrink-0">
             ({formatBytes(fileMeta.size)})
           </span>
-          {fileMeta.source === "vfs" && fileMeta.path && (
+          {/* Show VFS path tooltip only if source is VFS */}
+          {isVfsSource && fileMeta.path && (
             <TooltipProvider delayDuration={100}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="text-xs text-blue-400 truncate max-w-[100px]">
+                  <span className="text-xs text-cyan-400 truncate max-w-[100px]">
                     (VFS: {fileMeta.path})
                   </span>
                 </TooltipTrigger>

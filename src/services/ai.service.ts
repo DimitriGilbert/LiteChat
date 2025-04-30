@@ -1,4 +1,5 @@
 // src/services/ai.service.ts
+// Entire file content provided
 import type { PromptObject, PromptTurnObject } from "@/types/litechat/prompt";
 import type { Interaction } from "@/types/litechat/interaction";
 import type { ToolImplementation } from "@/types/litechat/modding";
@@ -32,8 +33,14 @@ import { type AttachedFileMetadata } from "@/store/input.store";
 import {
   runMiddleware,
   getContextSnapshot,
-  processFileMetaToUserContent,
+  processFileMetaToUserContent, // Keep this helper
 } from "@/lib/litechat/ai-helpers";
+// Import VFS operations and the global VFS instance
+import * as VfsOps from "@/lib/litechat/vfs-operations";
+import { useConversationStore } from "@/store/conversation.store"; // Import ConversationStore
+import type { fs as FsType } from "@zenfs/core"; // Import fs type
+// Import VfsStore ONLY to check the configured key
+import { useVfsStore } from "@/store/vfs.store";
 
 export class AIService {
   private static activeStreams = new Map<string, AbortController>();
@@ -43,6 +50,7 @@ export class AIService {
     initiatingTurnData: PromptTurnObject,
   ): Promise<string | null> {
     const interactionStoreStateAndActions = useInteractionStore.getState();
+    const conversationStoreState = useConversationStore.getState(); // Get conversation store state
     const conversationId =
       interactionStoreStateAndActions.currentConversationId;
     if (!conversationId) {
@@ -90,20 +98,125 @@ export class AIService {
       }
     }
 
-    if (
-      lastUserMessageIndex !== -1 &&
-      initiatingTurnData.metadata?.attachedFiles &&
-      initiatingTurnData.metadata.attachedFiles.length > 0
-    ) {
+    const attachedFilesMeta = initiatingTurnData.metadata?.attachedFiles ?? [];
+
+    if (lastUserMessageIndex !== -1 && attachedFilesMeta.length > 0) {
       const userMessage = finalMessages[
         lastUserMessageIndex
       ] as CoreUserMessage;
+      const fileContentParts: (TextPart | ImagePart)[] = [];
 
-      const fileContents = (
-        initiatingTurnData.metadata.attachedFiles as AttachedFileMetadata[]
-      )
-        .map(processFileMetaToUserContent) // Use helper
-        .filter((content): content is TextPart | ImagePart => content !== null);
+      // --- Determine VFS Key and Ensure VFS is Ready (if needed) ---
+      let vfsInstance: typeof FsType | null = null; // Use FsType here
+      let targetVfsKey: string | null = null;
+      const needsVfs = attachedFilesMeta.some((f) => f.source === "vfs");
+
+      if (needsVfs) {
+        const currentConversation =
+          conversationStoreState.getConversationById(conversationId);
+        targetVfsKey = currentConversation?.projectId ?? "orphan"; // Use project ID or 'orphan'
+        console.log(
+          `[AIService] VFS files detected. Target VFS key: ${targetVfsKey}`,
+        );
+
+        // Check if the globally configured VFS matches the target key
+        const currentConfiguredKey = useVfsStore.getState().configuredVfsKey;
+        if (
+          VfsOps.VFS && // Check if the global VFS instance exists
+          currentConfiguredKey === targetVfsKey
+        ) {
+          console.log(
+            `[AIService] Using existing VFS instance for key: ${targetVfsKey}`,
+          );
+          vfsInstance = VfsOps.VFS; // Use the existing global instance
+        } else {
+          // If not configured or key mismatch, attempt direct initialization
+          console.log(
+            `[AIService] Existing VFS instance mismatch or unavailable (Configured: ${currentConfiguredKey}, Needed: ${targetVfsKey}). Attempting direct initialization...`,
+          );
+          try {
+            // Use VfsOps.initializeFsOp directly
+            vfsInstance = await VfsOps.initializeFsOp(targetVfsKey);
+            if (!vfsInstance) {
+              throw new Error(
+                `Direct VFS initialization failed for key ${targetVfsKey}.`,
+              );
+            }
+            console.log(
+              `[AIService] Direct VFS initialization successful for key ${targetVfsKey}.`,
+            );
+            // Note: This initialized instance might differ from the global VfsOps.VFS
+            // if the store's desired key changes again before this finishes.
+            // We will use this *specific* instance for reading files below.
+          } catch (vfsError) {
+            console.error(
+              `[AIService] Failed to ensure VFS ready for key ${targetVfsKey} via direct init:`,
+              vfsError,
+            );
+            toast.error(
+              `Filesystem error: Could not access files for key ${targetVfsKey}.`,
+            );
+            vfsInstance = null; // Ensure instance is null on failure
+          }
+        }
+      }
+      // --- End VFS Readiness Check ---
+
+      // --- Process each attached file ---
+      for (const fileMeta of attachedFilesMeta as AttachedFileMetadata[]) {
+        let contentPart: TextPart | ImagePart | null = null;
+        try {
+          if (fileMeta.source === "direct") {
+            // Process directly uploaded file content
+            contentPart = processFileMetaToUserContent(fileMeta);
+          } else if (
+            fileMeta.source === "vfs" &&
+            vfsInstance && // Check if we have a valid instance for the target key
+            fileMeta.path
+          ) {
+            // Fetch content from VFS using the obtained instance
+            console.log(`[AIService] Fetching VFS file: ${fileMeta.path}`);
+            // Use the obtained vfsInstance with VfsOps.readFileOp
+            // Note: VfsOps functions use the global fs by default,
+            // but we assume initializeFsOp configures the global one correctly
+            // for the duration of this operation if direct init was needed.
+            // If ZenFS allows passing an instance, that would be safer.
+            // For now, rely on initializeFsOp setting the global context.
+            const contentBytes = await VfsOps.readFileOp(fileMeta.path);
+            // Now process the fetched content using the helper
+            contentPart = processFileMetaToUserContent({
+              ...fileMeta,
+              contentBytes: contentBytes,
+              contentText: undefined,
+              contentBase64: undefined,
+            });
+          } else if (fileMeta.source === "vfs") {
+            // Handle case where VFS was needed but not ready/initialized
+            console.warn(
+              `[AIService] Skipping VFS file ${fileMeta.name} as VFS instance for key ${targetVfsKey} could not be obtained.`,
+            );
+            contentPart = {
+              type: "text",
+              text: `[Skipped VFS file: ${fileMeta.name} - Filesystem unavailable]`,
+            };
+          }
+
+          if (contentPart) {
+            fileContentParts.push(contentPart);
+          }
+        } catch (processingError) {
+          console.error(
+            `[AIService] Error processing file ${fileMeta.name}:`,
+            processingError,
+          );
+          // Add an error placeholder to the message
+          fileContentParts.push({
+            type: "text",
+            text: `[Error processing file: ${fileMeta.name}]`,
+          });
+        }
+      }
+      // --- End File Processing Loop ---
 
       let userMessageContentParts: (TextPart | ImagePart)[] = [];
       if (typeof userMessage.content === "string") {
@@ -124,12 +237,13 @@ export class AIService {
       }
 
       // Combine file content parts with existing text/image parts
+      // Place file parts *before* the user's text message content
       finalMessages[lastUserMessageIndex] = {
         ...userMessage,
-        content: [...fileContents, ...userMessageContentParts],
+        content: [...fileContentParts, ...userMessageContentParts],
       };
       console.log(
-        `AIService: Added ${fileContents.length} file(s) to user message content.`,
+        `AIService: Added ${fileContentParts.length} file part(s) to user message content.`,
       );
     }
     // --- End File Processing ---

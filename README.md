@@ -8,16 +8,17 @@ LiteChat isn't just another AI chat interface; it's your private, high-performan
 
 *   **True Privacy:** Unlike many cloud-based solutions, LiteChat is **100% client-side**. Your data stays with you. Period. Interact directly with AI providers like OpenAI, Google Gemini, OpenRouter, or your self-hosted Ollama/LM Studio instances without intermediaries.
 *   **Blazing Fast:** Experience a fluid, responsive interface thanks to a lightweight design and efficient state management. No server lag, just smooth conversation flow.
-*   **Organize Your Thoughts:** Structure your chats with **Projects**. Group related conversations, set project-specific instructions or models, and keep your workspace tidy.
-*   **Integrated File Management (VFS):** Go beyond simple text prompts. LiteChat features a built-in **Virtual File System**. Upload files, create folders, and manage assets directly within the interface. Provide files as context to your AI, keeping relevant documents alongside your conversations.
+*   **Organize Your Thoughts (Projects):** Structure your chats with **Projects**. Create nested folders, group related conversations, set project-specific instructions or models (which inherit from parents or global defaults), and keep your workspace tidy. Each project gets its own dedicated Virtual File System.
+*   **Integrated File Management (VFS):** Go beyond simple text prompts. LiteChat features a built-in **Virtual File System** linked to your projects (or a shared space for non-project chats). Upload files, create folders, and manage assets directly within the interface. Provide files as context to your AI, keeping relevant documents alongside your conversations.
 *   **Git Powered:** The VFS isn't just for storage; it's **Git-enabled**. Initialize repositories within VFS folders, clone remote repos (like codebases or notes), commit your changes, pull updates, and push – all from within LiteChat. Perfect for AI-assisted coding, documentation, or version-controlled notes.
-*   **Sync Conversations with Git:** Keep your conversations backed up and synchronized across devices by linking them to specific Git repositories. Your chat history becomes part of your version-controlled workflow.
-*   **Endlessly Extendable:** LiteChat is built on a **modular, event-driven architecture**. This means you (or the community) can easily create **Mods** to:
-    *   Add new UI elements and controls.
-    *   Integrate custom tools for the AI to use.
-    *   Modify AI behavior with middleware.
-    *   Listen to events and trigger custom workflows.
-    *   Add new settings tabs.
+*   **Sync Conversations with Git:** Keep your conversations backed up and synchronized across devices by linking them to specific Git repositories configured in settings. Your chat history becomes part of your version-controlled workflow.
+*   **AI Tool Calling:** Extend the AI's capabilities by registering custom tools (via Mods). Enable specific tools per conversation, allowing the AI to interact with external APIs, perform calculations, access VFS files, or execute custom logic. Tool calls and results are clearly displayed within the chat history.
+*   **Endlessly Extendable (Mods):** LiteChat is built on a **modular, event-driven architecture**. This means you (or the community) can easily create **Mods** to:
+    *   Add new UI elements and controls (`PromptControl`, `ChatControl`).
+    *   Integrate custom tools for the AI to use (`registerTool`).
+    *   Modify AI behavior with middleware (`addMiddleware`).
+    *   Listen to application events and trigger custom workflows (`on`).
+    *   Add new settings tabs (`registerSettingsTab`).
     *   ...and much more!
 
 LiteChat is for anyone who values privacy, wants fine-grained control over their AI interactions, and loves to tinker and customize their tools. It's your personal AI workbench.
@@ -83,13 +84,15 @@ LiteChat is a static React web application designed for local execution and exte
 
 *   **Client-Side Architecture:** All application logic, data storage (IndexedDB via Dexie), and AI API interactions occur directly within the user's browser. No backend is required for core functionality.
 *   **Component-Based UI (React):** Leverages reusable components (e.g., `<ChatCanvas>`, `<PromptWrapper>`, `<FileManager>`) built with shadcn/ui and Tailwind CSS.
-*   **State Management (Zustand):** Uses modular Zustand stores for efficient state management (`ConversationStore`, `InteractionStore`, `ProviderStore`, `VfsStore`, etc.).
-*   **Controls (`PromptControl`, `ChatControl`):** Encapsulate discrete UI functionalities (e.g., model selection, file attachment, conversation list, settings panels). They manage their UI rendering and state interactions.
-*   **Event-Driven (`mitt`):** A central event emitter enables decoupled communication between components, stores, and mods.
-*   **Middleware Hooks:** Allow interception and modification of data at critical points (prompt finalization, AI request start, response chunk processing).
-*   **Virtual File System (VFS):** Implemented using ZenFS with an IndexedDB backend. Provides file storage and management capabilities within the browser environment.
-*   **Git Integration (`isomorphic-git`):** Enables Git operations (clone, commit, pull, push, status) directly on folders within the VFS, interacting with remote repositories via an optional CORS proxy or correctly configured servers.
-*   **Conversation Sync:** Leverages the VFS/Git integration to store and sync conversation data (`.json` files containing conversation metadata and interactions) within designated Git repositories.
+*   **State Management (Zustand):** Uses modular Zustand stores for efficient state management (`ConversationStore`, `InteractionStore`, `ProviderStore`, `VfsStore`, `InputStore`, `PromptStateStore`, etc.). `useShallow` is recommended for selecting state.
+*   **Controls (`PromptControl`, `ChatControl`):** Encapsulate discrete UI functionalities (e.g., model selection, file attachment, conversation list, settings panels). They manage their UI rendering and state interactions. Registered via `ControlRegistryStore`.
+*   **Event-Driven (`mitt`):** A central event emitter (`emitter`) enables decoupled communication between components, stores, and mods using `ModEvent` types.
+*   **Middleware Hooks:** Allow interception and modification of data at critical points (prompt finalization, AI request start, response chunk processing) using `ModMiddlewareHook` types. Registered via `ControlRegistryStore`.
+*   **Projects:** Hierarchical structure (`Project` type) for organizing conversations. Projects have unique paths, can inherit settings (system prompt, model, parameters, sync repo) from parents or global defaults, and each has a dedicated VFS instance. Managed by `ConversationStore`.
+*   **Virtual File System (VFS):** Implemented using ZenFS with an IndexedDB backend. Provides file storage and management capabilities within the browser environment, scoped per-project (or a shared 'orphan' space). Managed by `VfsStore` and `vfs-operations.ts`.
+*   **Git Integration (`isomorphic-git`):** Enables Git operations (clone, commit, pull, push, status) directly on folders within the VFS via `vfs-git-operations.ts`, interacting with remote repositories via an optional CORS proxy or correctly configured servers.
+*   **Conversation Sync:** Leverages the VFS/Git integration to store and sync conversation data (`.json` files containing conversation metadata and interactions) within designated Git repositories (`SyncRepo` config). Logic handled by `conversation-sync-logic.ts`.
+*   **Tool Calling:** Mods register tools (`Tool` definition + optional `ToolImplementation`) via `ControlRegistryStore`. Users enable tools per-conversation. `AIService` uses the `ai` SDK's `streamText` function with the `tools` and `toolChoice` options to manage execution. Tool calls and results are stored as JSON strings in `Interaction.metadata`.
 
 **Deployment & CORS:**
 
@@ -204,37 +207,39 @@ This section details the architecture and APIs for developers extending or modif
     *   `<LiteChat>`: Main orchestrator, initializes stores, loads data/mods, renders layout. Connects major sub-systems.
     *   `<PromptWrapper>`: Manages user input area. Renders `InputArea`, `PromptControl` triggers/panels via `<PromptControlWrapper>`. Collects data from controls (`getParameters`, `getMetadata`), handles file attachment display, runs `PROMPT_TURN_FINALIZE` middleware, outputs `PromptTurnObject` on submit.
     *   `<ChatCanvas>`: Displays conversation history (`Interaction` objects). Uses `UserPromptDisplay`, `InteractionCard` (for completed/revisions), and `StreamingInteractionCard` (for live responses).
-    *   `<ChatControlWrapper>`: Renders registered `ChatControl` components into designated panels (e.g., 'sidebar', 'header', 'sidebar-footer') based on `panelId` and `renderMode`.
+    *   `<ChatControlWrapper>`: Renders registered `ChatControl` components into designated panels (e.g., 'sidebar', 'header', 'sidebar-footer', 'drawer_right') based on `panelId` and `renderMode`.
     *   `<FileManager>`: Provides the UI for the Virtual File System, including toolbar, file/folder table (`FileManagerTable`, `FileManagerRow`), context menus, and dialogs (`CloneDialog`, `CommitDialog`).
     *   `<SettingsModal>`: Tabbed dialog for application configuration.
+    *   `<ProjectSettingsModal>`: Tabbed dialog for project-specific configuration.
 *   **Controls:**
-    *   `PromptControl`: Self-contained units adding functionality to the prompt area (e.g., model selection, file attachment, parameter sliders, VFS access). They contribute parameters/metadata and can run middleware on the `PromptTurnObject`. Defined in `src/types/litechat/prompt.ts`.
-    *   `ChatControl`: Self-contained units adding functionality to the overall chat UI (e.g., conversation list sidebar, settings button, status indicators). They render UI into specific panels and can interact with stores/events. Defined in `src/types/litechat/chat.ts`.
+    *   `PromptControl`: Self-contained units adding functionality to the prompt area (e.g., model selection, file attachment, parameter sliders, VFS access, tool selection, Git sync). They contribute parameters/metadata and can run middleware on the `PromptTurnObject`. Defined in `src/types/litechat/prompt.ts`.
+    *   `ChatControl`: Self-contained units adding functionality to the overall chat UI (e.g., conversation list sidebar, settings button, status indicators, VFS drawer). They render UI into specific panels and can interact with stores/events. Defined in `src/types/litechat/chat.ts`.
 *   **State Management (Zustand):** Modular stores (`src/store/`) manage specific data domains:
     *   `InteractionStore`: Manages `Interaction[]` for the selected conversation, including streaming state (`streamingInteractionIds`, `activeStreamBuffers`).
-    *   `ConversationStore`: Manages `Conversation[]` and `Project[]` lists, the tree structure, selection state (`selectedItemId`, `selectedItemType`), and Git sync status/operations.
+    *   `ConversationStore`: Manages `Conversation[]` and `Project[]` lists, the tree structure, selection state (`selectedItemId`, `selectedItemType`), project settings inheritance, and Git sync status/operations.
     *   `ControlRegistryStore`: Stores registered `PromptControl`, `ChatControl`, middleware functions, and tool definitions/implementations.
     *   `ProviderStore`: Manages provider configurations (`DbProviderConfig`), API keys (`DbApiKey`), runtime model selection (`selectedModelId`), global model sort order, and related persistence/fetching logic.
-    *   `SettingsStore`: Global application settings (theme, default parameters, Git user config).
+    *   `SettingsStore`: Global application settings (theme, default parameters, Git user config, tool defaults).
     *   `ModStore`: Manages mod definitions (`DbMod`) from DB and loaded runtime instances (`ModInstance`), including custom settings tabs.
     *   `UIStateStore`: Transient UI state (modal visibility, panel states, sidebar collapse state, focus flags).
-    *   `VfsStore`: Manages the Virtual File System state (nodes, childrenMap, current path, selected files) and interacts with `VfsOps`.
-    *   `InputStore`: Manages files attached to the *next* prompt submission, including their content. Cleared after successful submission.
+    *   `VfsStore`: Manages the Virtual File System state (nodes, childrenMap, current path, selected files) and interacts with `VfsOps`. Switches context based on `vfsKey`.
+    *   `InputStore`: Manages files attached to the *next* prompt submission, including their content (for direct uploads). Cleared after successful submission.
+    *   `PromptStateStore`: Manages transient state for the *next* prompt (effective model, parameters). Initialized based on current project/global settings.
 *   **Services (`src/services/`):**
     *   `AIService`: Handles communication with AI SDKs (`@ai-sdk`). Takes the final `PromptObject`, runs `INTERACTION_BEFORE_START` middleware, manages streaming via `streamText`, processes file content into messages, handles tool calls/results, runs `INTERACTION_PROCESS_CHUNK` middleware, updates `InteractionStore`.
     *   `PersistenceService`: Centralizes Dexie database operations (CRUD for all persistent data types). Handles DB schema versioning and upgrades.
     *   `ModLoader` (`src/modding/loader.ts`): Loads and executes mod scripts (from URL or direct content), providing them with the `LiteChatModApi`.
     *   `model-fetcher.ts`: Fetches available model lists from provider APIs (OpenAI, OpenRouter, Ollama, etc.) with caching.
-    *   `vfs-operations.ts`: Implements file system operations (list, read, write, delete, mkdir, rename, zip, Git ops) using ZenFS and isomorphic-git. Handles user feedback via `toast`.
+    *   `vfs-operations.ts` & `vfs-git-operations.ts`: Implements file system and Git operations using ZenFS and isomorphic-git. Handles user feedback via `toast`.
 *   **Data Models (`src/types/litechat/`):** Defines core data structures:
     *   `PromptTurnObject`: Represents user's input turn data, including file content. Snapshot stored in `Interaction.prompt`.
     *   `PromptObject`: Final payload sent to `AIService`, file content processed into `messages`.
-    *   `Interaction`: Logical unit/turn in conversation (user input + AI response/tool call).
+    *   `Interaction`: Logical unit/turn in conversation (user input + AI response/tool call). Includes tool call/result JSON strings in metadata.
     *   `Conversation`: Metadata for a chat thread, linked to `Project`.
-    *   `Project`: Folder-like structure for organizing conversations, stores path.
+    *   `Project`: Folder-like structure for organizing conversations, stores path, can override settings.
     *   `DbProviderConfig`, `DbApiKey`, `SyncRepo`, `DbMod`: Database representations.
     *   `VfsNode` (`VfsFile`, `VfsDirectory`): Nodes within the Virtual File System.
-    *   `AttachedFileMetadata`: Structure for files attached to the prompt input.
+    *   `AttachedFileMetadata`: Structure for files attached to the prompt input (in `InputStore`).
 *   **Events & Modding (`src/lib/litechat/event-emitter.ts`, `src/types/litechat/modding.ts`):**
     *   `emitter`: Central `mitt` instance for pub/sub.
     *   `ModEvent`: Standardized event names (e.g., `CONVERSATION_SELECTED`, `INTERACTION_STARTED`, `VFS_FILE_WRITTEN`).
@@ -251,7 +256,7 @@ Mods receive an API object (`LiteChatModApi`) upon loading, enabling interaction
 *   **Settings:**
     *   `registerSettingsTab(tab: CustomSettingTab): () => void`
 *   **AI Tools:**
-    *   `registerTool<P>(toolName: string, definition: Tool<P>, implementation?: ToolImplementation<P>): () => void`
+    *   `registerTool<P>(toolName: string, definition: Tool<P>, implementation?: ToolImplementation<P>): () => void` (Registers a tool definition and its execution logic)
 *   **Event Handling:**
     *   `on<E extends ModEventName>(eventName: E, callback: (payload: ModEventPayloadMap[E]) => void): () => void`
 *   **Middleware:**
@@ -287,3 +292,4 @@ Mods receive an API object (`LiteChatModApi`) upon loading, enabling interaction
 ## License
 
 MIT
+```

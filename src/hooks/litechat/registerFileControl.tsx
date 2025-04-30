@@ -1,4 +1,5 @@
-// src/hooks/litechat/registerFileControl.ts
+// src/hooks/litechat/registerFileControl.tsx
+// Entire file content provided
 import React, { useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { PaperclipIcon } from "lucide-react";
@@ -13,6 +14,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { FilePreviewRenderer } from "@/components/LiteChat/common/FilePreviewRenderer";
+// Import the helper from ai-helpers
+import { isLikelyTextFile } from "@/lib/litechat/ai-helpers";
 
 const MAX_FILE_SIZE_MB = 20;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -40,16 +43,21 @@ export function registerFileControl() {
           }
 
           try {
+            // Initialize fileData object
             let fileData: {
               contentText?: string;
               contentBase64?: string;
             } = {};
-            const isText = file.type.startsWith("text/");
+
+            // Determine if it's likely text using the helper function
+            const isText = isLikelyTextFile(file.name, file.type);
             const isImage = file.type.startsWith("image/");
 
             if (isText) {
+              // Read as text if the helper identifies it as text
               fileData.contentText = await file.text();
             } else if (isImage) {
+              // Read as base64 ONLY if it's an image
               const reader = new FileReader();
               const promise = new Promise<string>((resolve, reject) => {
                 reader.onload = () => resolve(reader.result as string);
@@ -57,21 +65,29 @@ export function registerFileControl() {
               });
               reader.readAsDataURL(file);
               const dataUrl = await promise;
-              fileData.contentBase64 = dataUrl.split(",")[1]; // Extract base64 part
+              // Ensure dataUrl is not null and split correctly
+              if (dataUrl && dataUrl.includes(",")) {
+                fileData.contentBase64 = dataUrl.split(",")[1];
+              } else {
+                console.warn(
+                  `Could not extract base64 from data URL for ${file.name}`,
+                );
+              }
             } else {
-              // For other types, maybe just store metadata or handle differently
-              // For now, we'll skip adding content for non-text/non-image
+              // For other types, do not attempt to read content here
               console.log(
-                `File type ${file.type} not directly processed for content.`,
+                `File type ${file.type} (Name: ${file.name}) not directly processed for content storage in InputStore.`,
               );
             }
 
+            // Add to store with potentially populated contentText/contentBase64
             addAttachedFile({
               source: "direct",
               name: file.name,
-              type: file.type,
+              // Store the original browser-provided type, but content processing will use isLikelyTextFile
+              type: file.type || "application/octet-stream",
               size: file.size,
-              ...fileData,
+              ...fileData, // Spread the potentially populated content fields
             });
           } catch (error) {
             console.error(`Error processing file ${file.name}:`, error);
@@ -126,6 +142,7 @@ export function registerFileControl() {
   };
 
   const FileControlPanel: React.FC = () => {
+    // Read directly from the store within the component instance
     const { attachedFilesMetadata, removeAttachedFile } =
       useInputStore.getState();
     const isStreaming = useInteractionStore.getState().status === "streaming";
@@ -151,7 +168,6 @@ export function registerFileControl() {
   registerPromptControl({
     id: "core-file-attachment",
     order: 20,
-    // status: () => "ready", // Removed status
     triggerRenderer: () => React.createElement(FileControlTrigger),
     renderer: () => React.createElement(FileControlPanel),
     // Metadata is handled by PromptWrapper reading from InputStore

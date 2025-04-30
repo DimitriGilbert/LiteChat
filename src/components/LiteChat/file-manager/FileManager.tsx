@@ -1,4 +1,5 @@
 // src/components/LiteChat/file-manager/FileManager.tsx
+// Entire file content provided
 import React, {
   useState,
   useEffect,
@@ -23,6 +24,7 @@ import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react"; // Import Loader icon
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils"; // Import cn
 
 export const FileManager = memo(() => {
   // --- VFS Store State & Actions ---
@@ -560,7 +562,9 @@ WARNING: This will delete all contents inside`
   }
 
   return (
-    <div className="flex h-full flex-col bg-card text-card-foreground rounded-lg border border-border shadow-sm overflow-hidden">
+    // Ensure this top-level div allows flex children to grow/shrink
+    <div className={cn("flex h-full flex-col bg-card text-card-foreground")}>
+      {/* Toolbar remains flex-shrink-0 */}
       <FileManagerToolbar
         currentPath={currentPath}
         isAnyLoading={isAnyOperationLoading || isVfsLoading}
@@ -584,34 +588,38 @@ WARNING: This will delete all contents inside`
         handleArchiveChange={handleArchiveChange}
       />
 
-      <FileManagerTable
-        entries={currentNodes}
-        editingPath={editingPath}
-        newName={newName}
-        creatingFolder={creatingFolder}
-        newFolderName={newFolderName}
-        selectedFileIds={selectedFileIds}
-        isOperationLoading={isAnyOperationLoading}
-        handleNavigate={handleNavigate}
-        handleCheckboxChange={handleCheckboxChange}
-        startEditing={startEditing}
-        cancelEditing={cancelEditing}
-        handleRename={handleRename}
-        cancelCreatingFolder={cancelCreatingFolder}
-        handleCreateFolder={handleCreateFolder}
-        handleDownload={handleDownload}
-        handleDelete={handleDelete}
-        setNewName={setNewName}
-        setNewFolderName={setNewFolderName}
-        renameInputRef={renameInputRef}
-        newFolderInputRef={newFolderInputRef}
-        gitRepoStatus={gitRepoStatus}
-        handleGitInit={handleGitInit}
-        handleGitPull={handleGitPull}
-        handleGitCommit={handleGitCommit}
-        handleGitPush={handleGitPush}
-        handleGitStatus={handleGitStatus}
-      />
+      {/* Table container should grow and handle overflow */}
+      {/* Changed overflow-hidden back to overflow-auto */}
+      <div className="flex-grow overflow-auto">
+        <FileManagerTable
+          entries={currentNodes}
+          editingPath={editingPath}
+          newName={newName}
+          creatingFolder={creatingFolder}
+          newFolderName={newFolderName}
+          selectedFileIds={selectedFileIds}
+          isOperationLoading={isAnyOperationLoading}
+          handleNavigate={handleNavigate}
+          handleCheckboxChange={handleCheckboxChange}
+          startEditing={startEditing}
+          cancelEditing={cancelEditing}
+          handleRename={handleRename}
+          cancelCreatingFolder={cancelCreatingFolder}
+          handleCreateFolder={handleCreateFolder}
+          handleDownload={handleDownload}
+          handleDelete={handleDelete}
+          setNewName={setNewName}
+          setNewFolderName={setNewFolderName}
+          renameInputRef={renameInputRef}
+          newFolderInputRef={newFolderInputRef}
+          gitRepoStatus={gitRepoStatus}
+          handleGitInit={handleGitInit}
+          handleGitPull={handleGitPull}
+          handleGitCommit={handleGitCommit}
+          handleGitPush={handleGitPush}
+          handleGitStatus={handleGitStatus}
+        />
+      </div>
 
       {/* Dialogs */}
       <CloneDialog

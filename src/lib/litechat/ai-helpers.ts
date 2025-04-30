@@ -1,4 +1,5 @@
 // src/lib/litechat/ai-helpers.ts
+// Entire file content provided
 import type {
   ModMiddlewareHookName,
   ModMiddlewarePayloadMap,
@@ -20,6 +21,7 @@ import type {
   ToolCallPart,
   ToolResultPart,
 } from "ai";
+// Import VFS store to check configured key alongside the global VFS instance
 
 /**
  * Runs registered middleware functions for a specific hook.
@@ -132,35 +134,84 @@ const COMMON_TEXT_EXTENSIONS = [
   ".sh",
   ".bat",
   ".ps1",
+  ".gitignore",
+  ".env", // Add other common config/text files
+  ".log",
+  ".csv",
+  ".tsv",
+  ".ini",
+  ".cfg",
+  ".conf",
 ];
 
+// Helper function to determine if a file is likely text-based
+export const isLikelyTextFile = (name: string, mimeType?: string): boolean => {
+  const fileNameLower = name.toLowerCase();
+  // Prioritize specific text MIME types
+  if (
+    mimeType?.startsWith("text/") ||
+    mimeType === "application/json" ||
+    mimeType === "application/xml" ||
+    mimeType === "application/javascript" ||
+    mimeType === "application/typescript"
+  ) {
+    return true;
+  }
+  // Fallback: Check extension even if MIME type is generic or missing
+  return COMMON_TEXT_EXTENSIONS.some((ext) => fileNameLower.endsWith(ext));
+};
+
 /**
- * Processes attached file metadata into AI SDK compatible content parts (TextPart or ImagePart).
+ * Processes attached file metadata *with its content* into AI SDK compatible parts.
  * Handles text content, base64 image content, and provides fallbacks for other types.
- * @param fileMeta Metadata of the attached file.
+ * Assumes content (contentText, contentBase64, or contentBytes) is present in fileMeta.
+ * @param fileMeta Metadata of the attached file, augmented with content.
  * @returns A TextPart, ImagePart, or null if processing fails critically.
  */
 export function processFileMetaToUserContent(
-  fileMeta: AttachedFileMetadata,
+  fileMeta: AttachedFileMetadata & { contentBytes?: Uint8Array }, // Allow passing raw bytes
 ): TextPart | ImagePart | null {
   try {
     const mimeType = fileMeta.type || "application/octet-stream";
-    const fileNameLower = fileMeta.name.toLowerCase();
-    const isLikelyText =
-      mimeType.startsWith("text/") ||
-      mimeType === "application/json" ||
-      COMMON_TEXT_EXTENSIONS.some((ext) => fileNameLower.endsWith(ext));
+    // Use the robust helper function here
+    const isText = isLikelyTextFile(fileMeta.name, mimeType);
     const isImage = mimeType.startsWith("image/");
 
-    if (isLikelyText && fileMeta.contentText !== undefined) {
+    // Prioritize contentBytes if available (from VFS)
+    if (fileMeta.contentBytes !== undefined) {
+      if (isText) {
+        const textDecoder = new TextDecoder();
+        return {
+          type: "text",
+          text: textDecoder.decode(fileMeta.contentBytes),
+        };
+      } else if (isImage) {
+        return {
+          type: "image",
+          image: fileMeta.contentBytes,
+          mimeType: mimeType,
+        };
+      } else {
+        // Non-text, non-image from VFS - send note
+        console.warn(
+          `AIService: Unsupported VFS file type "${mimeType}" for direct inclusion. Sending note.`,
+        );
+        return {
+          type: "text",
+          text: `[Attached VFS file: ${fileMeta.name} (${mimeType})]`,
+        };
+      }
+    }
+    // Handle direct uploads if contentBytes are not present
+    else if (fileMeta.contentText !== undefined && isText) {
       return { type: "text", text: fileMeta.contentText };
-    } else if (isImage && fileMeta.contentBase64 !== undefined) {
+    } else if (fileMeta.contentBase64 !== undefined && isImage) {
       const buffer = base64ToUint8Array(fileMeta.contentBase64);
       return { type: "image", image: buffer, mimeType: mimeType };
-    } else if (!isLikelyText && fileMeta.contentBase64 !== undefined) {
-      // For non-text, non-image files with base64, send a note instead of raw data
+    } else if (fileMeta.contentBase64 !== undefined && !isText && !isImage) {
+      // Non-text, non-image direct upload - send note
       console.warn(
-        `AIService: Unsupported file type "${mimeType}" for direct inclusion. Sending note.`,
+        `AIService: Unsupported direct upload type "${mimeType}" for direct inclusion. Sending note.`,
       );
       return {
         type: "text",
@@ -168,9 +219,20 @@ export function processFileMetaToUserContent(
       };
     } else {
       // Handle cases where content is missing or type is ambiguous
-      throw new Error(
-        `Missing content or unable to determine type for file: ${fileMeta.name}`,
-      );
+      // If it's likely text based on name but contentText is missing, it's an error
+      if (isText && fileMeta.contentText === undefined) {
+        throw new Error(
+          `Missing text content for likely text file: ${fileMeta.name}`,
+        );
+      }
+      // If it's likely image based on MIME but contentBase64 is missing, it's an error
+      if (isImage && fileMeta.contentBase64 === undefined) {
+        throw new Error(
+          `Missing base64 content for image file: ${fileMeta.name}`,
+        );
+      }
+      // Otherwise, treat as unsupported/unknown
+      throw new Error(`Missing or unusable content for file: ${fileMeta.name}`);
     }
   } catch (error) {
     console.error(
@@ -208,11 +270,6 @@ export function buildHistoryMessages(
       i.prompt.metadata.attachedFiles.length > 0 &&
       !i.prompt?.content
     ) {
-      // If only files were attached, represent the user turn with an empty content message
-      // This might be necessary for some models to acknowledge the file input turn.
-      // Alternatively, omit this turn if the model handles file-only input implicitly.
-      // Let's include it for now for broader compatibility.
-      // msgs.push({ role: "user", content: "" });
       // Omit user turn if only files and no text content
     }
 

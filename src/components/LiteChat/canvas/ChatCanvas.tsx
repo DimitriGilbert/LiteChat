@@ -1,4 +1,5 @@
 // src/components/LiteChat/canvas/ChatCanvas.tsx
+// Entire file content provided
 import React, { useMemo, useRef, useEffect } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { InteractionCard } from "./InteractionCard";
@@ -40,28 +41,31 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     // const interactionMap = new Map(interactions.map((i) => [i.id, i]));
     const processedIds = new Set<string>();
 
-    interactions
-      .sort((a, b) => a.index - b.index)
-      .forEach((interaction) => {
-        if (processedIds.has(interaction.id)) return;
+    // Create a shallow copy of the interactions array before sorting
+    const sortedInteractions = [...interactions].sort(
+      (a, b) => a.index - b.index,
+    );
 
-        // Simple grouping: each interaction is its own group for now
-        const group = [interaction];
-        processedIds.add(interaction.id);
-        groups.push(group);
+    sortedInteractions.forEach((interaction) => {
+      if (processedIds.has(interaction.id)) return;
 
-        // Example of potential future grouping logic (e.g., by parentId for revisions)
-        // let current = interaction;
-        // const group = [current];
-        // processedIds.add(current.id);
-        // while (current.parentId && interactionMap.has(current.parentId) && !processedIds.has(current.parentId)) {
-        //     const parent = interactionMap.get(current.parentId)!;
-        //     group.unshift(parent); // Add parent to the beginning
-        //     processedIds.add(parent.id);
-        //     current = parent;
-        // }
-        // groups.push(group);
-      });
+      // Simple grouping: each interaction is its own group for now
+      const group = [interaction];
+      processedIds.add(interaction.id);
+      groups.push(group);
+
+      // Example of potential future grouping logic (e.g., by parentId for revisions)
+      // let current = interaction;
+      // const group = [current];
+      // processedIds.add(current.id);
+      // while (current.parentId && interactionMap.has(current.parentId) && !processedIds.has(current.parentId)) {
+      //     const parent = interactionMap.get(current.parentId)!;
+      //     group.unshift(parent); // Add parent to the beginning
+      //     processedIds.add(parent.id);
+      //     current = parent;
+      // }
+      // groups.push(group);
+    });
     return groups;
   }, [interactions]);
 

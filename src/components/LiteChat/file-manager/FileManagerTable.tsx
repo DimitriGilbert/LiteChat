@@ -1,4 +1,5 @@
 // src/components/LiteChat/file-manager/FileManagerTable.tsx
+// Entire file content provided
 import React, { useMemo } from "react";
 import {
   Table,
@@ -8,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
+// Removed ScrollArea import
 import type { VfsNode } from "@/types/litechat/vfs";
 import { NewFolderRow } from "./NewFolderRow";
 import { FileManagerRow } from "./FileManagerRow";
@@ -84,7 +85,9 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
   }
 
   return (
-    <ScrollArea className="flex-grow h-0 border-t border-border">
+    // Removed ScrollArea component
+    // Added relative container for sticky header
+    <div className="relative h-full">
       <Table className="w-full text-sm">
         <TableHeader className="sticky top-0 bg-card z-10">
           <TableRow className="hover:bg-card">
@@ -152,6 +155,6 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
           )}
         </TableBody>
       </Table>
-    </ScrollArea>
+    </div>
   );
 };
