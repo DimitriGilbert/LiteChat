@@ -1,4 +1,5 @@
 // src/components/LiteChat/settings/SettingsApiKeys.tsx
+// Entire file content provided
 import React, { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +30,11 @@ import { toast } from "sonner";
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
+import {
+  LoadingStateWrapper,
+  DefaultListLoadingSkeleton,
+} from "../common/LoadingStateWrapper"; // Import new component
+import { ActionTooltipButton } from "../common/ActionTooltipButton"; // Import ActionTooltipButton
 
 const SettingsApiKeysComponent: React.FC = () => {
   const {
@@ -52,7 +57,7 @@ const SettingsApiKeysComponent: React.FC = () => {
 
   const [newKeyName, setNewKeyName] = useState("");
   const [newKeyValue, setNewKeyValue] = useState("");
-  const [newKeyProviderType, setNewKeyProviderType] = useState<string>(""); // Use "" as initial value
+  const [newKeyProviderType, setNewKeyProviderType] = useState<string>("");
   const [isAdding, setIsAdding] = useState(false);
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
   const [showValues, setShowValues] = useState<Record<string, boolean>>({});
@@ -73,10 +78,9 @@ const SettingsApiKeysComponent: React.FC = () => {
         );
         setNewKeyName("");
         setNewKeyValue("");
-        setNewKeyProviderType(""); // Reset to empty string
+        setNewKeyProviderType("");
       } catch (error: unknown) {
         console.error("Failed to add API key (from component):", error);
-        // Toast handled by store action
       } finally {
         setIsAdding(false);
       }
@@ -94,7 +98,6 @@ const SettingsApiKeysComponent: React.FC = () => {
         setIsDeleting((prev) => ({ ...prev, [id]: true }));
         try {
           await deleteApiKey(id);
-          // State update handled by store action now
           setShowValues((prev) => {
             const next = { ...prev };
             delete next[id];
@@ -102,9 +105,7 @@ const SettingsApiKeysComponent: React.FC = () => {
           });
         } catch (error: unknown) {
           console.error("Failed to delete API key (from component):", error);
-          // Toast handled by store action
         } finally {
-          // Reset deleting state regardless of success/failure if error is caught
           setIsDeleting((prev) => ({ ...prev, [id]: false }));
         }
       }
@@ -142,16 +143,21 @@ const SettingsApiKeysComponent: React.FC = () => {
   };
 
   const getKeyTypeLabel = (providerIdOrType: string): string => {
-    // Consider adding more types or making this dynamic if needed
     const knownTypes: Record<string, string> = {
       openai: "OpenAI",
       google: "Google",
       openrouter: "OpenRouter",
       "openai-compatible": "OpenAI-Compatible",
-      // Add other known provider IDs/types here
     };
     return knownTypes[providerIdOrType] || "Unknown/Custom";
   };
+
+  const emptyKeysComponent = (
+    <p className="text-sm text-gray-500 dark:text-gray-400 p-4 text-center">
+      No API keys stored yet. Add one above. Link keys to providers in the
+      'Providers' tab.
+    </p>
+  );
 
   return (
     <div className="space-y-6 p-1">
@@ -176,7 +182,6 @@ const SettingsApiKeysComponent: React.FC = () => {
               Intended Provider Type
             </Label>
             <Select
-              // Ensure value is controlled, use "" for empty state
               value={newKeyProviderType}
               onValueChange={setNewKeyProviderType}
               required
@@ -186,14 +191,12 @@ const SettingsApiKeysComponent: React.FC = () => {
                 <SelectValue placeholder="Select Type..." />
               </SelectTrigger>
               <SelectContent>
-                {/* Add more relevant types */}
                 <SelectItem value="openai">OpenAI</SelectItem>
                 <SelectItem value="google">Google</SelectItem>
                 <SelectItem value="openrouter">OpenRouter</SelectItem>
                 <SelectItem value="openai-compatible">
                   OpenAI-Compatible
                 </SelectItem>
-                {/* Add other types as needed */}
               </SelectContent>
             </Select>
           </div>
@@ -220,18 +223,13 @@ const SettingsApiKeysComponent: React.FC = () => {
       {/* Stored Keys Table */}
       <div>
         <h3 className="text-lg font-medium mb-2">Stored API Keys</h3>
-        {isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : (dbApiKeys || []).length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            No API keys stored yet. Add one above. Link keys to providers in the
-            'Providers' tab.
-          </p>
-        ) : (
+        {/* Use LoadingStateWrapper */}
+        <LoadingStateWrapper
+          isLoading={isLoading}
+          data={dbApiKeys}
+          loadingComponent={<DefaultListLoadingSkeleton count={2} />}
+          emptyComponent={emptyKeysComponent}
+        >
           <div className="border rounded-md overflow-hidden">
             <Table>
               <TableHeader>
@@ -254,45 +252,43 @@ const SettingsApiKeysComponent: React.FC = () => {
                         {linkedProviderNames.get(key.id) ?? "Not linked"}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <span className="font-mono text-xs">
                             {showValues[key.id]
                               ? key.value
                               : "••••••••••••••••"}
                           </span>
-                          <Button
-                            variant="ghost"
-                            size="icon"
+                          {/* Use ActionTooltipButton */}
+                          <ActionTooltipButton
+                            tooltipText={
+                              showValues[key.id] ? "Hide key" : "Show key"
+                            }
                             onClick={() => toggleShowValue(key.id)}
-                            className="h-6 w-6"
                             aria-label={
                               showValues[key.id] ? "Hide key" : "Show key"
                             }
+                            icon={showValues[key.id] ? EyeOffIcon : EyeIcon}
                             disabled={isKeyDeleting}
-                          >
-                            {showValues[key.id] ? (
-                              <EyeOffIcon className="h-4 w-4" />
-                            ) : (
-                              <EyeIcon className="h-4 w-4" />
-                            )}
-                          </Button>
+                            className="h-6 w-6"
+                          />
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                        {/* Use ActionTooltipButton */}
+                        <ActionTooltipButton
+                          tooltipText="Delete"
                           onClick={() => handleDeleteKey(key.id, key.name)}
-                          className="text-red-600 hover:text-red-700 h-8 w-8"
                           aria-label={`Delete key ${key.name}`}
+                          icon={
+                            isKeyDeleting ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              Trash2Icon
+                            )
+                          }
                           disabled={isKeyDeleting}
-                        >
-                          {isKeyDeleting ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2Icon className="h-4 w-4" />
-                          )}
-                        </Button>
+                          className="text-red-600 hover:text-red-700 h-8 w-8"
+                        />
                       </TableCell>
                     </TableRow>
                   );
@@ -300,7 +296,7 @@ const SettingsApiKeysComponent: React.FC = () => {
               </TableBody>
             </Table>
           </div>
-        )}
+        </LoadingStateWrapper>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 // src/lib/litechat/ai-helpers.ts
 // Entire file content provided
+import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
 import type {
   ModMiddlewareHookName,
   ModMiddlewarePayloadMap,
@@ -104,62 +105,7 @@ export function base64ToUint8Array(base64: string): Uint8Array {
   }
 }
 
-// List of common text file extensions for content processing
-const COMMON_TEXT_EXTENSIONS = [
-  ".txt",
-  ".md",
-  ".json",
-  ".js",
-  ".ts",
-  ".jsx",
-  ".tsx",
-  ".html",
-  ".css",
-  ".py",
-  ".java",
-  ".c",
-  ".cpp",
-  ".h",
-  ".cs",
-  ".go",
-  ".php",
-  ".rb",
-  ".swift",
-  ".kt",
-  ".rs",
-  ".toml",
-  ".yaml",
-  ".yml",
-  ".xml",
-  ".sh",
-  ".bat",
-  ".ps1",
-  ".gitignore",
-  ".env", // Add other common config/text files
-  ".log",
-  ".csv",
-  ".tsv",
-  ".ini",
-  ".cfg",
-  ".conf",
-];
-
-// Helper function to determine if a file is likely text-based
-export const isLikelyTextFile = (name: string, mimeType?: string): boolean => {
-  const fileNameLower = name.toLowerCase();
-  // Prioritize specific text MIME types
-  if (
-    mimeType?.startsWith("text/") ||
-    mimeType === "application/json" ||
-    mimeType === "application/xml" ||
-    mimeType === "application/javascript" ||
-    mimeType === "application/typescript"
-  ) {
-    return true;
-  }
-  // Fallback: Check extension even if MIME type is generic or missing
-  return COMMON_TEXT_EXTENSIONS.some((ext) => fileNameLower.endsWith(ext));
-};
+// Constants and helper function moved to file-extensions.ts
 
 /**
  * Processes attached file metadata *with its content* into AI SDK compatible parts.

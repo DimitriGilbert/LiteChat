@@ -14,8 +14,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { FilePreviewRenderer } from "@/components/LiteChat/common/FilePreviewRenderer";
-// Import the helper from ai-helpers
-import { isLikelyTextFile } from "@/lib/litechat/ai-helpers";
+// Import the helper from file-extensions
+import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
 
 const MAX_FILE_SIZE_MB = 20;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -50,7 +50,7 @@ export function registerFileControl() {
             } = {};
 
             // Determine if it's likely text using the helper function
-            const isText = isLikelyTextFile(file.name, file.type);
+            const isText = isLikelyTextFile(file.name, file.type); // Use imported helper
             const isImage = file.type.startsWith("image/");
 
             if (isText) {

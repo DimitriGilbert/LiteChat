@@ -1,6 +1,6 @@
 // src/hooks/litechat/useItemEditing.tsx
-// NEW FILE
-import { useState, useCallback, useRef } from "react";
+// Entire file content provided
+import { useState, useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import type { SidebarItem } from "@/store/conversation.store";
 import type { Project } from "@/types/litechat/project";
@@ -16,7 +16,7 @@ interface UseItemEditingProps {
     id: string,
     updates: Partial<Omit<Conversation, "id" | "createdAt">>,
   ) => Promise<void>;
-  deleteProject: (id: string) => Promise<void>; // Needed for cancelling new projects
+  deleteProject: (id: string) => Promise<void>;
   getProjectById: (id: string | null) => Project | undefined;
   getConversationById: (id: string | null) => Conversation | undefined;
 }
@@ -25,12 +25,13 @@ export function useItemEditing({
   updateProject,
   updateConversation,
   deleteProject,
+  // getProjectById, // Keep for checking if it's a new project
 }: UseItemEditingProps) {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingItemType, setEditingItemType] =
     useState<SidebarItemType | null>(null);
-  const [editingName, setEditingName] = useState<string>(""); // Original name for comparison/display
-  const [localEditingName, setLocalEditingName] = useState<string>(""); // Input field value
+  const [originalName, setOriginalName] = useState<string>(""); // Store the name when editing starts
+  const [localEditingName, setLocalEditingName] = useState<string>(""); // Input field value, managed locally
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const editInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -38,17 +39,22 @@ export function useItemEditing({
     setEditingItemId(item.id);
     setEditingItemType(item.itemType);
     const currentName = item.itemType === "project" ? item.name : item.title;
-    setEditingName(currentName); // Store original name
-    setLocalEditingName(currentName); // Initialize local state
+    setOriginalName(currentName); // Store original name
+    setLocalEditingName(currentName); // Initialize local input state
     setIsSavingEdit(false);
+    // Focus needs to happen in the component via useEffect
   }, []);
 
   const handleCancelEdit = useCallback(
-    (isNewProject: boolean = false) => {
+    (isNewProjectOverride?: boolean) => {
       const currentEditingId = editingItemId; // Capture before resetting
+      const isNewProject =
+        isNewProjectOverride ??
+        (editingItemType === "project" && originalName === "New Project");
+
       setEditingItemId(null);
       setEditingItemType(null);
-      setEditingName("");
+      setOriginalName("");
       setLocalEditingName("");
       setIsSavingEdit(false);
 
@@ -63,19 +69,27 @@ export function useItemEditing({
         });
       }
     },
-    [editingItemId, deleteProject], // Add deleteProject dependency
+    [editingItemId, editingItemType, originalName, deleteProject],
   );
 
   const handleSaveEdit = useCallback(async () => {
     if (!editingItemId || !editingItemType || isSavingEdit) return;
 
     const trimmedLocalName = localEditingName.trim();
+    const isNewProject =
+      editingItemType === "project" && originalName === "New Project";
 
-    // Prevent saving if name is empty or unchanged
-    if (!trimmedLocalName || trimmedLocalName === editingName) {
-      handleCancelEdit(
-        editingItemType === "project" && editingName === "New Project",
-      ); // Cancel instead of saving
+    // Prevent saving if name is empty
+    if (!trimmedLocalName) {
+      toast.error("Name cannot be empty.");
+      // Optionally refocus the input
+      editInputRef.current?.focus();
+      return;
+    }
+
+    // If the name hasn't changed (and it's not a new project being named), just cancel edit mode
+    if (trimmedLocalName === originalName && !isNewProject) {
+      handleCancelEdit();
       return;
     }
 
@@ -87,32 +101,44 @@ export function useItemEditing({
         await updateConversation(editingItemId, { title: trimmedLocalName });
       }
       toast.success("Item renamed successfully.");
-      setEditingItemId(null); // Exit edit mode on success
+      // Exit edit mode on success
+      setEditingItemId(null);
       setEditingItemType(null);
-      setEditingName("");
+      setOriginalName("");
       setLocalEditingName("");
     } catch (error) {
       console.error("Failed to save item name:", error);
-      // Error toast is likely handled by the store actions, but maybe add a generic one here?
-      // toast.error("Failed to rename item.");
+      toast.error(
+        `Failed to rename item: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      // Keep editing mode active on error? Or cancel? Let's cancel for now.
+      // handleCancelEdit(isNewProject); // Or maybe just reset saving state?
     } finally {
       setIsSavingEdit(false);
     }
   }, [
     editingItemId,
     editingItemType,
-    localEditingName, // Use local state for saving
-    editingName, // Use original name for comparison
+    localEditingName,
+    originalName,
     isSavingEdit,
     updateProject,
     updateConversation,
     handleCancelEdit,
   ]);
 
+  // Effect to focus input when editing starts
+  useEffect(() => {
+    if (editingItemId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingItemId]);
+
   return {
     editingItemId,
     editingItemType,
-    editingName, // Original name
+    originalName, // Keep original name for comparison/display if needed
     localEditingName, // Local state for input
     setLocalEditingName, // Setter for local state
     isSavingEdit,

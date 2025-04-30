@@ -5,7 +5,7 @@ import {
   useConversationStore,
   type SidebarItem,
 } from "@/store/conversation.store";
-import { useProjectStore } from "@/store/project.store"; // Import ProjectStore
+import { useProjectStore } from "@/store/project.store";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ import { ConversationItemRenderer } from "@/components/LiteChat/chat/control/con
 import { useItemEditing } from "@/hooks/litechat/useItemEditing";
 
 // --- Recursive Filtering Helper ---
+// Memoize the helper itself if its dependencies are stable
 const itemMatchesFilterOrHasMatchingDescendant = (
   itemId: string,
   itemType: SidebarItemType,
@@ -100,57 +101,53 @@ const itemMatchesFilterOrHasMatchingDescendant = (
 
 // --- Main Control Component ---
 export const ConversationListControlComponent: React.FC = () => {
-  // Use ConversationStore for conversations, selection, sync status
-  const {
-    conversations,
-    selectItem,
-    selectedItemId,
-    selectedItemType,
-    addConversation,
-    updateConversation,
-    deleteConversation,
-    exportConversation,
-    exportProject, // Keep exportProject here as it needs both project/convo data
-    isLoading: isConversationLoading, // Rename to avoid conflict
-    syncRepos,
-    conversationSyncStatus,
-    getConversationById,
-  } = useConversationStore(
-    useShallow((state) => ({
-      conversations: state.conversations,
-      selectItem: state.selectItem,
-      selectedItemId: state.selectedItemId,
-      selectedItemType: state.selectedItemType,
-      addConversation: state.addConversation,
-      updateConversation: state.updateConversation,
-      deleteConversation: state.deleteConversation,
-      exportConversation: state.exportConversation,
-      exportProject: state.exportProject,
-      isLoading: state.isLoading,
-      syncRepos: state.syncRepos,
-      conversationSyncStatus: state.conversationSyncStatus,
-      getConversationById: state.getConversationById,
-    })),
+  // --- State Selection ---
+  // Select primitive/stable values directly
+  const selectedItemId = useConversationStore((state) => state.selectedItemId);
+  const selectedItemType = useConversationStore(
+    (state) => state.selectedItemType,
   );
-  // Use ProjectStore for projects and project actions
-  const {
-    projects,
-    addProject,
-    updateProject,
-    deleteProject,
-    getProjectById,
-    isLoading: isProjectLoading, // Rename to avoid conflict
-  } = useProjectStore(
-    useShallow((state) => ({
-      projects: state.projects,
-      addProject: state.addProject,
-      updateProject: state.updateProject,
-      deleteProject: state.deleteProject,
-      getProjectById: state.getProjectById,
-      isLoading: state.isLoading,
-    })),
+  const isConversationLoading = useConversationStore(
+    (state) => state.isLoading,
   );
+  const isProjectLoading = useProjectStore((state) => state.isLoading);
   const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
+
+  // Select potentially changing arrays/objects with useShallow
+  const { conversations, syncRepos, conversationSyncStatus } =
+    useConversationStore(
+      useShallow((state) => ({
+        conversations: state.conversations,
+        syncRepos: state.syncRepos,
+        conversationSyncStatus: state.conversationSyncStatus,
+      })),
+    );
+  const projects = useProjectStore((state) => state.projects); // Assuming projects array reference is stable or changes infrequently
+
+  // Select actions (these are stable references)
+  const selectItem = useConversationStore((state) => state.selectItem);
+  const addConversation = useConversationStore(
+    (state) => state.addConversation,
+  );
+  const updateConversation = useConversationStore(
+    (state) => state.updateConversation,
+  );
+  const deleteConversation = useConversationStore(
+    (state) => state.deleteConversation,
+  );
+  const exportConversation = useConversationStore(
+    (state) => state.exportConversation,
+  );
+  const exportProject = useConversationStore((state) => state.exportProject);
+  const getConversationById = useConversationStore(
+    (state) => state.getConversationById,
+  );
+  const addProject = useProjectStore((state) => state.addProject);
+  const updateProject = useProjectStore((state) => state.updateProject);
+  const deleteProject = useProjectStore((state) => state.deleteProject);
+  const getProjectById = useProjectStore((state) => state.getProjectById);
+
+  // --- Local UI State ---
   const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(
     new Set(),
   );
@@ -160,10 +157,18 @@ export const ConversationListControlComponent: React.FC = () => {
   const isLoading = isConversationLoading || isProjectLoading;
 
   // --- Use the Item Editing Hook ---
+  // Pass stable action references
+  const editingState = useItemEditing({
+    updateProject,
+    updateConversation,
+    deleteProject,
+    getProjectById,
+    getConversationById,
+  });
   const {
     editingItemId,
     editingItemType,
-    editingName,
+    originalName,
     localEditingName,
     setLocalEditingName,
     isSavingEdit,
@@ -171,15 +176,11 @@ export const ConversationListControlComponent: React.FC = () => {
     handleStartEditing,
     handleSaveEdit,
     handleCancelEdit,
-  } = useItemEditing({
-    updateProject, // From ProjectStore
-    updateConversation, // From ConversationStore
-    deleteProject, // From ProjectStore
-    getProjectById, // From ProjectStore
-    getConversationById, // From ConversationStore
-  });
+  } = editingState;
   // --- End Item Editing Hook ---
 
+  // --- Callbacks ---
+  // Wrap callbacks that depend on state/props in useCallback
   const toggleProjectExpansion = useCallback((projectId: string) => {
     setExpandedProjects((prev) => {
       const next = new Set(prev);
@@ -236,23 +237,13 @@ export const ConversationListControlComponent: React.FC = () => {
       if (parentProjectId) {
         setExpandedProjects((prev) => new Set(prev).add(parentProjectId));
       }
+      // Delay starting edit slightly to allow state updates
       setTimeout(() => {
         const newProjectData = getProjectById(newId);
         if (newProjectData) {
           handleStartEditing({ ...newProjectData, itemType: "project" });
         } else {
-          console.warn(
-            "New project data not found immediately, using fallback for edit start",
-          );
-          handleStartEditing({
-            id: newId,
-            itemType: "project",
-            name: "New Project",
-            parentId: parentProjectId,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            path: `/New Project`,
-          });
+          console.warn("New project data not found, cannot start edit.");
         }
       }, 50);
     } catch (error) {
@@ -274,13 +265,11 @@ export const ConversationListControlComponent: React.FC = () => {
       if (editingItemId && id !== editingItemId) {
         if (
           localEditingName.trim() &&
-          localEditingName.trim() !== editingName
+          localEditingName.trim() !== originalName
         ) {
-          handleSaveEdit();
+          handleSaveEdit(); // Attempt save
         } else {
-          handleCancelEdit(
-            editingItemType === "project" && editingName === "New Project",
-          );
+          handleCancelEdit(); // Cancel edit
         }
       }
 
@@ -293,9 +282,8 @@ export const ConversationListControlComponent: React.FC = () => {
     },
     [
       editingItemId,
-      editingItemType,
-      editingName,
-      localEditingName,
+      localEditingName, // Depend on local name for check
+      originalName, // Depend on original name for check
       selectedItemId,
       selectedItemType,
       handleSaveEdit,
@@ -354,7 +342,8 @@ export const ConversationListControlComponent: React.FC = () => {
     [exportProject],
   );
 
-  // FIX: Safely handle potentially undefined syncRepos
+  // --- Memoized Derived Data ---
+  // Memoize maps and structures derived from store state
   const repoNameMap = useMemo(() => {
     return new Map((syncRepos || []).map((r) => [r.id, r.name]));
   }, [syncRepos]);
@@ -383,8 +372,9 @@ export const ConversationListControlComponent: React.FC = () => {
         conversationsByProjectId: convosByProjId,
         projectsByParentId: projByParentId,
       };
-    }, [projects, conversations]);
+    }, [projects, conversations]); // Only recompute if projects or conversations change
 
+  // Memoize the getChildren function itself, ensuring its dependencies are stable
   const getChildren = useCallback(
     (
       parentId: string | null,
@@ -402,8 +392,8 @@ export const ConversationListControlComponent: React.FC = () => {
             p.id,
             "project",
             lowerCaseFilter,
-            projects,
-            conversations,
+            projects, // Pass stable references
+            conversations, // Pass stable references
             projectsById,
             conversationsByProjectId,
             projectsByParentId,
@@ -415,6 +405,7 @@ export const ConversationListControlComponent: React.FC = () => {
         conversationsByProjectId.get(parentId) || []
       ).filter((c) => c.title.toLowerCase().includes(lowerCaseFilter));
 
+      // Sorting can be done here or memoized separately if needed
       childProjects.sort(
         (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
       );
@@ -425,14 +416,15 @@ export const ConversationListControlComponent: React.FC = () => {
       return { projects: childProjects, conversations: childConversations };
     },
     [
-      projects,
-      conversations,
-      projectsById,
-      conversationsByProjectId,
-      projectsByParentId,
+      projects, // Stable reference from store assumed
+      conversations, // Stable reference from store assumed
+      projectsById, // Memoized derived data
+      conversationsByProjectId, // Memoized derived data
+      projectsByParentId, // Memoized derived data
     ],
-  );
+  ); // Dependencies are stable references or memoized maps
 
+  // Memoize the calculation of root items
   const rootItems = useMemo(() => {
     const lowerCaseFilter = filterText.toLowerCase();
     const memoCache: Record<string, boolean> = {};
@@ -464,16 +456,17 @@ export const ConversationListControlComponent: React.FC = () => {
     combined.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
     return combined;
   }, [
-    projects,
-    conversations,
-    filterText,
-    projectsById,
-    conversationsByProjectId,
-    projectsByParentId,
-  ]);
+    projects, // Stable reference
+    conversations, // Stable reference
+    filterText, // Primitive
+    projectsById, // Memoized map
+    conversationsByProjectId, // Memoized map
+    projectsByParentId, // Memoized map
+  ]); // Recompute only when dependencies change
 
   return (
     <div className="p-2 border-r border-[--border] bg-card text-card-foreground h-full flex flex-col">
+      {/* Header */}
       <div className="flex justify-between items-center mb-2 flex-shrink-0 px-1">
         <h3 className="text-sm font-semibold">Workspace</h3>
         <div className="flex items-center">
@@ -514,6 +507,7 @@ export const ConversationListControlComponent: React.FC = () => {
         </div>
       </div>
 
+      {/* Filter Input */}
       <div className="relative mb-2 px-1 flex-shrink-0">
         <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -526,6 +520,7 @@ export const ConversationListControlComponent: React.FC = () => {
         />
       </div>
 
+      {/* List Area */}
       <ScrollArea className="flex-grow">
         {isLoading ? (
           <div className="space-y-1 p-1">
@@ -556,11 +551,12 @@ export const ConversationListControlComponent: React.FC = () => {
                 onExportProject={handleExportProject}
                 expandedProjects={expandedProjects}
                 toggleProjectExpansion={toggleProjectExpansion}
-                getChildren={getChildren}
+                getChildren={getChildren} // Pass memoized function
                 filterText={filterText}
+                // Pass editing state and handlers from the hook
                 editingItemId={editingItemId}
                 editingItemType={editingItemType}
-                editingName={editingName}
+                originalName={originalName}
                 localEditingName={localEditingName}
                 setLocalEditingName={setLocalEditingName}
                 handleStartEditing={handleStartEditing}

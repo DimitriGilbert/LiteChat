@@ -1,4 +1,5 @@
 // src/components/LiteChat/canvas/StreamingContentView.tsx
+// Entire file content provided
 import React, { useMemo } from "react";
 import {
   useMarkdownParser,
@@ -7,9 +8,9 @@ import {
 import { CodeBlockRenderer } from "../common/CodeBlockRenderer";
 import { useSettingsStore } from "@/store/settings.store";
 import { cn } from "@/lib/utils";
+import { useShallow } from "zustand/react/shallow"; // Import useShallow
 
 interface StreamingContentViewProps {
-  // Changed prop name from 'content' to 'markdownContent'
   markdownContent: string | null | undefined;
   isStreaming?: boolean;
   className?: string;
@@ -20,16 +21,34 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
   isStreaming = false,
   className,
 }) => {
-  const enableStreamingMarkdown = useSettingsStore(
-    (state) => state.enableStreamingMarkdown,
+  // Use useShallow to select multiple state values efficiently
+  const { enableStreamingMarkdown, enableStreamingCodeBlockParsing } =
+    useSettingsStore(
+      useShallow((state) => ({
+        enableStreamingMarkdown: state.enableStreamingMarkdown,
+        enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing,
+      })),
+    );
+
+  // Only parse if streaming markdown is enabled
+  const parsedContent = useMarkdownParser(
+    enableStreamingMarkdown ? markdownContent : null,
   );
-  const parsedContent = useMarkdownParser(markdownContent);
 
   // Memoize the rendered content to avoid re-rendering unchanged parts
   const renderedContent = useMemo(() => {
+    // If streaming markdown is disabled, return raw text wrapped in pre
+    if (!enableStreamingMarkdown) {
+      return (
+        <pre className={cn("whitespace-pre-wrap text-sm", className)}>
+          {markdownContent}
+        </pre>
+      );
+    }
+
+    // If streaming markdown is enabled, render parsed content
     return parsedContent.map((item, index) => {
       if (typeof item === "string") {
-        // Render HTML string directly
         return (
           <div
             key={`html-${index}`}
@@ -38,21 +57,25 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
           />
         );
       } else if (item.type === "code") {
-        // Render CodeBlockData using CodeBlockRenderer
         const codeData = item as CodeBlockData;
+        // CodeBlockRenderer now internally checks enableStreamingCodeBlockParsing
         return (
           <CodeBlockRenderer
             key={`code-${index}`}
-            // Pass the language prop correctly (using codeData.lang)
             lang={codeData.lang}
             code={codeData.code}
-            // isStreaming={isStreaming && index === parsedContent.length - 1} // Only last block might be streaming
           />
         );
       }
       return null;
     });
-  }, [parsedContent, isStreaming]); // Depend on parsedContent and isStreaming
+  }, [
+    parsedContent,
+    enableStreamingMarkdown,
+    markdownContent,
+    className,
+    // enableStreamingCodeBlockParsing is implicitly handled by CodeBlockRenderer
+  ]);
 
   // Fallback for empty content
   if (!markdownContent?.trim()) {
@@ -60,15 +83,6 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
       <div className={cn("text-muted-foreground italic", className)}>
         {isStreaming ? "Generating response..." : "No response content."}
       </div>
-    );
-  }
-
-  // If streaming markdown is disabled, render raw text
-  if (isStreaming && !enableStreamingMarkdown) {
-    return (
-      <pre className={cn("whitespace-pre-wrap text-sm", className)}>
-        {markdownContent}
-      </pre>
     );
   }
 

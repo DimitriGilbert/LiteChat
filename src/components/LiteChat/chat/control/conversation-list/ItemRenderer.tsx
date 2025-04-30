@@ -1,5 +1,6 @@
 // src/components/LiteChat/chat/control/conversation-list/ItemRenderer.tsx
-import React, { useEffect, memo } from "react"; // Import memo
+// Entire file content provided
+import React, { memo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,7 @@ import {
   DownloadIcon,
   Loader2,
   FileJsonIcon,
-  CogIcon, // Import Settings Icon
+  CogIcon,
 } from "lucide-react";
 import {
   Tooltip,
@@ -29,7 +30,7 @@ import type { SyncStatus } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project";
 import { Conversation } from "@/types/litechat/chat";
 import { SidebarItem } from "@/store/conversation.store";
-import { useUIStateStore } from "@/store/ui.store"; // Import UI store
+import { useUIStateStore } from "@/store/ui.store";
 
 interface ConversationItemProps {
   item: SidebarItem;
@@ -59,7 +60,7 @@ interface ConversationItemProps {
   // Inline Editing Props - Updated
   editingItemId: string | null;
   editingItemType: SidebarItemType | null;
-  editingName: string; // Original name (read-only display while editing)
+  originalName: string; // Original name (read-only display while editing)
   localEditingName: string; // Value for the input field
   setLocalEditingName: (name: string) => void; // Setter for the input field
   handleStartEditing: (item: SidebarItem) => void;
@@ -89,9 +90,9 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
     // Inline Editing Props - Destructure new props
     editingItemId,
     editingItemType,
-    editingName, // Original name
-    localEditingName, // Input value
-    setLocalEditingName, // Input setter
+    originalName, // Use originalName from hook
+    localEditingName, // Input value from hook
+    setLocalEditingName, // Input setter from hook
     handleStartEditing,
     handleSaveEdit,
     handleCancelEdit,
@@ -171,17 +172,18 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
         e.preventDefault();
         handleSaveEdit();
       } else if (e.key === "Escape") {
-        handleCancelEdit(isProject && editingName === "New Project");
+        // Pass undefined, let hook determine if it was a new project
+        handleCancelEdit();
       }
     };
 
-    // Focus input when editing starts
-    useEffect(() => {
-      if (isEditingThis) {
-        editInputRef.current?.focus();
-        editInputRef.current?.select();
-      }
-    }, [isEditingThis, editInputRef]);
+    // Focus input when editing starts (handled by the hook now)
+    // useEffect(() => {
+    //   if (isEditingThis) {
+    //     editInputRef.current?.focus();
+    //     editInputRef.current?.select();
+    //   }
+    // }, [isEditingThis, editInputRef]);
 
     // Determine display name correctly (uses original name from item prop)
     const displayName = isProject ? item.name : item.title;
@@ -234,7 +236,8 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                 value={localEditingName} // Use local state for value
                 onChange={(e) => setLocalEditingName(e.target.value)} // Update local state
                 onKeyDown={handleInputKeyDown}
-                // Removed onBlur handler - rely on Enter/Escape/Save/Cancel buttons
+                // Remove onBlur - rely on Enter/Escape/Save/Cancel buttons
+                // onBlur={handleSaveEdit}
                 className="h-6 px-1 py-0 text-xs flex-grow min-w-0"
                 onClick={(e) => e.stopPropagation()} // Prevent item click when clicking input
                 disabled={isSavingEdit}
@@ -258,12 +261,8 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                     e.stopPropagation();
                     handleSaveEdit();
                   }}
-                  // Disable save if saving, name is empty, or name hasn't changed from original
-                  disabled={
-                    isSavingEdit ||
-                    !localEditingName.trim() ||
-                    localEditingName.trim() === editingName
-                  }
+                  // Disable save if saving or name is empty
+                  disabled={isSavingEdit || !localEditingName.trim()}
                   aria-label="Save changes"
                 >
                   {isSavingEdit ? (
@@ -278,10 +277,8 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                   className="h-5 w-5 text-muted-foreground hover:text-foreground"
                   onClick={(e) => {
                     e.stopPropagation();
-                    // Pass whether it's a new project based on the *original* name
-                    handleCancelEdit(
-                      isProject && editingName === "New Project",
-                    );
+                    // Pass undefined, let hook determine if it was a new project
+                    handleCancelEdit();
                   }}
                   disabled={isSavingEdit}
                   aria-label="Cancel edit"
@@ -442,7 +439,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                   // Pass down editing props
                   editingItemId={editingItemId}
                   editingItemType={editingItemType}
-                  editingName={editingName}
+                  originalName={originalName}
                   localEditingName={localEditingName}
                   setLocalEditingName={setLocalEditingName}
                   handleStartEditing={handleStartEditing}
@@ -475,7 +472,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                   // Pass down editing props
                   editingItemId={editingItemId}
                   editingItemType={editingItemType}
-                  editingName={editingName}
+                  originalName={originalName}
                   localEditingName={localEditingName}
                   setLocalEditingName={setLocalEditingName}
                   handleStartEditing={handleStartEditing}

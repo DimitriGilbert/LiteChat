@@ -249,22 +249,22 @@
         @apply relative my-4 overflow-hidden border border-border rounded-lg;
     }
 
-    /* Header styling */
+    /* Header styling - RESTORED */
     .code-block-header {
-        @apply flex items-center justify-between px-4 py-2
-      border-b border-border;
-        background-color: hsl(var(--card));
+        @apply flex items-center justify-between px-3 py-1.5 /* Adjusted padding */
+      border-b border-border bg-muted/50; /* Use muted background */
     }
 
     /* Code block content - minimal styling to not override external themes */
+    /* Apply overflow-x-auto here */
     .code-block-content {
-        @apply overflow-x-auto text-sm m-0;
+        @apply text-sm m-0 overflow-x-auto;
     }
 
-    /* .code-block-content code {
-        @apply p-4 block font-mono;
-        background-color: transparent;
-    } */
+    /* Ensure code tag within pre takes up space */
+    .code-block-content code {
+        @apply block p-4; /* Restore padding */
+    }
 
     .folded-content-preview {
         @apply cursor-pointer text-muted-foreground italic text-xs max-h-20 overflow-hidden relative;

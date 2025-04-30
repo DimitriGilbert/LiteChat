@@ -1,44 +1,38 @@
 // src/components/LiteChat/settings/SettingsGit.tsx
-import React from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+// Entire file content provided
+import React, { useMemo } from "react";
 import { SettingsGitConfig } from "./SettingsGitConfig";
 import { SettingsGitSyncRepos } from "./SettingsGitSyncRepos";
-import { cn } from "@/lib/utils";
+import { TabbedLayout, TabDefinition } from "../common/TabbedLayout"; // Import TabbedLayout
 
 const SettingsGitComponent: React.FC = () => {
-  // Reusing the tab trigger style from SettingsModal for consistency
-  const tabTriggerClass = cn(
-    "px-3 py-1.5 text-sm font-medium rounded-md",
-    "text-muted-foreground",
-    "border border-transparent",
-    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-    "data-[state=active]:bg-primary/10 data-[state=active]:text-primary",
-    "data-[state=active]:border-primary",
-    "dark:data-[state=active]:bg-primary/20 dark:data-[state=active]:text-primary",
-    "dark:data-[state=active]:border-primary/70",
-    "hover:bg-muted/50 hover:text-primary/80",
-  );
+  // Define tabs for the layout
+  const tabs: TabDefinition[] = useMemo(
+    () => [
+      {
+        value: "config",
+        label: "User Config",
+        content: <SettingsGitConfig />,
+      },
+      {
+        value: "sync",
+        label: "Sync Repositories",
+        content: <SettingsGitSyncRepos />,
+      },
+      // Add more Git-related tabs here later if needed
+    ],
+    [],
+  ); // No dependencies, tabs are static
 
   return (
-    <Tabs defaultValue="config" className="flex flex-col h-full">
-      <TabsList className="flex-shrink-0 gap-1 p-1">
-        <TabsTrigger value="config" className={tabTriggerClass}>
-          User Config
-        </TabsTrigger>
-        <TabsTrigger value="sync" className={tabTriggerClass}>
-          Sync Repositories
-        </TabsTrigger>
-        {/* Add more Git-related tabs here later */}
-      </TabsList>
-      <div className="flex-grow mt-4 overflow-y-auto">
-        <TabsContent value="config">
-          <SettingsGitConfig />
-        </TabsContent>
-        <TabsContent value="sync">
-          <SettingsGitSyncRepos />
-        </TabsContent>
-      </div>
-    </Tabs>
+    // Use TabbedLayout, remove internal Tabs component
+    <TabbedLayout
+      tabs={tabs}
+      defaultValue="config"
+      className="h-full" // Ensure it fills height if needed by parent
+      listClassName="bg-muted/50 rounded-md" // Example custom list style
+      contentContainerClassName="mt-4" // Add margin top to content
+    />
   );
 };
 

@@ -1,4 +1,5 @@
 // src/components/LiteChat/common/CodeBlockRenderer.tsx
+// Entire file content provided
 import React, {
   useState,
   useEffect,
@@ -20,7 +21,7 @@ import "prismjs/components/prism-sql";
 // Import base Prism styles
 import "prismjs/themes/prism.css";
 
-// import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"; // Import cn
 import { Button } from "@/components/ui/button";
 import { CheckIcon, ClipboardIcon, ChevronsUpDownIcon } from "lucide-react";
 import {
@@ -186,63 +187,81 @@ export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
 
   const foldedPreviewText = useMemo(() => {
     if (!code) return "";
-    return code.split("\n").slice(0, 3).join("\n");
+    return code
+      .split(
+        `
+`,
+      )
+      .slice(0, 3).join(`
+`);
   }, [code]);
 
   return (
-    <div className="code-block-container my-4">
-      <div className="code-block-header">
-        <span className="text-xs text-muted-foreground">{lang || "code"}</span>
-        <div className="flex items-center gap-0.5">
-          <TooltipProvider delayDuration={100}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={toggleFold}
-                  aria-label={isFolded ? "Unfold code" : "Fold code"}
-                >
-                  <ChevronsUpDownIcon className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                {isFolded ? "Unfold" : "Fold"}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TooltipProvider delayDuration={100}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={handleCopy}
-                  aria-label="Copy code"
-                >
-                  {isCopied ? (
-                    <CheckIcon className="h-3.5 w-3.5 text-green-500" />
-                  ) : (
-                    <ClipboardIcon className="h-3.5 w-3.5" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Copy</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+    <div className="code-block-container group/codeblock my-4 relative">
+      {/* Floating Action Buttons */}
+      <div
+        className="absolute top-1 right-1 z-10 flex items-center gap-0.5 opacity-0 group-hover/codeblock:opacity-100 transition-opacity
+                   bg-card/70 backdrop-blur-sm p-0.5 rounded-md"
+      >
+        <TooltipProvider delayDuration={100}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                onClick={toggleFold}
+                aria-label={isFolded ? "Unfold code" : "Fold code"}
+              >
+                <ChevronsUpDownIcon className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {isFolded ? "Unfold" : "Fold"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider delayDuration={100}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                onClick={handleCopy}
+                aria-label="Copy code"
+              >
+                {isCopied ? (
+                  <CheckIcon className="h-3.5 w-3.5 text-green-500" />
+                ) : (
+                  <ClipboardIcon className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Copy</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
+
+      {/* Code Content */}
       {!isFolded && (
-        <pre className="code-block-content">
+        // Apply overflow-x-auto here and adjust padding
+        <pre
+          className={cn(
+            "code-block-content",
+            "pt-8 pb-4 px-4 overflow-x-auto", // Added overflow and padding
+          )}
+        >
           <code ref={codeRef} className={languageClass}>
             {code}
           </code>
         </pre>
       )}
       {isFolded && (
-        <div className="folded-content-preview p-4 pt-0" onClick={toggleFold}>
+        <div
+          className="folded-content-preview p-4 pt-8 cursor-pointer" // Add padding-top
+          onClick={toggleFold}
+        >
           <pre className="whitespace-pre-wrap break-words text-muted-foreground font-mono text-sm">
             {foldedPreviewText}
           </pre>

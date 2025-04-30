@@ -1,5 +1,6 @@
 // src/components/LiteChat/common/FilePreviewRenderer.tsx
 // Entire file content provided
+import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   FileTextIcon,
@@ -12,7 +13,8 @@ import {
   UploadCloudIcon,
   XIcon,
   ChevronsUpDownIcon,
-  HardDriveIcon, // Import VFS icon
+  HardDriveIcon,
+  DownloadIcon, // Import Download Icon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -81,51 +83,7 @@ const metadataToFile = (meta: AttachedFileMetadata): File | null => {
   return null;
 };
 
-// Export this helper function
-export const COMMON_TEXT_EXTENSIONS_PREVIEW = [
-  ".txt",
-  ".md",
-  ".json",
-  ".js",
-  ".ts",
-  ".jsx",
-  ".tsx",
-  ".html",
-  ".css",
-  ".py",
-  ".java",
-  ".c",
-  ".cpp",
-  ".h",
-  ".cs",
-  ".go",
-  ".php",
-  ".rb",
-  ".swift",
-  ".kt",
-  ".rs",
-  ".toml",
-  ".yaml",
-  ".yml",
-  ".xml",
-  ".sh",
-  ".bat",
-  ".ps1",
-];
-
-// Export this helper function
-export const isLikelyTextFilePreview = (
-  name: string,
-  mimeType?: string,
-): boolean => {
-  const fileNameLower = name.toLowerCase();
-  if (mimeType?.startsWith("text/") || mimeType === "application/json") {
-    return true;
-  }
-  return COMMON_TEXT_EXTENSIONS_PREVIEW.some((ext) =>
-    fileNameLower.endsWith(ext),
-  );
-};
+// Constants and helper function moved to file-extensions.ts
 
 export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   fileMeta,
@@ -137,10 +95,11 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   );
   const [error, setError] = useState<string | null>(null);
   const [isAddingToVfs, setIsAddingToVfs] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false); // State for download
   const [isFolded, setIsFolded] = useState(true); // Default to folded
 
   const mimeType = fileMeta.type || "application/octet-stream";
-  const isText = isLikelyTextFilePreview(fileMeta.name, mimeType);
+  const isText = isLikelyTextFile(fileMeta.name, mimeType); // Use imported helper
   const isImage = mimeType.startsWith("image/");
   const isAudio = mimeType.startsWith("audio/");
   const isVideo = mimeType.startsWith("video/");
@@ -191,6 +150,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
     // Depend only on relevant fields for direct uploads
   }, [
     fileMeta.id,
+    fileMeta.size,
     fileMeta.source,
     fileMeta.contentBase64,
     fileMeta.contentText,
@@ -220,6 +180,37 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       toast.error(`Failed to add "${fileMeta.name}" to VFS.`);
     } finally {
       setIsAddingToVfs(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      let blob: Blob;
+      if (fileMeta.source === "vfs" && fileMeta.path) {
+        const content = await VfsOps.readFileOp(fileMeta.path);
+        blob = new Blob([content], { type: mimeType });
+      } else {
+        const file = metadataToFile(fileMeta);
+        if (!file) throw new Error("Could not reconstruct file data.");
+        blob = file;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileMeta.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download file:", err);
+      toast.error(
+        `Download failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -334,6 +325,28 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
           )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Download Button */}
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  aria-label="Download file"
+                >
+                  {isDownloading ? (
+                    <Loader2Icon className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <DownloadIcon className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Download File</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           {/* Fold/Unfold Button */}
           <TooltipProvider delayDuration={100}>
             <Tooltip>
