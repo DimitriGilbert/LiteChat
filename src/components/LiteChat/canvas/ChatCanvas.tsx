@@ -1,16 +1,22 @@
 // src/components/LiteChat/canvas/ChatCanvas.tsx
-import React, { useRef, useEffect, useCallback } from "react"; // Added refs/state/effect/callback
+import React, { useMemo, useRef, useEffect } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
-import type { ChatCanvasProps } from "@/types/litechat/chat";
-import { cn } from "@/lib/utils";
 import { InteractionCard } from "./InteractionCard";
-import { UserPromptDisplay } from "./UserPromptDisplay";
 import { StreamingInteractionCard } from "./StreamingInteractionCard";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import { useInteractionStore } from "@/store/interaction.store";
-import { useShallow } from "zustand/react/shallow";
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
-import { Button } from "@/components/ui/button"; // Import Button
-import { ArrowDownIcon } from "lucide-react"; // Import Icon
+import { Skeleton } from "@/components/ui/skeleton";
+
+export interface ChatCanvasProps {
+  conversationId: string | null;
+  interactions: Interaction[];
+  status: "idle" | "loading" | "streaming" | "error";
+  className?: string;
+  onRegenerateInteraction?: (interactionId: string) => void;
+  onEditInteraction?: (interactionId: string) => void; // Add onEdit prop
+  onStopInteraction?: (interactionId: string) => void;
+}
 
 export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   conversationId,
@@ -18,161 +24,151 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   status,
   className,
   onRegenerateInteraction,
+  onEditInteraction, // Receive onEdit prop
   onStopInteraction,
 }) => {
-  const scrollRef = useRef<HTMLDivElement>(null); // Ref for the scrollable container
-  // const [showScrollButton, setShowScrollButton] = useState(false); // State for button visibility
-
-  const streamingIds = useInteractionStore(
-    useShallow((state) => new Set(state.streamingInteractionIds)),
+  // Ref for the ScrollArea component itself
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const streamingInteractionIds = useInteractionStore(
+    (state) => state.streamingInteractionIds,
   );
 
-  // Group interactions by index to handle potential revisions/regenerations
-  const groupedInteractions = interactions.reduce(
-    (acc, i) => {
-      // Only group user_assistant messages for display
-      if (i.type === "message.user_assistant") {
-        const indexKey = i.index ?? -1;
-        (acc[indexKey] = acc[indexKey] || []).push(i);
-      }
-      return acc;
-    },
-    {} as Record<string | number, Interaction[]>,
-  );
+  // Group interactions by their parentId or index for potential future grouping logic
+  // For now, we'll treat each interaction as its own group for simplicity
+  const interactionGroups = useMemo(() => {
+    const groups: Interaction[][] = [];
+    // const interactionMap = new Map(interactions.map((i) => [i.id, i]));
+    const processedIds = new Set<string>();
 
-  // Sort indices numerically
-  const sortedIndices = Object.keys(groupedInteractions)
-    .map(Number)
-    .filter((n) => !isNaN(n) && n >= 0)
-    .sort((a, b) => a - b);
+    interactions
+      .sort((a, b) => a.index - b.index)
+      .forEach((interaction) => {
+        if (processedIds.has(interaction.id)) return;
 
-  // Function to scroll to the bottom
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: behavior,
+        // Simple grouping: each interaction is its own group for now
+        const group = [interaction];
+        processedIds.add(interaction.id);
+        groups.push(group);
+
+        // Example of potential future grouping logic (e.g., by parentId for revisions)
+        // let current = interaction;
+        // const group = [current];
+        // processedIds.add(current.id);
+        // while (current.parentId && interactionMap.has(current.parentId) && !processedIds.has(current.parentId)) {
+        //     const parent = interactionMap.get(current.parentId)!;
+        //     group.unshift(parent); // Add parent to the beginning
+        //     processedIds.add(parent.id);
+        //     current = parent;
+        // }
+        // groups.push(group);
       });
-    }
-  }, []);
+    return groups;
+  }, [interactions]);
 
-  // Effect to scroll to bottom when new interactions are added or streaming starts/ends
-  // Only auto-scroll if user is already near the bottom
+  // Scroll to bottom effect
   useEffect(() => {
-    const scrollElement = scrollRef.current;
-    if (scrollElement) {
-      const isNearBottom =
-        scrollElement.scrollHeight -
-          scrollElement.scrollTop -
-          scrollElement.clientHeight <
-        150; // Threshold
+    // Find the viewport element within the ScrollArea ref
+    const viewportElement = scrollAreaRef.current?.querySelector(
+      "[data-radix-scroll-area-viewport]",
+    );
 
-      if (isNearBottom) {
-        scrollToBottom("smooth");
+    if (viewportElement) {
+      // Scroll down only if not already near the bottom (e.g., user scrolled up)
+      // or if a new streaming interaction started
+      const { scrollHeight, clientHeight, scrollTop } = viewportElement;
+      const isAtBottom = scrollHeight - clientHeight <= scrollTop + 100; // Threshold
+      const isStreamingJustStarted =
+        status === "streaming" && streamingInteractionIds.length > 0;
+
+      if (isAtBottom || isStreamingJustStarted) {
+        viewportElement.scrollTo({
+          top: scrollHeight,
+          behavior: "smooth",
+        });
       }
     }
-    // Depend on interactions length and status to trigger scroll check
-  }, [interactions.length, status, scrollToBottom]);
+  }, [interactions, status, streamingInteractionIds]); // Depend on interactions and status
 
-  // Effect to handle scroll button visibility
-  // useEffect(() => {
-  //   const scrollElement = scrollRef.current;
-  //   if (!scrollElement) return;
+  const renderContent = () => {
+    if (status === "loading") {
+      return (
+        <div className="space-y-4 p-4">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+      );
+    }
 
-  //   const handleScroll = () => {
-  //     const isNearBottom =
-  //       scrollElement.scrollHeight -
-  //         scrollElement.scrollTop -
-  //         scrollElement.clientHeight <
-  //       150;
-  //     setShowScrollButton(!isNearBottom);
-  //   };
+    if (!conversationId) {
+      return (
+        <div className="flex h-full items-center justify-center">
+          <p className="text-muted-foreground">
+            Select a conversation or start a new one.
+          </p>
+        </div>
+      );
+    }
 
-  //   scrollElement.addEventListener("scroll", handleScroll);
-  //   handleScroll(); // Initial check
+    if (interactions.length === 0 && status !== "streaming") {
+      return (
+        <div className="flex h-full items-center justify-center">
+          <p className="text-muted-foreground">No messages yet.</p>
+        </div>
+      );
+    }
 
-  //   return () => scrollElement.removeEventListener("scroll", handleScroll);
-  // }, []);
+    return (
+      <div className="space-y-4 p-4">
+        {interactionGroups.map((group) => {
+          // For now, render each interaction individually
+          const interaction = group[0]; // Get the single interaction from the group
+          const isStreaming = streamingInteractionIds.includes(interaction.id);
+
+          if (isStreaming) {
+            return (
+              <StreamingInteractionCard
+                key={`${interaction.id}-streaming`}
+                interactionId={interaction.id}
+                onStop={onStopInteraction}
+              />
+            );
+          } else {
+            return (
+              <InteractionCard
+                key={interaction.id}
+                interaction={interaction}
+                // Pass onEdit prop down
+                onEdit={onEditInteraction}
+                onRegenerate={onRegenerateInteraction}
+                onDelete={
+                  interaction.type === "message.user_assistant"
+                    ? useInteractionStore.getState().deleteInteraction
+                    : undefined
+                }
+              />
+            );
+          }
+        })}
+        {/* Render placeholder for newly started streaming interactions not yet in the main list */}
+        {status === "streaming" &&
+          streamingInteractionIds
+            .filter((id) => !interactions.some((i) => i.id === id))
+            .map((id) => (
+              <StreamingInteractionCard
+                key={`${id}-streaming-new`}
+                interactionId={id}
+                onStop={onStopInteraction}
+              />
+            ))}
+      </div>
+    );
+  };
 
   return (
-    // Added relative positioning for the button
-    <div className={cn("relative", className)}>
-      {/* Scrollable container */}
-      <div ref={scrollRef} className="h-full overflow-y-auto pr-2">
-        {sortedIndices.map((index) => {
-          const group = groupedInteractions[index] || [];
-
-          // Find the latest interaction within the group (for revisions)
-          const latestInteraction = group.sort(
-            (a, b) =>
-              (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0),
-          )[0];
-
-          // If no interaction found for this index (shouldn't happen with grouping logic), skip
-          if (!latestInteraction) {
-            return null;
-          }
-
-          return (
-            <React.Fragment key={`${index}-${latestInteraction.id}`}>
-              {/* Render User Prompt Display using the prompt from the latest interaction */}
-              {latestInteraction.prompt && (
-                <UserPromptDisplay interaction={latestInteraction} />
-              )}
-
-              {/* Render Assistant Response Card (Streaming or Completed) */}
-              {/* Only render assistant card if it's not just a user prompt OR if it's streaming */}
-              {(latestInteraction.response !== null ||
-                latestInteraction.status === "STREAMING") &&
-                (streamingIds.has(latestInteraction.id) ? (
-                  <StreamingInteractionCard
-                    interactionId={latestInteraction.id}
-                    onStop={onStopInteraction!}
-                  />
-                ) : (
-                  <InteractionCard
-                    interaction={latestInteraction}
-                    allInteractionsInGroup={group} // Pass the whole group for revision handling
-                    onRegenerate={onRegenerateInteraction}
-                  />
-                ))}
-            </React.Fragment>
-          );
-        })}
-
-        {/* Loading/Empty States */}
-        {status === "loading" && (
-          <div className="p-4 space-y-4">
-            <Skeleton className="h-16 w-3/4 ml-auto rounded-md" />
-            <Skeleton className="h-12 w-3/4 mr-auto rounded-md" />
-            <Skeleton className="h-16 w-3/4 ml-auto rounded-md" />
-            <Skeleton className="h-12 w-3/4 mr-auto rounded-md" />
-          </div>
-        )}
-        {interactions.length === 0 && status === "idle" && !conversationId && (
-          <div className="p-4 text-center text-muted-foreground">
-            Select or start a new conversation.
-          </div>
-        )}
-        {interactions.length === 0 && status === "idle" && conversationId && (
-          <div className="p-4 text-center text-muted-foreground">
-            Send a message to start chatting.
-          </div>
-        )}
-      </div>
-
-      {/* Scroll to Bottom Button */}
-      {/* {showScrollButton && ( */}
-      <Button
-        variant="outline"
-        size="icon"
-        className="absolute bottom-4 right-4 h-10 w-10 rounded-full shadow-lg bg-card/80 backdrop-blur-sm hover:bg-muted"
-        onClick={() => scrollToBottom("smooth")}
-        aria-label="Scroll to bottom"
-      >
-        <ArrowDownIcon className="h-5 w-5" />
-      </Button>
-      {/* )} */}
-    </div>
+    // Pass the ref to the ScrollArea component itself
+    <ScrollArea className={cn("flex-grow", className)} ref={scrollAreaRef}>
+      {renderContent()}
+    </ScrollArea>
   );
 };

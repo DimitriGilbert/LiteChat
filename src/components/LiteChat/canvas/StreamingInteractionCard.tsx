@@ -1,92 +1,142 @@
 // src/components/LiteChat/canvas/StreamingInteractionCard.tsx
-import React, { memo } from "react";
+// Entire file content provided
+import React, { useMemo } from "react"; // Import useMemo
+import { UserPromptDisplay } from "./UserPromptDisplay";
+import { StreamingContentView } from "./StreamingContentView";
+import { StopButton } from "../common/StopButton";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
-import { StopButton } from "@/components/LiteChat/common/StopButton";
-import { StreamingContentView } from "./StreamingContentView"; // Import the content view
-import { WrenchIcon, Loader2 } from "lucide-react"; // Import icons for tool call
+import { useProviderStore } from "@/store/provider.store";
+import { splitModelId } from "@/lib/litechat/provider-helpers";
 
 interface StreamingInteractionCardProps {
   interactionId: string;
-  onStop: (id: string) => void;
+  onStop?: (interactionId: string) => void;
+  className?: string;
 }
 
 export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
-  memo(({ interactionId, onStop }) => {
-    // Fetch minimal data needed for the shell display (only once ideally)
-    // We select specific fields to minimize re-renders of this shell component
-    const interactionShellData = useInteractionStore(
+  React.memo(({ interactionId, onStop, className }) => {
+    // Get interaction data and buffered content
+    const { interaction, bufferedContent } = useInteractionStore(
       useShallow((state) => {
         const interaction = state.interactions.find(
           (i) => i.id === interactionId,
         );
-        // Check if there are tool calls in metadata (string array)
-        const hasToolCalls =
-          (interaction?.metadata?.toolCalls?.length ?? 0) > 0;
-        // Check if the buffer is empty (or null/undefined)
-        const isBufferEmpty = !state.activeStreamBuffers[interactionId];
-
-        return interaction && interaction.status === "STREAMING"
-          ? {
-              index: interaction.index,
-              type: interaction.type,
-              modelId: interaction.metadata?.modelId,
-              hasToolCalls: hasToolCalls,
-              showToolPlaceholder: hasToolCalls && isBufferEmpty, // New flag
-            }
-          : null;
+        return {
+          interaction,
+          bufferedContent: state.activeStreamBuffers[interactionId] ?? "",
+        };
       }),
     );
 
-    // If interaction disappears or stops streaming while shell is rendered
-    if (!interactionShellData) {
-      console.log(
-        `[StreamingInteractionCard] Shell data not found or not streaming for ${interactionId}, rendering null.`,
+    // Get provider data using useShallow
+    const { dbProviderConfigs, getAllAvailableModelDefsForProvider } =
+      useProviderStore(
+        useShallow((state) => ({
+          dbProviderConfigs: state.dbProviderConfigs,
+          getAllAvailableModelDefsForProvider:
+            state.getAllAvailableModelDefsForProvider,
+        })),
       );
-      return null;
+
+    // --- Memoize Model Name Calculation ---
+    const displayModelName = useMemo(() => {
+      const modelIdFromMeta = interaction?.metadata?.modelId;
+      if (!modelIdFromMeta) return "Loading Model...";
+
+      const { providerId, modelId: specificModelId } =
+        splitModelId(modelIdFromMeta);
+      if (!providerId || !specificModelId) {
+        return modelIdFromMeta; // Fallback if split fails
+      }
+
+      const provider = dbProviderConfigs.find((p) => p.id === providerId);
+      const providerName = provider?.name ?? providerId;
+
+      // Use the stable selector function from the store
+      const allModels = getAllAvailableModelDefsForProvider(providerId);
+      const modelDef = allModels.find((m) => m.id === specificModelId);
+
+      return `${modelDef?.name ?? specificModelId} (${providerName})`;
+    }, [
+      interaction?.metadata?.modelId, // Depend on the specific interaction's modelId
+      dbProviderConfigs, // Depend on the array reference
+      getAllAvailableModelDefsForProvider, // Depend on the stable selector function
+    ]);
+    // --- End Memoize Model Name Calculation ---
+
+    if (!interaction) {
+      console.warn(
+        `StreamingInteractionCard: Interaction data for ${interactionId} not found yet.`,
+      );
+      // Render a simple placeholder while interaction data loads
+      return (
+        <div
+          className={cn(
+            "group relative rounded-lg border border-primary/30 bg-card p-4 shadow-sm animate-pulse",
+            className,
+          )}
+        >
+          <div className="h-8 bg-muted rounded w-3/4 mb-4"></div>{" "}
+          {/* Skeleton for user prompt */}
+          <div className="mt-3 pt-3 border-t border-border/50">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                Assistant (Loading...)
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Streaming...
+              </span>
+            </div>
+            <div className="h-16 bg-muted rounded w-full"></div>{" "}
+            {/* Skeleton for response */}
+          </div>
+        </div>
+      );
     }
 
-    const { index, type, modelId, hasToolCalls, showToolPlaceholder } =
-      interactionShellData;
+    const handleStopClick = () => {
+      if (onStop) {
+        onStop(interactionId);
+      }
+    };
 
     return (
       <div
-        key={interactionId} // Use interactionId as key
         className={cn(
-          // Add group class
-          "p-3 my-2 border rounded-md shadow-sm bg-card border-dashed relative group",
+          "group relative rounded-lg border border-primary/30 bg-card p-4 shadow-sm animate-fadeIn",
+          className,
         )}
       >
-        {/* Header - Renders based on minimally selected data */}
-        <div className="text-xs text-muted-foreground mb-1 flex justify-between items-center">
-          <span className="flex items-center gap-1.5">
-            Idx:{index} | {type} | Streaming
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+        {/* User Prompt */}
+        {interaction.prompt && (
+          <UserPromptDisplay
+            turnData={interaction.prompt}
+            timestamp={interaction.startedAt}
+          />
+        )}
+
+        {/* Assistant Response */}
+        <div className="mt-3 pt-3 border-t border-border/50">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-medium text-muted-foreground">
+              Assistant ({displayModelName})
             </span>
-            {modelId && <span className="ml-1 text-blue-400">({modelId})</span>}
-            {/* Display indicator if tool calls are present */}
-            {hasToolCalls && (
-              <span className="ml-2 flex items-center gap-1 text-orange-400">
-                <WrenchIcon className="h-3 w-3" />
-                (Using Tools...)
-              </span>
-            )}
-          </span>
-          {/* Use the sticky class for the stop button container */}
-          <div className="interaction-card-actions-sticky">
-            <StopButton interactionId={interactionId} onStop={onStop} />
+            <span className="text-xs text-muted-foreground">Streaming...</span>
           </div>
+          {/* Render buffered content */}
+          <StreamingContentView
+            markdownContent={bufferedContent}
+            isStreaming={true}
+          />
         </div>
-        {/* Content Area - Render the dedicated streaming view component */}
-        <StreamingContentView interactionId={interactionId} />
-        {/* Show placeholder if tools are being called but no text is streaming yet */}
-        {showToolPlaceholder && (
-          <div className="mt-2 text-xs text-muted-foreground italic flex items-center gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Executing tools...
+
+        {/* Stop Button */}
+        {onStop && (
+          <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <StopButton onStop={handleStopClick} aria-label="Stop Generation" />
           </div>
         )}
       </div>

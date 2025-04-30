@@ -1,5 +1,6 @@
-// src/hooks/litechat/registerVfsControl.tsx
-import React, { useEffect, useMemo } from "react";
+// src/hooks/litechat/registerVfsControl.ts
+// Entire file content provided as it's significantly changed
+import React from "react";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useUIStateStore } from "@/store/ui.store";
 import { useVfsStore } from "@/store/vfs.store";
@@ -14,40 +15,27 @@ import {
 import { FileManager } from "@/components/LiteChat/file-manager/FileManager";
 import { FileManagerBanner } from "@/components/LiteChat/file-manager/FileManagerBanner";
 import { useConversationStore } from "@/store/conversation.store";
-import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
 
-export const RegisterVfsControl: React.FC = () => {
-  const registerPromptControl = useControlRegistryStore(
-    (state) => state.registerPromptControl,
-  );
-  const registerChatControl = useControlRegistryStore(
-    (state) => state.registerChatControl,
-  );
-  const { toggleChatControlPanel, isChatControlPanelOpen } = useUIStateStore(
-    useShallow((state) => ({
-      toggleChatControlPanel: state.toggleChatControlPanel,
-      isChatControlPanelOpen: state.isChatControlPanelOpen,
-    })),
-  );
-  // Get global enableVfs state and current key for banner
-  const { enableVfs, vfsKey } = useVfsStore(
-    useShallow((state) => ({
-      enableVfs: state.enableVfs,
-      vfsKey: state.vfsKey,
-    })),
-  );
-  // Get conversation state for banner context
-  const { selectedItemType } = useConversationStore(
-    useShallow((state) => ({
-      selectedItemType: state.selectedItemType,
-    })),
-  );
+// Convert back to a plain function
+export function registerVfsControl() {
+  const registerPromptControl =
+    useControlRegistryStore.getState().registerPromptControl;
+  const registerChatControl =
+    useControlRegistryStore.getState().registerChatControl;
 
-  const isVfsPanelOpen = isChatControlPanelOpen["vfs"] ?? false;
+  // Trigger Component (Renders based on current state)
+  const VfsTriggerButton: React.FC = () => {
+    // Read state inside the component instance
+    const { toggleChatControlPanel, isChatControlPanelOpen } =
+      useUIStateStore.getState();
+    const enableVfs = useVfsStore.getState().enableVfs;
+    const isVfsPanelOpen = isChatControlPanelOpen["vfs"] ?? false;
 
-  // Memoize the trigger component
-  const VfsTriggerButton = useMemo(() => {
+    if (!enableVfs) {
+      return null; // Don't render trigger if VFS is disabled globally
+    }
+
     return (
       <TooltipProvider delayDuration={100}>
         <Tooltip>
@@ -69,13 +57,16 @@ export const RegisterVfsControl: React.FC = () => {
         </Tooltip>
       </TooltipProvider>
     );
-  }, [isVfsPanelOpen, toggleChatControlPanel]);
+  };
 
-  // Memoize the panel component
-  const VfsPanel = useMemo(() => {
+  // Panel Component (Renders based on current state)
+  const VfsPanel: React.FC = () => {
+    // Read state inside the component instance
+    const { vfsKey } = useVfsStore.getState();
+    const { selectedItemType } = useConversationStore.getState();
+
     return (
       <div className="flex flex-col h-full w-[450px] border-l border-border bg-card">
-        {/* Banner now uses vfsKey directly */}
         <FileManagerBanner
           vfsKey={vfsKey}
           selectedItemType={selectedItemType}
@@ -83,46 +74,31 @@ export const RegisterVfsControl: React.FC = () => {
         <FileManager />
       </div>
     );
-  }, [vfsKey, selectedItemType]); // Depend on vfsKey and selectedItemType for banner
+  };
 
-  useEffect(() => {
-    console.log("[Component] Registering Core VFS Control");
-    // Register Prompt Control (Trigger in Prompt Area)
-    const unregisterPrompt = registerPromptControl({
-      id: "core-vfs-prompt-trigger",
-      order: 20,
-      // Show trigger if VFS is globally enabled (or always if no global toggle)
-      show: () => enableVfs, // Use the global enable flag
-      triggerRenderer: () => VfsTriggerButton,
-      getParameters: undefined,
-      getMetadata: undefined,
-      clearOnSubmit: undefined,
-    });
+  // Register Prompt Control (Trigger in Prompt Area)
+  registerPromptControl({
+    id: "core-vfs-prompt-trigger",
+    order: 20,
+    // Show condition is handled inside the VfsTriggerButton component now
+    show: () => useVfsStore.getState().enableVfs, // Still useful for initial filtering
+    triggerRenderer: () => React.createElement(VfsTriggerButton),
+    getParameters: undefined,
+    getMetadata: undefined,
+    clearOnSubmit: undefined,
+  });
 
-    // Register Chat Control (The Panel itself)
-    const unregisterChat = registerChatControl({
-      id: "core-vfs-panel-trigger",
-      panel: "drawer_right",
-      order: 10,
-      // Show panel based ONLY on the UI store state for this panel
-      show: () => isVfsPanelOpen,
-      renderer: () => VfsPanel,
-      status: () => "ready",
-    });
+  // Register Chat Control (The Panel itself)
+  registerChatControl({
+    id: "core-vfs-panel-trigger",
+    panel: "drawer_right",
+    order: 10,
+    // Show panel based ONLY on the UI store state for this panel
+    show: () =>
+      useUIStateStore.getState().isChatControlPanelOpen["vfs"] ?? false,
+    renderer: () => React.createElement(VfsPanel),
+    status: () => "ready",
+  });
 
-    return () => {
-      console.log("[Component] Unregistering Core VFS Control");
-      unregisterPrompt();
-      unregisterChat();
-    };
-  }, [
-    registerPromptControl,
-    registerChatControl,
-    enableVfs, // Depend on global enable flag for prompt trigger show condition
-    isVfsPanelOpen, // Depend on panel open state for ChatControl show condition
-    VfsTriggerButton,
-    VfsPanel,
-  ]);
-
-  return null;
-};
+  console.log("[Function] Registered Core VFS Control");
+}

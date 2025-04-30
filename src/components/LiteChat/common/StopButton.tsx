@@ -1,48 +1,51 @@
 // src/components/LiteChat/common/StopButton.tsx
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { SquareIcon } from "lucide-react"; // Using SquareIcon for stop
+import { SquareIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 
 interface StopButtonProps {
-  interactionId: string;
-  onStop: (id: string) => void;
+  // Changed prop name from 'onClick' to 'onStop'
+  onStop: () => void;
   className?: string;
+  size?: "sm" | "icon" | "default" | "lg";
+  variant?:
+    | "default"
+    | "destructive"
+    | "outline"
+    | "secondary"
+    | "ghost"
+    | "link";
+  "aria-label"?: string;
 }
 
 export const StopButton: React.FC<StopButtonProps> = ({
-  interactionId,
   onStop,
   className,
+  size = "icon",
+  variant = "ghost",
+  "aria-label": ariaLabel = "Stop Generation",
 }) => {
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent clicks propagating to parent elements
-    onStop(interactionId);
-  };
-
   return (
     <TooltipProvider delayDuration={100}>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            variant="destructive" // Use destructive variant for stop
-            size="icon"
-            className={cn("h-6 w-6", className)} // Smaller size for inline use
-            onClick={handleClick}
-            aria-label="Stop generation"
+            variant={variant}
+            size={size}
+            onClick={onStop} // Use the onStop prop here
+            className={className}
+            aria-label={ariaLabel}
           >
-            <SquareIcon className="h-3.5 w-3.5" />
+            <SquareIcon className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="top">
-          <p>Stop Generation</p>
-        </TooltipContent>
+        <TooltipContent side="top">Stop</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );

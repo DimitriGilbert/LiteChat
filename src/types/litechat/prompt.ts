@@ -1,6 +1,8 @@
 // src/types/litechat/prompt.ts
+// Entire file content provided as it's significantly changed
 import type React from "react";
 import type { CoreMessage, Tool } from "ai";
+import { ChatControlStatus } from "./chat";
 
 /**
  * Represents the data captured from the user's input turn via the PromptWrapper.
@@ -73,10 +75,11 @@ export interface PromptObject {
 
 /**
  * Defines the props expected by a custom Input Area renderer component.
+ * Reflects the change where InputArea manages its own state.
  */
 export interface InputAreaRendererProps {
-  value: string;
-  onChange: (value: string) => void;
+  // value and onChange removed
+  initialValue?: string; // Optional initial value
   onSubmit: () => void;
   disabled?: boolean;
   placeholder?: string;
@@ -100,6 +103,7 @@ export interface PromptControl {
   order?: number;
   /** Optional function to determine if the control should be shown */
   show?: () => boolean;
+  status?: () => ChatControlStatus;
   /**
    * Optional function to render the control's main UI (e.g., file previews, parameter sliders).
    * Rendered in the 'panel' area above the text input.
@@ -144,3 +148,11 @@ export interface PromptControl {
  * Defines the area where a PromptControl can render its UI.
  */
 export type PromptControlArea = "panel" | "trigger";
+
+// --- Ref Type for InputArea ---
+// Moved from InputArea.tsx to be centrally defined
+export interface InputAreaRef {
+  getValue: () => string;
+  // setValue removed as InputArea clears itself internally on submit
+  focus: () => void;
+}

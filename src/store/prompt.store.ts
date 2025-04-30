@@ -1,5 +1,5 @@
 // src/store/prompt.store.ts
-// NEW FILE
+// Entire file content provided as it's a new file
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
@@ -40,7 +40,7 @@ interface PromptActions {
 
 export const usePromptStateStore = create(
   immer<PromptState & PromptActions>((set) => ({
-    // Initial State (all null, will be initialized by PromptWrapper)
+    // Initial State (all null, will be initialized by LiteChat)
     modelId: null,
     temperature: null,
     maxTokens: null,
@@ -59,6 +59,7 @@ export const usePromptStateStore = create(
     setFrequencyPenalty: (value) => set({ frequencyPenalty: value }),
 
     initializePromptState: (settings) => {
+      console.log("[PromptStateStore] Initializing with:", settings);
       set({
         modelId: settings.modelId,
         temperature: settings.temperature,
@@ -71,9 +72,9 @@ export const usePromptStateStore = create(
     },
 
     resetPromptState: () => {
-      // Resetting might involve re-initializing based on current context,
-      // or simply clearing to nulls. Let's clear for now.
-      // PromptWrapper will call initializePromptState again on context change.
+      // Resetting clears the state. LiteChat will re-initialize it
+      // based on the current context when needed (e.g., after submit, on context change).
+      console.log("[PromptStateStore] Resetting state.");
       set({
         modelId: null,
         temperature: null,

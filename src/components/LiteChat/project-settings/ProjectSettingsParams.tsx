@@ -1,5 +1,5 @@
-// src/components/LiteChat/settings/ProjectSettingsParams.tsx
-// NEW FILE
+// src/components/LiteChat/project-settings/ProjectSettingsParams.tsx
+// Entire file content provided due to multiple changes
 import React, { useCallback } from "react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -81,12 +81,7 @@ export const ProjectSettingsParams: React.FC<ProjectSettingsParamsProps> = ({
     [],
   );
 
-  const handleSliderVisualChange = useCallback(
-    (setter: React.Dispatch<React.SetStateAction<number>>, value: number[]) => {
-      setter(value[0]);
-    },
-    [],
-  );
+  // Removed handleSliderVisualChange helper
 
   const handleSliderCommit = useCallback(
     <T extends number | null>(setter: (value: T) => void, value: number[]) => {
@@ -107,7 +102,8 @@ export const ProjectSettingsParams: React.FC<ProjectSettingsParamsProps> = ({
           max={1}
           step={0.01}
           value={[localTemp]}
-          onValueChange={(v) => handleSliderVisualChange(setLocalTemp, v)}
+          // Directly call the setter in onValueChange
+          onValueChange={(v: number[]) => setLocalTemp(v[0])}
           onValueCommit={(v) => handleSliderCommit(setTemperature, v)}
           disabled={isSaving}
         />
@@ -131,7 +127,8 @@ export const ProjectSettingsParams: React.FC<ProjectSettingsParamsProps> = ({
           max={1}
           step={0.01}
           value={[localTopP]}
-          onValueChange={(v) => handleSliderVisualChange(setLocalTopP, v)}
+          // Directly call the setter in onValueChange
+          onValueChange={(v: number[]) => setLocalTopP(v[0])}
           onValueCommit={(v) => handleSliderCommit(setTopP, v)}
           disabled={isSaving}
         />
@@ -205,7 +202,8 @@ export const ProjectSettingsParams: React.FC<ProjectSettingsParamsProps> = ({
           max={2}
           step={0.01}
           value={[localPresence]}
-          onValueChange={(v) => handleSliderVisualChange(setLocalPresence, v)}
+          // Directly call the setter in onValueChange
+          onValueChange={(v: number[]) => setLocalPresence(v[0])}
           onValueCommit={(v) => handleSliderCommit(setPresencePenalty, v)}
           disabled={isSaving}
         />
@@ -230,7 +228,8 @@ export const ProjectSettingsParams: React.FC<ProjectSettingsParamsProps> = ({
           max={2}
           step={0.01}
           value={[localFrequency]}
-          onValueChange={(v) => handleSliderVisualChange(setLocalFrequency, v)}
+          // Directly call the setter in onValueChange
+          onValueChange={(v: number[]) => setLocalFrequency(v[0])}
           onValueCommit={(v) => handleSliderCommit(setFrequencyPenalty, v)}
           disabled={isSaving}
         />

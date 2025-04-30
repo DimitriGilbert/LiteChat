@@ -1,124 +1,145 @@
 // src/components/LiteChat/prompt/control/GlobalModelSelector.tsx
+// Entire file content provided
 import React, { useMemo } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
-import { Combobox } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { AiModelConfig } from "@/types/litechat/provider";
-import {
-  combineModelId,
-  DEFAULT_MODELS,
-} from "@/lib/litechat/provider-helpers"; // Import necessary helpers
+import { cn } from "@/lib/utils";
+import { combineModelId } from "@/lib/litechat/provider-helpers";
 
-// Define props for the controlled component
 interface GlobalModelSelectorProps {
-  value: string | null;
+  /** The effective model ID for the current context */
+  value: string | null; // Changed from optional - it should always receive the effective value
+  /** Callback to update the GLOBAL default model selection */
   onChange: (value: string | null) => void;
+  /** Optional flag to disable the selector */
   disabled?: boolean;
+  /** Optional className for the trigger */
+  className?: string;
 }
 
-export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> = ({
-  value,
-  onChange,
-  disabled = false,
-}) => {
-  // Select the raw data needed to derive the ordered list
-  const { dbProviderConfigs, globalModelSortOrder, isLoading } =
-    useProviderStore(
-      useShallow((state) => ({
-        // Removed getGloballyEnabledAndOrderedModels selector
-        dbProviderConfigs: state.dbProviderConfigs,
-        globalModelSortOrder: state.globalModelSortOrder,
-        isLoading: state.isLoading,
-      })),
-    );
+export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
+  React.memo(({ value, onChange, disabled = false, className }) => {
+    // Select necessary state using useShallow
+    const { dbProviderConfigs, globalModelSortOrder, isLoading } =
+      useProviderStore(
+        useShallow((state) => ({
+          dbProviderConfigs: state.dbProviderConfigs,
+          globalModelSortOrder: state.globalModelSortOrder,
+          isLoading: state.isLoading,
+        })),
+      );
 
-  // --- Re-implement the logic to get enabled and ordered models ---
-  const enabledAndOrderedModels: Omit<AiModelConfig, "instance">[] =
-    useMemo(() => {
-      const globallyEnabledModelsMap = new Map<
+    // Memoize the calculation of ordered models
+    const orderedModels = useMemo(() => {
+      const enabledModelsMap = new Map<
         string,
-        Omit<AiModelConfig, "instance">
+        { name: string; providerName: string }
       >();
-      const enabledCombinedIds = new Set<string>();
+      const enabledIds = new Set<string>();
 
       dbProviderConfigs.forEach((config) => {
         if (!config.isEnabled || !config.enabledModels) return;
-
-        const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
+        // Use fetchedModels or default models associated with the provider type
         const allProviderModels =
-          config.fetchedModels ?? DEFAULT_MODELS[providerTypeKey] ?? [];
+          config.fetchedModels ??
+          (config.type
+            ? useProviderStore
+                .getState()
+                .getAllAvailableModelDefsForProvider(config.id)
+            : []);
         const providerModelsMap = new Map(
           allProviderModels.map((m) => [m.id, m]),
         );
-
         config.enabledModels.forEach((modelId) => {
           const combinedId = combineModelId(config.id, modelId);
           const modelDef = providerModelsMap.get(modelId);
           if (modelDef) {
-            enabledCombinedIds.add(combinedId);
-            globallyEnabledModelsMap.set(combinedId, {
-              id: combinedId,
+            enabledIds.add(combinedId);
+            enabledModelsMap.set(combinedId, {
               name: modelDef.name || modelId,
-              providerId: config.id,
               providerName: config.name,
-              metadata: modelDef.metadata,
             });
           }
         });
       });
 
-      const sortedModels: Omit<AiModelConfig, "instance">[] = [];
-      const addedIds = new Set<string>();
+      const sorted: { id: string; name: string; providerName: string }[] = [];
+      const added = new Set<string>();
 
-      globalModelSortOrder.forEach((combinedId) => {
-        if (enabledCombinedIds.has(combinedId)) {
-          const details = globallyEnabledModelsMap.get(combinedId);
-          if (details && !addedIds.has(combinedId)) {
-            sortedModels.push(details);
-            addedIds.add(combinedId);
+      globalModelSortOrder.forEach((id) => {
+        if (enabledIds.has(id)) {
+          const details = enabledModelsMap.get(id);
+          if (details && !added.has(id)) {
+            sorted.push({ id, ...details });
+            added.add(id);
           }
         }
       });
 
-      const remainingEnabled = Array.from(enabledCombinedIds)
-        .filter((combinedId) => !addedIds.has(combinedId))
-        .map((combinedId) => globallyEnabledModelsMap.get(combinedId))
-        .filter((details): details is Omit<AiModelConfig, "instance"> =>
-          Boolean(details),
-        )
-        .sort((a, b) => a.name.localeCompare(b.name));
+      enabledIds.forEach((id) => {
+        if (!added.has(id)) {
+          const details = enabledModelsMap.get(id);
+          if (details) {
+            sorted.push({ id, ...details });
+          }
+        }
+      });
 
-      return [...sortedModels, ...remainingEnabled];
-    }, [dbProviderConfigs, globalModelSortOrder]); // Depend on the raw data
-  // --- End derived logic ---
+      return sorted;
+    }, [dbProviderConfigs, globalModelSortOrder]); // Dependencies are stable references or primitives
 
-  const options = React.useMemo(
-    () =>
-      enabledAndOrderedModels.map((m) => ({
-        value: m.id,
-        label: `${m.name} (${m.providerName})`,
-      })),
-    [enabledAndOrderedModels],
-  );
+    // Memoize the details of the currently selected model based on the 'value' prop
+    const selectedModelDetails = useMemo(() => {
+      return orderedModels.find((m) => m.id === value);
+    }, [orderedModels, value]); // Depend on the calculated models and the effective value prop
 
-  if (isLoading && options.length === 0) {
-    return <Skeleton className="h-10 w-[250px]" />;
-  }
+    if (isLoading) {
+      return <Skeleton className={cn("h-9 w-[200px]", className)} />;
+    }
 
-  return (
-    <Combobox
-      options={options}
-      value={value ?? ""}
-      onChange={onChange}
-      placeholder="Select Model..."
-      searchPlaceholder="Search models..."
-      emptyText={isLoading ? "Loading models..." : "No models enabled/found."}
-      triggerClassName="h-10 w-full min-w-[200px] max-w-[300px] text-xs"
-      contentClassName="w-[--radix-popover-trigger-width]"
-      disabled={
-        disabled || (isLoading && options.length === 0) || options.length === 0
-      }
-    />
-  );
-};
+    return (
+      <Select
+        value={value ?? "none"} // Use the effective value prop
+        onValueChange={(val) => onChange(val === "none" ? null : val)} // Call the global setter on change
+        disabled={disabled || orderedModels.length === 0}
+      >
+        <SelectTrigger
+          className={cn("w-auto h-9 text-sm", className)}
+          aria-label="Select AI Model"
+        >
+          <SelectValue placeholder="Select Model...">
+            {selectedModelDetails ? (
+              <span className="truncate">
+                {selectedModelDetails.name} ({selectedModelDetails.providerName}
+                )
+              </span>
+            ) : (
+              <span className="text-muted-foreground">Select Model...</span>
+            )}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {orderedModels.length === 0 ? (
+            <SelectItem value="none" disabled>
+              No models enabled
+            </SelectItem>
+          ) : (
+            orderedModels.map((model) => (
+              <SelectItem key={model.id} value={model.id}>
+                {model.name} ({model.providerName})
+              </SelectItem>
+            ))
+          )}
+        </SelectContent>
+      </Select>
+    );
+  });
+GlobalModelSelector.displayName = "GlobalModelSelector";

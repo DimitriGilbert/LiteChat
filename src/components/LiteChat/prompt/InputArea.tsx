@@ -1,27 +1,22 @@
 // src/components/LiteChat/prompt/InputArea.tsx
+// Entire file content provided
 import React, {
   forwardRef,
   useImperativeHandle,
   useRef,
   useEffect,
-  useState, // Added useState for internal value management
+  useState,
   memo,
 } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useUIStateStore } from "@/store/ui.store";
+import { useInputStore } from "@/store/input.store";
 import { useShallow } from "zustand/react/shallow";
-
-// Define the Ref handle type
-export interface InputAreaRef {
-  getValue: () => string;
-  focus: () => void;
-}
+import type { InputAreaRef } from "@/types/litechat/prompt"; // Import from types
 
 interface InputAreaProps {
-  // value prop removed - managed internally
-  // onChange prop removed - managed internally, value exposed via ref
-  initialValue?: string; // Optional initial value
+  initialValue?: string;
   onSubmit: () => void;
   disabled?: boolean;
   placeholder?: string;
@@ -36,14 +31,15 @@ export const InputArea = memo(
         onSubmit,
         disabled,
         placeholder = "Type message... (Shift+Enter for new line)",
+        className,
+        ...rest
       },
       ref,
     ) => {
       const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
-      // Internal state for the input value
       const [internalValue, setInternalValue] = useState(initialValue);
 
-      // Expose methods via ref
+      // Expose methods via ref (removed setValue)
       useImperativeHandle(ref, () => ({
         getValue: () => internalValue,
         focus: () => internalTextareaRef.current?.focus(),
@@ -56,7 +52,6 @@ export const InputArea = memo(
         })),
       );
 
-      // Effect to focus the textarea when the flag becomes true
       useEffect(() => {
         if (focusInputOnNextRender && internalTextareaRef.current) {
           setFocusInputFlag(false);
@@ -69,18 +64,22 @@ export const InputArea = memo(
       const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === "Enter" && !e.shiftKey && !disabled) {
           e.preventDefault();
-          onSubmit(); // Trigger submit
+          // Check if value is empty OR if files are attached before submitting
+          const hasFiles =
+            useInputStore.getState().attachedFilesMetadata.length > 0;
+          if (internalValue.trim().length > 0 || hasFiles) {
+            onSubmit();
+            setInternalValue(""); // Clear internal state after submit
+          }
         }
       };
 
-      // Update internal state on change
       const handleTextareaChange = (
         e: React.ChangeEvent<HTMLTextAreaElement>,
       ) => {
         setInternalValue(e.target.value);
       };
 
-      // Auto-resize effect based on internal value
       useEffect(() => {
         const textarea = internalTextareaRef.current;
         if (textarea) {
@@ -88,11 +87,11 @@ export const InputArea = memo(
           const scrollHeight = textarea.scrollHeight;
           const maxHeight = 250;
           textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+          textarea.style.overflowY =
+            scrollHeight > maxHeight ? "auto" : "hidden";
         }
-      }, [internalValue]); // Depend on internalValue
+      }, [internalValue]);
 
-      // Effect to reset internal value if initialValue changes externally (e.g., after submit clear)
-      // This might not be strictly necessary if PromptWrapper clears via ref, but good practice.
       useEffect(() => {
         setInternalValue(initialValue);
       }, [initialValue]);
@@ -100,17 +99,19 @@ export const InputArea = memo(
       return (
         <Textarea
           ref={internalTextareaRef}
-          value={internalValue} // Use internal state
-          onChange={handleTextareaChange} // Use internal handler
+          value={internalValue}
+          onChange={handleTextareaChange}
           onKeyDown={handleKeyDown}
           disabled={disabled}
           placeholder={placeholder}
-          rows={3}
+          rows={1}
           className={cn(
-            "w-full p-3 border border-[--border] rounded bg-input text-foreground resize-none focus:ring-2 focus:ring-[--primary] outline-none disabled:opacity-50 overflow-y-auto",
-            "min-h-[80px] max-h-[250px]",
+            "w-full p-3 border rounded bg-input text-foreground resize-none focus:ring-2 focus:ring-primary outline-none disabled:opacity-50 overflow-y-auto",
+            "min-h-[40px] max-h-[250px]",
+            className,
           )}
           aria-label="Chat input"
+          {...rest}
         />
       );
     },
