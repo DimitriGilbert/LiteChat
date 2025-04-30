@@ -1,4 +1,5 @@
 // src/components/LiteChat/chat/control/ConversationOnlyList.tsx
+// Entire file content provided
 import React from "react";
 import { useConversationStore } from "@/store/conversation.store";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,9 +14,7 @@ import {
   DownloadIcon,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-// Removed ChatControl import
 import type { SyncStatus } from "@/types/litechat/sync";
-// Removed useControlRegistryStore import
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUIStateStore } from "@/store/ui.store";
@@ -56,7 +55,7 @@ const getSyncIndicatorInternal = (
       tooltipText = `Sync error with ${repoName}`;
       break;
     case "needs-sync":
-      IconComponent = AlertCircleIcon;
+      IconComponent = AlertCircleIcon; // Use AlertCircleIcon for needs-sync as well
       className = "text-orange-500";
       tooltipText = `Needs sync with ${repoName}`;
       break;
@@ -95,7 +94,7 @@ export const ConversationListControlComponent: React.FC = () => {
   } = useConversationStore(
     useShallow((state) => ({
       conversations: state.conversations,
-      projects: state.projects,
+      // projects removed from selector
       selectItem: state.selectItem,
       selectedItemId: state.selectedItemId,
       addConversation: state.addConversation,
@@ -110,7 +109,11 @@ export const ConversationListControlComponent: React.FC = () => {
 
   const handleNewChat = async () => {
     try {
-      const newId = await addConversation({ title: "New Chat" });
+      // Pass null for projectId as this list doesn't handle projects
+      const newId = await addConversation({
+        title: "New Chat",
+        projectId: null,
+      });
       selectItem(newId, "conversation");
       setTimeout(() => setFocusInputFlag(true), 0);
     } catch (error) {
@@ -119,11 +122,11 @@ export const ConversationListControlComponent: React.FC = () => {
   };
 
   const handleSelectItem = (id: string, type: "conversation" | "project") => {
+    // This component only handles conversations
+    if (type !== "conversation") return;
     if (id === selectedItemId) return;
     selectItem(id, type);
-    if (type === "conversation") {
-      setTimeout(() => setFocusInputFlag(true), 0);
-    }
+    setTimeout(() => setFocusInputFlag(true), 0);
   };
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
@@ -150,9 +153,10 @@ export const ConversationListControlComponent: React.FC = () => {
   };
 
   const repoNameMap = React.useMemo(() => {
-    return new Map(syncRepos.map((r) => [r.id, r.name]));
+    return new Map((syncRepos || []).map((r) => [r.id, r.name]));
   }, [syncRepos]);
 
+  // Directly use conversations as items to render
   const itemsToRender = conversations;
 
   return (

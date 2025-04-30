@@ -1,4 +1,5 @@
 // src/lib/litechat/vfs-git-operations.ts
+// Entire file content provided - Updated gitPullOp
 import { fs } from "@zenfs/core";
 import { toast } from "sonner";
 import {
@@ -12,10 +13,9 @@ import http from "isomorphic-git/http/web";
 import { useSettingsStore } from "@/store/settings.store";
 
 // --- Constants ---
-const CORS_PROXY = "https://cors.isomorphic-git.org"; // Consider making this configurable
+const CORS_PROXY = "https://cors.isomorphic-git.org";
 
-// --- Session Credentials Store (Simple In-Memory) ---
-// NOTE: This is VERY basic and resets on page reload.
+// --- Session Credentials Store ---
 const sessionCredentials = new Map<
   string,
   { username?: string; password?: string }
@@ -23,12 +23,6 @@ const sessionCredentials = new Map<
 
 // --- Helper Functions ---
 
-/**
- * Ensures Git user name and email are configured for the repository directory.
- * Reads from global settings and sets if necessary.
- * @param dir The repository directory path.
- * @returns True if configuration is successful or already set, false otherwise.
- */
 const ensureGitConfig = async (dir: string): Promise<boolean> => {
   const { gitUserName, gitUserEmail } = useSettingsStore.getState();
   if (!gitUserName || !gitUserEmail) {
@@ -38,13 +32,12 @@ const ensureGitConfig = async (dir: string): Promise<boolean> => {
     return false;
   }
   try {
-    // Check current config, set only if different to avoid unnecessary writes
     const currentName = await git
       .getConfig({ fs, dir, path: "user.name" })
-      .catch(() => null); // Handle potential error if not set
+      .catch(() => null);
     const currentEmail = await git
       .getConfig({ fs, dir, path: "user.email" })
-      .catch(() => null); // Handle potential error if not set
+      .catch(() => null);
 
     if (currentName !== gitUserName) {
       await git.setConfig({
@@ -72,13 +65,6 @@ const ensureGitConfig = async (dir: string): Promise<boolean> => {
   }
 };
 
-/**
- * Isomorphic-git authentication callback.
- * Prioritizes provided credentials, then session credentials, then prompts the user.
- * @param url The URL requiring authentication.
- * @param storedCreds Optional credentials passed directly (e.g., from SyncRepo config).
- * @returns Authentication credentials object or null to cancel.
- */
 const onAuth = async (
   url: string,
   storedCreds?: { username?: string | null; password?: string | null },
@@ -86,48 +72,41 @@ const onAuth = async (
   const urlOrigin = new URL(url).origin;
   console.log(`[VFS Git Op] Auth requested for ${url}`);
 
-  // 1. Use provided stored credentials if available
   if (storedCreds?.username && storedCreds?.password) {
     console.log(`[VFS Git Op] Using stored credentials for ${url}`);
     return {
       username: storedCreds.username,
       password: storedCreds.password,
-      // IMPORTANT: Force basic auth scheme for tokens used as passwords
-      // This might be necessary for GitHub PATs, etc.
-      // Adjust if other auth methods are needed.
       authScheme: "Basic",
     };
   }
 
-  // 2. Check session credentials
   const sessionCred = sessionCredentials.get(urlOrigin);
   if (sessionCred?.username && sessionCred?.password) {
     console.log(`[VFS Git Op] Using session credentials for ${url}`);
     return {
       username: sessionCred.username,
       password: sessionCred.password,
-      authScheme: "Basic", // Assume basic for session too
+      authScheme: "Basic",
     };
   }
 
-  // 3. Prompt user if no credentials found
   console.log(
     `[VFS Git Op] No stored or session credentials found for ${url}. Prompting user.`,
   );
   const username = window.prompt(`Enter username for ${url}`);
   if (!username) {
     toast.error("Authentication cancelled: Username not provided.");
-    return null; // Cancel auth
+    return null;
   }
   const password = window.prompt(
     `Enter password or token for ${username}@${url}`,
   );
   if (!password) {
     toast.error("Authentication cancelled: Password/token not provided.");
-    return null; // Cancel auth
+    return null;
   }
 
-  // Store prompted credentials in session map
   sessionCredentials.set(urlOrigin, { username, password });
   console.log(
     `[VFS Git Op] Stored prompted credentials in session for ${urlOrigin}`,
@@ -136,36 +115,20 @@ const onAuth = async (
   return { username, password, authScheme: "Basic" };
 };
 
-/**
- * Isomorphic-git authentication failure callback.
- * Clears potentially invalid session credentials.
- * @param url The URL for which authentication failed.
- * @param auth The credentials that failed.
- * @returns Null (indicates failure, no retry credentials provided here).
- */
 const onAuthFailure = (url: string, auth: any): any => {
   const urlOrigin = new URL(url).origin;
   console.error(`[VFS Git Op] Auth FAILED for ${url}`, auth);
-  // Clear potentially invalid session credentials
   if (sessionCredentials.has(urlOrigin)) {
     console.log(
       `[VFS Git Op] Clearing failed session credentials for ${urlOrigin}`,
     );
     sessionCredentials.delete(urlOrigin);
   }
-  // Let the main operation handle the final error toast
-  return null; // Indicate failure, don't retry automatically
+  return null;
 };
 
-/**
- * Isomorphic-git authentication success callback.
- * Logs success.
- * @param url The URL for which authentication succeeded.
- * @param auth The credentials that succeeded.
- */
 const onAuthSuccess = (url: string, auth: any): void => {
   console.log(`[VFS Git Op] Auth SUCCESS for ${url}`, auth);
-  // Optionally store successful session credentials if prompted
   const urlOrigin = new URL(url).origin;
   if (!sessionCredentials.has(urlOrigin) && auth.username && auth.password) {
     sessionCredentials.set(urlOrigin, {
@@ -178,42 +141,35 @@ const onAuthSuccess = (url: string, auth: any): void => {
   }
 };
 
-/**
- * Formats Git HTTP errors for better user feedback.
- * @param error The error object, potentially an HttpError from isomorphic-git.
- * @returns A formatted error string.
- */
 const formatGitHttpError = (error: any): string => {
   if (error.name === "HttpError" && error.data) {
     const { statusCode, statusMessage, body } = error.data;
     let details = "";
     if (body) {
       try {
-        // Attempt to parse as JSON first
         const parsedBody = JSON.parse(body);
         details =
           parsedBody.message || parsedBody.error || JSON.stringify(parsedBody);
       } catch {
-        // Fallback to plain text if not JSON
         details = body;
       }
     }
     return `HTTP ${statusCode} ${statusMessage}${details ? `: ${details}` : ""}`;
   }
-  // Handle NotFoundError specifically
   if (error.name === "NotFoundError") {
     return `Not Found: ${error.message}`;
+  }
+  if (error.code === "CheckoutConflictError") {
+    return "Checkout conflict: Local changes would be overwritten.";
+  }
+  if (error.code === "MergeConflictError") {
+    return "Merge conflict: Resolve conflicts manually.";
   }
   return error instanceof Error ? error.message : String(error);
 };
 
 // --- Exported Git Operations ---
 
-/**
- * Checks if a directory is a Git repository by looking for a .git subdirectory.
- * @param path The directory path to check.
- * @returns True if it's a Git repository, false otherwise.
- */
 export const isGitRepoOp = async (path: string): Promise<boolean> => {
   const normalized = normalizePath(path);
   const gitDirPath = joinPath(normalized, ".git");
@@ -222,9 +178,8 @@ export const isGitRepoOp = async (path: string): Promise<boolean> => {
     return stats.isDirectory();
   } catch (err: unknown) {
     if (err instanceof Error && (err as any).code === "ENOENT") {
-      return false; // .git directory doesn't exist
+      return false;
     }
-    // Log other errors but return false
     console.error(
       `[VFS Git Op] Error checking for .git in ${normalized}:`,
       err,
@@ -233,57 +188,42 @@ export const isGitRepoOp = async (path: string): Promise<boolean> => {
   }
 };
 
-/**
- * Clones a Git repository into the specified target path and checks out the specified branch.
- * @param targetPath The directory path where the repo folder will be created/cloned into.
- * @param url The URL of the repository to clone.
- * @param branch The branch name to clone and checkout. Defaults to remote's default if not provided.
- * @param credentials Optional authentication credentials.
- * @throws Throws an error if cloning fails.
- */
 export const gitCloneOp = async (
-  targetPath: string, // This is the directory *for* the repo, e.g., /synced_repos/repoId
+  targetPath: string,
   url: string,
-  branch?: string, // Branch is now optional, will use remote default if omitted
+  branch?: string,
   credentials?: { username?: string | null; password?: string | null },
 ): Promise<void> => {
-  const dir = normalizePath(targetPath); // Use targetPath directly as 'dir'
+  const dir = normalizePath(targetPath);
   console.log(`[VFS Git Op] Attempting to clone ${url} into ${dir}`);
 
   try {
-    // Check if the target directory *already contains* a .git directory
     let isAlreadyCloned = false;
     try {
       await fs.promises.stat(joinPath(dir, ".git"));
       isAlreadyCloned = true;
     } catch (e: any) {
-      if (e.code !== "ENOENT") throw e; // Rethrow unexpected stat errors
+      if (e.code !== "ENOENT") throw e;
     }
 
     if (isAlreadyCloned) {
-      // If .git exists, the repo is already there. Maybe pull instead?
-      // For now, we throw a specific error indicating it's already cloned.
-      // The calling logic (initializeOrSyncRepoLogic) should handle this.
       console.warn(
         `[VFS Git Op] Clone target ${dir} already contains a .git directory.`,
       );
       throw new Error(`Repository already cloned at ${dir}.`);
     }
 
-    // Ensure the parent directory exists before cloning into 'dir'
     const parentDir = dirname(dir);
     if (parentDir !== "/") {
       try {
         await fs.promises.mkdir(parentDir, { recursive: true });
       } catch (mkdirErr: any) {
-        if (mkdirErr.code !== "EEXIST") throw mkdirErr; // Ignore if parent already exists
+        if (mkdirErr.code !== "EEXIST") throw mkdirErr;
       }
     }
 
-    // Determine the branch to checkout
     let branchToCheckout = branch;
     if (!branchToCheckout) {
-      // If no branch specified, discover the remote's default branch (HEAD)
       try {
         const remoteInfo = await git.getRemoteInfo({
           http,
@@ -293,7 +233,7 @@ export const gitCloneOp = async (
           onAuthFailure,
           onAuthSuccess,
         });
-        branchToCheckout = remoteInfo.HEAD?.replace("refs/heads/", ""); // Get default branch name
+        branchToCheckout = remoteInfo.HEAD?.replace("refs/heads/", "");
         if (!branchToCheckout) {
           throw new Error("Could not determine default branch from remote.");
         }
@@ -311,21 +251,19 @@ export const gitCloneOp = async (
       }
     }
 
-    // Proceed with clone, specifying the determined branch
     await git.clone({
       fs,
       http,
-      dir, // Clone directly into the target directory
+      dir,
       corsProxy: CORS_PROXY,
       url,
-      ref: branchToCheckout, // Use the determined branch for checkout
-      singleBranch: true, // Only clone the specified branch
-      depth: 10, // Consider making depth configurable or removing for full history
-      onAuth: (authUrl) => onAuth(authUrl, credentials), // Pass credentials
+      ref: branchToCheckout,
+      singleBranch: true,
+      depth: 10,
+      onAuth: (authUrl) => onAuth(authUrl, credentials),
       onAuthFailure,
       onAuthSuccess,
       onProgress: (e) => {
-        // Basic progress logging
         if (e.phase === "counting objects" && e.total) {
           console.log(`Clone progress: ${e.phase} ${e.loaded}/${e.total}`);
         } else if (e.phase === "receiving objects" && e.total) {
@@ -336,11 +274,8 @@ export const gitCloneOp = async (
       },
     });
 
-    // Verify clone success by checking for .git directory *after* clone attempt
     await fs.promises.stat(joinPath(dir, ".git"));
 
-    // Ensure the correct branch is checked out locally after clone
-    // Although clone *should* check it out, double-check and fix if needed.
     const currentLocalBranch = await git
       .currentBranch({ fs, dir, fullname: false })
       .catch(() => null);
@@ -362,11 +297,9 @@ export const gitCloneOp = async (
   } catch (err: unknown) {
     console.error(`[VFS Git Op] Git clone failed for ${url}:`, err);
     const errorMsg = formatGitHttpError(err);
-    // Avoid redundant toast if the error is "already cloned"
     if (!(err instanceof Error && err.message.includes("already cloned"))) {
       toast.error(`Git clone failed: ${errorMsg}`);
     }
-    // Attempt cleanup only if the error wasn't "already cloned"
     if (!(err instanceof Error && err.message.includes("already cloned"))) {
       try {
         console.log(`[VFS Git Op] Attempting cleanup of failed clone: ${dir}`);
@@ -378,15 +311,10 @@ export const gitCloneOp = async (
         );
       }
     }
-    throw err; // Re-throw the original error
+    throw err;
   }
 };
 
-/**
- * Initializes an empty Git repository in the specified directory.
- * @param path The directory path to initialize.
- * @throws Throws an error if initialization fails.
- */
 export const gitInitOp = async (path: string): Promise<void> => {
   const dir = normalizePath(path);
   try {
@@ -401,12 +329,6 @@ export const gitInitOp = async (path: string): Promise<void> => {
   }
 };
 
-/**
- * Stages all changes (new, modified, deleted) and commits them.
- * @param path The repository directory path.
- * @param message The commit message.
- * @throws Throws an error if commit fails.
- */
 export const gitCommitOp = async (
   path: string,
   message: string,
@@ -418,11 +340,9 @@ export const gitCommitOp = async (
       throw new Error("Git user configuration is missing or invalid.");
     }
 
-    // Stage all changes (add new/modified, remove deleted)
-    await git.add({ fs, dir, filepath: "." }); // Stage everything tracked/untracked
-    // Check status *after* staging everything to see if anything was actually staged
+    await git.add({ fs, dir, filepath: "." });
     const status = await git.statusMatrix({ fs, dir });
-    const hasStagedChanges = status.some(([, stage]) => stage !== 0); // Check if stage status is non-zero
+    const hasStagedChanges = status.some(([, , stage]) => stage !== 0);
 
     if (!hasStagedChanges) {
       toast.info("No changes detected to commit.");
@@ -449,8 +369,8 @@ export const gitCommitOp = async (
 };
 
 /**
- * Pulls changes from the remote repository for the specified branch using fetch + merge.
- * Ensures the correct local branch is checked out before merging.
+ * Pulls changes from the remote repository for the specified branch.
+ * Uses `git.pull` which handles fetch and merge/rebase internally.
  * @param path The repository directory path.
  * @param branch The branch name to pull (from SyncRepo config).
  * @param credentials Optional authentication credentials.
@@ -458,7 +378,7 @@ export const gitCommitOp = async (
  */
 export const gitPullOp = async (
   path: string,
-  branch: string, // Branch name from SyncRepo config
+  branch: string,
   credentials?: { username?: string | null; password?: string | null },
 ): Promise<void> => {
   const dir = normalizePath(path);
@@ -471,7 +391,9 @@ export const gitPullOp = async (
       throw new Error("Branch name must be provided for pull operation.");
     }
 
-    // --- Ensure correct local branch is checked out ---
+    console.log(`[VFS Git Op] Pulling branch ${branch} for ${dir}`);
+
+    // Ensure the target branch exists locally and is checked out
     const currentLocalBranch = await git
       .currentBranch({ fs, dir, fullname: false })
       .catch(() => null);
@@ -481,20 +403,16 @@ export const gitPullOp = async (
         `[VFS Git Op] Current branch is ${currentLocalBranch}, switching to ${branch} before pull...`,
       );
       try {
-        await git.checkout({
-          fs,
-          dir,
-          ref: branch,
-        });
-        console.log(`[VFS Git Op] Successfully checked out branch ${branch}.`);
+        // Try checking out existing local branch
+        await git.checkout({ fs, dir, ref: branch });
       } catch (checkoutError: any) {
-        // If checkout fails because the local branch doesn't exist, try creating it from remote
+        // If checkout fails because local branch doesn't exist, try creating it from remote
         if (checkoutError.code === "NotFoundError") {
           console.log(
-            `[VFS Git Op] Local branch ${branch} not found. Attempting to create from origin/${branch}...`,
+            `[VFS Git Op] Local branch ${branch} not found. Attempting to fetch and create...`,
           );
           try {
-            // Fetch first to ensure remote ref exists
+            // Fetch the specific branch first to ensure remote ref exists
             await git.fetch({
               fs,
               http,
@@ -540,125 +458,53 @@ export const gitPullOp = async (
         }
       }
     }
-    // --- End Branch Checkout ---
 
-    console.log(`[VFS Git Op] Fetching ${branch} for ${dir}`);
-
-    // 1. Fetch the configured branch from the remote 'origin'
-    await git.fetch({
+    // Now perform the pull operation on the (now checked out) branch
+    await git.pull({
       fs,
       http,
       dir,
+      ref: branch, // Specify the branch to pull
+      singleBranch: true, // Often desired for sync scenarios
+      author: {
+        // Required for potential merge commits
+        name: useSettingsStore.getState().gitUserName!,
+        email: useSettingsStore.getState().gitUserEmail!,
+      },
       corsProxy: CORS_PROXY,
-      remote: "origin",
-      ref: branch, // Use the configured branch name
-      depth: 1,
-      singleBranch: true,
-      tags: false,
       onAuth: (authUrl) => onAuth(authUrl, credentials),
       onAuthFailure,
       onAuthSuccess,
     });
 
-    console.log("[VFS Git Op] Fetch successful.");
-
-    // Check if FETCH_HEAD exists after fetch
-    const fetchHeadOid = await git
-      .resolveRef({ fs, dir, ref: "FETCH_HEAD" })
-      .catch(() => null);
-    if (!fetchHeadOid) {
-      // This might happen if the branch is already up-to-date or remote branch doesn't exist
-      // Let's check the remote ref directly
-      try {
-        const remoteRef = `refs/remotes/origin/${branch}`;
-        const remoteOid = await git.resolveRef({ fs, dir, ref: remoteRef });
-        const localOid = await git.resolveRef({ fs, dir, ref: branch });
-        if (remoteOid === localOid) {
-          toast.info(`Branch "${branch}" is already up-to-date.`);
-          console.log(`[VFS Git Op] Branch ${branch} already up-to-date.`);
-          return; // Exit successfully
-        } else {
-          // This case is less likely if fetch succeeded but FETCH_HEAD is missing
-          console.warn(
-            `[VFS Git Op] FETCH_HEAD missing after fetch, but remote ref ${remoteRef} exists. Proceeding with merge attempt.`,
-          );
-        }
-      } catch (refError) {
-        console.error(
-          `[VFS Git Op] Error resolving refs after fetch:`,
-          refError,
-        );
-        throw new Error(
-          `Could not confirm remote branch "${branch}" state after fetch.`,
-        );
-      }
-    }
-
-    console.log(
-      `[VFS Git Op] Merging FETCH_HEAD (${fetchHeadOid}) into ${branch}`,
-    );
-
-    // 2. Merge the fetched commit (FETCH_HEAD) into the current branch (which should be `branch`)
-    const mergeResult = await git.merge({
-      fs,
-      dir,
-      ours: branch, // Merge into the correct local branch
-      theirs: "FETCH_HEAD",
-      fastForward: false, // Allow merge commits if necessary
-      author: {
-        name: useSettingsStore.getState().gitUserName!,
-        email: useSettingsStore.getState().gitUserEmail!,
-      },
-    });
-
-    console.log("[VFS Git Op] Merge result:", mergeResult);
-
-    if (mergeResult.oid) {
-      // Check if it was a fast-forward or a merge commit
-      const headOid = await git.resolveRef({ fs, dir, ref: "HEAD" });
-      if (headOid === fetchHeadOid) {
-        toast.success(
-          `Pulled and fast-forwarded changes for "${basename(dir)}"`,
-        );
-        console.log(`[VFS Git Op] Pull/Fast-forward successful for ${dir}`);
-      } else {
-        toast.success(
-          `Pulled and merged changes (merge commit created) for "${basename(dir)}"`,
-        );
-        console.log(
-          `[VFS Git Op] Pull/Merge successful (merge commit) for ${dir}`,
-        );
-      }
-    } else if (mergeResult.alreadyMerged) {
-      toast.info(`Branch "${branch}" is already up-to-date.`);
-      console.log(`[VFS Git Op] Branch ${branch} already up-to-date.`);
-    } else {
-      // Merge failed, likely conflicts
-      console.error("[VFS Git Op] Merge failed after fetch:", mergeResult);
-      throw new Error(
-        `Merge failed after fetch. Conflicts likely occurred. Resolve manually.`,
-      );
-    }
+    toast.success(`Pulled changes successfully for "${basename(dir)}"`);
+    console.log(`[VFS Git Op] Pull successful for ${dir}`);
   } catch (err: unknown) {
-    console.error(
-      `[VFS Git Op] Git pull (fetch/merge) failed for ${dir}:`,
-      err,
-    );
-    toast.error(`Git pull failed: ${formatGitHttpError(err)}`);
-    throw err;
+    console.error(`[VFS Git Op] Git pull failed for ${dir}:`, err);
+    // Check for "already up-to-date" which isn't an error
+    if (
+      err instanceof Error &&
+      err.message.toLowerCase().includes("already up-to-date")
+    ) {
+      toast.info(`Branch "${branch}" is already up-to-date.`);
+    } else {
+      toast.error(`Git pull failed: ${formatGitHttpError(err)}`);
+    }
+    // Re-throw only if it's not an "already up-to-date" message
+    if (
+      !(
+        err instanceof Error &&
+        err.message.toLowerCase().includes("already up-to-date")
+      )
+    ) {
+      throw err;
+    }
   }
 };
 
-/**
- * Pushes committed changes from the specified local branch to the corresponding remote branch.
- * @param path The repository directory path.
- * @param branch The local branch name to push (from SyncRepo config).
- * @param credentials Optional authentication credentials.
- * @throws Throws an error if push fails.
- */
 export const gitPushOp = async (
   path: string,
-  branch: string, // Branch name from SyncRepo config
+  branch: string,
   credentials?: { username?: string | null; password?: string | null },
 ): Promise<void> => {
   const dir = normalizePath(path);
@@ -672,10 +518,10 @@ export const gitPushOp = async (
       http,
       dir,
       corsProxy: CORS_PROXY,
-      ref: branch, // Push the specified local branch
-      remote: "origin", // Assuming standard remote name
-      remoteRef: `refs/heads/${branch}`, // Explicitly target the remote branch
-      force: false, // Default to non-force push
+      ref: branch,
+      remote: "origin",
+      remoteRef: `refs/heads/${branch}`,
+      force: false,
       onAuth: (authUrl) => onAuth(authUrl, credentials),
       onAuthFailure,
       onAuthSuccess,
@@ -684,21 +530,19 @@ export const gitPushOp = async (
     if (result?.ok) {
       toast.success(`Pushed changes successfully for "${basename(dir)}"`);
     } else {
-      // Check for specific "up-to-date" or "rejected" messages
       if (result?.error?.includes("up-to-date")) {
         toast.info(`Branch "${branch}" already up-to-date on remote.`);
       } else if (result?.error?.includes("rejected")) {
         toast.error(
           `Push rejected for "${basename(dir)}". Pull changes first.`,
         );
-        throw new Error(result.error); // Re-throw rejection error
+        throw new Error(result.error);
       } else {
         throw new Error(result?.error || "Push rejected by remote");
       }
     }
   } catch (err: unknown) {
     console.error(`[VFS Git Op] Git push failed for ${dir}:`, err);
-    // Avoid double-toasting rejection errors handled above
     if (!(err instanceof Error && err.message.includes("rejected"))) {
       toast.error(`Git push failed: ${formatGitHttpError(err)}`);
     }
@@ -706,11 +550,6 @@ export const gitPushOp = async (
   }
 };
 
-/**
- * Gets and displays the Git status for the repository.
- * @param path The repository directory path.
- * @throws Throws an error if status check fails.
- */
 export const gitStatusOp = async (path: string): Promise<void> => {
   const dir = normalizePath(path);
   console.log(`[VFS Git Op] Git Status on ${dir}`);
@@ -718,42 +557,28 @@ export const gitStatusOp = async (path: string): Promise<void> => {
     const status = await git.statusMatrix({ fs, dir });
     console.log("Git Status Matrix:", status);
 
-    // Format status for user display
     const formattedStatus = status
       .map(([filepath, head, workdir, stage]) => {
-        // Determine status based on codes (refer to isomorphic-git docs)
-        // Head: 0=absent, 1=present
-        // Workdir: 0=absent, 1=unmodified, 2=modified
-        // Stage: 0=absent, 1=unmodified, 2=modified, 3=added
         let statusText = "";
-
-        // Staging area status
         if (stage === 2) statusText += "INDEX_Modified ";
         if (stage === 3) statusText += "INDEX_Added ";
-
-        // Working directory status
-        if (head === 0 && workdir === 2)
-          statusText += "WT_New"; // Untracked
+        if (head === 0 && workdir === 2) statusText += "WT_New";
         else if (head === 1 && workdir === 2) statusText += "WT_Modified";
         else if (head === 1 && workdir === 0) statusText += "WT_Deleted";
         else if (head === 1 && workdir === 1 && stage === 0)
-          statusText = "Unmodified"; // Only show if nothing staged
-
-        // Fallback for unexpected combinations or unmerged states
+          statusText = "Unmodified";
         if (!statusText || statusText === "INDEX_Unmodified ") {
           statusText = `h:${head} w:${workdir} s:${stage}`;
         }
-
         return `${filepath}: ${statusText.trim()}`;
       })
-      .filter((line) => !line.endsWith("Unmodified")) // Don't show unmodified files
-      .join(`
-`); // Use newline for readability in toast
+      .filter((line) => !line.endsWith("Unmodified")).join(`
+`);
 
     toast.info(
       `Git Status for "${basename(dir)}":
 ${formattedStatus || "No changes"}`,
-      { duration: 15000 }, // Longer duration for status
+      { duration: 15000 },
     );
   } catch (err: unknown) {
     console.error(`[VFS Git Op] Git status failed for ${dir}:`, err);
@@ -764,12 +589,6 @@ ${formattedStatus || "No changes"}`,
   }
 };
 
-/**
- * Gets the current branch name.
- * @param path The repository directory path.
- * @returns The current branch name.
- * @throws Throws an error if unable to determine the branch.
- */
 export const gitCurrentBranchOp = async (path: string): Promise<string> => {
   const dir = normalizePath(path);
   try {
@@ -788,12 +607,6 @@ export const gitCurrentBranchOp = async (path: string): Promise<string> => {
   }
 };
 
-/**
- * Lists local branches in the repository.
- * @param path The repository directory path.
- * @returns An array of local branch names.
- * @throws Throws an error if listing fails.
- */
 export const gitListBranchesOp = async (path: string): Promise<string[]> => {
   const dir = normalizePath(path);
   try {
@@ -810,12 +623,6 @@ ${branches.join(", ")}`);
   }
 };
 
-/**
- * Lists configured remotes in the repository.
- * @param path The repository directory path.
- * @returns An array of remote objects containing name and URL.
- * @throws Throws an error if listing fails.
- */
 export const gitListRemotesOp = async (
   path: string,
 ): Promise<{ remote: string; url: string }[]> => {

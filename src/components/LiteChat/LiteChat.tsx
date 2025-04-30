@@ -1,10 +1,11 @@
 // src/components/LiteChat/LiteChat.tsx
-// Entire file content provided due to significant changes in initialization
+// Entire file content provided
 import React, { useEffect, useCallback, useMemo, useState } from "react";
 import { PromptWrapper } from "@/components/LiteChat/prompt/PromptWrapper";
 import { ChatCanvas } from "@/components/LiteChat/canvas/ChatCanvas";
 import { ChatControlWrapper } from "@/components/LiteChat/chat/ChatControlWrapper";
 import { useConversationStore } from "@/store/conversation.store";
+import { useProjectStore } from "@/store/project.store"; // Import ProjectStore
 import { useInteractionStore } from "@/store/interaction.store";
 import { useUIStateStore } from "@/store/ui.store";
 import { useControlRegistryStore } from "@/store/control.store";
@@ -30,12 +31,12 @@ import { registerSettingsControl } from "@/hooks/litechat/registerSettingsContro
 import { registerSidebarToggleControl } from "@/hooks/litechat/registerSidebarToggleControl";
 import { registerParameterControl } from "@/hooks/litechat/registerParameterControl";
 import { registerFileControl } from "@/hooks/litechat/registerFileControl";
-import { registerVfsControl } from "@/hooks/litechat/registerVfsControl"; // Import plain function
+import { registerVfsControl } from "@/hooks/litechat/registerVfsControl";
 import { registerGitSyncControl } from "@/hooks/litechat/registerGitSyncControl";
 import { registerVfsTools } from "@/hooks/litechat/registerVfsTools";
 import { registerGitTools } from "@/hooks/litechat/registerGitTools";
 import { registerToolSelectorControl } from "@/hooks/litechat/registerToolSelectorControl";
-import { registerProjectSettingsControl } from "@/hooks/litechat/registerProjectSettingsControl"; // Import plain function
+import { registerProjectSettingsControl } from "@/hooks/litechat/registerProjectSettingsControl";
 import { buildHistoryMessages } from "@/lib/litechat/ai-helpers";
 import { usePromptStateStore } from "@/store/prompt.store";
 import { registerGlobalModelSelector } from "@/hooks/litechat/registerGlobalModelSelector";
@@ -44,32 +45,28 @@ export const LiteChat: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
 
   // --- Store Hooks ---
-  // Use specific selectors or shallow for ConversationStore
-  const {
-    selectedItemId,
-    selectedItemType,
-    loadSidebarItems,
-    getConversationById,
-    getEffectiveProjectSettings,
-  } = useConversationStore(
+  const { selectedItemId, selectedItemType, loadSidebarItems } =
+    useConversationStore(
+      useShallow((state) => ({
+        selectedItemId: state.selectedItemId,
+        selectedItemType: state.selectedItemType,
+        loadSidebarItems: state.loadSidebarItems,
+        getConversationById: state.getConversationById, // Keep for VFS key logic
+      })),
+    );
+  // Get project store actions/state needed
+  const { getEffectiveProjectSettings } = useProjectStore(
     useShallow((state) => ({
-      selectedItemId: state.selectedItemId,
-      selectedItemType: state.selectedItemType,
-      loadSidebarItems: state.loadSidebarItems,
-      addConversation: state.addConversation,
-      selectItem: state.selectItem,
-      getConversationById: state.getConversationById,
+      getProjectById: state.getProjectById,
       getEffectiveProjectSettings: state.getEffectiveProjectSettings,
     })),
   );
-  // Use specific selectors or shallow for InteractionStore
   const { interactions, status: interactionStatus } = useInteractionStore(
     useShallow((state) => ({
       interactions: state.interactions,
       status: state.status,
     })),
   );
-  // Use specific selectors or shallow for UIStateStore
   const {
     globalError,
     isSidebarCollapsed,
@@ -85,12 +82,10 @@ export const LiteChat: React.FC = () => {
   );
   const isVfsPanelOpen = isChatControlPanelOpen["vfs"] ?? false;
 
-  // Use a stable selector for chatControls to prevent re-renders if the object reference changes but content is the same
   const chatControls = useControlRegistryStore(
     useShallow((state) => Object.values(state.chatControls)),
   );
 
-  // Get store actions needed for initialization (stable references)
   const { loadDbMods, setLoadedMods } = useModStore(
     useShallow((state) => ({
       loadDbMods: state.loadDbMods,
@@ -124,10 +119,9 @@ export const LiteChat: React.FC = () => {
     let isMounted = true;
     const initializeApp = async () => {
       console.log("LiteChat: Starting initialization...");
-      setIsInitializing(true); // Set loading state immediately
+      setIsInitializing(true);
 
       try {
-        // --- Step 1: Load Core Data ---
         console.log("LiteChat: Loading core data...");
         await loadSettings();
         if (!isMounted) return;
@@ -135,11 +129,11 @@ export const LiteChat: React.FC = () => {
         await loadProviderData();
         if (!isMounted) return;
         console.log("LiteChat: Provider data loaded.");
-        await loadSidebarItems(); // Load conversations and projects
+        // loadSidebarItems now loads projects via ProjectStore internally
+        await loadSidebarItems();
         if (!isMounted) return;
         console.log("LiteChat: Sidebar items loaded.");
 
-        // --- Step 2: Register Core Controls & Tools ---
         console.log("LiteChat: Registering core controls and tools...");
         registerConversationListControl();
         registerSettingsControl();
@@ -151,12 +145,11 @@ export const LiteChat: React.FC = () => {
         registerVfsTools();
         registerGitTools();
         registerToolSelectorControl();
-        registerVfsControl(); // Call plain function
-        registerProjectSettingsControl(); // Call plain function
+        registerVfsControl();
+        registerProjectSettingsControl();
         console.log("LiteChat: Core controls and tools registered.");
         if (!isMounted) return;
 
-        // --- Step 3: Load Mods ---
         console.log("LiteChat: Loading mods...");
         await loadDbMods();
         if (!isMounted) return;
@@ -168,8 +161,7 @@ export const LiteChat: React.FC = () => {
         setLoadedMods(loadedModInstances);
         console.log(`LiteChat: ${loadedModInstances.length} mods processed.`);
 
-        // --- Step 4: Initialize Prompt State ---
-        // Get initial context AFTER sidebar items are loaded
+        // Initialize Prompt State using ProjectStore
         const initialSelectedItemId =
           useConversationStore.getState().selectedItemId;
         const initialSelectedItemType =
@@ -183,8 +175,8 @@ export const LiteChat: React.FC = () => {
                   .getConversationById(initialSelectedItemId)?.projectId ??
                 null)
               : null;
-        // Use the getEffectiveProjectSettings from the store directly
-        const initialEffectiveSettings = useConversationStore
+        // Use ProjectStore's getEffectiveProjectSettings
+        const initialEffectiveSettings = useProjectStore
           .getState()
           .getEffectiveProjectSettings(initialProjectId);
         initializePromptState(initialEffectiveSettings);
@@ -197,48 +189,41 @@ export const LiteChat: React.FC = () => {
         toast.error(
           `Initialization failed: ${error instanceof Error ? error.message : String(error)}`,
         );
-        // Optionally set an error state in UIStore
         useUIStateStore.getState().setGlobalError("Initialization failed.");
       } finally {
-        // --- Step 5: Finalize Initialization ---
         if (isMounted) {
           console.log("LiteChat: Initialization complete.");
-          setIsInitializing(false); // Clear loading state
+          setIsInitializing(false);
         }
       }
     };
 
     initializeApp();
 
-    // Cleanup function
     return () => {
       isMounted = false;
       console.log("LiteChat: Unmounting, initialization cancelled if pending.");
-      // Consider adding unregistration logic here if necessary,
-      // though usually not needed for singleton stores/controls.
     };
-    // Run this effect only once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array ensures this runs only once
+  }, []);
 
   // --- Effect to update Prompt State on Context Change ---
   useEffect(() => {
-    // Skip if still initializing to avoid race conditions
     if (isInitializing) return;
 
     const currentProjectId =
       selectedItemType === "project"
         ? selectedItemId
         : selectedItemType === "conversation"
-          ? (getConversationById(selectedItemId)?.projectId ?? null)
+          ? (useConversationStore.getState().getConversationById(selectedItemId)
+              ?.projectId ?? null)
           : null;
 
     console.log(
       `[LiteChat Effect] Context changed (Item: ${selectedItemId}, Type: ${selectedItemType}). Calculating effective settings for Project ID: ${currentProjectId}`,
     );
-    // Use the stable reference from the store hook
+    // Use ProjectStore's getEffectiveProjectSettings
     const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
-    // Use the stable reference from the store hook
     initializePromptState(effectiveSettings);
     console.log(
       "[LiteChat Effect] Prompt state updated based on context change.",
@@ -247,10 +232,9 @@ export const LiteChat: React.FC = () => {
   }, [
     selectedItemId,
     selectedItemType,
-    getConversationById, // Stable reference from store hook
-    getEffectiveProjectSettings, // Stable reference from store hook
-    initializePromptState, // Stable reference from store hook
-    isInitializing, // Include isInitializing to prevent running before init finishes
+    getEffectiveProjectSettings, // From ProjectStore hook
+    initializePromptState,
+    isInitializing,
   ]);
 
   // --- VFS Context Management Effect ---
@@ -260,40 +244,34 @@ export const LiteChat: React.FC = () => {
       if (selectedItemType === "project") {
         targetVfsKey = selectedItemId;
       } else if (selectedItemType === "conversation") {
-        const convo = getConversationById(selectedItemId);
-        targetVfsKey = convo?.projectId ?? "orphan"; // Use 'orphan' key for non-project convos
+        const convo = useConversationStore
+          .getState()
+          .getConversationById(selectedItemId);
+        targetVfsKey = convo?.projectId ?? "orphan";
       } else {
-        targetVfsKey = "orphan"; // Default to orphan if nothing selected
+        targetVfsKey = "orphan";
       }
       console.log(
         `[LiteChat Effect] VFS Panel Opened/Context Changed. Setting target key: ${targetVfsKey}`,
       );
     } else {
-      targetVfsKey = null; // Set to null when panel is closed
+      targetVfsKey = null;
       console.log(
         "[LiteChat Effect] VFS Panel Closed. Setting target key: null",
       );
     }
-    // Call setVfsKey only if the target key actually changes
-    // Access VFS store state directly here as it's less likely to cause loops
     if (useVfsStore.getState().vfsKey !== targetVfsKey) {
-      setVfsKey(targetVfsKey); // Use stable reference from store hook
+      setVfsKey(targetVfsKey);
     }
-  }, [
-    isVfsPanelOpen,
-    selectedItemId,
-    selectedItemType,
-    getConversationById, // Stable reference from store hook
-    setVfsKey, // Stable reference from store hook
-  ]);
+  }, [isVfsPanelOpen, selectedItemId, selectedItemType, setVfsKey]);
 
   // --- Prompt Submission Handler ---
   const handlePromptSubmit = useCallback(
     async (turnData: PromptTurnObject) => {
-      // Get necessary state/actions using getState() inside the callback
       const conversationState = useConversationStore.getState();
+      const projectState = useProjectStore.getState(); // Get project state
       const uiStateActions = useUIStateStore.getState();
-      const promptState = usePromptStateStore.getState(); // Get current prompt state
+      const promptState = usePromptStateStore.getState();
 
       let currentConvId =
         conversationState.selectedItemType === "conversation"
@@ -308,10 +286,10 @@ export const LiteChat: React.FC = () => {
               )?.projectId ?? null)
             : null;
 
-      // Get settings for THIS turn from the PromptStateStore
       const modelToUse = promptState.modelId;
+      // Use ProjectStore's getEffectiveProjectSettings
       const systemPrompt =
-        conversationState.getEffectiveProjectSettings(currentProjectId)
+        projectState.getEffectiveProjectSettings(currentProjectId)
           .systemPrompt ?? undefined;
 
       if (!modelToUse) {
@@ -319,28 +297,24 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
-      // Create new conversation if needed
       if (!currentConvId) {
         console.log("LiteChat: No conversation selected, creating new one...");
         try {
-          // Use actions obtained via getState()
           const newId = await conversationState.addConversation({
             title: "New Chat",
             projectId: currentProjectId,
           });
           await conversationState.selectItem(newId, "conversation");
-          // Re-fetch state after selection to ensure it's updated
           currentConvId = useConversationStore.getState().selectedItemId;
           if (currentConvId !== newId) {
             console.error(
               "LiteChat: Mismatch between created ID and selected ID after selection!",
             );
-            currentConvId = newId; // Fallback to the ID returned by addConversation
+            currentConvId = newId;
           }
           console.log(
             `LiteChat: New conversation created (${currentConvId}), selected, and InteractionStore synced.`,
           );
-          // Use action obtained via getState()
           setTimeout(() => uiStateActions.setFocusInputFlag(true), 0);
         } catch (error) {
           console.error("LiteChat: Failed to create new conversation", error);
@@ -349,18 +323,15 @@ export const LiteChat: React.FC = () => {
         }
       }
 
-      // Build message history
       const currentHistory = useInteractionStore.getState().interactions;
       const completedHistory = currentHistory.filter(
         (i) => i.status === "COMPLETED" && i.type === "message.user_assistant",
       );
       const messages: CoreMessage[] = buildHistoryMessages(completedHistory);
 
-      // Add current user message
       if (turnData.content) {
         messages.push({ role: "user", content: turnData.content });
       } else if (turnData.metadata?.attachedFiles?.length) {
-        // Add an empty user message if only files are attached
         messages.push({ role: "user", content: "" });
       } else {
         console.error("LiteChat: Attempting to submit with no content.");
@@ -368,7 +339,6 @@ export const LiteChat: React.FC = () => {
         return;
       }
 
-      // Combine parameters from prompt state and turn data
       const finalParameters = {
         temperature: promptState.temperature,
         max_tokens: promptState.maxTokens,
@@ -376,10 +346,9 @@ export const LiteChat: React.FC = () => {
         top_k: promptState.topK,
         presence_penalty: promptState.presencePenalty,
         frequency_penalty: promptState.frequencyPenalty,
-        ...(turnData.parameters ?? {}), // Turn-specific params override prompt state
+        ...(turnData.parameters ?? {}),
       };
 
-      // Remove null/undefined parameters
       Object.keys(finalParameters).forEach((key) => {
         if (
           finalParameters[key as keyof typeof finalParameters] === null ||
@@ -389,16 +358,14 @@ export const LiteChat: React.FC = () => {
         }
       });
 
-      // Prepare final AI payload
       const aiPayload: PromptObject = {
         system: systemPrompt,
         messages: messages,
         parameters: finalParameters,
         metadata: {
           ...turnData.metadata,
-          modelId: modelToUse, // Ensure modelId from prompt state is included
+          modelId: modelToUse,
         },
-        // Tools and toolChoice will be added by AIService based on metadata
       };
 
       emitter.emit("prompt:finalised", { prompt: aiPayload });
@@ -407,12 +374,11 @@ export const LiteChat: React.FC = () => {
       try {
         await AIService.startInteraction(aiPayload, turnData);
         console.log("LiteChat: AIService interaction started.");
-        // Reset prompt state AFTER successful submission start
-        resetPromptState(); // Use stable reference from hook
-        // Re-initialize based on current context
+        resetPromptState();
+        // Re-initialize based on current context using ProjectStore
         const effectiveSettings =
-          conversationState.getEffectiveProjectSettings(currentProjectId);
-        initializePromptState(effectiveSettings); // Use stable reference from hook
+          projectState.getEffectiveProjectSettings(currentProjectId);
+        initializePromptState(effectiveSettings);
       } catch (e) {
         console.error("LiteChat: Error starting AI interaction:", e);
         toast.error(
@@ -420,158 +386,138 @@ export const LiteChat: React.FC = () => {
         );
       }
     },
-    [
-      // Include stable references from hooks as dependencies
-      initializePromptState,
-      resetPromptState,
-      // buildHistoryMessages is a stable import
-    ],
+    [initializePromptState, resetPromptState],
   );
 
   // --- Regeneration Handler ---
-  const onRegenerateInteraction = useCallback(
-    async (interactionId: string) => {
-      console.log(`LiteChat: Regenerating interaction ${interactionId}`);
-      // Get necessary state/actions using getState() inside the callback
-      const interactionStore = useInteractionStore.getState();
-      const conversationState = useConversationStore.getState();
-      const promptState = usePromptStateStore.getState(); // Get current prompt state
+  const onRegenerateInteraction = useCallback(async (interactionId: string) => {
+    console.log(`LiteChat: Regenerating interaction ${interactionId}`);
+    const interactionStore = useInteractionStore.getState();
+    const conversationState = useConversationStore.getState();
+    const projectState = useProjectStore.getState(); // Get project state
+    const promptState = usePromptStateStore.getState();
 
-      const targetInteraction = interactionStore.interactions.find(
-        (i) => i.id === interactionId,
+    const targetInteraction = interactionStore.interactions.find(
+      (i) => i.id === interactionId,
+    );
+
+    if (!targetInteraction || !targetInteraction.prompt) {
+      console.error(
+        `LiteChat: Cannot regenerate - interaction ${interactionId} or its prompt not found.`,
       );
+      toast.error("Cannot regenerate: Original interaction data missing.");
+      return;
+    }
 
-      if (!targetInteraction || !targetInteraction.prompt) {
-        console.error(
-          `LiteChat: Cannot regenerate - interaction ${interactionId} or its prompt not found.`,
-        );
-        toast.error("Cannot regenerate: Original interaction data missing.");
-        return;
-      }
-
-      if (targetInteraction.type !== "message.user_assistant") {
-        console.error(
-          `LiteChat: Cannot regenerate non-user_assistant interaction: ${interactionId}`,
-        );
-        toast.error("Can only regenerate from a user message interaction.");
-        return;
-      }
-
-      const currentConversation = conversationState.getConversationById(
-        targetInteraction.conversationId,
+    if (targetInteraction.type !== "message.user_assistant") {
+      console.error(
+        `LiteChat: Cannot regenerate non-user_assistant interaction: ${interactionId}`,
       );
-      const currentProjectId = currentConversation?.projectId ?? null;
+      toast.error("Can only regenerate from a user message interaction.");
+      return;
+    }
 
-      // Use the current prompt state for regeneration
-      const modelToUse = promptState.modelId;
-      const systemPrompt =
-        conversationState.getEffectiveProjectSettings(currentProjectId)
-          .systemPrompt ?? undefined;
+    const currentConversation = conversationState.getConversationById(
+      targetInteraction.conversationId,
+    );
+    const currentProjectId = currentConversation?.projectId ?? null;
 
-      if (!modelToUse) {
-        toast.error("Please select a model before regenerating.");
-        return;
-      }
+    const modelToUse = promptState.modelId;
+    // Use ProjectStore's getEffectiveProjectSettings
+    const systemPrompt =
+      projectState.getEffectiveProjectSettings(currentProjectId).systemPrompt ??
+      undefined;
 
-      // Build history up to the point of regeneration
-      const historyUpToIndex = targetInteraction.index;
-      const historyInteractions = interactionStore.interactions
-        .filter(
-          (i) =>
-            i.conversationId === targetInteraction.conversationId &&
-            i.index < historyUpToIndex &&
-            i.status === "COMPLETED" &&
-            i.type === "message.user_assistant",
-        )
-        .sort((a, b) => a.index - b.index);
+    if (!modelToUse) {
+      toast.error("Please select a model before regenerating.");
+      return;
+    }
 
-      const messages: CoreMessage[] = buildHistoryMessages(historyInteractions);
+    const historyUpToIndex = targetInteraction.index;
+    const historyInteractions = interactionStore.interactions
+      .filter(
+        (i) =>
+          i.conversationId === targetInteraction.conversationId &&
+          i.index < historyUpToIndex &&
+          i.status === "COMPLETED" &&
+          i.type === "message.user_assistant",
+      )
+      .sort((a, b) => a.index - b.index);
 
-      // Add the user message from the interaction being regenerated
-      if (
-        targetInteraction.prompt?.content &&
-        typeof targetInteraction.prompt.content === "string"
-      ) {
-        messages.push({
-          role: "user",
-          content: targetInteraction.prompt.content,
-        });
-      } else if (targetInteraction.prompt?.metadata?.attachedFiles?.length) {
-        // Add an empty user message if the original prompt only had files
-        messages.push({ role: "user", content: "" });
-      } else {
-        console.error(
-          `LiteChat: Cannot regenerate - missing or invalid user prompt content in interaction ${interactionId}.`,
-        );
-        toast.error("Cannot regenerate: Original user prompt missing.");
-        return;
-      }
+    const messages: CoreMessage[] = buildHistoryMessages(historyInteractions);
 
-      // Combine parameters from prompt state and original prompt
-      const finalParameters = {
-        temperature: promptState.temperature,
-        max_tokens: promptState.maxTokens,
-        top_p: promptState.topP,
-        top_k: promptState.topK,
-        presence_penalty: promptState.presencePenalty,
-        frequency_penalty: promptState.frequencyPenalty,
-        ...(targetInteraction.prompt.parameters ?? {}), // Original params override prompt state for regen
-      };
-      Object.keys(finalParameters).forEach((key) => {
-        if (
-          finalParameters[key as keyof typeof finalParameters] === null ||
-          finalParameters[key as keyof typeof finalParameters] === undefined
-        ) {
-          delete finalParameters[key as keyof typeof finalParameters];
-        }
+    if (
+      targetInteraction.prompt?.content &&
+      typeof targetInteraction.prompt.content === "string"
+    ) {
+      messages.push({
+        role: "user",
+        content: targetInteraction.prompt.content,
       });
-
-      // Preserve enabled tools from the original prompt
-      const enabledTools =
-        targetInteraction.prompt.metadata?.enabledTools ?? [];
-
-      // Prepare metadata for the regeneration payload
-      const currentMetadata = {
-        ...targetInteraction.prompt.metadata,
-        regeneratedFromId: interactionId,
-        modelId: modelToUse, // Use current model from prompt state
-        attachedFiles: undefined, // Files are processed into messages, not needed in metadata here
-        enabledTools: enabledTools, // Preserve original tools
-      };
-
-      // Prepare final AI payload for regeneration
-      const aiPayload: PromptObject = {
-        system: systemPrompt,
-        messages: messages,
-        parameters: finalParameters,
-        metadata: currentMetadata,
-        // Tools and toolChoice will be added by AIService based on metadata
-      };
-
-      emitter.emit("prompt:finalised", { prompt: aiPayload });
-      console.log(
-        `LiteChat: Submitting regeneration request for ${interactionId}:`,
-        aiPayload,
+    } else if (targetInteraction.prompt?.metadata?.attachedFiles?.length) {
+      messages.push({ role: "user", content: "" });
+    } else {
+      console.error(
+        `LiteChat: Cannot regenerate - missing or invalid user prompt content in interaction ${interactionId}.`,
       );
+      toast.error("Cannot regenerate: Original user prompt missing.");
+      return;
+    }
 
-      try {
-        // Pass the original promptTurnObject as the second argument
-        await AIService.startInteraction(aiPayload, targetInteraction.prompt);
-        console.log(
-          `LiteChat: AIService regeneration interaction started for ${interactionId}.`,
-        );
-      } catch (e) {
-        console.error(
-          `LiteChat: Error starting regeneration for ${interactionId}:`,
-          e,
-        );
-        toast.error("Failed to start regeneration.");
+    const finalParameters = {
+      temperature: promptState.temperature,
+      max_tokens: promptState.maxTokens,
+      top_p: promptState.topP,
+      top_k: promptState.topK,
+      presence_penalty: promptState.presencePenalty,
+      frequency_penalty: promptState.frequencyPenalty,
+      ...(targetInteraction.prompt.parameters ?? {}),
+    };
+    Object.keys(finalParameters).forEach((key) => {
+      if (
+        finalParameters[key as keyof typeof finalParameters] === null ||
+        finalParameters[key as keyof typeof finalParameters] === undefined
+      ) {
+        delete finalParameters[key as keyof typeof finalParameters];
       }
-    },
-    [
-      // buildHistoryMessages is a stable import
-    ],
-  );
+    });
+
+    const enabledTools = targetInteraction.prompt.metadata?.enabledTools ?? [];
+
+    const currentMetadata = {
+      ...targetInteraction.prompt.metadata,
+      regeneratedFromId: interactionId,
+      modelId: modelToUse,
+      attachedFiles: undefined,
+      enabledTools: enabledTools,
+    };
+
+    const aiPayload: PromptObject = {
+      system: systemPrompt,
+      messages: messages,
+      parameters: finalParameters,
+      metadata: currentMetadata,
+    };
+
+    emitter.emit("prompt:finalised", { prompt: aiPayload });
+    console.log(
+      `LiteChat: Submitting regeneration request for ${interactionId}:`,
+      aiPayload,
+    );
+
+    try {
+      await AIService.startInteraction(aiPayload, targetInteraction.prompt);
+      console.log(
+        `LiteChat: AIService regeneration interaction started for ${interactionId}.`,
+      );
+    } catch (e) {
+      console.error(
+        `LiteChat: Error starting regeneration for ${interactionId}:`,
+        e,
+      );
+      toast.error("Failed to start regeneration.");
+    }
+  }, []);
 
   // --- Stop Interaction Handler ---
   const onStopInteraction = useCallback((interactionId: string) => {
@@ -580,7 +526,6 @@ export const LiteChat: React.FC = () => {
   }, []);
 
   // --- Memoized Controls ---
-  // These selectors depend only on chatControls state, which is stable itself
   const sidebarControls = useMemo(
     () =>
       chatControls
@@ -611,7 +556,6 @@ export const LiteChat: React.FC = () => {
   );
 
   // --- Memoized Modal Renderers ---
-  // Find the renderers once and memoize them
   const settingsModalRenderer = useMemo(
     () =>
       chatControls.find((c) => c.id === "core-settings-trigger")
@@ -626,7 +570,6 @@ export const LiteChat: React.FC = () => {
     [chatControls],
   );
 
-  // Determine current conversation ID for ChatCanvas
   const currentConversationIdForCanvas =
     selectedItemType === "conversation" ? selectedItemId : null;
 
@@ -730,16 +673,15 @@ export const LiteChat: React.FC = () => {
           />
         </div>
 
-        {/* Right Drawer (VFS) - Rendered conditionally by ChatControlWrapper */}
+        {/* Right Drawer (VFS) */}
         <ChatControlWrapper
-          controls={chatControls} // Pass all controls
+          controls={chatControls}
           panelId="drawer_right"
           renderMode="full"
-          // No specific className needed here, panel component handles its own styling
         />
       </div>
 
-      {/* Render Modals - Use the memoized renderers */}
+      {/* Render Modals */}
       {isChatControlPanelOpen["settingsModal"] &&
         settingsModalRenderer &&
         settingsModalRenderer()}

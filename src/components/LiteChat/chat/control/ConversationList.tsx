@@ -1,9 +1,11 @@
 // src/components/LiteChat/chat/control/ConversationList.tsx
+// Entire file content provided
 import React, { useMemo, useState, useCallback } from "react";
 import {
   useConversationStore,
   type SidebarItem,
 } from "@/store/conversation.store";
+import { useProjectStore } from "@/store/project.store"; // Import ProjectStore
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,10 +24,9 @@ import { toast } from "sonner";
 import { Project } from "@/types/litechat/project";
 import { Conversation } from "@/types/litechat/chat";
 import { ConversationItemRenderer } from "@/components/LiteChat/chat/control/conversation-list/ItemRenderer";
-import { useItemEditing } from "@/hooks/litechat/useItemEditing"; // Import the hook
+import { useItemEditing } from "@/hooks/litechat/useItemEditing";
 
 // --- Recursive Filtering Helper ---
-// (Helper function remains the same)
 const itemMatchesFilterOrHasMatchingDescendant = (
   itemId: string,
   itemType: SidebarItemType,
@@ -99,45 +100,54 @@ const itemMatchesFilterOrHasMatchingDescendant = (
 
 // --- Main Control Component ---
 export const ConversationListControlComponent: React.FC = () => {
+  // Use ConversationStore for conversations, selection, sync status
   const {
     conversations,
-    projects,
     selectItem,
     selectedItemId,
     selectedItemType,
     addConversation,
     updateConversation,
     deleteConversation,
-    addProject,
-    updateProject,
-    deleteProject,
     exportConversation,
-    exportProject,
-    isLoading,
+    exportProject, // Keep exportProject here as it needs both project/convo data
+    isLoading: isConversationLoading, // Rename to avoid conflict
     syncRepos,
     conversationSyncStatus,
     getConversationById,
-    getProjectById,
   } = useConversationStore(
     useShallow((state) => ({
       conversations: state.conversations,
-      projects: state.projects,
       selectItem: state.selectItem,
       selectedItemId: state.selectedItemId,
       selectedItemType: state.selectedItemType,
       addConversation: state.addConversation,
       updateConversation: state.updateConversation,
       deleteConversation: state.deleteConversation,
-      addProject: state.addProject,
-      updateProject: state.updateProject,
-      deleteProject: state.deleteProject,
       exportConversation: state.exportConversation,
       exportProject: state.exportProject,
       isLoading: state.isLoading,
       syncRepos: state.syncRepos,
       conversationSyncStatus: state.conversationSyncStatus,
       getConversationById: state.getConversationById,
+    })),
+  );
+  // Use ProjectStore for projects and project actions
+  const {
+    projects,
+    addProject,
+    updateProject,
+    deleteProject,
+    getProjectById,
+    isLoading: isProjectLoading, // Rename to avoid conflict
+  } = useProjectStore(
+    useShallow((state) => ({
+      projects: state.projects,
+      addProject: state.addProject,
+      updateProject: state.updateProject,
+      deleteProject: state.deleteProject,
       getProjectById: state.getProjectById,
+      isLoading: state.isLoading,
     })),
   );
   const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
@@ -145,6 +155,9 @@ export const ConversationListControlComponent: React.FC = () => {
     new Set(),
   );
   const [filterText, setFilterText] = useState("");
+
+  // Combined loading state
+  const isLoading = isConversationLoading || isProjectLoading;
 
   // --- Use the Item Editing Hook ---
   const {
@@ -159,16 +172,14 @@ export const ConversationListControlComponent: React.FC = () => {
     handleSaveEdit,
     handleCancelEdit,
   } = useItemEditing({
-    // Pass the required store actions to the hook
-    updateProject,
-    updateConversation,
-    deleteProject, // Pass deleteProject for cancelling new projects
-    getProjectById,
-    getConversationById,
+    updateProject, // From ProjectStore
+    updateConversation, // From ConversationStore
+    deleteProject, // From ProjectStore
+    getProjectById, // From ProjectStore
+    getConversationById, // From ConversationStore
   });
   // --- End Item Editing Hook ---
 
-  // Wrap toggleProjectExpansion in useCallback
   const toggleProjectExpansion = useCallback((projectId: string) => {
     setExpandedProjects((prev) => {
       const next = new Set(prev);
@@ -181,7 +192,6 @@ export const ConversationListControlComponent: React.FC = () => {
     });
   }, []);
 
-  // Wrap getParentProjectId in useCallback
   const getParentProjectId = useCallback(() => {
     if (selectedItemType === "project") {
       return selectedItemId;
@@ -192,9 +202,8 @@ export const ConversationListControlComponent: React.FC = () => {
     return null;
   }, [selectedItemId, selectedItemType, getConversationById]);
 
-  // Wrap handleNewChat in useCallback
   const handleNewChat = useCallback(async () => {
-    if (editingItemId) return; // Prevent action while editing
+    if (editingItemId) return;
     try {
       const parentProjectId = getParentProjectId();
       const newId = await addConversation({
@@ -208,16 +217,15 @@ export const ConversationListControlComponent: React.FC = () => {
       toast.error("Failed to create new chat.");
     }
   }, [
-    editingItemId, // Add dependency
+    editingItemId,
     getParentProjectId,
     addConversation,
     selectItem,
     setFocusInputFlag,
   ]);
 
-  // Wrap handleNewProject in useCallback
   const handleNewProject = useCallback(async () => {
-    if (editingItemId) return; // Prevent action while editing
+    if (editingItemId) return;
     try {
       const parentProjectId = getParentProjectId();
       const newId = await addProject({
@@ -225,20 +233,14 @@ export const ConversationListControlComponent: React.FC = () => {
         parentId: parentProjectId,
       });
       selectItem(newId, "project");
-      // Expand the parent project if there is one
       if (parentProjectId) {
         setExpandedProjects((prev) => new Set(prev).add(parentProjectId));
       }
-      // Expand the new project itself if needed (though it has no children yet)
-      // setExpandedProjects((prev) => new Set(prev).add(newId));
-
-      // Start editing the new project immediately
       setTimeout(() => {
         const newProjectData = getProjectById(newId);
         if (newProjectData) {
           handleStartEditing({ ...newProjectData, itemType: "project" });
         } else {
-          // Fallback if data isn't immediately available (less likely now)
           console.warn(
             "New project data not found immediately, using fallback for edit start",
           );
@@ -249,67 +251,60 @@ export const ConversationListControlComponent: React.FC = () => {
             parentId: parentProjectId,
             createdAt: new Date(),
             updatedAt: new Date(),
-            path: `/New Project`, // This path might be slightly off
+            path: `/New Project`,
           });
         }
-      }, 50); // Small delay to allow state updates
+      }, 50);
     } catch (error) {
       console.error("Failed to create new project:", error);
-      // Error toast handled by store action if needed
     }
   }, [
-    editingItemId, // Add dependency
+    editingItemId,
     getParentProjectId,
     addProject,
     selectItem,
     getProjectById,
-    handleStartEditing, // Add dependency
+    handleStartEditing,
   ]);
 
-  // Wrap handleSelectItem in useCallback
   const handleSelectItem = useCallback(
     (id: string, type: SidebarItemType) => {
-      if (id === editingItemId) return; // Don't select while editing the same item
+      if (id === editingItemId) return;
 
-      // Handle saving/cancelling edits if clicking away
       if (editingItemId && id !== editingItemId) {
-        // Check if the local name is different from the original name
         if (
           localEditingName.trim() &&
           localEditingName.trim() !== editingName
         ) {
-          handleSaveEdit(); // Attempt to save if changed
+          handleSaveEdit();
         } else {
-          // Cancel otherwise, pass true if it was a "New Project" being cancelled
           handleCancelEdit(
             editingItemType === "project" && editingName === "New Project",
           );
         }
       }
 
-      // Only select if not the currently selected item
       if (id !== selectedItemId || type !== selectedItemType) {
-        selectItem(id, type); // Select the item in the conversation store
+        selectItem(id, type);
         if (type === "conversation") {
-          setTimeout(() => setFocusInputFlag(true), 0); // Focus input for conversations
+          setTimeout(() => setFocusInputFlag(true), 0);
         }
       }
     },
     [
       editingItemId,
-      editingItemType, // Add dependency
-      editingName, // Add dependency
-      localEditingName, // Add dependency
+      editingItemType,
+      editingName,
+      localEditingName,
       selectedItemId,
       selectedItemType,
-      handleSaveEdit, // Add dependency
-      handleCancelEdit, // Add dependency
+      handleSaveEdit,
+      handleCancelEdit,
       selectItem,
       setFocusInputFlag,
     ],
   );
 
-  // Wrap handleDeleteConversation in useCallback
   const handleDeleteConversation = useCallback(
     (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
@@ -323,11 +318,10 @@ export const ConversationListControlComponent: React.FC = () => {
     [deleteConversation],
   );
 
-  // Wrap handleDeleteProject in useCallback
   const handleDeleteProject = useCallback(
     (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
-      // Confirmation is handled within ItemRenderer now
+      // Confirmation handled in ItemRenderer
       deleteProject(id).catch((error) => {
         console.error("Failed to delete project:", error);
         toast.error("Failed to delete project.");
@@ -336,7 +330,6 @@ export const ConversationListControlComponent: React.FC = () => {
     [deleteProject],
   );
 
-  // Wrap handleExportConversation in useCallback
   const handleExportConversation = useCallback(
     async (id: string, format: "json" | "md", e: React.MouseEvent) => {
       e.stopPropagation();
@@ -344,13 +337,11 @@ export const ConversationListControlComponent: React.FC = () => {
         await exportConversation(id, format);
       } catch (error) {
         console.error(`Failed to export conversation as ${format}:`, error);
-        // Toast handled by store action
       }
     },
     [exportConversation],
   );
 
-  // Wrap handleExportProject in useCallback
   const handleExportProject = useCallback(
     async (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
@@ -358,17 +349,16 @@ export const ConversationListControlComponent: React.FC = () => {
         await exportProject(id);
       } catch (error) {
         console.error("Failed to export project:", error);
-        // Toast handled by store action
       }
     },
     [exportProject],
   );
 
+  // FIX: Safely handle potentially undefined syncRepos
   const repoNameMap = useMemo(() => {
-    return new Map(syncRepos.map((r) => [r.id, r.name]));
+    return new Map((syncRepos || []).map((r) => [r.id, r.name]));
   }, [syncRepos]);
 
-  // --- Precompute maps for filtering helper ---
   const { projectsById, conversationsByProjectId, projectsByParentId } =
     useMemo(() => {
       const projById = new Map(projects.map((p) => [p.id, p]));
@@ -395,7 +385,6 @@ export const ConversationListControlComponent: React.FC = () => {
       };
     }, [projects, conversations]);
 
-  // --- Updated getChildren function (uses filtering helper) ---
   const getChildren = useCallback(
     (
       parentId: string | null,
@@ -426,7 +415,6 @@ export const ConversationListControlComponent: React.FC = () => {
         conversationsByProjectId.get(parentId) || []
       ).filter((c) => c.title.toLowerCase().includes(lowerCaseFilter));
 
-      // Sort children by updatedAt descending
       childProjects.sort(
         (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
       );
@@ -445,7 +433,6 @@ export const ConversationListControlComponent: React.FC = () => {
     ],
   );
 
-  // --- Updated rootItems calculation (uses filtering helper) ---
   const rootItems = useMemo(() => {
     const lowerCaseFilter = filterText.toLowerCase();
     const memoCache: Record<string, boolean> = {};
@@ -474,7 +461,6 @@ export const ConversationListControlComponent: React.FC = () => {
         (c): SidebarItem => ({ ...c, itemType: "conversation" }),
       ),
     ];
-    // Sort root items by updatedAt descending
     combined.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
     return combined;
   }, [
@@ -488,7 +474,6 @@ export const ConversationListControlComponent: React.FC = () => {
 
   return (
     <div className="p-2 border-r border-[--border] bg-card text-card-foreground h-full flex flex-col">
-      {/* Header */}
       <div className="flex justify-between items-center mb-2 flex-shrink-0 px-1">
         <h3 className="text-sm font-semibold">Workspace</h3>
         <div className="flex items-center">
@@ -500,7 +485,7 @@ export const ConversationListControlComponent: React.FC = () => {
                   variant="ghost"
                   onClick={handleNewProject}
                   aria-label="New Project"
-                  disabled={isLoading || !!editingItemId} // Disable if editing
+                  disabled={isLoading || !!editingItemId}
                   className="h-7 w-7 p-0"
                 >
                   <FolderPlusIcon className="h-4 w-4" />
@@ -517,7 +502,7 @@ export const ConversationListControlComponent: React.FC = () => {
                   variant="ghost"
                   onClick={handleNewChat}
                   aria-label="New Chat"
-                  disabled={isLoading || !!editingItemId} // Disable if editing
+                  disabled={isLoading || !!editingItemId}
                   className="h-7 w-7 p-0"
                 >
                   <PlusIcon className="h-4 w-4" />
@@ -529,7 +514,6 @@ export const ConversationListControlComponent: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter Input */}
       <div className="relative mb-2 px-1 flex-shrink-0">
         <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -542,7 +526,6 @@ export const ConversationListControlComponent: React.FC = () => {
         />
       </div>
 
-      {/* List Area */}
       <ScrollArea className="flex-grow">
         {isLoading ? (
           <div className="space-y-1 p-1">
@@ -566,7 +549,7 @@ export const ConversationListControlComponent: React.FC = () => {
                 selectedItemId={selectedItemId}
                 conversationSyncStatus={conversationSyncStatus}
                 repoNameMap={repoNameMap}
-                onSelectItem={handleSelectItem} // Pass the updated handler
+                onSelectItem={handleSelectItem}
                 onDeleteConversation={handleDeleteConversation}
                 onDeleteProject={handleDeleteProject}
                 onExportConversation={handleExportConversation}
@@ -575,7 +558,6 @@ export const ConversationListControlComponent: React.FC = () => {
                 toggleProjectExpansion={toggleProjectExpansion}
                 getChildren={getChildren}
                 filterText={filterText}
-                // Pass editing state and handlers from the hook
                 editingItemId={editingItemId}
                 editingItemType={editingItemType}
                 editingName={editingName}

@@ -1,4 +1,5 @@
 // src/components/LiteChat/chat/control/conversation-list/IconRenderer.tsx
+// Entire file content provided
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { PlusIcon, FolderPlusIcon } from "lucide-react";
@@ -9,25 +10,26 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useConversationStore } from "@/store/conversation.store";
+import { useProjectStore } from "@/store/project.store"; // Import ProjectStore
 import { useUIStateStore } from "@/store/ui.store";
 import { useShallow } from "zustand/react/shallow";
 
 export const ConversationListIconRenderer: React.FC = () => {
-  const {
-    addConversation,
-    addProject,
-    selectItem,
-    selectedItemId,
-    selectedItemType,
-    getConversationById,
-  } = useConversationStore(
+  // Get actions from both stores
+  const { addConversation, selectItem, selectedItemId, selectedItemType } =
+    useConversationStore(
+      useShallow((state) => ({
+        addConversation: state.addConversation,
+        selectItem: state.selectItem,
+        selectedItemId: state.selectedItemId,
+        selectedItemType: state.selectedItemType,
+        getConversationById: state.getConversationById, // Keep for getParentProjectId
+      })),
+    );
+  const { addProject } = useProjectStore(
     useShallow((state) => ({
-      addConversation: state.addConversation,
       addProject: state.addProject,
-      selectItem: state.selectItem,
-      selectedItemId: state.selectedItemId,
-      selectedItemType: state.selectedItemType,
-      getConversationById: state.getConversationById,
+      getProjectById: state.getProjectById, // Keep for handleNewProject logic
     })),
   );
   const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
@@ -36,7 +38,10 @@ export const ConversationListIconRenderer: React.FC = () => {
     if (selectedItemType === "project") {
       return selectedItemId;
     } else if (selectedItemType === "conversation" && selectedItemId) {
-      const convo = getConversationById(selectedItemId);
+      // Need getConversationById from ConversationStore here
+      const convo = useConversationStore
+        .getState()
+        .getConversationById(selectedItemId);
       return convo?.projectId ?? null;
     }
     return null;
@@ -59,6 +64,7 @@ export const ConversationListIconRenderer: React.FC = () => {
   const handleNewProject = async () => {
     try {
       const parentProjectId = getParentProjectId();
+      // Use addProject from ProjectStore
       const newId = await addProject({
         name: "New Project",
         parentId: parentProjectId,

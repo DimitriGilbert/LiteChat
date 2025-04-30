@@ -1,4 +1,5 @@
-// src/components/LiteChat/settings/ProjectSettingsModal.tsx
+// src/components/LiteChat/project-settings/ProjectSettingsModal.tsx
+// Entire file content provided
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
@@ -11,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
-import { useConversationStore } from "@/store/conversation.store";
+import { useProjectStore } from "@/store/project.store"; // Use ProjectStore
 import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { useVfsStore } from "@/store/vfs.store";
@@ -23,6 +24,7 @@ import { ProjectSettingsPrompt } from "./ProjectSettingsPrompt";
 import { ProjectSettingsParams } from "./ProjectSettingsParams";
 import { ProjectSettingsSync } from "./ProjectSettingsSync";
 import { ProjectSettingsVfs } from "./ProjectSettingsVfs";
+import { useConversationStore } from "@/store/conversation.store"; // Needed for syncRepos
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
@@ -35,19 +37,17 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   onClose,
   projectId,
 }) => {
-  const {
-    getProjectById,
-    updateProject,
-    getEffectiveProjectSettings,
-    syncRepos,
-  } = useConversationStore(
-    useShallow((state) => ({
-      getProjectById: state.getProjectById,
-      updateProject: state.updateProject,
-      getEffectiveProjectSettings: state.getEffectiveProjectSettings,
-      syncRepos: state.syncRepos,
-    })),
-  );
+  // Use ProjectStore for project data and actions
+  const { getProjectById, updateProject, getEffectiveProjectSettings } =
+    useProjectStore(
+      useShallow((state) => ({
+        getProjectById: state.getProjectById,
+        updateProject: state.updateProject,
+        getEffectiveProjectSettings: state.getEffectiveProjectSettings,
+      })),
+    );
+  // Get syncRepos from ConversationStore
+  const syncRepos = useConversationStore((state) => state.syncRepos);
 
   const globalDefaults = useSettingsStore(
     useShallow((state) => ({
@@ -61,10 +61,8 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
     })),
   );
   const globalModelId = useProviderStore((state) => state.selectedModelId);
-  // Only need setVfsKey from VFS store
   const setVfsKey = useVfsStore((state) => state.setVfsKey);
 
-  // State for each setting, allowing null to represent 'inherit'
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
   const [modelId, setModelId] = useState<string | null>(null);
   const [temperature, setTemperature] = useState<number | null>(null);
@@ -75,7 +73,6 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   const [frequencyPenalty, setFrequencyPenalty] = useState<number | null>(null);
   const [syncRepoId, setSyncRepoId] = useState<string | null>(null);
 
-  // Local state for slider visual feedback
   const [localTemp, setLocalTemp] = useState(0.7);
   const [localTopP, setLocalTopP] = useState(1.0);
   const [localPresence, setLocalPresence] = useState(0.0);
@@ -89,29 +86,28 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
     ? getEffectiveProjectSettings(projectId)
     : null;
 
+  // This recursive helper needs to stay or be moved to ProjectStore if preferred
   const getEffectiveSyncRepoId = useCallback(
     (projId: string | null): string | null => {
       if (!projId) return null;
-      const currentProj = getProjectById(projId);
+      const currentProj = getProjectById(projId); // Use ProjectStore's getter
       if (!currentProj) return null;
       if (currentProj.metadata?.syncRepoId !== undefined) {
         return currentProj.metadata.syncRepoId;
       }
       return getEffectiveSyncRepoId(currentProj.parentId);
     },
-    [getProjectById],
+    [getProjectById], // Depend on ProjectStore's getter
   );
   const effectiveSyncRepoId = projectId
     ? getEffectiveSyncRepoId(projectId)
     : null;
 
-  // Effect to load settings AND set VFS key when modal opens/closes
   useEffect(() => {
     if (isOpen && projectId) {
       console.log(
         `[ProjectSettingsModal] Opening for ${projectId}. Setting VFS key.`,
       );
-      // Set the desired VFS key. The VFS store will handle initialization.
       setVfsKey(projectId);
 
       const currentProject = getProjectById(projectId);
@@ -137,9 +133,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
       );
     } else if (!isOpen) {
       console.log("[ProjectSettingsModal] Closing. Setting VFS key to null.");
-      // Set desired VFS key to null when modal closes
       setVfsKey(null);
-      // Reset form state when closed
       setSystemPrompt(null);
       setModelId(null);
       setTemperature(null);
@@ -155,12 +149,10 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
     projectId,
     getProjectById,
     getEffectiveProjectSettings,
-    getEffectiveSyncRepoId,
     globalDefaults,
-    setVfsKey, // Add setVfsKey dependency
+    setVfsKey,
   ]);
 
-  // Update local slider state when the main state changes (no changes needed here)
   useEffect(
     () =>
       setLocalTemp(
@@ -203,7 +195,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
     setIsSaving(true);
     try {
       const parentSettings = project?.parentId
-        ? getEffectiveProjectSettings(project.parentId)
+        ? getEffectiveProjectSettings(project.parentId) // Use ProjectStore getter
         : {
             systemPrompt: globalDefaults.globalSystemPrompt,
             modelId: globalModelId,
@@ -218,38 +210,61 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
         ? getEffectiveSyncRepoId(project.parentId)
         : null;
 
-      const updates: Partial<Project> = {};
+      const updates: Partial<Omit<Project, "id" | "createdAt" | "path">> = {};
       const metadataUpdates: Record<string, any> = {
         ...(project?.metadata ?? {}),
       };
 
-      updates.systemPrompt =
-        systemPrompt !== parentSettings.systemPrompt ? systemPrompt : undefined;
-      updates.modelId =
-        modelId !== parentSettings.modelId ? modelId : undefined;
-      updates.temperature =
-        temperature !== parentSettings.temperature ? temperature : undefined;
-      updates.maxTokens =
-        maxTokens !== parentSettings.maxTokens ? maxTokens : undefined;
-      updates.topP = topP !== parentSettings.topP ? topP : undefined;
-      updates.topK = topK !== parentSettings.topK ? topK : undefined;
-      updates.presencePenalty =
-        presencePenalty !== parentSettings.presencePenalty
-          ? presencePenalty
-          : undefined;
-      updates.frequencyPenalty =
-        frequencyPenalty !== parentSettings.frequencyPenalty
-          ? frequencyPenalty
-          : undefined;
+      // Only include the field in updates if it's different from the parent/default
+      if (systemPrompt !== parentSettings.systemPrompt) {
+        updates.systemPrompt = systemPrompt;
+      } else {
+        updates.systemPrompt = undefined; // Explicitly set to undefined to remove override
+      }
+      if (modelId !== parentSettings.modelId) {
+        updates.modelId = modelId;
+      } else {
+        updates.modelId = undefined;
+      }
+      if (temperature !== parentSettings.temperature) {
+        updates.temperature = temperature;
+      } else {
+        updates.temperature = undefined;
+      }
+      if (maxTokens !== parentSettings.maxTokens) {
+        updates.maxTokens = maxTokens;
+      } else {
+        updates.maxTokens = undefined;
+      }
+      if (topP !== parentSettings.topP) {
+        updates.topP = topP;
+      } else {
+        updates.topP = undefined;
+      }
+      if (topK !== parentSettings.topK) {
+        updates.topK = topK;
+      } else {
+        updates.topK = undefined;
+      }
+      if (presencePenalty !== parentSettings.presencePenalty) {
+        updates.presencePenalty = presencePenalty;
+      } else {
+        updates.presencePenalty = undefined;
+      }
+      if (frequencyPenalty !== parentSettings.frequencyPenalty) {
+        updates.frequencyPenalty = frequencyPenalty;
+      } else {
+        updates.frequencyPenalty = undefined;
+      }
 
       if (syncRepoId !== parentSyncRepoId) {
         metadataUpdates.syncRepoId = syncRepoId;
       } else {
-        delete metadataUpdates.syncRepoId;
+        delete metadataUpdates.syncRepoId; // Remove from metadata if matching parent
       }
       updates.metadata = metadataUpdates;
 
-      await updateProject(projectId, updates);
+      await updateProject(projectId, updates); // Use ProjectStore action
       toast.success(`Project "${project?.name}" settings updated.`);
       onClose();
     } catch (error) {
@@ -303,7 +318,6 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
             </TabsTrigger>
           </TabsList>
 
-          {/* Container for tab content with overflow */}
           <div className="flex-grow overflow-y-auto pb-6 pr-2 -mr-2">
             <TabsContent value="prompt">
               <ProjectSettingsPrompt
@@ -367,15 +381,12 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
                 syncRepoId={syncRepoId}
                 setSyncRepoId={setSyncRepoId}
                 effectiveSyncRepoId={effectiveSyncRepoId}
-                syncRepos={syncRepos}
+                syncRepos={syncRepos} // Pass syncRepos from ConversationStore
                 isSaving={isSaving}
               />
             </TabsContent>
 
-            {/* Render VFS tab content */}
             <TabsContent value="vfs" className="h-full">
-              {" "}
-              {/* Ensure content takes height */}
               <ProjectSettingsVfs
                 projectId={projectId}
                 projectName={project?.name ?? null}
