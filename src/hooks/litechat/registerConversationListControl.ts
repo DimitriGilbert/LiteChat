@@ -1,4 +1,5 @@
 // src/hooks/litechat/registerConversationListControl.ts
+// Entire file content provided
 import React from "react"; // Import React
 import { ConversationListControlComponent } from "@/components/LiteChat/chat/control/ConversationList";
 import { ConversationListIconRenderer } from "@/components/LiteChat/chat/control/conversation-list/IconRenderer";
@@ -15,7 +16,7 @@ export function registerConversationListControl() {
     panel: "sidebar",
     order: 10,
     status: () => (isLoading ? "loading" : "ready"),
-    // Wrap component calls in React.createElement
+    // Wrap component calls in React.createElement or JSX
     renderer: () => React.createElement(ConversationListControlComponent),
     iconRenderer: () => React.createElement(ConversationListIconRenderer),
     show: () => true,

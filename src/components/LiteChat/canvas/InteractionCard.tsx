@@ -1,10 +1,9 @@
 // src/components/LiteChat/canvas/InteractionCard.tsx
 // Entire file content provided
-import React, { useMemo, useState, useCallback } from "react"; // Import useState, useCallback
+import React, { useMemo, useState, useCallback } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { UserPromptDisplay } from "./UserPromptDisplay";
-import { StreamingContentView } from "./StreamingContentView";
-import { Button } from "@/components/ui/button";
+// Removed StreamingContentView import
 import {
   RefreshCwIcon,
   Trash2Icon,
@@ -14,19 +13,20 @@ import {
   ChevronUpIcon,
   ClipboardIcon,
   CheckIcon,
-} from "lucide-react"; // Import icons
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useProviderStore } from "@/store/provider.store";
 import { splitModelId } from "@/lib/litechat/provider-helpers";
 import { useShallow } from "zustand/react/shallow";
-import { toast } from "sonner"; // Import toast
+import { toast } from "sonner";
+import { ActionTooltipButton } from "../common/ActionTooltipButton";
+// Import the markdown parser hook and types
+import {
+  useMarkdownParser,
+  CodeBlockData,
+} from "@/lib/litechat/useMarkdownParser";
+import { CodeBlockRenderer } from "../common/CodeBlockRenderer"; // Keep CodeBlockRenderer
 
 interface InteractionCardProps {
   interaction: Interaction;
@@ -36,12 +36,50 @@ interface InteractionCardProps {
   className?: string;
 }
 
+// Component to render static markdown content
+const StaticContentView: React.FC<{ markdownContent: string | null }> = ({
+  markdownContent,
+}) => {
+  const parsedContent = useMarkdownParser(markdownContent); // Use the parser hook
+
+  if (!markdownContent?.trim()) {
+    return (
+      <div className="text-muted-foreground italic">No response content.</div>
+    );
+  }
+
+  return (
+    <div>
+      {parsedContent.map((item, index) => {
+        if (typeof item === "string") {
+          return (
+            <div
+              key={`html-${index}`}
+              className="markdown-content"
+              dangerouslySetInnerHTML={{ __html: item }}
+            />
+          );
+        } else if (item.type === "code") {
+          const codeData = item as CodeBlockData;
+          return (
+            <CodeBlockRenderer
+              key={`code-${index}`}
+              lang={codeData.lang}
+              code={codeData.code}
+            />
+          );
+        }
+        return null;
+      })}
+    </div>
+  );
+};
+
 export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
   ({ interaction, onRegenerate, onDelete, onEdit, className }) => {
-    const [isResponseFolded, setIsResponseFolded] = useState(false); // State for folding response
-    const [isResponseCopied, setIsResponseCopied] = useState(false); // State for copy button
+    const [isResponseFolded, setIsResponseFolded] = useState(false);
+    const [isResponseCopied, setIsResponseCopied] = useState(false);
 
-    // Use useShallow for potentially complex state or multiple selections
     const { dbProviderConfigs, getAllAvailableModelDefsForProvider } =
       useProviderStore(
         useShallow((state) => ({
@@ -97,7 +135,6 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
       ? formatDistanceToNow(new Date(interaction.endedAt), { addSuffix: true })
       : "Processing...";
 
-    // --- Memoize Model Name Calculation ---
     const displayModelName = useMemo(() => {
       const modelIdFromMeta = interaction.metadata?.modelId;
       if (!modelIdFromMeta) return "Unknown Model";
@@ -105,23 +142,21 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
       const { providerId, modelId: specificModelId } =
         splitModelId(modelIdFromMeta);
       if (!providerId || !specificModelId) {
-        return modelIdFromMeta; // Fallback if split fails
+        return modelIdFromMeta;
       }
 
       const provider = dbProviderConfigs.find((p) => p.id === providerId);
       const providerName = provider?.name ?? providerId;
 
-      // Use the stable selector function from the store
       const allModels = getAllAvailableModelDefsForProvider(providerId);
       const modelDef = allModels.find((m) => m.id === specificModelId);
 
       return `${modelDef?.name ?? specificModelId} (${providerName})`;
     }, [
       interaction.metadata?.modelId,
-      dbProviderConfigs, // Depend on the array reference
-      getAllAvailableModelDefsForProvider, // Depend on the stable selector function
+      dbProviderConfigs,
+      getAllAvailableModelDefsForProvider,
     ]);
-    // --- End Memoize Model Name Calculation ---
 
     const showActions =
       interaction.status === "COMPLETED" || interaction.status === "ERROR";
@@ -139,7 +174,6 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
           className,
         )}
       >
-        {/* User Prompt */}
         {interaction.prompt && (
           <UserPromptDisplay
             turnData={interaction.prompt}
@@ -147,9 +181,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
           />
         )}
 
-        {/* Assistant Response */}
         <div className="mt-3 pt-3 border-t border-border/50 relative group/assistant">
-          {/* Header */}
           <div className="flex justify-between items-center mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-10 p-1 -m-1 rounded-t">
             <div className="flex items-center gap-2">
               <BotIcon className="h-4 w-4 text-secondary" />
@@ -161,61 +193,39 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
               <span className="text-xs text-muted-foreground mr-2">
                 {timeAgo}
               </span>
-              {/* Copy Button */}
               {hasResponseContent &&
                 typeof interaction.response === "string" && (
-                  <TooltipProvider delayDuration={100}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity"
-                          onClick={handleCopyResponse}
-                          aria-label="Copy assistant response"
-                        >
-                          {isResponseCopied ? (
-                            <CheckIcon className="h-3 w-3 text-green-500" />
-                          ) : (
-                            <ClipboardIcon className="h-3 w-3" />
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">Copy Response</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <ActionTooltipButton
+                    tooltipText="Copy Response"
+                    onClick={handleCopyResponse}
+                    aria-label="Copy assistant response"
+                    icon={
+                      isResponseCopied ? (
+                        <CheckIcon className="text-green-500" />
+                      ) : (
+                        <ClipboardIcon />
+                      )
+                    }
+                    className="h-5 w-5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity"
+                  />
                 )}
-              {/* Fold Button */}
               {hasResponseContent && (
-                <TooltipProvider delayDuration={100}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity"
-                        onClick={toggleResponseFold}
-                        aria-label={
-                          isResponseFolded ? "Unfold response" : "Fold response"
-                        }
-                      >
-                        {isResponseFolded ? (
-                          <ChevronDownIcon className="h-3.5 w-3.5" />
-                        ) : (
-                          <ChevronUpIcon className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      {isResponseFolded ? "Unfold" : "Fold"}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <ActionTooltipButton
+                  tooltipText={isResponseFolded ? "Unfold" : "Fold"}
+                  onClick={toggleResponseFold}
+                  aria-label={
+                    isResponseFolded ? "Unfold response" : "Fold response"
+                  }
+                  icon={
+                    isResponseFolded ? <ChevronDownIcon /> : <ChevronUpIcon />
+                  }
+                  iconClassName="h-3.5 w-3.5"
+                  className="h-5 w-5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity"
+                />
               )}
             </div>
           </div>
 
-          {/* Content (Conditionally Rendered) */}
           {!isResponseFolded && (
             <>
               {isError && interaction.metadata?.error && (
@@ -224,11 +234,8 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
                   <p>{interaction.metadata.error}</p>
                 </div>
               )}
-              {/* Render response content */}
-              <StreamingContentView
-                markdownContent={interaction.response}
-                isStreaming={false}
-              />
+              {/* Use StaticContentView for completed interactions */}
+              <StaticContentView markdownContent={interaction.response} />
             </>
           )}
           {isResponseFolded && (
@@ -243,62 +250,38 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
           )}
         </div>
 
-        {/* Action Buttons (Floating within the card) */}
         {showActions && (
           <div
             className="absolute bottom-2 right-2 flex items-center space-x-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200
                        bg-card/80 backdrop-blur-sm p-1 rounded-md shadow-md z-20"
           >
-            <TooltipProvider delayDuration={100}>
-              {onEdit && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={handleEdit}
-                      aria-label="Edit User Prompt"
-                    >
-                      <EditIcon className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Edit</TooltipContent>
-                </Tooltip>
-              )}
-              {onRegenerate && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={handleRegenerate}
-                      aria-label="Regenerate Response"
-                    >
-                      <RefreshCwIcon className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Regenerate</TooltipContent>
-                </Tooltip>
-              )}
-              {onDelete && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-destructive hover:text-destructive/80"
-                      onClick={handleDelete}
-                      aria-label="Delete Interaction"
-                    >
-                      <Trash2Icon className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Delete</TooltipContent>
-                </Tooltip>
-              )}
-            </TooltipProvider>
+            {onEdit && (
+              <ActionTooltipButton
+                tooltipText="Edit"
+                onClick={handleEdit}
+                aria-label="Edit User Prompt"
+                icon={<EditIcon />}
+                className="h-6 w-6"
+              />
+            )}
+            {onRegenerate && (
+              <ActionTooltipButton
+                tooltipText="Regenerate"
+                onClick={handleRegenerate}
+                aria-label="Regenerate Response"
+                icon={<RefreshCwIcon />}
+                className="h-6 w-6"
+              />
+            )}
+            {onDelete && (
+              <ActionTooltipButton
+                tooltipText="Delete"
+                onClick={handleDelete}
+                aria-label="Delete Interaction"
+                icon={<Trash2Icon />}
+                className="h-6 w-6 text-destructive hover:text-destructive/80"
+              />
+            )}
           </div>
         )}
       </div>

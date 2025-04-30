@@ -1,6 +1,6 @@
 // src/components/LiteChat/canvas/UserPromptDisplay.tsx
 // Entire file content provided
-import React, { useState, useCallback } from "react"; // Import useState, useCallback
+import React, { useState, useCallback } from "react";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
 import { FilePreviewRenderer } from "../common/FilePreviewRenderer";
 import { formatDistanceToNow } from "date-fns";
@@ -11,15 +11,9 @@ import {
   ChevronUpIcon,
   ClipboardIcon,
   CheckIcon,
-} from "lucide-react"; // Import icons
-import { Button } from "@/components/ui/button"; // Import Button
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"; // Import Tooltip
-import { toast } from "sonner"; // Import toast
+} from "lucide-react";
+import { toast } from "sonner";
+import { ActionTooltipButton } from "../common/ActionTooltipButton"; // Import ActionTooltipButton
 
 interface UserPromptDisplayProps {
   turnData: Readonly<PromptTurnObject>;
@@ -29,8 +23,8 @@ interface UserPromptDisplayProps {
 
 export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
   ({ turnData, timestamp, className }) => {
-    const [isFolded, setIsFolded] = useState(false); // State for folding
-    const [isCopied, setIsCopied] = useState(false); // State for copy button
+    const [isFolded, setIsFolded] = useState(false);
+    const [isCopied, setIsCopied] = useState(false);
 
     const timeAgo = timestamp
       ? formatDistanceToNow(new Date(timestamp), { addSuffix: true })
@@ -58,7 +52,6 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
 
     return (
       <div className={cn("user-prompt relative group/user", className)}>
-        {/* Header */}
         <div className="flex justify-between items-center mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-10 p-1 -m-1 rounded-t">
           <div className="flex items-center gap-2">
             <UserIcon className="h-4 w-4 text-primary" />
@@ -68,73 +61,47 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
             <span className="text-xs text-muted-foreground mr-2">
               {timeAgo}
             </span>
-            {/* Copy Button */}
             {hasContent && (
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 opacity-0 group-hover/user:opacity-100 focus-within:opacity-100 transition-opacity"
-                      onClick={handleCopy}
-                      aria-label="Copy user prompt"
-                    >
-                      {isCopied ? (
-                        <CheckIcon className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <ClipboardIcon className="h-3 w-3" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Copy Prompt</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <ActionTooltipButton
+                tooltipText="Copy Prompt"
+                onClick={handleCopy}
+                aria-label="Copy user prompt"
+                icon={
+                  isCopied ? (
+                    <CheckIcon className="text-green-500" />
+                  ) : (
+                    <ClipboardIcon />
+                  )
+                }
+                className="h-5 w-5 opacity-0 group-hover/user:opacity-100 focus-within:opacity-100 transition-opacity"
+              />
             )}
-            {/* Fold Button */}
             {(hasContent || hasFiles) && (
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 opacity-0 group-hover/user:opacity-100 focus-within:opacity-100 transition-opacity"
-                      onClick={toggleFold}
-                      aria-label={isFolded ? "Unfold prompt" : "Fold prompt"}
-                    >
-                      {isFolded ? (
-                        <ChevronDownIcon className="h-3.5 w-3.5" />
-                      ) : (
-                        <ChevronUpIcon className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    {isFolded ? "Unfold" : "Fold"}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <ActionTooltipButton
+                tooltipText={isFolded ? "Unfold" : "Fold"}
+                onClick={toggleFold}
+                aria-label={isFolded ? "Unfold prompt" : "Fold prompt"}
+                icon={isFolded ? <ChevronDownIcon /> : <ChevronUpIcon />}
+                iconClassName="h-3.5 w-3.5"
+                className="h-5 w-5 opacity-0 group-hover/user:opacity-100 focus-within:opacity-100 transition-opacity"
+              />
             )}
           </div>
         </div>
 
-        {/* Content (Conditionally Rendered) */}
         {!isFolded && (
           <>
-            {/* Display attached files if any */}
             {hasFiles && (
               <div className="mb-2 space-y-1">
                 {turnData.metadata.attachedFiles?.map((fileMeta) => (
                   <FilePreviewRenderer
                     key={fileMeta.id}
                     fileMeta={fileMeta}
-                    isReadOnly={true} // Prompts in history are read-only
+                    isReadOnly={true}
                   />
                 ))}
               </div>
             )}
-            {/* Display text content if any */}
             {hasContent && (
               <p className="whitespace-pre-wrap text-sm text-foreground">
                 {turnData.content}

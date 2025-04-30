@@ -22,14 +22,12 @@ const SettingsGeneralComponent: React.FC = () => {
   const {
     theme,
     setTheme,
-    enableAdvancedSettings,
-    setEnableAdvancedSettings,
+    // Removed unused enableAdvancedSettings and setEnableAdvancedSettings
     enableStreamingMarkdown,
     setEnableStreamingMarkdown,
-    streamingUpdateFPS, // Use new state
-    setStreamingUpdateFPS, // Use new setter
-    enableStreamingCodeBlockParsing, // Use new state
-    setEnableStreamingCodeBlockParsing, // Use new setter
+    streamingRenderFPS, // Corrected state name
+    setStreamingRenderFPS, // Corrected setter name
+    // Removed enableStreamingCodeBlockParsing and its setter
     prismThemeUrl,
     setPrismThemeUrl,
     resetGeneralSettings,
@@ -37,15 +35,14 @@ const SettingsGeneralComponent: React.FC = () => {
     useShallow((state) => ({
       theme: state.theme,
       setTheme: state.setTheme,
-      enableAdvancedSettings: state.enableAdvancedSettings,
-      setEnableAdvancedSettings: state.setEnableAdvancedSettings,
+      // Removed enableAdvancedSettings: state.enableAdvancedSettings,
+      // Removed setEnableAdvancedSettings: state.setEnableAdvancedSettings,
       enableStreamingMarkdown: state.enableStreamingMarkdown,
       setEnableStreamingMarkdown: state.setEnableStreamingMarkdown,
-      streamingUpdateFPS: state.streamingUpdateFPS, // Get new state
-      setStreamingUpdateFPS: state.setStreamingUpdateFPS, // Get new setter
-      enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing, // Get new state
-      setEnableStreamingCodeBlockParsing:
-        state.setEnableStreamingCodeBlockParsing, // Get new setter
+      streamingRenderFPS: state.streamingRenderFPS, // Corrected state name
+      setStreamingRenderFPS: state.setStreamingRenderFPS, // Corrected setter name
+      // Removed enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing,
+      // Removed setEnableStreamingCodeBlockParsing: state.setEnableStreamingCodeBlockParsing,
       prismThemeUrl: state.prismThemeUrl,
       setPrismThemeUrl: state.setPrismThemeUrl,
       resetGeneralSettings: state.resetGeneralSettings,
@@ -53,7 +50,7 @@ const SettingsGeneralComponent: React.FC = () => {
   );
 
   // Local state for the single FPS slider
-  const [localFps, setLocalFps] = useState(streamingUpdateFPS);
+  const [localFps, setLocalFps] = useState(streamingRenderFPS); // Use correct state
 
   // Combined FPS Handlers
   const handleFpsSliderVisualChange = useCallback((value: number[]) => {
@@ -61,9 +58,9 @@ const SettingsGeneralComponent: React.FC = () => {
   }, []);
   const handleFpsSliderCommit = useCallback(
     (value: number[]) => {
-      setStreamingUpdateFPS(value[0]); // Use the new setter
+      setStreamingRenderFPS(value[0]); // Use the correct setter
     },
-    [setStreamingUpdateFPS],
+    [setStreamingRenderFPS], // Use correct setter dependency
   );
   const handleFpsInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -72,17 +69,17 @@ const SettingsGeneralComponent: React.FC = () => {
         value === "" ? 15 : parseInt(value.replace(/[^0-9]/g, ""), 10); // Default to 15
       if (!isNaN(numValue)) {
         const clampedFps = Math.max(3, Math.min(60, numValue)); // Range 3-60
-        setStreamingUpdateFPS(clampedFps); // Use the new setter
+        setStreamingRenderFPS(clampedFps); // Use the correct setter
         setLocalFps(clampedFps);
       }
     },
-    [setStreamingUpdateFPS],
+    [setStreamingRenderFPS], // Use correct setter dependency
   );
 
   // Sync local state if store changes from elsewhere
   useEffect(() => {
-    setLocalFps(streamingUpdateFPS);
-  }, [streamingUpdateFPS]);
+    setLocalFps(streamingRenderFPS); // Use correct state
+  }, [streamingRenderFPS]); // Use correct state dependency
 
   // Handler for the reset button (remains the same)
   const handleResetClick = () => {
@@ -159,26 +156,7 @@ const SettingsGeneralComponent: React.FC = () => {
             onCheckedChange={setEnableStreamingMarkdown}
           />
         </div>
-        {/* Streaming Code Block Parsing Toggle */}
-        <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-          <div>
-            <Label
-              htmlFor="streaming-code-parsing-switch"
-              className="font-medium"
-            >
-              Parse Code Blocks While Streaming
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Apply syntax highlighting to code blocks as they stream in.
-              Disable if experiencing lag with large code outputs.
-            </p>
-          </div>
-          <Switch
-            id="streaming-code-parsing-switch"
-            checked={enableStreamingCodeBlockParsing ?? true}
-            onCheckedChange={setEnableStreamingCodeBlockParsing}
-          />
-        </div>
+        {/* Removed Streaming Code Block Parsing Toggle */}
         {/* Combined Streaming FPS Setting */}
         <div className="rounded-lg border p-3 shadow-sm space-y-2">
           <div>
@@ -216,29 +194,7 @@ const SettingsGeneralComponent: React.FC = () => {
         </div>
       </div>
 
-      {/* Advanced Settings (Hidden for now, can be re-enabled if needed) */}
-      {/*
-      <Separator />
-      <div className="space-y-2">
-        <h3 className="text-lg font-medium">Advanced Settings</h3>
-        <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-          <div>
-            <Label htmlFor="advanced-settings-switch" className="font-medium">
-              Enable Advanced Controls
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Show controls for AI parameters (temperature, etc.) and Assistant
-              settings tab.
-            </p>
-          </div>
-          <Switch
-            id="advanced-settings-switch"
-            checked={enableAdvancedSettings ?? false}
-            onCheckedChange={setEnableAdvancedSettings}
-          />
-        </div>
-      </div>
-      */}
+      {/* Removed Advanced Settings Section */}
 
       {/* Reset Button Section */}
       <Separator />

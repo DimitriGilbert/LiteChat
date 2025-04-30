@@ -22,13 +22,13 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
   className,
 }) => {
   // Use useShallow to select multiple state values efficiently
-  const { enableStreamingMarkdown, enableStreamingCodeBlockParsing } =
-    useSettingsStore(
-      useShallow((state) => ({
-        enableStreamingMarkdown: state.enableStreamingMarkdown,
-        enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing,
-      })),
-    );
+  // Removed enableStreamingCodeBlockParsing as it doesn't exist in the store
+  const { enableStreamingMarkdown } = useSettingsStore(
+    useShallow((state) => ({
+      enableStreamingMarkdown: state.enableStreamingMarkdown,
+      // Removed enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing,
+    })),
+  );
 
   // Only parse if streaming markdown is enabled
   const parsedContent = useMarkdownParser(
@@ -59,6 +59,7 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
       } else if (item.type === "code") {
         const codeData = item as CodeBlockData;
         // CodeBlockRenderer now internally checks enableStreamingCodeBlockParsing
+        // which was removed, so it will rely on its own logic or default behavior
         return (
           <CodeBlockRenderer
             key={`code-${index}`}
@@ -69,13 +70,7 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
       }
       return null;
     });
-  }, [
-    parsedContent,
-    enableStreamingMarkdown,
-    markdownContent,
-    className,
-    // enableStreamingCodeBlockParsing is implicitly handled by CodeBlockRenderer
-  ]);
+  }, [parsedContent, enableStreamingMarkdown, markdownContent, className]);
 
   // Fallback for empty content
   if (!markdownContent?.trim()) {

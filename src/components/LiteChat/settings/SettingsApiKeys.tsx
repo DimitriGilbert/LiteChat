@@ -267,7 +267,9 @@ const SettingsApiKeysComponent: React.FC = () => {
                             aria-label={
                               showValues[key.id] ? "Hide key" : "Show key"
                             }
-                            icon={showValues[key.id] ? EyeOffIcon : EyeIcon}
+                            icon={
+                              showValues[key.id] ? <EyeOffIcon /> : <EyeIcon />
+                            }
                             disabled={isKeyDeleting}
                             className="h-6 w-6"
                           />

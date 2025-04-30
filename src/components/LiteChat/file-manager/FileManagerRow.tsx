@@ -1,8 +1,8 @@
 // src/components/LiteChat/file-manager/FileManagerRow.tsx
+// Entire file content provided
 import React from "react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   FolderIcon,
@@ -21,12 +21,6 @@ import {
   Loader2Icon,
 } from "lucide-react";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -36,17 +30,17 @@ import {
 import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/litechat/file-manager-utils";
 import type { VfsNode } from "@/types/litechat/vfs";
+import { ActionTooltipButton } from "../common/ActionTooltipButton"; // Import ActionTooltipButton
 
 interface FileManagerRowProps {
   entry: VfsNode;
   isEditingThis: boolean;
-  isChecked: boolean; // Keep this prop, value comes from FileManagerTable
+  isChecked: boolean;
   isGitRepo: boolean;
   newName: string;
   isOperationLoading: boolean;
   creatingFolder: boolean;
   handleNavigate: (entry: VfsNode) => void;
-  // Update handler signature to pass node ID
   handleCheckboxChange: (checked: boolean, nodeId: string) => void;
   startEditing: (entry: VfsNode) => void;
   cancelEditing: () => void;
@@ -121,7 +115,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
 
   const rowContent = (
     <TableRow
-      key={entry.id} // Use node ID as key
+      key={entry.id}
       className={cn(
         "group hover:bg-muted/50",
         isEditingThis && "bg-muted ring-1 ring-primary",
@@ -136,12 +130,10 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
         <Checkbox
           checked={isChecked}
           onCheckedChange={(checked) =>
-            // Pass node ID to handler
             handleCheckboxChange(!!checked, entry.id)
           }
           aria-label={`Select ${entry.name}`}
           className="border-border data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-          // Disable checkbox for folders or when loading
           disabled={isOperationLoading || isDirectory}
         />
       </TableCell>
@@ -196,117 +188,74 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
         >
           {isEditingThis ? (
             <>
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-green-500 hover:text-green-400"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRename();
-                      }}
-                      aria-label="Save name"
-                      disabled={isOperationLoading || !newName.trim()}
-                    >
-                      {isOperationLoading ? (
-                        <Loader2Icon className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <CheckIcon className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Save (Enter)</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        cancelEditing();
-                      }}
-                      aria-label="Cancel edit"
-                      disabled={isOperationLoading}
-                    >
-                      <XIcon className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Cancel (Esc)</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <ActionTooltipButton
+                tooltipText="Save (Enter)"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRename();
+                }}
+                aria-label="Save name"
+                disabled={isOperationLoading || !newName.trim()}
+                icon={
+                  isOperationLoading ? (
+                    <Loader2Icon className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckIcon />
+                  )
+                }
+                className="h-6 w-6 text-green-500 hover:text-green-400"
+              />
+              <ActionTooltipButton
+                tooltipText="Cancel (Esc)"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  cancelEditing();
+                }}
+                aria-label="Cancel edit"
+                disabled={isOperationLoading}
+                icon={<XIcon />}
+                className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              />
             </>
           ) : (
             <>
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startEditing(entry);
-                      }}
-                      aria-label="Rename"
-                      disabled={isOperationLoading || creatingFolder}
-                    >
-                      <EditIcon className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Rename</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownload(entry);
-                      }}
-                      aria-label={
-                        isDirectory ? "Download folder as ZIP" : "Download file"
-                      }
-                      disabled={isOperationLoading}
-                    >
-                      <DownloadIcon className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    {isDirectory ? "Download folder (.zip)" : "Download file"}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-destructive hover:text-destructive/80"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(entry);
-                      }}
-                      aria-label={`Delete ${isDirectory ? "folder" : "file"}`}
-                      disabled={isOperationLoading}
-                    >
-                      <Trash2Icon className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Delete</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <ActionTooltipButton
+                tooltipText="Rename"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  startEditing(entry);
+                }}
+                aria-label="Rename"
+                disabled={isOperationLoading || creatingFolder}
+                icon={<EditIcon />}
+                className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              />
+              <ActionTooltipButton
+                tooltipText={
+                  isDirectory ? "Download folder (.zip)" : "Download file"
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDownload(entry);
+                }}
+                aria-label={
+                  isDirectory ? "Download folder as ZIP" : "Download file"
+                }
+                disabled={isOperationLoading}
+                icon={<DownloadIcon />}
+                className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              />
+              <ActionTooltipButton
+                tooltipText="Delete"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(entry);
+                }}
+                aria-label={`Delete ${isDirectory ? "folder" : "file"}`}
+                disabled={isOperationLoading}
+                icon={<Trash2Icon />}
+                className="h-6 w-6 text-destructive hover:text-destructive/80"
+              />
             </>
           )}
         </div>
