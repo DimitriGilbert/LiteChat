@@ -159,11 +159,6 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                 interaction={interaction}
                 onEdit={onEditInteraction}
                 onRegenerate={onRegenerateInteraction}
-                onDelete={
-                  interaction.type === "message.user_assistant"
-                    ? useInteractionStore.getState().deleteInteraction
-                    : undefined
-                }
               />
             );
           }

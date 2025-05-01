@@ -1,5 +1,5 @@
 // src/lib/litechat/ai-helpers.ts
-// Entire file content provided
+// Ensure necessary functions are exported and update imports if needed
 import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
 import type {
   ModMiddlewareHookName,
@@ -208,15 +208,37 @@ export function buildHistoryMessages(
   return historyInteractions.flatMap((i): CoreMessage[] => {
     const msgs: CoreMessage[] = [];
 
-    // Add user message if content exists
-    if (i.prompt?.content && typeof i.prompt.content === "string") {
-      msgs.push({ role: "user", content: i.prompt.content });
-    } else if (
-      i.prompt?.metadata?.attachedFiles &&
-      i.prompt.metadata.attachedFiles.length > 0 &&
-      !i.prompt?.content
-    ) {
-      // Omit user turn if only files and no text content
+    // Add user message if content exists or files were attached
+    // Check the original prompt turn data stored in the interaction
+    const userPrompt = i.prompt;
+    if (userPrompt) {
+      const userMessageContentParts: (TextPart | ImagePart)[] = [];
+      // Add file parts first (reconstruct from basic metadata if needed, though ideally not necessary here)
+      // For history, we primarily care about the text content. If files were complex (images),
+      // they might not be fully represented unless stored differently.
+      // Let's assume for history we only need the text part.
+      if (userPrompt.content) {
+        userMessageContentParts.push({
+          type: "text",
+          text: userPrompt.content,
+        });
+      }
+      // Add placeholders for files if they existed, for context
+      if (
+        userPrompt.metadata?.attachedFiles &&
+        userPrompt.metadata.attachedFiles.length > 0
+      ) {
+        userPrompt.metadata.attachedFiles.forEach((f) => {
+          userMessageContentParts.push({
+            type: "text",
+            text: `[User attached file: ${f.name}]`,
+          });
+        });
+      }
+
+      if (userMessageContentParts.length > 0) {
+        msgs.push({ role: "user", content: userMessageContentParts });
+      }
     }
 
     // Add assistant text response
