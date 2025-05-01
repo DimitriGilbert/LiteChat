@@ -2,6 +2,7 @@
 // Entire file content provided
 import React, { useMemo, useRef, useEffect, useState } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
+// Updated import path for InteractionCard
 import { InteractionCard } from "./InteractionCard";
 import { StreamingInteractionCard } from "./StreamingInteractionCard";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -93,7 +94,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     };
 
     viewport.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll()
+    handleScroll();
 
     return () => {
       viewport.removeEventListener("scroll", handleScroll);
@@ -158,6 +159,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                 interaction={interaction}
                 onEdit={onEditInteraction}
                 onRegenerate={onRegenerateInteraction}
+                onDelete={undefined} // Delete is handled internally now
               />
             );
           }
@@ -177,12 +179,10 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   };
 
   return (
-    // Reverted: Container is flex-grow and relative, ScrollArea is NOT absolutely positioned
     <div className={cn("flex-grow relative", className)}>
       <ScrollArea className="h-full w-full" ref={scrollAreaRef}>
         {renderContent()}
       </ScrollArea>
-      {/* Jump to Bottom Button remains absolutely positioned relative to the container */}
       {showJumpToBottom && (
         <TooltipProvider delayDuration={100}>
           <Tooltip>

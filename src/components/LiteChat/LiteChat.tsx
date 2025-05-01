@@ -32,7 +32,6 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-// Import the registration FUNCTIONS (remain the same)
 import { registerConversationListControl } from "@/hooks/litechat/registerConversationListControl";
 import { registerSettingsControl } from "@/hooks/litechat/registerSettingsControl";
 import { registerSidebarToggleControl } from "@/hooks/litechat/registerSidebarToggleControl";
@@ -46,13 +45,12 @@ import { registerToolSelectorControl } from "@/hooks/litechat/registerToolSelect
 import { registerProjectSettingsControl } from "@/hooks/litechat/registerProjectSettingsControl";
 import { usePromptStateStore } from "@/store/prompt.store";
 import { registerGlobalModelSelector } from "@/hooks/litechat/registerGlobalModelSelector";
-import { useInputStore } from "@/store/input.store"; // Import InputStore
-import { registerSystemPromptControl } from "@/hooks/litechat/registerSystemPromptControl"; // Import system prompt control
+import { registerSystemPromptControl } from "@/hooks/litechat/registerSystemPromptControl";
 
 export const LiteChat: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // --- Store Hooks (remain largely the same) ---
+  // --- Store Hooks  ---
   const { selectedItemId, selectedItemType, loadSidebarItems } =
     useConversationStore(
       useShallow((state) => ({

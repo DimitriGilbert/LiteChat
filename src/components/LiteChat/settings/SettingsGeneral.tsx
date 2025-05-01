@@ -24,6 +24,9 @@ const SettingsGeneralComponent: React.FC = () => {
     setTheme,
     enableStreamingMarkdown,
     setEnableStreamingMarkdown,
+    // Get new setting state and action
+    enableStreamingCodeBlockParsing,
+    setEnableStreamingCodeBlockParsing,
     streamingRenderFPS,
     setStreamingRenderFPS,
     prismThemeUrl,
@@ -35,6 +38,10 @@ const SettingsGeneralComponent: React.FC = () => {
       setTheme: state.setTheme,
       enableStreamingMarkdown: state.enableStreamingMarkdown,
       setEnableStreamingMarkdown: state.setEnableStreamingMarkdown,
+      // Get new setting state and action
+      enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing,
+      setEnableStreamingCodeBlockParsing:
+        state.setEnableStreamingCodeBlockParsing,
       streamingRenderFPS: state.streamingRenderFPS,
       setStreamingRenderFPS: state.setStreamingRenderFPS,
       prismThemeUrl: state.prismThemeUrl,
@@ -150,7 +157,24 @@ const SettingsGeneralComponent: React.FC = () => {
             onCheckedChange={setEnableStreamingMarkdown}
           />
         </div>
-        {/* Removed Streaming Code Block Parsing Toggle */}
+        {/* Streaming Code Block Parsing Toggle */}
+        <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+          <div>
+            <Label htmlFor="streaming-codeblock-switch" className="font-medium">
+              Use Full Code Blocks While Streaming
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Use the syntax-highlighting component for code blocks during
+              streaming. Disable for potentially smoother streaming on complex
+              code, using a basic block instead.
+            </p>
+          </div>
+          <Switch
+            id="streaming-codeblock-switch"
+            checked={enableStreamingCodeBlockParsing ?? false}
+            onCheckedChange={setEnableStreamingCodeBlockParsing}
+          />
+        </div>
         {/* Combined Streaming FPS Setting */}
         <div className="rounded-lg border p-3 shadow-sm space-y-2">
           <div>
@@ -187,8 +211,6 @@ const SettingsGeneralComponent: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Removed Advanced Settings Section */}
 
       {/* Reset Button Section */}
       <Separator />

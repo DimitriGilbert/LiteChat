@@ -8,7 +8,7 @@ import {
 import { CodeBlockRenderer } from "../common/CodeBlockRenderer";
 import { useSettingsStore } from "@/store/settings.store";
 import { cn } from "@/lib/utils";
-import { useShallow } from "zustand/react/shallow"
+import { useShallow } from "zustand/react/shallow";
 
 interface StreamingContentViewProps {
   markdownContent: string | null | undefined;
@@ -22,13 +22,14 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
   className,
 }) => {
   // Use useShallow to select multiple state values efficiently
-  // Removed enableStreamingCodeBlockParsing as it doesn't exist in the store
-  const { enableStreamingMarkdown } = useSettingsStore(
-    useShallow((state) => ({
-      enableStreamingMarkdown: state.enableStreamingMarkdown,
-      // Removed enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing,
-    })),
-  );
+  const { enableStreamingMarkdown, enableStreamingCodeBlockParsing } =
+    useSettingsStore(
+      useShallow((state) => ({
+        enableStreamingMarkdown: state.enableStreamingMarkdown,
+        // Get the new setting
+        enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing,
+      })),
+    );
 
   // Only parse if streaming markdown is enabled
   const parsedContent = useMarkdownParser(
@@ -58,19 +59,52 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
         );
       } else if (item.type === "code") {
         const codeData = item as CodeBlockData;
-        // CodeBlockRenderer now internally checks enableStreamingCodeBlockParsing
-        // which was removed, so it will rely on its own logic or default behavior
-        return (
-          <CodeBlockRenderer
-            key={`code-${index}`}
-            lang={codeData.lang}
-            code={codeData.code}
-          />
-        );
+        const languageClass = codeData.lang
+          ? `language-${codeData.lang}`
+          : "language-plaintext";
+        // Conditionally render CodeBlockRenderer or basic pre/code
+        if (enableStreamingCodeBlockParsing) {
+          return (
+            <CodeBlockRenderer
+              key={`code-${index}`}
+              lang={codeData.lang}
+              code={codeData.code}
+            />
+          );
+        } else {
+          // Render basic pre/code block if setting is off
+          return (
+            <pre
+              key={`pre-${index}`}
+              className="code-block-container my-4 border border-border rounded-lg overflow-x-auto"
+            >
+              <div className="code-block-header flex items-center justify-between px-3 py-2 border-b border-border bg-muted/50">
+                <div className="text-sm font-medium">
+                  {codeData.lang ? codeData.lang.toUpperCase() : "CODE"}
+                </div>
+                {/* Optionally add basic copy button here too */}
+              </div>
+              <code
+                className={cn(
+                  languageClass,
+                  "block p-4 font-mono text-sm leading-relaxed",
+                )}
+              >
+                {codeData.code}
+              </code>
+            </pre>
+          );
+        }
       }
       return null;
     });
-  }, [parsedContent, enableStreamingMarkdown, markdownContent, className]);
+  }, [
+    parsedContent,
+    enableStreamingMarkdown,
+    enableStreamingCodeBlockParsing, // Add dependency
+    markdownContent,
+    className,
+  ]);
 
   // Fallback for empty content
   if (!markdownContent?.trim()) {

@@ -1,27 +1,17 @@
 // src/store/project.store.ts
-// Entire file content provided - New store for projects
+// Entire file content provided
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { Project } from "@/types/litechat/project";
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
-import { buildPath } from "@/lib/litechat/file-manager-utils";
+import { dirname, buildPath } from "@/lib/litechat/file-manager-utils";
 import { useSettingsStore } from "./settings.store";
+import { useConversationStore } from "./conversation.store";
+import { useVfsStore } from "./vfs.store";
+// Import ProviderStore to get the globally selected model
 import { useProviderStore } from "./provider.store";
-import { useConversationStore } from "./conversation.store"
-
-// Interface for effective project settings (copied from conversation.store)
-interface EffectiveProjectSettings {
-  systemPrompt: string | null;
-  modelId: string | null;
-  temperature: number | null;
-  maxTokens: number | null;
-  topP: number | null;
-  topK: number | null;
-  presencePenalty: number | null;
-  frequencyPenalty: number | null;
-}
 
 interface ProjectState {
   projects: Project[];
@@ -43,10 +33,19 @@ interface ProjectActions {
   ) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   getProjectById: (id: string | null) => Project | undefined;
-  getEffectiveProjectSettings: (
+  getProjectHierarchy: (
     projectId: string | null,
-  ) => EffectiveProjectSettings;
-  getTopLevelProjectId: (projectId: string | null) => string | null;
+  ) => { id: string; name: string }[];
+  getEffectiveProjectSettings: (projectId: string | null) => {
+    systemPrompt: string | null;
+    modelId: string | null;
+    temperature: number | null;
+    maxTokens: number | null;
+    topP: number | null;
+    topK: number | null;
+    presencePenalty: number | null;
+    frequencyPenalty: number | null;
+  };
 }
 
 export const useProjectStore = create(
@@ -59,32 +58,28 @@ export const useProjectStore = create(
       set({ isLoading: true, error: null });
       try {
         const dbProjects = await PersistenceService.loadProjects();
-        set({
-          projects: dbProjects,
-          isLoading: false,
-        });
+        set({ projects: dbProjects, isLoading: false });
       } catch (e) {
         console.error("ProjectStore: Error loading projects", e);
-        set({ error: "Failed load projects", isLoading: false });
+        set({ error: "Failed to load projects", isLoading: false });
       }
     },
 
     addProject: async (projectData) => {
-      const parentId = projectData.parentId ?? null;
-      const parentProject = get().getProjectById(parentId);
-      const parentPath = parentProject ? parentProject.path : "/";
-      const projectName = projectData.name.trim();
-      const newPath = buildPath(parentPath, projectName);
-
       const newId = nanoid();
       const now = new Date();
+      const parentId = projectData.parentId ?? null;
+      const parentProject = parentId ? get().getProjectById(parentId) : null;
+      const parentPath = parentProject ? parentProject.path : "/";
+      const newPath = buildPath(parentPath, projectData.name);
+
       const newProject: Project = {
         id: newId,
-        path: newPath,
         createdAt: now,
         updatedAt: now,
-        name: projectName,
+        name: projectData.name,
         parentId: parentId,
+        path: newPath,
         systemPrompt: projectData.systemPrompt ?? null,
         modelId: projectData.modelId ?? null,
         temperature: projectData.temperature ?? null,
@@ -98,26 +93,23 @@ export const useProjectStore = create(
 
       set((state) => {
         state.projects.push(newProject);
+        state.projects.sort(
+          (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+        );
       });
 
       try {
         const projectToSave = get().getProjectById(newId);
         if (projectToSave) {
-          const plainData = JSON.parse(JSON.stringify(projectToSave));
-          await PersistenceService.saveProject(plainData);
+          await PersistenceService.saveProject(projectToSave);
+          // Initialize VFS for the new project immediately
+          await useVfsStore.getState().initializeVFS(newId);
         } else {
           throw new Error("Failed to retrieve newly added project state");
         }
         return newId;
-      } catch (e: any) {
+      } catch (e) {
         console.error("ProjectStore: Error adding project", e);
-        if (e.name === "ConstraintError") {
-          toast.error(
-            `A project or folder named "${projectName}" already exists in this location.`,
-          );
-        } else {
-          toast.error("Failed to save new project.");
-        }
         set((state) => ({
           error: "Failed to save new project",
           projects: state.projects.filter((p) => p.id !== newId),
@@ -129,100 +121,86 @@ export const useProjectStore = create(
     updateProject: async (id, updates) => {
       const originalProject = get().getProjectById(id);
       if (!originalProject) {
-        console.warn(`ProjectStore: Project ${id} not found.`);
+        console.warn(`ProjectStore: Project ${id} not found for update.`);
         return;
       }
 
       let newPath = originalProject.path;
-      let newName = originalProject.name;
-
-      if (updates.name !== undefined && updates.name !== originalProject.name) {
-        newName = updates.name.trim();
-        const parentProject = get().getProjectById(originalProject.parentId);
-        const parentPath = parentProject ? parentProject.path : "/";
-        newPath = buildPath(parentPath, newName);
+      if (updates.name && updates.name !== originalProject.name) {
+        const parentPath = dirname(originalProject.path);
+        newPath = buildPath(parentPath, updates.name);
       }
+
+      const updatedProjectData: Project = {
+        ...originalProject,
+        ...updates,
+        path: newPath,
+        updatedAt: new Date(),
+      };
 
       set((state) => {
         const index = state.projects.findIndex((p) => p.id === id);
         if (index !== -1) {
-          Object.assign(state.projects[index], {
-            ...updates,
-            name: newName,
-            path: newPath,
-            updatedAt: new Date(),
-          });
+          state.projects[index] = updatedProjectData;
+          state.projects.sort(
+            (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+          );
         }
       });
 
-      const updatedProjectData = get().getProjectById(id);
-
-      if (updatedProjectData) {
-        try {
-          const plainData = JSON.parse(JSON.stringify(updatedProjectData));
-          await PersistenceService.saveProject(plainData);
-        } catch (e: any) {
-          console.error("ProjectStore: Error updating project", e);
-          if (e.name === "ConstraintError") {
-            toast.error(
-              `A project or folder named "${newName}" already exists in this location.`,
-            );
-          } else {
-            toast.error("Failed to save project update.");
-          }
-          set((state) => {
-            const index = state.projects.findIndex((p) => p.id === id);
-            if (index !== -1) {
-              state.projects[index] = originalProject;
-            }
-            state.error = "Failed to save project update";
-          });
-          throw e;
-        }
-      } else {
-        console.error(
-          "ProjectStore: Failed to retrieve updated project state after update.",
-        );
+      try {
+        await PersistenceService.saveProject(updatedProjectData);
+      } catch (e) {
+        console.error("ProjectStore: Error updating project", e);
         set((state) => {
           const index = state.projects.findIndex((p) => p.id === id);
           if (index !== -1) {
             state.projects[index] = originalProject;
+            state.projects.sort(
+              (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+            );
           }
-          state.error = "Failed to save project update (state error)";
+          state.error = "Failed to save project update";
         });
+        throw e;
       }
     },
 
     deleteProject: async (id) => {
-      const projectToDelete = get().projects.find((p) => p.id === id);
+      const projectToDelete = get().getProjectById(id);
       if (!projectToDelete) return;
 
-      const descendantProjectIds = new Set<string>();
-      const findDescendants = (projectId: string) => {
-        descendantProjectIds.add(projectId);
-        get()
-          .projects.filter((p) => p.parentId === projectId)
-          .forEach((child) => findDescendants(child.id));
-      };
-      findDescendants(id);
+      const childProjectIds = get()
+        .projects.filter((p) => p.parentId === id)
+        .map((p) => p.id);
+      const allIdsToDelete = [id, ...childProjectIds];
 
-      // Update project state
       set((state) => ({
-        projects: state.projects.filter((p) => !descendantProjectIds.has(p.id)),
+        projects: state.projects.filter((p) => !allIdsToDelete.includes(p.id)),
       }));
 
-      // Update conversation state (unlink convos)
-      useConversationStore.getState()._unlinkConversationsFromProjects(
-        Array.from(descendantProjectIds)
-      );
+      // Unlink conversations associated with the deleted projects
+      useConversationStore
+        .getState()
+        ._unlinkConversationsFromProjects(allIdsToDelete);
 
       try {
-        // Delete from DB (this handles recursive deletion and unlinking in persistence)
         await PersistenceService.deleteProject(id);
+        // VFS deletion should be handled separately if needed, maybe via settings
+        toast.success(`Project "${projectToDelete.name}" deleted.`);
       } catch (e) {
         console.error("ProjectStore: Error deleting project", e);
-        set({ error: "Failed to delete project. Please reload." });
-        // Consider reverting state if needed, though complex with dependencies
+        set((state) => {
+          // Re-add the deleted projects if deletion failed
+          const projectsToAddBack = get()
+            .projects.filter((p) => allIdsToDelete.includes(p.id))
+            .concat(projectToDelete); // Ensure the main one is added back too
+          state.projects.push(...projectsToAddBack);
+          state.projects.sort(
+            (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+          );
+          state.error = "Failed to delete project";
+        });
         throw e;
       }
     },
@@ -232,88 +210,114 @@ export const useProjectStore = create(
       return get().projects.find((p) => p.id === id);
     },
 
-    getEffectiveProjectSettings: (projectId) => {
-      const globalSettings = useSettingsStore.getState();
-      const globalProvider = useProviderStore.getState();
-
-      const defaults: EffectiveProjectSettings = {
-        systemPrompt: globalSettings.globalSystemPrompt,
-        modelId: globalProvider.selectedModelId,
-        temperature: globalSettings.temperature,
-        maxTokens: globalSettings.maxTokens,
-        topP: globalSettings.topP,
-        topK: globalSettings.topK,
-        presencePenalty: globalSettings.presencePenalty,
-        frequencyPenalty: globalSettings.frequencyPenalty,
-      };
-
-      if (!projectId) {
-        return defaults;
-      }
-
-      const projectStack: Project[] = [];
-      let currentId: string | null = projectId;
+    getProjectHierarchy: (projectId) => {
+      const hierarchy: { id: string; name: string }[] = [];
+      let currentId = projectId;
       while (currentId) {
         const project = get().getProjectById(currentId);
         if (project) {
-          projectStack.unshift(project);
+          hierarchy.unshift({ id: project.id, name: project.name });
           currentId = project.parentId;
         } else {
-          currentId = null;
+          break;
+        }
+      }
+      return hierarchy;
+    },
+
+    getEffectiveProjectSettings: (projectId) => {
+      const globalSettings = useSettingsStore.getState();
+      // Get the globally selected model ID from ProviderStore
+      const globalModelId = useProviderStore.getState().selectedModelId;
+
+      let currentId = projectId;
+      let settings = {
+        systemPrompt: null as string | null,
+        modelId: null as string | null,
+        temperature: null as number | null,
+        maxTokens: null as number | null,
+        topP: null as number | null,
+        topK: null as number | null,
+        presencePenalty: null as number | null,
+        frequencyPenalty: null as number | null,
+      };
+
+      // Traverse up the hierarchy
+      while (currentId) {
+        const project = get().getProjectById(currentId);
+        if (project) {
+          if (
+            settings.systemPrompt === null &&
+            project.systemPrompt !== null &&
+            project.systemPrompt !== undefined
+          )
+            settings.systemPrompt = project.systemPrompt;
+          if (
+            settings.modelId === null &&
+            project.modelId !== null &&
+            project.modelId !== undefined
+          )
+            settings.modelId = project.modelId;
+          if (
+            settings.temperature === null &&
+            project.temperature !== null &&
+            project.temperature !== undefined
+          )
+            settings.temperature = project.temperature;
+          if (
+            settings.maxTokens === null &&
+            project.maxTokens !== null &&
+            project.maxTokens !== undefined
+          )
+            settings.maxTokens = project.maxTokens;
+          if (
+            settings.topP === null &&
+            project.topP !== null &&
+            project.topP !== undefined
+          )
+            settings.topP = project.topP;
+          if (
+            settings.topK === null &&
+            project.topK !== null &&
+            project.topK !== undefined
+          )
+            settings.topK = project.topK;
+          if (
+            settings.presencePenalty === null &&
+            project.presencePenalty !== null &&
+            project.presencePenalty !== undefined
+          )
+            settings.presencePenalty = project.presencePenalty;
+          if (
+            settings.frequencyPenalty === null &&
+            project.frequencyPenalty !== null &&
+            project.frequencyPenalty !== undefined
+          )
+            settings.frequencyPenalty = project.frequencyPenalty;
+
+          currentId = project.parentId;
+        } else {
+          break;
         }
       }
 
-      const effectiveSettings = projectStack.reduce((settings, project) => {
-        return {
-          systemPrompt:
-            project.systemPrompt !== undefined && project.systemPrompt !== null
-              ? project.systemPrompt
-              : settings.systemPrompt,
-          modelId:
-            project.modelId !== undefined && project.modelId !== null
-              ? project.modelId
-              : settings.modelId,
-          temperature:
-            project.temperature !== undefined && project.temperature !== null
-              ? project.temperature
-              : settings.temperature,
-          maxTokens:
-            project.maxTokens !== undefined && project.maxTokens !== null
-              ? project.maxTokens
-              : settings.maxTokens,
-          topP:
-            project.topP !== undefined && project.topP !== null
-              ? project.topP
-              : settings.topP,
-          topK:
-            project.topK !== undefined && project.topK !== null
-              ? project.topK
-              : settings.topK,
-          presencePenalty:
-            project.presencePenalty !== undefined &&
-            project.presencePenalty !== null
-              ? project.presencePenalty
-              : settings.presencePenalty,
-          frequencyPenalty:
-            project.frequencyPenalty !== undefined &&
-            project.frequencyPenalty !== null
-              ? project.frequencyPenalty
-              : settings.frequencyPenalty,
-        };
-      }, defaults);
+      // Apply global defaults if still null
+      if (settings.systemPrompt === null)
+        settings.systemPrompt = globalSettings.globalSystemPrompt;
+      // Use globalModelId from ProviderStore as the final fallback
+      if (settings.modelId === null) settings.modelId = globalModelId;
+      if (settings.temperature === null)
+        settings.temperature = globalSettings.temperature;
+      if (settings.maxTokens === null)
+        settings.maxTokens = globalSettings.maxTokens;
+      if (settings.topP === null) settings.topP = globalSettings.topP;
+      if (settings.topK === null) settings.topK = globalSettings.topK;
+      if (settings.presencePenalty === null)
+        settings.presencePenalty = globalSettings.presencePenalty;
+      if (settings.frequencyPenalty === null)
+        settings.frequencyPenalty = globalSettings.frequencyPenalty;
 
-      return effectiveSettings;
-    },
-
-    getTopLevelProjectId: (projectId) => {
-      if (!projectId) return null;
-      let currentProject = get().getProjectById(projectId);
-      while (currentProject?.parentId) {
-        const parent = get().getProjectById(currentProject.parentId);
-        if (!parent) return currentProject.id;
-        currentProject = parent;
-      }
-      return currentProject?.id ?? null;
+      return settings;
     },
   })),
 );

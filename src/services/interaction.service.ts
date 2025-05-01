@@ -1,5 +1,5 @@
 // src/services/interaction.service.ts
-// Entire file content provided - Corrected model instantiation
+// Entire file content provided
 import type { PromptObject, PromptTurnObject } from "@/types/litechat/prompt";
 import type {
   Interaction,
@@ -23,7 +23,7 @@ import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { z } from "zod";
 import type { ToolImplementation } from "@/types/litechat/modding";
-import type {
+import {
   Tool,
   ToolCallPart,
   ToolResultPart,
@@ -32,9 +32,13 @@ import type {
   ProviderMetadata,
   LanguageModelV1,
   CoreMessage,
+  // Import middleware and wrapper
+  extractReasoningMiddleware,
+  wrapLanguageModel,
 } from "ai";
 
 // Define the structure for options passed to executeInteraction
+// Remove experimental_middlewares
 interface AIServiceCallOptions {
   model: LanguageModelV1;
   messages: CoreMessage[];
@@ -119,7 +123,7 @@ export const InteractionService = {
         ...(finalPrompt.metadata || {}),
         toolCalls: [],
         toolResults: [],
-        reasoning: undefined,
+        reasoning: undefined, // Initialize reasoning
       },
       index: newIndex,
       parentId: parentId,
@@ -273,8 +277,20 @@ export const InteractionService = {
       finalPrompt.parameters?.maxSteps ??
       useSettingsStore.getState().toolMaxSteps;
 
-    const callOptions: AIServiceCallOptions = {
+    // Instantiate reasoning middleware
+    const reasoningMiddleware = extractReasoningMiddleware({
+      tagName: "reasoning",
+    });
+
+    // Wrap the model instance with the middleware
+    const wrappedModel = wrapLanguageModel({
       model: modelInstance,
+      middleware: reasoningMiddleware,
+    });
+
+    const callOptions: AIServiceCallOptions = {
+      // Use the wrapped model
+      model: wrappedModel,
       messages: finalPrompt.messages,
       abortSignal: abortController.signal,
       system: finalPrompt.system,
@@ -291,6 +307,7 @@ export const InteractionService = {
       toolChoice:
         finalPrompt.toolChoice ??
         (Object.keys(toolsWithExecute).length > 0 ? "auto" : "none"),
+      // experimental_middlewares removed
     };
 
     // 6. Define Callbacks
@@ -419,6 +436,8 @@ export const InteractionService = {
       finishReason: FinishReason;
       usage?: LanguageModelUsage;
       providerMetadata?: ProviderMetadata;
+      // Middleware might add custom fields here
+      reasoning?: string;
     },
   ): void {
     console.log(
@@ -449,6 +468,8 @@ export const InteractionService = {
       finishReason: FinishReason;
       usage?: LanguageModelUsage;
       providerMetadata?: ProviderMetadata;
+      // Include reasoning here if middleware adds it
+      reasoning?: string;
     },
   ): void {
     const interactionStore = useInteractionStore.getState();
@@ -476,12 +497,8 @@ export const InteractionService = {
       `[InteractionService] Finalizing ${interactionId}. Buffered Content Length: ${finalBufferedContent.length}`,
     );
 
-    const reasoningData =
-      // @ts-expect-error Do not know how to cast....
-      (finishDetails?.providerMetadata?.reasoning as string) ||
-      // @ts-expect-error Do not know how to cast....
-      (finishDetails?.providerMetadata?.steps as string) ||
-      undefined;
+    // Extract reasoning from finishDetails (added by middleware)
+    const reasoningData = finishDetails?.reasoning;
 
     const finalUpdates: Partial<Omit<Interaction, "id">> = {
       status: status,
@@ -499,6 +516,7 @@ export const InteractionService = {
         }),
         toolCalls: toolData.calls,
         toolResults: toolData.results,
+        // Store extracted reasoning
         reasoning: reasoningData,
         ...((status === "ERROR" ||
           status === "WARNING" ||
