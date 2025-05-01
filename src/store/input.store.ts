@@ -1,6 +1,8 @@
 // src/store/input.store.ts
+// Entire file content provided
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import { nanoid } from "nanoid"; // Import nanoid
 
 // Define a unified structure for attached file metadata
 export interface AttachedFileMetadata {
@@ -19,8 +21,7 @@ export interface AttachedFileMetadata {
 export interface InputState {
   // Store metadata about files attached for the *next* submission
   attachedFilesMetadata: AttachedFileMetadata[];
-  // Store tools enabled for the *next* submission
-  enabledTools: Set<string>;
+  // Other transient states (tools, overrides) are managed locally by controls
 }
 
 export interface InputActions {
@@ -28,25 +29,22 @@ export interface InputActions {
   addAttachedFile: (fileData: Omit<AttachedFileMetadata, "id">) => void;
   // Remove file by its unique attachment ID
   removeAttachedFile: (attachmentId: string) => void;
-  // Clear all attachments for the next prompt
+  // Clear only attached files for the next prompt
   clearAttachedFiles: () => void;
-  // Set enabled tools
-  setEnabledTools: (updater: (prev: Set<string>) => Set<string>) => void;
 }
 
 export const useInputStore = create(
   immer<InputState & InputActions>((set) => ({
     // Initial State
     attachedFilesMetadata: [],
-    enabledTools: new Set<string>(),
 
     // Actions
     addAttachedFile: (fileData) => {
       set((state) => {
-        // Check for duplicates based on source and name/path
+        // Check for duplicates based on source and name/path/size
         const isDuplicate = state.attachedFilesMetadata.some((f) =>
           f.source === "direct" && fileData.source === "direct"
-            ? f.name === fileData.name
+            ? f.name === fileData.name && f.size === fileData.size
             : f.source === "vfs" && fileData.source === "vfs"
               ? f.path === fileData.path
               : false,
@@ -54,7 +52,7 @@ export const useInputStore = create(
 
         if (!isDuplicate) {
           const newAttachment: AttachedFileMetadata = {
-            id: crypto.randomUUID(),
+            id: nanoid(), // Use nanoid for unique IDs
             ...fileData,
           };
           state.attachedFilesMetadata.push(newAttachment);
@@ -73,14 +71,8 @@ export const useInputStore = create(
       });
     },
     clearAttachedFiles: () => {
-      // Also clear enabled tools when clearing attachments
-      set({ attachedFilesMetadata: [], enabledTools: new Set<string>() });
-    },
-    // Action to set enabled tools
-    setEnabledTools: (updater) => {
-      set((state) => {
-        state.enabledTools = updater(state.enabledTools);
-      });
+      // Clear only attached files
+      set({ attachedFilesMetadata: [] });
     },
   })),
 );

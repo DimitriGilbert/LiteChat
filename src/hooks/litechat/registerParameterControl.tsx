@@ -1,4 +1,5 @@
 // src/hooks/litechat/registerParameterControl.tsx
+// Entire file content provided
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { SlidersHorizontalIcon } from "lucide-react";
@@ -9,7 +10,7 @@ import {
 } from "@/components/ui/popover";
 import {
   ParameterControlComponent,
-  type ParameterControlComponentProps
+  type ParameterControlComponentProps,
 } from "@/components/LiteChat/prompt/control/ParameterControlComponent";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useSettingsStore } from "@/store/settings.store";
@@ -29,7 +30,7 @@ export function registerParameterControl() {
 
   // Component to render inside the Popover, fetching state and passing props
   const ParameterPopoverContent: React.FC = () => {
-    // Get current prompt state values and setters
+    // Get current prompt state values and setters from the store hook
     const {
       temperature,
       setTemperature,
@@ -43,7 +44,7 @@ export function registerParameterControl() {
       setPresencePenalty,
       frequencyPenalty,
       setFrequencyPenalty,
-    } = usePromptStateStore.getState();
+    } = usePromptStateStore(); // Use the hook directly here
 
     // Get global defaults from SettingsStore to display in "Use Default" buttons
     const globalDefaults = useSettingsStore.getState();
@@ -85,18 +86,21 @@ export function registerParameterControl() {
       topK,
       presencePenalty,
       frequencyPenalty,
-    } = usePromptStateStore.getState();
+    } = usePromptStateStore(); // Use hook here
     // Read global defaults for comparison
     const globalDefaults = useSettingsStore.getState();
 
     // Check if any parameter in the prompt state is different from the global default
+    // Note: This comparison logic might need refinement if defaults can be null
     const hasNonDefaultParams =
-      temperature !== globalDefaults.temperature ||
-      topP !== globalDefaults.topP ||
-      maxTokens !== globalDefaults.maxTokens ||
-      topK !== globalDefaults.topK ||
-      presencePenalty !== globalDefaults.presencePenalty ||
-      frequencyPenalty !== globalDefaults.frequencyPenalty;
+      (temperature !== null && temperature !== globalDefaults.temperature) ||
+      (topP !== null && topP !== globalDefaults.topP) ||
+      (maxTokens !== null && maxTokens !== globalDefaults.maxTokens) ||
+      (topK !== null && topK !== globalDefaults.topK) ||
+      (presencePenalty !== null &&
+        presencePenalty !== globalDefaults.presencePenalty) ||
+      (frequencyPenalty !== null &&
+        frequencyPenalty !== globalDefaults.frequencyPenalty);
 
     return (
       <Popover>
@@ -131,8 +135,9 @@ export function registerParameterControl() {
     order: 30,
     status: () => "ready",
     triggerRenderer: () => React.createElement(ParameterControlTrigger),
-    // getParameters reads directly from the prompt state store now
+    // getParameters reads directly from the prompt state store
     getParameters: () => {
+      // Use getState() here as this function is outside React components
       const {
         temperature,
         topP,
@@ -140,7 +145,7 @@ export function registerParameterControl() {
         topK,
         presencePenalty,
         frequencyPenalty,
-      } = usePromptStateStore.getState()
+      } = usePromptStateStore.getState();
       return {
         // Only include parameters if they are not null (i.e., explicitly set)
         ...(temperature !== null && { temperature }),
@@ -153,7 +158,8 @@ export function registerParameterControl() {
         }),
       };
     },
-    show: () => useSettingsStore.getState().enableAdvancedSettings
+    // No metadata or clearOnSubmit needed for this control
+    show: () => useSettingsStore.getState().enableAdvancedSettings,
   });
 
   console.log("[Function] Registered Core Parameter Control");

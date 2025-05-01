@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/PromptWrapper.tsx
-// Entire file content provided due to layout and prop changes
+// Entire file content provided
 import React, {
   useState,
   useCallback,
@@ -17,7 +17,7 @@ import { useInputStore } from "@/store/input.store";
 import type {
   PromptTurnObject,
   InputAreaRenderer,
-  InputAreaRef
+  InputAreaRef,
 } from "@/types/litechat/prompt";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
@@ -55,6 +55,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       setFocusInputFlag: state.setFocusInputFlag,
     })),
   );
+  // Only need attachedFilesMetadata and clearAttachedFiles from InputStore
   const { attachedFilesMetadata, clearAttachedFiles } = useInputStore(
     useShallow((state) => ({
       attachedFilesMetadata: state.attachedFilesMetadata,
@@ -100,6 +101,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       let parameters: Record<string, any> = {};
       let metadata: Record<string, any> = {};
 
+      // Collect parameters and metadata from all controls
       for (const control of promptControls) {
         if (control.getParameters) {
           const params = await control.getParameters();
@@ -111,19 +113,22 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         }
       }
 
+      // Add attached files metadata (from InputStore)
       if (attachedFilesMetadata.length > 0) {
         metadata.attachedFiles = [...attachedFilesMetadata];
       }
 
+      // Construct the initial turn data
       let turnData: PromptTurnObject = {
         id: nanoid(),
         content: trimmedValue,
         parameters,
-        metadata,
+        metadata, // Metadata now includes data from controls like tools, steps, system prompt
       };
 
       emitter.emit("prompt:submitted", { turnData });
 
+      // Run middleware
       const middlewareResult = await runMiddleware(
         "middleware:prompt:turnFinalize",
         { turnData },
@@ -140,18 +145,23 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
           ? (middlewareResult as { turnData: PromptTurnObject }).turnData
           : turnData;
 
+      // Call the main onSubmit handler (passed from LiteChat)
       await onSubmit(finalTurnData);
 
-      // Clear state AFTER successful submission initiation
+      // --- Clear State AFTER successful submission initiation ---
       // InputArea clears itself internally now
+
+      // Clear attached files from InputStore
       clearAttachedFiles();
 
+      // Call clearOnSubmit for relevant controls to reset their local state
       promptControls.forEach((control) => {
         if (control.clearOnSubmit) {
           control.clearOnSubmit();
         }
       });
 
+      // Focus input for the next turn
       setFocusInputFlag(true);
     } catch (error) {
       console.error("Error during prompt submission:", error);
@@ -171,8 +181,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     setFocusInputFlag,
   ]);
 
-  // InputArea handles Enter key internally now
-
   return (
     <div className={cn("p-4 space-y-3", className)}>
       {/* Panel Controls Area (Above Input) */}
@@ -180,18 +188,16 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         <PromptControlWrapper
           controls={panelControls}
           area="panel"
-          className="flex flex-wrap gap-2 items-start mb-2" // Added margin-bottom
+          className="flex flex-wrap gap-2 items-start mb-2"
         />
       )}
 
       {/* Input Area */}
       <InputAreaRenderer
         ref={inputAreaRef}
-        // Pass only the props defined in InputAreaRendererProps
         onSubmit={handleSubmit}
         disabled={isStreaming || isSubmitting}
         placeholder={placeholder}
-        // Removed className="flex-grow" as it's on its own row
       />
 
       {/* Trigger Controls and Submit Button Area (Below Input) */}

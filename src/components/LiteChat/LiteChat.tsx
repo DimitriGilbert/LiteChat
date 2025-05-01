@@ -112,16 +112,13 @@ export const LiteChat: React.FC = () => {
       setVfsKey: state.setVfsKey,
     })),
   );
-  // Get resetTransientParameters instead of resetPromptState
-  const { initializePromptState, resetTransientParameters } =
-    usePromptStateStore(
-      useShallow((state) => ({
-        initializePromptState: state.initializePromptState,
-        resetTransientParameters: state.resetTransientParameters, // Use new action
-      })),
-    );
-  // Get clearAttachedFiles from InputStore
-  const clearAttachedFiles = useInputStore((state) => state.clearAttachedFiles);
+  // Get only initializePromptState from PromptStateStore
+  const { initializePromptState } = usePromptStateStore(
+    useShallow((state) => ({
+      initializePromptState: state.initializePromptState,
+      // resetTransientParameters removed
+    })),
+  );
 
   // --- Initialization Effect (remains the same) ---
   useEffect(() => {
@@ -361,8 +358,9 @@ export const LiteChat: React.FC = () => {
         console.log("LiteChat: ConversationService processing initiated.");
 
         // --- UI Cleanup AFTER calling the service ---
-        clearAttachedFiles(); // Clear files from InputStore
-        resetTransientParameters(); // Reset only parameters, keep modelId
+        // clearAttachedFiles() is called by PromptWrapper now
+        // resetTransientParameters() is removed as parameters are handled differently
+        // Control state clearing is handled by PromptWrapper calling clearOnSubmit
 
         // Focus input for the next turn
         uiStateActions.setFocusInputFlag(true);
@@ -373,9 +371,7 @@ export const LiteChat: React.FC = () => {
       }
     },
     [
-      // initializePromptState removed
-      resetTransientParameters, // Use new action
-      clearAttachedFiles,
+      // Dependencies updated
     ],
   );
 
@@ -390,7 +386,8 @@ export const LiteChat: React.FC = () => {
           `LiteChat: ConversationService regeneration initiated for ${interactionId}.`,
         );
         // --- UI Cleanup AFTER calling the service ---
-        resetTransientParameters(); // Reset only parameters, keep modelId
+        // resetTransientParameters() removed
+        // Control state clearing is handled by PromptWrapper calling clearOnSubmit
         // Focus input
         useUIStateStore.getState().setFocusInputFlag(true);
       } catch (error) {
@@ -398,8 +395,10 @@ export const LiteChat: React.FC = () => {
         // Toast handled by service
       }
     },
-    [resetTransientParameters /* initializePromptState removed */],
-  ); // Update dependencies
+    [
+      // Dependencies updated
+    ],
+  );
 
   // --- Stop Interaction Handler (remains the same) ---
   const onStopInteraction = useCallback((interactionId: string) => {

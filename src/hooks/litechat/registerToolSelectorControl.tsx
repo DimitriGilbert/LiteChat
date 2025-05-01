@@ -1,6 +1,6 @@
 // src/hooks/litechat/registerToolSelectorControl.tsx
-// Entire file content provided - No changes needed here based on analysis
-import React, { useState, useEffect, useMemo } from "react";
+// Entire file content provided
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { WrenchIcon } from "lucide-react";
 import {
@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/popover";
 import { ToolSelectorControlComponent } from "@/components/LiteChat/prompt/control/ToolSelectorControlComponent";
 import { useControlRegistryStore } from "@/store/control.store";
-import { useConversationStore } from "@/store/conversation.store";
+import { useConversationStore } from "@/store/conversation.store"; // Keep for context check
 import { useInteractionStore } from "@/store/interaction.store";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -19,69 +19,109 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+// InputStore is NOT needed here anymore for tools/steps
+
+// --- Local State Management within Registration Scope ---
+let transientEnabledTools = new Set<string>();
+let transientMaxStepsOverride: number | null = null;
+// Callback to allow the component to update the scoped variables
+let updateScopedState: (
+  updater: (prev: {
+    enabledTools: Set<string>;
+    maxStepsOverride: number | null;
+  }) => {
+    enabledTools: Set<string>;
+    maxStepsOverride: number | null;
+  },
+) => void = () => {};
+// --- End Local State Management ---
 
 export function registerToolSelectorControl() {
   const registerPromptControl =
     useControlRegistryStore.getState().registerPromptControl;
 
+  // Reset local state when registering (e.g., on app load/reload)
+  transientEnabledTools = new Set<string>();
+  transientMaxStepsOverride = null;
+
   const ToolSelectorTrigger: React.FC = () => {
     // --- State Hooks ---
-    const {
-      selectedItemId,
-      selectedItemType,
-      getConversationById,
-      updateCurrentConversationToolSettings
-    } = useConversationStore(
+    // Read conversation context for disabling the control
+    const { selectedItemId, selectedItemType } = useConversationStore(
       useShallow((state) => ({
         selectedItemId: state.selectedItemId,
         selectedItemType: state.selectedItemType,
-        getConversationById: state.getConversationById,
-        updateCurrentConversationToolSettings:
-          state.updateCurrentConversationToolSettings
       })),
     );
+    // Local state *within the component* for UI updates
+    const [localState, setLocalState] = useState({
+      enabledTools: transientEnabledTools,
+      maxStepsOverride: transientMaxStepsOverride,
+    });
+    // Local state for popover's max steps input
+    const [popoverMaxSteps, setPopoverMaxSteps] = useState<number | null>(
+      localState.maxStepsOverride,
+    );
+
     const isStreaming = useInteractionStore.getState().status === "streaming";
     const allToolsCount = Object.keys(
       useControlRegistryStore.getState().tools,
     ).length;
 
-    // --- Derived State ---
-    const conversation =
-      selectedItemType === "conversation" && selectedItemId
-        ? getConversationById(selectedItemId)
-        : null;
-
-    const enabledTools = useMemo(
-      () => new Set(conversation?.metadata?.enabledTools ?? []),
-      [conversation?.metadata?.enabledTools],
-    );
-    const maxStepsOverride =
-      conversation?.metadata?.toolMaxStepsOverride ?? null;
-
-    // --- Local State for Popover ---
-    // Local state for maxSteps override specific to the popover instance
-    const [localMaxSteps, setLocalMaxSteps] = useState<number | null>(
-      maxStepsOverride,
-    );
-
-    // Update local state if the conversation's override changes externally
+    // --- Update Scoped State ---
+    // Provide a way for this component instance to update the scoped variables
     useEffect(() => {
-      setLocalMaxSteps(maxStepsOverride);
-    }, [maxStepsOverride]);
+      updateScopedState = (updater) => {
+        const newState = updater({
+          enabledTools: transientEnabledTools,
+          maxStepsOverride: transientMaxStepsOverride,
+        });
+        transientEnabledTools = newState.enabledTools;
+        transientMaxStepsOverride = newState.maxStepsOverride;
+        // Update local component state to trigger re-render
+        setLocalState(newState);
+      };
+      // Initial sync
+      setLocalState({
+        enabledTools: transientEnabledTools,
+        maxStepsOverride: transientMaxStepsOverride,
+      });
+      // Cleanup function to avoid memory leaks if the control is ever unregistered
+      return () => {
+        updateScopedState = () => {};
+      };
+    }, []); // Empty dependency array ensures this runs once per mount
+
+    // Update popover input when local state changes
+    useEffect(() => {
+      setPopoverMaxSteps(localState.maxStepsOverride);
+    }, [localState.maxStepsOverride]);
 
     // --- Event Handlers ---
     const handlePopoverOpenChange = (open: boolean) => {
-      // When closing, persist the localMaxSteps to the conversation
-      if (!open && localMaxSteps !== maxStepsOverride) {
-        updateCurrentConversationToolSettings({
-          toolMaxStepsOverride: localMaxSteps,
-        });
+      // When closing, persist the popoverMaxSteps to the scoped variable
+      if (!open && popoverMaxSteps !== localState.maxStepsOverride) {
+        updateScopedState((prev) => ({
+          ...prev,
+          maxStepsOverride: popoverMaxSteps,
+        }));
       }
     };
 
+    // Callback for the child component to update enabled tools
+    const handleSetEnabledTools = useCallback(
+      (updater: (prev: Set<string>) => Set<string>) => {
+        updateScopedState((prev) => ({
+          ...prev,
+          enabledTools: updater(prev.enabledTools),
+        }));
+      },
+      [], // updateScopedState is stable within the effect
+    );
+
     // --- Render Logic ---
     const hasActiveSettings =
-      enabledTools.size > 0 || maxStepsOverride !== null;
+      localState.enabledTools.size > 0 || localState.maxStepsOverride !== null;
     const isDisabled =
       isStreaming || allToolsCount === 0 || selectedItemType !== "conversation";
 
@@ -105,16 +145,18 @@ export function registerToolSelectorControl() {
             <TooltipContent side="top">
               {isDisabled
                 ? "Tools unavailable (select conversation)"
-                : `Tools (${enabledTools.size} enabled)`}
+                : `Tools (${localState.enabledTools.size} enabled)`}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
         <PopoverContent className="w-auto p-0" align="start">
-          {/* Pass local state and setter to the component */}
+          {/* Pass local state and setters to the component */}
           <ToolSelectorControlComponent
-            localMaxSteps={localMaxSteps}
-            setLocalMaxSteps={setLocalMaxSteps}
-            // Pass conversation details needed by the component
+            enabledTools={localState.enabledTools}
+            setEnabledTools={handleSetEnabledTools} // Pass callback to update scoped state
+            localMaxSteps={popoverMaxSteps} // Pass popover-specific state
+            setLocalMaxSteps={setPopoverMaxSteps} // Pass popover-specific setter
+            // Pass conversation details needed by the component (if any)
             conversationId={selectedItemId}
             conversationType={selectedItemType}
           />
@@ -128,29 +170,28 @@ export function registerToolSelectorControl() {
     order: 50,
     triggerRenderer: () => React.createElement(ToolSelectorTrigger),
     getMetadata: () => {
-      // Get current state when metadata is requested
-      const { selectedItemId, selectedItemType, getConversationById } =
-        useConversationStore.getState();
-      const conversation =
-        selectedItemType === "conversation" && selectedItemId
-          ? getConversationById(selectedItemId)
-          : null;
-
-      // Read directly from conversation metadata
-      const enabledTools = conversation?.metadata?.enabledTools ?? [];
-      const maxStepsOverride =
-        conversation?.metadata?.toolMaxStepsOverride ?? null;
-
+      // Read directly from the scoped variables when metadata is requested
       return {
-        enabledTools: enabledTools,
+        enabledTools: Array.from(transientEnabledTools),
         // Include maxSteps override only if it's explicitly set (not null)
-        ...(maxStepsOverride !== null && { maxSteps: maxStepsOverride }),
+        ...(transientMaxStepsOverride !== null && {
+          maxSteps: transientMaxStepsOverride,
+        }),
       };
     },
+    clearOnSubmit: () => {
+      // Reset the scoped variables
+      transientEnabledTools = new Set<string>();
+      transientMaxStepsOverride = null;
+      // Trigger a state update in the mounted component instance, if any
+      updateScopedState(() => ({
+        enabledTools: new Set<string>(),
+        maxStepsOverride: null,
+      }));
+    },
     show: () =>
-      Object.keys(useControlRegistryStore.getState().tools).length > 0
+      Object.keys(useControlRegistryStore.getState().tools).length > 0,
   });
 
   console.log("[Function] Registered Core Tool Selector Control");
-  // No cleanup needed or returned
 }

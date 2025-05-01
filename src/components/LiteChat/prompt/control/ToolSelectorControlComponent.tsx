@@ -1,8 +1,8 @@
 // src/components/LiteChat/prompt/control/ToolSelectorControlComponent.tsx
 // Entire file content provided
-import React, { useState, useMemo, useCallback } from "react"
+import React, { useState, useMemo, useCallback } from "react";
 import { useControlRegistryStore } from "@/store/control.store";
-import { useConversationStore } from "@/store/conversation.store";
+// ConversationStore removed
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,41 +10,34 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { SearchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useShallow } from "zustand/react/shallow";
+// useShallow removed
 import { useSettingsStore } from "@/store/settings.store";
 import type { SidebarItemType } from "@/types/litechat/chat";
 
 interface ToolSelectorControlComponentProps {
   className?: string;
-  localMaxSteps: number | null;
-  setLocalMaxSteps: (steps: number | null) => void;
-  conversationId: string | null;
-  conversationType: SidebarItemType | null;
+  // Accept transient state from parent component (which reads from scoped variable)
+  enabledTools: Set<string>;
+  setEnabledTools: (updater: (prev: Set<string>) => Set<string>) => void;
+  localMaxSteps: number | null; // This is the popover's input state
+  setLocalMaxSteps: (steps: number | null) => void; // Setter for popover's input state
+  conversationId: string | null; // Keep for context if needed
+  conversationType: SidebarItemType | null; // Keep for context if needed
 }
 
 export const ToolSelectorControlComponent: React.FC<
   ToolSelectorControlComponentProps
 > = ({
   className,
+  // Use props passed from trigger
+  enabledTools,
+  setEnabledTools,
   localMaxSteps,
   setLocalMaxSteps,
   conversationId,
   conversationType,
 }) => {
   // --- Store Hooks ---
-  // Use useShallow to select multiple fields efficiently
-  const { conversation, updateCurrentConversationToolSettings } =
-    useConversationStore(
-      useShallow((state) => ({
-        // Select the conversation object directly
-        conversation:
-          conversationType === "conversation" && conversationId
-            ? state.getConversationById(conversationId)
-            : null,
-        updateCurrentConversationToolSettings:
-          state.updateCurrentConversationToolSettings,
-      })),
-    );
   const allTools = useControlRegistryStore((state) => state.tools);
   const globalDefaultMaxSteps = useSettingsStore((state) => state.toolMaxSteps);
 
@@ -52,10 +45,7 @@ export const ToolSelectorControlComponent: React.FC<
   const [filterText, setFilterText] = useState("");
 
   // --- Derived State ---
-  // Derive enabledTools directly from the selected conversation object
-  const enabledTools = useMemo(() => {
-    return new Set(conversation?.metadata?.enabledTools ?? []);
-  }, [conversation?.metadata?.enabledTools])
+  // enabledTools is now directly from props
 
   const availableTools = useMemo(() => {
     return Object.entries(allTools)
@@ -83,47 +73,47 @@ export const ToolSelectorControlComponent: React.FC<
   // --- Event Handlers ---
   const handleToggle = useCallback(
     (toolName: string, checked: boolean) => {
-      // Update the conversation store directly for persistence
-      const newEnabledTools = new Set(enabledTools)
-      if (checked) {
-        newEnabledTools.add(toolName);
-      } else {
-        newEnabledTools.delete(toolName);
-      }
-      updateCurrentConversationToolSettings({
-        enabledTools: Array.from(newEnabledTools),
+      // Update the state via the passed setter prop
+      setEnabledTools((prev) => {
+        const next = new Set(prev);
+        if (checked) {
+          next.add(toolName);
+        } else {
+          next.delete(toolName);
+        }
+        return next;
       });
-      // The component will re-render because `enabledTools` (derived from the store) will change.
     },
-    [enabledTools, updateCurrentConversationToolSettings]
+    [setEnabledTools],
   );
 
   const handleToggleAll = useCallback(
     (enable: boolean) => {
-      const newEnabledSet = enable
-        ? new Set(availableTools.map((t) => t.name))
-        : new Set<string>();
-      // Update store state directly
-      updateCurrentConversationToolSettings({
-        enabledTools: Array.from(newEnabledSet),
+      // Update the state via the passed setter prop
+      setEnabledTools(() => {
+        if (enable) {
+          return new Set(availableTools.map((t) => t.name));
+        } else {
+          return new Set();
+        }
       });
     },
-    [availableTools, updateCurrentConversationToolSettings],
+    [availableTools, setEnabledTools],
   );
 
   const handleMaxStepsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value === "") {
-      setLocalMaxSteps(null)
+      setLocalMaxSteps(null); // Update popover state
       return;
     }
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue)) {
       // Clamp value between 1 and 20
       const clampedValue = Math.max(1, Math.min(20, numValue));
-      setLocalMaxSteps(clampedValue)
+      setLocalMaxSteps(clampedValue); // Update popover state
     } else {
-      setLocalMaxSteps(null)
+      setLocalMaxSteps(null); // Update popover state
     }
   };
 
@@ -194,7 +184,7 @@ export const ToolSelectorControlComponent: React.FC<
               >
                 <Switch
                   id={`tool-switch-${tool.name}`}
-                  // Read directly from derived state
+                  // Read directly from prop
                   checked={enabledTools.has(tool.name)}
                   onCheckedChange={(checked) =>
                     handleToggle(tool.name, checked)
