@@ -10,7 +10,6 @@ import { dirname, buildPath } from "@/lib/litechat/file-manager-utils";
 import { useSettingsStore } from "./settings.store";
 import { useConversationStore } from "./conversation.store";
 import { useVfsStore } from "./vfs.store";
-// Import ProviderStore to get the globally selected model
 import { useProviderStore } from "./provider.store";
 
 interface ProjectState {

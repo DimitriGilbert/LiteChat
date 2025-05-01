@@ -23,12 +23,12 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable";
-import { SortableModelItem } from "@/components/LiteChat/settings/SortableModelItem";
+import { SortableModelItem } from "@/components/LiteChat/common/SortableModelItem";
 import type { AiModelConfig } from "@/types/litechat/provider";
 import {
   combineModelId,
   DEFAULT_MODELS,
-} from "@/lib/litechat/provider-helpers"
+} from "@/lib/litechat/provider-helpers";
 
 export const GlobalModelOrganizer: React.FC = () => {
   const {
@@ -65,7 +65,7 @@ export const GlobalModelOrganizer: React.FC = () => {
       );
 
       config.enabledModels.forEach((modelId) => {
-        const combinedId = combineModelId(config.id, modelId)
+        const combinedId = combineModelId(config.id, modelId);
         const modelDef = providerModelsMap.get(modelId);
         if (modelDef) {
           enabledCombinedIds.add(combinedId);
