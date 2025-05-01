@@ -625,17 +625,19 @@ export const LiteChat: React.FC = () => {
             className={cn(
               "flex-shrink-0 border-t border-[--border] p-2",
               isSidebarCollapsed
-                ? "flex flex-col items-center gap-2"
-                : "flex items-center justify-between",
+                ? "flex flex-col items-center gap-2" // Stack vertically when collapsed
+                : "flex items-center justify-center", // Center horizontally when expanded
             )}
           >
             <ChatControlWrapper
               controls={sidebarFooterControls}
               panelId="sidebar-footer"
-              renderMode={isSidebarCollapsed ? "icon" : "full"}
+              renderMode={isSidebarCollapsed ? "icon" : "full"} // Render mode depends on collapse state
               className={cn(
                 "flex",
-                isSidebarCollapsed ? "flex-col gap-2" : "items-center gap-1",
+                isSidebarCollapsed
+                  ? "flex-col gap-2 items-center" // Vertical layout for icons
+                  : "items-center gap-1 justify-center", // Horizontal layout for full controls
               )}
             />
           </div>
@@ -689,7 +691,7 @@ export const LiteChat: React.FC = () => {
         projectSettingsModalRenderer &&
         projectSettingsModalRenderer()}
 
-      <Toaster richColors position="bottom-left" closeButton />
+      <Toaster richColors position="bottom-right" closeButton />
     </>
   );
 };

@@ -1,4 +1,5 @@
 // src/components/LiteChat/settings/SettingsProviders.tsx
+// Entire file content provided
 import React, { useState, useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
@@ -8,6 +9,7 @@ import { PlusIcon } from "lucide-react";
 import { ProviderRow } from "./SettingsProviderRow";
 import { AddProviderForm } from "./AddProviderForm";
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
+// Removed GlobalModelOrganizer and Separator imports
 
 // This component now focuses solely on the list and adding providers
 const SettingsProvidersComponent: React.FC = () => {
@@ -52,7 +54,7 @@ const SettingsProvidersComponent: React.FC = () => {
 
   return (
     // Ensure this component uses flex-col and h-full to occupy space correctly
-    <div className="space-y-4 h-full flex flex-col">
+    <div className="space-y-6 h-full flex flex-col">
       {/* Provider Configuration Section */}
       <div>
         <h3 className="text-lg font-semibold text-card-foreground">
@@ -86,7 +88,9 @@ const SettingsProvidersComponent: React.FC = () => {
 
       {/* Provider List - Takes remaining space, NO internal ScrollArea */}
       {/* The parent div in SettingsModal handles scrolling */}
-      <div className="flex-grow overflow-hidden border-t border-border pt-4 mt-4">
+      <div className="flex-grow border-t border-border pt-4 mt-4">
+        {" "}
+        {/* Removed overflow-hidden */}
         <div className="space-y-2">
           {isLoading && !isAdding ? (
             <>

@@ -16,6 +16,7 @@ import { SettingsDataManagement } from "./SettingsDataManagement";
 import { SettingsMods } from "./SettingsMods";
 import { SettingsProviders } from "./SettingsProviders";
 import { SettingsGit } from "./SettingsGit";
+import { GlobalModelOrganizer } from "./GlobalModelOrganizer"; // Import Organizer
 import type { CustomSettingTab } from "@/types/litechat/modding";
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
@@ -77,9 +78,29 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
           content: <SettingsGeneral />,
         },
         {
-          value: "providers",
-          label: "Providers & Models",
-          content: <SettingsProviders />,
+          value: "providers", // Keep this as the main parent tab value
+          label: "Providers & Models", // Label for the parent tab
+          // Content now uses TabbedLayout for sub-tabs
+          content: (
+            <TabbedLayout
+              tabs={[
+                {
+                  value: "providers-config",
+                  label: "Configuration",
+                  content: <SettingsProviders />,
+                },
+                {
+                  value: "providers-order",
+                  label: "Model Order",
+                  content: <GlobalModelOrganizer />,
+                },
+              ]}
+              defaultValue="providers-config" // Default to config sub-tab
+              className="h-full" // Ensure sub-layout fills height
+              listClassName="bg-muted/50 rounded-md"
+              contentContainerClassName="mt-4"
+            />
+          ),
         },
         ...(enableAdvancedSettings
           ? [
@@ -133,14 +154,14 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
             </DialogDescription>
           </DialogHeader>
 
-          {/* Use TabbedLayout */}
+          {/* Use TabbedLayout for the main settings sections */}
           <TabbedLayout
             tabs={tabs}
             initialValue={activeTab} // Pass initial value
             onValueChange={handleTabChange} // Handle value changes
             className="flex-grow overflow-hidden px-6" // Adjust padding if needed
             listClassName="-mx-6 px-6" // Adjust list padding
-            contentContainerClassName="pb-6 pr-2 -mr-2" // Adjust content padding
+            contentContainerClassName="flex-grow overflow-y-auto pb-6 pr-2 -mr-2" // Ensure content grows and scrolls
           />
 
           <DialogFooter className="flex-shrink-0 border-t p-6 pt-4 mt-auto">

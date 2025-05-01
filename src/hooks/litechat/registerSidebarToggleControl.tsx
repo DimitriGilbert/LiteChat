@@ -1,4 +1,5 @@
-// src/hooks/litechat/registerSidebarToggleControl.ts
+// src/hooks/litechat/registerSidebarToggleControl.tsx
+// Entire file content provided
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { PanelLeftCloseIcon, PanelRightCloseIcon } from "lucide-react";
@@ -39,7 +40,7 @@ export function registerSidebarToggleControl() {
               )}
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">
+          <TooltipContent side="top">
             {isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           </TooltipContent>
         </Tooltip>
@@ -49,10 +50,11 @@ export function registerSidebarToggleControl() {
 
   registerChatControl({
     id: "core-sidebar-toggle",
-    panel: "header",
-    order: 10,
+    panel: "sidebar-footer", // Move to sidebar footer
+    order: 10, // Adjust order as needed within the footer
     status: () => "ready",
     renderer: () => React.createElement(SidebarToggleComponent),
+    iconRenderer: () => React.createElement(SidebarToggleComponent),
     show: () => true, // Always show the toggle
   });
 

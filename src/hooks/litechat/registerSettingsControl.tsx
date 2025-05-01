@@ -1,4 +1,5 @@
-// src/hooks/litechat/registerSettingsControl.ts
+// src/hooks/litechat/registerSettingsControl.tsx
+// Entire file content provided
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { SettingsIcon } from "lucide-react";
@@ -43,7 +44,7 @@ export function registerSettingsControl() {
               <SettingsIcon className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">Settings</TooltipContent>
+          <TooltipContent side="top">Settings</TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );
@@ -59,10 +60,11 @@ export function registerSettingsControl() {
 
   registerChatControl({
     id: "core-settings-trigger",
-    panel: "header",
-    order: 1000,
+    panel: "sidebar-footer", // Move to sidebar footer
+    order: 1000, // Adjust order as needed within the footer
     status: () => "ready",
     renderer: () => React.createElement(SettingsTriggerComponent),
+    iconRenderer: () => React.createElement(SettingsTriggerComponent),
     settingsRenderer: () => React.createElement(SettingsModalRenderer),
     show: () => true,
   });

@@ -3,7 +3,6 @@
 import React, { useMemo, useState, useCallback } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { UserPromptDisplay } from "./UserPromptDisplay";
-// Removed StreamingContentView import
 import {
   RefreshCwIcon,
   Trash2Icon,
@@ -21,20 +20,112 @@ import { splitModelId } from "@/lib/litechat/provider-helpers";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
 import { ActionTooltipButton } from "../common/ActionTooltipButton";
-// Import the markdown parser hook and types
 import {
   useMarkdownParser,
   CodeBlockData,
 } from "@/lib/litechat/useMarkdownParser";
-import { CodeBlockRenderer } from "../common/CodeBlockRenderer"; // Keep CodeBlockRenderer
+import { CodeBlockRenderer } from "../common/CodeBlockRenderer";
+import { ToolCallPart, ToolResultPart } from "ai"; // Import AI SDK types
 
-interface InteractionCardProps {
-  interaction: Interaction;
-  onRegenerate?: (interactionId: string) => void;
-  onDelete?: (interactionId: string) => void;
-  onEdit?: (interactionId: string) => void;
-  className?: string;
-}
+// --- Tool Call/Result Rendering Components ---
+const ToolCallDisplay: React.FC<{ toolCall: ToolCallPart }> = ({
+  toolCall,
+}) => {
+  const [isArgsFolded, setIsArgsFolded] = useState(true);
+  const toggleFold = () => setIsArgsFolded((p) => !p);
+  const argsString = useMemo(() => {
+    try {
+      return JSON.stringify(toolCall.args, null, 2);
+    } catch {
+      return String(toolCall.args);
+    }
+  }, [toolCall.args]);
+
+  return (
+    <div className="my-2 p-2 border border-amber-500/30 bg-amber-500/10 rounded-md text-xs">
+      <div className="flex items-center justify-between mb-1">
+        <span className="font-semibold text-amber-700 dark:text-amber-300">
+          Tool Call: <code className="font-mono">{toolCall.toolName}</code>
+        </span>
+        <ActionTooltipButton
+          tooltipText={isArgsFolded ? "Show Args" : "Hide Args"}
+          onClick={toggleFold}
+          aria-label={isArgsFolded ? "Show arguments" : "Hide arguments"}
+          icon={isArgsFolded ? <ChevronDownIcon /> : <ChevronUpIcon />}
+          iconClassName="h-3 w-3"
+          className="h-5 w-5 text-muted-foreground"
+        />
+      </div>
+      {!isArgsFolded && <CodeBlockRenderer lang="json" code={argsString} />}
+    </div>
+  );
+};
+
+const ToolResultDisplay: React.FC<{ toolResult: ToolResultPart }> = ({
+  toolResult,
+}) => {
+  const [isResultFolded, setIsResultFolded] = useState(true); // Default unfolded
+  const toggleFold = () => setIsResultFolded((p) => !p);
+  const resultString = useMemo(() => {
+    try {
+      // Check for structured error from AIService wrapper
+      if (
+        typeof toolResult.result === "object" &&
+        toolResult.result !== null &&
+        (toolResult.result as any)._isError === true
+      ) {
+        return `Error: ${(toolResult.result as any).error}`;
+      }
+      return JSON.stringify(toolResult.result, null, 2);
+    } catch {
+      return String(toolResult.result);
+    }
+  }, [toolResult.result]);
+
+  const isErrorResult =
+    typeof toolResult.result === "object" &&
+    toolResult.result !== null &&
+    (toolResult.result as any)._isError === true;
+
+  return (
+    <div
+      className={cn(
+        "my-2 p-2 border rounded-md text-xs",
+        isErrorResult
+          ? "border-destructive/30 bg-destructive/10"
+          : "border-green-500/30 bg-green-500/10",
+      )}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <span
+          className={cn(
+            "font-semibold",
+            isErrorResult
+              ? "text-destructive"
+              : "text-green-700 dark:text-green-300",
+          )}
+        >
+          Tool Result: <code className="font-mono">{toolResult.toolName}</code>
+        </span>
+        <ActionTooltipButton
+          tooltipText={isResultFolded ? "Show Result" : "Hide Result"}
+          onClick={toggleFold}
+          aria-label={isResultFolded ? "Show result" : "Hide result"}
+          icon={isResultFolded ? <ChevronDownIcon /> : <ChevronUpIcon />}
+          iconClassName="h-3 w-3"
+          className="h-5 w-5 text-muted-foreground"
+        />
+      </div>
+      {!isResultFolded && (
+        <CodeBlockRenderer
+          lang={isErrorResult ? "text" : "json"}
+          code={resultString}
+        />
+      )}
+    </div>
+  );
+};
+// --- End Tool Call/Result Rendering Components ---
 
 // Component to render static markdown content
 const StaticContentView: React.FC<{ markdownContent: string | null }> = ({
@@ -43,9 +134,7 @@ const StaticContentView: React.FC<{ markdownContent: string | null }> = ({
   const parsedContent = useMarkdownParser(markdownContent); // Use the parser hook
 
   if (!markdownContent?.trim()) {
-    return (
-      <div className="text-muted-foreground italic">No response content.</div>
-    );
+    return null; // Return null if no text content to render
   }
 
   return (
@@ -74,6 +163,14 @@ const StaticContentView: React.FC<{ markdownContent: string | null }> = ({
     </div>
   );
 };
+
+interface InteractionCardProps {
+  interaction: Interaction;
+  onRegenerate?: (interactionId: string) => void;
+  onDelete?: (interactionId: string) => void;
+  onEdit?: (interactionId: string) => void;
+  className?: string;
+}
 
 export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
   ({ interaction, onRegenerate, onDelete, onEdit, className }) => {
@@ -165,6 +262,12 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
       interaction.response &&
       (typeof interaction.response !== "string" ||
         interaction.response.trim().length > 0);
+    const hasToolCalls =
+      interaction.metadata?.toolCalls &&
+      interaction.metadata.toolCalls.length > 0;
+    const hasToolResults =
+      interaction.metadata?.toolResults &&
+      interaction.metadata.toolResults.length > 0;
 
     return (
       <div
@@ -209,7 +312,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
                     className="h-5 w-5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity"
                   />
                 )}
-              {hasResponseContent && (
+              {(hasResponseContent || hasToolCalls || hasToolResults) && (
                 <ActionTooltipButton
                   tooltipText={isResponseFolded ? "Unfold" : "Fold"}
                   onClick={toggleResponseFold}
@@ -234,8 +337,58 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
                   <p>{interaction.metadata.error}</p>
                 </div>
               )}
-              {/* Use StaticContentView for completed interactions */}
+              {/* Render Tool Calls */}
+              {interaction.metadata?.toolCalls?.map((callStr, idx) => {
+                try {
+                  const parsedCall = JSON.parse(callStr) as ToolCallPart;
+                  return (
+                    <ToolCallDisplay
+                      key={`call-${idx}`}
+                      toolCall={parsedCall}
+                    />
+                  );
+                } catch (e) {
+                  console.error("Failed to parse tool call string:", e);
+                  return (
+                    <div
+                      key={`call-err-${idx}`}
+                      className="text-xs text-destructive"
+                    >
+                      [Error displaying tool call]
+                    </div>
+                  );
+                }
+              })}
+              {/* Render Tool Results */}
+              {interaction.metadata?.toolResults?.map((resStr, idx) => {
+                try {
+                  const parsedResult = JSON.parse(resStr) as ToolResultPart;
+                  return (
+                    <ToolResultDisplay
+                      key={`res-${idx}`}
+                      toolResult={parsedResult}
+                    />
+                  );
+                } catch (e) {
+                  console.error("Failed to parse tool result string:", e);
+                  return (
+                    <div
+                      key={`res-err-${idx}`}
+                      className="text-xs text-destructive"
+                    >
+                      [Error displaying tool result]
+                    </div>
+                  );
+                }
+              })}
+              {/* Render Text Response */}
               <StaticContentView markdownContent={interaction.response} />
+              {/* Show placeholder if no text and no tools */}
+              {!hasResponseContent && !hasToolCalls && !hasToolResults && (
+                <div className="text-muted-foreground italic">
+                  No response content.
+                </div>
+              )}
             </>
           )}
           {isResponseFolded && (
@@ -243,9 +396,14 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
               className="text-xs text-muted-foreground italic cursor-pointer hover:bg-muted/20 p-1 rounded"
               onClick={toggleResponseFold}
             >
-              {typeof interaction.response === "string"
+              {hasToolCalls
+                ? `[${interaction.metadata.toolCalls?.length} Tool Call(s)] `
+                : ""}
+              {hasResponseContent && typeof interaction.response === "string"
                 ? `"${interaction.response.substring(0, 80)}${interaction.response.length > 80 ? "..." : ""}"`
-                : "[Non-text response]"}
+                : hasToolCalls || hasToolResults
+                  ? ""
+                  : "[No text response]"}
             </div>
           )}
         </div>

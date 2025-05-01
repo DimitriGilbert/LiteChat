@@ -2,7 +2,13 @@
 // Entire file content provided
 import type { PromptObject, PromptTurnObject } from "@/types/litechat/prompt";
 import type { Interaction } from "@/types/litechat/interaction";
-import type { ToolImplementation } from "@/types/litechat/modding";
+import type {
+  ToolImplementation,
+  ModMiddlewareHookName,
+  ModMiddlewarePayloadMap,
+  ModMiddlewareReturnMap,
+  ReadonlyChatContextSnapshot,
+} from "@/types/litechat/modding";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useSettingsStore } from "@/store/settings.store";
@@ -28,19 +34,19 @@ import { useProviderStore } from "@/store/provider.store";
 import { toast } from "sonner";
 import { z } from "zod";
 import { PersistenceService } from "@/services/persistence.service";
+import { useConversationStore } from "@/store/conversation.store"; // Import ConversationStore
+import { useVfsStore } from "@/store/vfs.store"; // Import VfsStore
+import type { fs as FsType } from "@zenfs/core"; // Import fs type
 import { type AttachedFileMetadata } from "@/store/input.store";
 // Import helpers from the new file
 import {
   runMiddleware,
   getContextSnapshot,
   processFileMetaToUserContent, // Keep this helper
+  buildHistoryMessages, // Import buildHistoryMessages
 } from "@/lib/litechat/ai-helpers";
 // Import VFS operations and the global VFS instance
 import * as VfsOps from "@/lib/litechat/vfs-operations";
-import { useConversationStore } from "@/store/conversation.store"; // Import ConversationStore
-import type { fs as FsType } from "@zenfs/core"; // Import fs type
-// Import VfsStore ONLY to check the configured key
-import { useVfsStore } from "@/store/vfs.store";
 
 export class AIService {
   private static activeStreams = new Map<string, AbortController>();
@@ -317,33 +323,88 @@ export class AIService {
           const toolInfo = allRegisteredTools[name];
           if (toolInfo) {
             const toolDefinition: Tool<any> = { ...toolInfo.definition };
-            if (toolInfo.implementation) {
-              // Wrap implementation to handle errors and context
-              toolDefinition.execute = async (args: any) => {
+            // Wrap implementation to handle errors, context, and VFS readiness
+            toolDefinition.execute = async (args: any) => {
+              // --- VFS Readiness Check (Correct Async Handling) ---
+              // Determine the target VFS key based on the current conversation's project
+              const currentConversationId =
+                useInteractionStore.getState().currentConversationId;
+              const conversation = currentConversationId
+                ? useConversationStore
+                    .getState()
+                    .getConversationById(currentConversationId)
+                : null;
+              const targetVfsKey = conversation?.projectId ?? "orphan";
+              let vfsStoreState = useVfsStore.getState();
+
+              // Check if VFS needs initialization or context switch
+              if (
+                vfsStoreState.configuredVfsKey !== targetVfsKey ||
+                !vfsStoreState.fs
+              ) {
+                console.log(
+                  `[AIService Tool Execute] VFS for key "${targetVfsKey}" not ready. Attempting initialization...`,
+                );
                 try {
-                  const contextSnapshot = getContextSnapshot(); // Use helper
-                  const parsedArgs = toolInfo.definition.parameters.parse(args);
-                  const implementation: ToolImplementation<any> =
-                    toolInfo.implementation!;
-                  return await implementation(parsedArgs, contextSnapshot);
-                } catch (e) {
-                  console.error(
-                    `[AIService] Error executing tool ${name} via SDK:`,
-                    e,
-                  );
-                  const toolError = e instanceof Error ? e.message : String(e);
-                  // Provide structured error for Zod validation issues
-                  if (e instanceof z.ZodError) {
-                    return {
-                      _isError: true,
-                      error: `Invalid arguments: ${e.errors.map((err) => `${err.path.join(".")} (${err.message})`).join(", ")}`,
-                    };
+                  // Trigger and AWAIT initialization
+                  useVfsStore.getState().setVfsKey(targetVfsKey);
+                  await useVfsStore.getState().initializeVFS(targetVfsKey);
+                  // Re-check state after awaiting initialization
+                  vfsStoreState = useVfsStore.getState();
+                  if (
+                    vfsStoreState.configuredVfsKey !== targetVfsKey ||
+                    !vfsStoreState.fs
+                  ) {
+                    // Check for error state after initialization attempt
+                    const errorMsg = vfsStoreState.error
+                      ? `: ${vfsStoreState.error}`
+                      : "";
+                    throw new Error(
+                      `VFS initialization failed or did not configure correctly for key "${targetVfsKey}"${errorMsg}`,
+                    );
                   }
-                  // Return generic error structure
-                  return { _isError: true, error: toolError };
+                  console.log(
+                    `[AIService Tool Execute] VFS for key "${targetVfsKey}" initialized successfully.`,
+                  );
+                } catch (initError: any) {
+                  console.error(
+                    `[AIService Tool Execute] VFS initialization failed for key "${targetVfsKey}":`,
+                    initError,
+                  );
+                  return {
+                    _isError: true,
+                    error: `Filesystem error: ${initError.message || "Failed to initialize VFS."}`,
+                  };
                 }
-              };
-            }
+              }
+              // --- End VFS Readiness Check ---
+
+              // --- Execute Tool Implementation ---
+              try {
+                const contextSnapshot = getContextSnapshot(); // Use helper
+                const parsedArgs = toolInfo.definition.parameters.parse(args);
+                const implementation: ToolImplementation<any> =
+                  toolInfo.implementation!;
+                // VFS is guaranteed to be ready here, VfsOps uses the global fs
+                return await implementation(parsedArgs, contextSnapshot);
+              } catch (e) {
+                console.error(
+                  `[AIService] Error executing tool ${name} via SDK:`,
+                  e,
+                );
+                const toolError = e instanceof Error ? e.message : String(e);
+                // Provide structured error for Zod validation issues
+                if (e instanceof z.ZodError) {
+                  return {
+                    _isError: true,
+                    error: `Invalid arguments: ${e.errors.map((err) => `${err.path.join(".")} (${err.message})`).join(", ")}`,
+                  };
+                }
+                // Return generic error structure
+                return { _isError: true, error: toolError };
+              }
+              // --- End Execute Tool Implementation ---
+            };
             acc[name] = toolDefinition;
           }
           return acc;
