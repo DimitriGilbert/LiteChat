@@ -37,8 +37,8 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes} // Apply attributes to the main div
-      {...listeners} // Apply listeners to the main div
+      {...attributes}
+      {...listeners}
       className={cn(
         "flex items-center space-x-2 p-2 rounded border border-transparent bg-muted/50 hover:bg-muted mb-1",
         isDragging && "shadow-lg border-primary bg-card",
