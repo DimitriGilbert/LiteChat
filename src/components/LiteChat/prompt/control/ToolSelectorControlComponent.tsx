@@ -1,5 +1,6 @@
 // src/components/LiteChat/prompt/control/ToolSelectorControlComponent.tsx
-import React, { useState, useMemo, useCallback, useEffect } from "react"; // Added useEffect
+// Entire file content provided
+import React, { useState, useMemo, useCallback } from "react"; // Removed useEffect
 import { useControlRegistryStore } from "@/store/control.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -11,51 +12,50 @@ import { SearchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
+import type { SidebarItemType } from "@/types/litechat/chat";
 
 interface ToolSelectorControlComponentProps {
   className?: string;
   localMaxSteps: number | null;
   setLocalMaxSteps: (steps: number | null) => void;
+  conversationId: string | null;
+  conversationType: SidebarItemType | null;
 }
 
 export const ToolSelectorControlComponent: React.FC<
   ToolSelectorControlComponentProps
-> = ({ className, localMaxSteps, setLocalMaxSteps }) => {
-  const {
-    selectedItemId,
-    selectedItemType,
-    getConversationById,
-    updateCurrentConversationToolSettings,
-  } = useConversationStore(
-    useShallow((state) => ({
-      selectedItemId: state.selectedItemId,
-      selectedItemType: state.selectedItemType,
-      getConversationById: state.getConversationById,
-      updateCurrentConversationToolSettings:
-        state.updateCurrentConversationToolSettings,
-    })),
-  );
-
+> = ({
+  className,
+  localMaxSteps,
+  setLocalMaxSteps,
+  conversationId,
+  conversationType,
+}) => {
+  // --- Store Hooks ---
+  // Use useShallow to select multiple fields efficiently
+  const { conversation, updateCurrentConversationToolSettings } =
+    useConversationStore(
+      useShallow((state) => ({
+        // Select the conversation object directly
+        conversation:
+          conversationType === "conversation" && conversationId
+            ? state.getConversationById(conversationId)
+            : null,
+        updateCurrentConversationToolSettings:
+          state.updateCurrentConversationToolSettings,
+      })),
+    );
   const allTools = useControlRegistryStore((state) => state.tools);
-  const [filterText, setFilterText] = useState("");
-  // --- Local state for visual switch representation ---
-  const [localEnabledTools, setLocalEnabledTools] = useState<Set<string>>(
-    new Set(),
-  );
+  const globalDefaultMaxSteps = useSettingsStore((state) => state.toolMaxSteps);
 
-  // Effect to initialize/sync local state when conversation changes or component mounts
-  useEffect(() => {
-    if (selectedItemType === "conversation" && selectedItemId) {
-      const conversation = getConversationById(selectedItemId);
-      const storeEnabledTools = new Set(
-        conversation?.metadata?.enabledTools ?? [],
-      );
-      setLocalEnabledTools(storeEnabledTools);
-    } else {
-      setLocalEnabledTools(new Set()); // Clear if no conversation selected
-    }
-    // Re-sync when the selected item changes
-  }, [selectedItemId, selectedItemType, getConversationById]);
+  // --- Local UI State ---
+  const [filterText, setFilterText] = useState("");
+
+  // --- Derived State ---
+  // Derive enabledTools directly from the selected conversation object
+  const enabledTools = useMemo(() => {
+    return new Set(conversation?.metadata?.enabledTools ?? []);
+  }, [conversation?.metadata?.enabledTools]); // Depend on the metadata field
 
   const availableTools = useMemo(() => {
     return Object.entries(allTools)
@@ -80,21 +80,11 @@ export const ToolSelectorControlComponent: React.FC<
     );
   }, [availableTools, filterText]);
 
+  // --- Event Handlers ---
   const handleToggle = useCallback(
     (toolName: string, checked: boolean) => {
-      // 1. Update local state immediately for UI feedback
-      setLocalEnabledTools((prev) => {
-        const next = new Set(prev);
-        if (checked) {
-          next.add(toolName);
-        } else {
-          next.delete(toolName);
-        }
-        return next;
-      });
-
-      // 2. Update the conversation store for persistence
-      const newEnabledTools = new Set(localEnabledTools); // Use current local state as base
+      // Update the conversation store directly for persistence
+      const newEnabledTools = new Set(enabledTools); // Use current derived state
       if (checked) {
         newEnabledTools.add(toolName);
       } else {
@@ -103,8 +93,9 @@ export const ToolSelectorControlComponent: React.FC<
       updateCurrentConversationToolSettings({
         enabledTools: Array.from(newEnabledTools),
       });
+      // The component will re-render because `enabledTools` (derived from the store) will change.
     },
-    [localEnabledTools, updateCurrentConversationToolSettings], // Depend on local state and store action
+    [enabledTools, updateCurrentConversationToolSettings], // Depend on derived state
   );
 
   const handleToggleAll = useCallback(
@@ -112,9 +103,7 @@ export const ToolSelectorControlComponent: React.FC<
       const newEnabledSet = enable
         ? new Set(availableTools.map((t) => t.name))
         : new Set<string>();
-      // 1. Update local state
-      setLocalEnabledTools(newEnabledSet);
-      // 2. Update store state
+      // Update store state directly
       updateCurrentConversationToolSettings({
         enabledTools: Array.from(newEnabledSet),
       });
@@ -125,19 +114,22 @@ export const ToolSelectorControlComponent: React.FC<
   const handleMaxStepsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value === "") {
-      setLocalMaxSteps(null);
+      setLocalMaxSteps(null); // Update local state for the popover
       return;
     }
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue)) {
-      setLocalMaxSteps(numValue);
+      // Clamp value between 1 and 20
+      const clampedValue = Math.max(1, Math.min(20, numValue));
+      setLocalMaxSteps(clampedValue); // Update local state
     } else {
-      setLocalMaxSteps(null);
+      setLocalMaxSteps(null); // Reset if input is invalid
     }
   };
 
+  // --- Render Logic ---
   const displayMaxSteps = localMaxSteps === null ? "" : String(localMaxSteps);
-  const isDisabled = selectedItemType !== "conversation" || !selectedItemId;
+  const isDisabled = conversationType !== "conversation" || !conversationId;
 
   return (
     <div className={cn("p-4 h-[28rem] max-w-2xl space-y-3", className)}>
@@ -155,7 +147,7 @@ export const ToolSelectorControlComponent: React.FC<
       </div>
       <div className="flex justify-between items-center">
         <Label className="text-xs text-muted-foreground">
-          {filteredTools.length} tools shown ({localEnabledTools.size} enabled)
+          {filteredTools.length} tools shown ({enabledTools.size} enabled)
         </Label>
         <div className="space-x-2">
           <Button
@@ -173,7 +165,7 @@ export const ToolSelectorControlComponent: React.FC<
             disabled={
               isDisabled ||
               availableTools.length === 0 ||
-              localEnabledTools.size === 0
+              enabledTools.size === 0
             }
           >
             Disable All
@@ -202,8 +194,8 @@ export const ToolSelectorControlComponent: React.FC<
               >
                 <Switch
                   id={`tool-switch-${tool.name}`}
-                  // Read from local state for immediate feedback
-                  checked={localEnabledTools.has(tool.name)}
+                  // Read directly from derived state
+                  checked={enabledTools.has(tool.name)}
                   onCheckedChange={(checked) =>
                     handleToggle(tool.name, checked)
                   }
@@ -241,11 +233,12 @@ export const ToolSelectorControlComponent: React.FC<
           value={displayMaxSteps}
           onChange={handleMaxStepsChange}
           className="w-20 h-8 text-xs mt-1"
-          placeholder={String(useSettingsStore.getState().toolMaxSteps ?? 5)}
+          placeholder={String(globalDefaultMaxSteps ?? 5)}
           disabled={isDisabled}
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Overrides the global setting for the next message only (1-20).
+          Overrides the global setting for the next message only (1-20). Leave
+          blank to use default.
         </p>
       </div>
     </div>

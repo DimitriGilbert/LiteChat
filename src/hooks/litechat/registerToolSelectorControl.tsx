@@ -1,5 +1,6 @@
-// src/hooks/litechat/registerToolSelectorControl.ts
-import React, { useState } from "react";
+// src/hooks/litechat/registerToolSelectorControl.tsx
+// Entire file content provided - No changes needed here based on analysis
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { WrenchIcon } from "lucide-react";
 import {
@@ -24,56 +25,68 @@ export function registerToolSelectorControl() {
     useControlRegistryStore.getState().registerPromptControl;
 
   const ToolSelectorTrigger: React.FC = () => {
-    const { selectedItemId, selectedItemType, getConversationById } =
-      useConversationStore(
-        useShallow((state) => ({
-          selectedItemId: state.selectedItemId,
-          selectedItemType: state.selectedItemType,
-          getConversationById: state.getConversationById,
-        })),
-      );
+    // --- State Hooks ---
+    const {
+      selectedItemId,
+      selectedItemType,
+      getConversationById,
+      updateCurrentConversationToolSettings, // Get the update action
+    } = useConversationStore(
+      useShallow((state) => ({
+        selectedItemId: state.selectedItemId,
+        selectedItemType: state.selectedItemType,
+        getConversationById: state.getConversationById,
+        updateCurrentConversationToolSettings:
+          state.updateCurrentConversationToolSettings, // Get action
+      })),
+    );
     const isStreaming = useInteractionStore.getState().status === "streaming";
     const allToolsCount = Object.keys(
       useControlRegistryStore.getState().tools,
     ).length;
 
+    // --- Derived State ---
     const conversation =
       selectedItemType === "conversation" && selectedItemId
         ? getConversationById(selectedItemId)
         : null;
 
-    const enabledToolsCount = conversation?.metadata?.enabledTools?.length ?? 0;
+    const enabledTools = useMemo(
+      () => new Set(conversation?.metadata?.enabledTools ?? []),
+      [conversation?.metadata?.enabledTools],
+    );
     const maxStepsOverride =
       conversation?.metadata?.toolMaxStepsOverride ?? null;
 
+    // --- Local State for Popover ---
     // Local state for maxSteps override specific to the popover instance
     const [localMaxSteps, setLocalMaxSteps] = useState<number | null>(
       maxStepsOverride,
     );
 
     // Update local state if the conversation's override changes externally
-    React.useEffect(() => {
+    useEffect(() => {
       setLocalMaxSteps(maxStepsOverride);
     }, [maxStepsOverride]);
 
+    // --- Event Handlers ---
+    const handlePopoverOpenChange = (open: boolean) => {
+      // When closing, persist the localMaxSteps to the conversation
+      if (!open && localMaxSteps !== maxStepsOverride) {
+        updateCurrentConversationToolSettings({
+          toolMaxStepsOverride: localMaxSteps,
+        });
+      }
+    };
+
+    // --- Render Logic ---
     const hasActiveSettings =
-      enabledToolsCount > 0 || maxStepsOverride !== null;
+      enabledTools.size > 0 || maxStepsOverride !== null;
     const isDisabled =
       isStreaming || allToolsCount === 0 || selectedItemType !== "conversation";
 
     return (
-      <Popover
-        onOpenChange={(open) => {
-          // When closing, persist the localMaxSteps to the conversation
-          if (!open) {
-            useConversationStore
-              .getState()
-              .updateCurrentConversationToolSettings({
-                toolMaxStepsOverride: localMaxSteps,
-              });
-          }
-        }}
-      >
+      <Popover onOpenChange={handlePopoverOpenChange}>
         <TooltipProvider delayDuration={100}>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -92,14 +105,18 @@ export function registerToolSelectorControl() {
             <TooltipContent side="top">
               {isDisabled
                 ? "Tools unavailable (select conversation)"
-                : `Tools (${enabledToolsCount} enabled)`}
+                : `Tools (${enabledTools.size} enabled)`}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
         <PopoverContent className="w-auto p-0" align="start">
+          {/* Pass local state and setter to the component */}
           <ToolSelectorControlComponent
             localMaxSteps={localMaxSteps}
             setLocalMaxSteps={setLocalMaxSteps}
+            // Pass conversation details needed by the component
+            conversationId={selectedItemId}
+            conversationType={selectedItemType}
           />
         </PopoverContent>
       </Popover>
@@ -109,7 +126,6 @@ export function registerToolSelectorControl() {
   registerPromptControl({
     id: "core-tool-selector",
     order: 50,
-    // status: () => "ready", // Removed status
     triggerRenderer: () => React.createElement(ToolSelectorTrigger),
     getMetadata: () => {
       // Get current state when metadata is requested
@@ -119,12 +135,16 @@ export function registerToolSelectorControl() {
         selectedItemType === "conversation" && selectedItemId
           ? getConversationById(selectedItemId)
           : null;
+
+      // Read directly from conversation metadata
+      const enabledTools = conversation?.metadata?.enabledTools ?? [];
+      const maxStepsOverride =
+        conversation?.metadata?.toolMaxStepsOverride ?? null;
+
       return {
-        enabledTools: conversation?.metadata?.enabledTools ?? [],
-        // Include maxSteps override if set, otherwise it's handled by AIService default
-        ...(conversation?.metadata?.toolMaxStepsOverride !== null && {
-          maxSteps: conversation?.metadata?.toolMaxStepsOverride,
-        }),
+        enabledTools: enabledTools,
+        // Include maxSteps override only if it's explicitly set (not null)
+        ...(maxStepsOverride !== null && { maxSteps: maxStepsOverride }),
       };
     },
     show: () =>

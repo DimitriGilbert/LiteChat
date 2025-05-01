@@ -12,6 +12,7 @@ import {
   ChevronUpIcon,
   ClipboardIcon,
   CheckIcon,
+  BrainCircuitIcon, // Import an icon for reasoning
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -64,7 +65,7 @@ const ToolCallDisplay: React.FC<{ toolCall: ToolCallPart }> = ({
 const ToolResultDisplay: React.FC<{ toolResult: ToolResultPart }> = ({
   toolResult,
 }) => {
-  const [isResultFolded, setIsResultFolded] = useState(true); // Default unfolded
+  const [isResultFolded, setIsResultFolded] = useState(true); // Default folded
   const toggleFold = () => setIsResultFolded((p) => !p);
   const resultString = useMemo(() => {
     try {
@@ -175,6 +176,7 @@ interface InteractionCardProps {
 export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
   ({ interaction, onRegenerate, onDelete, onEdit, className }) => {
     const [isResponseFolded, setIsResponseFolded] = useState(false);
+    const [isReasoningFolded, setIsReasoningFolded] = useState(true); // Default folded
     const [isResponseCopied, setIsResponseCopied] = useState(false);
 
     const { dbProviderConfigs, getAllAvailableModelDefsForProvider } =
@@ -209,6 +211,10 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
 
     const toggleResponseFold = useCallback(
       () => setIsResponseFolded((prev) => !prev),
+      [],
+    );
+    const toggleReasoningFold = useCallback(
+      () => setIsReasoningFolded((prev) => !prev),
       [],
     );
 
@@ -258,6 +264,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
     const showActions =
       interaction.status === "COMPLETED" || interaction.status === "ERROR";
     const isError = interaction.status === "ERROR";
+    const hasReasoning = !!interaction.metadata?.reasoning;
     const hasResponseContent =
       interaction.response &&
       (typeof interaction.response !== "string" ||
@@ -312,7 +319,10 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
                     className="h-5 w-5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity"
                   />
                 )}
-              {(hasResponseContent || hasToolCalls || hasToolResults) && (
+              {(hasResponseContent ||
+                hasToolCalls ||
+                hasToolResults ||
+                hasReasoning) && ( // Include reasoning in check
                 <ActionTooltipButton
                   tooltipText={isResponseFolded ? "Unfold" : "Fold"}
                   onClick={toggleResponseFold}
@@ -335,6 +345,41 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
                 <div className="mb-2 rounded border border-destructive bg-destructive/10 p-2 text-xs text-destructive-foreground">
                   <p className="font-semibold">Error:</p>
                   <p>{interaction.metadata.error}</p>
+                </div>
+              )}
+              {/* Reasoning Display (NEW) */}
+              {hasReasoning && (
+                <div className="my-2 p-2 border border-blue-500/30 bg-blue-500/10 rounded-md text-xs">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                      <BrainCircuitIcon className="h-3.5 w-3.5" /> Reasoning
+                    </span>
+                    <ActionTooltipButton
+                      tooltipText={
+                        isReasoningFolded ? "Show Reasoning" : "Hide Reasoning"
+                      }
+                      onClick={toggleReasoningFold}
+                      aria-label={
+                        isReasoningFolded ? "Show reasoning" : "Hide reasoning"
+                      }
+                      icon={
+                        isReasoningFolded ? (
+                          <ChevronDownIcon />
+                        ) : (
+                          <ChevronUpIcon />
+                        )
+                      }
+                      iconClassName="h-3 w-3"
+                      className="h-5 w-5 text-muted-foreground"
+                    />
+                  </div>
+                  {!isReasoningFolded && (
+                    // Render reasoning as static content for now
+                    // No markdown parsing for reasoning steps
+                    <pre className="whitespace-pre-wrap text-xs font-mono p-2 bg-background/30 rounded">
+                      {interaction.metadata.reasoning!}
+                    </pre>
+                  )}
                 </div>
               )}
               {/* Render Tool Calls */}
@@ -384,11 +429,14 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
               {/* Render Text Response */}
               <StaticContentView markdownContent={interaction.response} />
               {/* Show placeholder if no text and no tools */}
-              {!hasResponseContent && !hasToolCalls && !hasToolResults && (
-                <div className="text-muted-foreground italic">
-                  No response content.
-                </div>
-              )}
+              {!hasResponseContent &&
+                !hasToolCalls &&
+                !hasToolResults &&
+                !hasReasoning && ( // Include reasoning in check
+                  <div className="text-muted-foreground italic">
+                    No response content.
+                  </div>
+                )}
             </>
           )}
           {isResponseFolded && (
@@ -396,12 +444,13 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
               className="text-xs text-muted-foreground italic cursor-pointer hover:bg-muted/20 p-1 rounded"
               onClick={toggleResponseFold}
             >
+              {hasReasoning ? "[Reasoning] " : ""}
               {hasToolCalls
                 ? `[${interaction.metadata.toolCalls?.length} Tool Call(s)] `
                 : ""}
               {hasResponseContent && typeof interaction.response === "string"
                 ? `"${interaction.response.substring(0, 80)}${interaction.response.length > 80 ? "..." : ""}"`
-                : hasToolCalls || hasToolResults
+                : hasToolCalls || hasToolResults || hasReasoning
                   ? ""
                   : "[No text response]"}
             </div>

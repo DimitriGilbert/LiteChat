@@ -1,6 +1,12 @@
 // src/components/LiteChat/LiteChat.tsx
-// Update handlers to use new services
-import React, { useEffect, useCallback, useMemo, useState } from "react";
+// Entire file content provided
+import React, {
+  useEffect,
+  useCallback,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
 import { PromptWrapper } from "@/components/LiteChat/prompt/PromptWrapper";
 import { ChatCanvas } from "@/components/LiteChat/canvas/ChatCanvas";
 import { ChatControlWrapper } from "@/components/LiteChat/chat/ChatControlWrapper";
@@ -40,6 +46,8 @@ import { registerToolSelectorControl } from "@/hooks/litechat/registerToolSelect
 import { registerProjectSettingsControl } from "@/hooks/litechat/registerProjectSettingsControl";
 import { usePromptStateStore } from "@/store/prompt.store";
 import { registerGlobalModelSelector } from "@/hooks/litechat/registerGlobalModelSelector";
+import { useInputStore } from "@/store/input.store"; // Import InputStore
+import { registerSystemPromptControl } from "@/hooks/litechat/registerSystemPromptControl"; // Import system prompt control
 
 export const LiteChat: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
@@ -104,12 +112,16 @@ export const LiteChat: React.FC = () => {
       setVfsKey: state.setVfsKey,
     })),
   );
-  const { initializePromptState, resetPromptState } = usePromptStateStore(
-    useShallow((state) => ({
-      initializePromptState: state.initializePromptState,
-      resetPromptState: state.resetPromptState,
-    })),
-  );
+  // Get resetTransientParameters instead of resetPromptState
+  const { initializePromptState, resetTransientParameters } =
+    usePromptStateStore(
+      useShallow((state) => ({
+        initializePromptState: state.initializePromptState,
+        resetTransientParameters: state.resetTransientParameters, // Use new action
+      })),
+    );
+  // Get clearAttachedFiles from InputStore
+  const clearAttachedFiles = useInputStore((state) => state.clearAttachedFiles);
 
   // --- Initialization Effect (remains the same) ---
   useEffect(() => {
@@ -135,6 +147,7 @@ export const LiteChat: React.FC = () => {
         registerSettingsControl();
         registerSidebarToggleControl();
         registerGlobalModelSelector();
+        registerSystemPromptControl(); // Add the call here
         registerParameterControl();
         registerFileControl();
         registerGitSyncControl();
@@ -157,6 +170,8 @@ export const LiteChat: React.FC = () => {
         setLoadedMods(loadedModInstances);
         console.log(`LiteChat: ${loadedModInstances.length} mods processed.`);
 
+        // Initialize prompt state AFTER core data and controls are ready
+        // Use getState() here as we are outside the render cycle effectively
         const initialSelectedItemId =
           useConversationStore.getState().selectedItemId;
         const initialSelectedItemType =
@@ -173,7 +188,10 @@ export const LiteChat: React.FC = () => {
         const initialEffectiveSettings = useProjectStore
           .getState()
           .getEffectiveProjectSettings(initialProjectId);
-        initializePromptState(initialEffectiveSettings);
+        // Use getState() for prompt store action as well
+        usePromptStateStore
+          .getState()
+          .initializePromptState(initialEffectiveSettings);
         console.log(
           "LiteChat: Initial prompt state initialized.",
           initialEffectiveSettings,
@@ -199,36 +217,57 @@ export const LiteChat: React.FC = () => {
       console.log("LiteChat: Unmounting, initialization cancelled if pending.");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Keep dependencies empty for one-time init
 
-  // --- Effect to update Prompt State on Context Change (remains the same) ---
+  // --- Effect to update Prompt State on Context Change ---
+  // Store previous context to prevent unnecessary updates
+  const prevContextRef = useRef<{
+    itemId: string | null;
+    itemType: string | null;
+  }>({ itemId: null, itemType: null });
+
   useEffect(() => {
     if (isInitializing) return;
 
-    const currentProjectId =
-      selectedItemType === "project"
-        ? selectedItemId
-        : selectedItemType === "conversation"
-          ? (useConversationStore.getState().getConversationById(selectedItemId)
-              ?.projectId ?? null)
-          : null;
+    const currentContext = {
+      itemId: selectedItemId,
+      itemType: selectedItemType,
+    };
 
-    console.log(
-      `[LiteChat Effect] Context changed (Item: ${selectedItemId}, Type: ${selectedItemType}). Calculating effective settings for Project ID: ${currentProjectId}`,
-    );
-    const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
-    initializePromptState(effectiveSettings);
-    console.log(
-      "[LiteChat Effect] Prompt state updated based on context change.",
-      effectiveSettings,
-    );
+    // Only update if the context has actually changed
+    if (
+      currentContext.itemId !== prevContextRef.current.itemId ||
+      currentContext.itemType !== prevContextRef.current.itemType
+    ) {
+      const currentProjectId =
+        selectedItemType === "project"
+          ? selectedItemId
+          : selectedItemType === "conversation"
+            ? (useConversationStore
+                .getState()
+                .getConversationById(selectedItemId)?.projectId ?? null)
+            : null;
+
+      console.log(
+        `[LiteChat Effect] Context changed (Item: ${selectedItemId}, Type: ${selectedItemType}). Calculating effective settings for Project ID: ${currentProjectId}`,
+      );
+      const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
+      initializePromptState(effectiveSettings);
+      console.log(
+        "[LiteChat Effect] Prompt state updated based on context change.",
+        effectiveSettings,
+      );
+
+      // Update the ref with the new context
+      prevContextRef.current = currentContext;
+    }
   }, [
     selectedItemId,
     selectedItemType,
     getEffectiveProjectSettings,
     initializePromptState,
     isInitializing,
-  ]);
+  ]); // Dependencies remain the same
 
   // --- VFS Context Management Effect (remains the same) ---
   useEffect(() => {
@@ -263,6 +302,8 @@ export const LiteChat: React.FC = () => {
     async (turnData: PromptTurnObject) => {
       const conversationState = useConversationStore.getState();
       const uiStateActions = useUIStateStore.getState();
+      // Get current prompt state *before* potential conversation creation
+      const currentPromptState = usePromptStateStore.getState();
 
       let currentConvId =
         conversationState.selectedItemType === "conversation"
@@ -306,50 +347,64 @@ export const LiteChat: React.FC = () => {
       // --- Delegate prompt processing to ConversationService ---
       console.log("LiteChat: Submitting turn data to ConversationService...");
       try {
-        await ConversationService.submitPrompt(turnData);
+        // Add the currently selected model from PromptStateStore to the turnData metadata
+        // This ensures the model selected *just before* submit is used.
+        const finalTurnData = {
+          ...turnData,
+          metadata: {
+            ...turnData.metadata,
+            modelId: currentPromptState.modelId, // Read from prompt state
+          },
+        };
+
+        await ConversationService.submitPrompt(finalTurnData);
         console.log("LiteChat: ConversationService processing initiated.");
 
-        // Reset prompt state AFTER initiating submission
-        resetPromptState();
-        // Re-initialize based on current context using ProjectStore
-        const effectiveSettings = useProjectStore
-          .getState()
-          .getEffectiveProjectSettings(currentProjectId); // Use current project ID
-        initializePromptState(effectiveSettings);
+        // --- UI Cleanup AFTER calling the service ---
+        clearAttachedFiles(); // Clear files from InputStore
+        resetTransientParameters(); // Reset only parameters, keep modelId
+
+        // Focus input for the next turn
+        uiStateActions.setFocusInputFlag(true);
       } catch (error) {
         // Errors during submission initiation are caught here
         console.error("LiteChat: Error submitting prompt:", error);
-        toast.error(
-          `Failed to submit prompt: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        // Toast is likely handled within ConversationService
       }
     },
-    [initializePromptState, resetPromptState], // Dependencies updated
+    [
+      // initializePromptState removed
+      resetTransientParameters, // Use new action
+      clearAttachedFiles,
+    ],
   );
 
   // --- Regeneration Handler (UPDATED) ---
-  const onRegenerateInteraction = useCallback(async (interactionId: string) => {
-    console.log(`LiteChat: Regenerating interaction ${interactionId}`);
-    try {
-      // --- Delegate regeneration to ConversationService ---
-      await ConversationService.regenerateInteraction(interactionId);
-      console.log(
-        `LiteChat: ConversationService regeneration initiated for ${interactionId}.`,
-      );
-    } catch (error) {
-      console.error("LiteChat: Error regenerating interaction:", error);
-      toast.error(
-        `Failed to regenerate: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }, []); // No specific dependencies needed here
+  const onRegenerateInteraction = useCallback(
+    async (interactionId: string) => {
+      console.log(`LiteChat: Regenerating interaction ${interactionId}`);
+      try {
+        // --- Delegate regeneration to ConversationService ---
+        await ConversationService.regenerateInteraction(interactionId);
+        console.log(
+          `LiteChat: ConversationService regeneration initiated for ${interactionId}.`,
+        );
+        // --- UI Cleanup AFTER calling the service ---
+        resetTransientParameters(); // Reset only parameters, keep modelId
+        // Focus input
+        useUIStateStore.getState().setFocusInputFlag(true);
+      } catch (error) {
+        console.error("LiteChat: Error regenerating interaction:", error);
+        // Toast handled by service
+      }
+    },
+    [resetTransientParameters /* initializePromptState removed */],
+  ); // Update dependencies
 
-  // --- Stop Interaction Handler (UPDATED) ---
+  // --- Stop Interaction Handler (remains the same) ---
   const onStopInteraction = useCallback((interactionId: string) => {
     console.log(`LiteChat: Stopping interaction ${interactionId}`);
-    // --- Delegate stop to InteractionService ---
     InteractionService.abortInteraction(interactionId);
-    // InteractionService handles state updates and potential errors/toasts
   }, []);
 
   // --- Memoized Controls (remain the same) ---

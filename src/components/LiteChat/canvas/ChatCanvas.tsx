@@ -79,7 +79,6 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
         scrollToBottom(isStreamingJustStarted ? "smooth" : "auto");
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interactions, status, streamingInteractionIds]);
 
   useEffect(() => {

@@ -17,15 +17,15 @@ export type ActionTooltipButtonProps = React.ComponentProps<"button"> &
     asChild?: boolean;
   } & {
     tooltipText: string;
-    icon: LucideIcon | React.ReactNode; // Allow passing icon component or node
+    icon: LucideIcon | React.ReactNode;
     iconClassName?: string;
     tooltipSide?: "top" | "bottom" | "left" | "right";
-    "aria-label": string; // Make aria-label mandatory
+    "aria-label": string;
   };
 
 export const ActionTooltipButton: React.FC<ActionTooltipButtonProps> = ({
   tooltipText,
-  icon: IconProp, // Rename prop to avoid conflict with potential component variable
+  icon: IconProp,
   iconClassName,
   tooltipSide = "top",
   onClick,

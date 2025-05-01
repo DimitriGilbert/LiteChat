@@ -13,7 +13,7 @@ export interface TabDefinition {
 interface TabbedLayoutProps {
   tabs: TabDefinition[];
   defaultValue?: string;
-  initialValue?: string; // For controlled external state if needed
+  initialValue?: string
   onValueChange?: (value: string) => void;
   className?: string;
   listClassName?: string;

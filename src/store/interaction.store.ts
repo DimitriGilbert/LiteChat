@@ -1,5 +1,5 @@
 // src/store/interaction.store.ts
-// Refine actions to be purely synchronous state updates where possible
+// Entire file content provided
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { Interaction } from "@/types/litechat/interaction";
@@ -100,9 +100,11 @@ export const useInteractionStore = create(
         const index = state.interactions.findIndex((i) => i.id === id);
         if (index !== -1) {
           const existingInteraction = state.interactions[index];
+          // Create a new metadata object by merging
           let newMetadata = { ...(existingInteraction.metadata || {}) };
           if (updates.metadata) {
             newMetadata = { ...newMetadata, ...updates.metadata };
+            // Ensure toolCalls and toolResults are copied if present in updates
             if (
               updates.metadata.toolCalls !== undefined &&
               Array.isArray(updates.metadata.toolCalls)
@@ -116,11 +118,21 @@ export const useInteractionStore = create(
               newMetadata.toolResults = [...updates.metadata.toolResults];
             }
           }
-          state.interactions[index] = {
+
+          // Create the updated interaction object
+          const updatedInteraction = {
             ...existingInteraction,
             ...updates,
-            metadata: newMetadata,
+            metadata: newMetadata, // Assign the merged metadata
           };
+
+          // Explicitly handle the 'response' field if it's in the updates
+          if ("response" in updates) {
+            updatedInteraction.response = updates.response;
+          }
+
+          // Update the interaction in the state array
+          state.interactions[index] = updatedInteraction;
         } else {
           console.warn(
             `InteractionStore: Interaction ${id} not found for sync state update.`,

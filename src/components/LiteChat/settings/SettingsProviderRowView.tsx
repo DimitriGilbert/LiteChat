@@ -1,5 +1,6 @@
 // src/components/LiteChat/settings/SettingsProviderRowView.tsx
-import React, { useMemo, useCallback } from "react"; // Added useCallback
+// Entire file content provided
+import React, { useMemo, useCallback, useState } from "react"; // Added useState
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import { Button } from "@/components/ui/button";
 // ScrollArea removed
@@ -10,6 +11,8 @@ import {
   RefreshCwIcon,
   CheckIcon,
   AlertCircleIcon,
+  ChevronDownIcon, // Added ChevronDownIcon
+  ChevronUpIcon, // Added ChevronUpIcon
 } from "lucide-react";
 import {
   Tooltip,
@@ -26,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { useProviderStore } from "@/store/provider.store";
 import { ModelEnablementList } from "./ModelEnablementList"; // Import the new component
 import { toast } from "sonner"; // Import toast
+import { ActionTooltipButton } from "../common/ActionTooltipButton"; // Import ActionTooltipButton
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 
@@ -50,6 +54,8 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   fetchStatus,
   isDeleting,
 }) => {
+  const [isModelListFolded, setIsModelListFolded] = useState(true); // State for folding
+
   const needsKey = requiresApiKey(provider.type);
   const needsURL = requiresBaseURL(provider.type);
   const canFetch = supportsModelFetching(provider.type);
@@ -92,6 +98,11 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
     },
     [provider.enabledModels, provider.id, onUpdate],
   );
+
+  const toggleFold = () => setIsModelListFolded((prev) => !prev);
+
+  const enabledCount = provider.enabledModels?.length ?? 0;
+  const availableCount = allAvailableModels.length;
 
   return (
     <div className="space-y-4">
@@ -141,44 +152,28 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
           )}
         </div>
         <div className="flex items-center space-x-1 flex-shrink-0">
-          <TooltipProvider delayDuration={100}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onEdit}
-                  disabled={isEditButtonDisabled}
-                  aria-label="Edit provider"
-                  className="h-8 w-8"
-                >
-                  <Edit2Icon className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Edit</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TooltipProvider delayDuration={100}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onDelete}
-                  disabled={isDeleteButtonDisabled}
-                  className="text-destructive hover:text-destructive/80 h-8 w-8"
-                  aria-label="Delete provider"
-                >
-                  {isDeleting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2Icon className="h-4 w-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Delete</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <ActionTooltipButton
+            tooltipText="Edit"
+            onClick={onEdit}
+            disabled={isEditButtonDisabled}
+            aria-label="Edit provider"
+            icon={<Edit2Icon />}
+            className="h-8 w-8"
+          />
+          <ActionTooltipButton
+            tooltipText="Delete"
+            onClick={onDelete}
+            disabled={isDeleteButtonDisabled}
+            className="text-destructive hover:text-destructive/80 h-8 w-8"
+            aria-label="Delete provider"
+            icon={
+              isDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2Icon />
+              )
+            }
+          />
         </div>
       </div>
 
@@ -251,20 +246,33 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
         )}
       </div>
 
-      {/* Model Enablement List */}
-      <div className="space-y-1">
-        <span className="font-medium text-card-foreground text-sm">
-          Model Enablement (Saves Immediately):
-        </span>
-        <ModelEnablementList
-          providerId={provider.id}
-          allAvailableModels={allAvailableModels}
-          enabledModelIds={enabledModelsSet}
-          onToggleModel={handleModelToggle} // Use immediate save handler
-          isLoading={fetchStatus === "fetching"} // Show loading skeleton during fetch
-          disabled={isDeleting} // Disable switches if deleting provider
-          listHeightClass="h-64" // Adjust height for view mode
-        />
+      {/* Model Enablement Section */}
+      <div className="space-y-1 pt-2">
+        <div className="flex items-center justify-between">
+          <span className="font-medium text-card-foreground text-sm">
+            Model Enablement ({enabledCount} / {availableCount} enabled)
+          </span>
+          <ActionTooltipButton
+            tooltipText={isModelListFolded ? "Show Models" : "Hide Models"}
+            onClick={toggleFold}
+            aria-label={
+              isModelListFolded ? "Show model list" : "Hide model list"
+            }
+            icon={isModelListFolded ? <ChevronDownIcon /> : <ChevronUpIcon />}
+            className="h-6 w-6"
+          />
+        </div>
+        {!isModelListFolded && (
+          <ModelEnablementList
+            providerId={provider.id}
+            allAvailableModels={allAvailableModels}
+            enabledModelIds={enabledModelsSet}
+            onToggleModel={handleModelToggle} // Use immediate save handler
+            isLoading={fetchStatus === "fetching"} // Show loading skeleton during fetch
+            disabled={isDeleting} // Disable switches if deleting provider
+            listHeightClass="h-64" // Adjust height for view mode
+          />
+        )}
       </div>
     </div>
   );

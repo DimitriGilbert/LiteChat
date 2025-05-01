@@ -53,5 +53,6 @@ export interface Interaction {
       size: number;
       path?: string;
     }[];
+    reasoning?: string;
   };
 }

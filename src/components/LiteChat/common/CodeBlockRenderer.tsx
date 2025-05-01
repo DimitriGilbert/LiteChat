@@ -20,7 +20,7 @@ import "prismjs/components/prism-sql";
 // Import base Prism styles
 import "prismjs/themes/prism.css";
 
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button";
 import { CheckIcon, ClipboardIcon, ChevronsUpDownIcon } from "lucide-react";
 import {

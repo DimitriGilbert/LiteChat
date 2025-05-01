@@ -1,5 +1,5 @@
 // src/services/conversation.service.ts
-// Full file content after implementing Step 2
+// Entire file content provided
 import type { PromptObject, PromptTurnObject } from "@/types/litechat/prompt";
 import { InteractionService } from "./interaction.service";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -20,10 +20,11 @@ import { useConversationStore } from "@/store/conversation.store"; // Import Con
 export const ConversationService = {
   async submitPrompt(turnData: PromptTurnObject): Promise<void> {
     console.log("[ConversationService] submitPrompt called", turnData);
+    // Read necessary state using getState()
     const interactionStoreState = useInteractionStore.getState();
     const projectStoreState = useProjectStore.getState();
-    const promptState = usePromptStateStore.getState();
-    const conversationStoreState = useConversationStore.getState(); // Get conversation store state
+    const promptState = usePromptStateStore.getState(); // Read current prompt state
+    const conversationStoreState = useConversationStore.getState();
 
     const conversationId = interactionStoreState.currentConversationId;
     if (!conversationId) {
@@ -69,24 +70,26 @@ export const ConversationService = {
       console.warn(
         "[ConversationService] No user text or file content found in turnData. Submitting without user message.",
       );
-      // Optionally, prevent submission if truly empty:
-      // toast.error("Cannot send an empty message.");
-      // return;
     }
 
-    // 3. Get Effective Settings
+    // 3. Get Effective Settings (System Prompt) - Use turn override if present
+    const turnSystemPrompt = turnData.metadata?.turnSystemPrompt as
+      | string
+      | undefined;
     const effectiveSettings =
       projectStoreState.getEffectiveProjectSettings(currentProjectId);
-    const systemPrompt = effectiveSettings.systemPrompt ?? undefined;
+    // Prioritize turn prompt, then project, then global
+    const systemPrompt =
+      turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
 
-    // 4. Merge Parameters
+    // 4. Merge Parameters (PromptState + TurnData)
     const finalParameters = {
-      temperature: promptState.temperature,
-      max_tokens: promptState.maxTokens,
-      top_p: promptState.topP,
-      top_k: promptState.topK,
-      presence_penalty: promptState.presencePenalty,
-      frequency_penalty: promptState.frequencyPenalty,
+      temperature: promptState.temperature, // Read from prompt state
+      max_tokens: promptState.maxTokens, // Read from prompt state
+      top_p: promptState.topP, // Read from prompt state
+      top_k: promptState.topK, // Read from prompt state
+      presence_penalty: promptState.presencePenalty, // Read from prompt state
+      frequency_penalty: promptState.frequencyPenalty, // Read from prompt state
       ...(turnData.parameters ?? {}), // Merge turn-specific params
     };
     // Clean null/undefined parameters
@@ -101,12 +104,16 @@ export const ConversationService = {
 
     // 5. Construct PromptObject
     const promptObject: PromptObject = {
-      system: systemPrompt,
+      system: systemPrompt, // Use the potentially overridden prompt
       messages: historyMessages,
       parameters: finalParameters,
       metadata: {
-        ...turnData.metadata, // Include metadata from turn (e.g., enabledTools)
-        modelId: promptState.modelId, // Ensure effective modelId is included
+        // Remove turnSystemPrompt from final metadata sent to AI service if desired
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        ...(({ turnSystemPrompt, ...restMeta }) => restMeta)(
+          turnData.metadata ?? {},
+        ),
+        modelId: promptState.modelId, // Read modelId from prompt state
         // Store only basic file info (no content) in the final prompt metadata sent to AI Service
         attachedFiles: turnData.metadata.attachedFiles?.map(
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -128,6 +135,8 @@ export const ConversationService = {
       toast.error(
         `Failed to start interaction: ${error instanceof Error ? error.message : String(error)}`,
       );
+      // Re-throw or handle as needed if LiteChat needs to know about the failure
+      throw error;
     }
   },
 
@@ -136,9 +145,10 @@ export const ConversationService = {
       "[ConversationService] regenerateInteraction called",
       interactionId,
     );
+    // Read necessary state using getState()
     const interactionStoreState = useInteractionStore.getState();
     const projectStoreState = useProjectStore.getState();
-    const promptState = usePromptStateStore.getState();
+    const promptState = usePromptStateStore.getState(); // Read current prompt state
     const conversationStoreState = useConversationStore.getState();
 
     const targetInteraction = interactionStoreState.interactions.find(
@@ -194,22 +204,26 @@ export const ConversationService = {
       console.warn(
         "[ConversationService] No user text or file content found in original turnData for regeneration.",
       );
-      // Allow regeneration even without user content if assistant turn exists
     }
 
-    // 3. Get Effective Settings
+    // 3. Get Effective Settings (System Prompt) - Use turn override if present
+    const turnSystemPrompt = originalTurnData.metadata?.turnSystemPrompt as
+      | string
+      | undefined;
     const effectiveSettings =
       projectStoreState.getEffectiveProjectSettings(currentProjectId);
-    const systemPrompt = effectiveSettings.systemPrompt ?? undefined;
+    // Prioritize turn prompt, then project, then global
+    const systemPrompt =
+      turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
 
-    // 4. Merge Parameters (Current settings + original turn params)
+    // 4. Merge Parameters (Current PromptState + Original TurnData Params)
     const finalParameters = {
-      temperature: promptState.temperature,
-      max_tokens: promptState.maxTokens,
-      top_p: promptState.topP,
-      top_k: promptState.topK,
-      presence_penalty: promptState.presencePenalty,
-      frequency_penalty: promptState.frequencyPenalty,
+      temperature: promptState.temperature, // Read from prompt state
+      max_tokens: promptState.maxTokens, // Read from prompt state
+      top_p: promptState.topP, // Read from prompt state
+      top_k: promptState.topK, // Read from prompt state
+      presence_penalty: promptState.presencePenalty, // Read from prompt state
+      frequency_penalty: promptState.frequencyPenalty, // Read from prompt state
       ...(originalTurnData.parameters ?? {}), // Merge original params
     };
     Object.keys(finalParameters).forEach((key) => {
@@ -223,12 +237,16 @@ export const ConversationService = {
 
     // 5. Construct PromptObject
     const promptObject: PromptObject = {
-      system: systemPrompt,
+      system: systemPrompt, // Use the potentially overridden prompt
       messages: historyMessages,
       parameters: finalParameters,
       metadata: {
-        ...originalTurnData.metadata, // Start with original metadata
-        modelId: promptState.modelId, // Use current model selection
+        // Remove turnSystemPrompt from final metadata sent to AI service if desired
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        ...(({ turnSystemPrompt, ...restMeta }) => restMeta)(
+          originalTurnData.metadata ?? {},
+        ),
+        modelId: promptState.modelId, // Use current model selection from prompt state
         regeneratedFromId: interactionId, // Add regeneration marker
         // Store only basic file info (no content)
         attachedFiles: originalAttachedFiles.map(
@@ -236,6 +254,7 @@ export const ConversationService = {
           ({ contentBase64, contentText, ...rest }) => rest,
         ),
       },
+      // toolChoice and tools will be added by InteractionService based on metadata
     };
 
     // 6. Delegate to InteractionService
@@ -253,6 +272,8 @@ export const ConversationService = {
       toast.error(
         `Failed to start regeneration: ${error instanceof Error ? error.message : String(error)}`,
       );
+      // Re-throw or handle as needed
+      throw error;
     }
   },
 
@@ -340,6 +361,7 @@ export const ConversationService = {
       `[ConversationService] VFS for key "${targetVfsKey}" not ready. Attempting initialization...`,
     );
     try {
+      // Use getState() for VFS store action as well
       await useVfsStore.getState().initializeVFS(targetVfsKey);
       const updatedVfsState = useVfsStore.getState();
       if (

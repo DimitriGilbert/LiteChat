@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 interface LoadingStateWrapperProps {
   isLoading: boolean;
   error?: string | null;
-  data?: any[] | Record<string, any> | null; // Check if data exists and has items/keys
+  data?: any[] | Record<string, any> | null
   loadingComponent?: React.ReactNode;
   errorComponent?: React.ReactNode;
   emptyComponent?: React.ReactNode;

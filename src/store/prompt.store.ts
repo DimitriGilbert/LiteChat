@@ -1,5 +1,5 @@
 // src/store/prompt.store.ts
-// Entire file content provided as it's a new file
+// Entire file content provided
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
@@ -34,8 +34,10 @@ interface PromptActions {
     presencePenalty: number | null;
     frequencyPenalty: number | null;
   }) => void;
-  // Action to reset state (e.g., after submission)
-  resetPromptState: () => void;
+  // Action to reset state (e.g., after submission) - DEPRECATED
+  // resetPromptState: () => void;
+  // NEW Action to reset only transient parameters, keeping modelId
+  resetTransientParameters: () => void;
 }
 
 export const usePromptStateStore = create(
@@ -71,12 +73,25 @@ export const usePromptStateStore = create(
       });
     },
 
-    resetPromptState: () => {
-      // Resetting clears the state. LiteChat will re-initialize it
-      // based on the current context when needed (e.g., after submit, on context change).
-      console.log("[PromptStateStore] Resetting state.");
+    // resetPromptState: () => {
+    //   // Resetting clears the state. LiteChat will re-initialize it
+    //   // based on the current context when needed (e.g., after submit, on context change).
+    //   console.log("[PromptStateStore] Resetting state.");
+    //   set({
+    //     modelId: null,
+    //     temperature: null,
+    //     maxTokens: null,
+    //     topP: null,
+    //     topK: null,
+    //     presencePenalty: null,
+    //     frequencyPenalty: null,
+    //   });
+    // },
+
+    resetTransientParameters: () => {
+      console.log("[PromptStateStore] Resetting transient parameters.");
       set({
-        modelId: null,
+        // modelId is NOT reset here
         temperature: null,
         maxTokens: null,
         topP: null,

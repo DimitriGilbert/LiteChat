@@ -2,7 +2,7 @@
 // Entire file content provided
 import React from "react";
 import { SquareIcon } from "lucide-react";
-import { ActionTooltipButton } from "./ActionTooltipButton"; // Import ActionTooltipButton
+import { ActionTooltipButton } from "./ActionTooltipButton"
 
 interface StopButtonProps {
   onStop: () => void;

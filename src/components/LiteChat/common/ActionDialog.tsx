@@ -7,7 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose, // Import DialogClose
+  DialogClose
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2Icon } from "lucide-react";
@@ -18,11 +18,11 @@ interface ActionDialogProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string | React.ReactNode;
-  children: React.ReactNode; // Content for the dialog body (e.g., form inputs)
+  children: React.ReactNode
   submitLabel?: string;
   onSubmit: () => void | Promise<void>;
   isSubmitting: boolean;
-  submitDisabled?: boolean; // Optional additional disable condition
+  submitDisabled?: boolean
   className?: string;
   contentClassName?: string;
 }
@@ -41,7 +41,7 @@ export const ActionDialog: React.FC<ActionDialogProps> = ({
   contentClassName,
 }) => {
   const handleSubmit = async (e?: React.FormEvent) => {
-    e?.preventDefault(); // Prevent default form submission if used within a form
+    e?.preventDefault()
     if (isSubmitting || submitDisabled) return;
     await onSubmit();
   };

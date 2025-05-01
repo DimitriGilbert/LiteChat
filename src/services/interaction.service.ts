@@ -1,5 +1,5 @@
 // src/services/interaction.service.ts
-// Full file content after implementing Step 3 and Step 5, and refining persistence calls in Step 7
+// Entire file content provided - Corrected model instantiation
 import type { PromptObject, PromptTurnObject } from "@/types/litechat/prompt";
 import type {
   Interaction,
@@ -12,8 +12,12 @@ import { useProviderStore } from "@/store/provider.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { useVfsStore } from "@/store/vfs.store";
 import { useSettingsStore } from "@/store/settings.store";
-import { PersistenceService } from "./persistence.service"; // Import PersistenceService
-import { runMiddleware, getContextSnapshot } from "@/lib/litechat/ai-helpers";
+import { PersistenceService } from "./persistence.service";
+import { runMiddleware, getContextSnapshot } from "@/lib/litechat/ai-helpers"; // Import helpers
+import {
+  splitModelId,
+  instantiateModelInstance,
+} from "@/lib/litechat/provider-helpers"; // Import helpers
 import { emitter } from "@/lib/litechat/event-emitter";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
@@ -26,14 +30,14 @@ import type {
   FinishReason,
   LanguageModelUsage,
   ProviderMetadata,
-  LanguageModelV1, // Import LanguageModelV1
-  CoreMessage, // Import CoreMessage
+  LanguageModelV1,
+  CoreMessage,
 } from "ai";
 
 // Define the structure for options passed to executeInteraction
 interface AIServiceCallOptions {
-  model: LanguageModelV1; // Use imported type
-  messages: CoreMessage[]; // Use imported type
+  model: LanguageModelV1;
+  messages: CoreMessage[];
   abortSignal: AbortSignal;
   system?: string;
   tools?: Record<string, Tool<any>>;
@@ -52,9 +56,7 @@ interface AIServiceCallOptions {
 }
 
 export const InteractionService = {
-  // Map to store AbortControllers for active interactions
   _activeControllers: new Map<string, AbortController>(),
-  // Map to store accumulating tool calls/results as strings during streaming
   _streamingToolData: new Map<string, { calls: string[]; results: string[] }>(),
 
   async startInteraction(
@@ -89,7 +91,7 @@ export const InteractionService = {
     const interactionId = nanoid();
     const abortController = new AbortController();
     this._activeControllers.set(interactionId, abortController);
-    this._streamingToolData.set(interactionId, { calls: [], results: [] }); // Initialize tool data storage
+    this._streamingToolData.set(interactionId, { calls: [], results: [] });
 
     const interactionStoreState = useInteractionStore.getState();
     const currentInteractions = interactionStoreState.interactions;
@@ -107,16 +109,17 @@ export const InteractionService = {
     const interactionData: Interaction = {
       id: interactionId,
       conversationId: conversationId,
-      type: "message.user_assistant", // Assuming default type
-      prompt: { ...initiatingTurnData }, // Store the original turn data
+      type: "message.user_assistant",
+      prompt: { ...initiatingTurnData },
       response: null,
       status: "STREAMING",
       startedAt: new Date(),
       endedAt: null,
       metadata: {
         ...(finalPrompt.metadata || {}), // Use metadata from final prompt
-        toolCalls: [], // Initialize as empty arrays
-        toolResults: [], // Initialize as empty arrays
+        toolCalls: [],
+        toolResults: [],
+        reasoning: undefined,
       },
       index: newIndex,
       parentId: parentId,
@@ -125,13 +128,11 @@ export const InteractionService = {
     // 3. Update State & Persistence (Initial)
     interactionStoreState._addInteractionToState(interactionData);
     interactionStoreState._addStreamingId(interactionId);
-    // Call PersistenceService directly for initial save
     PersistenceService.saveInteraction({ ...interactionData }).catch((e) => {
       console.error(
         `[InteractionService] Failed initial persistence for ${interactionId}`,
         e,
       );
-      // Consider how to handle this failure - maybe revert state?
     });
 
     // 4. Emit Event
@@ -141,19 +142,62 @@ export const InteractionService = {
       type: interactionData.type,
     });
 
-    // 5. Prepare AI Call Options
-    const modelInstance = useProviderStore
+    // 5. Prepare AI Call Options - Get Specific Model Instance
+    const targetModelId = finalPrompt.metadata?.modelId;
+    if (!targetModelId) {
+      this._finalizeInteraction(
+        interactionId,
+        "ERROR",
+        new Error("No model ID specified in prompt metadata."),
+      );
+      return null;
+    }
+
+    const { providerId, modelId: specificModelId } =
+      splitModelId(targetModelId);
+    if (!providerId || !specificModelId) {
+      this._finalizeInteraction(
+        interactionId,
+        "ERROR",
+        new Error(`Invalid combined model ID format: ${targetModelId}`),
+      );
+      return null;
+    }
+
+    const providerConfig = useProviderStore
       .getState()
-      .getSelectedModel()?.instance;
+      .dbProviderConfigs.find((p) => p.id === providerId);
+    if (!providerConfig) {
+      this._finalizeInteraction(
+        interactionId,
+        "ERROR",
+        new Error(`Provider configuration not found for ID: ${providerId}`),
+      );
+      return null;
+    }
+
+    const apiKey = useProviderStore.getState().getApiKeyForProvider(providerId);
+    const modelInstance = instantiateModelInstance(
+      providerConfig,
+      specificModelId,
+      apiKey,
+    );
+
     if (!modelInstance) {
       this._finalizeInteraction(
         interactionId,
         "ERROR",
-        new Error("Selected model instance not available."),
+        new Error(
+          `Failed to instantiate model instance for ${targetModelId} from provider ${providerConfig.name}`,
+        ),
       );
-      return null; // Stop if no model
+      return null;
     }
+    console.log(
+      `[InteractionService] Using model instance for ${targetModelId}`,
+    );
 
+    // Prepare Tools
     const allRegisteredTools = useControlRegistryStore
       .getState()
       .getRegisteredTools();
@@ -164,7 +208,6 @@ export const InteractionService = {
         const toolInfo = allRegisteredTools[name];
         if (toolInfo?.implementation) {
           const toolDefinition: Tool<any> = { ...toolInfo.definition };
-          // Wrap implementation
           toolDefinition.execute = async (args: any) => {
             // VFS Readiness Check
             const currentConvId =
@@ -185,7 +228,7 @@ export const InteractionService = {
               );
               try {
                 await useVfsStore.getState().initializeVFS(targetVfsKey);
-                vfsStoreState = useVfsStore.getState(); // Re-check state
+                vfsStoreState = useVfsStore.getState();
                 if (
                   vfsStoreState.configuredVfsKey !== targetVfsKey ||
                   !vfsStoreState.fs
@@ -231,11 +274,10 @@ export const InteractionService = {
       useSettingsStore.getState().toolMaxSteps;
 
     const callOptions: AIServiceCallOptions = {
-      model: modelInstance,
+      model: modelInstance, // Use the specifically instantiated model
       messages: finalPrompt.messages,
       abortSignal: abortController.signal,
       system: finalPrompt.system,
-      // Pass parameters directly from the finalPrompt object
       temperature: finalPrompt.parameters?.temperature,
       maxTokens: finalPrompt.parameters?.max_tokens,
       topP: finalPrompt.parameters?.top_p,
@@ -265,10 +307,8 @@ export const InteractionService = {
     console.log(
       `[InteractionService] Calling AIService.executeInteraction for ${interactionId}`,
     );
-    // Don't await this, let it run in the background
     AIService.executeInteraction(interactionId, callOptions, callbacks).catch(
       (execError) => {
-        // Catch potential synchronous errors from executeInteraction itself
         console.error(
           `[InteractionService] Error calling AIService.executeInteraction for ${interactionId}:`,
           execError,
@@ -282,7 +322,7 @@ export const InteractionService = {
       },
     );
 
-    return interactionId; // Return ID immediately
+    return interactionId;
   },
 
   abortInteraction(interactionId: string): void {
@@ -290,16 +330,11 @@ export const InteractionService = {
     const controller = this._activeControllers.get(interactionId);
     if (controller && !controller.signal.aborted) {
       controller.abort();
-      // The AIService will detect the abort signal.
-      // The _handleError or _handleFinish callback will be triggered
-      // depending on how the SDK handles AbortError.
-      // We finalize the state there.
       toast.info("Interaction cancelled.");
     } else {
       console.warn(
         `[InteractionService] No active controller found or already aborted for ${interactionId}.`,
       );
-      // Force cleanup if state is inconsistent
       const interactionStoreState = useInteractionStore.getState();
       if (
         interactionStoreState.streamingInteractionIds.includes(interactionId)
@@ -309,12 +344,11 @@ export const InteractionService = {
         );
         this._finalizeInteraction(
           interactionId,
-          "CANCELLED", // Use CANCELLED status
+          "CANCELLED",
           new Error("Interaction aborted manually (controller missing)"),
         );
       }
     }
-    // Controller is removed from map in _finalizeInteraction
   },
 
   // --- Callback Implementations ---
@@ -348,10 +382,8 @@ export const InteractionService = {
       };
       currentData.calls.push(callString);
       this._streamingToolData.set(interactionId, currentData);
-
-      // Update interaction metadata in state immediately (append)
       useInteractionStore.getState()._updateInteractionInState(interactionId, {
-        metadata: { toolCalls: [...currentData.calls] }, // Pass copy
+        metadata: { toolCalls: [...currentData.calls] },
       });
     } catch (e) {
       console.error(
@@ -370,10 +402,8 @@ export const InteractionService = {
       };
       currentData.results.push(resultString);
       this._streamingToolData.set(interactionId, currentData);
-
-      // Update interaction metadata in state immediately (append)
       useInteractionStore.getState()._updateInteractionInState(interactionId, {
-        metadata: { toolResults: [...currentData.results] }, // Pass copy
+        metadata: { toolResults: [...currentData.results] },
       });
     } catch (e) {
       console.error(
@@ -402,12 +432,11 @@ export const InteractionService = {
       `[InteractionService] Handling error for interaction ${interactionId}:`,
       error,
     );
-    // Check if it's an abort error
     const isAbort = error.name === "AbortError";
     this._finalizeInteraction(
       interactionId,
-      isAbort ? "CANCELLED" : "ERROR", // Use CANCELLED for abort
-      isAbort ? undefined : error, // Pass error only if not abort
+      isAbort ? "CANCELLED" : "ERROR",
+      isAbort ? undefined : error,
     );
   },
 
@@ -423,16 +452,13 @@ export const InteractionService = {
     },
   ): void {
     const interactionStore = useInteractionStore.getState();
-    // Ensure interaction exists before proceeding
     const currentInteraction = interactionStore.interactions.find(
       (i) => i.id === interactionId,
     );
-    // If interaction was already finalized (e.g., rapid abort/error), exit
     if (!currentInteraction || currentInteraction.status !== "STREAMING") {
       console.warn(
         `[InteractionService] Interaction ${interactionId} already finalized or not found. Skipping finalization with status ${status}.`,
       );
-      // Still ensure cleanup happens if maps contain the ID
       this._activeControllers.delete(interactionId);
       this._streamingToolData.delete(interactionId);
       return;
@@ -446,12 +472,21 @@ export const InteractionService = {
     };
     const currentMetadata = currentInteraction.metadata || {};
 
+    console.log(
+      `[InteractionService] Finalizing ${interactionId}. Buffered Content Length: ${finalBufferedContent.length}`,
+    );
+
+    const reasoningData =
+      (finishDetails?.providerMetadata?.reasoning as string) ||
+      (finishDetails?.providerMetadata?.steps as string) ||
+      undefined;
+
     const finalUpdates: Partial<Omit<Interaction, "id">> = {
       status: status,
       endedAt: new Date(),
-      response: finalBufferedContent,
+      response: finalBufferedContent || null,
       metadata: {
-        ...currentMetadata, // Preserve existing metadata
+        ...currentMetadata,
         ...(finishDetails?.usage && {
           promptTokens: finishDetails.usage.promptTokens,
           completionTokens: finishDetails.usage.completionTokens,
@@ -460,10 +495,9 @@ export const InteractionService = {
         ...(finishDetails?.providerMetadata && {
           providerMetadata: finishDetails.providerMetadata,
         }),
-        // Store final tool calls/results as JSON strings
         toolCalls: toolData.calls,
         toolResults: toolData.results,
-        // Add error message if status indicates an issue
+        reasoning: reasoningData,
         ...((status === "ERROR" ||
           status === "WARNING" ||
           status === "CANCELLED") && {
@@ -472,23 +506,23 @@ export const InteractionService = {
       },
     };
 
-    // Update state synchronously
     interactionStore._updateInteractionInState(interactionId, finalUpdates);
-    interactionStore._removeStreamingId(interactionId); // Cleans up buffer
+    interactionStore._removeStreamingId(interactionId);
 
-    // --- Trigger Persistence Directly ---
-    const finalInteractionState = interactionStore.interactions.find(
-      (i) => i.id === interactionId,
-    );
+    const finalInteractionState = useInteractionStore
+      .getState()
+      .interactions.find((i) => i.id === interactionId);
+
     if (finalInteractionState) {
-      // Call PersistenceService directly instead of store action
+      console.log(
+        `[InteractionService] Persisting final state for ${interactionId}. Response length: ${finalInteractionState.response?.length ?? 0}`,
+      );
       PersistenceService.saveInteraction({ ...finalInteractionState }).catch(
         (e) => {
           console.error(
             `[InteractionService] Failed final persistence for ${interactionId}`,
             e,
           );
-          // Optionally update UI store error state here
         },
       );
     } else {
@@ -496,9 +530,7 @@ export const InteractionService = {
         `[InteractionService] CRITICAL - Could not find final state for interaction ${interactionId} to persist.`,
       );
     }
-    // --- End Persistence Trigger ---
 
-    // Emit completion event
     let parsedToolCalls: ToolCallPart[] = [];
     let parsedToolResults: ToolResultPart[] = [];
     try {
@@ -519,7 +551,6 @@ export const InteractionService = {
       toolResults: parsedToolResults,
     });
 
-    // Clean up controller and tool data maps
     this._activeControllers.delete(interactionId);
     this._streamingToolData.delete(interactionId);
 
@@ -527,4 +558,4 @@ export const InteractionService = {
       `[InteractionService] Finalized interaction ${interactionId} with status ${status}.`,
     );
   },
-}; // End InteractionService object
+};
