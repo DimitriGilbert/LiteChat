@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useConversationStore } from "@/store/conversation.store";
-import { useProjectStore } from "@/store/project.store"; // Import ProjectStore
+import { useProjectStore } from "@/store/project.store"
 import { useUIStateStore } from "@/store/ui.store";
 import { useShallow } from "zustand/react/shallow";
 
@@ -23,13 +23,13 @@ export const ConversationListIconRenderer: React.FC = () => {
         selectItem: state.selectItem,
         selectedItemId: state.selectedItemId,
         selectedItemType: state.selectedItemType,
-        getConversationById: state.getConversationById, // Keep for getParentProjectId
+        getConversationById: state.getConversationById
       })),
     );
   const { addProject } = useProjectStore(
     useShallow((state) => ({
       addProject: state.addProject,
-      getProjectById: state.getProjectById, // Keep for handleNewProject logic
+      getProjectById: state.getProjectById
     })),
   );
   const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);

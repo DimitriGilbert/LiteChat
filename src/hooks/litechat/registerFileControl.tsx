@@ -50,7 +50,7 @@ export function registerFileControl() {
             } = {};
 
             // Determine if it's likely text using the helper function
-            const isText = isLikelyTextFile(file.name, file.type); // Use imported helper
+            const isText = isLikelyTextFile(file.name, file.type)
             const isImage = file.type.startsWith("image/");
 
             if (isText) {
@@ -87,7 +87,7 @@ export function registerFileControl() {
               // Store the original browser-provided type, but content processing will use isLikelyTextFile
               type: file.type || "application/octet-stream",
               size: file.size,
-              ...fileData, // Spread the potentially populated content fields
+              ...fileData
             });
           } catch (error) {
             console.error(`Error processing file ${file.name}:`, error);
@@ -174,7 +174,7 @@ export function registerFileControl() {
     clearOnSubmit: () => {
       // InputStore.clearAttachedFiles is called by PromptWrapper
     },
-    show: () => true, // Always show file attachment capability
+    show: () => true
   });
 
   console.log("[Function] Registered Core File Attachment Control");

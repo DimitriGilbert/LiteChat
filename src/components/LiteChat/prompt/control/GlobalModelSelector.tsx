@@ -24,7 +24,7 @@ import { combineModelId } from "@/lib/litechat/provider-helpers";
 
 interface GlobalModelSelectorProps {
   /** The effective model ID for the current context */
-  value: string | null; // Changed from optional - it should always receive the effective value
+  value: string | null
   /** Callback to update the GLOBAL default model selection */
   onChange: (value: string | null) => void;
   /** Optional flag to disable the selector */
@@ -36,7 +36,7 @@ interface GlobalModelSelectorProps {
 export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
   React.memo(({ value, onChange, disabled = false, className }) => {
     const [open, setOpen] = useState(false);
-    const [filterText, setFilterText] = useState(""); // Local state for filtering
+    const [filterText, setFilterText] = useState("")
 
     const { dbProviderConfigs, globalModelSortOrder, isLoading } =
       useProviderStore(
@@ -103,7 +103,7 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
       });
 
       return sorted;
-    }, [dbProviderConfigs, globalModelSortOrder]); // Dependencies are stable references or primitives
+    }, [dbProviderConfigs, globalModelSortOrder])
 
     const filteredModels = useMemo(() => {
       if (!filterText.trim()) {
@@ -120,14 +120,14 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
 
     const selectedModelDetails = useMemo(() => {
       return orderedModels.find((m) => m.id === value);
-    }, [orderedModels, value]); // Depend on the calculated models and the effective value prop
+    }, [orderedModels, value])
 
     const handleSelect = useCallback(
       (currentValue: string) => {
         const newValue = currentValue === value ? null : currentValue;
-        onChange(newValue); // Call the global setter
-        setOpen(false); // Close popover on selection
-        setFilterText(""); // Clear filter on selection
+        onChange(newValue)
+        setOpen(false)
+        setFilterText("")
       },
       [onChange, value],
     );

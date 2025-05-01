@@ -9,11 +9,11 @@ import { Input } from "@/components/ui/input";
 interface ModelEnablementListProps {
   providerId: string;
   allAvailableModels: { id: string; name: string }[];
-  enabledModelIds: Set<string>; // Use a Set for efficient lookup
+  enabledModelIds: Set<string>
   onToggleModel: (modelId: string, isEnabled: boolean) => void;
-  isLoading?: boolean; // Optional loading state
-  disabled?: boolean; // Optional disabled state for switches
-  listHeightClass?: string; // Allow customizing height
+  isLoading?: boolean
+  disabled?: boolean
+  listHeightClass?: string
 }
 
 export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
@@ -23,7 +23,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   onToggleModel,
   isLoading = false,
   disabled = false,
-  listHeightClass = "h-48", // Default height
+  listHeightClass = "h-48"
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>("");
 

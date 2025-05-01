@@ -23,7 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { useShallow } from "zustand/react/shallow";
 import { useModStore } from "@/store/mod.store";
@@ -68,7 +68,7 @@ const SettingsModsComponent: React.FC = () => {
         name: modName.trim(),
         sourceUrl: modUrl.trim() || null,
         scriptContent: modScript.trim() || null,
-        enabled: true, // Default to enabled
+        enabled: true,
         loadOrder: (dbMods?.length ?? 0 + 1) * 10,
       };
       await addDbMod(modData);
@@ -78,7 +78,6 @@ const SettingsModsComponent: React.FC = () => {
       toast.info("Mod added. Reload required for changes to take effect.");
     } catch (error) {
       console.error("Failed to add mod (from component):", error);
-      // Toast handled by store action
     } finally {
       setIsAdding(false);
     }
@@ -149,7 +148,7 @@ const SettingsModsComponent: React.FC = () => {
       }
       const dbMod = (dbMods || []).find((m: DbMod) => m.id === modId);
       if (!dbMod) {
-        return { status: "Unknown" }; // Should not happen if dbMods is synced
+        return { status: "Unknown" };
       }
       return dbMod.enabled
         ? { status: "Load Pending (Reload Required)" }

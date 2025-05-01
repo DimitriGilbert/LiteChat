@@ -64,7 +64,7 @@ interface ControlActions {
     implementation?: ToolImplementation<P>,
   ) => () => void;
   unregisterTool: (toolName: string) => void;
-  getRegisteredTools: () => Readonly<ControlState["tools"]>; // Ensure this matches the interface
+  getRegisteredTools: () => Readonly<ControlState["tools"]>
 }
 
 export const useControlRegistryStore = create(

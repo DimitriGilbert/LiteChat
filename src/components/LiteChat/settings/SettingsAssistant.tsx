@@ -7,7 +7,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
 // Import the reusable component
 import { ParameterControlComponent } from "@/components/LiteChat/prompt/control/ParameterControlComponent";
-import { Separator } from "@/components/ui/separator"; // Import Separator
+import { Separator } from "@/components/ui/separator"
 
 const SettingsAssistantComponent: React.FC = () => {
   // --- Fetch state/actions from store ---
@@ -53,9 +53,9 @@ const SettingsAssistantComponent: React.FC = () => {
 
   const handleMaxStepsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    const numValue = value === "" ? 5 : parseInt(value, 10); // Default to 5 if empty
+    const numValue = value === "" ? 5 : parseInt(value, 10)
     if (!isNaN(numValue)) {
-      setToolMaxSteps(numValue); // Setter already clamps
+      setToolMaxSteps(numValue)
     }
   };
 

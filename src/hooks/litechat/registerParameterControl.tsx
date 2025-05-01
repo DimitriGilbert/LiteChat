@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/popover";
 import {
   ParameterControlComponent,
-  type ParameterControlComponentProps, // Import props type
+  type ParameterControlComponentProps
 } from "@/components/LiteChat/prompt/control/ParameterControlComponent";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useSettingsStore } from "@/store/settings.store";
@@ -140,7 +140,7 @@ export function registerParameterControl() {
         topK,
         presencePenalty,
         frequencyPenalty,
-      } = usePromptStateStore.getState(); // Read from prompt state
+      } = usePromptStateStore.getState()
       return {
         // Only include parameters if they are not null (i.e., explicitly set)
         ...(temperature !== null && { temperature }),
@@ -153,7 +153,7 @@ export function registerParameterControl() {
         }),
       };
     },
-    show: () => useSettingsStore.getState().enableAdvancedSettings, // Show based on setting
+    show: () => useSettingsStore.getState().enableAdvancedSettings
   });
 
   console.log("[Function] Registered Core Parameter Control");

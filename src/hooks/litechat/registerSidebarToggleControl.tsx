@@ -50,12 +50,12 @@ export function registerSidebarToggleControl() {
 
   registerChatControl({
     id: "core-sidebar-toggle",
-    panel: "sidebar-footer", // Move to sidebar footer
-    order: 10, // Adjust order as needed within the footer
+    panel: "sidebar-footer",
+    order: 10,
     status: () => "ready",
     renderer: () => React.createElement(SidebarToggleComponent),
     iconRenderer: () => React.createElement(SidebarToggleComponent),
-    show: () => true, // Always show the toggle
+    show: () => true,
   });
 
   console.log("[Function] Registered Core Sidebar Toggle Control");

@@ -16,13 +16,13 @@ import { SettingsDataManagement } from "./SettingsDataManagement";
 import { SettingsMods } from "./SettingsMods";
 import { SettingsProviders } from "./SettingsProviders";
 import { SettingsGit } from "./SettingsGit";
-import { GlobalModelOrganizer } from "./GlobalModelOrganizer"; // Import Organizer
+import { GlobalModelOrganizer } from "./GlobalModelOrganizer";
 import type { CustomSettingTab } from "@/types/litechat/modding";
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
 import { useModStore } from "@/store/mod.store";
 import { useUIStateStore } from "@/store/ui.store";
-import { TabbedLayout, TabDefinition } from "../common/TabbedLayout"; // Import new component
+import { TabbedLayout, TabDefinition } from "../common/TabbedLayout";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -78,25 +78,24 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
           content: <SettingsGeneral />,
         },
         {
-          value: "providers", // Keep this as the main parent tab value
-          label: "Providers & Models", // Label for the parent tab
-          // Content now uses TabbedLayout for sub-tabs
+          value: "providers",
+          label: "Providers & Models",
           content: (
             <TabbedLayout
               tabs={[
-                {
-                  value: "providers-config",
-                  label: "Configuration",
-                  content: <SettingsProviders />,
-                },
                 {
                   value: "providers-order",
                   label: "Model Order",
                   content: <GlobalModelOrganizer />,
                 },
+                {
+                  value: "providers-config",
+                  label: "Configuration",
+                  content: <SettingsProviders />,
+                },
               ]}
-              defaultValue="providers-config" // Default to config sub-tab
-              className="h-full" // Ensure sub-layout fills height
+              defaultValue="providers-config"
+              className="h-full"
               listClassName="bg-muted/50 rounded-md"
               contentContainerClassName="mt-4"
             />

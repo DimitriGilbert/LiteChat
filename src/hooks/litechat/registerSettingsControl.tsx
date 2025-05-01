@@ -60,8 +60,8 @@ export function registerSettingsControl() {
 
   registerChatControl({
     id: "core-settings-trigger",
-    panel: "sidebar-footer", // Move to sidebar footer
-    order: 1000, // Adjust order as needed within the footer
+    panel: "sidebar-footer",
+    order: 1000,
     status: () => "ready",
     renderer: () => React.createElement(SettingsTriggerComponent),
     iconRenderer: () => React.createElement(SettingsTriggerComponent),

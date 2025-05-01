@@ -81,7 +81,7 @@ export function getContextSnapshot(): ReadonlyChatContextSnapshot {
     maxTokens: sS.maxTokens,
     theme: sS.theme,
   };
-  return Object.freeze(snapshot); // Ensure deep freeze if necessary
+  return Object.freeze(snapshot)
 }
 
 /**
@@ -115,7 +115,7 @@ export function base64ToUint8Array(base64: string): Uint8Array {
  * @returns A TextPart, ImagePart, or null if processing fails critically.
  */
 export function processFileMetaToUserContent(
-  fileMeta: AttachedFileMetadata & { contentBytes?: Uint8Array }, // Allow passing raw bytes
+  fileMeta: AttachedFileMetadata & { contentBytes?: Uint8Array }
 ): TextPart | ImagePart | null {
   try {
     const mimeType = fileMeta.type || "application/octet-stream";
@@ -278,7 +278,7 @@ export function buildHistoryMessages(
       if (validToolCalls.length > 0) {
         msgs.push({
           role: "assistant",
-          content: validToolCalls, // Add the array of valid tool calls
+          content: validToolCalls
         });
       }
     }
@@ -315,7 +315,7 @@ export function buildHistoryMessages(
       if (validToolResults.length > 0) {
         msgs.push({
           role: "tool",
-          content: validToolResults, // Add the array of valid tool results
+          content: validToolResults
         });
       }
     }

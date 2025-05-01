@@ -97,7 +97,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
         apiKeyId: editData.apiKeyId,
         baseURL: editData.baseURL,
         autoFetchModels: editData.autoFetchModels,
-        enabledModels: finalEnabledModels, // Include enabledModels in save
+        enabledModels: finalEnabledModels
       };
 
       Object.keys(finalChanges).forEach((key) => {

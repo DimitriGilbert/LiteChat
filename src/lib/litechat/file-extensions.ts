@@ -51,59 +51,59 @@ export const COMMON_TEXT_EXTENSIONS: ReadonlySet<string> = new Set([
   ".sql",
   ".dockerfile",
   "dockerfile",
-  ".mod", // Go modules
-  ".sum", // Go modules checksum
-  ".csproj", // C# project
-  ".vbproj", // VB.NET project
-  ".fsproj", // F# project
-  ".sln", // Visual Studio solution
-  ".props", // MSBuild props
-  ".targets", // MSBuild targets
-  ".gradle", // Gradle build script
-  ".kts", // Kotlin script (often build scripts)
-  ".pom", // Maven project
-  ".rst", // reStructuredText
-  ".tex", // LaTeX
-  ".bib", // BibTeX
-  ".r", // R language
-  ".rmd", // R Markdown
-  ".pl", // Perl
-  ".pm", // Perl module
-  ".lua", // Lua
-  ".dart", // Dart
-  ".diff", // Diff file
-  ".patch", // Patch file
-  ".applescript", // AppleScript
-  ".properties", // Java properties
-  ".http", // HTTP request file
-  ".rest", // REST client file
-  ".tf", // Terraform
-  ".tfvars", // Terraform variables
-  ".hcl", // HashiCorp Configuration Language
-  ".rego", // Open Policy Agent Rego
-  ".liquid", // Liquid template
-  ".erb", // ERB template
-  ".jinja", // Jinja template
-  ".j2", // Jinja2 template alias
-  ".mustache", // Mustache template
-  ".hbs", // Handlebars template
-  ".pug", // Pug template
-  ".haml", // Haml template
-  ".slim", // Slim template
-  ".svelte", // Svelte component
-  ".vue", // Vue component
-  ".astro", // Astro component
-  ".svg", // SVG is XML-based text
-  ".webmanifest", // Web App Manifest
-  ".vtt", // WebVTT subtitles
-  ".srt", // SubRip subtitles
-  ".sbv", // YouTube subtitles
-  ".ass", // Advanced SubStation Alpha subtitles
-  ".ssa", // SubStation Alpha subtitles
-  ".config", // General config extension
-  ".mdx", // MDX (Markdown + JSX)
-  ".nfo", // Info file (often text)
-  ".diz", // Description in Zip
+  ".mod",
+  ".sum",
+  ".csproj",
+  ".vbproj",
+  ".fsproj",
+  ".sln",
+  ".props",
+  ".targets",
+  ".gradle",
+  ".kts",
+  ".pom",
+  ".rst",
+  ".tex",
+  ".bib",
+  ".r",
+  ".rmd",
+  ".pl",
+  ".pm",
+  ".lua",
+  ".dart",
+  ".diff",
+  ".patch",
+  ".applescript",
+  ".properties",
+  ".http",
+  ".rest",
+  ".tf",
+  ".tfvars",
+  ".hcl",
+  ".rego",
+  ".liquid",
+  ".erb",
+  ".jinja",
+  ".j2",
+  ".mustache",
+  ".hbs",
+  ".pug",
+  ".haml",
+  ".slim",
+  ".svelte",
+  ".vue",
+  ".astro",
+  ".svg",
+  ".webmanifest",
+  ".vtt",
+  ".srt",
+  ".sbv",
+  ".ass",
+  ".ssa",
+  ".config",
+  ".mdx",
+  ".nfo",
+  ".diz",
 ]);
 Object.freeze(COMMON_TEXT_EXTENSIONS);
 
@@ -112,7 +112,7 @@ export const isLikelyTextFile = (
   name: string | undefined | null,
   mimeType?: string | undefined | null,
 ): boolean => {
-  if (!name) return false; // Need a name to check extension
+  if (!name) return false;
 
   const fileNameLower = name.toLowerCase();
 

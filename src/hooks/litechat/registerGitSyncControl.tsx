@@ -25,7 +25,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getSyncIndicator } from "@/components/LiteChat/chat/control/conversation-list/SyncIndicator"; // Import helper
+import { getSyncIndicator } from "@/components/LiteChat/chat/control/conversation-list/SyncIndicator"
 
 export function registerGitSyncControl() {
   const registerPromptControl =
@@ -99,7 +99,7 @@ export function registerGitSyncControl() {
       currentStatus === "syncing";
 
     if (selectedItemType !== "conversation") {
-      return null; // Only show for conversations
+      return null
     }
 
     return (
@@ -180,7 +180,7 @@ export function registerGitSyncControl() {
   registerPromptControl({
     id: "core-git-sync",
     order: 40,
-    // status: () => (useConversationStore.getState().isLoading ? "loading" : "ready"), // Removed status
+    // status: () => (useConversationStore.getState().isLoading ? "loading" : "ready")
     triggerRenderer: () => React.createElement(GitSyncControlTrigger),
     // Use getState() here as it's outside component context
     show: () => useConversationStore.getState().syncRepos.length > 0,

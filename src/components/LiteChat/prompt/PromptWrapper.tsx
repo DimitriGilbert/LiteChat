@@ -17,7 +17,7 @@ import { useInputStore } from "@/store/input.store";
 import type {
   PromptTurnObject,
   InputAreaRenderer,
-  InputAreaRef, // Import InputAreaRef from types
+  InputAreaRef
 } from "@/types/litechat/prompt";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";

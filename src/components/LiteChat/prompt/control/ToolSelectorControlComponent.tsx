@@ -1,6 +1,6 @@
 // src/components/LiteChat/prompt/control/ToolSelectorControlComponent.tsx
 // Entire file content provided
-import React, { useState, useMemo, useCallback } from "react"; // Removed useEffect
+import React, { useState, useMemo, useCallback } from "react"
 import { useControlRegistryStore } from "@/store/control.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -55,7 +55,7 @@ export const ToolSelectorControlComponent: React.FC<
   // Derive enabledTools directly from the selected conversation object
   const enabledTools = useMemo(() => {
     return new Set(conversation?.metadata?.enabledTools ?? []);
-  }, [conversation?.metadata?.enabledTools]); // Depend on the metadata field
+  }, [conversation?.metadata?.enabledTools])
 
   const availableTools = useMemo(() => {
     return Object.entries(allTools)
@@ -84,7 +84,7 @@ export const ToolSelectorControlComponent: React.FC<
   const handleToggle = useCallback(
     (toolName: string, checked: boolean) => {
       // Update the conversation store directly for persistence
-      const newEnabledTools = new Set(enabledTools); // Use current derived state
+      const newEnabledTools = new Set(enabledTools)
       if (checked) {
         newEnabledTools.add(toolName);
       } else {
@@ -95,7 +95,7 @@ export const ToolSelectorControlComponent: React.FC<
       });
       // The component will re-render because `enabledTools` (derived from the store) will change.
     },
-    [enabledTools, updateCurrentConversationToolSettings], // Depend on derived state
+    [enabledTools, updateCurrentConversationToolSettings]
   );
 
   const handleToggleAll = useCallback(
@@ -114,16 +114,16 @@ export const ToolSelectorControlComponent: React.FC<
   const handleMaxStepsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value === "") {
-      setLocalMaxSteps(null); // Update local state for the popover
+      setLocalMaxSteps(null)
       return;
     }
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue)) {
       // Clamp value between 1 and 20
       const clampedValue = Math.max(1, Math.min(20, numValue));
-      setLocalMaxSteps(clampedValue); // Update local state
+      setLocalMaxSteps(clampedValue)
     } else {
-      setLocalMaxSteps(null); // Reset if input is invalid
+      setLocalMaxSteps(null)
     }
   };
 

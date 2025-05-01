@@ -28,16 +28,14 @@ export function registerProjectSettingsControl() {
     );
   };
 
-  // Register the control that renders the modal
   registerChatControl({
-    id: "core-project-settings-trigger", // Keep the ID consistent
+    id: "core-project-settings-trigger",
     renderer: undefined,
     iconRenderer: undefined,
-    panel: undefined, // Not displayed directly in panels
-    show: () => false, // Doesn't show up in standard wrappers
-    // Define the settingsRenderer to render the modal
+    panel: undefined,
+    show: () => false,
     settingsRenderer: () => React.createElement(ProjectSettingsModalRenderer),
-    order: 1000, // Low priority for standard rendering
+    order: 1000,
     status: () => "ready",
   });
 

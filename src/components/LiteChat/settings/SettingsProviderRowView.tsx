@@ -1,6 +1,6 @@
 // src/components/LiteChat/settings/SettingsProviderRowView.tsx
 // Entire file content provided
-import React, { useMemo, useCallback, useState } from "react"; // Added useState
+import React, { useMemo, useCallback, useState } from "react";
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import { Button } from "@/components/ui/button";
 // ScrollArea removed
@@ -11,8 +11,8 @@ import {
   RefreshCwIcon,
   CheckIcon,
   AlertCircleIcon,
-  ChevronDownIcon, // Added ChevronDownIcon
-  ChevronUpIcon, // Added ChevronUpIcon
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from "lucide-react";
 import {
   Tooltip,
@@ -27,9 +27,9 @@ import {
 } from "@/lib/litechat/provider-helpers";
 import { cn } from "@/lib/utils";
 import { useProviderStore } from "@/store/provider.store";
-import { ModelEnablementList } from "./ModelEnablementList"; // Import the new component
-import { toast } from "sonner"; // Import toast
-import { ActionTooltipButton } from "../common/ActionTooltipButton"; // Import ActionTooltipButton
+import { ModelEnablementList } from "./ModelEnablementList";
+import { toast } from "sonner";
+import { ActionTooltipButton } from "../common/ActionTooltipButton";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 
@@ -39,7 +39,7 @@ interface ProviderRowViewModeProps {
   onEdit: () => void;
   onDelete: () => Promise<void>;
   onFetchModels: () => Promise<void>;
-  onUpdate: (id: string, changes: Partial<DbProviderConfig>) => Promise<void>; // Add onUpdate prop
+  onUpdate: (id: string, changes: Partial<DbProviderConfig>) => Promise<void>;
   fetchStatus: FetchStatus;
   isDeleting: boolean;
 }
@@ -50,11 +50,11 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   onEdit,
   onDelete,
   onFetchModels,
-  onUpdate, // Receive onUpdate
+  onUpdate,
   fetchStatus,
   isDeleting,
 }) => {
-  const [isModelListFolded, setIsModelListFolded] = useState(true); // State for folding
+  const [isModelListFolded, setIsModelListFolded] = useState(true);
 
   const needsKey = requiresApiKey(provider.type);
   const needsURL = requiresBaseURL(provider.type);

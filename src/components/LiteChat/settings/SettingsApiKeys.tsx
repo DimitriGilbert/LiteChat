@@ -33,8 +33,8 @@ import { useProviderStore } from "@/store/provider.store";
 import {
   LoadingStateWrapper,
   DefaultListLoadingSkeleton,
-} from "../common/LoadingStateWrapper"; // Import new component
-import { ActionTooltipButton } from "../common/ActionTooltipButton"; // Import ActionTooltipButton
+} from "../common/LoadingStateWrapper"
+import { ActionTooltipButton } from "../common/ActionTooltipButton"
 
 const SettingsApiKeysComponent: React.FC = () => {
   const {

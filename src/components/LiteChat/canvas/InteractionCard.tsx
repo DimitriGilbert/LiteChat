@@ -12,7 +12,7 @@ import {
   ChevronUpIcon,
   ClipboardIcon,
   CheckIcon,
-  BrainCircuitIcon, // Import an icon for reasoning
+  BrainCircuitIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -26,7 +26,7 @@ import {
   CodeBlockData,
 } from "@/lib/litechat/useMarkdownParser";
 import { CodeBlockRenderer } from "../common/CodeBlockRenderer";
-import { ToolCallPart, ToolResultPart } from "ai"; // Import AI SDK types
+import { ToolCallPart, ToolResultPart } from "ai"
 
 // --- Tool Call/Result Rendering Components ---
 const ToolCallDisplay: React.FC<{ toolCall: ToolCallPart }> = ({
@@ -65,7 +65,7 @@ const ToolCallDisplay: React.FC<{ toolCall: ToolCallPart }> = ({
 const ToolResultDisplay: React.FC<{ toolResult: ToolResultPart }> = ({
   toolResult,
 }) => {
-  const [isResultFolded, setIsResultFolded] = useState(true); // Default folded
+  const [isResultFolded, setIsResultFolded] = useState(true)
   const toggleFold = () => setIsResultFolded((p) => !p);
   const resultString = useMemo(() => {
     try {
@@ -132,10 +132,10 @@ const ToolResultDisplay: React.FC<{ toolResult: ToolResultPart }> = ({
 const StaticContentView: React.FC<{ markdownContent: string | null }> = ({
   markdownContent,
 }) => {
-  const parsedContent = useMarkdownParser(markdownContent); // Use the parser hook
+  const parsedContent = useMarkdownParser(markdownContent)
 
   if (!markdownContent?.trim()) {
-    return null; // Return null if no text content to render
+    return null
   }
 
   return (
@@ -176,7 +176,7 @@ interface InteractionCardProps {
 export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
   ({ interaction, onRegenerate, onDelete, onEdit, className }) => {
     const [isResponseFolded, setIsResponseFolded] = useState(false);
-    const [isReasoningFolded, setIsReasoningFolded] = useState(true); // Default folded
+    const [isReasoningFolded, setIsReasoningFolded] = useState(true)
     const [isResponseCopied, setIsResponseCopied] = useState(false);
 
     const { dbProviderConfigs, getAllAvailableModelDefsForProvider } =

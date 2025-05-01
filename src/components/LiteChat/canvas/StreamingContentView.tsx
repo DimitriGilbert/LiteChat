@@ -8,7 +8,7 @@ import {
 import { CodeBlockRenderer } from "../common/CodeBlockRenderer";
 import { useSettingsStore } from "@/store/settings.store";
 import { cn } from "@/lib/utils";
-import { useShallow } from "zustand/react/shallow"; // Import useShallow
+import { useShallow } from "zustand/react/shallow"
 
 interface StreamingContentViewProps {
   markdownContent: string | null | undefined;

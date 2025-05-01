@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { PersistenceService } from "@/services/persistence.service";
-import { toast } from "sonner"; // Import toast for feedback
+import { toast } from "sonner";
 
 interface SettingsState {
   theme: "light" | "dark" | "system";
@@ -15,12 +15,12 @@ interface SettingsState {
   frequencyPenalty: number | null;
   enableAdvancedSettings: boolean;
   enableStreamingMarkdown: boolean;
-  streamingRenderFPS: number; // General FPS
-  streamingCodeRenderFPS: number; // FPS specifically for code blocks
+  streamingRenderFPS: number;
+  streamingCodeRenderFPS: number;
   gitUserName: string | null;
   gitUserEmail: string | null;
   toolMaxSteps: number;
-  prismThemeUrl: string | null; // Added for Prism theme URL
+  prismThemeUrl: string | null;
 }
 
 interface SettingsActions {
@@ -39,7 +39,7 @@ interface SettingsActions {
   setGitUserName: (name: string | null) => void;
   setGitUserEmail: (email: string | null) => void;
   setToolMaxSteps: (steps: number) => void;
-  setPrismThemeUrl: (url: string | null) => void; // Added setter for Prism theme
+  setPrismThemeUrl: (url: string | null) => void;
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>;
 }
@@ -60,7 +60,7 @@ const DEFAULT_STREAMING_CODE_FPS = 10;
 const DEFAULT_GIT_USER_NAME = null;
 const DEFAULT_GIT_USER_EMAIL = null;
 const DEFAULT_TOOL_MAX_STEPS = 5;
-const DEFAULT_PRISM_THEME_URL = null; // Default Prism theme URL
+const DEFAULT_PRISM_THEME_URL = null;
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set) => ({
@@ -80,7 +80,7 @@ export const useSettingsStore = create(
     gitUserName: DEFAULT_GIT_USER_NAME,
     gitUserEmail: DEFAULT_GIT_USER_EMAIL,
     toolMaxSteps: DEFAULT_TOOL_MAX_STEPS,
-    prismThemeUrl: DEFAULT_PRISM_THEME_URL, // Initialize Prism theme URL
+    prismThemeUrl: DEFAULT_PRISM_THEME_URL,
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -181,7 +181,7 @@ export const useSettingsStore = create(
           gitUserName,
           gitUserEmail,
           toolMaxSteps,
-          prismThemeUrl, // Load Prism theme URL
+          prismThemeUrl,
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -260,7 +260,7 @@ export const useSettingsStore = create(
           gitUserName,
           gitUserEmail,
           toolMaxSteps,
-          prismThemeUrl, // Set loaded Prism theme URL
+          prismThemeUrl,
         });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);
@@ -274,7 +274,7 @@ export const useSettingsStore = create(
           enableStreamingMarkdown: DEFAULT_ENABLE_STREAMING_MARKDOWN,
           streamingRenderFPS: DEFAULT_STREAMING_FPS,
           streamingCodeRenderFPS: DEFAULT_STREAMING_CODE_FPS,
-          prismThemeUrl: DEFAULT_PRISM_THEME_URL, // Reset Prism theme URL
+          prismThemeUrl: DEFAULT_PRISM_THEME_URL,
         });
         await Promise.all([
           PersistenceService.saveSetting("theme", DEFAULT_THEME),

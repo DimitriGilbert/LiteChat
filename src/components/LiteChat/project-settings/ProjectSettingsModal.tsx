@@ -23,7 +23,7 @@ import { ProjectSettingsParams } from "./ProjectSettingsParams";
 import { ProjectSettingsSync } from "./ProjectSettingsSync";
 import { ProjectSettingsVfs } from "./ProjectSettingsVfs";
 import { useConversationStore } from "@/store/conversation.store";
-import { TabbedLayout, TabDefinition } from "../common/TabbedLayout"; // Import new component
+import { TabbedLayout, TabDefinition } from "../common/TabbedLayout"
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
@@ -120,7 +120,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
       setLocalFrequency(
         effective?.frequencyPenalty ?? globalDefaults.frequencyPenalty ?? 0.0,
       );
-      setActiveTab("prompt"); // Reset to default tab on open
+      setActiveTab("prompt")
     } else if (!isOpen) {
       setVfsKey(null);
       setSystemPrompt(null);

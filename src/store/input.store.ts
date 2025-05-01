@@ -4,14 +4,14 @@ import { immer } from "zustand/middleware/immer";
 
 // Define a unified structure for attached file metadata
 export interface AttachedFileMetadata {
-  id: string; // Unique ID for this attachment instance
+  id: string;
   source: "direct" | "vfs";
   name: string;
-  type: string; // MIME type
+  type: string;
   size: number;
   // Store content directly in metadata
-  contentText?: string; // For text files
-  contentBase64?: string; // For non-text files
+  contentText?: string;
+  contentBase64?: string;
   // VFS path is only needed for VFS source
   path?: string;
 }
@@ -38,7 +38,7 @@ export const useInputStore = create(
   immer<InputState & InputActions>((set) => ({
     // Initial State
     attachedFilesMetadata: [],
-    enabledTools: new Set<string>(), // Initialize enabledTools
+    enabledTools: new Set<string>(),
 
     // Actions
     addAttachedFile: (fileData) => {

@@ -18,7 +18,7 @@ import {
 // Import import/export service
 import { ImportExportService } from "@/services/import-export.service";
 // Import the key from the constants file
-import { SYNC_VFS_KEY } from "@/lib/litechat/constants"; // Assuming constants file exists
+import { SYNC_VFS_KEY } from "@/lib/litechat/constants"
 import { useVfsStore } from "./vfs.store";
 import type { fs as FsType } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
@@ -42,7 +42,7 @@ interface ConversationState {
   error: string | null;
 }
 interface ConversationActions {
-  loadSidebarItems: () => Promise<void>; // Will now load projects from ProjectStore too
+  loadSidebarItems: () => Promise<void>
   addConversation: (
     conversationData: Partial<Omit<Conversation, "id" | "createdAt">> & {
       title: string;

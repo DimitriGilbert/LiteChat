@@ -5,7 +5,7 @@ import { useControlRegistryStore } from "@/store/control.store";
 import { useUIStateStore } from "@/store/ui.store";
 import { useVfsStore } from "@/store/vfs.store";
 import { Button } from "@/components/ui/button";
-import { HardDriveIcon, PaperclipIcon } from "lucide-react"; // Import PaperclipIcon
+import { HardDriveIcon, PaperclipIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 // Import InputStore action
 import { useInputStore } from "@/store/input.store";
 import { toast } from "sonner";
-import { useShallow } from "zustand/react/shallow"; // Import useShallow
+import { useShallow } from "zustand/react/shallow";
 
 // Convert back to a plain function
 export function registerVfsControl() {
@@ -46,7 +46,7 @@ export function registerVfsControl() {
       useShallow((state) => ({
         enableVfs: state.enableVfs,
         selectedFileIds: state.selectedFileIds,
-        nodes: state.nodes, // Keep nodes if needed for handleAttachSelectedFiles
+        nodes: state.nodes,
         clearSelection: state.clearSelection,
       })),
     );
@@ -68,7 +68,7 @@ export function registerVfsControl() {
             name: node.name,
             type: node.mimeType || "application/octet-stream",
             size: node.size,
-            path: node.path, // Include the path for fetching later
+            path: node.path,
             // Do NOT include contentText or contentBase64 here
           });
           attachedCount++;
@@ -79,14 +79,14 @@ export function registerVfsControl() {
         toast.success(
           `Attached ${attachedCount} file(s) from VFS to the next prompt.`,
         );
-        clearSelection(); // Clear VFS selection after attaching
+        clearSelection();
         // Optionally close the panel after attaching
         // toggleChatControlPanel("vfs", false);
       }
     };
 
     if (!enableVfs) {
-      return null; // Don't render trigger if VFS is disabled globally
+      return null;
     }
 
     return (
@@ -142,10 +142,10 @@ export function registerVfsControl() {
   // Panel Component (Renders based on current state)
   const VfsPanel: React.FC = () => {
     // Read state inside the component instance
-    const vfsKey = useVfsStore((state) => state.vfsKey); // Simple selector, no shallow needed
+    const vfsKey = useVfsStore((state) => state.vfsKey);
     const selectedItemType = useConversationStore(
       (state) => state.selectedItemType,
-    ); // Simple selector
+    );
 
     return (
       // Ensure this container allows FileManager to fill height
@@ -165,7 +165,7 @@ export function registerVfsControl() {
   // Register Prompt Control (Trigger in Prompt Area)
   registerPromptControl({
     id: "core-vfs-prompt-trigger",
-    order: 25, // Adjust order slightly to appear after file upload
+    order: 25,
     show: () => useVfsStore.getState().enableVfs,
     triggerRenderer: () => React.createElement(VfsTriggerButton),
     getParameters: undefined,

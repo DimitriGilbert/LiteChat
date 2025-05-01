@@ -58,7 +58,7 @@ export const ParameterControlComponent: React.FC<
   // Local state for visual feedback during slider interaction
   // Initialize with the current value or the default if null
   const [localTemp, setLocalTemp] = useState(temperature ?? defaultTemperature);
-  const [localTopP, setLocalTopP] = useState(topP ?? defaultTopP ?? 1.0); // Default TopP to 1 if null
+  const [localTopP, setLocalTopP] = useState(topP ?? defaultTopP ?? 1.0)
   const [localPresence, setLocalPresence] = useState(
     presencePenalty ?? defaultPresencePenalty ?? 0.0,
   );
@@ -106,7 +106,7 @@ export const ParameterControlComponent: React.FC<
   // Handler for "Use Default" buttons
   const handleUseDefault = useCallback(
     (setter: (value: number | null) => void) => {
-      setter(null); // Set to null to indicate using the default/inherited value
+      setter(null)
     },
     [],
   );

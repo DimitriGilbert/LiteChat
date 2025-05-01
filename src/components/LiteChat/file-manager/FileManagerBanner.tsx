@@ -1,7 +1,7 @@
 // src/components/LiteChat/file-manager/FileManagerBanner.tsx
 import React from "react";
 import { FolderIcon, UsersIcon } from "lucide-react";
-import type { SidebarItemType } from "@/types/litechat/chat"; // Updated path
+import type { SidebarItemType } from "@/types/litechat/chat"
 
 interface FileManagerBannerProps {
   vfsKey: string | null;

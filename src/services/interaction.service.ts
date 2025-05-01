@@ -13,11 +13,11 @@ import { useConversationStore } from "@/store/conversation.store";
 import { useVfsStore } from "@/store/vfs.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { PersistenceService } from "./persistence.service";
-import { runMiddleware, getContextSnapshot } from "@/lib/litechat/ai-helpers"; // Import helpers
+import { runMiddleware, getContextSnapshot } from "@/lib/litechat/ai-helpers";
 import {
   splitModelId,
   instantiateModelInstance,
-} from "@/lib/litechat/provider-helpers"; // Import helpers
+} from "@/lib/litechat/provider-helpers";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
@@ -116,7 +116,7 @@ export const InteractionService = {
       startedAt: new Date(),
       endedAt: null,
       metadata: {
-        ...(finalPrompt.metadata || {}), // Use metadata from final prompt
+        ...(finalPrompt.metadata || {}),
         toolCalls: [],
         toolResults: [],
         reasoning: undefined,
@@ -274,7 +274,7 @@ export const InteractionService = {
       useSettingsStore.getState().toolMaxSteps;
 
     const callOptions: AIServiceCallOptions = {
-      model: modelInstance, // Use the specifically instantiated model
+      model: modelInstance,
       messages: finalPrompt.messages,
       abortSignal: abortController.signal,
       system: finalPrompt.system,
@@ -477,7 +477,9 @@ export const InteractionService = {
     );
 
     const reasoningData =
+      // @ts-expect-error Do not know how to cast....
       (finishDetails?.providerMetadata?.reasoning as string) ||
+      // @ts-expect-error Do not know how to cast....
       (finishDetails?.providerMetadata?.steps as string) ||
       undefined;
 

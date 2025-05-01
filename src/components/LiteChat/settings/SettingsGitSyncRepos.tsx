@@ -31,7 +31,7 @@ import { useConversationStore } from "@/store/conversation.store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import { ActionTooltipButton } from "../common/ActionTooltipButton"; // Import ActionTooltipButton
+import { ActionTooltipButton } from "../common/ActionTooltipButton"
 
 const SettingsGitSyncReposComponent: React.FC = () => {
   const {

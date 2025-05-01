@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
-import { ToolCallPart } from "ai"; // Import AI SDK types
+import { ToolCallPart } from "ai"
 
 export const ToolCallDisplay: React.FC<{ toolCall: ToolCallPart }> = ({
   toolCall,

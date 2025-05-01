@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { buildPath } from "@/lib/litechat/file-manager-utils";
 import { useSettingsStore } from "./settings.store";
 import { useProviderStore } from "./provider.store";
-import { useConversationStore } from "./conversation.store"; // Needed for deleting convos within project
+import { useConversationStore } from "./conversation.store"
 
 // Interface for effective project settings (copied from conversation.store)
 interface EffectiveProjectSettings {
@@ -213,7 +213,7 @@ export const useProjectStore = create(
 
       // Update conversation state (unlink convos)
       useConversationStore.getState()._unlinkConversationsFromProjects(
-        Array.from(descendantProjectIds), // Pass IDs to unlink
+        Array.from(descendantProjectIds)
       );
 
       try {

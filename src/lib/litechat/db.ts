@@ -18,7 +18,7 @@ export interface DbAppState {
 //   projectTable: Table<Project, string>,
 // ): Promise<string> {
 //   const project = await projectTable.get(projectId);
-//   if (!project) return "/"; // Should not happen in migration context
+//   if (!project) return "/"
 
 //   if (!project.parentId) {
 //     return normalizePath(`/${project.name}`);
@@ -64,7 +64,7 @@ export class LiteChatDatabase extends Dexie {
       appState: "&key",
       providerConfigs: "++id, &name, type, isEnabled, apiKeyId",
       apiKeys: "++id, &name",
-      syncRepos: "++id, &name, remoteUrl", // Schema before auth fields
+      syncRepos: "++id, &name, remoteUrl",
       projects: "++id, &path, parentId, createdAt, updatedAt, name",
     });
     this.version(4).stores({
@@ -77,7 +77,7 @@ export class LiteChatDatabase extends Dexie {
       providerConfigs: "++id, &name, type, isEnabled, apiKeyId",
       apiKeys: "++id, &name",
       syncRepos: "++id, &name, remoteUrl",
-      projects: "++id, name, parentId, createdAt, updatedAt", // Schema before path
+      projects: "++id, name, parentId, createdAt, updatedAt",
     });
     this.version(3).stores({
       conversations:

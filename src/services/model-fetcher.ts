@@ -1,18 +1,18 @@
 // src/services/model-fetcher.ts
-import type { DbProviderConfig } from "@/types/litechat/provider"; // Corrected path
+import type { DbProviderConfig } from "@/types/litechat/provider";
 import { toast } from "sonner";
-import { ensureV1Path } from "@/lib/litechat/provider-helpers"; // Corrected path
+import { ensureV1Path } from "@/lib/litechat/provider-helpers";
 
 // Define the structure for fetched model information including metadata
 interface FetchedModel {
   id: string;
   name: string;
-  metadata?: Record<string, any>; // Add optional metadata field
+  metadata?: Record<string, any>;
 }
 
 // Simple in-memory cache for fetched models
 const fetchCache = new Map<string, Promise<FetchedModel[]>>();
-const CACHE_DURATION_MS = 5 * 60 * 1000; // Cache for 5 minutes
+const CACHE_DURATION_MS = 5 * 60 * 1000;
 
 /**
  * Fetches the list of available models for a given provider configuration.
@@ -62,8 +62,8 @@ export async function fetchModelsForProvider(
           url = "https://openrouter.ai/api/v1/models";
           // Add OpenRouter specific headers
           headers["HTTP-Referer"] =
-            globalThis.location?.origin || "http://localhost:3000"; // Use a reasonable fallback
-          headers["X-Title"] = "LiteChat"; // Optional: Identify your app
+            globalThis.location?.origin || "http://localhost:3000";
+          headers["X-Title"] = "LiteChat";
           break;
         }
         case "ollama": {
@@ -93,7 +93,7 @@ export async function fetchModelsForProvider(
           console.log(
             `[ModelFetcher] Model fetching not supported via API for type: ${config.type}. Returning empty list.`,
           );
-          return []; // Return empty array for unsupported types
+          return [];
         }
       }
     } catch (urlError) {
@@ -105,7 +105,7 @@ export async function fetchModelsForProvider(
       toast.error(
         `Invalid Base URL for ${config.name}: ${urlError instanceof Error ? urlError.message : String(urlError)}`,
       );
-      return []; // Return empty array on URL error
+      return [];
     }
 
     console.log(
@@ -147,9 +147,9 @@ export async function fetchModelsForProvider(
         // Ollama returns { models: [{ name: ..., details: {...} }, ...] }
         if (data.models && Array.isArray(data.models)) {
           models = data.models.map((m: any) => ({
-            id: m.name, // Ollama uses 'name' as the ID
-            name: m.name, // Use 'name' for display as well
-            metadata: m.details ?? {}, // Store details object as metadata
+            id: m.name,
+            name: m.name,
+            metadata: m.details ?? {},
           }));
         } else {
           console.warn(
@@ -167,7 +167,7 @@ export async function fetchModelsForProvider(
             return {
               id: id,
               name: name || id,
-              metadata: rest, // Store all other fields in metadata
+              metadata: rest,
             };
           });
         } else {
@@ -179,15 +179,15 @@ export async function fetchModelsForProvider(
       } else {
         // OpenAI, OpenAI-Compatible often return { data: [{ id: ..., ... }, ...] }
         // Or sometimes just the array [{ id: ..., ... }]
-        const modelList = data.data || data; // Handle both structures
+        const modelList = data.data || data;
         if (Array.isArray(modelList)) {
           models = modelList.map((m: any) => {
             // Extract known metadata fields, put others in metadata object
             const { id, name, ...rest } = m;
             return {
               id: id,
-              name: name || id, // Use 'name' if available, otherwise 'id'
-              metadata: rest, // Store other fields in metadata
+              name: name || id,
+              metadata: rest,
             };
           });
         } else {

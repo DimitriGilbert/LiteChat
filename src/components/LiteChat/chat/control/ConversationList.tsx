@@ -122,7 +122,7 @@ export const ConversationListControlComponent: React.FC = () => {
         conversationSyncStatus: state.conversationSyncStatus,
       })),
     );
-  const projects = useProjectStore((state) => state.projects); // Assuming projects array reference is stable or changes infrequently
+  const projects = useProjectStore((state) => state.projects);
 
   // Select actions (these are stable references)
   const selectItem = useConversationStore((state) => state.selectItem);
@@ -267,9 +267,9 @@ export const ConversationListControlComponent: React.FC = () => {
           localEditingName.trim() &&
           localEditingName.trim() !== originalName
         ) {
-          handleSaveEdit(); // Attempt save
+          handleSaveEdit();
         } else {
-          handleCancelEdit(); // Cancel edit
+          handleCancelEdit();
         }
       }
 
@@ -282,8 +282,8 @@ export const ConversationListControlComponent: React.FC = () => {
     },
     [
       editingItemId,
-      localEditingName, // Depend on local name for check
-      originalName, // Depend on original name for check
+      localEditingName,
+      originalName,
       selectedItemId,
       selectedItemType,
       handleSaveEdit,
@@ -372,7 +372,7 @@ export const ConversationListControlComponent: React.FC = () => {
         conversationsByProjectId: convosByProjId,
         projectsByParentId: projByParentId,
       };
-    }, [projects, conversations]); // Only recompute if projects or conversations change
+    }, [projects, conversations]);
 
   // Memoize the getChildren function itself, ensuring its dependencies are stable
   const getChildren = useCallback(
@@ -392,8 +392,8 @@ export const ConversationListControlComponent: React.FC = () => {
             p.id,
             "project",
             lowerCaseFilter,
-            projects, // Pass stable references
-            conversations, // Pass stable references
+            projects,
+            conversations,
             projectsById,
             conversationsByProjectId,
             projectsByParentId,
@@ -416,13 +416,13 @@ export const ConversationListControlComponent: React.FC = () => {
       return { projects: childProjects, conversations: childConversations };
     },
     [
-      projects, // Stable reference from store assumed
-      conversations, // Stable reference from store assumed
-      projectsById, // Memoized derived data
-      conversationsByProjectId, // Memoized derived data
-      projectsByParentId, // Memoized derived data
+      projects,
+      conversations,
+      projectsById,
+      conversationsByProjectId,
+      projectsByParentId,
     ],
-  ); // Dependencies are stable references or memoized maps
+  );
 
   // Memoize the calculation of root items
   const rootItems = useMemo(() => {
@@ -456,13 +456,13 @@ export const ConversationListControlComponent: React.FC = () => {
     combined.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
     return combined;
   }, [
-    projects, // Stable reference
-    conversations, // Stable reference
-    filterText, // Primitive
-    projectsById, // Memoized map
-    conversationsByProjectId, // Memoized map
-    projectsByParentId, // Memoized map
-  ]); // Recompute only when dependencies change
+    projects,
+    conversations,
+    filterText,
+    projectsById,
+    conversationsByProjectId,
+    projectsByParentId,
+  ]);
 
   return (
     <div className="p-2 border-r border-[--border] bg-card text-card-foreground h-full flex flex-col">

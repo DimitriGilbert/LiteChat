@@ -123,7 +123,7 @@ export const useInteractionStore = create(
           const updatedInteraction = {
             ...existingInteraction,
             ...updates,
-            metadata: newMetadata, // Assign the merged metadata
+            metadata: newMetadata
           };
 
           // Explicitly handle the 'response' field if it's in the updates

@@ -17,8 +17,8 @@ import type { VfsNode } from "@/types/litechat/vfs";
 
 interface FileManagerToolbarProps {
   currentPath: string;
-  isAnyLoading: boolean; // Combined loading state
-  isOperationLoading: boolean; // Specific FS operation loading
+  isAnyLoading: boolean;
+  isOperationLoading: boolean;
   entries: VfsNode[];
   editingPath: string | null;
   creatingFolder: boolean;
@@ -30,7 +30,7 @@ interface FileManagerToolbarProps {
   handleFolderUploadClick: () => void;
   handleArchiveUploadClick: () => void;
   handleDownloadAll: () => void;
-  handleCloneClick: () => void; // Added handler for clone button
+  handleCloneClick: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   folderInputRef: React.RefObject<HTMLInputElement | null>;
   archiveInputRef: React.RefObject<HTMLInputElement | null>;
@@ -41,7 +41,7 @@ interface FileManagerToolbarProps {
 export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
   currentPath,
   isAnyLoading,
-  isOperationLoading, // Use this for refresh icon specifically
+  isOperationLoading,
   entries,
   editingPath,
   creatingFolder,
@@ -53,7 +53,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
   handleFolderUploadClick,
   handleArchiveUploadClick,
   handleDownloadAll,
-  handleCloneClick, // Destructure clone handler
+  handleCloneClick,
   fileInputRef,
   folderInputRef,
   archiveInputRef,
@@ -249,7 +249,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              handleCloneClick(); // Use the passed handler
+              handleCloneClick();
             }}
             disabled={isAnyLoading} // Disable on any loading
             className="h-8"

@@ -15,7 +15,7 @@ import type { CoreMessage, ImagePart, TextPart } from "ai";
 import { toast } from "sonner";
 import type { AttachedFileMetadata } from "@/store/input.store";
 import type { fs as FsType } from "@zenfs/core";
-import { useConversationStore } from "@/store/conversation.store"; // Import ConversationStore
+import { useConversationStore } from "@/store/conversation.store";
 
 export const ConversationService = {
   async submitPrompt(turnData: PromptTurnObject): Promise<void> {
@@ -23,7 +23,7 @@ export const ConversationService = {
     // Read necessary state using getState()
     const interactionStoreState = useInteractionStore.getState();
     const projectStoreState = useProjectStore.getState();
-    const promptState = usePromptStateStore.getState(); // Read current prompt state
+    const promptState = usePromptStateStore.getState();
     const conversationStoreState = useConversationStore.getState();
 
     const conversationId = interactionStoreState.currentConversationId;
@@ -84,13 +84,13 @@ export const ConversationService = {
 
     // 4. Merge Parameters (PromptState + TurnData)
     const finalParameters = {
-      temperature: promptState.temperature, // Read from prompt state
-      max_tokens: promptState.maxTokens, // Read from prompt state
-      top_p: promptState.topP, // Read from prompt state
-      top_k: promptState.topK, // Read from prompt state
-      presence_penalty: promptState.presencePenalty, // Read from prompt state
-      frequency_penalty: promptState.frequencyPenalty, // Read from prompt state
-      ...(turnData.parameters ?? {}), // Merge turn-specific params
+      temperature: promptState.temperature,
+      max_tokens: promptState.maxTokens,
+      top_p: promptState.topP,
+      top_k: promptState.topK,
+      presence_penalty: promptState.presencePenalty,
+      frequency_penalty: promptState.frequencyPenalty,
+      ...(turnData.parameters ?? {}),
     };
     // Clean null/undefined parameters
     Object.keys(finalParameters).forEach((key) => {
@@ -104,7 +104,7 @@ export const ConversationService = {
 
     // 5. Construct PromptObject
     const promptObject: PromptObject = {
-      system: systemPrompt, // Use the potentially overridden prompt
+      system: systemPrompt,
       messages: historyMessages,
       parameters: finalParameters,
       metadata: {
@@ -113,7 +113,7 @@ export const ConversationService = {
         ...(({ turnSystemPrompt, ...restMeta }) => restMeta)(
           turnData.metadata ?? {},
         ),
-        modelId: promptState.modelId, // Read modelId from prompt state
+        modelId: promptState.modelId,
         // Store only basic file info (no content) in the final prompt metadata sent to AI Service
         attachedFiles: turnData.metadata.attachedFiles?.map(
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -128,7 +128,7 @@ export const ConversationService = {
       await InteractionService.startInteraction(
         promptObject,
         conversationId,
-        turnData, // Pass original turnData for storage
+        turnData,
       );
     } catch (error) {
       console.error("[ConversationService] Error starting interaction:", error);
@@ -148,7 +148,7 @@ export const ConversationService = {
     // Read necessary state using getState()
     const interactionStoreState = useInteractionStore.getState();
     const projectStoreState = useProjectStore.getState();
-    const promptState = usePromptStateStore.getState(); // Read current prompt state
+    const promptState = usePromptStateStore.getState();
     const conversationStoreState = useConversationStore.getState();
 
     const targetInteraction = interactionStoreState.interactions.find(
@@ -218,13 +218,13 @@ export const ConversationService = {
 
     // 4. Merge Parameters (Current PromptState + Original TurnData Params)
     const finalParameters = {
-      temperature: promptState.temperature, // Read from prompt state
-      max_tokens: promptState.maxTokens, // Read from prompt state
-      top_p: promptState.topP, // Read from prompt state
-      top_k: promptState.topK, // Read from prompt state
-      presence_penalty: promptState.presencePenalty, // Read from prompt state
-      frequency_penalty: promptState.frequencyPenalty, // Read from prompt state
-      ...(originalTurnData.parameters ?? {}), // Merge original params
+      temperature: promptState.temperature,
+      max_tokens: promptState.maxTokens,
+      top_p: promptState.topP,
+      top_k: promptState.topK,
+      presence_penalty: promptState.presencePenalty,
+      frequency_penalty: promptState.frequencyPenalty,
+      ...(originalTurnData.parameters ?? {}),
     };
     Object.keys(finalParameters).forEach((key) => {
       if (
@@ -237,7 +237,7 @@ export const ConversationService = {
 
     // 5. Construct PromptObject
     const promptObject: PromptObject = {
-      system: systemPrompt, // Use the potentially overridden prompt
+      system: systemPrompt,
       messages: historyMessages,
       parameters: finalParameters,
       metadata: {
@@ -246,8 +246,8 @@ export const ConversationService = {
         ...(({ turnSystemPrompt, ...restMeta }) => restMeta)(
           originalTurnData.metadata ?? {},
         ),
-        modelId: promptState.modelId, // Use current model selection from prompt state
-        regeneratedFromId: interactionId, // Add regeneration marker
+        modelId: promptState.modelId,
+        regeneratedFromId: interactionId,
         // Store only basic file info (no content)
         attachedFiles: originalAttachedFiles.map(
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -262,7 +262,7 @@ export const ConversationService = {
       await InteractionService.startInteraction(
         promptObject,
         conversationId,
-        originalTurnData, // Pass original turn data
+        originalTurnData,
       );
     } catch (error) {
       console.error(

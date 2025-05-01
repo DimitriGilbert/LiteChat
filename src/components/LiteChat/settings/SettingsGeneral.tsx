@@ -22,12 +22,10 @@ const SettingsGeneralComponent: React.FC = () => {
   const {
     theme,
     setTheme,
-    // Removed unused enableAdvancedSettings and setEnableAdvancedSettings
     enableStreamingMarkdown,
     setEnableStreamingMarkdown,
-    streamingRenderFPS, // Corrected state name
-    setStreamingRenderFPS, // Corrected setter name
-    // Removed enableStreamingCodeBlockParsing and its setter
+    streamingRenderFPS,
+    setStreamingRenderFPS,
     prismThemeUrl,
     setPrismThemeUrl,
     resetGeneralSettings,
@@ -35,14 +33,10 @@ const SettingsGeneralComponent: React.FC = () => {
     useShallow((state) => ({
       theme: state.theme,
       setTheme: state.setTheme,
-      // Removed enableAdvancedSettings: state.enableAdvancedSettings,
-      // Removed setEnableAdvancedSettings: state.setEnableAdvancedSettings,
       enableStreamingMarkdown: state.enableStreamingMarkdown,
       setEnableStreamingMarkdown: state.setEnableStreamingMarkdown,
-      streamingRenderFPS: state.streamingRenderFPS, // Corrected state name
-      setStreamingRenderFPS: state.setStreamingRenderFPS, // Corrected setter name
-      // Removed enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing,
-      // Removed setEnableStreamingCodeBlockParsing: state.setEnableStreamingCodeBlockParsing,
+      streamingRenderFPS: state.streamingRenderFPS,
+      setStreamingRenderFPS: state.setStreamingRenderFPS,
       prismThemeUrl: state.prismThemeUrl,
       setPrismThemeUrl: state.setPrismThemeUrl,
       resetGeneralSettings: state.resetGeneralSettings,
@@ -50,7 +44,7 @@ const SettingsGeneralComponent: React.FC = () => {
   );
 
   // Local state for the single FPS slider
-  const [localFps, setLocalFps] = useState(streamingRenderFPS); // Use correct state
+  const [localFps, setLocalFps] = useState(streamingRenderFPS);
 
   // Combined FPS Handlers
   const handleFpsSliderVisualChange = useCallback((value: number[]) => {
@@ -58,28 +52,28 @@ const SettingsGeneralComponent: React.FC = () => {
   }, []);
   const handleFpsSliderCommit = useCallback(
     (value: number[]) => {
-      setStreamingRenderFPS(value[0]); // Use the correct setter
+      setStreamingRenderFPS(value[0]);
     },
-    [setStreamingRenderFPS], // Use correct setter dependency
+    [setStreamingRenderFPS],
   );
   const handleFpsInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
       const numValue =
-        value === "" ? 15 : parseInt(value.replace(/[^0-9]/g, ""), 10); // Default to 15
+        value === "" ? 15 : parseInt(value.replace(/[^0-9]/g, ""), 10);
       if (!isNaN(numValue)) {
-        const clampedFps = Math.max(3, Math.min(60, numValue)); // Range 3-60
-        setStreamingRenderFPS(clampedFps); // Use the correct setter
+        const clampedFps = Math.max(3, Math.min(60, numValue));
+        setStreamingRenderFPS(clampedFps);
         setLocalFps(clampedFps);
       }
     },
-    [setStreamingRenderFPS], // Use correct setter dependency
+    [setStreamingRenderFPS],
   );
 
   // Sync local state if store changes from elsewhere
   useEffect(() => {
-    setLocalFps(streamingRenderFPS); // Use correct state
-  }, [streamingRenderFPS]); // Use correct state dependency
+    setLocalFps(streamingRenderFPS);
+  }, [streamingRenderFPS]);
 
   // Handler for the reset button (remains the same)
   const handleResetClick = () => {

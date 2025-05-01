@@ -157,7 +157,7 @@ export function createAiModelConfig(
   );
 
   return {
-    id: combineModelId(config.id, modelId), // Use helper here
+    id: combineModelId(config.id, modelId),
     name: modelInfo.name,
     providerId: config.id,
     providerName: config.name,

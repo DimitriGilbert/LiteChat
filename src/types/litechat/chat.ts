@@ -7,14 +7,14 @@ import type { PromptObject } from "./prompt";
 // Conversation and SidebarItemType remain the same
 export interface Conversation extends DbBase {
   title: string;
-  projectId: string | null; // Link to parent project - ADDED
+  projectId: string | null
   metadata?: Record<string, any> & {
     // Add specific metadata fields here
-    enabledTools?: string[]; // Store as array for JSON compatibility
+    enabledTools?: string[]
     toolMaxStepsOverride?: number | null;
   };
-  syncRepoId?: string | null; // ID of the SyncRepo this convo is linked to
-  lastSyncedAt?: Date | null; // Timestamp of the last successful sync
+  syncRepoId?: string | null
+  lastSyncedAt?: Date | null
 }
 // Updated SidebarItemType
 export type SidebarItemType = "conversation" | "project";
@@ -27,7 +27,7 @@ export interface ChatControl {
   id: string;
   status: () => ChatControlStatus;
   renderer?: () => React.ReactElement | null;
-  iconRenderer?: () => React.ReactElement | null; // Added icon renderer
+  iconRenderer?: () => React.ReactElement | null
   panel?: string;
   show?: () => boolean;
   settingsConfig?: {
@@ -57,5 +57,5 @@ export interface ChatCanvasProps {
   className?: string;
   onRegenerateInteraction?: (interactionId: string) => void;
   onEditInteraction?: (interactionId: string) => void;
-  onStopInteraction?: (interactionId: string) => void; // Add this prop
+  onStopInteraction?: (interactionId: string) => void
 }

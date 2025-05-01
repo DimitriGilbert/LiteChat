@@ -11,8 +11,8 @@ export type DbProviderType =
 // Stored in DB for API Keys
 export interface DbApiKey extends DbBase {
   name: string;
-  value: string; // Encrypt this!
-  providerId: string; // Intended provider type/ID for context
+  value: string
+  providerId: string
 }
 
 // Stored in DB for Provider Configurations
@@ -22,14 +22,14 @@ export interface DbProviderConfig extends DbBase {
   isEnabled: boolean;
   apiKeyId: string | null;
   baseURL: string | null;
-  enabledModels: string[] | null; // Models enabled FOR THIS PROVIDER
+  enabledModels: string[] | null
   autoFetchModels: boolean;
   // Update fetchedModels to include optional metadata
   fetchedModels:
     | {
         id: string;
         name: string;
-        metadata?: Record<string, any>; // Add optional metadata field
+        metadata?: Record<string, any>
       }[]
     | null;
   modelsLastFetchedAt: Date | null;
@@ -37,11 +37,11 @@ export interface DbProviderConfig extends DbBase {
 
 // Runtime representation of a Model
 export interface AiModelConfig {
-  id: string; // Combined ID: "providerId:modelId"
-  name: string; // Display name, e.g., "GPT-4o"
-  providerId: string; // ID of the provider config
-  providerName: string; // Name of the provider config
-  instance: any; // The actual AI SDK instance
+  id: string
+  name: string
+  providerId: string
+  providerName: string
+  instance: any
   contextWindow?: number;
   supportsImageGeneration?: boolean;
   supportsToolCalling?: boolean;

@@ -30,14 +30,14 @@ export function registerToolSelectorControl() {
       selectedItemId,
       selectedItemType,
       getConversationById,
-      updateCurrentConversationToolSettings, // Get the update action
+      updateCurrentConversationToolSettings
     } = useConversationStore(
       useShallow((state) => ({
         selectedItemId: state.selectedItemId,
         selectedItemType: state.selectedItemType,
         getConversationById: state.getConversationById,
         updateCurrentConversationToolSettings:
-          state.updateCurrentConversationToolSettings, // Get action
+          state.updateCurrentConversationToolSettings
       })),
     );
     const isStreaming = useInteractionStore.getState().status === "streaming";
@@ -148,7 +148,7 @@ export function registerToolSelectorControl() {
       };
     },
     show: () =>
-      Object.keys(useControlRegistryStore.getState().tools).length > 0, // Show only if tools are registered
+      Object.keys(useControlRegistryStore.getState().tools).length > 0
   });
 
   console.log("[Function] Registered Core Tool Selector Control");

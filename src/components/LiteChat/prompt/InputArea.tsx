@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { useUIStateStore } from "@/store/ui.store";
 import { useInputStore } from "@/store/input.store";
 import { useShallow } from "zustand/react/shallow";
-import type { InputAreaRef } from "@/types/litechat/prompt"; // Import from types
+import type { InputAreaRef } from "@/types/litechat/prompt"
 
 interface InputAreaProps {
   initialValue?: string;
@@ -69,7 +69,7 @@ export const InputArea = memo(
             useInputStore.getState().attachedFilesMetadata.length > 0;
           if (internalValue.trim().length > 0 || hasFiles) {
             onSubmit();
-            setInternalValue(""); // Clear internal state after submit
+            setInternalValue("")
           }
         }
       };

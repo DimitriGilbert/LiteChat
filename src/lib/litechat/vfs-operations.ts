@@ -63,11 +63,11 @@ export const initializeFsOp = async (
   try {
     const vfsConf = {
       backend: IndexedDB,
-      name: `litechat_vfs_${vfsKey}`, // Use key in DB name
+      name: `litechat_vfs_${vfsKey}`
     };
     // Configure the filesystem. This might throw if already configured differently.
     await configureSingle(vfsConf);
-    return fs; // Return the globally configured fs instance
+    return fs
   } catch (error) {
     console.error(
       `[VFS Op] Failed to initialize VFS for key "${vfsKey}":`,
@@ -99,7 +99,7 @@ export const listFilesOp = async (path: string): Promise<FileSystemEntry[]> => {
           `[VFS Op] Directory not found for listing, attempting creation: ${normalized}`,
         );
         await createDirectoryRecursive(normalized);
-        return []; // Return empty as it was just created
+        return []
       }
       // Rethrow other stat errors
       throw statErr;
@@ -116,7 +116,7 @@ export const listFilesOp = async (path: string): Promise<FileSystemEntry[]> => {
             path: fullPath,
             isDirectory: fileStat.isDirectory(),
             size: fileStat.size,
-            lastModified: fileStat.mtime, // Use mtime (modification time)
+            lastModified: fileStat.mtime
           };
         } catch (statErr: unknown) {
           // Log error but filter out the entry if stat fails
@@ -134,7 +134,7 @@ export const listFilesOp = async (path: string): Promise<FileSystemEntry[]> => {
     toast.error(
       `Error listing files: ${err instanceof Error ? err.message : String(err)}`,
     );
-    throw err; // Re-throw error for caller handling
+    throw err
   }
 };
 
@@ -191,7 +191,7 @@ export const writeFileOp = async (
         `Error writing file "${basename(normalized)}": ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-    throw err; // Re-throw error
+    throw err
   }
 };
 
@@ -226,14 +226,14 @@ export const deleteItemOp = async (
     // Ignore "Not Found" errors, maybe already deleted
     if (err instanceof Error && (err as any).code === "ENOENT") {
       console.warn(`[VFS Op] Item not found for deletion: ${normalized}`);
-      return; // Don't throw, just return
+      return
     }
     // Handle other errors
     console.error(`[VFS Op] Failed to delete ${normalized}:`, err);
     toast.error(
       `Error deleting "${basename(normalized)}": ${err instanceof Error ? err.message : String(err)}`,
     );
-    throw err; // Re-throw other errors
+    throw err
   }
 };
 
@@ -243,7 +243,7 @@ export const deleteItemOp = async (
  * @throws Throws an error if creation fails.
  */
 export const createDirectoryOp = async (path: string): Promise<void> => {
-  await createDirectoryRecursive(path); // Uses helper with error handling
+  await createDirectoryRecursive(path)
 };
 
 /**
@@ -256,13 +256,13 @@ export const downloadFileOp = async (
   filename?: string,
 ): Promise<void> => {
   try {
-    const data = await readFileOp(path); // Use existing op with error handling
+    const data = await readFileOp(path)
     const blob = new Blob([data]);
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     const normalized = normalizePath(path);
-    link.download = filename || basename(normalized); // Use basename helper
+    link.download = filename || basename(normalized)
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -292,7 +292,7 @@ export const uploadFilesOp = async (
   const normalizedTargetPath = normalizePath(targetPath);
   let successCount = 0;
   let errorCount = 0;
-  const fileArray = Array.from(files); // Convert FileList to array if necessary
+  const fileArray = Array.from(files)
 
   try {
     // Ensure target directory exists
@@ -303,7 +303,7 @@ export const uploadFilesOp = async (
       const filePath = joinPath(normalizedTargetPath, file.name);
       try {
         const buffer = await file.arrayBuffer();
-        await writeFileOp(filePath, new Uint8Array(buffer)); // Use existing op
+        await writeFileOp(filePath, new Uint8Array(buffer))
         successCount++;
       } catch (err: unknown) {
         // writeFileOp handles its own toast, just count errors here
@@ -372,7 +372,7 @@ export const uploadAndExtractZipOp = async (
         } else {
           // Write file entry
           const content = await zipEntry.async("uint8array");
-          await writeFileOp(fullTargetPath, content); // Use existing op
+          await writeFileOp(fullTargetPath, content)
         }
         return { name: zipEntry.name, isDir: zipEntry.dir };
       }),
@@ -433,7 +433,7 @@ export const downloadAllAsZipOp = async (
 ): Promise<void> => {
   const zip = new JSZip();
   const normalizedRoot = normalizePath(rootPath);
-  const rootDirName = basename(normalizedRoot) || "root"; // Use 'root' if path is '/'
+  const rootDirName = basename(normalizedRoot) || "root"
 
   try {
     // Verify the root path exists and is a directory
@@ -453,12 +453,12 @@ export const downloadAllAsZipOp = async (
           `Cannot export: Error accessing path "${rootDirName}". ${statErr instanceof Error ? statErr.message : String(statErr)}`,
         );
       }
-      return; // Stop if root path is invalid
+      return
     }
 
     // Recursive function to add folder contents to the ZIP
     const addFolderToZip = async (folderPath: string, zipFolder: JSZip) => {
-      const entries = await listFilesOp(folderPath); // Use existing op
+      const entries = await listFilesOp(folderPath)
 
       for (const entry of entries) {
         if (entry.isDirectory) {
@@ -475,7 +475,7 @@ export const downloadAllAsZipOp = async (
           }
         } else {
           // Read file content and add it to the zip folder
-          const content = await readFileOp(entry.path); // Use existing op
+          const content = await readFileOp(entry.path)
           zipFolder.file(entry.name, content);
         }
       }
@@ -539,7 +539,7 @@ export const renameOp = async (
     throw new Error("Cannot rename the root directory.");
   }
   if (normalizedOld === normalizedNew) {
-    return; // No operation needed
+    return
   }
 
   try {
@@ -587,7 +587,7 @@ export const renameOp = async (
       `[VFS Op] Failed to rename ${normalizedOld} to ${normalizedNew}:`,
       err,
     );
-    throw err; // Re-throw error
+    throw err
   }
 };
 

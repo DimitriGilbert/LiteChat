@@ -211,7 +211,7 @@ export const useVfsStore = create(
       console.log(
         `[VfsStore] setVfsKey: Changing desired key from ${currentDesiredKey} to ${key}. Configured: ${currentConfiguredKey}`,
       );
-      set({ vfsKey: key }); // Update the desired key
+      set({ vfsKey: key })
 
       // Immediately reset state if the key changes or becomes null
       // This signals to components that the current FS is no longer valid
@@ -226,7 +226,7 @@ export const useVfsStore = create(
         loading: false,
         operationLoading: false,
         selectedFileIds: new Set(),
-        initializingKey: null, // Cancel any ongoing initialization
+        initializingKey: null
       });
 
       // Trigger initialization only if the new key is not null
@@ -266,7 +266,7 @@ export const useVfsStore = create(
         console.log(
           `[VfsStore] Initialization skipped for key "${vfsKey}" (already configured).`,
         );
-        set({ loading: false }); // Ensure loading is false if skipped
+        set({ loading: false })
         return;
       }
       // --- End Checks ---
@@ -280,7 +280,7 @@ export const useVfsStore = create(
       } = get();
 
       console.log(`[VfsStore] Initializing VFS with key: ${vfsKey}`);
-      set({ initializingKey: vfsKey }); // Mark this key as initializing
+      set({ initializingKey: vfsKey })
       _setLoading(true);
       _setError(null);
       // State reset now happens in setVfsKey
@@ -297,13 +297,13 @@ export const useVfsStore = create(
           console.warn(
             `[VfsStore] Initialization for key "${vfsKey}" completed, but desired key changed to "${get().vfsKey}". Discarding result.`,
           );
-          set({ initializingKey: null, loading: false }); // Clear flags for the completed (but now irrelevant) init
-          return; // Don't update state with stale FS
+          set({ initializingKey: null, loading: false })
+          return
         }
         // --- End Post-Initialization Check ---
 
         _setFsInstance(fsInstance);
-        _setConfiguredVfsKey(vfsKey); // Set configured key *after* success
+        _setConfiguredVfsKey(vfsKey)
         console.log(`[VfsStore] VFS instance configured for key: ${vfsKey}`);
 
         const stableRootId = "vfs-root";
@@ -462,7 +462,7 @@ export const useVfsStore = create(
 
     findNodeByPath: (path) => {
       const normalized = normalizePath(path);
-      if (get().vfsKey !== get().configuredVfsKey) return undefined; // Check if correct FS is active
+      if (get().vfsKey !== get().configuredVfsKey) return undefined
 
       if (normalized === "/") {
         const rootNodeId = get().rootId;
@@ -473,7 +473,7 @@ export const useVfsStore = create(
 
     setCurrentPath: async (path) => {
       const { findNodeByPath, fetchNodes, rootId, fs: fsInstance } = get();
-      if (!fsInstance || get().vfsKey !== get().configuredVfsKey) return; // Check readiness
+      if (!fsInstance || get().vfsKey !== get().configuredVfsKey) return
 
       const normalizedPath = normalizePath(path);
       const targetNode = findNodeByPath(normalizedPath);

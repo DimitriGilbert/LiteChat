@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { formatBytes } from "@/lib/litechat/file-manager-utils";
 import { format } from "date-fns";
 import { useConversationStore } from "@/store/conversation.store";
-import { useProjectStore } from "@/store/project.store"; // Import ProjectStore
+import { useProjectStore } from "@/store/project.store"
 
 // Structure for project export
 interface ProjectExportNode {

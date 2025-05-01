@@ -20,17 +20,17 @@ export interface PromptTurnObject {
   metadata: Record<string, any> & {
     // Unified attachedFiles metadata structure including content
     attachedFiles?: {
-      id: string; // Unique attachment ID for this prompt instance
+      id: string
       source: "direct" | "vfs";
       name: string;
-      type: string; // MIME type
+      type: string
       size: number;
-      path?: string; // Path if source is 'vfs'
+      path?: string
       // Content is stored here for persistence
       contentText?: string;
       contentBase64?: string;
     }[];
-    enabledTools?: string[]; // Added: Names of tools enabled for this turn
+    enabledTools?: string[]
   };
 }
 
@@ -59,7 +59,7 @@ export interface PromptObject {
   parameters: Record<string, any>;
   /** Final combined metadata for the AI call (file content is NOT included here) */
   metadata: Record<string, any> & {
-    enabledTools?: string[]; // Added: Names of tools enabled for this turn
+    enabledTools?: string[]
     // Only basic file info needed here, content is processed into messages
     attachedFiles?: {
       id: string;
@@ -79,7 +79,7 @@ export interface PromptObject {
  */
 export interface InputAreaRendererProps {
   // value and onChange removed
-  initialValue?: string; // Optional initial value
+  initialValue?: string
   onSubmit: () => void;
   disabled?: boolean;
   placeholder?: string;

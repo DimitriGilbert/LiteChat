@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
-import { SettingsSection } from "../common/SettingsSection"; // Import new component
+import { SettingsSection } from "../common/SettingsSection"
 
 const SettingsGitConfigComponent: React.FC = () => {
   const { gitUserName, setGitUserName, gitUserEmail, setGitUserEmail } =

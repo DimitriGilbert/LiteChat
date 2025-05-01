@@ -93,7 +93,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     };
 
     viewport.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll(); // Initial check
+    handleScroll()
 
     return () => {
       viewport.removeEventListener("scroll", handleScroll);

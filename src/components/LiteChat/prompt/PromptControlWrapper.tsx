@@ -1,7 +1,7 @@
 // src/components/LiteChat/prompt/PromptControlWrapper.tsx
 import React from "react";
 import type { PromptControl } from "@/types/litechat/prompt";
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils"
 
 interface PromptControlWrapperProps {
   controls: PromptControl[];

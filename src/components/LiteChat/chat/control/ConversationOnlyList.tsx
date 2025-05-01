@@ -55,7 +55,7 @@ const getSyncIndicatorInternal = (
       tooltipText = `Sync error with ${repoName}`;
       break;
     case "needs-sync":
-      IconComponent = AlertCircleIcon; // Use AlertCircleIcon for needs-sync as well
+      IconComponent = AlertCircleIcon
       className = "text-orange-500";
       tooltipText = `Needs sync with ${repoName}`;
       break;

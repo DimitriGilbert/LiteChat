@@ -25,13 +25,13 @@ export function useItemEditing({
   updateProject,
   updateConversation,
   deleteProject,
-  // getProjectById, // Keep for checking if it's a new project
+  // getProjectById
 }: UseItemEditingProps) {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingItemType, setEditingItemType] =
     useState<SidebarItemType | null>(null);
-  const [originalName, setOriginalName] = useState<string>(""); // Store the name when editing starts
-  const [localEditingName, setLocalEditingName] = useState<string>(""); // Input field value, managed locally
+  const [originalName, setOriginalName] = useState<string>("");
+  const [localEditingName, setLocalEditingName] = useState<string>("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const editInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -39,15 +39,15 @@ export function useItemEditing({
     setEditingItemId(item.id);
     setEditingItemType(item.itemType);
     const currentName = item.itemType === "project" ? item.name : item.title;
-    setOriginalName(currentName); // Store original name
-    setLocalEditingName(currentName); // Initialize local input state
+    setOriginalName(currentName);
+    setLocalEditingName(currentName);
     setIsSavingEdit(false);
     // Focus needs to happen in the component via useEffect
   }, []);
 
   const handleCancelEdit = useCallback(
     (isNewProjectOverride?: boolean) => {
-      const currentEditingId = editingItemId; // Capture before resetting
+      const currentEditingId = editingItemId;
       const isNewProject =
         isNewProjectOverride ??
         (editingItemType === "project" && originalName === "New Project");
@@ -112,7 +112,7 @@ export function useItemEditing({
         `Failed to rename item: ${error instanceof Error ? error.message : String(error)}`,
       );
       // Keep editing mode active on error? Or cancel? Let's cancel for now.
-      // handleCancelEdit(isNewProject); // Or maybe just reset saving state?
+      // handleCancelEdit(isNewProject)
     } finally {
       setIsSavingEdit(false);
     }
@@ -138,9 +138,9 @@ export function useItemEditing({
   return {
     editingItemId,
     editingItemType,
-    originalName, // Keep original name for comparison/display if needed
-    localEditingName, // Local state for input
-    setLocalEditingName, // Setter for local state
+    originalName,
+    localEditingName,
+    setLocalEditingName,
     isSavingEdit,
     editInputRef,
     handleStartEditing,

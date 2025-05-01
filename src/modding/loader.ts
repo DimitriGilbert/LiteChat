@@ -37,7 +37,7 @@ export async function loadMods(dbMods: DbMod[]): Promise<ModInstance[]> {
               `[ModLoader] Error fetching script from ${mod.sourceUrl}:`,
               fetchError,
             );
-            throw fetchError; // Re-throw to be caught by the outer try-catch
+            throw fetchError
           }
         }
         if (!scriptContent) throw new Error("Mod script content is empty.");

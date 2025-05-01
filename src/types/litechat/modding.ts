@@ -4,7 +4,7 @@ import type { z } from "zod";
 import type { PromptTurnObject, PromptControl, PromptObject } from "./prompt";
 import type { ChatControl } from "./chat";
 import type { Interaction } from "./interaction";
-import type { ToolCallPart, ToolResultPart, Tool } from "ai"; // Import AI SDK types including Tool
+import type { ToolCallPart, ToolResultPart, Tool } from "ai";
 
 // --- Base Mod Types ---
 export interface DbMod {
@@ -24,11 +24,11 @@ export interface ModInstance {
 }
 // --- Custom Settings Tab ---
 export interface CustomSettingTab {
-  id: string; // Unique ID for the tab (e.g., 'mod-myfeature-settings')
-  title: string; // Title shown on the tab trigger
-  component: React.ComponentType<any>; // The React component to render
-  order?: number; // Optional order for placement
-  icon?: React.ReactElement; // Optional icon for the tab
+  id: string;
+  title: string;
+  component: React.ComponentType<any>;
+  order?: number;
+  icon?: React.ReactElement;
 }
 // --- Readonly Context Snapshot ---
 export interface ReadonlyChatContextSnapshot {
@@ -59,8 +59,8 @@ export const ModEvent = {
   INTERACTION_STARTED: "interaction:started",
   INTERACTION_STREAM_CHUNK: "interaction:stream_chunk",
   INTERACTION_COMPLETED: "interaction:completed",
-  PROMPT_SUBMITTED: "prompt:submitted", // Before PromptWrapper middleware (uses PromptTurnObject)
-  PROMPT_FINALISED: "prompt:finalised", // After PromptWrapper middleware, before AIService call (uses PromptObject)
+  PROMPT_SUBMITTED: "prompt:submitted",
+  PROMPT_FINALISED: "prompt:finalised",
   SETTINGS_OPENED: "settings:opened",
   SETTINGS_CLOSED: "settings:closed",
   MOD_LOADED: "mod:loaded",
@@ -91,8 +91,8 @@ export interface ModEventPayloadMap {
     interactionId: string;
     status: Interaction["status"];
     error?: string;
-    toolCalls?: ToolCallPart[]; // Add tool info to event
-    toolResults?: ToolResultPart[]; // Add tool info to event
+    toolCalls?: ToolCallPart[];
+    toolResults?: ToolResultPart[];
   };
   [ModEvent.PROMPT_SUBMITTED]: { turnData: PromptTurnObject };
   // Use PromptObject here
@@ -113,8 +113,8 @@ export interface ModEventPayloadMap {
 
 // --- Middleware ---
 export const ModMiddlewareHook = {
-  PROMPT_TURN_FINALIZE: "middleware:prompt:turnFinalize", // Modify PromptTurnObject
-  INTERACTION_BEFORE_START: "middleware:interaction:beforeStart", // Modify final PromptObject (AI Payload)
+  PROMPT_TURN_FINALIZE: "middleware:prompt:turnFinalize",
+  INTERACTION_BEFORE_START: "middleware:interaction:beforeStart",
   INTERACTION_PROCESS_CHUNK: "middleware:interaction:processChunk",
   INTERACTION_BEFORE_RENDER: "middleware:interaction:beforeRender",
 } as const;
@@ -185,7 +185,7 @@ export interface LiteChatModApi {
 export interface ModState {
   dbMods: DbMod[];
   loadedMods: ModInstance[];
-  modSettingsTabs: CustomSettingTab[]; // Added state for tabs
+  modSettingsTabs: CustomSettingTab[];
   isLoading: boolean;
   error: string | null;
 }

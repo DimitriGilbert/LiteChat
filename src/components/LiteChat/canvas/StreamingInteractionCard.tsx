@@ -1,6 +1,6 @@
 // src/components/LiteChat/canvas/StreamingInteractionCard.tsx
 // Entire file content provided
-import React, { useMemo } from "react"; // Import useMemo
+import React, { useMemo } from "react";
 import { UserPromptDisplay } from "./UserPromptDisplay";
 import { StreamingContentView } from "./StreamingContentView";
 import { StopButton } from "../common/StopButton";
@@ -49,7 +49,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       const { providerId, modelId: specificModelId } =
         splitModelId(modelIdFromMeta);
       if (!providerId || !specificModelId) {
-        return modelIdFromMeta; // Fallback if split fails
+        return modelIdFromMeta;
       }
 
       const provider = dbProviderConfigs.find((p) => p.id === providerId);
@@ -61,9 +61,9 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
 
       return `${modelDef?.name ?? specificModelId} (${providerName})`;
     }, [
-      interaction?.metadata?.modelId, // Depend on the specific interaction's modelId
-      dbProviderConfigs, // Depend on the array reference
-      getAllAvailableModelDefsForProvider, // Depend on the stable selector function
+      interaction?.metadata?.modelId,
+      dbProviderConfigs,
+      getAllAvailableModelDefsForProvider,
     ]);
     // --- End Memoize Model Name Calculation ---
 

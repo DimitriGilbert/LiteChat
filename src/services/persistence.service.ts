@@ -5,14 +5,14 @@ import type { Interaction } from "@/types/litechat/interaction";
 import type { DbMod } from "@/types/litechat/modding";
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import type { SyncRepo } from "@/types/litechat/sync";
-import type { Project } from "@/types/litechat/project"; // Import Project type
+import type { Project } from "@/types/litechat/project";
 
 // Helper function to ensure date fields are Date objects
 const ensureDateFields = <
   T extends { createdAt?: any; updatedAt?: any; [key: string]: any },
 >(
   item: T,
-  otherDateFields: string[] = [], // Default value is an empty array
+  otherDateFields: string[] = [],
 ): T => {
   const newItem = { ...item };
   if (item.createdAt && !(item.createdAt instanceof Date)) {
@@ -63,7 +63,7 @@ export class PersistenceService {
         ...c,
         syncRepoId: c.syncRepoId ?? null,
         lastSyncedAt: c.lastSyncedAt ?? null,
-        projectId: c.projectId ?? null, // Ensure projectId has default
+        projectId: c.projectId ?? null,
       };
       return await db.conversations.put(conversationToSave);
     } catch (error) {
@@ -340,7 +340,7 @@ export class PersistenceService {
       // Dates are already Date objects here
       const projectToSave: Project = {
         id: p.id,
-        path: p.path, // Ensure path is included
+        path: p.path,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
         name: p.name,
@@ -367,7 +367,7 @@ export class PersistenceService {
           .equals(projectId)
           .toArray();
         for (const child of childProjects) {
-          await deleteRecursive(child.id); // Recursive call
+          await deleteRecursive(child.id);
         }
 
         // Find and unlink conversations associated with this project
@@ -412,12 +412,12 @@ export class PersistenceService {
           db.providerConfigs,
           db.apiKeys,
           db.syncRepos,
-          db.projects, // Add projects table
+          db.projects,
         ],
         async () => {
           await db.interactions.clear();
           await db.conversations.clear();
-          await db.projects.clear(); // Clear projects table
+          await db.projects.clear();
           await db.mods.clear();
           await db.appState.clear();
           await db.providerConfigs.clear();

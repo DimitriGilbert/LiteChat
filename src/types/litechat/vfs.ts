@@ -1,11 +1,11 @@
 // src/types/litechat/vfs.ts
 export interface VfsNodeBase {
-  id: string; // Unique ID (e.g., UUID or path-based hash)
-  parentId: string | null; // ID of the parent directory, null for root
+  id: string
+  parentId: string | null
   name: string;
-  path: string; // Full path for easier querying
-  createdAt: number; // Use number (timestamp) for easier IndexedDB indexing/sorting
-  lastModified: number; // Use number (timestamp)
+  path: string
+  createdAt: number
+  lastModified: number
 }
 
 export interface VfsDirectory extends VfsNodeBase {
@@ -23,16 +23,16 @@ export type VfsNode = VfsDirectory | VfsFile;
 
 // Interface for file content storage (used by PersistenceService/VFS Ops)
 export interface VfsFileContent {
-  fileId: string; // Corresponds to VfsFile.id
-  content: ArrayBuffer; // Store content as ArrayBuffer in IndexedDB
+  fileId: string
+  content: ArrayBuffer
 }
 
 // Interface for representing a selected VFS file in the input context
 export interface VfsFileObject {
-  id: string; // VFS Node ID
+  id: string
   name: string;
   size: number;
-  type: string; // MIME type
+  type: string
   path?: string;
 }
 

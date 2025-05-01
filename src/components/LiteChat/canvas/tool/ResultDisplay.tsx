@@ -3,12 +3,12 @@ import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
-import { ToolResultPart } from "ai"; // Import AI SDK types
+import { ToolResultPart } from "ai"
 
 export const ToolResultDisplay: React.FC<{ toolResult: ToolResultPart }> = ({
   toolResult,
 }) => {
-  const [isResultFolded, setIsResultFolded] = useState(true); // Default unfolded
+  const [isResultFolded, setIsResultFolded] = useState(true)
   const toggleFold = () => setIsResultFolded((p) => !p);
   const resultString = useMemo(() => {
     try {

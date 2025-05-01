@@ -13,7 +13,7 @@ import {
   CheckIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ActionTooltipButton } from "../common/ActionTooltipButton"; // Import ActionTooltipButton
+import { ActionTooltipButton } from "../common/ActionTooltipButton"
 
 interface UserPromptDisplayProps {
   turnData: Readonly<PromptTurnObject>;

@@ -28,7 +28,7 @@ import type { AiModelConfig } from "@/types/litechat/provider";
 import {
   combineModelId,
   DEFAULT_MODELS,
-} from "@/lib/litechat/provider-helpers"; // Import combineModelId from helpers
+} from "@/lib/litechat/provider-helpers"
 
 export const GlobalModelOrganizer: React.FC = () => {
   const {
@@ -65,7 +65,7 @@ export const GlobalModelOrganizer: React.FC = () => {
       );
 
       config.enabledModels.forEach((modelId) => {
-        const combinedId = combineModelId(config.id, modelId); // Use imported helper
+        const combinedId = combineModelId(config.id, modelId)
         const modelDef = providerModelsMap.get(modelId);
         if (modelDef) {
           enabledCombinedIds.add(combinedId);

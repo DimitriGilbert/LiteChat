@@ -16,7 +16,7 @@ import { useModStore } from "@/store/mod.store";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { toast } from "sonner";
 import type { z } from "zod";
-import { splitModelId } from "@/lib/litechat/provider-helpers"; // Import from helpers
+import { splitModelId } from "@/lib/litechat/provider-helpers"
 
 // Helper splitModelId REMOVED from here
 
@@ -77,7 +77,7 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       const cS = useConversationStore.getState();
       const sS = useSettingsStore.getState();
       const pS = useProviderStore.getState();
-      const { providerId } = splitModelId(pS.selectedModelId); // Use imported helper
+      const { providerId } = splitModelId(pS.selectedModelId)
 
       const selectedConversationId =
         cS.selectedItemType === "conversation" ? cS.selectedItemId : null;

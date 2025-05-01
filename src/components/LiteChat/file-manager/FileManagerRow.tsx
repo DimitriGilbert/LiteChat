@@ -30,7 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/litechat/file-manager-utils";
 import type { VfsNode } from "@/types/litechat/vfs";
-import { ActionTooltipButton } from "../common/ActionTooltipButton"; // Import ActionTooltipButton
+import { ActionTooltipButton } from "../common/ActionTooltipButton"
 
 interface FileManagerRowProps {
   entry: VfsNode;

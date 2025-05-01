@@ -1,19 +1,19 @@
 // src/components/LiteChat/chat/ChatControlWrapper.tsx
 import React from "react";
 import type { ChatControl } from "@/types/litechat/chat";
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils";
 
 interface ChatControlWrapperProps {
   controls: ChatControl[];
   panelId: string;
-  renderMode?: "full" | "icon"; // Added renderMode prop
+  renderMode?: "full" | "icon";
   className?: string;
 }
 
 export const ChatControlWrapper: React.FC<ChatControlWrapperProps> = ({
   controls,
   panelId,
-  renderMode = "full", // Default to full rendering
+  renderMode = "full",
   className,
 }) => {
   // Filter controls based on panelId and the show condition

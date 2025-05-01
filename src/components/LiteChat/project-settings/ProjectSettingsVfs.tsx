@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { AlertCircleIcon } from "lucide-react";
 import { toast } from "sonner";
 import { FileManager } from "@/components/LiteChat/file-manager/FileManager";
-import { TabbedLayout, TabDefinition } from "../common/TabbedLayout"; // Import TabbedLayout
+import { TabbedLayout, TabDefinition } from "../common/TabbedLayout"
 
 interface ProjectSettingsVfsProps {
   projectId: string | null;
@@ -82,7 +82,7 @@ export const ProjectSettingsVfs: React.FC<ProjectSettingsVfsProps> = ({
       },
     ],
     [projectId, projectName, isSaving],
-  ); // Dependencies for tab content
+  )
 
   return (
     // Use TabbedLayout, remove internal Tabs component

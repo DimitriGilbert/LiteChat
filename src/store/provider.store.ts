@@ -11,9 +11,9 @@ import { PersistenceService } from "@/services/persistence.service";
 import {
   createAiModelConfig,
   DEFAULT_MODELS,
-  combineModelId, // Import from helpers
-  splitModelId, // Import from helpers
-} from "@/lib/litechat/provider-helpers"; // Correct import path
+  combineModelId,
+  splitModelId,
+} from "@/lib/litechat/provider-helpers";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
@@ -112,7 +112,7 @@ export const useProviderStore = create(
           (acc: string[], provider) => {
             if (provider.isEnabled && provider.enabledModels) {
               provider.enabledModels.forEach((modelId) => {
-                acc.push(combineModelId(provider.id, modelId)); // Use imported helper
+                acc.push(combineModelId(provider.id, modelId));
               });
             }
             return acc;
@@ -270,7 +270,7 @@ export const useProviderStore = create(
           (acc: string[], provider) => {
             if (provider.isEnabled && provider.enabledModels) {
               provider.enabledModels.forEach((modelId) => {
-                acc.push(combineModelId(provider.id, modelId)); // Use imported helper
+                acc.push(combineModelId(provider.id, modelId));
               });
             }
             return acc;
@@ -322,7 +322,7 @@ export const useProviderStore = create(
           (acc: string[], provider) => {
             if (provider.isEnabled && provider.enabledModels) {
               provider.enabledModels.forEach((modelId) => {
-                acc.push(combineModelId(provider.id, modelId)); // Use imported helper
+                acc.push(combineModelId(provider.id, modelId));
               });
             }
             return acc;
@@ -394,7 +394,7 @@ export const useProviderStore = create(
         (acc: string[], provider) => {
           if (provider.isEnabled && provider.enabledModels) {
             provider.enabledModels.forEach((modelId) => {
-              acc.push(combineModelId(provider.id, modelId)); // Use imported helper
+              acc.push(combineModelId(provider.id, modelId));
             });
           }
           return acc;
@@ -436,7 +436,7 @@ export const useProviderStore = create(
       const { selectedModelId, dbProviderConfigs, dbApiKeys } = get();
       if (!selectedModelId) return undefined;
 
-      const { providerId, modelId } = splitModelId(selectedModelId); // Use imported helper
+      const { providerId, modelId } = splitModelId(selectedModelId);
       if (!providerId || !modelId) return undefined;
 
       const config = dbProviderConfigs.find((p) => p.id === providerId);

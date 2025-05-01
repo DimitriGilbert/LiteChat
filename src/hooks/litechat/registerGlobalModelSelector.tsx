@@ -7,7 +7,7 @@ import { useProviderStore } from "@/store/provider.store";
 import { useInteractionStore } from "@/store/interaction.store";
 // Import the prompt state store hook and actions
 import { usePromptStateStore } from "@/store/prompt.store";
-import { useShallow } from "zustand/react/shallow"; // Import useShallow
+import { useShallow } from "zustand/react/shallow";
 
 export function registerGlobalModelSelector() {
   const registerPromptControl =
@@ -44,7 +44,7 @@ export function registerGlobalModelSelector() {
     status: () => (useProviderStore.getState().isLoading ? "loading" : "ready"),
     triggerRenderer: () => React.createElement(GlobalModelSelectorTrigger),
     getParameters: undefined,
-    getMetadata: undefined, // Metadata (modelId) is implicitly handled by PromptStateStore
+    getMetadata: undefined,
     show: () => true,
   });
 

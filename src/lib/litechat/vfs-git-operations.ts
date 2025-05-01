@@ -432,7 +432,7 @@ export const gitPullOp = async (
               fs,
               dir,
               ref: branch,
-              checkout: true, // Checkout after creating
+              checkout: true,
             });
             console.log(
               `[VFS Git Op] Successfully created and checked out local branch ${branch}.`,
@@ -464,8 +464,8 @@ export const gitPullOp = async (
       fs,
       http,
       dir,
-      ref: branch, // Specify the branch to pull
-      singleBranch: true, // Often desired for sync scenarios
+      ref: branch,
+      singleBranch: true,
       author: {
         // Required for potential merge commits
         name: useSettingsStore.getState().gitUserName!,

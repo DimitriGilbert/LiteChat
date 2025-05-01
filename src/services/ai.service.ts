@@ -11,8 +11,6 @@ import type {
   ProviderMetadata,
 } from "ai";
 
-// Define the structure for options passed to executeInteraction
-// (Keep this interface definition as it defines the contract)
 export interface AIServiceCallOptions {
   model: LanguageModelV1;
   messages: CoreMessage[];
@@ -34,40 +32,27 @@ export interface AIServiceCallOptions {
   // Add other potential streamText options as needed
 }
 
-// Define the structure for callbacks
-// (Keep this interface definition as it defines the contract)
 export interface AIServiceCallbacks {
   onChunk: (chunk: string) => void;
   onToolCall: (toolCall: ToolCallPart) => void;
   onToolResult: (toolResult: ToolResultPart) => void;
   onFinish: (details: {
-    finishReason: FinishReason; // Use imported type
-    usage?: LanguageModelUsage; // Use imported type
-    providerMetadata?: ProviderMetadata; // Use imported type
+    finishReason: FinishReason;
+    usage?: LanguageModelUsage;
+    providerMetadata?: ProviderMetadata;
   }) => void;
   onError: (error: Error) => void;
 }
 
 export class AIService {
-  // Removed activeStreams map - AbortController managed by InteractionService
-
-  /**
-   * Executes the AI interaction using the AI SDK's streamText.
-   * @param interactionId A unique ID for tracking purposes (mainly logging).
-   * @param options The parameters for the streamText call, including the AbortSignal.
-   * @param callbacks Functions to call for different stream events.
-   */
+  // Executes the AI interaction using the AI SDK's streamText.
   static async executeInteraction(
-    interactionId: string, // Keep for logging
+    interactionId: string,
     options: AIServiceCallOptions,
     callbacks: AIServiceCallbacks,
   ): Promise<void> {
-    console.log(
-      `[AIService] Executing interaction ${interactionId} via streamText...`,
-    );
-
     let streamResult: StreamTextResult<any, any> | undefined;
-    let receivedFinishPart = false; // Flag to track if 'finish' part was received
+    let receivedFinishPart = false;
 
     try {
       // Directly call streamText with the provided options
@@ -79,7 +64,7 @@ export class AIService {
           console.log(`[AIService] Stream ${interactionId} aborted by signal.`);
           // Let the finally block handle cleanup. The caller (InteractionService)
           // will determine the final state based on the abort.
-          break; // Exit the loop
+          break;
         }
 
         // Process the stream part based on its type
@@ -94,7 +79,7 @@ export class AIService {
             callbacks.onToolResult(part);
             break;
           case "finish":
-            receivedFinishPart = true; // Mark that finish was received
+            receivedFinishPart = true;
             callbacks.onFinish({
               finishReason: part.finishReason,
               usage: part.usage,
@@ -116,8 +101,6 @@ export class AIService {
         }
       }
 
-      // After the loop, if it wasn't aborted and no 'finish' part was received,
-      // it indicates an unexpected end. Signal an error.
       if (!options.abortSignal.aborted && !receivedFinishPart) {
         console.warn(
           `[AIService] Stream ${interactionId} ended without a 'finish' part.`,
@@ -131,21 +114,15 @@ export class AIService {
         `[AIService] Error during streamText call for ${interactionId}:`,
         error,
       );
-      // Don't call onError if it was an AbortError triggered by the signal
       if (!(error instanceof Error && error.name === "AbortError")) {
         callbacks.onError(
           error instanceof Error ? error : new Error(String(error)),
         );
       }
-      // If it *was* an AbortError, the caller (InteractionService) will handle it
-      // based on the signal being aborted.
     } finally {
-      // No cleanup needed here as AbortController is managed by InteractionService
       console.log(
         `[AIService] Stream processing loop finished for ${interactionId}.`,
       );
     }
   }
-
-  // Removed abortInteraction - This is now handled by InteractionService
 }

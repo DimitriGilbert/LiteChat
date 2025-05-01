@@ -22,9 +22,9 @@ import { CloneDialog } from "./CloneDialog";
 import { CommitDialog } from "./CommitDialog";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react"; // Import Loader icon
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils";
 
 export const FileManager = memo(() => {
   // --- VFS Store State & Actions ---
@@ -48,11 +48,10 @@ export const FileManager = memo(() => {
     vfsKey,
     configuredVfsKey,
     initializingKey,
-    // Destructure actions needed in callbacks
     _setError,
     _setOperationLoading,
-    findNodeByPath, // Destructure findNodeByPath
-    initializeVFS, // Destructure initializeVFS
+    findNodeByPath,
+    initializeVFS,
   } = useVfsStore(
     useShallow((state) => ({
       nodes: state.nodes,
@@ -77,8 +76,8 @@ export const FileManager = memo(() => {
       // Destructure actions
       _setError: state._setError,
       _setOperationLoading: state._setOperationLoading,
-      findNodeByPath: state.findNodeByPath, // Destructure findNodeByPath
-      initializeVFS: state.initializeVFS, // Destructure initializeVFS
+      findNodeByPath: state.findNodeByPath,
+      initializeVFS: state.initializeVFS,
     })),
   );
 
@@ -209,22 +208,17 @@ export const FileManager = memo(() => {
   const runOperation = useCallback(
     async (op: () => Promise<any>, setLoadingState?: boolean) => {
       if (isAnyOperationLoading || isVfsLoading) return;
-      if (setLoadingState !== false) _setOperationLoading(true); // Use action
-      _setError(null); // Use action
+      if (setLoadingState !== false) _setOperationLoading(true);
+      _setError(null);
       try {
         await op();
       } catch (err) {
         console.error("[FileManager Operation Error]:", err);
       } finally {
-        if (setLoadingState !== false) _setOperationLoading(false); // Use action
+        if (setLoadingState !== false) _setOperationLoading(false);
       }
     },
-    [
-      isAnyOperationLoading,
-      isVfsLoading,
-      _setError, // Add dependency
-      _setOperationLoading, // Add dependency
-    ],
+    [isAnyOperationLoading, isVfsLoading, _setError, _setOperationLoading],
   );
 
   const handleNavigate = useCallback(
@@ -273,7 +267,7 @@ export const FileManager = memo(() => {
 
   const handleCheckboxChange = useCallback(
     (checked: boolean, nodeId: string) => {
-      const node = nodes[nodeId]; // Access nodes directly from hook state
+      const node = nodes[nodeId];
       if (node && node.type === "file") {
         if (checked) {
           selectFile(nodeId);
@@ -284,7 +278,7 @@ export const FileManager = memo(() => {
         toast.info("Folders cannot be attached to the prompt.");
       }
     },
-    [selectFile, deselectFile, nodes], // Add nodes dependency
+    [selectFile, deselectFile, nodes],
   );
 
   const startEditing = useCallback(
@@ -307,7 +301,7 @@ export const FileManager = memo(() => {
       cancelEditing();
       return;
     }
-    const node = findNodeByPath(editingPath); // Use action from hook
+    const node = findNodeByPath(editingPath);
     if (node && node.name !== newName.trim()) {
       await runOperation(() => renameNode(node.id, newName.trim()));
     }
@@ -317,7 +311,7 @@ export const FileManager = memo(() => {
     newName,
     renameNode,
     cancelEditing,
-    findNodeByPath, // Add dependency
+    findNodeByPath,
     runOperation,
   ]);
 
@@ -424,7 +418,7 @@ WARNING: This will delete all contents inside`
     async (path: string, op: () => Promise<any>) => {
       if (isGitOpLoading[path] || isVfsLoading || fsOperationLoading) return;
       setIsGitOpLoading((prev) => ({ ...prev, [path]: true }));
-      _setError(null); // Use action
+      _setError(null);
       try {
         await op();
       } catch (err) {
@@ -433,12 +427,7 @@ WARNING: This will delete all contents inside`
         setIsGitOpLoading((prev) => ({ ...prev, [path]: false }));
       }
     },
-    [
-      _setError, // Add dependency
-      isGitOpLoading,
-      isVfsLoading,
-      fsOperationLoading,
-    ],
+    [_setError, isGitOpLoading, isVfsLoading, fsOperationLoading],
   );
 
   const handleGitInit = useCallback(
@@ -492,7 +481,7 @@ WARNING: This will delete all contents inside`
       return;
     }
     setIsCloning(true);
-    _setError(null); // Use action
+    _setError(null);
     try {
       const repoName =
         basename(cloneRepoUrl.trim().replace(/\.git$/, "")) || "cloned_repo";
@@ -518,7 +507,7 @@ WARNING: This will delete all contents inside`
       return;
     }
     setIsCommitting(true);
-    _setError(null); // Use action
+    _setError(null);
     try {
       await VfsOps.gitCommitOp(commitPath, commitMessage.trim());
       setIsCommitDialogOpen(false);
@@ -527,7 +516,7 @@ WARNING: This will delete all contents inside`
     } finally {
       setIsCommitting(false);
     }
-  }, [commitPath, commitMessage, _setError]); // Add _setError dependency
+  }, [commitPath, commitMessage, _setError]);
 
   // --- Render Logic ---
 
