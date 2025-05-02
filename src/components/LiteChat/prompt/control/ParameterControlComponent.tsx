@@ -1,20 +1,18 @@
 // src/components/LiteChat/prompt/control/ParameterControlComponent.tsx
-
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch"; // Import Switch
+// Switch removed
 import { cn } from "@/lib/utils";
-import { useProviderStore } from "@/store/provider.store"; // Import provider store
+import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import {
   createAiModelConfig,
   splitModelId,
-} from "@/lib/litechat/provider-helpers"; // Import helper
+} from "@/lib/litechat/provider-helpers";
 
-// Define props to accept potentially nullable values and setters
 export interface ParameterControlComponentProps {
   temperature: number | null;
   setTemperature: (value: number | null) => void;
@@ -28,19 +26,17 @@ export interface ParameterControlComponentProps {
   setPresencePenalty: (value: number | null) => void;
   frequencyPenalty: number | null;
   setFrequencyPenalty: (value: number | null) => void;
-  // Add props for new parameters
-  reasoningEnabled: boolean | null;
-  setReasoningEnabled: (enabled: boolean | null) => void;
-  webSearchEnabled: boolean | null;
-  setWebSearchEnabled: (enabled: boolean | null) => void;
-  // Optional props for default/inherited values (used in ProjectSettings)
+  // Props for reasoning/web search removed
+  reasoningEnabled: boolean | null; // Keep for type compatibility if needed elsewhere, but unused here
+  setReasoningEnabled: (enabled: boolean | null) => void; // Keep for type compatibility
+  webSearchEnabled: boolean | null; // Keep for type compatibility
+  setWebSearchEnabled: (enabled: boolean | null) => void; // Keep for type compatibility
   defaultTemperature?: number;
   defaultTopP?: number | null;
   defaultMaxTokens?: number | null;
   defaultTopK?: number | null;
   defaultPresencePenalty?: number | null;
   defaultFrequencyPenalty?: number | null;
-  // Optional className
   className?: string;
 }
 
@@ -59,12 +55,7 @@ export const ParameterControlComponent: React.FC<
   setPresencePenalty,
   frequencyPenalty,
   setFrequencyPenalty,
-  // Destructure new props
-  reasoningEnabled,
-  setReasoningEnabled,
-  webSearchEnabled,
-  setWebSearchEnabled,
-  // Use provided defaults or fallback to global typical defaults
+  // reasoningEnabled/webSearchEnabled destructured but not used
   defaultTemperature = 0.7,
   defaultTopP = null,
   defaultMaxTokens = null,
@@ -73,7 +64,6 @@ export const ParameterControlComponent: React.FC<
   defaultFrequencyPenalty = 0.0,
   className,
 }) => {
-  // Select primitive/stable values needed for computation
   const { selectedModelId, dbProviderConfigs, dbApiKeys } = useProviderStore(
     useShallow((state) => ({
       selectedModelId: state.selectedModelId,
@@ -82,7 +72,6 @@ export const ParameterControlComponent: React.FC<
     })),
   );
 
-  // Compute selectedModel *inside* useMemo based on stable IDs/configs
   const selectedModel = useMemo(() => {
     if (!selectedModelId) return undefined;
     const { providerId, modelId: specificModelId } =
@@ -92,15 +81,13 @@ export const ParameterControlComponent: React.FC<
     if (!config) return undefined;
     const apiKeyRecord = dbApiKeys.find((k) => k.id === config.apiKeyId);
     return createAiModelConfig(config, specificModelId, apiKeyRecord?.value);
-  }, [selectedModelId, dbProviderConfigs, dbApiKeys]); // Depend on stable values/arrays
+  }, [selectedModelId, dbProviderConfigs, dbApiKeys]);
 
-  // Compute supportedParams based on the computed selectedModel
   const supportedParams = useMemo(
     () => new Set(selectedModel?.metadata?.supported_parameters ?? []),
-    [selectedModel], // Depend on the computed model
+    [selectedModel],
   );
 
-  // Local state for visual feedback during slider interaction
   const [localTemp, setLocalTemp] = useState(temperature ?? defaultTemperature);
   const [localTopP, setLocalTopP] = useState(topP ?? defaultTopP ?? 1.0);
   const [localPresence, setLocalPresence] = useState(
@@ -110,7 +97,6 @@ export const ParameterControlComponent: React.FC<
     frequencyPenalty ?? defaultFrequencyPenalty ?? 0.0,
   );
 
-  // Update local state if the prop value changes
   useEffect(() => {
     setLocalTemp(temperature ?? defaultTemperature);
   }, [temperature, defaultTemperature]);
@@ -124,7 +110,6 @@ export const ParameterControlComponent: React.FC<
     setLocalFrequency(frequencyPenalty ?? defaultFrequencyPenalty ?? 0.0);
   }, [frequencyPenalty, defaultFrequencyPenalty]);
 
-  // Handlers remain the same
   const handleNumberInputChange = useCallback(
     (
       setter: (value: number | null) => void,
@@ -153,14 +138,7 @@ export const ParameterControlComponent: React.FC<
     [],
   );
 
-  // Handler for new toggles
-  const handleToggleChange = useCallback(
-    (setter: (value: boolean | null) => void, checked: boolean) => {
-      // If toggling off, set to null (use default). If toggling on, set to true.
-      setter(checked ? true : null);
-    },
-    [],
-  );
+  // handleToggleChange removed
 
   const showUseDefault =
     defaultTemperature !== undefined ||
@@ -181,7 +159,7 @@ export const ParameterControlComponent: React.FC<
           <Slider
             id="param-temperature"
             min={0}
-            max={1} // Max might vary, 1 is common
+            max={1}
             step={0.01}
             value={[localTemp]}
             onValueChange={(v) => setLocalTemp(v[0])}
@@ -346,41 +324,7 @@ export const ParameterControlComponent: React.FC<
         </div>
       )}
 
-      {/* Reasoning Toggle */}
-      {supportedParams.has("reasoning") && (
-        <div className="flex items-center space-x-2 pt-2">
-          <Switch
-            id="param-reasoning"
-            // Checked state is true only if the prop is explicitly true
-            checked={reasoningEnabled === true}
-            onCheckedChange={(checked) =>
-              handleToggleChange(setReasoningEnabled, checked)
-            }
-            aria-labelledby="param-reasoning-label"
-          />
-          <Label id="param-reasoning-label" htmlFor="param-reasoning">
-            Enable Reasoning (if supported)
-          </Label>
-        </div>
-      )}
-
-      {/* Web Search Toggle */}
-      {supportedParams.has("web_search_options") && (
-        <div className="flex items-center space-x-2 pt-2">
-          <Switch
-            id="param-web-search"
-            // Checked state is true only if the prop is explicitly true
-            checked={webSearchEnabled === true}
-            onCheckedChange={(checked) =>
-              handleToggleChange(setWebSearchEnabled, checked)
-            }
-            aria-labelledby="param-web-search-label"
-          />
-          <Label id="param-web-search-label" htmlFor="param-web-search">
-            Enable Web Search (if supported)
-          </Label>
-        </div>
-      )}
+      {/* Reasoning/Web Search Toggles Removed */}
     </div>
   );
 };

@@ -1,5 +1,4 @@
 // src/hooks/litechat/registerSystemPromptControl.tsx
-
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { TextIcon } from "lucide-react";
@@ -23,46 +22,36 @@ import { useProjectStore } from "@/store/project.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { useSettingsStore } from "@/store/settings.store";
 
-// --- Local State Management within Registration Scope ---
 let turnSystemPromptValue = "";
-// Callback to allow the component to update the scoped variable
 let updateScopedPrompt: (prompt: string) => void = () => {};
-// --- End Local State Management ---
 
 export function registerSystemPromptControl() {
   const registerPromptControl =
     useControlRegistryStore.getState().registerPromptControl;
 
-  // Reset local state when registering
   turnSystemPromptValue = "";
 
   const SystemPromptControlTrigger: React.FC = () => {
-    // Local state *within the component* for the textarea and popover
     const [localPrompt, setLocalPrompt] = useState(turnSystemPromptValue);
     const [popoverOpen, setPopoverOpen] = useState(false);
-    // Local state to track if the scoped variable has changed, forcing re-render
     const [scopedValueChanged, setScopedValueChanged] = useState(0);
 
     const isStreaming = useInteractionStore(
       useShallow((state) => state.status === "streaming"),
     );
 
-    // Get effective prompt for placeholder
-    // Select primitive/stable values
     const { selectedItemId, selectedItemType } = useConversationStore(
       useShallow((state) => ({
         selectedItemId: state.selectedItemId,
         selectedItemType: state.selectedItemType,
       })),
     );
-    // Select stable functions/arrays
-    const { getConversationById } = useConversationStore.getState(); // Use getState for stable function
-    const { getEffectiveProjectSettings } = useProjectStore.getState(); // Use getState for stable function
+    const { getConversationById } = useConversationStore.getState();
+    const { getEffectiveProjectSettings } = useProjectStore.getState();
     const globalSystemPrompt = useSettingsStore(
       (state) => state.globalSystemPrompt,
-    ); // Select primitive
+    );
 
-    // Compute effective prompt inside useMemo
     const effectiveSystemPrompt = useMemo(() => {
       const currentProjectId =
         selectedItemType === "project"
@@ -82,48 +71,39 @@ export function registerSystemPromptControl() {
       globalSystemPrompt,
     ]);
 
-    // Provide a way for this component instance to update the scoped variable
     useEffect(() => {
       updateScopedPrompt = (prompt: string) => {
         turnSystemPromptValue = prompt;
-        // Update local component state to trigger re-render if needed
         setLocalPrompt(prompt);
-        setScopedValueChanged((v) => v + 1); // Force re-render
+        setScopedValueChanged((v) => v + 1);
       };
-      // Initial sync
       setLocalPrompt(turnSystemPromptValue);
-      // Cleanup
       return () => {
         updateScopedPrompt = () => {};
       };
-    }, []); // Empty dependency array
+    }, []);
 
-    // Sync local state if scoped variable changes (e.g., via clearOnSubmit)
     useEffect(() => {
       setLocalPrompt(turnSystemPromptValue);
-    }, [scopedValueChanged]); // Depend on the counter
+    }, [scopedValueChanged]);
 
     const handleSave = useCallback(() => {
-      // Update the scoped variable via the callback
       updateScopedPrompt(localPrompt.trim());
       setPopoverOpen(false);
     }, [localPrompt]);
 
     const handleClear = useCallback(() => {
-      // Update the scoped variable via the callback
       updateScopedPrompt("");
       setPopoverOpen(false);
     }, []);
 
     const handleOpenChange = (open: boolean) => {
       if (open) {
-        // Reset local state to current scoped value when opening
         setLocalPrompt(turnSystemPromptValue);
       }
       setPopoverOpen(open);
     };
 
-    // Read directly from the scoped variable for button state
     const hasTurnPrompt = turnSystemPromptValue.trim().length > 0;
 
     return (
@@ -157,8 +137,8 @@ export function registerSystemPromptControl() {
           <Textarea
             id="turn-system-prompt"
             placeholder={`Inherited: ${effectiveSystemPrompt?.substring(0, 50) || "Default"}${effectiveSystemPrompt && effectiveSystemPrompt.length > 50 ? "..." : ""}`}
-            value={localPrompt} // Use local state for input value
-            onChange={(e) => setLocalPrompt(e.target.value)} // Update local state
+            value={localPrompt}
+            onChange={(e) => setLocalPrompt(e.target.value)}
             rows={5}
             className="text-sm"
           />
@@ -167,7 +147,7 @@ export function registerSystemPromptControl() {
               variant="outline"
               size="sm"
               onClick={handleClear}
-              disabled={!localPrompt.trim()} // Disable based on local input
+              disabled={!localPrompt.trim()}
             >
               Clear Override
             </Button>
@@ -182,18 +162,15 @@ export function registerSystemPromptControl() {
 
   registerPromptControl({
     id: "core-system-prompt",
-    order: 15,
+    // order removed
     status: () => "ready",
     triggerRenderer: () => React.createElement(SystemPromptControlTrigger),
     getMetadata: () => {
-      // Read directly from the scoped variable
       const prompt = turnSystemPromptValue.trim();
       return prompt ? { turnSystemPrompt: prompt } : undefined;
     },
     clearOnSubmit: () => {
-      // Reset the scoped variable
       turnSystemPromptValue = "";
-      // Trigger update in component instance if mounted
       updateScopedPrompt("");
     },
     show: () => true,

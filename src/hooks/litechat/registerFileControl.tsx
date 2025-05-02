@@ -1,5 +1,4 @@
 // src/hooks/litechat/registerFileControl.tsx
-
 import React, { useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { PaperclipIcon } from "lucide-react";
@@ -20,7 +19,7 @@ import { useShallow } from "zustand/react/shallow";
 import {
   createAiModelConfig,
   splitModelId,
-} from "@/lib/litechat/provider-helpers"; // Import helper
+} from "@/lib/litechat/provider-helpers";
 
 const MAX_FILE_SIZE_MB = 20;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -34,7 +33,6 @@ export function registerFileControl() {
     const addAttachedFile = useInputStore.getState().addAttachedFile;
     const isStreaming = useInteractionStore.getState().status === "streaming";
 
-    // Select primitive/stable values needed for computation
     const { selectedModelId, dbProviderConfigs, dbApiKeys } = useProviderStore(
       useShallow((state) => ({
         selectedModelId: state.selectedModelId,
@@ -43,7 +41,6 @@ export function registerFileControl() {
       })),
     );
 
-    // Compute selectedModel *inside* useMemo based on stable IDs/configs
     const selectedModel = useMemo(() => {
       if (!selectedModelId) return undefined;
       const { providerId, modelId: specificModelId } =
@@ -53,17 +50,14 @@ export function registerFileControl() {
       if (!config) return undefined;
       const apiKeyRecord = dbApiKeys.find((k) => k.id === config.apiKeyId);
       return createAiModelConfig(config, specificModelId, apiKeyRecord?.value);
-    }, [selectedModelId, dbProviderConfigs, dbApiKeys]); // Depend on stable values/arrays
+    }, [selectedModelId, dbProviderConfigs, dbApiKeys]);
 
-    // Determine if file input should be allowed based on computed model metadata
     const allowFileInput = useMemo(() => {
       const inputModalities =
         selectedModel?.metadata?.architecture?.input_modalities;
-      // If no model selected or modalities unknown, allow by default
       if (!inputModalities) return true;
-      // Allow if it supports anything other than just text
       return inputModalities.some((mod) => mod !== "text");
-    }, [selectedModel]); // Depend on the computed model
+    }, [selectedModel]);
 
     const handleFileChange = useCallback(
       async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,7 +142,7 @@ export function registerFileControl() {
           onChange={handleFileChange}
           multiple
           className="hidden"
-          disabled={isStreaming || !allowFileInput} // Disable based on modality
+          disabled={isStreaming || !allowFileInput}
         />
         <TooltipProvider delayDuration={100}>
           <Tooltip>
@@ -158,7 +152,7 @@ export function registerFileControl() {
                 variant="ghost"
                 size="icon"
                 onClick={handleButtonClick}
-                disabled={isStreaming || !allowFileInput} // Disable based on modality
+                disabled={isStreaming || !allowFileInput}
                 className="h-8 w-8"
                 aria-label={tooltipText}
               >
@@ -201,13 +195,11 @@ export function registerFileControl() {
 
   registerPromptControl({
     id: "core-file-attachment",
-    order: 20,
+    // order removed
     triggerRenderer: () => React.createElement(FileControlTrigger),
     renderer: () => React.createElement(FileControlPanel),
-    clearOnSubmit: () => {
-      // InputStore.clearAttachedFiles is called by PromptWrapper
-    },
-    show: () => true, // Control visibility based on model capability inside the trigger
+    clearOnSubmit: () => {},
+    show: () => true, // Visibility handled internally by trigger
   });
 
   console.log("[Function] Registered Core File Attachment Control");

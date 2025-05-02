@@ -80,26 +80,7 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
         {
           value: "providers",
           label: "Providers & Models",
-          content: (
-            <TabbedLayout
-              tabs={[
-                {
-                  value: "providers-order",
-                  label: "Model Order",
-                  content: <GlobalModelOrganizer />,
-                },
-                {
-                  value: "providers-config",
-                  label: "Configuration",
-                  content: <SettingsProviders />,
-                },
-              ]}
-              defaultValue="providers-config"
-              className="h-full"
-              listClassName="bg-muted/50 rounded-md"
-              contentContainerClassName="mt-4"
-            />
-          ),
+          content: <SettingsProviders />,
         },
         ...(enableAdvancedSettings
           ? [
@@ -161,6 +142,7 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
             className="flex-grow overflow-hidden px-6" // Adjust padding if needed
             listClassName="-mx-6 px-6" // Adjust list padding
             contentContainerClassName="flex-grow overflow-y-auto pb-6 pr-2 -mr-2" // Ensure content grows and scrolls
+            scrollable={true}
           />
 
           <DialogFooter className="flex-shrink-0 border-t p-6 pt-4 mt-auto">

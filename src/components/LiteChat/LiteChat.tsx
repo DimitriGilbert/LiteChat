@@ -1,5 +1,4 @@
 // src/components/LiteChat/LiteChat.tsx
-
 import React, {
   useEffect,
   useCallback,
@@ -47,12 +46,14 @@ import { registerGlobalModelSelector } from "@/hooks/litechat/registerGlobalMode
 import { registerSystemPromptControl } from "@/hooks/litechat/registerSystemPromptControl";
 import { registerStructuredOutputControl } from "@/hooks/litechat/registerStructuredOutputControl";
 import { registerUsageDisplayControl } from "@/hooks/litechat/registerUsageDisplayControl";
+// Import new control registration functions
+import { registerReasoningControl } from "@/hooks/litechat/registerReasoningControl";
+import { registerWebSearchControl } from "@/hooks/litechat/registerWebSearchControl";
 
 export const LiteChat: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
 
   // --- Store Hooks ---
-  // Select primitive/stable values directly
   const selectedItemId = useConversationStore((state) => state.selectedItemId);
   const selectedItemType = useConversationStore(
     (state) => state.selectedItemType,
@@ -63,7 +64,6 @@ export const LiteChat: React.FC = () => {
   const getConversationById = useConversationStore(
     (state) => state.getConversationById,
   );
-  // Select potentially changing arrays/objects with useShallow
   const { getEffectiveProjectSettings } = useProjectStore(
     useShallow((state) => ({
       projects: state.projects,
@@ -141,24 +141,31 @@ export const LiteChat: React.FC = () => {
         console.log("LiteChat: Sidebar items loaded.");
 
         console.log("LiteChat: Registering core controls and tools...");
-        // Layout Controls
+        // --- Call Registration Functions in Desired Order ---
+        // Layout Controls (Sidebar, Header, Footer)
         registerConversationListControl();
-        registerSettingsControl();
         registerSidebarToggleControl();
-        registerProjectSettingsControl();
-        // Prompt Controls
+        registerSettingsControl();
+        registerProjectSettingsControl(); // Modal, order less critical
+
+        // Prompt Controls (Order matters for visual layout)
         registerGlobalModelSelector();
+        registerUsageDisplayControl(); // High priority
         registerSystemPromptControl();
-        registerParameterControl();
+        registerReasoningControl(); // New
+        registerWebSearchControl(); // New
         registerFileControl();
         registerVfsControl(); // Includes prompt trigger and panel
-        registerGitSyncControl();
-        registerToolSelectorControl();
+        registerToolSelectorControl(); // Tools often last
+        registerParameterControl(); // Advanced params lower down
         registerStructuredOutputControl();
-        registerUsageDisplayControl();
-        // Tools
+        registerGitSyncControl();
+
+        // Tools (Registration order doesn't affect UI directly)
         registerVfsTools();
         registerGitTools();
+        // --- End Registration Call Order ---
+
         console.log("LiteChat: Core controls and tools registered.");
         if (!isMounted) return;
 
@@ -173,15 +180,12 @@ export const LiteChat: React.FC = () => {
         setLoadedMods(loadedModInstances);
         console.log(`LiteChat: ${loadedModInstances.length} mods processed.`);
 
-        // Initialize prompt state AFTER core data and controls are ready
-        // Use locally selected state for initial calculation
         const initialProjectId =
           selectedItemType === "project"
             ? selectedItemId
             : selectedItemType === "conversation"
               ? (getConversationById(selectedItemId)?.projectId ?? null)
               : null;
-        // Use the selector function directly here as it's outside the hook dependency array
         const initialEffectiveSettings =
           getEffectiveProjectSettings(initialProjectId);
         initializePromptState(initialEffectiveSettings);
@@ -210,7 +214,7 @@ export const LiteChat: React.FC = () => {
       console.log("LiteChat: Unmounting, initialization cancelled if pending.");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Keep deps empty for one-time init
+  }, []);
 
   // --- Effect to update Prompt State on Context Change ---
   const prevContextRef = useRef<{
@@ -240,7 +244,6 @@ export const LiteChat: React.FC = () => {
       console.log(
         `[LiteChat Effect] Context changed (Item: ${selectedItemId}, Type: ${selectedItemType}). Calculating effective settings for Project ID: ${currentProjectId}`,
       );
-      // Use the selector function directly here as it's outside the hook dependency array
       const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
       initializePromptState(effectiveSettings);
       console.log(
@@ -250,7 +253,6 @@ export const LiteChat: React.FC = () => {
 
       prevContextRef.current = currentContext;
     }
-    // Depend only on primitive/stable values that trigger the context change
   }, [
     selectedItemId,
     selectedItemType,
@@ -267,7 +269,6 @@ export const LiteChat: React.FC = () => {
       if (selectedItemType === "project") {
         targetVfsKey = selectedItemId;
       } else if (selectedItemType === "conversation") {
-        // Use getState() here as it's outside component render but inside effect
         const convo = useConversationStore
           .getState()
           .getConversationById(selectedItemId);
@@ -291,7 +292,6 @@ export const LiteChat: React.FC = () => {
 
   // --- Prompt Submission Handler ---
   const handlePromptSubmit = useCallback(async (turnData: PromptTurnObject) => {
-    // Use getState() inside callback as it's not part of render deps
     const conversationState = useConversationStore.getState();
     const uiStateActions = useUIStateStore.getState();
     const currentPromptState = usePromptStateStore.getState();
@@ -380,7 +380,8 @@ export const LiteChat: React.FC = () => {
           (c) =>
             (c.panel ?? "main") === "sidebar" && (c.show ? c.show() : true),
         )
-        .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity)),
+        // Sort removed - rely on registration order
+        .map((c) => c), // Create new array reference if needed
     [chatControls],
   );
   const sidebarFooterControls = useMemo(
@@ -389,14 +390,16 @@ export const LiteChat: React.FC = () => {
         .filter(
           (c) => c.panel === "sidebar-footer" && (c.show ? c.show() : true),
         )
-        .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity)),
+        // Sort removed
+        .map((c) => c),
     [chatControls],
   );
   const headerControls = useMemo(
     () =>
       chatControls
         .filter((c) => c.panel === "header" && (c.show ? c.show() : true))
-        .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity)),
+        // Sort removed
+        .map((c) => c),
     [chatControls],
   );
 

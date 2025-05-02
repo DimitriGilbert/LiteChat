@@ -1,18 +1,14 @@
-// src/hooks/litechat/registerProjectSettingsControl.ts
-
+// src/hooks/litechat/registerProjectSettingsControl.tsx
 import React from "react";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useUIStateStore } from "@/store/ui.store";
 import { ProjectSettingsModal } from "@/components/LiteChat/project-settings/ProjectSettingsModal";
 
-// Convert back to a plain function
 export function registerProjectSettingsControl() {
   const registerChatControl =
     useControlRegistryStore.getState().registerChatControl;
 
-  // Modal Renderer Component (Renders based on current state)
   const ProjectSettingsModalRenderer: React.FC = () => {
-    // Read state inside the component instance
     const {
       isProjectSettingsModalOpen,
       projectSettingsModalTargetId,
@@ -35,7 +31,7 @@ export function registerProjectSettingsControl() {
     panel: undefined,
     show: () => false,
     settingsRenderer: () => React.createElement(ProjectSettingsModalRenderer),
-    order: 1000,
+    // order removed
     status: () => "ready",
   });
 

@@ -7,14 +7,14 @@ import type { PromptObject } from "./prompt";
 // Conversation and SidebarItemType remain the same
 export interface Conversation extends DbBase {
   title: string;
-  projectId: string | null
+  projectId: string | null;
   metadata?: Record<string, any> & {
     // Add specific metadata fields here
-    enabledTools?: string[]
+    enabledTools?: string[];
     toolMaxStepsOverride?: number | null;
   };
-  syncRepoId?: string | null
-  lastSyncedAt?: Date | null
+  syncRepoId?: string | null;
+  lastSyncedAt?: Date | null;
 }
 // Updated SidebarItemType
 export type SidebarItemType = "conversation" | "project";
@@ -27,14 +27,14 @@ export interface ChatControl {
   id: string;
   status: () => ChatControlStatus;
   renderer?: () => React.ReactElement | null;
-  iconRenderer?: () => React.ReactElement | null
+  iconRenderer?: () => React.ReactElement | null;
   panel?: string;
   show?: () => boolean;
   settingsConfig?: {
     tabId: string;
     title: string;
     icon?: React.ReactElement;
-    order?: number;
+    order?: number; // Keep order for settings tabs specifically
   };
   settingsRenderer?: () => React.ReactElement | null;
   onSettingSubmit?: (settingsData: any) => void | Promise<void>;
@@ -42,7 +42,7 @@ export interface ChatControl {
     before?: (payload: AIPayload) => AIPayload | Promise<AIPayload> | false;
     after?: (response: AIResponse) => AIResponse | Promise<AIResponse> | false;
   };
-  order?: number;
+  // order removed - determined by registration sequence
 }
 
 // --- Chat Canvas ---
@@ -57,5 +57,5 @@ export interface ChatCanvasProps {
   className?: string;
   onRegenerateInteraction?: (interactionId: string) => void;
   onEditInteraction?: (interactionId: string) => void;
-  onStopInteraction?: (interactionId: string) => void
+  onStopInteraction?: (interactionId: string) => void;
 }

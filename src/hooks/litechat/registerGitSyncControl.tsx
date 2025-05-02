@@ -1,4 +1,4 @@
-// src/hooks/litechat/registerGitSyncControl.ts
+// src/hooks/litechat/registerGitSyncControl.tsx
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { GitBranchIcon, GitPullRequestIcon, Loader2 } from "lucide-react";
@@ -25,7 +25,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getSyncIndicator } from "@/components/LiteChat/chat/control/conversation-list/SyncIndicator"
+import { getSyncIndicator } from "@/components/LiteChat/chat/control/conversation-list/SyncIndicator";
 
 export function registerGitSyncControl() {
   const registerPromptControl =
@@ -99,7 +99,7 @@ export function registerGitSyncControl() {
       currentStatus === "syncing";
 
     if (selectedItemType !== "conversation") {
-      return null
+      return null;
     }
 
     return (
@@ -179,13 +179,10 @@ export function registerGitSyncControl() {
 
   registerPromptControl({
     id: "core-git-sync",
-    order: 40,
-    // status: () => (useConversationStore.getState().isLoading ? "loading" : "ready")
+    // order removed
     triggerRenderer: () => React.createElement(GitSyncControlTrigger),
-    // Use getState() here as it's outside component context
     show: () => useConversationStore.getState().syncRepos.length > 0,
   });
 
   console.log("[Function] Registered Core Git Sync Control");
-  // No cleanup needed or returned
 }

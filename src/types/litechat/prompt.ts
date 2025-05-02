@@ -83,6 +83,8 @@ export interface InputAreaRendererProps {
   onSubmit: () => void;
   disabled?: boolean;
   placeholder?: string;
+  // Add callback prop for value changes
+  onValueChange?: (value: string) => void;
   // Allow any other props to be passed down
   [key: string]: any;
 }
@@ -99,8 +101,7 @@ export type InputAreaRenderer = React.ComponentType<InputAreaRendererProps>;
 export interface PromptControl {
   /** Unique identifier for the control */
   id: string;
-  /** Display order preference (lower numbers appear first/higher priority) */
-  order?: number;
+  // order removed - determined by registration sequence
   /** Optional function to determine if the control should be shown */
   show?: () => boolean;
   status?: () => ChatControlStatus;

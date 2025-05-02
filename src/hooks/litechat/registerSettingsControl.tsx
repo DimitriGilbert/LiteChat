@@ -1,5 +1,4 @@
 // src/hooks/litechat/registerSettingsControl.tsx
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { SettingsIcon } from "lucide-react";
@@ -37,7 +36,7 @@ export function registerSettingsControl() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => handleOpenSettings()} // Open default tab
+              onClick={() => handleOpenSettings()}
               className="h-8 w-8"
               aria-label="Open Settings"
             >
@@ -61,7 +60,7 @@ export function registerSettingsControl() {
   registerChatControl({
     id: "core-settings-trigger",
     panel: "sidebar-footer",
-    order: 1000,
+    // order removed
     status: () => "ready",
     renderer: () => React.createElement(SettingsTriggerComponent),
     iconRenderer: () => React.createElement(SettingsTriggerComponent),
@@ -70,5 +69,4 @@ export function registerSettingsControl() {
   });
 
   console.log("[Function] Registered Core Settings Control");
-  // No cleanup needed or returned
 }

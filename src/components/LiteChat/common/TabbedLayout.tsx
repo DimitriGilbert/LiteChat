@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export interface TabDefinition {
   value: string;
@@ -13,11 +14,12 @@ export interface TabDefinition {
 interface TabbedLayoutProps {
   tabs: TabDefinition[];
   defaultValue?: string;
-  initialValue?: string
+  initialValue?: string;
   onValueChange?: (value: string) => void;
   className?: string;
   listClassName?: string;
   contentContainerClassName?: string;
+  scrollable?: boolean;
 }
 
 export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
@@ -28,6 +30,7 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
   className,
   listClassName,
   contentContainerClassName,
+  scrollable,
 }) => {
   const [internalValue, setInternalValue] = useState(
     initialValue ?? defaultValue ?? tabs[0]?.value,
@@ -59,6 +62,18 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
     "hover:bg-muted/50 hover:text-primary/80",
   );
 
+  const CntWrap: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const clnm = cn(
+      "flex-grow overflow-y-auto pb-6 pr-2 -mr-2",
+      contentContainerClassName,
+    );
+    if (scrollable) {
+      return <ScrollArea className={clnm}>{children}</ScrollArea>;
+    }
+
+    return <div className={clnm}>{children}</div>;
+  };
+
   return (
     <Tabs
       value={internalValue}
@@ -83,12 +98,7 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
           </TabsTrigger>
         ))}
       </TabsList>
-      <div
-        className={cn(
-          "flex-grow overflow-y-auto pb-6 pr-2 -mr-2",
-          contentContainerClassName,
-        )}
-      >
+      <CntWrap>
         {tabs.map((tab) => (
           <TabsContent
             key={tab.value}
@@ -100,7 +110,7 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
             {tab.content}
           </TabsContent>
         ))}
-      </div>
+      </CntWrap>
     </Tabs>
   );
 };
