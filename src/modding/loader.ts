@@ -1,8 +1,10 @@
 // src/modding/loader.ts
-import type {
-  DbMod,
-  ModInstance,
-  LiteChatModApi,
+// FULL FILE
+import {
+  type DbMod,
+  type ModInstance,
+  type LiteChatModApi,
+  ModEvent, // Import ModEvent enum
 } from "@/types/litechat/modding";
 import { createModApi } from "./api-factory";
 import { toast } from "sonner";
@@ -37,7 +39,7 @@ export async function loadMods(dbMods: DbMod[]): Promise<ModInstance[]> {
               `[ModLoader] Error fetching script from ${mod.sourceUrl}:`,
               fetchError,
             );
-            throw fetchError
+            throw fetchError;
           }
         }
         if (!scriptContent) throw new Error("Mod script content is empty.");
@@ -64,8 +66,8 @@ export async function loadMods(dbMods: DbMod[]): Promise<ModInstance[]> {
         error: instanceError ?? undefined,
       };
 
-      // Emit events after instance creation
-      emitter.emit(instance.error ? "mod:error" : "mod:loaded", {
+      // Emit events after instance creation using enum members
+      emitter.emit(instance.error ? ModEvent.MOD_ERROR : ModEvent.MOD_LOADED, {
         id: mod.id,
         name: mod.name,
         error: instance.error,
@@ -75,8 +77,8 @@ export async function loadMods(dbMods: DbMod[]): Promise<ModInstance[]> {
     }),
   );
 
-  // Emit app loaded event after all mods have been processed
-  emitter.emit("app:loaded", undefined);
+  // Emit app loaded event after all mods have been processed using enum member
+  emitter.emit(ModEvent.APP_LOADED, undefined);
   console.log(`[ModLoader] Finished processing ${instances.length} mods.`);
   return instances;
 }

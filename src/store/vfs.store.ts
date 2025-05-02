@@ -1,4 +1,5 @@
 // src/store/vfs.store.ts
+// FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import {
@@ -12,6 +13,8 @@ import { toast } from "sonner";
 import { fs } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { nanoid } from "nanoid";
+import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
+import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent
 
 interface VfsState {
   nodes: Record<string, VfsNode>;
@@ -181,6 +184,7 @@ export const useVfsStore = create(
           operationLoading: false,
           initializingKey: null,
         });
+        emitter.emit(ModEvent.VFS_CONTEXT_CHANGED, { vfsKey: null });
       } else if (!get().vfsKey && !get().configuredVfsKey) {
         console.log(
           "[VfsStore] VFS globally enabled, waiting for vfsKey to be set.",
@@ -189,6 +193,7 @@ export const useVfsStore = create(
     },
     _setConfiguredVfsKey: (key) => {
       set({ configuredVfsKey: key });
+      emitter.emit(ModEvent.VFS_CONTEXT_CHANGED, { vfsKey: key });
     },
 
     // --- VFS Context Switching ---
@@ -211,7 +216,7 @@ export const useVfsStore = create(
       console.log(
         `[VfsStore] setVfsKey: Changing desired key from ${currentDesiredKey} to ${key}. Configured: ${currentConfiguredKey}`,
       );
-      set({ vfsKey: key })
+      set({ vfsKey: key });
 
       // Immediately reset state if the key changes or becomes null
       // This signals to components that the current FS is no longer valid
@@ -226,8 +231,9 @@ export const useVfsStore = create(
         loading: false,
         operationLoading: false,
         selectedFileIds: new Set(),
-        initializingKey: null
+        initializingKey: null,
       });
+      emitter.emit(ModEvent.VFS_CONTEXT_CHANGED, { vfsKey: null }); // Signal context is invalid
 
       // Trigger initialization only if the new key is not null
       if (key !== null) {
@@ -266,7 +272,7 @@ export const useVfsStore = create(
         console.log(
           `[VfsStore] Initialization skipped for key "${vfsKey}" (already configured).`,
         );
-        set({ loading: false })
+        set({ loading: false });
         return;
       }
       // --- End Checks ---
@@ -280,7 +286,7 @@ export const useVfsStore = create(
       } = get();
 
       console.log(`[VfsStore] Initializing VFS with key: ${vfsKey}`);
-      set({ initializingKey: vfsKey })
+      set({ initializingKey: vfsKey });
       _setLoading(true);
       _setError(null);
       // State reset now happens in setVfsKey
@@ -297,13 +303,13 @@ export const useVfsStore = create(
           console.warn(
             `[VfsStore] Initialization for key "${vfsKey}" completed, but desired key changed to "${get().vfsKey}". Discarding result.`,
           );
-          set({ initializingKey: null, loading: false })
-          return
+          set({ initializingKey: null, loading: false });
+          return;
         }
         // --- End Post-Initialization Check ---
 
         _setFsInstance(fsInstance);
-        _setConfiguredVfsKey(vfsKey)
+        _setConfiguredVfsKey(vfsKey); // This emits VFS_CONTEXT_CHANGED
         console.log(`[VfsStore] VFS instance configured for key: ${vfsKey}`);
 
         const stableRootId = "vfs-root";
@@ -351,7 +357,7 @@ export const useVfsStore = create(
         if (get().initializingKey === vfsKey) {
           _setError(`Failed to initialize VFS (${vfsKey}).`);
           _setFsInstance(null);
-          _setConfiguredVfsKey(null);
+          _setConfiguredVfsKey(null); // This emits VFS_CONTEXT_CHANGED with null
         }
       } finally {
         if (get().initializingKey === vfsKey) {
@@ -462,7 +468,7 @@ export const useVfsStore = create(
 
     findNodeByPath: (path) => {
       const normalized = normalizePath(path);
-      if (get().vfsKey !== get().configuredVfsKey) return undefined
+      if (get().vfsKey !== get().configuredVfsKey) return undefined;
 
       if (normalized === "/") {
         const rootNodeId = get().rootId;
@@ -473,7 +479,7 @@ export const useVfsStore = create(
 
     setCurrentPath: async (path) => {
       const { findNodeByPath, fetchNodes, rootId, fs: fsInstance } = get();
-      if (!fsInstance || get().vfsKey !== get().configuredVfsKey) return
+      if (!fsInstance || get().vfsKey !== get().configuredVfsKey) return;
 
       const normalizedPath = normalizePath(path);
       const targetNode = findNodeByPath(normalizedPath);

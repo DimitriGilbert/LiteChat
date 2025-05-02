@@ -1,11 +1,13 @@
 // src/store/interaction.store.ts
-
+// FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { Interaction } from "@/types/litechat/interaction";
 import { PersistenceService } from "@/services/persistence.service";
+import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
+import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent
 
-interface InteractionState {
+export interface InteractionState {
   interactions: Interaction[];
   currentConversationId: string | null;
   streamingInteractionIds: string[];
@@ -51,6 +53,7 @@ export const useInteractionStore = create(
         get().clearInteractions();
         return;
       }
+      const previousStatus = get().status;
       set({
         status: "loading",
         error: null,
@@ -59,6 +62,11 @@ export const useInteractionStore = create(
         activeStreamBuffers: {},
         currentConversationId: conversationId,
       });
+      if (previousStatus !== "loading") {
+        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, {
+          status: "loading",
+        });
+      }
       try {
         const dbInteractions =
           await PersistenceService.loadInteractionsForConversation(
@@ -66,9 +74,11 @@ export const useInteractionStore = create(
           );
         dbInteractions.sort((a, b) => a.index - b.index);
         set({ interactions: dbInteractions, status: "idle" });
+        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, { status: "idle" });
       } catch (e) {
         console.error("InteractionStore: Error loading interactions", e);
         set({ error: "Failed load interactions", status: "error" });
+        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, { status: "error" });
       }
     },
 
@@ -171,6 +181,7 @@ export const useInteractionStore = create(
         } else {
           get().clearInteractions();
         }
+        // Note: CONTEXT_CHANGED event is emitted by ConversationStore.selectItem
       } else {
         console.log(
           `InteractionStore: Conversation ID ${id} is already current.`,
@@ -179,6 +190,7 @@ export const useInteractionStore = create(
     },
     clearInteractions: () => {
       console.log("InteractionStore: Clearing interactions.");
+      const previousStatus = get().status;
       set({
         interactions: [],
         streamingInteractionIds: [],
@@ -187,36 +199,59 @@ export const useInteractionStore = create(
         error: null,
         currentConversationId: null,
       });
+      if (previousStatus !== "idle") {
+        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, { status: "idle" });
+      }
     },
     setError: (error) => {
+      const previousStatus = get().status;
+      let newStatus: InteractionState["status"] = "idle";
       set((state) => {
         state.error = error;
         if (error) {
+          newStatus = "error";
           state.status = "error";
         } else if (state.status === "error") {
-          state.status =
+          newStatus =
             state.streamingInteractionIds.length > 0 ? "streaming" : "idle";
+          state.status = newStatus;
+        } else {
+          newStatus = state.status; // Keep current status if not error
         }
       });
+      if (previousStatus !== newStatus) {
+        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, {
+          status: newStatus,
+        });
+      }
     },
     setStatus: (status) => {
       if (get().status !== status) {
         set({ status });
+        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, { status });
       }
     },
     _addStreamingId: (id) => {
+      let statusChanged = false;
       set((state) => {
         if (!state.streamingInteractionIds.includes(id)) {
           state.streamingInteractionIds.push(id);
           state.activeStreamBuffers[id] = "";
           if (state.streamingInteractionIds.length === 1) {
             state.status = "streaming";
+            statusChanged = true;
           }
           state.error = null;
         }
       });
+      if (statusChanged) {
+        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, {
+          status: "streaming",
+        });
+      }
     },
     _removeStreamingId: (id) => {
+      let statusChanged = false;
       set((state) => {
         const index = state.streamingInteractionIds.indexOf(id);
         if (index !== -1) {
@@ -228,9 +263,15 @@ export const useInteractionStore = create(
             state.status === "streaming"
           ) {
             state.status = state.error ? "error" : "idle";
+            statusChanged = true;
           }
         }
       });
+      if (statusChanged) {
+        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, {
+          status: get().status,
+        });
+      }
     },
   })),
 );

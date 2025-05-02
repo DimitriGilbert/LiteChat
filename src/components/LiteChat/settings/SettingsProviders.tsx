@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TabbedLayout, TabDefinition } from "../common/TabbedLayout"; // Import TabbedLayout
 import { GlobalModelOrganizer } from "./GlobalModelOrganizer"; // Import Organizer
 import { ModelDataDisplay } from "./ModelDataDisplay"; // Import new component
+import { SettingsApiKeys } from "./ApiKeys";
 
 // This component now focuses solely on the list and adding providers
 const ProviderConfigList: React.FC<{
@@ -169,6 +170,11 @@ const SettingsProvidersComponent: React.FC = () => {
         value: "providers-order",
         label: "Model Order",
         content: <GlobalModelOrganizer />,
+      },
+      {
+        value: "api-keys",
+        label: "API Keys",
+        content: <SettingsApiKeys />,
       },
       {
         value: "providers-details",

@@ -1,5 +1,6 @@
 // src/hooks/litechat/registerParameterControl.tsx
-import React from "react";
+// FULL FILE
+import React, { useState, useEffect } from "react"; // useCallback removed
 import { Button } from "@/components/ui/button";
 import { SlidersHorizontalIcon } from "lucide-react";
 import {
@@ -23,138 +24,210 @@ import {
 import { usePromptStateStore } from "@/store/prompt.store";
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store"; // Import provider store
+import { emitter } from "@/lib/litechat/event-emitter";
+import { ModEvent } from "@/types/litechat/modding"; // ModEventPayloadMap removed
+// provider-helpers import removed
+import type { PromptState } from "@/store/prompt.store";
 
+// --- Popover Content Component ---
+const ParameterPopoverContent: React.FC = () => {
+  // Get setters from PromptStateStore
+  const {
+    setTemperature,
+    setTopP,
+    setMaxTokens,
+    setTopK,
+    setPresencePenalty,
+    setFrequencyPenalty,
+  } = usePromptStateStore(
+    useShallow((state) => ({
+      setTemperature: state.setTemperature,
+      setTopP: state.setTopP,
+      setMaxTokens: state.setMaxTokens,
+      setTopK: state.setTopK,
+      setPresencePenalty: state.setPresencePenalty,
+      setFrequencyPenalty: state.setFrequencyPenalty,
+    })),
+  );
+
+  // Get global defaults from SettingsStore
+  const globalDefaults = useSettingsStore.getState();
+
+  // Local state to hold current prompt parameters, updated by events
+  const [currentParams, setCurrentParams] = useState<Partial<PromptState>>(
+    () => usePromptStateStore.getState(), // Initial state
+  );
+
+  // Subscribe to parameter changes
+  useEffect(() => {
+    const handleParamsChanged = (payload: { params: Partial<PromptState> }) => {
+      setCurrentParams((prev) => ({ ...prev, ...payload.params }));
+    };
+    emitter.on(ModEvent.PROMPT_PARAMS_CHANGED, handleParamsChanged);
+    return () => {
+      emitter.off(ModEvent.PROMPT_PARAMS_CHANGED, handleParamsChanged);
+    };
+  }, []);
+
+  // Props for the ParameterControlComponent, using local state
+  const props: ParameterControlComponentProps = {
+    temperature: currentParams.temperature ?? null,
+    setTemperature,
+    topP: currentParams.topP ?? null,
+    setTopP,
+    maxTokens: currentParams.maxTokens ?? null,
+    setMaxTokens,
+    topK: currentParams.topK ?? null,
+    setTopK,
+    presencePenalty: currentParams.presencePenalty ?? null,
+    setPresencePenalty,
+    frequencyPenalty: currentParams.frequencyPenalty ?? null,
+    setFrequencyPenalty,
+    // Pass null/noop for removed props
+    reasoningEnabled: null,
+    setReasoningEnabled: () => {},
+    webSearchEnabled: null,
+    setWebSearchEnabled: () => {},
+    defaultTemperature: globalDefaults.temperature,
+    defaultTopP: globalDefaults.topP,
+    defaultMaxTokens: globalDefaults.maxTokens,
+    defaultTopK: globalDefaults.topK,
+    defaultPresencePenalty: globalDefaults.presencePenalty,
+    defaultFrequencyPenalty: globalDefaults.frequencyPenalty,
+  };
+
+  return <ParameterControlComponent {...props} />;
+};
+
+// --- Trigger Button Component ---
+const ParameterControlTrigger: React.FC = () => {
+  // Local state for button appearance and interaction status
+  const [hasNonDefaultParams, setHasNonDefaultParams] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(
+    () => useInteractionStore.getState().status === "streaming",
+  );
+  const [isVisible, setIsVisible] = useState(true); // Start visible, update based on model
+
+  // Subscribe to relevant events
+  useEffect(() => {
+    // Update button variant based on param changes
+    const handleParamsChanged = (payload: { params: Partial<PromptState> }) => {
+      const currentState = {
+        ...usePromptStateStore.getState(),
+        ...payload.params,
+      };
+      const nonDefault =
+        currentState.temperature !== null ||
+        currentState.topP !== null ||
+        currentState.maxTokens !== null ||
+        currentState.topK !== null ||
+        currentState.presencePenalty !== null ||
+        currentState.frequencyPenalty !== null;
+      setHasNonDefaultParams(nonDefault);
+    };
+
+    // Update streaming status
+    const handleStatusChange = (payload: {
+      status: "idle" | "loading" | "streaming" | "error";
+    }) => {
+      setIsStreaming(payload.status === "streaming");
+    };
+
+    // Update visibility based on model support
+    const handleModelChange = (payload: { modelId: string | null }) => {
+      if (!payload.modelId) {
+        setIsVisible(false);
+        return;
+      }
+      const { getSelectedModel } = useProviderStore.getState();
+      const selectedModel = getSelectedModel(); // Get current model details
+      const supported = selectedModel?.metadata?.supported_parameters ?? [];
+      const controlledParams = [
+        "temperature",
+        "top_p",
+        "max_tokens",
+        "top_k",
+        "presence_penalty",
+        "frequency_penalty",
+      ];
+      const showAdvanced = useSettingsStore.getState().enableAdvancedSettings;
+      setIsVisible(
+        showAdvanced && supported.some((p) => controlledParams.includes(p)),
+      );
+    };
+
+    // Handler for settings changes (specifically enableAdvancedSettings)
+    const handleSettingsChange = (payload: { key: string; value: any }) => {
+      if (payload.key === "enableAdvancedSettings") {
+        handleModelChange({
+          modelId: useProviderStore.getState().selectedModelId,
+        }); // Re-check visibility
+      }
+    };
+
+    // Initial check
+    handleParamsChanged({ params: {} }); // Check initial state
+    handleModelChange({ modelId: useProviderStore.getState().selectedModelId }); // Check initial model
+
+    // Subscriptions
+    emitter.on(ModEvent.PROMPT_PARAMS_CHANGED, handleParamsChanged);
+    emitter.on(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
+    emitter.on(ModEvent.MODEL_SELECTION_CHANGED, handleModelChange);
+    // Correctly subscribe to SETTINGS_CHANGED
+    emitter.on(ModEvent.SETTINGS_CHANGED, handleSettingsChange);
+
+    // Cleanup
+    return () => {
+      emitter.off(ModEvent.PROMPT_PARAMS_CHANGED, handleParamsChanged);
+      emitter.off(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
+      emitter.off(ModEvent.MODEL_SELECTION_CHANGED, handleModelChange);
+      // Correctly unsubscribe from SETTINGS_CHANGED
+      emitter.off(ModEvent.SETTINGS_CHANGED, handleSettingsChange);
+    };
+  }, []);
+
+  if (!isVisible) {
+    return null; // Don't render the button if not visible
+  }
+
+  return (
+    <Popover>
+      <TooltipProvider delayDuration={100}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <Button
+                variant={hasNonDefaultParams ? "secondary" : "ghost"}
+                size="icon"
+                className="h-8 w-8"
+                disabled={isStreaming}
+                aria-label="Adjust Advanced Parameters"
+              >
+                <SlidersHorizontalIcon className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="top">Advanced Parameters</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <PopoverContent className="w-auto p-0" align="start">
+        <ParameterPopoverContent />
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+// --- Registration Function ---
 export function registerParameterControl() {
   const registerPromptControl =
     useControlRegistryStore.getState().registerPromptControl;
-
-  const ParameterPopoverContent: React.FC = () => {
-    const {
-      temperature,
-      setTemperature,
-      topP,
-      setTopP,
-      maxTokens,
-      setMaxTokens,
-      topK,
-      setTopK,
-      presencePenalty,
-      setPresencePenalty,
-      frequencyPenalty,
-      setFrequencyPenalty,
-      // reasoningEnabled/webSearchEnabled removed
-    } = usePromptStateStore(
-      useShallow((state) => ({
-        temperature: state.temperature,
-        setTemperature: state.setTemperature,
-        topP: state.topP,
-        setTopP: state.setTopP,
-        maxTokens: state.maxTokens,
-        setMaxTokens: state.setMaxTokens,
-        topK: state.topK,
-        setTopK: state.setTopK,
-        presencePenalty: state.presencePenalty,
-        setPresencePenalty: state.setPresencePenalty,
-        frequencyPenalty: state.frequencyPenalty,
-        setFrequencyPenalty: state.setFrequencyPenalty,
-        // reasoningEnabled/webSearchEnabled removed
-      })),
-    );
-
-    const globalDefaults = useSettingsStore.getState();
-
-    const props: ParameterControlComponentProps = {
-      temperature,
-      setTemperature,
-      topP,
-      setTopP,
-      maxTokens,
-      setMaxTokens,
-      topK,
-      setTopK,
-      presencePenalty,
-      setPresencePenalty,
-      frequencyPenalty,
-      setFrequencyPenalty,
-      // Pass null/noop for removed props
-      reasoningEnabled: null,
-      setReasoningEnabled: () => {},
-      webSearchEnabled: null,
-      setWebSearchEnabled: () => {},
-      defaultTemperature: globalDefaults.temperature,
-      defaultTopP: globalDefaults.topP,
-      defaultMaxTokens: globalDefaults.maxTokens,
-      defaultTopK: globalDefaults.topK,
-      defaultPresencePenalty: globalDefaults.presencePenalty,
-      defaultFrequencyPenalty: globalDefaults.frequencyPenalty,
-    };
-
-    return <ParameterControlComponent {...props} />;
-  };
-
-  const ParameterControlTrigger: React.FC = () => {
-    const isStreaming = useInteractionStore.getState().status === "streaming";
-    const {
-      temperature,
-      topP,
-      maxTokens,
-      topK,
-      presencePenalty,
-      frequencyPenalty,
-      // reasoningEnabled/webSearchEnabled removed
-    } = usePromptStateStore(
-      useShallow((state) => ({
-        temperature: state.temperature,
-        topP: state.topP,
-        maxTokens: state.maxTokens,
-        topK: state.topK,
-        presencePenalty: state.presencePenalty,
-        frequencyPenalty: state.frequencyPenalty,
-        // reasoningEnabled/webSearchEnabled removed
-      })),
-    );
-
-    const hasNonDefaultParams =
-      temperature !== null ||
-      topP !== null ||
-      maxTokens !== null ||
-      topK !== null ||
-      presencePenalty !== null ||
-      frequencyPenalty !== null;
-    // reasoningEnabled/webSearchEnabled removed from check
-
-    return (
-      <Popover>
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={hasNonDefaultParams ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={isStreaming}
-                  aria-label="Adjust Advanced Parameters"
-                >
-                  <SlidersHorizontalIcon className="h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="top">Advanced Parameters</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        <PopoverContent className="w-auto p-0" align="start">
-          <ParameterPopoverContent />
-        </PopoverContent>
-      </Popover>
-    );
-  };
 
   registerPromptControl({
     id: "core-parameters",
     // order removed
     status: () => "ready",
     triggerRenderer: () => React.createElement(ParameterControlTrigger),
+    // getParameters still reads directly from the store at submission time
     getParameters: () => {
       const {
         temperature,
@@ -163,7 +236,6 @@ export function registerParameterControl() {
         topK,
         presencePenalty,
         frequencyPenalty,
-        // reasoningEnabled/webSearchEnabled removed
       } = usePromptStateStore.getState();
 
       const addParam = (obj: Record<string, any>, key: string, value: any) => {
@@ -179,27 +251,11 @@ export function registerParameterControl() {
       addParam(params, "top_k", topK);
       addParam(params, "presence_penalty", presencePenalty);
       addParam(params, "frequency_penalty", frequencyPenalty);
-      // reasoning/webSearch removed
 
       return Object.keys(params).length > 0 ? params : undefined;
     },
-    show: () => {
-      // Show only if advanced settings are enabled AND the model supports at least one of these params
-      const showAdvanced = useSettingsStore.getState().enableAdvancedSettings;
-      if (!showAdvanced) return false;
-
-      const selectedModel = useProviderStore.getState().getSelectedModel();
-      const supported = selectedModel?.metadata?.supported_parameters ?? [];
-      const controlledParams = [
-        "temperature",
-        "top_p",
-        "max_tokens",
-        "top_k",
-        "presence_penalty",
-        "frequency_penalty",
-      ];
-      return supported.some((p) => controlledParams.includes(p));
-    },
+    // Show function removed - component handles visibility
+    // show: () => { ... }
   });
 
   console.log("[Function] Registered Core Parameter Control");

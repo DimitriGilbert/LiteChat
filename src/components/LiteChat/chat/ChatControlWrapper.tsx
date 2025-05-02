@@ -1,4 +1,5 @@
 // src/components/LiteChat/chat/ChatControlWrapper.tsx
+// FULL FILE
 import React from "react";
 import type { ChatControl } from "@/types/litechat/chat";
 import { cn } from "@/lib/utils";
@@ -17,12 +18,10 @@ export const ChatControlWrapper: React.FC<ChatControlWrapperProps> = ({
   className,
 }) => {
   // Filter controls based on panelId and the show condition
-  const relevantControls = controls
-    .filter(
-      (c) => (c.panel ?? "main") === panelId && (c.show ? c.show() : true),
-    )
-    // Sort controls by the order property (ascending)
-    .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
+  // Rely on registration order, remove sort
+  const relevantControls = controls.filter(
+    (c) => (c.panel ?? "main") === panelId && (c.show ? c.show() : true),
+  );
 
   // Return null if no controls match the criteria
   if (relevantControls.length === 0) {

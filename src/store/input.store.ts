@@ -1,8 +1,10 @@
 // src/store/input.store.ts
-
+// FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { nanoid } from "nanoid"; // Import nanoid
+import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
+import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent
 
 // Define a unified structure for attached file metadata
 export interface AttachedFileMetadata {
@@ -34,12 +36,13 @@ export interface InputActions {
 }
 
 export const useInputStore = create(
-  immer<InputState & InputActions>((set) => ({
+  immer<InputState & InputActions>((set, get) => ({
     // Initial State
     attachedFilesMetadata: [],
 
     // Actions
     addAttachedFile: (fileData) => {
+      let added = false;
       set((state) => {
         // Check for duplicates based on source and name/path/size
         const isDuplicate = state.attachedFilesMetadata.some((f) =>
@@ -56,23 +59,41 @@ export const useInputStore = create(
             ...fileData,
           };
           state.attachedFilesMetadata.push(newAttachment);
+          added = true;
         } else {
           console.warn(
             `InputStore: File "${fileData.name}" (source: ${fileData.source}) already attached. Skipping.`,
           );
         }
       });
+      if (added) {
+        emitter.emit(ModEvent.ATTACHED_FILES_CHANGED, {
+          files: get().attachedFilesMetadata,
+        });
+      }
     },
     removeAttachedFile: (attachmentId) => {
+      let removed = false;
       set((state) => {
+        const initialLength = state.attachedFilesMetadata.length;
         state.attachedFilesMetadata = state.attachedFilesMetadata.filter(
           (f) => f.id !== attachmentId,
         );
+        removed = state.attachedFilesMetadata.length < initialLength;
       });
+      if (removed) {
+        emitter.emit(ModEvent.ATTACHED_FILES_CHANGED, {
+          files: get().attachedFilesMetadata,
+        });
+      }
     },
     clearAttachedFiles: () => {
+      const hadFiles = get().attachedFilesMetadata.length > 0;
       // Clear only attached files
       set({ attachedFilesMetadata: [] });
+      if (hadFiles) {
+        emitter.emit(ModEvent.ATTACHED_FILES_CHANGED, { files: [] });
+      }
     },
   })),
 );

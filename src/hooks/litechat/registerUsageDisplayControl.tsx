@@ -1,10 +1,11 @@
 // src/hooks/litechat/registerUsageDisplayControl.tsx
+// FULL FILE
 import React, { useState, useEffect, useMemo } from "react";
 import { useProviderStore } from "@/store/provider.store";
 import { useInputStore } from "@/store/input.store";
 import { useInteractionStore } from "@/store/interaction.store";
-import { useConversationStore } from "@/store/conversation.store";
-import { useShallow } from "zustand/react/shallow";
+// useConversationStore removed
+// useShallow removed
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -14,13 +15,14 @@ import {
 } from "@/components/ui/tooltip";
 import { CircleIcon } from "lucide-react";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { ModEvent } from "@/types/litechat/modding";
+import { ModEvent } from "@/types/litechat/modding"; // ModEventPayloadMap removed
 import {
   createAiModelConfig,
   splitModelId,
 } from "@/lib/litechat/provider-helpers";
 import { useControlRegistryStore } from "@/store/control.store";
 import type { Interaction } from "@/types/litechat/interaction";
+import type { AttachedFileMetadata } from "@/store/input.store";
 
 // Rough estimation: 1 token ~ 4 bytes
 const BYTES_PER_TOKEN_ESTIMATE = 4;
@@ -46,114 +48,146 @@ const estimateHistoryTokens = (interactions: Interaction[]): number => {
 };
 
 export const UsageDisplayControl: React.FC = () => {
-  // Internal state for input text and history tokens
+  // --- Component State ---
   const [currentInputText, setCurrentInputText] = useState("");
   const [historyTokens, setHistoryTokens] = useState(0);
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFileMetadata[]>(
+    [],
+  );
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [contextLength, setContextLength] = useState<number>(0);
 
-  // Subscribe to stores using hooks, selecting PRIMITIVE/STABLE values
-  const { selectedModelId, dbProviderConfigs, dbApiKeys } = useProviderStore(
-    useShallow((state) => ({
-      selectedModelId: state.selectedModelId,
-      dbProviderConfigs: state.dbProviderConfigs,
-      dbApiKeys: state.dbApiKeys,
-    })),
-  );
-  const attachedFiles = useInputStore(
-    useShallow((state) => state.attachedFilesMetadata),
-  );
-  const {
-    currentConversationId,
-    interactions,
-    status: interactionStatus,
-  } = useInteractionStore(
-    useShallow((state) => ({
-      currentConversationId: state.currentConversationId,
-      interactions: state.interactions,
-      status: state.status,
-    })),
-  );
-
-  // Effect to subscribe/unsubscribe to input changes
+  // --- Effects for Event Subscription ---
   useEffect(() => {
+    // Initial state fetch
+    const initialInputState = useInputStore.getState();
+    const initialProviderState = useProviderStore.getState();
+    const initialInteractionState = useInteractionStore.getState();
+
+    setAttachedFiles(initialInputState.attachedFilesMetadata);
+    setSelectedModelId(initialProviderState.selectedModelId);
+
+    // Calculate initial history tokens
+    if (initialInteractionState.currentConversationId) {
+      const staticInteractions = initialInteractionState.interactions.filter(
+        (i) => i.status === "COMPLETED",
+      );
+      setHistoryTokens(estimateHistoryTokens(staticInteractions));
+    } else {
+      setHistoryTokens(0);
+    }
+
+    // --- Event Handlers ---
     const handleInputChange = (payload: { value: string }) => {
       setCurrentInputText(payload.value);
     };
+    const handleFilesChanged = (payload: { files: AttachedFileMetadata[] }) => {
+      setAttachedFiles(payload.files);
+    };
+    const handleModelChanged = (payload: { modelId: string | null }) => {
+      console.log(payload);
+      setSelectedModelId(payload.modelId);
+    };
+    // Recalculate history when interactions complete or context changes
+    const handleInteractionCompleted = () => {
+      const state = useInteractionStore.getState();
+      if (state.currentConversationId) {
+        const staticInteractions = state.interactions.filter(
+          (i) => i.status === "COMPLETED",
+        );
+        setHistoryTokens(estimateHistoryTokens(staticInteractions));
+      }
+    };
+    const handleContextChanged = () => {
+      const state = useInteractionStore.getState();
+      if (state.currentConversationId) {
+        const staticInteractions = state.interactions.filter(
+          (i) => i.status === "COMPLETED",
+        );
+        setHistoryTokens(estimateHistoryTokens(staticInteractions));
+      } else {
+        setHistoryTokens(0);
+      }
+    };
+
+    // --- Subscriptions ---
     emitter.on(ModEvent.PROMPT_INPUT_CHANGE, handleInputChange);
+    emitter.on(ModEvent.ATTACHED_FILES_CHANGED, handleFilesChanged);
+    emitter.on(ModEvent.MODEL_SELECTION_CHANGED, handleModelChanged);
+    emitter.on(ModEvent.INTERACTION_COMPLETED, handleInteractionCompleted);
+    emitter.on(ModEvent.CONTEXT_CHANGED, handleContextChanged);
+
+    // --- Cleanup ---
     return () => {
       emitter.off(ModEvent.PROMPT_INPUT_CHANGE, handleInputChange);
+      emitter.off(ModEvent.ATTACHED_FILES_CHANGED, handleFilesChanged);
+      emitter.off(ModEvent.MODEL_SELECTION_CHANGED, handleModelChanged);
+      emitter.off(ModEvent.INTERACTION_COMPLETED, handleInteractionCompleted);
+      emitter.off(ModEvent.CONTEXT_CHANGED, handleContextChanged);
     };
-  }, []);
+  }, []); // Run only on mount
 
-  // Effect to calculate history tokens when conversation changes or interactions update (statically)
+  // --- Effect to update contextLength when selectedModelId changes ---
   useEffect(() => {
-    if (
-      currentConversationId &&
-      interactionStatus !== "streaming" &&
-      interactionStatus !== "loading"
-    ) {
-      const staticInteractions = interactions.filter(
-        (i) => i.status === "COMPLETED",
-      ); // Or filter as needed
-      const estimatedTokens = estimateHistoryTokens(staticInteractions);
-      setHistoryTokens(estimatedTokens);
-    } else if (!currentConversationId) {
-      setHistoryTokens(0); // Reset if no conversation selected
+    if (!selectedModelId) {
+      setContextLength(0);
+      return;
     }
-    // Only recalculate when conversation ID changes or interactions array ref changes *while not streaming*
-  }, [currentConversationId, interactions, interactionStatus]);
-
-  // --- Compute selectedModel *inside* useMemo based on stable IDs/configs ---
-  const selectedModel = useMemo(() => {
-    if (!selectedModelId) return undefined;
+    // Get necessary state *inside* the effect or pass as dependency
+    const { dbProviderConfigs, dbApiKeys } = useProviderStore.getState();
     const { providerId, modelId: specificModelId } =
       splitModelId(selectedModelId);
-    if (!providerId || !specificModelId) return undefined;
+    if (!providerId || !specificModelId) {
+      setContextLength(0);
+      return;
+    }
     const config = dbProviderConfigs.find((p) => p.id === providerId);
-    if (!config) return undefined;
+    if (!config) {
+      setContextLength(0);
+      return;
+    }
     const apiKeyRecord = dbApiKeys.find((k) => k.id === config.apiKeyId);
-    return createAiModelConfig(config, specificModelId, apiKeyRecord?.value);
-  }, [selectedModelId, dbProviderConfigs, dbApiKeys]);
-
-  // Memoized calculations based on internal state and computed model data
-  const {
-    contextLength,
-    estimatedInputTokens,
-    totalEstimatedTokens,
-    contextPercentage,
-  } = useMemo(() => {
-    const meta = selectedModel?.metadata;
+    const model = createAiModelConfig(
+      config,
+      specificModelId,
+      apiKeyRecord?.value,
+    );
+    const meta = model?.metadata;
     const length =
       meta?.top_provider?.context_length ?? meta?.context_length ?? 0;
+    setContextLength(length);
+  }, [selectedModelId]); // Re-run only when selectedModelId changes
 
-    const inputTextBytes = new TextEncoder().encode(currentInputText).length;
-    const fileBytes = attachedFiles.reduce((sum, file) => sum + file.size, 0);
-    const inputTokens = Math.ceil(
-      (inputTextBytes + fileBytes) / BYTES_PER_TOKEN_ESTIMATE,
-    );
-    const totalTokens = historyTokens + inputTokens;
+  // --- Memoized Calculations ---
+  const { estimatedInputTokens, totalEstimatedTokens, contextPercentage } =
+    useMemo(() => {
+      const inputTextBytes = new TextEncoder().encode(currentInputText).length;
+      const fileBytes = attachedFiles.reduce((sum, file) => sum + file.size, 0);
+      const inputTokens = Math.ceil(
+        (inputTextBytes + fileBytes) / BYTES_PER_TOKEN_ESTIMATE,
+      );
+      const totalTokens = historyTokens + inputTokens;
+      const percentage = contextLength
+        ? Math.min(100, Math.round((totalTokens / contextLength) * 100))
+        : 0;
 
-    const percentage = length
-      ? Math.min(100, Math.round((totalTokens / length) * 100))
-      : 0;
-
-    return {
-      contextLength: length,
-      estimatedInputTokens: inputTokens,
-      totalEstimatedTokens: totalTokens,
-      contextPercentage: percentage,
-    };
-  }, [currentInputText, attachedFiles, selectedModel, historyTokens]);
+      return {
+        estimatedInputTokens: inputTokens,
+        totalEstimatedTokens: totalTokens,
+        contextPercentage: percentage,
+      };
+    }, [currentInputText, attachedFiles, historyTokens, contextLength]);
 
   // Determine color based on percentage
   const indicatorColor = useMemo(() => {
-    if (contextPercentage > 85) return "text-red-600 dark:text-red-500"; // Stricter threshold
+    if (contextPercentage > 85) return "text-red-600 dark:text-red-500";
     if (contextPercentage > 70) return "text-orange-500 dark:text-orange-400";
     if (contextPercentage > 40) return "text-yellow-500 dark:text-yellow-400";
     return "text-green-600 dark:text-green-500";
   }, [contextPercentage]);
 
   // Early return if no model or context length is available
-  if (!selectedModel || contextLength === 0) {
+  if (!selectedModelId || contextLength === 0) {
     return null;
   }
 
@@ -186,7 +220,8 @@ export function registerUsageDisplayControl() {
     status: () => "ready",
     triggerRenderer: () => React.createElement(UsageDisplayControl),
     renderer: undefined,
-    show: () => true,
+    // Show function removed - component handles its own rendering logic
+    // show: () => true,
   });
 
   console.log("[Function] Registered Core Usage Display Control (Trigger)");

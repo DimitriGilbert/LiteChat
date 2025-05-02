@@ -285,7 +285,7 @@ const SettingsApiKeysComponent: React.FC = () => {
                             isKeyDeleting ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              Trash2Icon
+                              <Trash2Icon />
                             )
                           }
                           disabled={isKeyDeleting}

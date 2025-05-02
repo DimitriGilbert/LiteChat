@@ -1,5 +1,5 @@
 // src/store/conversation.store.ts
-
+// FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { Conversation, SidebarItemType } from "@/types/litechat/chat";
@@ -24,6 +24,8 @@ import type { fs as FsType } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 // Import ProjectStore for interaction
 import { useProjectStore } from "./project.store";
+import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
+import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent
 
 // Define a union type for items in the sidebar (now includes Project from ProjectStore)
 export type SidebarItem =
@@ -222,6 +224,9 @@ export const useConversationStore = create(
         const conversationToSave = get().getConversationById(newId);
         if (conversationToSave) {
           await PersistenceService.saveConversation(conversationToSave);
+          emitter.emit(ModEvent.CONVERSATION_ADDED, {
+            conversation: conversationToSave,
+          });
         } else {
           throw new Error("Failed to retrieve newly added conversation state");
         }
@@ -295,6 +300,10 @@ export const useConversationStore = create(
         try {
           const plainData = JSON.parse(JSON.stringify(updatedConversationData));
           await PersistenceService.saveConversation(plainData);
+          emitter.emit(ModEvent.CONVERSATION_UPDATED, {
+            conversationId: id,
+            updates: updates,
+          });
         } catch (e) {
           console.error("ConversationStore: Error updating conversation", e);
           set((state) => {
@@ -374,12 +383,18 @@ export const useConversationStore = create(
       try {
         await PersistenceService.deleteConversation(id);
         await PersistenceService.deleteInteractionsForConversation(id);
+        emitter.emit(ModEvent.CONVERSATION_DELETED, { conversationId: id });
 
         if (
           currentSelectedId === id &&
           currentSelectedType === "conversation"
         ) {
           await useInteractionStore.getState().setCurrentConversationId(null);
+          // Emit context change if selection was cleared
+          emitter.emit(ModEvent.CONTEXT_CHANGED, {
+            selectedItemId: null,
+            selectedItemType: null,
+          });
         }
       } catch (e) {
         console.error("ConversationStore: Error deleting conversation", e);
@@ -422,6 +437,21 @@ export const useConversationStore = create(
         await useInteractionStore
           .getState()
           .setCurrentConversationId(type === "conversation" ? id : null);
+        // Emit context change event
+        emitter.emit(ModEvent.CONTEXT_CHANGED, {
+          selectedItemId: id,
+          selectedItemType: type,
+        });
+        if (type === "conversation") {
+          emitter.emit(ModEvent.CONVERSATION_SELECTED, { conversationId: id });
+        } else if (type === "project") {
+          emitter.emit(ModEvent.PROJECT_SELECTED, { projectId: id });
+        } else {
+          emitter.emit(ModEvent.CONVERSATION_SELECTED, {
+            conversationId: null,
+          });
+          emitter.emit(ModEvent.PROJECT_SELECTED, { projectId: null });
+        }
       } else {
         console.log(`Item ${id} (${type}) already selected.`);
       }
@@ -479,6 +509,10 @@ export const useConversationStore = create(
         if (repoToSave) {
           const plainData = JSON.parse(JSON.stringify(repoToSave));
           await PersistenceService.saveSyncRepo(plainData);
+          emitter.emit(ModEvent.SYNC_REPO_CHANGED, {
+            repoId: newId,
+            action: "added",
+          });
         } else {
           throw new Error("Failed to retrieve newly added sync repo state");
         }
@@ -518,6 +552,10 @@ export const useConversationStore = create(
         try {
           const plainData = JSON.parse(JSON.stringify(repoToSave));
           await PersistenceService.saveSyncRepo(plainData);
+          emitter.emit(ModEvent.SYNC_REPO_CHANGED, {
+            repoId: id,
+            action: "updated",
+          });
           toast.success(`Sync repository "${repoToSave.name}" updated.`);
         } catch (e) {
           console.error("ConversationStore: Error updating sync repo", e);
@@ -567,6 +605,10 @@ export const useConversationStore = create(
 
       try {
         await PersistenceService.deleteSyncRepo(id);
+        emitter.emit(ModEvent.SYNC_REPO_CHANGED, {
+          repoId: id,
+          action: "deleted",
+        });
         toast.success(`Sync repository "${repoToDelete.name}" deleted.`);
 
         try {
@@ -617,12 +659,17 @@ export const useConversationStore = create(
           console.error(`Sync error for ${conversationId}: ${error}`);
         }
       });
+      emitter.emit(ModEvent.CONVERSATION_SYNC_STATUS_CHANGED, {
+        conversationId,
+        status,
+      });
     },
 
     _setRepoInitializationStatus: (repoId, status) => {
       set((state) => {
         state.repoInitializationStatus[repoId] = status;
       });
+      emitter.emit(ModEvent.REPO_INIT_STATUS_CHANGED, { repoId, status });
     },
 
     initializeOrSyncRepo: async (repoId) => {

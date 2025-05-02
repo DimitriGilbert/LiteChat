@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/PromptWrapper.tsx
-
+// FULL FILE
 import React, {
   useState,
   useCallback,
@@ -25,7 +25,7 @@ import { runMiddleware } from "@/lib/litechat/ai-helpers";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
-import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent
+import { ModEvent, ModMiddlewareHook } from "@/types/litechat/modding"; // Import Enums
 
 interface PromptWrapperProps {
   InputAreaRenderer: InputAreaRenderer;
@@ -75,9 +75,11 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
 
   // --- Memoized Controls ---
   const promptControls = useMemo(() => {
-    return Object.values(registeredPromptControls)
-      .filter((c) => (c.show ? c.show() : true))
-      .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
+    // Filter based on show function IF IT EXISTS
+    // Rely on registration order, remove sort
+    return Object.values(registeredPromptControls).filter((c) =>
+      c.show ? c.show() : true,
+    );
   }, [registeredPromptControls]);
 
   const panelControls = useMemo(
@@ -95,7 +97,10 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     const valueFromRef = inputAreaRef.current?.getValue() ?? "";
     const trimmedValue = valueFromRef.trim();
 
-    if (!trimmedValue && attachedFilesMetadata.length === 0) {
+    // Read attached files directly from store state at submission time
+    const currentAttachedFiles = useInputStore.getState().attachedFilesMetadata;
+
+    if (!trimmedValue && currentAttachedFiles.length === 0) {
       return;
     }
     if (isStreaming || isSubmitting) return;
@@ -106,6 +111,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       let parameters: Record<string, any> = {};
       let metadata: Record<string, any> = {};
 
+      // Use the memoized promptControls list
       for (const control of promptControls) {
         if (control.getParameters) {
           const params = await control.getParameters();
@@ -117,8 +123,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         }
       }
 
-      if (attachedFilesMetadata.length > 0) {
-        metadata.attachedFiles = [...attachedFilesMetadata];
+      if (currentAttachedFiles.length > 0) {
+        metadata.attachedFiles = [...currentAttachedFiles];
       }
 
       let turnData: PromptTurnObject = {
@@ -128,10 +134,12 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         metadata,
       };
 
-      emitter.emit("prompt:submitted", { turnData });
+      // Use enum member for event name
+      emitter.emit(ModEvent.PROMPT_SUBMITTED, { turnData });
 
+      // Use enum member for middleware hook name
       const middlewareResult = await runMiddleware(
-        "middleware:prompt:turnFinalize",
+        ModMiddlewareHook.PROMPT_TURN_FINALIZE,
         { turnData },
       );
 
@@ -149,10 +157,10 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       await onSubmit(finalTurnData);
 
       // Clear state AFTER successful submission initiation
-      clearAttachedFiles();
+      clearAttachedFiles(); // This will emit ATTACHED_FILES_CHANGED
       promptControls.forEach((control) => {
         if (control.clearOnSubmit) {
-          control.clearOnSubmit();
+          control.clearOnSubmit(); // This should trigger relevant state resets/events
         }
       });
       setFocusInputFlag(true);
@@ -169,9 +177,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   }, [
     isStreaming,
     isSubmitting,
-    promptControls,
+    promptControls, // Use memoized list
     onSubmit,
-    attachedFilesMetadata,
     clearAttachedFiles,
     setFocusInputFlag,
   ]);

@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/InputArea.tsx
-
+// FULL FILE
 import React, {
   forwardRef,
   useImperativeHandle,
@@ -22,6 +22,7 @@ interface InputAreaProps {
   placeholder?: string;
   // Add callback prop for value changes
   onValueChange?: (value: string) => void;
+  className?: string; // Add className prop
   [key: string]: any;
 }
 

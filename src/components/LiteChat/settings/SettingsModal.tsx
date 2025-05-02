@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsModal.tsx
-
+// FULL FILE
 import React, { memo, useState, useEffect, useMemo } from "react";
 import {
   Dialog,
@@ -16,7 +16,7 @@ import { SettingsDataManagement } from "./SettingsDataManagement";
 import { SettingsMods } from "./SettingsMods";
 import { SettingsProviders } from "./SettingsProviders";
 import { SettingsGit } from "./SettingsGit";
-import { GlobalModelOrganizer } from "./GlobalModelOrganizer";
+// GlobalModelOrganizer removed
 import type { CustomSettingTab } from "@/types/litechat/modding";
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";

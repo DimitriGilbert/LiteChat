@@ -1,5 +1,5 @@
 // src/services/interaction.service.ts
-
+// FULL FILE
 import type { PromptObject, PromptTurnObject } from "@/types/litechat/prompt";
 import type {
   Interaction,
@@ -22,7 +22,11 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { z } from "zod";
-import type { ToolImplementation } from "@/types/litechat/modding";
+import {
+  type ToolImplementation,
+  ModMiddlewareHook,
+  ModEvent,
+} from "@/types/litechat/modding";
 import {
   Tool,
   ToolCallPart,
@@ -32,7 +36,6 @@ import {
   ProviderMetadata,
   LanguageModelV1,
   CoreMessage,
-  // Import middleware and wrapper
   extractReasoningMiddleware,
   wrapLanguageModel,
 } from "ai";
@@ -75,9 +78,9 @@ export const InteractionService = {
       initiatingTurnData,
     );
 
-    // 1. Run Middleware
+    // 1. Run Middleware using enum member
     const startMiddlewareResult = await runMiddleware(
-      "middleware:interaction:beforeStart",
+      ModMiddlewareHook.INTERACTION_BEFORE_START,
       { prompt, conversationId },
     );
     if (startMiddlewareResult === false) {
@@ -139,8 +142,8 @@ export const InteractionService = {
       );
     });
 
-    // 4. Emit Event
-    emitter.emit("interaction:started", {
+    // 4. Emit Event using enum member
+    emitter.emit(ModEvent.INTERACTION_STARTED, {
       interactionId,
       conversationId,
       type: interactionData.type,
@@ -371,8 +374,9 @@ export const InteractionService = {
   // --- Callback Implementations ---
   async _handleChunk(interactionId: string, chunk: string): Promise<void> {
     const chunkPayload = { interactionId, chunk };
+    // Use enum member for middleware hook name
     const chunkResult = await runMiddleware(
-      "middleware:interaction:processChunk",
+      ModMiddlewareHook.INTERACTION_PROCESS_CHUNK,
       chunkPayload,
     );
     if (chunkResult !== false) {
@@ -383,7 +387,8 @@ export const InteractionService = {
       useInteractionStore
         .getState()
         .appendInteractionResponseChunk(interactionId, processedChunk);
-      emitter.emit("interaction:stream_chunk", {
+      // Use enum member for event name
+      emitter.emit(ModEvent.INTERACTION_STREAM_CHUNK, {
         interactionId,
         chunk: processedChunk,
       });
@@ -563,7 +568,8 @@ export const InteractionService = {
       );
     }
 
-    emitter.emit("interaction:completed", {
+    // Use enum member for event name
+    emitter.emit(ModEvent.INTERACTION_COMPLETED, {
       interactionId,
       status: status,
       error: error?.message,

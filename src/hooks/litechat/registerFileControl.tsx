@@ -1,5 +1,12 @@
 // src/hooks/litechat/registerFileControl.tsx
-import React, { useRef, useCallback, useMemo } from "react";
+// FULL FILE
+import React, {
+  useRef,
+  useCallback,
+  // useMemo removed
+  useState,
+  useEffect,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { PaperclipIcon } from "lucide-react";
 import { useControlRegistryStore } from "@/store/control.store";
@@ -15,191 +22,235 @@ import {
 } from "@/components/ui/tooltip";
 import { FilePreviewRenderer } from "@/components/LiteChat/common/FilePreviewRenderer";
 import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
-import { useShallow } from "zustand/react/shallow";
-import {
-  createAiModelConfig,
-  splitModelId,
-} from "@/lib/litechat/provider-helpers";
+// useShallow removed
+// provider-helpers import removed
+import { emitter } from "@/lib/litechat/event-emitter";
+import { ModEvent } from "@/types/litechat/modding";
+import type { AttachedFileMetadata } from "@/store/input.store";
 
 const MAX_FILE_SIZE_MB = 20;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
+// --- Trigger Component ---
+const FileControlTrigger: React.FC = () => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const addAttachedFile = useInputStore.getState().addAttachedFile;
+
+  // Local state managed by events
+  const [isStreaming, setIsStreaming] = useState(
+    () => useInteractionStore.getState().status === "streaming",
+  );
+  const [allowFileInput, setAllowFileInput] = useState(true); // Assume allowed initially
+
+  // Subscribe to events
+  useEffect(() => {
+    const handleStatusChange = (payload: {
+      status: "idle" | "loading" | "streaming" | "error";
+    }) => {
+      setIsStreaming(payload.status === "streaming");
+    };
+
+    const handleModelChange = (payload: { modelId: string | null }) => {
+      if (!payload.modelId) {
+        setAllowFileInput(true); // Default to allowed if no model
+        return;
+      }
+      const { getSelectedModel } = useProviderStore.getState();
+      const selectedModel = getSelectedModel();
+      const inputModalities =
+        selectedModel?.metadata?.architecture?.input_modalities;
+      setAllowFileInput(
+        !inputModalities || inputModalities.some((mod) => mod !== "text"),
+      );
+    };
+
+    // Initial check
+    handleModelChange({ modelId: useProviderStore.getState().selectedModelId });
+
+    // Subscriptions
+    emitter.on(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
+    emitter.on(ModEvent.MODEL_SELECTION_CHANGED, handleModelChange);
+
+    // Cleanup
+    return () => {
+      emitter.off(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
+      emitter.off(ModEvent.MODEL_SELECTION_CHANGED, handleModelChange);
+    };
+  }, []);
+
+  const handleFileChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = event.target.files;
+      if (!files) return;
+
+      for (const file of Array.from(files)) {
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          toast.error(
+            `File "${file.name}" exceeds the ${MAX_FILE_SIZE_MB}MB limit.`,
+          );
+          continue;
+        }
+
+        try {
+          let fileData: {
+            contentText?: string;
+            contentBase64?: string;
+          } = {};
+
+          const isText = isLikelyTextFile(file.name, file.type);
+          const isImage = file.type.startsWith("image/");
+
+          if (isText) {
+            fileData.contentText = await file.text();
+          } else if (isImage) {
+            const reader = new FileReader();
+            const promise = new Promise<string>((resolve, reject) => {
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = (error) => reject(error);
+            });
+            reader.readAsDataURL(file);
+            const dataUrl = await promise;
+            if (dataUrl && dataUrl.includes(",")) {
+              fileData.contentBase64 = dataUrl.split(",")[1];
+            } else {
+              console.warn(
+                `Could not extract base64 from data URL for ${file.name}`,
+              );
+            }
+          } else {
+            console.log(
+              `File type ${file.type} (Name: ${file.name}) not directly processed for content storage in InputStore.`,
+            );
+          }
+
+          // This action will emit ATTACHED_FILES_CHANGED
+          addAttachedFile({
+            source: "direct",
+            name: file.name,
+            type: file.type || "application/octet-stream",
+            size: file.size,
+            ...fileData,
+          });
+        } catch (error) {
+          console.error(`Error processing file ${file.name}:`, error);
+          toast.error(
+            `Failed to process file "${file.name}": ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+
+      if (event.target) {
+        event.target.value = "";
+      }
+    },
+    [addAttachedFile],
+  );
+
+  const handleButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const tooltipText = allowFileInput
+    ? "Attach Files"
+    : "File input not supported by this model";
+
+  return (
+    <>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        multiple
+        className="hidden"
+        disabled={isStreaming || !allowFileInput}
+      />
+      <TooltipProvider delayDuration={100}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleButtonClick}
+              disabled={isStreaming || !allowFileInput}
+              className="h-8 w-8"
+              aria-label={tooltipText}
+            >
+              <PaperclipIcon className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{tooltipText}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </>
+  );
+};
+
+// --- Panel Component ---
+const FileControlPanel: React.FC = () => {
+  // Get remove action from store
+  const removeAttachedFile = useInputStore.getState().removeAttachedFile;
+
+  // Local state managed by events
+  const [attachedFilesMetadata, setAttachedFilesMetadata] = useState<
+    AttachedFileMetadata[]
+  >(() => useInputStore.getState().attachedFilesMetadata);
+  const [isStreaming, setIsStreaming] = useState(
+    () => useInteractionStore.getState().status === "streaming",
+  );
+
+  // Subscribe to events
+  useEffect(() => {
+    const handleFilesChanged = (payload: { files: AttachedFileMetadata[] }) => {
+      setAttachedFilesMetadata(payload.files);
+    };
+    const handleStatusChange = (payload: {
+      status: "idle" | "loading" | "streaming" | "error";
+    }) => {
+      setIsStreaming(payload.status === "streaming");
+    };
+
+    // Subscriptions
+    emitter.on(ModEvent.ATTACHED_FILES_CHANGED, handleFilesChanged);
+    emitter.on(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
+
+    // Cleanup
+    return () => {
+      emitter.off(ModEvent.ATTACHED_FILES_CHANGED, handleFilesChanged);
+      emitter.off(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
+    };
+  }, []);
+
+  if (attachedFilesMetadata.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+      {attachedFilesMetadata.map((fileMeta) => (
+        <FilePreviewRenderer
+          key={fileMeta.id}
+          fileMeta={fileMeta}
+          onRemove={removeAttachedFile} // Pass store action directly
+          isReadOnly={isStreaming}
+        />
+      ))}
+    </div>
+  );
+};
+
+// --- Registration Function ---
 export function registerFileControl() {
   const registerPromptControl =
     useControlRegistryStore.getState().registerPromptControl;
-
-  const FileControlTrigger: React.FC = () => {
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const addAttachedFile = useInputStore.getState().addAttachedFile;
-    const isStreaming = useInteractionStore.getState().status === "streaming";
-
-    const { selectedModelId, dbProviderConfigs, dbApiKeys } = useProviderStore(
-      useShallow((state) => ({
-        selectedModelId: state.selectedModelId,
-        dbProviderConfigs: state.dbProviderConfigs,
-        dbApiKeys: state.dbApiKeys,
-      })),
-    );
-
-    const selectedModel = useMemo(() => {
-      if (!selectedModelId) return undefined;
-      const { providerId, modelId: specificModelId } =
-        splitModelId(selectedModelId);
-      if (!providerId || !specificModelId) return undefined;
-      const config = dbProviderConfigs.find((p) => p.id === providerId);
-      if (!config) return undefined;
-      const apiKeyRecord = dbApiKeys.find((k) => k.id === config.apiKeyId);
-      return createAiModelConfig(config, specificModelId, apiKeyRecord?.value);
-    }, [selectedModelId, dbProviderConfigs, dbApiKeys]);
-
-    const allowFileInput = useMemo(() => {
-      const inputModalities =
-        selectedModel?.metadata?.architecture?.input_modalities;
-      if (!inputModalities) return true;
-      return inputModalities.some((mod) => mod !== "text");
-    }, [selectedModel]);
-
-    const handleFileChange = useCallback(
-      async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = event.target.files;
-        if (!files) return;
-
-        for (const file of Array.from(files)) {
-          if (file.size > MAX_FILE_SIZE_BYTES) {
-            toast.error(
-              `File "${file.name}" exceeds the ${MAX_FILE_SIZE_MB}MB limit.`,
-            );
-            continue;
-          }
-
-          try {
-            let fileData: {
-              contentText?: string;
-              contentBase64?: string;
-            } = {};
-
-            const isText = isLikelyTextFile(file.name, file.type);
-            const isImage = file.type.startsWith("image/");
-
-            if (isText) {
-              fileData.contentText = await file.text();
-            } else if (isImage) {
-              const reader = new FileReader();
-              const promise = new Promise<string>((resolve, reject) => {
-                reader.onload = () => resolve(reader.result as string);
-                reader.onerror = (error) => reject(error);
-              });
-              reader.readAsDataURL(file);
-              const dataUrl = await promise;
-              if (dataUrl && dataUrl.includes(",")) {
-                fileData.contentBase64 = dataUrl.split(",")[1];
-              } else {
-                console.warn(
-                  `Could not extract base64 from data URL for ${file.name}`,
-                );
-              }
-            } else {
-              console.log(
-                `File type ${file.type} (Name: ${file.name}) not directly processed for content storage in InputStore.`,
-              );
-            }
-
-            addAttachedFile({
-              source: "direct",
-              name: file.name,
-              type: file.type || "application/octet-stream",
-              size: file.size,
-              ...fileData,
-            });
-          } catch (error) {
-            console.error(`Error processing file ${file.name}:`, error);
-            toast.error(
-              `Failed to process file "${file.name}": ${error instanceof Error ? error.message : String(error)}`,
-            );
-          }
-        }
-
-        if (event.target) {
-          event.target.value = "";
-        }
-      },
-      [addAttachedFile],
-    );
-
-    const handleButtonClick = () => {
-      fileInputRef.current?.click();
-    };
-
-    const tooltipText = allowFileInput
-      ? "Attach Files"
-      : "File input not supported by this model";
-
-    return (
-      <>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          multiple
-          className="hidden"
-          disabled={isStreaming || !allowFileInput}
-        />
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={handleButtonClick}
-                disabled={isStreaming || !allowFileInput}
-                className="h-8 w-8"
-                aria-label={tooltipText}
-              >
-                <PaperclipIcon className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">{tooltipText}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </>
-    );
-  };
-
-  const FileControlPanel: React.FC = () => {
-    const { attachedFilesMetadata, removeAttachedFile } = useInputStore(
-      useShallow((state) => ({
-        attachedFilesMetadata: state.attachedFilesMetadata,
-        removeAttachedFile: state.removeAttachedFile,
-      })),
-    );
-    const isStreaming = useInteractionStore.getState().status === "streaming";
-
-    if (attachedFilesMetadata.length === 0) {
-      return null;
-    }
-
-    return (
-      <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
-        {attachedFilesMetadata.map((fileMeta) => (
-          <FilePreviewRenderer
-            key={fileMeta.id}
-            fileMeta={fileMeta}
-            onRemove={removeAttachedFile}
-            isReadOnly={isStreaming}
-          />
-        ))}
-      </div>
-    );
-  };
 
   registerPromptControl({
     id: "core-file-attachment",
     // order removed
     triggerRenderer: () => React.createElement(FileControlTrigger),
     renderer: () => React.createElement(FileControlPanel),
-    clearOnSubmit: () => {},
-    show: () => true, // Visibility handled internally by trigger
+    // clearOnSubmit is handled by PromptWrapper calling InputStore.clearAttachedFiles
+    // show function removed - component handles visibility/disabled state
   });
 
   console.log("[Function] Registered Core File Attachment Control");

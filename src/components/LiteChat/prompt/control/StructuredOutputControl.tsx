@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/control/StructuredOutputControl.tsx
-
+// FULL FILE
 import React, { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,6 +29,7 @@ interface StructuredOutputItem {
   json: string;
 }
 
+// Define the component as a value using React.FC
 export const StructuredOutputControl: React.FC = () => {
   const { structuredOutputJson, setStructuredOutputJson } = usePromptStateStore(
     useShallow((state) => ({

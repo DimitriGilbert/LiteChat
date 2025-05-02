@@ -1,4 +1,5 @@
 // src/hooks/litechat/registerToolSelectorControl.tsx
+// FULL FILE
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { WrenchIcon } from "lucide-react";
@@ -11,7 +12,7 @@ import { ToolSelectorControlComponent } from "@/components/LiteChat/prompt/contr
 import { useControlRegistryStore } from "@/store/control.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { useInteractionStore } from "@/store/interaction.store";
-import { useShallow } from "zustand/react/shallow";
+// useShallow removed
 import {
   Tooltip,
   TooltipContent,
@@ -19,8 +20,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useProviderStore } from "@/store/provider.store"; // Import provider store
+import { emitter } from "@/lib/litechat/event-emitter";
+import { ModEvent } from "@/types/litechat/modding";
+import type { SidebarItemType } from "@/types/litechat/chat";
 
 // --- Local State Management within Registration Scope ---
+// This remains necessary to hold the *transient* state for the *next* prompt
 let transientEnabledTools = new Set<string>();
 let transientMaxStepsOverride: number | null = null;
 let updateScopedState: (
@@ -34,149 +39,224 @@ let updateScopedState: (
 ) => void = () => {};
 // --- End Local State Management ---
 
+// --- Trigger Component ---
+const ToolSelectorTrigger: React.FC = () => {
+  // Local state for UI elements, updated by scoped state changes
+  const [localState, setLocalState] = useState({
+    enabledTools: transientEnabledTools,
+    maxStepsOverride: transientMaxStepsOverride,
+  });
+  const [popoverMaxSteps, setPopoverMaxSteps] = useState<number | null>(
+    localState.maxStepsOverride,
+  );
+  const [popoverOpen, setPopoverOpen] = useState(false);
+
+  // Local state managed by events
+  const [isStreaming, setIsStreaming] = useState(
+    () => useInteractionStore.getState().status === "streaming",
+  );
+  const [isVisible, setIsVisible] = useState(true); // Assume visible initially
+  const [selectedItemType, setSelectedItemType] =
+    useState<SidebarItemType | null>(
+      () => useConversationStore.getState().selectedItemType,
+    );
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(
+    () => useConversationStore.getState().selectedItemId,
+  );
+
+  // Get tool count (relatively stable)
+  const allToolsCount = Object.keys(
+    useControlRegistryStore.getState().tools,
+  ).length;
+
+  // Effect to manage the scoped state update function
+  useEffect(() => {
+    updateScopedState = (updater) => {
+      const newState = updater({
+        enabledTools: transientEnabledTools,
+        maxStepsOverride: transientMaxStepsOverride,
+      });
+      transientEnabledTools = newState.enabledTools;
+      transientMaxStepsOverride = newState.maxStepsOverride;
+      setLocalState(newState); // Update component state
+    };
+    // Sync initial local state
+    setLocalState({
+      enabledTools: transientEnabledTools,
+      maxStepsOverride: transientMaxStepsOverride,
+    });
+    return () => {
+      updateScopedState = () => {}; // Cleanup on unmount
+    };
+  }, []);
+
+  // Effect to sync popover input with local state
+  useEffect(() => {
+    setPopoverMaxSteps(localState.maxStepsOverride);
+  }, [localState.maxStepsOverride]);
+
+  // Subscribe to events
+  useEffect(() => {
+    const handleStatusChange = (payload: {
+      status: "idle" | "loading" | "streaming" | "error";
+    }) => {
+      setIsStreaming(payload.status === "streaming");
+    };
+    const handleModelChange = (payload: { modelId: string | null }) => {
+      if (!payload.modelId) {
+        setIsVisible(false);
+        return;
+      }
+      const { getSelectedModel } = useProviderStore.getState();
+      const selectedModel = getSelectedModel();
+      const hasRegisteredTools =
+        Object.keys(useControlRegistryStore.getState().tools).length > 0;
+      setIsVisible(
+        hasRegisteredTools &&
+          (selectedModel?.metadata?.supported_parameters?.includes("tools") ??
+            false),
+      );
+    };
+    const handleContextChange = (payload: {
+      selectedItemId: string | null;
+      selectedItemType: SidebarItemType | null;
+    }) => {
+      setSelectedItemType(payload.selectedItemType);
+      setSelectedItemId(payload.selectedItemId);
+    };
+
+    // Initial checks
+    handleModelChange({ modelId: useProviderStore.getState().selectedModelId });
+    handleContextChange({
+      selectedItemId: useConversationStore.getState().selectedItemId,
+      selectedItemType: useConversationStore.getState().selectedItemType,
+    });
+
+    // Subscriptions
+    emitter.on(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
+    emitter.on(ModEvent.MODEL_SELECTION_CHANGED, handleModelChange);
+    emitter.on(ModEvent.CONTEXT_CHANGED, handleContextChange);
+
+    // Cleanup
+    return () => {
+      emitter.off(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
+      emitter.off(ModEvent.MODEL_SELECTION_CHANGED, handleModelChange);
+      emitter.off(ModEvent.CONTEXT_CHANGED, handleContextChange);
+    };
+  }, []);
+
+  // --- Event Handlers ---
+  const handlePopoverOpenChange = (open: boolean) => {
+    setPopoverOpen(open);
+    // Update transient state when popover closes if max steps changed
+    if (!open && popoverMaxSteps !== localState.maxStepsOverride) {
+      updateScopedState((prev) => ({
+        ...prev,
+        maxStepsOverride: popoverMaxSteps,
+      }));
+    }
+  };
+
+  const handleSetEnabledTools = useCallback(
+    (updater: (prev: Set<string>) => Set<string>) => {
+      // Update transient state via the scoped updater
+      updateScopedState((prev) => ({
+        ...prev,
+        enabledTools: updater(prev.enabledTools),
+      }));
+    },
+    [], // updateScopedState is stable within the effect scope
+  );
+
+  // --- Derived State for Rendering ---
+  const hasActiveSettings =
+    localState.enabledTools.size > 0 || localState.maxStepsOverride !== null;
+  const isDisabled =
+    isStreaming || allToolsCount === 0 || selectedItemType !== "conversation";
+
+  if (!isVisible) {
+    return null; // Don't render if not supported
+  }
+
+  return (
+    <Popover open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
+      <TooltipProvider delayDuration={100}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <Button
+                variant={hasActiveSettings ? "secondary" : "ghost"}
+                size="icon"
+                className="h-8 w-8"
+                disabled={isDisabled}
+                aria-label="Configure Tools"
+              >
+                <WrenchIcon className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            {isDisabled
+              ? "Tools unavailable (select conversation)"
+              : `Tools (${localState.enabledTools.size} enabled)`}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <PopoverContent className="w-auto p-0" align="start">
+        <ToolSelectorControlComponent
+          enabledTools={localState.enabledTools} // Pass current local state
+          setEnabledTools={handleSetEnabledTools} // Pass handler to update scoped state
+          localMaxSteps={popoverMaxSteps} // Pass popover's input state
+          setLocalMaxSteps={setPopoverMaxSteps} // Pass setter for popover's input state
+          conversationId={selectedItemId}
+          conversationType={selectedItemType}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+// --- Registration Function ---
 export function registerToolSelectorControl() {
   const registerPromptControl =
     useControlRegistryStore.getState().registerPromptControl;
 
+  // Reset transient state on registration (e.g., app load)
   transientEnabledTools = new Set<string>();
   transientMaxStepsOverride = null;
-
-  const ToolSelectorTrigger: React.FC = () => {
-    const { selectedItemId, selectedItemType } = useConversationStore(
-      useShallow((state) => ({
-        selectedItemId: state.selectedItemId,
-        selectedItemType: state.selectedItemType,
-      })),
-    );
-    const [localState, setLocalState] = useState({
-      enabledTools: transientEnabledTools,
-      maxStepsOverride: transientMaxStepsOverride,
-    });
-    const [popoverMaxSteps, setPopoverMaxSteps] = useState<number | null>(
-      localState.maxStepsOverride,
-    );
-
-    const isStreaming = useInteractionStore.getState().status === "streaming";
-    const allToolsCount = Object.keys(
-      useControlRegistryStore.getState().tools,
-    ).length;
-
-    useEffect(() => {
-      updateScopedState = (updater) => {
-        const newState = updater({
-          enabledTools: transientEnabledTools,
-          maxStepsOverride: transientMaxStepsOverride,
-        });
-        transientEnabledTools = newState.enabledTools;
-        transientMaxStepsOverride = newState.maxStepsOverride;
-        setLocalState(newState);
-      };
-      setLocalState({
-        enabledTools: transientEnabledTools,
-        maxStepsOverride: transientMaxStepsOverride,
-      });
-      return () => {
-        updateScopedState = () => {};
-      };
-    }, []);
-
-    useEffect(() => {
-      setPopoverMaxSteps(localState.maxStepsOverride);
-    }, [localState.maxStepsOverride]);
-
-    const handlePopoverOpenChange = (open: boolean) => {
-      if (!open && popoverMaxSteps !== localState.maxStepsOverride) {
-        updateScopedState((prev) => ({
-          ...prev,
-          maxStepsOverride: popoverMaxSteps,
-        }));
-      }
-    };
-
-    const handleSetEnabledTools = useCallback(
-      (updater: (prev: Set<string>) => Set<string>) => {
-        updateScopedState((prev) => ({
-          ...prev,
-          enabledTools: updater(prev.enabledTools),
-        }));
-      },
-      [],
-    );
-
-    const hasActiveSettings =
-      localState.enabledTools.size > 0 || localState.maxStepsOverride !== null;
-    const isDisabled =
-      isStreaming || allToolsCount === 0 || selectedItemType !== "conversation";
-
-    return (
-      <Popover onOpenChange={handlePopoverOpenChange}>
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={hasActiveSettings ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={isDisabled}
-                  aria-label="Configure Tools"
-                >
-                  <WrenchIcon className="h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              {isDisabled
-                ? "Tools unavailable (select conversation)"
-                : `Tools (${localState.enabledTools.size} enabled)`}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        <PopoverContent className="w-auto p-0" align="start">
-          <ToolSelectorControlComponent
-            enabledTools={localState.enabledTools}
-            setEnabledTools={handleSetEnabledTools}
-            localMaxSteps={popoverMaxSteps}
-            setLocalMaxSteps={setPopoverMaxSteps}
-            conversationId={selectedItemId}
-            conversationType={selectedItemType}
-          />
-        </PopoverContent>
-      </Popover>
-    );
-  };
 
   registerPromptControl({
     id: "core-tool-selector",
     // order removed
     triggerRenderer: () => React.createElement(ToolSelectorTrigger),
+    // getMetadata reads directly from the transient scoped state
     getMetadata: () => {
-      return {
-        enabledTools: Array.from(transientEnabledTools),
-        ...(transientMaxStepsOverride !== null && {
-          maxSteps: transientMaxStepsOverride,
-        }),
-      };
+      // Return only if there are settings to apply
+      if (
+        transientEnabledTools.size > 0 ||
+        transientMaxStepsOverride !== null
+      ) {
+        return {
+          enabledTools: Array.from(transientEnabledTools),
+          ...(transientMaxStepsOverride !== null && {
+            maxSteps: transientMaxStepsOverride,
+          }),
+        };
+      }
+      return undefined;
     },
+    // clearOnSubmit resets the transient scoped state
     clearOnSubmit: () => {
       transientEnabledTools = new Set<string>();
       transientMaxStepsOverride = null;
+      // Trigger a state update in any mounted trigger component
       updateScopedState(() => ({
         enabledTools: new Set<string>(),
         maxStepsOverride: null,
       }));
     },
-    show: () => {
-      // Show only if the selected model supports tools
-      const selectedModel = useProviderStore.getState().getSelectedModel();
-      const hasRegisteredTools =
-        Object.keys(useControlRegistryStore.getState().tools).length > 0;
-      return (
-        hasRegisteredTools &&
-        (selectedModel?.metadata?.supported_parameters?.includes("tools") ??
-          false)
-      );
-    },
+    // show function removed - component handles visibility
+    // show: () => { ... }
   });
 
   console.log("[Function] Registered Core Tool Selector Control");

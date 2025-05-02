@@ -1,11 +1,15 @@
 // src/modding/api-factory.ts
+// FULL FILE
 import type {
   DbMod,
   LiteChatModApi,
   ReadonlyChatContextSnapshot,
   CustomSettingTab,
   ToolImplementation,
+  ModMiddlewareHookName, // Import hook name type
 } from "@/types/litechat/modding";
+import type { PromptControl } from "@/types/litechat/prompt"; // Import correct PromptControl type
+import type { ChatControl } from "@/types/litechat/chat"; // Import correct ChatControl type
 import { Tool } from "ai";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -16,9 +20,7 @@ import { useModStore } from "@/store/mod.store";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { toast } from "sonner";
 import type { z } from "zod";
-import { splitModelId } from "@/lib/litechat/provider-helpers"
-
-// Helper splitModelId REMOVED from here
+import { splitModelId } from "@/lib/litechat/provider-helpers";
 
 export function createModApi(mod: DbMod): LiteChatModApi {
   const modId = mod.id;
@@ -30,13 +32,20 @@ export function createModApi(mod: DbMod): LiteChatModApi {
   const api: LiteChatModApi = {
     modId,
     modName,
-    registerPromptControl: (c) => {
+    registerPromptControl: (c: PromptControl) => {
+      // Ensure the control being registered matches the expected type
       const u = controlStoreActions.registerPromptControl(c);
       unsubscribers.push(u);
       return u;
     },
-    registerChatControl: (c) => {
-      const u = controlStoreActions.registerChatControl(c);
+    registerChatControl: (c: ChatControl) => {
+      // Ensure the control being registered matches the expected type
+      // Provide a default status function if the mod doesn't, to satisfy the stricter type
+      const controlWithDefaults: ChatControl = {
+        ...c,
+        status: c.status ?? (() => "ready"), // Provide default status
+      };
+      const u = controlStoreActions.registerChatControl(controlWithDefaults);
       unsubscribers.push(u);
       return u;
     },
@@ -61,7 +70,14 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       unsubscribers.push(u);
       return u;
     },
-    addMiddleware: (hN, cb) => {
+    addMiddleware: <H extends ModMiddlewareHookName>(
+      hN: H,
+      cb: (
+        payload: any,
+      ) =>
+        | import("@/types/litechat/modding").ModMiddlewareReturnMap[H]
+        | Promise<import("@/types/litechat/modding").ModMiddlewareReturnMap[H]>,
+    ) => {
       const u = controlStoreActions.registerMiddleware(hN, modId, cb);
       unsubscribers.push(u);
       return u;
@@ -77,7 +93,7 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       const cS = useConversationStore.getState();
       const sS = useSettingsStore.getState();
       const pS = useProviderStore.getState();
-      const { providerId } = splitModelId(pS.selectedModelId)
+      const { providerId } = splitModelId(pS.selectedModelId);
 
       const selectedConversationId =
         cS.selectedItemType === "conversation" ? cS.selectedItemId : null;

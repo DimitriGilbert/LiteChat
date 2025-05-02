@@ -1,5 +1,5 @@
 // src/store/provider.store.ts
-
+// FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type {
@@ -20,6 +20,8 @@ import {
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
+import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
+import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 const LAST_SELECTION_KEY = "provider:lastModelSelection";
@@ -86,6 +88,10 @@ export const useProviderStore = create(
     setEnableApiKeyManagement: (enabled) => {
       set({ enableApiKeyManagement: enabled });
       PersistenceService.saveSetting("enableApiKeyManagement", enabled);
+      emitter.emit(ModEvent.SETTINGS_CHANGED, {
+        key: "enableApiKeyManagement",
+        value: enabled,
+      });
     },
 
     loadInitialData: async () => {
@@ -157,6 +163,14 @@ export const useProviderStore = create(
 
         // Save the potentially updated selection
         await PersistenceService.saveSetting(LAST_SELECTION_KEY, modelToSelect);
+        // Emit initial selection event
+        console.log(
+          `[ProviderStore] Emitting initial ${ModEvent.MODEL_SELECTION_CHANGED} with payload:`,
+          { modelId: modelToSelect },
+        );
+        emitter.emit(ModEvent.MODEL_SELECTION_CHANGED, {
+          modelId: modelToSelect,
+        });
       } catch (e) {
         console.error("ProviderStore: Error loading initial data", e);
         set({
@@ -168,8 +182,26 @@ export const useProviderStore = create(
     },
 
     selectModel: (combinedId) => {
-      set({ selectedModelId: combinedId });
-      PersistenceService.saveSetting(LAST_SELECTION_KEY, combinedId);
+      const currentId = get().selectedModelId;
+      console.log(
+        `[ProviderStore] selectModel called. Current: ${currentId}, New: ${combinedId}`,
+      ); // Log call
+      if (currentId !== combinedId) {
+        set({ selectedModelId: combinedId });
+        PersistenceService.saveSetting(LAST_SELECTION_KEY, combinedId);
+        // Emit event when selection changes
+        console.log(
+          `[ProviderStore] Emitting ${ModEvent.MODEL_SELECTION_CHANGED} with payload:`,
+          { modelId: combinedId },
+        ); // Log emission
+        emitter.emit(ModEvent.MODEL_SELECTION_CHANGED, {
+          modelId: combinedId,
+        });
+      } else {
+        console.log(
+          `[ProviderStore] selectModel skipped: ID ${combinedId} already selected.`,
+        );
+      }
     },
 
     addApiKey: async (name, providerId, value) => {
@@ -189,6 +221,10 @@ export const useProviderStore = create(
           state.dbApiKeys.push(newKey);
         });
         toast.success(`API Key "${name}" added.`);
+        emitter.emit(ModEvent.API_KEY_CHANGED, {
+          keyId: newId,
+          action: "added",
+        });
         return newId;
       } catch (e) {
         console.error("ProviderStore: Error adding API key", e);
@@ -212,6 +248,10 @@ export const useProviderStore = create(
           );
         });
         toast.success(`API Key "${keyName}" deleted.`);
+        emitter.emit(ModEvent.API_KEY_CHANGED, {
+          keyId: id,
+          action: "deleted",
+        });
       } catch (e) {
         console.error("ProviderStore: Error deleting API key", e);
         toast.error(
@@ -244,6 +284,10 @@ export const useProviderStore = create(
           state.dbProviderConfigs.push(newConfig);
         });
         toast.success(`Provider "${configData.name}" added.`);
+        emitter.emit(ModEvent.PROVIDER_CONFIG_CHANGED, {
+          providerId: newId,
+          config: newConfig,
+        });
         return newId;
       } catch (e) {
         console.error("ProviderStore: Error adding provider config", e);
@@ -275,6 +319,10 @@ export const useProviderStore = create(
             state.dbProviderConfigs[index] = updatedConfigData;
           }
         });
+        emitter.emit(ModEvent.PROVIDER_CONFIG_CHANGED, {
+          providerId: id,
+          config: updatedConfigData,
+        });
 
         // --- Recalculate valid order and selection after update ---
         const currentOrder = get().globalModelSortOrder;
@@ -305,20 +353,7 @@ export const useProviderStore = create(
           }
         });
 
-        // Mark selection for validation if the order changed or if the update affected enablement
-        // Fix: Define selectionNeedsValidation or remove its usage
-        // let selectionNeedsValidation = false; // Define the variable
-        // if (
-        //   JSON.stringify(newOrder) !== JSON.stringify(currentOrder) ||
-        //   "isEnabled" in changes ||
-        //   "enabledModels" in changes
-        // ) {
-        //   selectionNeedsValidation = true;
-        // }
-        // --- End Recalculation ---
-
         // Update order and potentially the selected model
-        // Pass the flag to setGlobalModelSortOrder if needed, or handle validation there
         await get().setGlobalModelSortOrder(newOrder); // This handles selection validation
       } catch (e) {
         console.error("ProviderStore: Error updating provider config", e);
@@ -343,6 +378,10 @@ export const useProviderStore = create(
           );
           // Remove fetch status for the deleted provider
           delete state.providerFetchStatus[id];
+        });
+        emitter.emit(ModEvent.PROVIDER_CONFIG_CHANGED, {
+          providerId: id,
+          config: { ...config, isEnabled: false }, // Indicate deletion via event
         });
 
         // --- Recalculate valid order and selection after delete ---
@@ -450,7 +489,7 @@ export const useProviderStore = create(
           console.log(
             `[ProviderStore] Selection ${currentSelected} invalidated or missing. Selecting ${newSelection}`,
           );
-          get().selectModel(newSelection); // This also saves the new selection
+          get().selectModel(newSelection); // This also saves the new selection and emits event
         }
       }
       // --- End Selection Validation ---
