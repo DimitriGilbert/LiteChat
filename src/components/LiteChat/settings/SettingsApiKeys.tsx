@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsApiKeys.tsx
-// Entire file content provided
+
 import React, { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,8 +33,8 @@ import { useProviderStore } from "@/store/provider.store";
 import {
   LoadingStateWrapper,
   DefaultListLoadingSkeleton,
-} from "../common/LoadingStateWrapper"
-import { ActionTooltipButton } from "../common/ActionTooltipButton"
+} from "../common/LoadingStateWrapper";
+import { ActionTooltipButton } from "../common/ActionTooltipButton";
 
 const SettingsApiKeysComponent: React.FC = () => {
   const {

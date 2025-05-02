@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/interaction/AssistantResponse.tsx
-// NEW FILE
+
 import React, { useState, useCallback } from "react";
 import { ChevronDownIcon, ChevronUpIcon, BrainCircuitIcon } from "lucide-react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";

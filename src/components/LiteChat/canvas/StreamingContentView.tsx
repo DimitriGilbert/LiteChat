@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/StreamingContentView.tsx
-// Entire file content provided
+
 import React, { useMemo } from "react";
 import {
   useMarkdownParser,

@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsProviders.tsx
-// Entire file content provided
+
 import React, { useState, useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
@@ -8,11 +8,15 @@ import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { ProviderRow } from "./SettingsProviderRow";
 import { AddProviderForm } from "./AddProviderForm";
-import { Skeleton } from "@/components/ui/skeleton"
-// Removed GlobalModelOrganizer and Separator imports
+import { Skeleton } from "@/components/ui/skeleton";
+import { TabbedLayout, TabDefinition } from "../common/TabbedLayout"; // Import TabbedLayout
+import { GlobalModelOrganizer } from "./GlobalModelOrganizer"; // Import Organizer
+import { ModelDataDisplay } from "./ModelDataDisplay"; // Import new component
 
 // This component now focuses solely on the list and adding providers
-const SettingsProvidersComponent: React.FC = () => {
+const ProviderConfigList: React.FC<{
+  onSelectModelForDetails: (id: string | null) => void;
+}> = ({ onSelectModelForDetails }) => {
   const {
     addDbProviderConfig,
     updateDbProviderConfig,
@@ -53,7 +57,6 @@ const SettingsProvidersComponent: React.FC = () => {
   );
 
   return (
-    // Ensure this component uses flex-col and h-full to occupy space correctly
     <div className="space-y-6 h-full flex flex-col">
       {/* Provider Configuration Section */}
       <div>
@@ -62,7 +65,8 @@ const SettingsProvidersComponent: React.FC = () => {
         </h3>
         <p className="text-sm text-muted-foreground">
           Add, remove, or configure connections to AI providers. Enable models
-          within each provider's edit section.
+          within each provider's edit section. Click a model name to view its
+          details.
         </p>
       </div>
 
@@ -86,11 +90,8 @@ const SettingsProvidersComponent: React.FC = () => {
         )}
       </div>
 
-      {/* Provider List - Takes remaining space, NO internal ScrollArea */}
-      {/* The parent div in SettingsModal handles scrolling */}
-      <div className="flex-grow border-t border-border pt-4 mt-4">
-        {" "}
-        {/* Removed overflow-hidden */}
+      {/* Provider List */}
+      <div className="flex-grow border-t border-border pt-4 mt-4 overflow-y-auto">
         <div className="space-y-2">
           {isLoading && !isAdding ? (
             <>
@@ -111,6 +112,8 @@ const SettingsProvidersComponent: React.FC = () => {
                   onDelete={deleteDbProviderConfig}
                   onFetchModels={handleFetchModels}
                   fetchStatus={providerFetchStatus[provider.id] || "idle"}
+                  // Pass the setter for model details view
+                  onSelectModelForDetails={onSelectModelForDetails}
                 />
               ))}
             </div>
@@ -124,6 +127,67 @@ const SettingsProvidersComponent: React.FC = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+// Main component using TabbedLayout
+const SettingsProvidersComponent: React.FC = () => {
+  const { selectedModelForDetails, setSelectedModelForDetails } =
+    useProviderStore(
+      useShallow((state) => ({
+        selectedModelForDetails: state._selectedModelForDetails,
+        setSelectedModelForDetails: state.setSelectedModelForDetails,
+      })),
+    );
+
+  // State to manage the active tab
+  const [activeTab, setActiveTab] = useState("providers-config");
+
+  // Callback to handle selecting a model and switching tabs
+  const handleSelectModelAndSwitchTab = useCallback(
+    (combinedId: string | null) => {
+      setSelectedModelForDetails(combinedId);
+      if (combinedId) {
+        setActiveTab("providers-details"); // Switch to details tab
+      }
+    },
+    [setSelectedModelForDetails],
+  );
+
+  const tabs: TabDefinition[] = useMemo(
+    () => [
+      {
+        value: "providers-config",
+        label: "Configuration",
+        content: (
+          <ProviderConfigList
+            onSelectModelForDetails={handleSelectModelAndSwitchTab}
+          />
+        ),
+      },
+      {
+        value: "providers-order",
+        label: "Model Order",
+        content: <GlobalModelOrganizer />,
+      },
+      {
+        value: "providers-details",
+        label: "Model Details",
+        content: <ModelDataDisplay modelId={selectedModelForDetails} />,
+      },
+    ],
+    [selectedModelForDetails, handleSelectModelAndSwitchTab],
+  );
+
+  return (
+    <TabbedLayout
+      tabs={tabs}
+      initialValue={activeTab} // Use state for initial/current value
+      onValueChange={setActiveTab} // Update state on change
+      className="h-full"
+      listClassName="bg-muted/50 rounded-md"
+      contentContainerClassName="mt-4"
+    />
   );
 };
 

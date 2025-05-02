@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/interaction/InteractionCard.tsx
-// Entire file content provided (Refactored)
+
 import React, { useMemo, useState, useCallback } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { UserPromptDisplay } from "@/components/LiteChat/canvas/UserPromptDisplay";

@@ -1,5 +1,5 @@
 // src/hooks/litechat/registerVfsControl.tsx
-// Entire file content provided
+
 import React from "react";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useUIStateStore } from "@/store/ui.store";

@@ -1,5 +1,5 @@
 // src/lib/litechat/vfs-git-operations.ts
-// Entire file content provided - Updated gitPullOp
+
 import { fs } from "@zenfs/core";
 import { toast } from "sonner";
 import {

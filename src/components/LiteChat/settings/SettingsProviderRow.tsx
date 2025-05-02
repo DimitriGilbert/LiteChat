@@ -1,4 +1,5 @@
 // src/components/LiteChat/settings/SettingsProviderRow.tsx
+
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import { toast } from "sonner";
@@ -14,6 +15,8 @@ export interface ProviderRowProps {
   onDelete: (id: string) => Promise<void>;
   onFetchModels: (id: string) => Promise<void>;
   fetchStatus: FetchStatus;
+  // Add callback for selecting model details
+  onSelectModelForDetails: (combinedModelId: string | null) => void;
 }
 
 const ProviderRowComponent: React.FC<ProviderRowProps> = ({
@@ -23,6 +26,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   onDelete,
   onFetchModels,
   fetchStatus,
+  onSelectModelForDetails, // Receive the callback
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -34,7 +38,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   );
 
   const [rawAvailableModels, setRawAvailableModels] = useState<
-    { id: string; name: string }[]
+    { id: string; name: string }[] // Keep basic type here for simplicity
   >([]);
 
   const allAvailableModels = useMemo(() => {
@@ -46,7 +50,8 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   useEffect(() => {
     if (isEditing) {
       const models = getAllAvailableModelDefsForProvider(provider.id);
-      setRawAvailableModels(models);
+      // Map full model data to basic {id, name} for the edit list
+      setRawAvailableModels(models.map((m) => ({ id: m.id, name: m.name })));
       setEditData({
         name: provider.name,
         type: provider.type,
@@ -69,8 +74,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     provider.baseURL,
     provider.enabledModels,
     provider.autoFetchModels,
-    provider.fetchedModels,
-    getAllAvailableModelDefsForProvider,
+    getAllAvailableModelDefsForProvider, // Dependency added
   ]);
 
   const handleEdit = () => setIsEditing(true);
@@ -80,11 +84,9 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     setIsSaving(false);
   };
 
-  // Saves ALL changes from the edit form, including enabledModels
   const handleSave = useCallback(async () => {
     setIsSaving(true);
     try {
-      // Ensure enabledModels is null if empty before saving
       const finalEnabledModels =
         editData.enabledModels && editData.enabledModels.length > 0
           ? editData.enabledModels
@@ -97,7 +99,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
         apiKeyId: editData.apiKeyId,
         baseURL: editData.baseURL,
         autoFetchModels: editData.autoFetchModels,
-        enabledModels: finalEnabledModels
+        enabledModels: finalEnabledModels,
       };
 
       Object.keys(finalChanges).forEach((key) => {
@@ -120,7 +122,6 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     }
   }, [editData, onUpdate, provider.id, provider.name]);
 
-  // Handles changes to the editData state
   const handleChange = useCallback(
     (
       field: keyof DbProviderConfig,
@@ -143,7 +144,6 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
         console.error("Failed to delete provider:", error);
         setIsDeleting(false);
       }
-      // No finally needed, state is reset on success or error catch
     }
   }, [onDelete, provider.id, provider.name]);
 
@@ -151,7 +151,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     await onFetchModels(provider.id);
     if (isEditing) {
       const models = getAllAvailableModelDefsForProvider(provider.id);
-      setRawAvailableModels(models);
+      setRawAvailableModels(models.map((m) => ({ id: m.id, name: m.name })));
     }
   }, [
     onFetchModels,
@@ -161,18 +161,18 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   ]);
 
   return (
-    <div className="border-b border-border p-4 space-y-3 bg-card rounded-md shadow-sm">
+    <div className="border border-border p-4 space-y-3 bg-card rounded-md shadow-sm">
       {isEditing ? (
         <ProviderRowEditMode
           providerId={provider.id}
           editData={editData}
           apiKeys={apiKeys}
-          allAvailableModels={allAvailableModels}
+          allAvailableModels={allAvailableModels} // Pass basic {id, name} list
           isSaving={isSaving}
           onCancel={handleCancel}
-          onSave={handleSave} // Saves all changes
-          onChange={handleChange} // Updates local editData
-          onUpdate={onUpdate} // Still needed for potential future direct updates
+          onSave={handleSave}
+          onChange={handleChange}
+          onUpdate={onUpdate}
         />
       ) : (
         <ProviderRowViewMode
@@ -181,9 +181,11 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
           onEdit={handleEdit}
           onDelete={handleDelete}
           onFetchModels={handleFetchModels}
-          onUpdate={onUpdate} // Pass onUpdate for immediate toggle save
+          onUpdate={onUpdate}
           fetchStatus={fetchStatus}
           isDeleting={isDeleting}
+          // Pass the callback down
+          onSelectModelForDetails={onSelectModelForDetails}
         />
       )}
     </div>

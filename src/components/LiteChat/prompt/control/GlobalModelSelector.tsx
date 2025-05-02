@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/control/GlobalModelSelector.tsx
-// Entire file content provided
+
 import React, { useMemo, useState, useCallback } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,7 @@ import { combineModelId } from "@/lib/litechat/provider-helpers";
 
 interface GlobalModelSelectorProps {
   /** The effective model ID for the current context */
-  value: string | null
+  value: string | null;
   /** Callback to update the GLOBAL default model selection */
   onChange: (value: string | null) => void;
   /** Optional flag to disable the selector */
@@ -36,7 +36,7 @@ interface GlobalModelSelectorProps {
 export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
   React.memo(({ value, onChange, disabled = false, className }) => {
     const [open, setOpen] = useState(false);
-    const [filterText, setFilterText] = useState("")
+    const [filterText, setFilterText] = useState("");
 
     const { dbProviderConfigs, globalModelSortOrder, isLoading } =
       useProviderStore(
@@ -103,7 +103,7 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
       });
 
       return sorted;
-    }, [dbProviderConfigs, globalModelSortOrder])
+    }, [dbProviderConfigs, globalModelSortOrder]);
 
     const filteredModels = useMemo(() => {
       if (!filterText.trim()) {
@@ -120,14 +120,14 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
 
     const selectedModelDetails = useMemo(() => {
       return orderedModels.find((m) => m.id === value);
-    }, [orderedModels, value])
+    }, [orderedModels, value]);
 
     const handleSelect = useCallback(
       (currentValue: string) => {
         const newValue = currentValue === value ? null : currentValue;
-        onChange(newValue)
-        setOpen(false)
-        setFilterText("")
+        onChange(newValue);
+        setOpen(false);
+        setFilterText("");
       },
       [onChange, value],
     );

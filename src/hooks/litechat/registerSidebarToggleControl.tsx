@@ -1,5 +1,5 @@
 // src/hooks/litechat/registerSidebarToggleControl.tsx
-// Entire file content provided
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { PanelLeftCloseIcon, PanelRightCloseIcon } from "lucide-react";

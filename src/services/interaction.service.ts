@@ -1,5 +1,5 @@
 // src/services/interaction.service.ts
-// Entire file content provided
+
 import type { PromptObject, PromptTurnObject } from "@/types/litechat/prompt";
 import type {
   Interaction,

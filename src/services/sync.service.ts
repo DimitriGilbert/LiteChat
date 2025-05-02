@@ -1,5 +1,5 @@
 // src/services/sync.service.ts
-// Entire file content provided - Contains the actual sync logic
+
 import type { Conversation } from "@/types/litechat/chat";
 import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
 import type { Interaction } from "@/types/litechat/interaction";

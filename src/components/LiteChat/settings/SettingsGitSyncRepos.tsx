@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsGitSyncRepos.tsx
-// Entire file content provided
+
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,7 @@ import { useConversationStore } from "@/store/conversation.store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import { ActionTooltipButton } from "../common/ActionTooltipButton"
+import { ActionTooltipButton } from "../common/ActionTooltipButton";
 
 const SettingsGitSyncReposComponent: React.FC = () => {
   const {

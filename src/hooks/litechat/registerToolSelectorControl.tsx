@@ -1,5 +1,5 @@
 // src/hooks/litechat/registerToolSelectorControl.tsx
-// Entire file content provided
+
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { WrenchIcon } from "lucide-react";

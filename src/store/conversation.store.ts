@@ -1,5 +1,5 @@
 // src/store/conversation.store.ts
-// Entire file content provided - Significantly reduced
+
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { Conversation, SidebarItemType } from "@/types/litechat/chat";
@@ -18,7 +18,7 @@ import {
 // Import import/export service
 import { ImportExportService } from "@/services/import-export.service";
 // Import the key from the constants file
-import { SYNC_VFS_KEY } from "@/lib/litechat/constants"
+import { SYNC_VFS_KEY } from "@/lib/litechat/constants";
 import { useVfsStore } from "./vfs.store";
 import type { fs as FsType } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
@@ -42,7 +42,7 @@ interface ConversationState {
   error: string | null;
 }
 interface ConversationActions {
-  loadSidebarItems: () => Promise<void>
+  loadSidebarItems: () => Promise<void>;
   addConversation: (
     conversationData: Partial<Omit<Conversation, "id" | "createdAt">> & {
       title: string;

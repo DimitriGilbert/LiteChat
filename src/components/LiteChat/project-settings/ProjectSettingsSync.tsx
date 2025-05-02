@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/ProjectSettingsSync.tsx
-// NEW FILE
+
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";

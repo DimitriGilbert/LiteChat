@@ -1,5 +1,5 @@
 // src/components/LiteChat/common/FilePreviewRenderer.tsx
-// Entire file content provided
+
 import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
 import React, { useState, useEffect, useMemo } from "react";
 import {
@@ -14,7 +14,7 @@ import {
   XIcon,
   ChevronsUpDownIcon,
   HardDriveIcon,
-  DownloadIcon
+  DownloadIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,7 +36,7 @@ interface FilePreviewRendererProps {
   isReadOnly?: boolean;
 }
 
-const MAX_TEXT_PREVIEW_SIZE = 1024 * 5
+const MAX_TEXT_PREVIEW_SIZE = 1024 * 5;
 
 const base64ToBlobUrl = (base64: string, mimeType: string): string | null => {
   try {
@@ -95,11 +95,11 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   );
   const [error, setError] = useState<string | null>(null);
   const [isAddingToVfs, setIsAddingToVfs] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false)
-  const [isFolded, setIsFolded] = useState(true)
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isFolded, setIsFolded] = useState(true);
 
   const mimeType = fileMeta.type || "application/octet-stream";
-  const isText = isLikelyTextFile(fileMeta.name, mimeType)
+  const isText = isLikelyTextFile(fileMeta.name, mimeType);
   const isImage = mimeType.startsWith("image/");
   const isAudio = mimeType.startsWith("audio/");
   const isVideo = mimeType.startsWith("video/");
@@ -108,7 +108,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   // Effect to handle preview generation for DIRECT uploads
   useEffect(() => {
     let objectUrl: string | null = null;
-    setError(null)
+    setError(null);
 
     // Only generate blob URLs for non-text, direct uploads with base64 content
     if (fileMeta.source === "direct" && !isText && fileMeta.contentBase64) {
@@ -118,7 +118,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       }
       setPreviewContentUrl(objectUrl);
     } else {
-      setPreviewContentUrl(null)
+      setPreviewContentUrl(null);
     }
 
     // Check for text preview size limit (only for direct uploads)
@@ -217,7 +217,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   const toggleFold = () => setIsFolded((prev) => !prev);
 
   const renderIcon = () => {
-    if (isVfsSource) return <HardDriveIcon className="h-5 w-5 text-cyan-500" />
+    if (isVfsSource) return <HardDriveIcon className="h-5 w-5 text-cyan-500" />;
     if (isText) return <FileTextIcon className="h-5 w-5 text-blue-500" />;
     if (isImage) return <ImageIcon className="h-5 w-5 text-purple-500" />;
     if (isAudio) return <MusicIcon className="h-5 w-5 text-green-500" />;

@@ -1,4 +1,6 @@
 // src/components/LiteChat/settings/GlobalModelOrganizer.tsx
+// Line 77: Access metadata correctly
+
 import React, { useCallback, useMemo, useState } from "react";
 import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
@@ -25,10 +27,7 @@ import {
 } from "@dnd-kit/sortable";
 import { SortableModelItem } from "@/components/LiteChat/common/SortableModelItem";
 import type { AiModelConfig } from "@/types/litechat/provider";
-import {
-  combineModelId,
-  DEFAULT_MODELS,
-} from "@/lib/litechat/provider-helpers";
+import { combineModelId } from "@/lib/litechat/provider-helpers";
 
 export const GlobalModelOrganizer: React.FC = () => {
   const {
@@ -36,12 +35,15 @@ export const GlobalModelOrganizer: React.FC = () => {
     dbProviderConfigs,
     globalModelSortOrder,
     isLoading,
+    getAllAvailableModelDefsForProvider, // Get the selector
   } = useProviderStore(
     useShallow((state) => ({
       setGlobalModelSortOrder: state.setGlobalModelSortOrder,
       dbProviderConfigs: state.dbProviderConfigs,
       globalModelSortOrder: state.globalModelSortOrder,
       isLoading: state.isLoading,
+      getAllAvailableModelDefsForProvider:
+        state.getAllAvailableModelDefsForProvider, // Get the selector
     })),
   );
 
@@ -57,9 +59,8 @@ export const GlobalModelOrganizer: React.FC = () => {
     dbProviderConfigs.forEach((config) => {
       if (!config.isEnabled || !config.enabledModels) return;
 
-      const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
-      const allProviderModels =
-        config.fetchedModels ?? DEFAULT_MODELS[providerTypeKey] ?? [];
+      // Use the selector to get full model definitions
+      const allProviderModels = getAllAvailableModelDefsForProvider(config.id);
       const providerModelsMap = new Map(
         allProviderModels.map((m) => [m.id, m]),
       );
@@ -74,7 +75,7 @@ export const GlobalModelOrganizer: React.FC = () => {
             name: modelDef.name || modelId,
             providerId: config.id,
             providerName: config.name,
-            metadata: modelDef.metadata,
+            metadata: modelDef, // Store the full OpenRouterModel
           });
         }
       });
@@ -102,7 +103,11 @@ export const GlobalModelOrganizer: React.FC = () => {
       .sort((a, b) => a.name.localeCompare(b.name));
 
     return [...sortedModels, ...remainingEnabled];
-  }, [dbProviderConfigs, globalModelSortOrder]);
+  }, [
+    dbProviderConfigs,
+    globalModelSortOrder,
+    getAllAvailableModelDefsForProvider,
+  ]);
 
   const filteredAndOrderedModels = useMemo(() => {
     if (!filterText.trim()) {

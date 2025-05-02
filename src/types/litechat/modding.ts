@@ -1,4 +1,5 @@
 // src/types/litechat/modding.ts
+
 import type { z } from "zod";
 // Import PromptObject correctly
 import type { PromptTurnObject, PromptControl, PromptObject } from "./prompt";
@@ -61,6 +62,8 @@ export const ModEvent = {
   INTERACTION_COMPLETED: "interaction:completed",
   PROMPT_SUBMITTED: "prompt:submitted",
   PROMPT_FINALISED: "prompt:finalised",
+  // Add new event for input changes
+  PROMPT_INPUT_CHANGE: "prompt:input:change",
   SETTINGS_OPENED: "settings:opened",
   SETTINGS_CLOSED: "settings:closed",
   MOD_LOADED: "mod:loaded",
@@ -97,6 +100,8 @@ export interface ModEventPayloadMap {
   [ModEvent.PROMPT_SUBMITTED]: { turnData: PromptTurnObject };
   // Use PromptObject here
   [ModEvent.PROMPT_FINALISED]: { prompt: PromptObject };
+  // Define payload for new event
+  [ModEvent.PROMPT_INPUT_CHANGE]: { value: string };
   [ModEvent.SETTINGS_OPENED]: undefined;
   [ModEvent.SETTINGS_CLOSED]: undefined;
   [ModEvent.MOD_LOADED]: { id: string; name: string };

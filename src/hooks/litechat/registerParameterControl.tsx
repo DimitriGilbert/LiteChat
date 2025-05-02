@@ -1,5 +1,5 @@
 // src/hooks/litechat/registerParameterControl.tsx
-// Entire file content provided
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { SlidersHorizontalIcon } from "lucide-react";
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/tooltip";
 // Import the prompt state store
 import { usePromptStateStore } from "@/store/prompt.store";
+import { useShallow } from "zustand/react/shallow"; // Import useShallow
 
 export function registerParameterControl() {
   const registerPromptControl =
@@ -30,7 +31,7 @@ export function registerParameterControl() {
 
   // Component to render inside the Popover, fetching state and passing props
   const ParameterPopoverContent: React.FC = () => {
-    // Get current prompt state values and setters from the store hook
+    // Get current prompt state values and setters from the store hook using useShallow
     const {
       temperature,
       setTemperature,
@@ -44,7 +45,30 @@ export function registerParameterControl() {
       setPresencePenalty,
       frequencyPenalty,
       setFrequencyPenalty,
-    } = usePromptStateStore(); // Use the hook directly here
+      reasoningEnabled, // Get new state
+      setReasoningEnabled, // Get new setter
+      webSearchEnabled, // Get new state
+      setWebSearchEnabled, // Get new setter
+    } = usePromptStateStore(
+      useShallow((state) => ({
+        temperature: state.temperature,
+        setTemperature: state.setTemperature,
+        topP: state.topP,
+        setTopP: state.setTopP,
+        maxTokens: state.maxTokens,
+        setMaxTokens: state.setMaxTokens,
+        topK: state.topK,
+        setTopK: state.setTopK,
+        presencePenalty: state.presencePenalty,
+        setPresencePenalty: state.setPresencePenalty,
+        frequencyPenalty: state.frequencyPenalty,
+        setFrequencyPenalty: state.setFrequencyPenalty,
+        reasoningEnabled: state.reasoningEnabled, // Select new state
+        setReasoningEnabled: state.setReasoningEnabled, // Select new setter
+        webSearchEnabled: state.webSearchEnabled, // Select new state
+        setWebSearchEnabled: state.setWebSearchEnabled, // Select new setter
+      })),
+    );
 
     // Get global defaults from SettingsStore to display in "Use Default" buttons
     const globalDefaults = useSettingsStore.getState();
@@ -63,6 +87,10 @@ export function registerParameterControl() {
       setPresencePenalty,
       frequencyPenalty,
       setFrequencyPenalty,
+      reasoningEnabled, // Pass new state
+      setReasoningEnabled, // Pass new setter
+      webSearchEnabled, // Pass new state
+      setWebSearchEnabled, // Pass new setter
       // Pass global defaults for the "Use Default" display
       defaultTemperature: globalDefaults.temperature,
       defaultTopP: globalDefaults.topP,
@@ -76,7 +104,6 @@ export function registerParameterControl() {
   };
 
   const ParameterControlTrigger: React.FC = () => {
-    // Get state directly inside the component instance
     const isStreaming = useInteractionStore.getState().status === "streaming";
     // Read from prompt state store to determine if non-default values are set
     const {
@@ -86,21 +113,31 @@ export function registerParameterControl() {
       topK,
       presencePenalty,
       frequencyPenalty,
-    } = usePromptStateStore(); // Use hook here
-    // Read global defaults for comparison
-    const globalDefaults = useSettingsStore.getState();
+      reasoningEnabled, // Read new state
+      webSearchEnabled, // Read new state
+    } = usePromptStateStore(
+      useShallow((state) => ({
+        temperature: state.temperature,
+        topP: state.topP,
+        maxTokens: state.maxTokens,
+        topK: state.topK,
+        presencePenalty: state.presencePenalty,
+        frequencyPenalty: state.frequencyPenalty,
+        reasoningEnabled: state.reasoningEnabled, // Select new state
+        webSearchEnabled: state.webSearchEnabled, // Select new state
+      })),
+    );
 
-    // Check if any parameter in the prompt state is different from the global default
-    // Note: This comparison logic might need refinement if defaults can be null
+    // Check if any parameter in the prompt state is explicitly set (not null)
     const hasNonDefaultParams =
-      (temperature !== null && temperature !== globalDefaults.temperature) ||
-      (topP !== null && topP !== globalDefaults.topP) ||
-      (maxTokens !== null && maxTokens !== globalDefaults.maxTokens) ||
-      (topK !== null && topK !== globalDefaults.topK) ||
-      (presencePenalty !== null &&
-        presencePenalty !== globalDefaults.presencePenalty) ||
-      (frequencyPenalty !== null &&
-        frequencyPenalty !== globalDefaults.frequencyPenalty);
+      temperature !== null ||
+      topP !== null ||
+      maxTokens !== null ||
+      topK !== null ||
+      presencePenalty !== null ||
+      frequencyPenalty !== null ||
+      reasoningEnabled !== null || // Check new state
+      webSearchEnabled !== null; // Check new state
 
     return (
       <Popover>
@@ -123,7 +160,6 @@ export function registerParameterControl() {
           </Tooltip>
         </TooltipProvider>
         <PopoverContent className="w-auto p-0" align="start">
-          {/* Render the component that passes props */}
           <ParameterPopoverContent />
         </PopoverContent>
       </Popover>
@@ -145,18 +181,28 @@ export function registerParameterControl() {
         topK,
         presencePenalty,
         frequencyPenalty,
+        reasoningEnabled, // Get new state
+        webSearchEnabled, // Get new state
       } = usePromptStateStore.getState();
-      return {
-        // Only include parameters if they are not null (i.e., explicitly set)
-        ...(temperature !== null && { temperature }),
-        ...(topP !== null && { top_p: topP }),
-        ...(maxTokens !== null && { max_tokens: maxTokens }),
-        ...(topK !== null && { top_k: topK }),
-        ...(presencePenalty !== null && { presence_penalty: presencePenalty }),
-        ...(frequencyPenalty !== null && {
-          frequency_penalty: frequencyPenalty,
-        }),
+
+      // Helper to add param if not null
+      const addParam = (obj: Record<string, any>, key: string, value: any) => {
+        if (value !== null) {
+          obj[key] = value;
+        }
       };
+
+      const params: Record<string, any> = {};
+      addParam(params, "temperature", temperature);
+      addParam(params, "top_p", topP);
+      addParam(params, "max_tokens", maxTokens);
+      addParam(params, "top_k", topK);
+      addParam(params, "presence_penalty", presencePenalty);
+      addParam(params, "frequency_penalty", frequencyPenalty);
+      addParam(params, "reasoning", reasoningEnabled); // Add new param
+      addParam(params, "web_search", webSearchEnabled); // Add new param
+
+      return Object.keys(params).length > 0 ? params : undefined;
     },
     // No metadata or clearOnSubmit needed for this control
     show: () => useSettingsStore.getState().enableAdvancedSettings,

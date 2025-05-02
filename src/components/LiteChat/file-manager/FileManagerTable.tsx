@@ -1,5 +1,5 @@
 // src/components/LiteChat/file-manager/FileManagerTable.tsx
-// Entire file content provided
+
 import React, { useMemo } from "react";
 import {
   Table,

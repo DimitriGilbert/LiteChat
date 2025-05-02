@@ -1,6 +1,6 @@
 // src/hooks/litechat/registerSystemPromptControl.tsx
-// Entire file content provided
-import React, { useState, useCallback, useEffect } from "react";
+
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { TextIcon } from "lucide-react";
 import {
@@ -47,33 +47,40 @@ export function registerSystemPromptControl() {
       useShallow((state) => state.status === "streaming"),
     );
 
-    // Get effective prompt for placeholder (remains the same)
+    // Get effective prompt for placeholder
+    // Select primitive/stable values
     const { selectedItemId, selectedItemType } = useConversationStore(
       useShallow((state) => ({
         selectedItemId: state.selectedItemId,
         selectedItemType: state.selectedItemType,
-        getConversationById: state.getConversationById,
       })),
     );
-    const { getEffectiveProjectSettings } = useProjectStore(
-      useShallow((state) => ({
-        getEffectiveProjectSettings: state.getEffectiveProjectSettings,
-      })),
-    );
+    // Select stable functions/arrays
+    const { getConversationById } = useConversationStore.getState(); // Use getState for stable function
+    const { getEffectiveProjectSettings } = useProjectStore.getState(); // Use getState for stable function
     const globalSystemPrompt = useSettingsStore(
       (state) => state.globalSystemPrompt,
-    );
+    ); // Select primitive
 
-    const currentProjectId =
-      selectedItemType === "project"
-        ? selectedItemId
-        : selectedItemType === "conversation"
-          ? (useConversationStore.getState().getConversationById(selectedItemId)
-              ?.projectId ?? null)
-          : null;
-    const effectiveSystemPrompt =
-      getEffectiveProjectSettings(currentProjectId).systemPrompt ??
-      globalSystemPrompt;
+    // Compute effective prompt inside useMemo
+    const effectiveSystemPrompt = useMemo(() => {
+      const currentProjectId =
+        selectedItemType === "project"
+          ? selectedItemId
+          : selectedItemType === "conversation"
+            ? (getConversationById(selectedItemId)?.projectId ?? null)
+            : null;
+      return (
+        getEffectiveProjectSettings(currentProjectId).systemPrompt ??
+        globalSystemPrompt
+      );
+    }, [
+      selectedItemId,
+      selectedItemType,
+      getConversationById,
+      getEffectiveProjectSettings,
+      globalSystemPrompt,
+    ]);
 
     // Provide a way for this component instance to update the scoped variable
     useEffect(() => {

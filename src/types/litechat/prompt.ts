@@ -1,5 +1,5 @@
 // src/types/litechat/prompt.ts
-// Entire file content provided as it's significantly changed
+
 import type React from "react";
 import type { CoreMessage, Tool } from "ai";
 import { ChatControlStatus } from "./chat";
@@ -20,17 +20,17 @@ export interface PromptTurnObject {
   metadata: Record<string, any> & {
     // Unified attachedFiles metadata structure including content
     attachedFiles?: {
-      id: string
+      id: string;
       source: "direct" | "vfs";
       name: string;
-      type: string
+      type: string;
       size: number;
-      path?: string
+      path?: string;
       // Content is stored here for persistence
       contentText?: string;
       contentBase64?: string;
     }[];
-    enabledTools?: string[]
+    enabledTools?: string[];
   };
 }
 
@@ -59,7 +59,7 @@ export interface PromptObject {
   parameters: Record<string, any>;
   /** Final combined metadata for the AI call (file content is NOT included here) */
   metadata: Record<string, any> & {
-    enabledTools?: string[]
+    enabledTools?: string[];
     // Only basic file info needed here, content is processed into messages
     attachedFiles?: {
       id: string;
@@ -79,7 +79,7 @@ export interface PromptObject {
  */
 export interface InputAreaRendererProps {
   // value and onChange removed
-  initialValue?: string
+  initialValue?: string;
   onSubmit: () => void;
   disabled?: boolean;
   placeholder?: string;

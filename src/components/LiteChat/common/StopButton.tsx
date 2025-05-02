@@ -1,8 +1,8 @@
 // src/components/LiteChat/common/StopButton.tsx
-// Entire file content provided
+
 import React from "react";
 import { SquareIcon } from "lucide-react";
-import { ActionTooltipButton } from "./ActionTooltipButton"
+import { ActionTooltipButton } from "./ActionTooltipButton";
 
 interface StopButtonProps {
   onStop: () => void;

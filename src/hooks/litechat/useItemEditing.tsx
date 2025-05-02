@@ -1,5 +1,5 @@
 // src/hooks/litechat/useItemEditing.tsx
-// Entire file content provided
+
 import { useState, useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import type { SidebarItem } from "@/store/conversation.store";

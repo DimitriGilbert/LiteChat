@@ -1,11 +1,11 @@
 // src/components/LiteChat/settings/SettingsGitConfig.tsx
-// Entire file content provided
+
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
-import { SettingsSection } from "../common/SettingsSection"
+import { SettingsSection } from "../common/SettingsSection";
 
 const SettingsGitConfigComponent: React.FC = () => {
   const { gitUserName, setGitUserName, gitUserEmail, setGitUserEmail } =

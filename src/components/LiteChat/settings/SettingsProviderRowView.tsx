@@ -1,9 +1,8 @@
 // src/components/LiteChat/settings/SettingsProviderRowView.tsx
-// Entire file content provided
+
 import React, { useMemo, useCallback, useState } from "react";
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import { Button } from "@/components/ui/button";
-// ScrollArea removed
 import {
   Edit2Icon,
   Trash2Icon,
@@ -24,6 +23,7 @@ import {
   requiresApiKey,
   requiresBaseURL,
   supportsModelFetching,
+  combineModelId, // Import combineModelId
 } from "@/lib/litechat/provider-helpers";
 import { cn } from "@/lib/utils";
 import { useProviderStore } from "@/store/provider.store";
@@ -42,6 +42,8 @@ interface ProviderRowViewModeProps {
   onUpdate: (id: string, changes: Partial<DbProviderConfig>) => Promise<void>;
   fetchStatus: FetchStatus;
   isDeleting: boolean;
+  // Add callback prop
+  onSelectModelForDetails: (combinedModelId: string | null) => void;
 }
 
 const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
@@ -53,6 +55,7 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   onUpdate,
   fetchStatus,
   isDeleting,
+  onSelectModelForDetails, // Receive callback
 }) => {
   const [isModelListFolded, setIsModelListFolded] = useState(true);
 
@@ -66,6 +69,7 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   const getAllAvailableModelDefsForProvider = useProviderStore(
     (state) => state.getAllAvailableModelDefsForProvider,
   );
+  // Get full model defs here for display/linking
   const allAvailableModels = getAllAvailableModelDefsForProvider(provider.id);
   const enabledModelsSet = useMemo(
     () => new Set(provider.enabledModels ?? []),
@@ -77,7 +81,6 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
     : false;
   const showKeyWarning = needsKey && !apiKeyLinked;
 
-  // Handler for immediate model enable/disable save in View mode
   const handleModelToggle = useCallback(
     async (modelId: string, checked: boolean) => {
       const currentEnabledSet = new Set(provider.enabledModels ?? []);
@@ -90,7 +93,6 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
 
       try {
         await onUpdate(provider.id, { enabledModels: newEnabledModels });
-        // Optional: toast.success(`Model ${checked ? 'enabled' : 'disabled'}`);
       } catch (error) {
         toast.error("Failed to update model status.");
         console.error("Failed to save model toggle:", error);
@@ -103,6 +105,14 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
 
   const enabledCount = provider.enabledModels?.length ?? 0;
   const availableCount = allAvailableModels.length;
+
+  // Handler for clicking a model name
+  const handleModelClick = (modelId: string) => {
+    const combinedId = combineModelId(provider.id, modelId);
+    onSelectModelForDetails(combinedId);
+    // Optionally switch to the details tab (needs communication back up)
+    // This might be better handled in the parent component (SettingsProviders)
+  };
 
   return (
     <div className="space-y-4">
@@ -214,7 +224,6 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
             </span>
           )}
         </div>
-        {/* Fetch Models Button */}
         {canFetch && (
           <div className="pt-1">
             <Button
@@ -263,14 +272,20 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
           />
         </div>
         {!isModelListFolded && (
+          // Pass the model click handler to the list
           <ModelEnablementList
             providerId={provider.id}
-            allAvailableModels={allAvailableModels}
+            allAvailableModels={allAvailableModels.map((m) => ({
+              id: m.id,
+              name: m.name,
+            }))} // Pass basic info
             enabledModelIds={enabledModelsSet}
-            onToggleModel={handleModelToggle} // Use immediate save handler
-            isLoading={fetchStatus === "fetching"} // Show loading skeleton during fetch
-            disabled={isDeleting} // Disable switches if deleting provider
-            listHeightClass="h-64" // Adjust height for view mode
+            onToggleModel={handleModelToggle}
+            isLoading={fetchStatus === "fetching"}
+            disabled={isDeleting}
+            listHeightClass="h-64"
+            // Add the click handler prop
+            onModelClick={handleModelClick}
           />
         )}
       </div>

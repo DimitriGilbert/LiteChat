@@ -1,5 +1,5 @@
 // src/components/LiteChat/chat/control/ConversationOnlyList.tsx
-// Entire file content provided
+
 import React from "react";
 import { useConversationStore } from "@/store/conversation.store";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -55,7 +55,7 @@ const getSyncIndicatorInternal = (
       tooltipText = `Sync error with ${repoName}`;
       break;
     case "needs-sync":
-      IconComponent = AlertCircleIcon
+      IconComponent = AlertCircleIcon;
       className = "text-orange-500";
       tooltipText = `Needs sync with ${repoName}`;
       break;

@@ -1,6 +1,6 @@
 // src/hooks/litechat/registerConversationListControl.ts
-// Entire file content provided
-import React from "react"
+
+import React from "react";
 import { ConversationListControlComponent } from "@/components/LiteChat/chat/control/ConversationList";
 import { ConversationListIconRenderer } from "@/components/LiteChat/chat/control/conversation-list/IconRenderer";
 import { useControlRegistryStore } from "@/store/control.store";

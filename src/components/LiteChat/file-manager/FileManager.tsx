@@ -1,5 +1,5 @@
 // src/components/LiteChat/file-manager/FileManager.tsx
-// Entire file content provided
+
 import React, {
   useState,
   useEffect,

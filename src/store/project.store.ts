@@ -1,5 +1,5 @@
 // src/store/project.store.ts
-// Entire file content provided
+
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { Project } from "@/types/litechat/project";

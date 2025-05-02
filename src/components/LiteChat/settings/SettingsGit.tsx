@@ -1,9 +1,9 @@
 // src/components/LiteChat/settings/SettingsGit.tsx
-// Entire file content provided
+
 import React, { useMemo } from "react";
 import { SettingsGitConfig } from "./SettingsGitConfig";
 import { SettingsGitSyncRepos } from "./SettingsGitSyncRepos";
-import { TabbedLayout, TabDefinition } from "../common/TabbedLayout"
+import { TabbedLayout, TabDefinition } from "../common/TabbedLayout";
 
 const SettingsGitComponent: React.FC = () => {
   // Define tabs for the layout
@@ -22,7 +22,7 @@ const SettingsGitComponent: React.FC = () => {
       // Add more Git-related tabs here later if needed
     ],
     [],
-  )
+  );
 
   return (
     // Use TabbedLayout, remove internal Tabs component

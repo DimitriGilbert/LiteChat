@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/control/ToolSelectorControlComponent.tsx
-// Entire file content provided
+
 import React, { useState, useMemo, useCallback } from "react";
 import { useControlRegistryStore } from "@/store/control.store";
 // ConversationStore removed

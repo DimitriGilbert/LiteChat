@@ -1,5 +1,5 @@
 // src/components/LiteChat/common/ActionTooltipButton.tsx
-// Entire file content provided
+
 import React from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { VariantProps } from "class-variance-authority";

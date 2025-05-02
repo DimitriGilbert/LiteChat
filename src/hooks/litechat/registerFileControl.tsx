@@ -1,11 +1,12 @@
 // src/hooks/litechat/registerFileControl.tsx
-// Entire file content provided
-import React, { useRef, useCallback } from "react";
+
+import React, { useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { PaperclipIcon } from "lucide-react";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useInputStore } from "@/store/input.store";
 import { useInteractionStore } from "@/store/interaction.store";
+import { useProviderStore } from "@/store/provider.store";
 import { toast } from "sonner";
 import {
   Tooltip,
@@ -14,8 +15,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { FilePreviewRenderer } from "@/components/LiteChat/common/FilePreviewRenderer";
-// Import the helper from file-extensions
 import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
+import { useShallow } from "zustand/react/shallow";
+import {
+  createAiModelConfig,
+  splitModelId,
+} from "@/lib/litechat/provider-helpers"; // Import helper
 
 const MAX_FILE_SIZE_MB = 20;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -28,6 +33,37 @@ export function registerFileControl() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const addAttachedFile = useInputStore.getState().addAttachedFile;
     const isStreaming = useInteractionStore.getState().status === "streaming";
+
+    // Select primitive/stable values needed for computation
+    const { selectedModelId, dbProviderConfigs, dbApiKeys } = useProviderStore(
+      useShallow((state) => ({
+        selectedModelId: state.selectedModelId,
+        dbProviderConfigs: state.dbProviderConfigs,
+        dbApiKeys: state.dbApiKeys,
+      })),
+    );
+
+    // Compute selectedModel *inside* useMemo based on stable IDs/configs
+    const selectedModel = useMemo(() => {
+      if (!selectedModelId) return undefined;
+      const { providerId, modelId: specificModelId } =
+        splitModelId(selectedModelId);
+      if (!providerId || !specificModelId) return undefined;
+      const config = dbProviderConfigs.find((p) => p.id === providerId);
+      if (!config) return undefined;
+      const apiKeyRecord = dbApiKeys.find((k) => k.id === config.apiKeyId);
+      return createAiModelConfig(config, specificModelId, apiKeyRecord?.value);
+    }, [selectedModelId, dbProviderConfigs, dbApiKeys]); // Depend on stable values/arrays
+
+    // Determine if file input should be allowed based on computed model metadata
+    const allowFileInput = useMemo(() => {
+      const inputModalities =
+        selectedModel?.metadata?.architecture?.input_modalities;
+      // If no model selected or modalities unknown, allow by default
+      if (!inputModalities) return true;
+      // Allow if it supports anything other than just text
+      return inputModalities.some((mod) => mod !== "text");
+    }, [selectedModel]); // Depend on the computed model
 
     const handleFileChange = useCallback(
       async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -43,21 +79,17 @@ export function registerFileControl() {
           }
 
           try {
-            // Initialize fileData object
             let fileData: {
               contentText?: string;
               contentBase64?: string;
             } = {};
 
-            // Determine if it's likely text using the helper function
-            const isText = isLikelyTextFile(file.name, file.type)
+            const isText = isLikelyTextFile(file.name, file.type);
             const isImage = file.type.startsWith("image/");
 
             if (isText) {
-              // Read as text if the helper identifies it as text
               fileData.contentText = await file.text();
             } else if (isImage) {
-              // Read as base64 ONLY if it's an image
               const reader = new FileReader();
               const promise = new Promise<string>((resolve, reject) => {
                 reader.onload = () => resolve(reader.result as string);
@@ -65,7 +97,6 @@ export function registerFileControl() {
               });
               reader.readAsDataURL(file);
               const dataUrl = await promise;
-              // Ensure dataUrl is not null and split correctly
               if (dataUrl && dataUrl.includes(",")) {
                 fileData.contentBase64 = dataUrl.split(",")[1];
               } else {
@@ -74,20 +105,17 @@ export function registerFileControl() {
                 );
               }
             } else {
-              // For other types, do not attempt to read content here
               console.log(
                 `File type ${file.type} (Name: ${file.name}) not directly processed for content storage in InputStore.`,
               );
             }
 
-            // Add to store with potentially populated contentText/contentBase64
             addAttachedFile({
               source: "direct",
               name: file.name,
-              // Store the original browser-provided type, but content processing will use isLikelyTextFile
               type: file.type || "application/octet-stream",
               size: file.size,
-              ...fileData
+              ...fileData,
             });
           } catch (error) {
             console.error(`Error processing file ${file.name}:`, error);
@@ -97,7 +125,6 @@ export function registerFileControl() {
           }
         }
 
-        // Reset file input
         if (event.target) {
           event.target.value = "";
         }
@@ -109,6 +136,10 @@ export function registerFileControl() {
       fileInputRef.current?.click();
     };
 
+    const tooltipText = allowFileInput
+      ? "Attach Files"
+      : "File input not supported by this model";
+
     return (
       <>
         <input
@@ -117,7 +148,7 @@ export function registerFileControl() {
           onChange={handleFileChange}
           multiple
           className="hidden"
-          disabled={isStreaming}
+          disabled={isStreaming || !allowFileInput} // Disable based on modality
         />
         <TooltipProvider delayDuration={100}>
           <Tooltip>
@@ -127,14 +158,14 @@ export function registerFileControl() {
                 variant="ghost"
                 size="icon"
                 onClick={handleButtonClick}
-                disabled={isStreaming}
+                disabled={isStreaming || !allowFileInput} // Disable based on modality
                 className="h-8 w-8"
-                aria-label="Attach Files"
+                aria-label={tooltipText}
               >
                 <PaperclipIcon className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">Attach Files</TooltipContent>
+            <TooltipContent side="top">{tooltipText}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </>
@@ -142,9 +173,12 @@ export function registerFileControl() {
   };
 
   const FileControlPanel: React.FC = () => {
-    // Read directly from the store within the component instance
-    const { attachedFilesMetadata, removeAttachedFile } =
-      useInputStore.getState();
+    const { attachedFilesMetadata, removeAttachedFile } = useInputStore(
+      useShallow((state) => ({
+        attachedFilesMetadata: state.attachedFilesMetadata,
+        removeAttachedFile: state.removeAttachedFile,
+      })),
+    );
     const isStreaming = useInteractionStore.getState().status === "streaming";
 
     if (attachedFilesMetadata.length === 0) {
@@ -170,13 +204,11 @@ export function registerFileControl() {
     order: 20,
     triggerRenderer: () => React.createElement(FileControlTrigger),
     renderer: () => React.createElement(FileControlPanel),
-    // Metadata is handled by PromptWrapper reading from InputStore
     clearOnSubmit: () => {
       // InputStore.clearAttachedFiles is called by PromptWrapper
     },
-    show: () => true
+    show: () => true, // Control visibility based on model capability inside the trigger
   });
 
   console.log("[Function] Registered Core File Attachment Control");
-  // No cleanup needed or returned
 }

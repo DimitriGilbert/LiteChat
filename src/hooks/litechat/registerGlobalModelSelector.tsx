@@ -1,5 +1,5 @@
 // src/hooks/litechat/registerGlobalModelSelector.tsx
-// Entire file content provided
+
 import React from "react";
 import { GlobalModelSelector } from "@/components/LiteChat/prompt/control/GlobalModelSelector";
 import { useControlRegistryStore } from "@/store/control.store";

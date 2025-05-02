@@ -1,5 +1,5 @@
 // src/store/settings.store.ts
-// Entire file content provided
+
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { PersistenceService } from "@/services/persistence.service";
@@ -16,10 +16,9 @@ interface SettingsState {
   frequencyPenalty: number | null;
   enableAdvancedSettings: boolean;
   enableStreamingMarkdown: boolean;
-  // Add setting for code block parsing during streaming
   enableStreamingCodeBlockParsing: boolean;
+  foldStreamingCodeBlocks: boolean; // New setting
   streamingRenderFPS: number;
-  // streamingCodeRenderFPS removed
   gitUserName: string | null;
   gitUserEmail: string | null;
   toolMaxSteps: number;
@@ -37,10 +36,9 @@ interface SettingsActions {
   setFrequencyPenalty: (penalty: number | null) => void;
   setEnableAdvancedSettings: (enabled: boolean) => void;
   setEnableStreamingMarkdown: (enabled: boolean) => void;
-  // Add setter for code block parsing
   setEnableStreamingCodeBlockParsing: (enabled: boolean) => void;
+  setFoldStreamingCodeBlocks: (fold: boolean) => void; // New action
   setStreamingRenderFPS: (fps: number) => void;
-  // setStreamingCodeRenderFPS removed
   setGitUserName: (name: string | null) => void;
   setGitUserEmail: (email: string | null) => void;
   setToolMaxSteps: (steps: number) => void;
@@ -60,10 +58,9 @@ const DEFAULT_PRESENCE_PENALTY = 0.0;
 const DEFAULT_FREQUENCY_PENALTY = 0.0;
 const DEFAULT_ENABLE_ADVANCED_SETTINGS = true;
 const DEFAULT_ENABLE_STREAMING_MARKDOWN = true;
-// Add default for code block parsing
-const DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING = false; // Default to off
-const DEFAULT_STREAMING_FPS = 15; // Adjusted default FPS
-// DEFAULT_STREAMING_CODE_FPS removed
+const DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING = false;
+const DEFAULT_FOLD_STREAMING_CODE_BLOCKS = false; // New default
+const DEFAULT_STREAMING_FPS = 15;
 const DEFAULT_GIT_USER_NAME = null;
 const DEFAULT_GIT_USER_EMAIL = null;
 const DEFAULT_TOOL_MAX_STEPS = 5;
@@ -82,11 +79,10 @@ export const useSettingsStore = create(
     frequencyPenalty: DEFAULT_FREQUENCY_PENALTY,
     enableAdvancedSettings: DEFAULT_ENABLE_ADVANCED_SETTINGS,
     enableStreamingMarkdown: DEFAULT_ENABLE_STREAMING_MARKDOWN,
-    // Initialize new setting
     enableStreamingCodeBlockParsing:
       DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
+    foldStreamingCodeBlocks: DEFAULT_FOLD_STREAMING_CODE_BLOCKS, // Initialize new setting
     streamingRenderFPS: DEFAULT_STREAMING_FPS,
-    // streamingCodeRenderFPS removed
     gitUserName: DEFAULT_GIT_USER_NAME,
     gitUserEmail: DEFAULT_GIT_USER_EMAIL,
     toolMaxSteps: DEFAULT_TOOL_MAX_STEPS,
@@ -137,7 +133,6 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("enableStreamingMarkdown", enabled);
     },
 
-    // Implement setter for code block parsing
     setEnableStreamingCodeBlockParsing: (enabled) => {
       set({ enableStreamingCodeBlockParsing: enabled });
       PersistenceService.saveSetting(
@@ -146,13 +141,17 @@ export const useSettingsStore = create(
       );
     },
 
+    // Implement setter for fold setting
+    setFoldStreamingCodeBlocks: (fold) => {
+      set({ foldStreamingCodeBlocks: fold });
+      PersistenceService.saveSetting("foldStreamingCodeBlocks", fold);
+    },
+
     setStreamingRenderFPS: (fps) => {
-      const clampedFps = Math.max(3, Math.min(60, fps)); // Adjusted min FPS
+      const clampedFps = Math.max(3, Math.min(60, fps));
       set({ streamingRenderFPS: clampedFps });
       PersistenceService.saveSetting("streamingRenderFPS", clampedFps);
     },
-
-    // setStreamingCodeRenderFPS removed
 
     setGitUserName: (name) => {
       const trimmedName = name?.trim() || null;
@@ -190,10 +189,9 @@ export const useSettingsStore = create(
           systemPrompt,
           enableAdvanced,
           enableStreamingMd,
-          // Load new setting
           enableStreamingCodeBlock,
+          foldStreamingCodeBlocks, // Load new setting
           streamingFps,
-          // streamingCodeFps removed
           gitUserName,
           gitUserEmail,
           toolMaxSteps,
@@ -233,16 +231,19 @@ export const useSettingsStore = create(
             "enableStreamingMarkdown",
             DEFAULT_ENABLE_STREAMING_MARKDOWN,
           ),
-          // Load new setting from persistence
           PersistenceService.loadSetting<boolean>(
             "enableStreamingCodeBlockParsing",
             DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
+          ),
+          // Load new setting from persistence
+          PersistenceService.loadSetting<boolean>(
+            "foldStreamingCodeBlocks",
+            DEFAULT_FOLD_STREAMING_CODE_BLOCKS,
           ),
           PersistenceService.loadSetting<number>(
             "streamingRenderFPS",
             DEFAULT_STREAMING_FPS,
           ),
-          // streamingCodeRenderFPS removed
           PersistenceService.loadSetting<string | null>(
             "gitUserName",
             DEFAULT_GIT_USER_NAME,
@@ -272,10 +273,9 @@ export const useSettingsStore = create(
           globalSystemPrompt: systemPrompt,
           enableAdvancedSettings: enableAdvanced,
           enableStreamingMarkdown: enableStreamingMd,
-          // Set loaded value for new setting
           enableStreamingCodeBlockParsing: enableStreamingCodeBlock,
+          foldStreamingCodeBlocks: foldStreamingCodeBlocks, // Set loaded value
           streamingRenderFPS: streamingFps,
-          // streamingCodeRenderFPS removed
           gitUserName,
           gitUserEmail,
           toolMaxSteps,
@@ -291,11 +291,10 @@ export const useSettingsStore = create(
         set({
           theme: DEFAULT_THEME,
           enableStreamingMarkdown: DEFAULT_ENABLE_STREAMING_MARKDOWN,
-          // Reset new setting
           enableStreamingCodeBlockParsing:
             DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
+          foldStreamingCodeBlocks: DEFAULT_FOLD_STREAMING_CODE_BLOCKS, // Reset new setting
           streamingRenderFPS: DEFAULT_STREAMING_FPS,
-          // streamingCodeRenderFPS removed
           prismThemeUrl: DEFAULT_PRISM_THEME_URL,
         });
         await Promise.all([
@@ -304,16 +303,19 @@ export const useSettingsStore = create(
             "enableStreamingMarkdown",
             DEFAULT_ENABLE_STREAMING_MARKDOWN,
           ),
-          // Persist reset for new setting
           PersistenceService.saveSetting(
             "enableStreamingCodeBlockParsing",
             DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
+          ),
+          // Persist reset for new setting
+          PersistenceService.saveSetting(
+            "foldStreamingCodeBlocks",
+            DEFAULT_FOLD_STREAMING_CODE_BLOCKS,
           ),
           PersistenceService.saveSetting(
             "streamingRenderFPS",
             DEFAULT_STREAMING_FPS,
           ),
-          // streamingCodeRenderFPS removed
           PersistenceService.saveSetting(
             "prismThemeUrl",
             DEFAULT_PRISM_THEME_URL,

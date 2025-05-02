@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsModal.tsx
-// Entire file content provided
+
 import React, { memo, useState, useEffect, useMemo } from "react";
 import {
   Dialog,

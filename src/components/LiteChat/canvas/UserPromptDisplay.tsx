@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/UserPromptDisplay.tsx
-// Entire file content provided
+
 import React, { useState, useCallback } from "react";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
 import { FilePreviewRenderer } from "../common/FilePreviewRenderer";
@@ -13,7 +13,7 @@ import {
   CheckIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ActionTooltipButton } from "../common/ActionTooltipButton"
+import { ActionTooltipButton } from "../common/ActionTooltipButton";
 
 interface UserPromptDisplayProps {
   turnData: Readonly<PromptTurnObject>;

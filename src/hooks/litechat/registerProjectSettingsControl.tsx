@@ -1,5 +1,5 @@
 // src/hooks/litechat/registerProjectSettingsControl.ts
-// Entire file content provided as it's significantly changed
+
 import React from "react";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useUIStateStore } from "@/store/ui.store";

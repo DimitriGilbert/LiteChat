@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/StreamingInteractionCard.tsx
-// Entire file content provided
+
 import React, { useMemo } from "react";
 import { UserPromptDisplay } from "./UserPromptDisplay";
 import { StreamingContentView } from "./StreamingContentView";

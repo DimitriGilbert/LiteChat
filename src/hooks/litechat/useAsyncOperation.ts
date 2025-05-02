@@ -1,5 +1,5 @@
 // src/hooks/litechat/useAsyncOperation.ts
-// Entire file content provided
+
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
 
@@ -19,8 +19,8 @@ export function useAsyncOperation<TArgs extends any[], TResult>(
   // Corrected usage of the generic type
   operation: AsyncOperation<TArgs, TResult>,
   options?: {
-    setLoading?: (loading: boolean) => void
-    setError?: (error: string | null) => void
+    setLoading?: (loading: boolean) => void;
+    setError?: (error: string | null) => void;
     successMessage?: string | ((result: TResult) => string);
     errorMessagePrefix?: string;
   },
@@ -57,9 +57,9 @@ export function useAsyncOperation<TArgs extends any[], TResult>(
       } catch (err: unknown) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         console.error(`[useAsyncOperation Error - ${prefix}]:`, err);
-        setError(errorMsg)
+        setError(errorMsg);
         toast.error(`${prefix}: ${errorMsg}`);
-        return undefined
+        return undefined;
       } finally {
         setLoading(false);
       }

@@ -1,5 +1,5 @@
 // src/types/litechat/interaction.ts
-// Entire file content provided
+
 import type { PromptTurnObject } from "./prompt";
 import type { Metadata } from "./common";
 // Remove direct import of ToolCallPart/ToolResultPart from here

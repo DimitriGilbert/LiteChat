@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/ChatCanvas.tsx
-// Entire file content provided
+
 import React, { useMemo, useRef, useEffect, useState } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 // Updated import path for InteractionCard

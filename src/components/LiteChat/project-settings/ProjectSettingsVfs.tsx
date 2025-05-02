@@ -1,12 +1,12 @@
 // src/components/LiteChat/project-settings/ProjectSettingsVfs.tsx
-// Entire file content provided
+
 import React, { useMemo } from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { AlertCircleIcon } from "lucide-react";
 import { toast } from "sonner";
 import { FileManager } from "@/components/LiteChat/file-manager/FileManager";
-import { TabbedLayout, TabDefinition } from "../common/TabbedLayout"
+import { TabbedLayout, TabDefinition } from "../common/TabbedLayout";
 
 interface ProjectSettingsVfsProps {
   projectId: string | null;
@@ -82,7 +82,7 @@ export const ProjectSettingsVfs: React.FC<ProjectSettingsVfsProps> = ({
       },
     ],
     [projectId, projectName, isSaving],
-  )
+  );
 
   return (
     // Use TabbedLayout, remove internal Tabs component

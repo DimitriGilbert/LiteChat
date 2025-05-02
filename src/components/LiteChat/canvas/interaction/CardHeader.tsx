@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/interaction/CardHeader.tsx
-// NEW FILE
+
 import React, { useState, useCallback } from "react";
 import {
   BotIcon,

@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/interaction/CardActions.tsx
-// NEW FILE
+
 import React from "react";
 import { RefreshCwIcon, Trash2Icon, EditIcon } from "lucide-react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";

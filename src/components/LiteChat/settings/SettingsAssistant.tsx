@@ -1,4 +1,5 @@
 // src/components/LiteChat/settings/SettingsAssistant.tsx
+
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,7 +8,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
 // Import the reusable component
 import { ParameterControlComponent } from "@/components/LiteChat/prompt/control/ParameterControlComponent";
-import { Separator } from "@/components/ui/separator"
+import { Separator } from "@/components/ui/separator";
 
 const SettingsAssistantComponent: React.FC = () => {
   // --- Fetch state/actions from store ---
@@ -53,9 +54,9 @@ const SettingsAssistantComponent: React.FC = () => {
 
   const handleMaxStepsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    const numValue = value === "" ? 5 : parseInt(value, 10)
+    const numValue = value === "" ? 5 : parseInt(value, 10);
     if (!isNaN(numValue)) {
-      setToolMaxSteps(numValue)
+      setToolMaxSteps(numValue);
     }
   };
 
@@ -120,7 +121,11 @@ const SettingsAssistantComponent: React.FC = () => {
           setPresencePenalty={wrappedSetPresencePenalty} // Use wrapped setter
           frequencyPenalty={frequencyPenalty}
           setFrequencyPenalty={wrappedSetFrequencyPenalty} // Use wrapped setter
-          // No need for defaultXXX props here as we are setting the defaults
+          // Pass null for transient props as they don't apply to global defaults
+          reasoningEnabled={null}
+          setReasoningEnabled={() => {}}
+          webSearchEnabled={null}
+          setWebSearchEnabled={() => {}}
           className="p-0 w-full" // Adjust styling as needed
         />
       </div>

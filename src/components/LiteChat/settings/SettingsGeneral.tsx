@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsGeneral.tsx
-// Entire file content provided
+
 import React, { useCallback, useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -24,9 +24,10 @@ const SettingsGeneralComponent: React.FC = () => {
     setTheme,
     enableStreamingMarkdown,
     setEnableStreamingMarkdown,
-    // Get new setting state and action
     enableStreamingCodeBlockParsing,
     setEnableStreamingCodeBlockParsing,
+    foldStreamingCodeBlocks, // Get new setting state
+    setFoldStreamingCodeBlocks, // Get new setting action
     streamingRenderFPS,
     setStreamingRenderFPS,
     prismThemeUrl,
@@ -38,10 +39,11 @@ const SettingsGeneralComponent: React.FC = () => {
       setTheme: state.setTheme,
       enableStreamingMarkdown: state.enableStreamingMarkdown,
       setEnableStreamingMarkdown: state.setEnableStreamingMarkdown,
-      // Get new setting state and action
       enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing,
       setEnableStreamingCodeBlockParsing:
         state.setEnableStreamingCodeBlockParsing,
+      foldStreamingCodeBlocks: state.foldStreamingCodeBlocks, // Get new state
+      setFoldStreamingCodeBlocks: state.setFoldStreamingCodeBlocks, // Get new action
       streamingRenderFPS: state.streamingRenderFPS,
       setStreamingRenderFPS: state.setStreamingRenderFPS,
       prismThemeUrl: state.prismThemeUrl,
@@ -50,10 +52,8 @@ const SettingsGeneralComponent: React.FC = () => {
     })),
   );
 
-  // Local state for the single FPS slider
   const [localFps, setLocalFps] = useState(streamingRenderFPS);
 
-  // Combined FPS Handlers
   const handleFpsSliderVisualChange = useCallback((value: number[]) => {
     setLocalFps(value[0]);
   }, []);
@@ -77,12 +77,10 @@ const SettingsGeneralComponent: React.FC = () => {
     [setStreamingRenderFPS],
   );
 
-  // Sync local state if store changes from elsewhere
   useEffect(() => {
     setLocalFps(streamingRenderFPS);
   }, [streamingRenderFPS]);
 
-  // Handler for the reset button (remains the same)
   const handleResetClick = () => {
     if (
       window.confirm(
@@ -175,6 +173,23 @@ const SettingsGeneralComponent: React.FC = () => {
             onCheckedChange={setEnableStreamingCodeBlockParsing}
           />
         </div>
+        {/* Fold Streaming Code Blocks Toggle */}
+        <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+          <div>
+            <Label htmlFor="fold-codeblock-switch" className="font-medium">
+              Fold Code Blocks by Default During Streaming
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Automatically collapse code blocks as they stream in. Useful for
+              long code outputs.
+            </p>
+          </div>
+          <Switch
+            id="fold-codeblock-switch"
+            checked={foldStreamingCodeBlocks ?? false}
+            onCheckedChange={setFoldStreamingCodeBlocks} // Use new action
+          />
+        </div>
         {/* Combined Streaming FPS Setting */}
         <div className="rounded-lg border p-3 shadow-sm space-y-2">
           <div>
@@ -190,7 +205,7 @@ const SettingsGeneralComponent: React.FC = () => {
           <div className="flex items-center gap-4">
             <Slider
               id="streaming-fps-slider"
-              min={3} // Min FPS 3
+              min={3}
               max={60}
               step={1}
               value={[localFps]}
@@ -200,7 +215,7 @@ const SettingsGeneralComponent: React.FC = () => {
             />
             <Input
               type="number"
-              min={3} // Min FPS 3
+              min={3}
               max={60}
               step={1}
               value={localFps}

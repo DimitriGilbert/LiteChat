@@ -1,5 +1,5 @@
 // src/components/LiteChat/file-manager/FileManagerRow.tsx
-// Entire file content provided
+
 import React from "react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,7 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/litechat/file-manager-utils";
 import type { VfsNode } from "@/types/litechat/vfs";
-import { ActionTooltipButton } from "../common/ActionTooltipButton"
+import { ActionTooltipButton } from "../common/ActionTooltipButton";
 
 interface FileManagerRowProps {
   entry: VfsNode;

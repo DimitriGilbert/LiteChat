@@ -1,5 +1,5 @@
 // src/store/prompt.store.ts
-// Entire file content provided
+
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
@@ -12,7 +12,10 @@ interface PromptState {
   topK: number | null;
   presencePenalty: number | null;
   frequencyPenalty: number | null;
-  // Add other transient prompt states if needed
+  // New transient states
+  reasoningEnabled: boolean | null; // Use null for 'default/unset'
+  webSearchEnabled: boolean | null; // Use null for 'default/unset'
+  structuredOutputJson: string | null; // Store the JSON string
 }
 
 interface PromptActions {
@@ -24,6 +27,10 @@ interface PromptActions {
   setTopK: (value: number | null) => void;
   setPresencePenalty: (value: number | null) => void;
   setFrequencyPenalty: (value: number | null) => void;
+  // Setters for new parameters
+  setReasoningEnabled: (enabled: boolean | null) => void;
+  setWebSearchEnabled: (enabled: boolean | null) => void;
+  setStructuredOutputJson: (json: string | null) => void;
   // Action to set all state based on effective settings
   initializePromptState: (effectiveSettings: {
     modelId: string | null;
@@ -34,9 +41,7 @@ interface PromptActions {
     presencePenalty: number | null;
     frequencyPenalty: number | null;
   }) => void;
-  // Action to reset state (e.g., after submission) - DEPRECATED
-  // resetPromptState: () => void;
-  // NEW Action to reset only transient parameters, keeping modelId
+  // Action to reset only transient parameters, keeping modelId
   resetTransientParameters: () => void;
 }
 
@@ -50,6 +55,9 @@ export const usePromptStateStore = create(
     topK: null,
     presencePenalty: null,
     frequencyPenalty: null,
+    reasoningEnabled: null, // Initialize new state
+    webSearchEnabled: null, // Initialize new state
+    structuredOutputJson: null, // Initialize new state
 
     // Actions
     setModelId: (id) => set({ modelId: id }),
@@ -59,6 +67,10 @@ export const usePromptStateStore = create(
     setTopK: (value) => set({ topK: value }),
     setPresencePenalty: (value) => set({ presencePenalty: value }),
     setFrequencyPenalty: (value) => set({ frequencyPenalty: value }),
+    // Actions for new parameters
+    setReasoningEnabled: (enabled) => set({ reasoningEnabled: enabled }),
+    setWebSearchEnabled: (enabled) => set({ webSearchEnabled: enabled }),
+    setStructuredOutputJson: (json) => set({ structuredOutputJson: json }),
 
     initializePromptState: (settings) => {
       console.log("[PromptStateStore] Initializing with:", settings);
@@ -70,23 +82,12 @@ export const usePromptStateStore = create(
         topK: settings.topK,
         presencePenalty: settings.presencePenalty,
         frequencyPenalty: settings.frequencyPenalty,
+        // Do NOT reset transient params here, they persist until cleared
+        // reasoningEnabled: null,
+        // webSearchEnabled: null,
+        // structuredOutputJson: null,
       });
     },
-
-    // resetPromptState: () => {
-    //   // Resetting clears the state. LiteChat will re-initialize it
-    //   // based on the current context when needed (e.g., after submit, on context change).
-    //   console.log("[PromptStateStore] Resetting state.");
-    //   set({
-    //     modelId: null,
-    //     temperature: null,
-    //     maxTokens: null,
-    //     topP: null,
-    //     topK: null,
-    //     presencePenalty: null,
-    //     frequencyPenalty: null,
-    //   });
-    // },
 
     resetTransientParameters: () => {
       console.log("[PromptStateStore] Resetting transient parameters.");
@@ -98,6 +99,9 @@ export const usePromptStateStore = create(
         topK: null,
         presencePenalty: null,
         frequencyPenalty: null,
+        reasoningEnabled: null, // Reset new state
+        webSearchEnabled: null, // Reset new state
+        structuredOutputJson: null, // Reset new state
       });
     },
   })),

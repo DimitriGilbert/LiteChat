@@ -1,5 +1,5 @@
 // src/hooks/litechat/registerSettingsControl.tsx
-// Entire file content provided
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { SettingsIcon } from "lucide-react";

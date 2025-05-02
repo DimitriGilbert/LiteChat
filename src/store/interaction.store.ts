@@ -1,5 +1,5 @@
 // src/store/interaction.store.ts
-// Entire file content provided
+
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { Interaction } from "@/types/litechat/interaction";
@@ -123,7 +123,7 @@ export const useInteractionStore = create(
           const updatedInteraction = {
             ...existingInteraction,
             ...updates,
-            metadata: newMetadata
+            metadata: newMetadata,
           };
 
           // Explicitly handle the 'response' field if it's in the updates
