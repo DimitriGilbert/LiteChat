@@ -59,7 +59,11 @@ interface VfsActions {
   selectFile: (fileId: string) => void;
   deselectFile: (fileId: string) => void;
   clearSelection: () => void;
-  initializeVFS: (vfsKey: string) => Promise<void>;
+  // Update initializeVFS signature to return Promise<typeof fs> (throws on error)
+  initializeVFS: (
+    vfsKey: string,
+    options?: { force?: boolean },
+  ) => Promise<typeof fs>;
 }
 
 export const useVfsStore = create(
@@ -208,7 +212,15 @@ export const useVfsStore = create(
           console.log(
             `[VfsStore] setVfsKey: Re-triggering initialization for desired key ${key} as it's not configured.`,
           );
-          get().initializeVFS(key);
+          get()
+            .initializeVFS(key)
+            .catch((err) => {
+              console.error(
+                `[VfsStore] Error during re-initialization trigger for ${key}:`,
+                err,
+              );
+              // Error is handled within initializeVFS by setting state/toast
+            });
         }
         return;
       }
@@ -237,7 +249,15 @@ export const useVfsStore = create(
 
       // Trigger initialization only if the new key is not null
       if (key !== null) {
-        get().initializeVFS(key);
+        get()
+          .initializeVFS(key)
+          .catch((err) => {
+            console.error(
+              `[VfsStore] Error during initialization trigger for ${key}:`,
+              err,
+            );
+            // Error is handled within initializeVFS by setting state/toast
+          });
       } else {
         console.log(
           "[VfsStore] setVfsKey: Desired key is null. State cleared.",
@@ -246,34 +266,36 @@ export const useVfsStore = create(
     },
 
     // --- VFS Initialization ---
-    initializeVFS: async (vfsKey) => {
+    initializeVFS: async (vfsKey, options) => {
       if (!vfsKey) {
         console.warn("[VfsStore] initializeVFS called without a valid vfsKey.");
-        return;
+        throw new Error("VFS key cannot be empty."); // Throw error
       }
 
-      // --- Strict Initialization Checks ---
-      // 1. Is the requested key *not* the currently desired key? Abort.
-      if (get().vfsKey !== vfsKey) {
-        console.warn(
-          `[VfsStore] Initialization aborted for "${vfsKey}". Desired key is now "${get().vfsKey}".`,
-        );
-        return;
-      }
-      // 2. Is *any* key currently being initialized? Abort.
-      if (get().initializingKey !== null) {
-        console.warn(
-          `[VfsStore] Initialization skipped for "${vfsKey}". Already initializing key "${get().initializingKey}".`,
-        );
-        return;
-      }
-      // 3. Is the requested key already configured with a valid FS instance? Abort.
-      if (get().configuredVfsKey === vfsKey && get().fs) {
-        console.log(
-          `[VfsStore] Initialization skipped for key "${vfsKey}" (already configured).`,
-        );
-        set({ loading: false });
-        return;
+      const isForced = options?.force === true;
+
+      // --- Strict Initialization Checks (Skip some if forced) ---
+      if (!isForced) {
+        // 1. Is the requested key *not* the currently desired key? Abort.
+        if (get().vfsKey !== vfsKey) {
+          const message = `UI Initialization aborted for "${vfsKey}". Desired key is now "${get().vfsKey}".`;
+          console.warn(`[VfsStore] ${message}`);
+          throw new Error(message); // Throw error
+        }
+        // 2. Is *any* key currently being initialized? Abort.
+        if (get().initializingKey !== null) {
+          const message = `UI Initialization skipped for "${vfsKey}". Already initializing key "${get().initializingKey}".`;
+          console.warn(`[VfsStore] ${message}`);
+          throw new Error(message); // Throw error
+        }
+        // 3. Is the requested key already configured with a valid FS instance? Return existing.
+        if (get().configuredVfsKey === vfsKey && get().fs) {
+          console.log(
+            `[VfsStore] UI Initialization skipped for key "${vfsKey}" (already configured).`,
+          );
+          set({ loading: false });
+          return get().fs!; // Return existing instance
+        }
       }
       // --- End Checks ---
 
@@ -285,32 +307,47 @@ export const useVfsStore = create(
         _setConfiguredVfsKey,
       } = get();
 
-      console.log(`[VfsStore] Initializing VFS with key: ${vfsKey}`);
+      console.log(
+        `[VfsStore] Initializing VFS with key: ${vfsKey} (Forced: ${isForced})`,
+      );
       set({ initializingKey: vfsKey });
-      _setLoading(true);
-      _setError(null);
-      // State reset now happens in setVfsKey
+      if (!isForced) {
+        _setLoading(true);
+        _setError(null);
+      }
 
       try {
+        // This configures the global 'fs' object from @zenfs/core
         const fsInstance = await VfsOps.initializeFsOp(vfsKey);
         if (!fsInstance) {
-          throw new Error("Filesystem backend initialization failed.");
+          throw new Error("Filesystem backend initialization failed."); // Throw error
         }
 
-        // --- Post-Initialization Check ---
-        // Ensure the desired key hasn't changed *during* the async init operation
-        if (get().vfsKey !== vfsKey) {
-          console.warn(
-            `[VfsStore] Initialization for key "${vfsKey}" completed, but desired key changed to "${get().vfsKey}". Discarding result.`,
-          );
-          set({ initializingKey: null, loading: false });
-          return;
+        // --- Post-Initialization Check (Only for UI init) ---
+        if (!isForced) {
+          // Ensure the desired key hasn't changed *during* the async init operation
+          if (get().vfsKey !== vfsKey) {
+            const message = `UI Initialization for key "${vfsKey}" completed, but desired key changed to "${get().vfsKey}". Discarding result.`;
+            console.warn(`[VfsStore] ${message}`);
+            set({ initializingKey: null, loading: false });
+            throw new Error(message); // Throw error
+          }
         }
         // --- End Post-Initialization Check ---
 
+        // If forced, return the instance directly without updating store state
+        if (isForced) {
+          console.log(
+            `[VfsStore] Forced initialization complete for key: ${vfsKey}. Returning instance.`,
+          );
+          set({ initializingKey: null }); // Clear initializing flag
+          return fsInstance;
+        }
+
+        // --- UI Initialization State Updates ---
         _setFsInstance(fsInstance);
         _setConfiguredVfsKey(vfsKey); // This emits VFS_CONTEXT_CHANGED
-        console.log(`[VfsStore] VFS instance configured for key: ${vfsKey}`);
+        console.log(`[VfsStore] UI VFS instance configured for key: ${vfsKey}`);
 
         const stableRootId = "vfs-root";
         let rootNode = get().nodes[stableRootId];
@@ -324,7 +361,7 @@ export const useVfsStore = create(
               "[VfsStore] Root directory '/' not found, will be created implicitly.",
             );
           } else {
-            throw statErr;
+            throw statErr; // Throw other stat errors
           }
         }
 
@@ -352,28 +389,38 @@ export const useVfsStore = create(
         );
 
         await get().fetchNodes(rootNode.id);
+        return fsInstance; // Return instance for UI case as well
+        // --- End UI Initialization State Updates ---
       } catch (err) {
-        console.error(`Failed to initialize VFS for key ${vfsKey}:`, err);
+        const errorMessage = `Failed to initialize VFS (${vfsKey}): ${err instanceof Error ? err.message : String(err)}`;
+        console.error(`[VfsStore] ${errorMessage}`, err);
         if (get().initializingKey === vfsKey) {
-          _setError(`Failed to initialize VFS (${vfsKey}).`);
-          _setFsInstance(null);
-          _setConfiguredVfsKey(null); // This emits VFS_CONTEXT_CHANGED with null
+          // Only set error if this was the initializing instance
+          _setError(errorMessage);
+          if (!isForced) {
+            _setFsInstance(null);
+            _setConfiguredVfsKey(null); // This emits VFS_CONTEXT_CHANGED with null
+          }
         }
+        throw new Error(errorMessage); // Throw error
       } finally {
         if (get().initializingKey === vfsKey) {
-          set({ initializingKey: null, loading: false });
+          set({ initializingKey: null });
+          if (!isForced) {
+            set({ loading: false });
+          }
         }
       }
     },
 
-    // --- Other Actions (Ensure they check configuredVfsKey === vfsKey) ---
+    // --- Other Actions (Ensure they check configuredVfsKey === vfsKey for UI ops) ---
 
     fetchNodes: async (parentId = null) => {
       const {
         _setLoading,
         _setError,
         _addNodes,
-        fs: fsInstance,
+        fs: fsInstance, // Use the store's fs instance for UI fetches
         nodes,
         rootId,
         configuredVfsKey,
@@ -381,8 +428,8 @@ export const useVfsStore = create(
         initializingKey,
       } = get();
 
+      // This action is UI-driven, so it relies on the configured FS instance
       if (!fsInstance || configuredVfsKey !== vfsKey || initializingKey) {
-        // Don't set error here, just log and return if not ready
         console.warn(
           `[VfsStore] fetchNodes skipped. Ready: ${!!fsInstance}, Match: ${configuredVfsKey === vfsKey}, Init: ${initializingKey}`,
         );
@@ -396,7 +443,10 @@ export const useVfsStore = create(
         console.log(
           `[VfsStore] Fetching nodes for path: ${pathToFetch} (Key: ${configuredVfsKey})`,
         );
-        const fetchedEntries = await VfsOps.listFilesOp(pathToFetch);
+        // Pass the store's fsInstance explicitly
+        const fetchedEntries = await VfsOps.listFilesOp(pathToFetch, {
+          fsInstance,
+        });
         console.log(
           `[VfsStore] Fetched ${fetchedEntries.length} entries for ${pathToFetch}`,
         );
@@ -468,6 +518,7 @@ export const useVfsStore = create(
 
     findNodeByPath: (path) => {
       const normalized = normalizePath(path);
+      // This is UI-related, check configured key
       if (get().vfsKey !== get().configuredVfsKey) return undefined;
 
       if (normalized === "/") {
@@ -479,6 +530,7 @@ export const useVfsStore = create(
 
     setCurrentPath: async (path) => {
       const { findNodeByPath, fetchNodes, rootId, fs: fsInstance } = get();
+      // This is UI-related, check configured key
       if (!fsInstance || get().vfsKey !== get().configuredVfsKey) return;
 
       const normalizedPath = normalizePath(path);
@@ -507,13 +559,14 @@ export const useVfsStore = create(
       const {
         _setOperationLoading,
         _setError,
-        fs: fsInstance,
+        fs: fsInstance, // Use store's instance for UI ops
         nodes,
         rootId,
         _addNodes,
         configuredVfsKey,
         vfsKey,
       } = get();
+      // This is UI-related, check configured key
       if (!fsInstance || configuredVfsKey !== vfsKey) {
         _setError("Filesystem not ready.");
         return;
@@ -529,13 +582,15 @@ export const useVfsStore = create(
         const newPath = buildPath(parentPath, name.trim());
 
         try {
+          // Pass store's fsInstance
           await fsInstance.promises.stat(newPath);
           throw new Error(`"${name.trim()}" already exists.`);
         } catch (statErr: any) {
           if (statErr.code !== "ENOENT") throw statErr;
         }
 
-        await VfsOps.createDirectoryOp(newPath);
+        // Pass store's fsInstance
+        await VfsOps.createDirectoryOp(newPath, { fsInstance });
 
         const now = Date.now();
         const newNodeId = nanoid();
@@ -561,12 +616,13 @@ export const useVfsStore = create(
       const {
         _setOperationLoading,
         _setError,
-        fs: fsInstance,
+        fs: fsInstance, // Use store's instance for UI ops
         nodes,
         rootId,
         configuredVfsKey,
         vfsKey,
       } = get();
+      // This is UI-related, check configured key
       if (!fsInstance || configuredVfsKey !== vfsKey) {
         _setError("Filesystem not ready.");
         return;
@@ -575,7 +631,10 @@ export const useVfsStore = create(
       try {
         const parentNode = parentId ? nodes[parentId] : nodes[rootId || ""];
         const parentPath = parentNode ? parentNode.path : "/";
-        await VfsOps.uploadFilesOp(Array.from(files), parentPath);
+        // Pass store's fsInstance
+        await VfsOps.uploadFilesOp(Array.from(files), parentPath, {
+          fsInstance,
+        });
         await get().fetchNodes(parentId);
       } catch (err) {
         console.error("Failed to upload files:", err);
@@ -590,10 +649,11 @@ export const useVfsStore = create(
         _setOperationLoading,
         _setError,
         _removeNodes,
-        fs: fsInstance,
+        fs: fsInstance, // Use store's instance for UI ops
         configuredVfsKey,
         vfsKey,
       } = get();
+      // This is UI-related, check configured key
       if (!fsInstance || configuredVfsKey !== vfsKey) {
         _setError("Filesystem not ready.");
         return;
@@ -602,7 +662,10 @@ export const useVfsStore = create(
       try {
         const nodesToDelete = ids.map((id) => get().nodes[id]).filter(Boolean);
         for (const node of nodesToDelete) {
-          await VfsOps.deleteItemOp(node.path, node.type === "folder");
+          // Pass store's fsInstance
+          await VfsOps.deleteItemOp(node.path, node.type === "folder", {
+            fsInstance,
+          });
         }
         _removeNodes(ids);
       } catch (err) {
@@ -620,11 +683,12 @@ export const useVfsStore = create(
         _setError,
         _updateNode,
         nodes,
-        fs: fsInstance,
+        fs: fsInstance, // Use store's instance for UI ops
         rootId,
         configuredVfsKey,
         vfsKey,
       } = get();
+      // This is UI-related, check configured key
       if (!fsInstance || configuredVfsKey !== vfsKey) {
         _setError("Filesystem not ready.");
         return;
@@ -648,13 +712,15 @@ export const useVfsStore = create(
         const newPath = buildPath(parentPath, newName.trim());
 
         try {
+          // Pass store's fsInstance
           await fsInstance.promises.stat(newPath);
           throw new Error(`"${newName.trim()}" already exists.`);
         } catch (statErr: any) {
           if (statErr.code !== "ENOENT") throw statErr;
         }
 
-        await VfsOps.renameOp(node.path, newPath);
+        // Pass store's fsInstance
+        await VfsOps.renameOp(node.path, newPath, { fsInstance });
 
         const changes = {
           name: newName.trim(),
@@ -673,11 +739,12 @@ export const useVfsStore = create(
     downloadFile: async (fileId) => {
       const {
         nodes,
-        fs: fsInstance,
+        fs: fsInstance, // Use store's instance for UI ops
         _setError,
         configuredVfsKey,
         vfsKey,
       } = get();
+      // This is UI-related, check configured key
       if (!fsInstance || configuredVfsKey !== vfsKey) {
         _setError("Filesystem not ready.");
         return null;
@@ -689,7 +756,8 @@ export const useVfsStore = create(
       }
 
       try {
-        const content = await VfsOps.readFileOp(node.path);
+        // Pass store's fsInstance
+        const content = await VfsOps.readFileOp(node.path, { fsInstance });
         const mimeType =
           (node as VfsFile).mimeType || "application/octet-stream";
         const blob = new Blob([content], { type: mimeType });

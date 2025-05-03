@@ -39,6 +39,7 @@ import {
   extractReasoningMiddleware,
   wrapLanguageModel,
 } from "ai";
+import type { fs as FsType } from "@zenfs/core"; // Import FsType
 
 // Define the structure for options passed to executeInteraction
 // Remove experimental_middlewares
@@ -216,7 +217,7 @@ export const InteractionService = {
         if (toolInfo?.implementation) {
           const toolDefinition: Tool<any> = { ...toolInfo.definition };
           toolDefinition.execute = async (args: any) => {
-            // VFS Readiness Check
+            // VFS Readiness Check using forced initialization
             const currentConvId =
               useInteractionStore.getState().currentConversationId;
             const conversation = currentConvId
@@ -225,39 +226,42 @@ export const InteractionService = {
                   .getConversationById(currentConvId)
               : null;
             const targetVfsKey = conversation?.projectId ?? "orphan";
-            let vfsStoreState = useVfsStore.getState();
-            if (
-              vfsStoreState.configuredVfsKey !== targetVfsKey ||
-              !vfsStoreState.fs
-            ) {
+            let fsInstance: typeof FsType | undefined;
+            try {
               console.log(
-                `[InteractionService Tool Execute] VFS for key "${targetVfsKey}" not ready. Attempting initialization...`,
+                `[InteractionService Tool Execute] Ensuring VFS ready for key "${targetVfsKey}"...`,
               );
-              try {
-                await useVfsStore.getState().initializeVFS(targetVfsKey);
-                vfsStoreState = useVfsStore.getState();
-                if (
-                  vfsStoreState.configuredVfsKey !== targetVfsKey ||
-                  !vfsStoreState.fs
-                ) {
-                  throw new Error(
-                    `VFS initialization failed or did not configure correctly for key "${targetVfsKey}".`,
-                  );
-                }
-              } catch (initError: any) {
-                return {
-                  _isError: true,
-                  error: `Filesystem error: ${initError.message}`,
-                };
-              }
+              // Force initialize VFS for the required key
+              // Wrap in try...catch as initializeVFS now throws
+              fsInstance = await useVfsStore
+                .getState()
+                .initializeVFS(targetVfsKey, { force: true });
+
+              console.log(
+                `[InteractionService Tool Execute] VFS ready for key "${targetVfsKey}".`,
+              );
+            } catch (initError: any) {
+              console.error(
+                `[InteractionService Tool Execute] VFS initialization error for key "${targetVfsKey}":`,
+                initError,
+              );
+              // Return error structure if VFS fails
+              return {
+                _isError: true,
+                error: `Filesystem error: ${initError.message}`,
+              };
             }
-            // Execute Original Implementation
+
+            // Execute Original Implementation, passing the fsInstance
             try {
               const contextSnapshot = getContextSnapshot();
               const parsedArgs = toolInfo.definition.parameters.parse(args);
               const implementation: ToolImplementation<any> =
                 toolInfo.implementation!;
-              return await implementation(parsedArgs, contextSnapshot);
+              // Pass fsInstance via context
+              const contextWithFs = { ...contextSnapshot, fsInstance };
+
+              return await implementation(parsedArgs, contextWithFs as any);
             } catch (e) {
               const toolError = e instanceof Error ? e.message : String(e);
               if (e instanceof z.ZodError) {

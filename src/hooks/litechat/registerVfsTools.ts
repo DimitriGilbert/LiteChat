@@ -1,10 +1,11 @@
 // src/hooks/litechat/registerVfsTools.ts
+// FULL FILE
 import { useControlRegistryStore } from "@/store/control.store";
-import { useVfsStore } from "@/store/vfs.store";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { z } from "zod";
 import { Tool } from "ai";
 import { normalizePath, joinPath } from "@/lib/litechat/file-manager-utils";
+import type { ReadonlyChatContextSnapshot } from "@/types/litechat/modding";
 
 // --- Schemas ---
 const listFilesSchema = z.object({
@@ -58,15 +59,8 @@ const renameSchema = z.object({
 // --- Registration Function ---
 export function registerVfsTools() {
   const registerTool = useControlRegistryStore.getState().registerTool;
-  const getCurrentPath = () => {
-    const currentParentId = useVfsStore.getState().currentParentId;
-    const nodes = useVfsStore.getState().nodes;
-    const rootId = useVfsStore.getState().rootId;
-    const currentDirectory = currentParentId
-      ? nodes[currentParentId]
-      : nodes[rootId || ""];
-    return currentDirectory ? currentDirectory.path : "/";
-  };
+  // getCurrentPath is less reliable now, context should provide the FS instance
+  // const getCurrentPath = () => { ... };
 
   console.log("[Function] Registering Core VFS Tools...");
 
@@ -76,24 +70,44 @@ export function registerVfsTools() {
       "List files and directories in a specified VFS path, or the current path if none is given.",
     parameters: listFilesSchema,
   };
-  registerTool("core", "vfsListFiles", listFilesTool, async ({ path }) => {
-    const targetPath = normalizePath(path || getCurrentPath());
-    try {
-      const entries = await VfsOps.listFilesOp(targetPath);
-      return {
-        success: true,
-        path: targetPath,
-        entries: entries.map((e) => ({
-          name: e.name,
-          type: e.isDirectory ? "folder" : "file",
-          size: e.size,
-          lastModified: e.lastModified.toISOString(),
-        })),
-      };
-    } catch (e: any) {
-      return { success: false, path: targetPath, error: e.message };
-    }
-  });
+  registerTool(
+    "core",
+    "vfsListFiles",
+    listFilesTool,
+    // Update implementation signature to accept context
+    async (
+      { path },
+      context: ReadonlyChatContextSnapshot & { fsInstance?: typeof VfsOps.VFS },
+    ) => {
+      // Get fsInstance from context
+      const fsInstance = context?.fsInstance;
+      if (!fsInstance) {
+        return {
+          success: false,
+          error: "Filesystem instance not available in context.",
+        };
+      }
+      // Determine target path (needs a way to get current path if needed, maybe from context?)
+      // For now, assume path is always provided or defaults to root if context doesn't have current path
+      const targetPath = normalizePath(path || "/");
+      try {
+        // Pass the fsInstance to the operation
+        const entries = await VfsOps.listFilesOp(targetPath, { fsInstance });
+        return {
+          success: true,
+          path: targetPath,
+          entries: entries.map((e) => ({
+            name: e.name,
+            type: e.isDirectory ? "folder" : "file",
+            size: e.size,
+            lastModified: e.lastModified.toISOString(),
+          })),
+        };
+      } catch (e: any) {
+        return { success: false, path: targetPath, error: e.message };
+      }
+    },
+  );
 
   // --- Read File Tool ---
   const readFileTool: Tool<typeof readFileSchema> = {
@@ -104,16 +118,28 @@ export function registerVfsTools() {
     "core",
     "vfsReadFile",
     readFileTool,
-    async ({ path, encoding }) => {
+    // Update implementation signature
+    async (
+      { path, encoding },
+      context: ReadonlyChatContextSnapshot & { fsInstance?: typeof VfsOps.VFS },
+    ) => {
+      const fsInstance = context?.fsInstance;
+      if (!fsInstance) {
+        return {
+          success: false,
+          error: "Filesystem instance not available in context.",
+        };
+      }
       const normalizedPath = normalizePath(path);
       try {
-        const contentBytes = await VfsOps.readFileOp(normalizedPath);
+        // Pass fsInstance
+        const contentBytes = await VfsOps.readFileOp(normalizedPath, {
+          fsInstance,
+        });
         let content: string;
         if (encoding === "base64") {
-          // Convert Uint8Array to base64 string
           content = btoa(String.fromCharCode(...contentBytes));
         } else {
-          // Default to utf-8
           content = new TextDecoder().decode(contentBytes);
         }
         return { success: true, path: normalizedPath, content, encoding };
@@ -132,12 +158,22 @@ export function registerVfsTools() {
     "core",
     "vfsWriteFile",
     writeFileTool,
-    async ({ path, content, encoding }) => {
+    // Update implementation signature
+    async (
+      { path, content, encoding },
+      context: ReadonlyChatContextSnapshot & { fsInstance?: typeof VfsOps.VFS },
+    ) => {
+      const fsInstance = context?.fsInstance;
+      if (!fsInstance) {
+        return {
+          success: false,
+          error: "Filesystem instance not available in context.",
+        };
+      }
       const normalizedPath = normalizePath(path);
       try {
         let dataToWrite: Uint8Array | string;
         if (encoding === "base64") {
-          // Convert base64 string to Uint8Array
           const binaryString = atob(content);
           const len = binaryString.length;
           const bytes = new Uint8Array(len);
@@ -146,10 +182,10 @@ export function registerVfsTools() {
           }
           dataToWrite = bytes;
         } else {
-          // Default to utf-8 string
           dataToWrite = content;
         }
-        await VfsOps.writeFileOp(normalizedPath, dataToWrite);
+        // Pass fsInstance
+        await VfsOps.writeFileOp(normalizedPath, dataToWrite, { fsInstance });
         return { success: true, path: normalizedPath };
       } catch (e: any) {
         return { success: false, path: normalizedPath, error: e.message };
@@ -166,10 +202,22 @@ export function registerVfsTools() {
     "core",
     "vfsDelete",
     deleteFileTool,
-    async ({ path, recursive }) => {
+    // Update implementation signature
+    async (
+      { path, recursive },
+      context: ReadonlyChatContextSnapshot & { fsInstance?: typeof VfsOps.VFS },
+    ) => {
+      const fsInstance = context?.fsInstance;
+      if (!fsInstance) {
+        return {
+          success: false,
+          error: "Filesystem instance not available in context.",
+        };
+      }
       const normalizedPath = normalizePath(path);
       try {
-        await VfsOps.deleteItemOp(normalizedPath, recursive);
+        // Pass fsInstance
+        await VfsOps.deleteItemOp(normalizedPath, recursive, { fsInstance });
         return { success: true, path: normalizedPath };
       } catch (e: any) {
         return { success: false, path: normalizedPath, error: e.message };
@@ -186,10 +234,22 @@ export function registerVfsTools() {
     "core",
     "vfsCreateDirectory",
     createDirectoryTool,
-    async ({ path }) => {
+    // Update implementation signature
+    async (
+      { path },
+      context: ReadonlyChatContextSnapshot & { fsInstance?: typeof VfsOps.VFS },
+    ) => {
+      const fsInstance = context?.fsInstance;
+      if (!fsInstance) {
+        return {
+          success: false,
+          error: "Filesystem instance not available in context.",
+        };
+      }
       const normalizedPath = normalizePath(path);
       try {
-        await VfsOps.createDirectoryOp(normalizedPath);
+        // Pass fsInstance
+        await VfsOps.createDirectoryOp(normalizedPath, { fsInstance });
         return { success: true, path: normalizedPath };
       } catch (e: any) {
         return { success: false, path: normalizedPath, error: e.message };
@@ -206,7 +266,18 @@ export function registerVfsTools() {
     "core",
     "vfsRename",
     renameTool,
-    async ({ oldPath, newName }) => {
+    // Update implementation signature
+    async (
+      { oldPath, newName },
+      context: ReadonlyChatContextSnapshot & { fsInstance?: typeof VfsOps.VFS },
+    ) => {
+      const fsInstance = context?.fsInstance;
+      if (!fsInstance) {
+        return {
+          success: false,
+          error: "Filesystem instance not available in context.",
+        };
+      }
       const normalizedOldPath = normalizePath(oldPath);
       const parentPath = normalizePath(
         normalizedOldPath.substring(0, normalizedOldPath.lastIndexOf("/")) ||
@@ -214,7 +285,10 @@ export function registerVfsTools() {
       );
       const normalizedNewPath = joinPath(parentPath, newName);
       try {
-        await VfsOps.renameOp(normalizedOldPath, normalizedNewPath);
+        // Pass fsInstance
+        await VfsOps.renameOp(normalizedOldPath, normalizedNewPath, {
+          fsInstance,
+        });
         return {
           success: true,
           oldPath: normalizedOldPath,
@@ -232,5 +306,4 @@ export function registerVfsTools() {
   );
 
   console.log("[Function] Core VFS Tools Registered.");
-  // No cleanup needed or returned
 }

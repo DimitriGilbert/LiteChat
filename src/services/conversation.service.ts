@@ -1,5 +1,5 @@
 // src/services/conversation.service.ts
-
+// FULL FILE
 import type { PromptObject, PromptTurnObject } from "@/types/litechat/prompt";
 import { InteractionService } from "./interaction.service";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -283,29 +283,29 @@ export const ConversationService = {
     conversationId: string,
   ): Promise<(TextPart | ImagePart)[]> {
     const fileContentParts: (TextPart | ImagePart)[] = [];
-    const needsVfs = filesMeta.some((f) => f.source === "vfs");
-    let vfsInstance: typeof FsType | null = null;
+    const vfsFiles = filesMeta.filter((f) => f.source === "vfs");
+    let vfsInstance: typeof FsType | undefined;
 
-    if (needsVfs) {
+    if (vfsFiles.length > 0) {
       const currentConversation = useConversationStore
         .getState()
         .getConversationById(conversationId);
       const targetVfsKey = currentConversation?.projectId ?? "orphan";
-      vfsInstance = await this._ensureVfsReady(targetVfsKey);
-      if (!vfsInstance) {
+      try {
+        vfsInstance = await this._ensureVfsReady(targetVfsKey);
+      } catch (fsError) {
         toast.error(
           `Filesystem unavailable for key ${targetVfsKey}. VFS files cannot be processed.`,
         );
         // Add placeholders for VFS files if FS failed
-        filesMeta.forEach((fileMeta) => {
-          if (fileMeta.source === "vfs") {
-            fileContentParts.push({
-              type: "text",
-              text: `[Skipped VFS file: ${fileMeta.name} - Filesystem unavailable]`,
-            });
-          }
+        vfsFiles.forEach((fileMeta) => {
+          fileContentParts.push({
+            type: "text",
+            text: `[Skipped VFS file: ${fileMeta.name} - Filesystem unavailable]`,
+          });
         });
-        // Continue processing direct files
+        // Set vfsInstance to undefined to skip processing below
+        vfsInstance = undefined;
       }
     }
 
@@ -318,7 +318,10 @@ export const ConversationService = {
           console.log(
             `[ConversationService] Fetching VFS file: ${fileMeta.path}`,
           );
-          const contentBytes = await VfsOps.readFileOp(fileMeta.path);
+          // Pass the specific fsInstance to readFileOp
+          const contentBytes = await VfsOps.readFileOp(fileMeta.path, {
+            fsInstance: vfsInstance,
+          });
           contentPart = processFileMetaToUserContent({
             ...fileMeta,
             contentBytes: contentBytes,
@@ -345,47 +348,28 @@ export const ConversationService = {
     return fileContentParts;
   },
 
-  // --- Helper for VFS Readiness (moved from initial structure) ---
-  async _ensureVfsReady(targetVfsKey: string): Promise<typeof FsType | null> {
-    const vfsState = useVfsStore.getState();
-    if (
-      vfsState.fs &&
-      vfsState.configuredVfsKey === targetVfsKey &&
-      !vfsState.loading &&
-      !vfsState.initializingKey
-    ) {
-      return vfsState.fs;
-    }
-
+  // --- Helper for VFS Readiness (updated) ---
+  async _ensureVfsReady(
+    targetVfsKey: string,
+  ): Promise<typeof FsType | undefined> {
     console.log(
-      `[ConversationService] VFS for key "${targetVfsKey}" not ready. Attempting initialization...`,
+      `[ConversationService] Ensuring VFS ready for key "${targetVfsKey}"...`,
     );
     try {
-      // Use getState() for VFS store action as well
-      await useVfsStore.getState().initializeVFS(targetVfsKey);
-      const updatedVfsState = useVfsStore.getState();
-      if (
-        updatedVfsState.fs &&
-        updatedVfsState.configuredVfsKey === targetVfsKey
-      ) {
-        console.log(
-          `[ConversationService] VFS for key "${targetVfsKey}" initialized successfully.`,
-        );
-        return updatedVfsState.fs;
-      } else {
-        throw new Error(
-          `VFS initialization did not complete successfully for key ${targetVfsKey}. Store state: configured=${updatedVfsState.configuredVfsKey}, fs=${!!updatedVfsState.fs}`,
-        );
-      }
+      // Use forced initialization to get an instance without affecting UI state
+      // Wrap in try...catch as initializeVFS now throws on error
+      const fsInstance = await useVfsStore
+        .getState()
+        .initializeVFS(targetVfsKey, { force: true });
+      console.log(`[ConversationService] VFS ready for key "${targetVfsKey}".`);
+      return fsInstance;
     } catch (vfsError) {
       console.error(
         `[ConversationService] Failed to ensure VFS ready for key ${targetVfsKey}:`,
         vfsError,
       );
-      toast.error(
-        `Filesystem error: Could not access files for key ${targetVfsKey}.`,
-      );
-      return null;
+      // Re-throw the error to be caught by the caller (_processFilesForPrompt)
+      throw vfsError;
     }
   },
 };
