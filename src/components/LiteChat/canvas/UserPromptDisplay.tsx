@@ -1,6 +1,6 @@
 // src/components/LiteChat/canvas/UserPromptDisplay.tsx
-
-import React, { useState, useCallback } from "react";
+// FULL FILE
+import React, { useState, useCallback, useEffect } from "react";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
 import { FilePreviewRenderer } from "../common/FilePreviewRenderer";
 import { formatDistanceToNow } from "date-fns";
@@ -14,17 +14,37 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ActionTooltipButton } from "../common/ActionTooltipButton";
+import { useSettingsStore } from "@/store/settings.store"; // Import settings store
 
 interface UserPromptDisplayProps {
   turnData: Readonly<PromptTurnObject>;
   timestamp: Date | null;
   className?: string;
+  // Add prop to indicate if the corresponding assistant response is complete
+  isAssistantComplete?: boolean;
 }
 
 export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
-  ({ turnData, timestamp, className }) => {
-    const [isFolded, setIsFolded] = useState(false);
+  ({ turnData, timestamp, className, isAssistantComplete = true }) => {
+    // Get the setting from the store
+    const foldUserMessagesOnCompletion = useSettingsStore(
+      (state) => state.foldUserMessagesOnCompletion,
+    );
+
+    // Initialize fold state based on setting and completion status
+    const [isFolded, setIsFolded] = useState(
+      isAssistantComplete && foldUserMessagesOnCompletion,
+    );
     const [isCopied, setIsCopied] = useState(false);
+
+    // Effect to fold the message if the setting is enabled *after* the assistant completes
+    useEffect(() => {
+      if (isAssistantComplete && foldUserMessagesOnCompletion) {
+        setIsFolded(true);
+      }
+      // We only want this effect to run when the assistant completion status changes
+      // or the setting changes. We don't want it to re-run if the user manually unfolds.
+    }, [isAssistantComplete, foldUserMessagesOnCompletion]);
 
     const timeAgo = timestamp
       ? formatDistanceToNow(new Date(timestamp), { addSuffix: true })
@@ -53,39 +73,44 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
     return (
       <div className={cn("user-prompt relative group/user", className)}>
         <div className="flex justify-between items-center mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-10 p-1 -m-1 rounded-t">
-          <div className="flex items-center gap-2">
-            <UserIcon className="h-4 w-4 text-primary" />
-            <span className="text-xs font-semibold text-primary">User</span>
-          </div>
-          <div className="flex items-center gap-0.5">
-            <span className="text-xs text-muted-foreground mr-2">
-              {timeAgo}
+          {/* Left Group: Icon, Name, Actions */}
+          <div className="flex items-center gap-1">
+            <UserIcon className="h-4 w-4 text-primary flex-shrink-0" />
+            <span className="text-xs font-semibold text-primary mr-1">
+              User
             </span>
-            {hasContent && (
-              <ActionTooltipButton
-                tooltipText="Copy Prompt"
-                onClick={handleCopy}
-                aria-label="Copy user prompt"
-                icon={
-                  isCopied ? (
-                    <CheckIcon className="text-green-500" />
-                  ) : (
-                    <ClipboardIcon />
-                  )
-                }
-                className="h-5 w-5 opacity-0 group-hover/user:opacity-100 focus-within:opacity-100 transition-opacity"
-              />
-            )}
-            {(hasContent || hasFiles) && (
-              <ActionTooltipButton
-                tooltipText={isFolded ? "Unfold" : "Fold"}
-                onClick={toggleFold}
-                aria-label={isFolded ? "Unfold prompt" : "Fold prompt"}
-                icon={isFolded ? <ChevronDownIcon /> : <ChevronUpIcon />}
-                iconClassName="h-3.5 w-3.5"
-                className="h-5 w-5 opacity-0 group-hover/user:opacity-100 focus-within:opacity-100 transition-opacity"
-              />
-            )}
+            {/* Actions */}
+            <div className="flex items-center gap-0.5 opacity-0 group-hover/user:opacity-100 focus-within:opacity-100 transition-opacity">
+              {hasContent && (
+                <ActionTooltipButton
+                  tooltipText="Copy Prompt"
+                  onClick={handleCopy}
+                  aria-label="Copy user prompt"
+                  icon={
+                    isCopied ? (
+                      <CheckIcon className="text-green-500" />
+                    ) : (
+                      <ClipboardIcon />
+                    )
+                  }
+                  className="h-5 w-5"
+                />
+              )}
+              {(hasContent || hasFiles) && (
+                <ActionTooltipButton
+                  tooltipText={isFolded ? "Unfold" : "Fold"}
+                  onClick={toggleFold}
+                  aria-label={isFolded ? "Unfold prompt" : "Fold prompt"}
+                  icon={isFolded ? <ChevronDownIcon /> : <ChevronUpIcon />}
+                  iconClassName="h-3.5 w-3.5"
+                  className="h-5 w-5"
+                />
+              )}
+            </div>
+          </div>
+          {/* Right Group: Timestamp */}
+          <div className="flex items-center flex-shrink-0">
+            <span className="text-xs text-muted-foreground">{timeAgo}</span>
           </div>
         </div>
 

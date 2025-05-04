@@ -1,5 +1,5 @@
-// src/components/LiteChat/canvas/interaction/InteractionCard.tsx
-
+// src/components/LiteChat/canvas/InteractionCard.tsx
+// FULL FILE
 import React, { useMemo, useState, useCallback } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { UserPromptDisplay } from "@/components/LiteChat/canvas/UserPromptDisplay";
@@ -65,8 +65,8 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
       getAllAvailableModelDefsForProvider,
     ]);
 
-    const showActions =
-      interaction.status === "COMPLETED" || interaction.status === "ERROR";
+    const isComplete = interaction.status === "COMPLETED";
+    const showActions = isComplete || interaction.status === "ERROR";
     const isError = interaction.status === "ERROR";
     const hasResponseContent =
       interaction.response &&
@@ -79,7 +79,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
       interaction.metadata?.toolResults &&
       interaction.metadata.toolResults.length > 0;
     const hasReasoning = !!interaction.metadata?.reasoning;
-    const canFold =
+    const canFoldResponse =
       hasResponseContent || hasToolCalls || hasToolResults || hasReasoning;
 
     return (
@@ -95,6 +95,8 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
           <UserPromptDisplay
             turnData={interaction.prompt}
             timestamp={interaction.startedAt}
+            // Pass completion status to UserPromptDisplay
+            isAssistantComplete={isComplete}
           />
         )}
 
@@ -110,7 +112,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
             }
             isFolded={isResponseFolded}
             toggleFold={toggleResponseFold}
-            canFold={canFold}
+            canFold={canFoldResponse}
           />
           <AssistantResponse
             response={interaction.response}

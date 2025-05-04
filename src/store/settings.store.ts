@@ -1,5 +1,5 @@
 // src/store/settings.store.ts
-
+// FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { PersistenceService } from "@/services/persistence.service";
@@ -17,7 +17,8 @@ interface SettingsState {
   enableAdvancedSettings: boolean;
   enableStreamingMarkdown: boolean;
   enableStreamingCodeBlockParsing: boolean;
-  foldStreamingCodeBlocks: boolean; // New setting
+  foldStreamingCodeBlocks: boolean;
+  foldUserMessagesOnCompletion: boolean; // New setting
   streamingRenderFPS: number;
   gitUserName: string | null;
   gitUserEmail: string | null;
@@ -37,7 +38,8 @@ interface SettingsActions {
   setEnableAdvancedSettings: (enabled: boolean) => void;
   setEnableStreamingMarkdown: (enabled: boolean) => void;
   setEnableStreamingCodeBlockParsing: (enabled: boolean) => void;
-  setFoldStreamingCodeBlocks: (fold: boolean) => void; // New action
+  setFoldStreamingCodeBlocks: (fold: boolean) => void;
+  setFoldUserMessagesOnCompletion: (fold: boolean) => void; // New action
   setStreamingRenderFPS: (fps: number) => void;
   setGitUserName: (name: string | null) => void;
   setGitUserEmail: (email: string | null) => void;
@@ -59,7 +61,8 @@ const DEFAULT_FREQUENCY_PENALTY = 0.0;
 const DEFAULT_ENABLE_ADVANCED_SETTINGS = true;
 const DEFAULT_ENABLE_STREAMING_MARKDOWN = true;
 const DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING = false;
-const DEFAULT_FOLD_STREAMING_CODE_BLOCKS = false; // New default
+const DEFAULT_FOLD_STREAMING_CODE_BLOCKS = false;
+const DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION = false; // New default
 const DEFAULT_STREAMING_FPS = 15;
 const DEFAULT_GIT_USER_NAME = null;
 const DEFAULT_GIT_USER_EMAIL = null;
@@ -81,7 +84,8 @@ export const useSettingsStore = create(
     enableStreamingMarkdown: DEFAULT_ENABLE_STREAMING_MARKDOWN,
     enableStreamingCodeBlockParsing:
       DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
-    foldStreamingCodeBlocks: DEFAULT_FOLD_STREAMING_CODE_BLOCKS, // Initialize new setting
+    foldStreamingCodeBlocks: DEFAULT_FOLD_STREAMING_CODE_BLOCKS,
+    foldUserMessagesOnCompletion: DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION, // Initialize new setting
     streamingRenderFPS: DEFAULT_STREAMING_FPS,
     gitUserName: DEFAULT_GIT_USER_NAME,
     gitUserEmail: DEFAULT_GIT_USER_EMAIL,
@@ -141,10 +145,15 @@ export const useSettingsStore = create(
       );
     },
 
-    // Implement setter for fold setting
     setFoldStreamingCodeBlocks: (fold) => {
       set({ foldStreamingCodeBlocks: fold });
       PersistenceService.saveSetting("foldStreamingCodeBlocks", fold);
+    },
+
+    // Implement setter for new fold setting
+    setFoldUserMessagesOnCompletion: (fold) => {
+      set({ foldUserMessagesOnCompletion: fold });
+      PersistenceService.saveSetting("foldUserMessagesOnCompletion", fold);
     },
 
     setStreamingRenderFPS: (fps) => {
@@ -190,7 +199,8 @@ export const useSettingsStore = create(
           enableAdvanced,
           enableStreamingMd,
           enableStreamingCodeBlock,
-          foldStreamingCodeBlocks, // Load new setting
+          foldStreamingCodeBlocks,
+          foldUserMessages, // Load new setting
           streamingFps,
           gitUserName,
           gitUserEmail,
@@ -235,10 +245,14 @@ export const useSettingsStore = create(
             "enableStreamingCodeBlockParsing",
             DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
           ),
-          // Load new setting from persistence
           PersistenceService.loadSetting<boolean>(
             "foldStreamingCodeBlocks",
             DEFAULT_FOLD_STREAMING_CODE_BLOCKS,
+          ),
+          // Load new setting from persistence
+          PersistenceService.loadSetting<boolean>(
+            "foldUserMessagesOnCompletion",
+            DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION,
           ),
           PersistenceService.loadSetting<number>(
             "streamingRenderFPS",
@@ -274,7 +288,8 @@ export const useSettingsStore = create(
           enableAdvancedSettings: enableAdvanced,
           enableStreamingMarkdown: enableStreamingMd,
           enableStreamingCodeBlockParsing: enableStreamingCodeBlock,
-          foldStreamingCodeBlocks: foldStreamingCodeBlocks, // Set loaded value
+          foldStreamingCodeBlocks: foldStreamingCodeBlocks,
+          foldUserMessagesOnCompletion: foldUserMessages, // Set loaded value
           streamingRenderFPS: streamingFps,
           gitUserName,
           gitUserEmail,
@@ -293,7 +308,9 @@ export const useSettingsStore = create(
           enableStreamingMarkdown: DEFAULT_ENABLE_STREAMING_MARKDOWN,
           enableStreamingCodeBlockParsing:
             DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
-          foldStreamingCodeBlocks: DEFAULT_FOLD_STREAMING_CODE_BLOCKS, // Reset new setting
+          foldStreamingCodeBlocks: DEFAULT_FOLD_STREAMING_CODE_BLOCKS,
+          foldUserMessagesOnCompletion:
+            DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION, // Reset new setting
           streamingRenderFPS: DEFAULT_STREAMING_FPS,
           prismThemeUrl: DEFAULT_PRISM_THEME_URL,
         });
@@ -307,10 +324,14 @@ export const useSettingsStore = create(
             "enableStreamingCodeBlockParsing",
             DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
           ),
-          // Persist reset for new setting
           PersistenceService.saveSetting(
             "foldStreamingCodeBlocks",
             DEFAULT_FOLD_STREAMING_CODE_BLOCKS,
+          ),
+          // Persist reset for new setting
+          PersistenceService.saveSetting(
+            "foldUserMessagesOnCompletion",
+            DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION,
           ),
           PersistenceService.saveSetting(
             "streamingRenderFPS",

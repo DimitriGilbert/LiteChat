@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsGeneral.tsx
-
+// FULL FILE
 import React, { useCallback, useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -26,8 +26,10 @@ const SettingsGeneralComponent: React.FC = () => {
     setEnableStreamingMarkdown,
     enableStreamingCodeBlockParsing,
     setEnableStreamingCodeBlockParsing,
-    foldStreamingCodeBlocks, // Get new setting state
-    setFoldStreamingCodeBlocks, // Get new setting action
+    foldStreamingCodeBlocks,
+    setFoldStreamingCodeBlocks,
+    foldUserMessagesOnCompletion, // Get new setting state
+    setFoldUserMessagesOnCompletion, // Get new setting action
     streamingRenderFPS,
     setStreamingRenderFPS,
     prismThemeUrl,
@@ -42,8 +44,10 @@ const SettingsGeneralComponent: React.FC = () => {
       enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing,
       setEnableStreamingCodeBlockParsing:
         state.setEnableStreamingCodeBlockParsing,
-      foldStreamingCodeBlocks: state.foldStreamingCodeBlocks, // Get new state
-      setFoldStreamingCodeBlocks: state.setFoldStreamingCodeBlocks, // Get new action
+      foldStreamingCodeBlocks: state.foldStreamingCodeBlocks,
+      setFoldStreamingCodeBlocks: state.setFoldStreamingCodeBlocks,
+      foldUserMessagesOnCompletion: state.foldUserMessagesOnCompletion, // Get new state
+      setFoldUserMessagesOnCompletion: state.setFoldUserMessagesOnCompletion, // Get new action
       streamingRenderFPS: state.streamingRenderFPS,
       setStreamingRenderFPS: state.setStreamingRenderFPS,
       prismThemeUrl: state.prismThemeUrl,
@@ -139,7 +143,7 @@ const SettingsGeneralComponent: React.FC = () => {
 
       {/* Streaming Settings */}
       <div className="space-y-2">
-        <h3 className="text-lg font-medium">Streaming</h3>
+        <h3 className="text-lg font-medium">Streaming & Display</h3>
         {/* Streaming Markdown Toggle */}
         <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
           <div>
@@ -189,7 +193,24 @@ const SettingsGeneralComponent: React.FC = () => {
           <Switch
             id="fold-codeblock-switch"
             checked={foldStreamingCodeBlocks ?? false}
-            onCheckedChange={setFoldStreamingCodeBlocks} // Use new action
+            onCheckedChange={setFoldStreamingCodeBlocks}
+          />
+        </div>
+        {/* Fold User Messages Toggle */}
+        <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+          <div>
+            <Label htmlFor="fold-user-message-switch" className="font-medium">
+              Fold User Messages After Response
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Automatically collapse the user's prompt message once the
+              assistant finishes responding.
+            </p>
+          </div>
+          <Switch
+            id="fold-user-message-switch"
+            checked={foldUserMessagesOnCompletion ?? false}
+            onCheckedChange={setFoldUserMessagesOnCompletion} // Use new action
           />
         </div>
         {/* Combined Streaming FPS Setting */}

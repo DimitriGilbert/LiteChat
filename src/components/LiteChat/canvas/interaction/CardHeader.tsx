@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/interaction/CardHeader.tsx
-
+// FULL FILE
 import React, { useState, useCallback } from "react";
 import {
   BotIcon,
@@ -48,39 +48,45 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
 
   return (
     <div className="flex justify-between items-center mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-10 p-1 -m-1 rounded-t">
-      <div className="flex items-center gap-2">
-        <BotIcon className="h-4 w-4 text-secondary" />
-        <span className="text-xs font-semibold text-secondary">
+      {/* Left Group: Icon, Name, Actions */}
+      <div className="flex items-center gap-1">
+        <BotIcon className="h-4 w-4 text-secondary flex-shrink-0" />
+        <span className="text-xs font-semibold text-secondary truncate mr-1">
           Assistant ({displayModelName})
         </span>
+        {/* Actions moved here */}
+        <div className="flex items-center gap-0.5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity">
+          {responseContent && typeof responseContent === "string" && (
+            <ActionTooltipButton
+              tooltipText="Copy Response"
+              onClick={handleCopy}
+              aria-label="Copy assistant response"
+              icon={
+                isCopied ? (
+                  <CheckIcon className="text-green-500" />
+                ) : (
+                  <ClipboardIcon />
+                )
+              }
+              className="h-5 w-5"
+            />
+          )}
+          {canFold && (
+            <ActionTooltipButton
+              tooltipText={isFolded ? "Unfold" : "Fold"}
+              onClick={toggleFold}
+              aria-label={isFolded ? "Unfold response" : "Fold response"}
+              icon={isFolded ? <ChevronDownIcon /> : <ChevronUpIcon />}
+              iconClassName="h-3.5 w-3.5"
+              className="h-5 w-5"
+            />
+          )}
+        </div>
       </div>
-      <div className="flex items-center gap-0.5">
-        <span className="text-xs text-muted-foreground mr-2">{timeAgo}</span>
-        {responseContent && typeof responseContent === "string" && (
-          <ActionTooltipButton
-            tooltipText="Copy Response"
-            onClick={handleCopy}
-            aria-label="Copy assistant response"
-            icon={
-              isCopied ? (
-                <CheckIcon className="text-green-500" />
-              ) : (
-                <ClipboardIcon />
-              )
-            }
-            className="h-5 w-5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity"
-          />
-        )}
-        {canFold && (
-          <ActionTooltipButton
-            tooltipText={isFolded ? "Unfold" : "Fold"}
-            onClick={toggleFold}
-            aria-label={isFolded ? "Unfold response" : "Fold response"}
-            icon={isFolded ? <ChevronDownIcon /> : <ChevronUpIcon />}
-            iconClassName="h-3.5 w-3.5"
-            className="h-5 w-5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity"
-          />
-        )}
+
+      {/* Right Group: Timestamp */}
+      <div className="flex items-center flex-shrink-0">
+        <span className="text-xs text-muted-foreground">{timeAgo}</span>
       </div>
     </div>
   );

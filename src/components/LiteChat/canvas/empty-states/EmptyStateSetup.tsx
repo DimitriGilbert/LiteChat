@@ -1,6 +1,6 @@
 // src/components/LiteChat/canvas/empty-states/EmptyStateSetup.tsx
 // FULL FILE
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   AlertCircleIcon,
   SettingsIcon,
@@ -13,11 +13,15 @@ import { useConversationStore } from "@/store/conversation.store";
 import { useShallow } from "zustand/react/shallow";
 import { ApiKeyForm } from "@/components/LiteChat/common/ApiKeysForm";
 import { AddProviderForm } from "@/components/LiteChat/settings/AddProviderForm";
-import type { DbProviderConfig } from "@/types/litechat/provider";
+import type {
+  DbProviderConfig,
+  DbProviderType,
+} from "@/types/litechat/provider";
 import { SetupStep } from "./SetupStep";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { ModelEnablementList } from "@/components/LiteChat/settings/ModelEnablementList"; // Import ModelEnablementList
+import { ModelEnablementList } from "@/components/LiteChat/settings/ModelEnablementList";
+import { Lnk } from "@/components/ui/lnk"; // Import the new Lnk component
 
 export const EmptyStateSetup: React.FC = () => {
   const {
@@ -25,8 +29,8 @@ export const EmptyStateSetup: React.FC = () => {
     addApiKey,
     providers,
     addProviderConfig,
-    updateProviderConfig, // Add update action
-    getAllAvailableModelDefsForProvider, // Add selector
+    updateProviderConfig,
+    getAllAvailableModelDefsForProvider,
     isLoading: isProviderLoading,
     enableApiKeyManagement,
   } = useProviderStore(
@@ -35,9 +39,9 @@ export const EmptyStateSetup: React.FC = () => {
       addApiKey: state.addApiKey,
       providers: state.dbProviderConfigs,
       addProviderConfig: state.addProviderConfig,
-      updateProviderConfig: state.updateProviderConfig, // Get update action
+      updateProviderConfig: state.updateProviderConfig,
       getAllAvailableModelDefsForProvider:
-        state.getAllAvailableModelDefsForProvider, // Get selector
+        state.getAllAvailableModelDefsForProvider,
       isLoading: state.isLoading,
       enableApiKeyManagement: state.enableApiKeyManagement,
     })),
@@ -56,11 +60,13 @@ export const EmptyStateSetup: React.FC = () => {
   );
 
   const [isSavingKey, setIsSavingKey] = useState(false);
-  // @ts-expect-error I am not using it, but it return an array -_-...
   const [isSavingProvider, setIsSavingProvider] = useState(false);
   const [isStartingChat, setIsStartingChat] = useState(false);
   const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
-  const [isUpdatingModels, setIsUpdatingModels] = useState(false); // State for model toggle saving
+  const [isUpdatingModels, setIsUpdatingModels] = useState(false);
+  // State to hold the provider type of the last added key
+  const [lastAddedKeyProviderType, setLastAddedKeyProviderType] =
+    useState<DbProviderType | null>(null);
 
   // --- Step Completion Logic ---
   const isApiKeyStepComplete = useMemo(
@@ -74,7 +80,6 @@ export const EmptyStateSetup: React.FC = () => {
   );
 
   const isEnableModelsStepComplete = useMemo(() => {
-    // Check if *any* provider is enabled AND has at least one enabled model
     return providers.some(
       (p) => p.isEnabled && p.enabledModels && p.enabledModels.length > 0,
     );
@@ -88,7 +93,6 @@ export const EmptyStateSetup: React.FC = () => {
 
   const firstProviderModels = useMemo(() => {
     if (!firstProvider) return [];
-    // Map full model data to basic {id, name} for the list display
     return getAllAvailableModelDefsForProvider(firstProvider.id).map((m) => ({
       id: m.id,
       name: m.name,
@@ -105,6 +109,8 @@ export const EmptyStateSetup: React.FC = () => {
       setIsSavingKey(true);
       try {
         await addApiKey(name, providerId, value);
+        // Store the provider type of the added key
+        setLastAddedKeyProviderType(providerId as DbProviderType);
       } finally {
         setIsSavingKey(false);
       }
@@ -119,6 +125,8 @@ export const EmptyStateSetup: React.FC = () => {
       setIsSavingProvider(true);
       try {
         const newId = await addProviderConfig(config);
+        // Reset the last added key type after provider is added
+        setLastAddedKeyProviderType(null);
         return newId;
       } finally {
         setIsSavingProvider(false);
@@ -127,7 +135,6 @@ export const EmptyStateSetup: React.FC = () => {
     [addProviderConfig],
   );
 
-  // Handler for toggling models in Step 3
   const handleModelToggle = useCallback(
     async (modelId: string, checked: boolean) => {
       if (!firstProvider) return;
@@ -143,7 +150,6 @@ export const EmptyStateSetup: React.FC = () => {
         await updateProviderConfig(firstProvider.id, {
           enabledModels: newEnabledModels,
         });
-        // Optional: Add a success toast if needed
       } catch (error) {
         toast.error("Failed to update model status.");
         console.error("Failed to save model toggle:", error);
@@ -159,11 +165,14 @@ export const EmptyStateSetup: React.FC = () => {
     try {
       const newId = await addConversation({ title: "New Chat" });
       await selectItem(newId, "conversation");
+      // Focus flag is set correctly, ensure selection update doesn't interfere
+      setTimeout(() => setFocusInputFlag(true), 0);
     } catch (error) {
       toast.error("Failed to start your first chat.");
       console.error("Failed to start first chat:", error);
+    } finally {
+      // Only set loading false if it didn't succeed (otherwise component unmounts)
       setIsStartingChat(false);
-      setTimeout(() => setFocusInputFlag(true), 0);
     }
   }, [addConversation, selectItem, setFocusInputFlag]);
 
@@ -184,48 +193,24 @@ export const EmptyStateSetup: React.FC = () => {
               <div>
                 <p>
                   To use providers like{" "}
-                  <a
-                    href="https://addepto.com/blog/what-is-an-openai-api-and-how-to-use-it/"
-                    target="_blank"
-                  >
-                    OpenAI
-                  </a>
-                  ,{" "}
-                  <a
-                    href="https://support.gemini.com/hc/en-us/articles/360031080191-How-do-I-create-an-API-key"
-                    target="_blank"
-                  >
+                  <Lnk href="https://platform.openai.com/api-keys">OpenAI</Lnk>,{" "}
+                  <Lnk href="https://aistudio.google.com/app/apikey">
                     Google
-                  </a>
+                  </Lnk>
                   ,{" "}
-                  <a
-                    href="https://support.gemini.com/hc/en-us/articles/360031080191-How-do-I-create-an-API-key"
-                    target="_blank"
-                  >
-                    Anthotropic (Claude)
-                  </a>
-                  , or{" "}
-                  <a
-                    href="https://pulsarchat.com/docs/2-tutorial-on-how-to-get-an-openrouter-api-key"
-                    target="_blank"
-                  >
-                    OpenRouter
-                  </a>{" "}
+                  <Lnk href="https://console.anthropic.com/settings/keys">
+                    Anthropic (Claude)
+                  </Lnk>
+                  , or <Lnk href="https://openrouter.ai/keys">OpenRouter</Lnk>{" "}
                   or any OpenAi API compatible provider , add an API key. Keys
-                  are stored in your browser.
+                  are stored securely in your browser.
                 </p>
                 <p className="py-2">
-                  If you want trully local AI, "no internet required", you can
-                  setup{" "}
-                  <a href="https://www.ollama.com/" target="_blank">
-                    Ollama
-                  </a>{" "}
-                  or,{" "}
-                  <a href="https://lmstudio.ai/" target="_blank">
-                    LMStudio
-                  </a>{" "}
-                  (or any other local LLM solution with an OpenAI compatible
-                  API)
+                  If you want truly local AI, "no internet required", you can
+                  setup <Lnk href="https://www.ollama.com/">Ollama</Lnk> or,{" "}
+                  <Lnk href="https://lmstudio.ai/">LMStudio</Lnk> (or any other
+                  local LLM solution with an OpenAI compatible API). These
+                  typically don't require API keys.
                 </p>
               </div>
             ),
@@ -257,6 +242,8 @@ export const EmptyStateSetup: React.FC = () => {
             ) => Promise<string>
           }
           onCancel={() => {}}
+          // Pass the last added key's provider type as initial type
+          initialType={lastAddedKeyProviderType ?? undefined}
         />
       ),
     },
@@ -264,16 +251,23 @@ export const EmptyStateSetup: React.FC = () => {
     {
       id: "enable-models",
       title: "Enable Models",
-      description: `Enable models for the provider you just added (${firstProvider?.name || ""}). You can enable more later in Settings.`,
+      description: (
+        <>
+          Enable models for the provider you just added (
+          {firstProvider?.name || ""}). Enabling specific models improves the UI
+          by reducing clutter and choice paralysis. You can enable more later in
+          Settings.
+        </>
+      ),
       isComplete: isEnableModelsStepComplete,
-      content: firstProvider ? ( // Only render list if a provider exists
+      content: firstProvider ? (
         <ModelEnablementList
           providerId={firstProvider.id}
           allAvailableModels={firstProviderModels}
           enabledModelIds={firstProviderEnabledModels}
           onToggleModel={handleModelToggle}
-          isLoading={isProviderLoading || isUpdatingModels} // Show loading during toggle
-          listHeightClass="h-48" // Adjust height as needed
+          isLoading={isProviderLoading || isUpdatingModels}
+          listHeightClass="h-48"
         />
       ) : (
         <p className="text-sm text-muted-foreground italic">
@@ -286,7 +280,7 @@ export const EmptyStateSetup: React.FC = () => {
       id: "start-chat",
       title: "Start Chatting",
       description: "You're all set! Click below to start your first chat.",
-      isComplete: false, // Never visually complete
+      isComplete: false,
       content: (
         <Button
           onClick={handleStartFirstChat}
@@ -297,6 +291,8 @@ export const EmptyStateSetup: React.FC = () => {
           {isStartingChat ? "Starting..." : "Start First Chat"}
         </Button>
       ),
+      // Remove specific content class for this step
+      contentClassName: "",
     },
   ];
 
@@ -339,10 +335,10 @@ export const EmptyStateSetup: React.FC = () => {
                 isActive={isActive}
                 contentClassName={
                   step.id === "add-provider" || step.id === "api-key"
-                    ? "p-0 border-none shadow-none bg-transparent" // Remove padding/border for forms
+                    ? "p-0 border-none shadow-none bg-transparent"
                     : step.id === "enable-models"
-                      ? "p-0" // Remove padding for model list container
-                      : ""
+                      ? "p-0"
+                      : step.contentClassName // Use specific class if provided, else default
                 }
               >
                 {step.content}

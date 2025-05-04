@@ -1,5 +1,5 @@
 // src/components/LiteChat/common/CodeBlockRenderer.tsx
-
+// FULL FILE
 import React, {
   useState,
   useEffect,
@@ -71,12 +71,11 @@ export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
     useShallow((state) => ({
       prismThemeUrl: state.prismThemeUrl,
       theme: state.theme,
-      foldStreamingCodeBlocks: state.foldStreamingCodeBlocks, // Get the new setting
+      foldStreamingCodeBlocks: state.foldStreamingCodeBlocks,
     })),
   );
 
   const [isCopied, setIsCopied] = useState(false);
-  // Initialize fold state based on setting if streaming
   const [isFolded, setIsFolded] = useState(
     isStreaming ? foldStreamingCodeBlocks : false,
   );
@@ -187,59 +186,61 @@ export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
 
   return (
     <div className="code-block-container group/codeblock my-4 max-w-full">
-      <div className="code-block-header">
-        <div className="text-sm font-medium">
-          {lang ? lang.toUpperCase() : "CODE"}
+      <div className="code-block-header flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <div className="text-sm font-medium">
+            {lang ? lang.toUpperCase() : "CODE"}
+          </div>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover/codeblock:opacity-100 focus-within:opacity-100 transition-opacity">
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    onClick={toggleFold}
+                    aria-label={isFolded ? "Unfold code" : "Fold code"}
+                  >
+                    <ChevronsUpDownIcon className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  {isFolded ? "Unfold" : "Fold"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    onClick={handleCopy}
+                    aria-label="Copy code"
+                  >
+                    {isCopied ? (
+                      <CheckIcon className="h-3.5 w-3.5 text-green-500" />
+                    ) : (
+                      <ClipboardIcon className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Copy</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
-        <div className="flex items-center gap-0.5">
-          <TooltipProvider delayDuration={100}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={toggleFold}
-                  aria-label={isFolded ? "Unfold code" : "Fold code"}
-                >
-                  <ChevronsUpDownIcon className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                {isFolded ? "Unfold" : "Fold"}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TooltipProvider delayDuration={100}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={handleCopy}
-                  aria-label="Copy code"
-                >
-                  {isCopied ? (
-                    <CheckIcon className="h-3.5 w-3.5 text-green-500" />
-                  ) : (
-                    <ClipboardIcon className="h-3.5 w-3.5" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Copy</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+        <div></div>
       </div>
 
       {!isFolded && (
         <div className="overflow-hidden w-full">
+          {/* Ensure pre tag handles horizontal scroll */}
           <pre className={cn("overflow-x-auto w-full relative")}>
-            <code
-              ref={codeRef}
-              className={languageClass + " inline-block min-w-full"}
-            >
+            {/* Remove min-w-full from code tag */}
+            <code ref={codeRef} className={languageClass + " block"}>
               {code}
             </code>
           </pre>
