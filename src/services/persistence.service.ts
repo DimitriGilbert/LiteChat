@@ -7,8 +7,8 @@ import type { DbMod } from "@/types/litechat/modding";
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import type { SyncRepo } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project";
-// Import new types
 import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
+import type { DbAppState } from "@/lib/litechat/db"; // Import DbAppState
 
 // Helper function to ensure date fields are Date objects
 const ensureDateFields = <
@@ -24,16 +24,13 @@ const ensureDateFields = <
   if (item.updatedAt && !(item.updatedAt instanceof Date)) {
     newItem.updatedAt = new Date(item.updatedAt);
   }
-  // Check if otherDateFields is actually an array before iterating
   if (Array.isArray(otherDateFields)) {
     otherDateFields.forEach((field) => {
       if (item[field] && !(item[field] instanceof Date)) {
-        // Cast newItem to any to allow indexed assignment
         (newItem as any)[field] = new Date(item[field]);
       }
     });
   } else {
-    // Log a warning if it's not an array, though this shouldn't happen with the fix below
     console.warn(
       "[ensureDateFields] Expected otherDateFields to be an array, but received:",
       otherDateFields,
@@ -41,6 +38,23 @@ const ensureDateFields = <
   }
   return newItem;
 };
+
+// Structure for full export
+export interface FullExportData {
+  version: number; // To handle future format changes
+  exportedAt: string;
+  settings?: Record<string, any>;
+  apiKeys?: DbApiKey[];
+  providerConfigs?: DbProviderConfig[];
+  projects?: Project[];
+  conversations?: Conversation[];
+  interactions?: Interaction[];
+  rules?: DbRule[];
+  tags?: DbTag[];
+  tagRuleLinks?: DbTagRuleLink[];
+  mods?: DbMod[];
+  syncRepos?: SyncRepo[];
+}
 
 export class PersistenceService {
   // Conversations
@@ -50,7 +64,6 @@ export class PersistenceService {
         .orderBy("updatedAt")
         .reverse()
         .toArray();
-      // Ensure createdAt, updatedAt, and lastSyncedAt are Date objects
       return conversations.map((c) => ensureDateFields(c, ["lastSyncedAt"]));
     } catch (error) {
       console.error("PersistenceService: Error loading conversations:", error);
@@ -60,8 +73,6 @@ export class PersistenceService {
 
   static async saveConversation(c: Conversation): Promise<string> {
     try {
-      // Ensure sync and project fields have default values if missing
-      // Dates are already Date objects here, Dexie handles serialization
       const conversationToSave: Conversation = {
         ...c,
         syncRepoId: c.syncRepoId ?? null,
@@ -84,7 +95,7 @@ export class PersistenceService {
     }
   }
 
-  // Interactions (Ensure dates are handled if needed, though less likely to be sorted directly)
+  // Interactions
   static async loadInteractionsForConversation(
     id: string,
   ): Promise<Interaction[]> {
@@ -92,7 +103,6 @@ export class PersistenceService {
       const interactions = await db.interactions
         .where({ conversationId: id })
         .sortBy("index");
-      // Ensure startedAt and endedAt are Date objects if they exist
       return interactions.map((i) =>
         ensureDateFields(i, ["startedAt", "endedAt"]),
       );
@@ -107,7 +117,6 @@ export class PersistenceService {
 
   static async saveInteraction(i: Interaction): Promise<string> {
     try {
-      // Dates are already Date objects here
       return await db.interactions.put(i);
     } catch (error) {
       console.error("PersistenceService: Error saving interaction:", error);
@@ -136,12 +145,10 @@ export class PersistenceService {
     }
   }
 
-  // Mods (Ensure dates are handled)
+  // Mods
   static async loadMods(): Promise<DbMod[]> {
     try {
       const mods = await db.mods.orderBy("loadOrder").toArray();
-      // Ensure createdAt is a Date object
-      // Explicitly pass empty array for otherDateFields
       return mods.map((m) => ensureDateFields(m, []));
     } catch (error) {
       console.error("PersistenceService: Error loading mods:", error);
@@ -151,7 +158,6 @@ export class PersistenceService {
 
   static async saveMod(m: DbMod): Promise<string> {
     try {
-      // Dates are already Date objects here
       return await db.mods.put(m);
     } catch (error) {
       console.error("PersistenceService: Error saving mod:", error);
@@ -168,7 +174,7 @@ export class PersistenceService {
     }
   }
 
-  // App State (Settings) (no changes needed)
+  // App State (Settings)
   static async saveSetting(key: string, value: any): Promise<string> {
     try {
       return await db.appState.put({ key: `settings:${key}`, value });
@@ -188,11 +194,10 @@ export class PersistenceService {
     }
   }
 
-  // Provider Configs (Ensure dates are handled)
+  // Provider Configs
   static async loadProviderConfigs(): Promise<DbProviderConfig[]> {
     try {
       const configs = (await db.providerConfigs?.toArray()) ?? [];
-      // Ensure date fields are Date objects
       return configs.map((c) => ensureDateFields(c, ["modelsLastFetchedAt"]));
     } catch (error) {
       console.error(
@@ -205,7 +210,6 @@ export class PersistenceService {
 
   static async saveProviderConfig(c: DbProviderConfig): Promise<string> {
     try {
-      // Dates are already Date objects here
       return await db.providerConfigs.put(c);
     } catch (error) {
       console.error("PersistenceService: Error saving provider config:", error);
@@ -225,12 +229,10 @@ export class PersistenceService {
     }
   }
 
-  // API Keys (Ensure dates are handled)
+  // API Keys
   static async loadApiKeys(): Promise<DbApiKey[]> {
     try {
       const keys = (await db.apiKeys?.toArray()) ?? [];
-      // Ensure date fields are Date objects
-      // Explicitly pass empty array for otherDateFields
       return keys.map((k) => ensureDateFields(k, []));
     } catch (error) {
       console.error("PersistenceService: Error loading API keys:", error);
@@ -240,7 +242,6 @@ export class PersistenceService {
 
   static async saveApiKey(k: DbApiKey): Promise<string> {
     try {
-      // Dates are already Date objects here
       return await db.apiKeys.put(k);
     } catch (error) {
       console.error("PersistenceService: Error saving API key:", error);
@@ -273,11 +274,10 @@ export class PersistenceService {
     }
   }
 
-  // Sync Repos (Ensure dates are handled)
+  // Sync Repos
   static async loadSyncRepos(): Promise<SyncRepo[]> {
     try {
       const repos = await db.syncRepos.toArray();
-      // Ensure date fields are Date objects
       return repos.map((r) =>
         ensureDateFields(r, ["lastPulledAt", "lastPushedAt"]),
       );
@@ -289,7 +289,6 @@ export class PersistenceService {
 
   static async saveSyncRepo(repo: SyncRepo): Promise<string> {
     try {
-      // Dates are already Date objects here
       return await db.syncRepos.put(repo);
     } catch (error) {
       console.error("PersistenceService: Error saving sync repo:", error);
@@ -321,15 +320,13 @@ export class PersistenceService {
     }
   }
 
-  // --- Projects ---
+  // Projects
   static async loadProjects(): Promise<Project[]> {
     try {
       const projects = await db.projects
         .orderBy("updatedAt")
         .reverse()
         .toArray();
-      // Ensure date fields are Date objects
-      // Explicitly pass empty array for otherDateFields
       return projects.map((p) => ensureDateFields(p, []));
     } catch (error) {
       console.error("PersistenceService: Error loading projects:", error);
@@ -339,8 +336,6 @@ export class PersistenceService {
 
   static async saveProject(p: Project): Promise<string> {
     try {
-      // Ensure the object is clean and cloneable, including the path
-      // Dates are already Date objects here
       const projectToSave: Project = {
         id: p.id,
         path: p.path,
@@ -367,9 +362,7 @@ export class PersistenceService {
 
   static async deleteProject(id: string): Promise<void> {
     try {
-      // Recursively delete child projects and unlink conversations
       const deleteRecursive = async (projectId: string) => {
-        // Find and delete child projects
         const childProjects = await db.projects
           .where("parentId")
           .equals(projectId)
@@ -377,8 +370,6 @@ export class PersistenceService {
         for (const child of childProjects) {
           await deleteRecursive(child.id);
         }
-
-        // Find and unlink conversations associated with this project
         const convosToUnlink = await db.conversations
           .where("projectId")
           .equals(projectId)
@@ -392,12 +383,9 @@ export class PersistenceService {
             `PersistenceService: Unlinked Project ${projectId} from ${convosToUnlink.length} conversations.`,
           );
         }
-
-        // Delete the project itself
         await db.projects.delete(projectId);
         console.log(`PersistenceService: Deleted Project ${projectId}`);
       };
-
       await db.transaction("rw", [db.projects, db.conversations], async () => {
         await deleteRecursive(id);
       });
@@ -407,7 +395,7 @@ export class PersistenceService {
     }
   }
 
-  // --- Rules ---
+  // Rules
   static async loadRules(): Promise<DbRule[]> {
     try {
       const rules = await db.rules.orderBy("name").toArray();
@@ -429,7 +417,6 @@ export class PersistenceService {
 
   static async deleteRule(id: string): Promise<void> {
     try {
-      // Also delete associated links in a transaction
       await db.transaction("rw", [db.rules, db.tagRuleLinks], async () => {
         await db.tagRuleLinks.where("ruleId").equals(id).delete();
         await db.rules.delete(id);
@@ -440,7 +427,7 @@ export class PersistenceService {
     }
   }
 
-  // --- Tags ---
+  // Tags
   static async loadTags(): Promise<DbTag[]> {
     try {
       const tags = await db.tags.orderBy("name").toArray();
@@ -462,7 +449,6 @@ export class PersistenceService {
 
   static async deleteTag(id: string): Promise<void> {
     try {
-      // Also delete associated links in a transaction
       await db.transaction("rw", [db.tags, db.tagRuleLinks], async () => {
         await db.tagRuleLinks.where("tagId").equals(id).delete();
         await db.tags.delete(id);
@@ -473,7 +459,7 @@ export class PersistenceService {
     }
   }
 
-  // --- TagRuleLinks ---
+  // TagRuleLinks
   static async loadTagRuleLinks(): Promise<DbTagRuleLink[]> {
     try {
       return await db.tagRuleLinks.toArray();
@@ -501,6 +487,182 @@ export class PersistenceService {
     }
   }
 
+  // --- Full Export/Import ---
+  static async getAllDataForExport(): Promise<FullExportData> {
+    const [
+      appState,
+      apiKeys,
+      providerConfigs,
+      projects,
+      conversations,
+      interactions,
+      rules,
+      tags,
+      tagRuleLinks,
+      mods,
+      syncRepos,
+    ] = await Promise.all([
+      db.appState.toArray(),
+      db.apiKeys.toArray(),
+      db.providerConfigs.toArray(),
+      db.projects.toArray(),
+      db.conversations.toArray(),
+      db.interactions.toArray(),
+      db.rules.toArray(),
+      db.tags.toArray(),
+      db.tagRuleLinks.toArray(),
+      db.mods.toArray(),
+      db.syncRepos.toArray(),
+    ]);
+
+    const settings: Record<string, any> = {};
+    appState.forEach((item) => {
+      if (item.key.startsWith("settings:")) {
+        settings[item.key.substring(9)] = item.value;
+      }
+    });
+
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      settings,
+      apiKeys,
+      providerConfigs,
+      projects,
+      conversations,
+      interactions,
+      rules,
+      tags,
+      tagRuleLinks,
+      mods,
+      syncRepos,
+    };
+  }
+
+  static async importAllData(
+    data: FullExportData,
+    options: {
+      importSettings?: boolean;
+      importApiKeys?: boolean;
+      importProviderConfigs?: boolean;
+      importProjects?: boolean;
+      importConversations?: boolean;
+      importRulesAndTags?: boolean;
+      importMods?: boolean;
+      importSyncRepos?: boolean;
+    },
+  ): Promise<void> {
+    if (data.version !== 1) {
+      throw new Error(
+        `Unsupported export version: ${data.version}. Expected version 1.`,
+      );
+    }
+
+    await db.transaction(
+      "rw",
+      [
+        db.appState,
+        db.apiKeys,
+        db.providerConfigs,
+        db.projects,
+        db.conversations,
+        db.interactions,
+        db.rules,
+        db.tags,
+        db.tagRuleLinks,
+        db.mods,
+        db.syncRepos,
+      ],
+      async () => {
+        if (options.importSettings) await db.appState.clear();
+        if (options.importApiKeys) await db.apiKeys.clear();
+        if (options.importProviderConfigs) await db.providerConfigs.clear();
+        if (options.importProjects) await db.projects.clear();
+        if (options.importConversations) {
+          await db.conversations.clear();
+          await db.interactions.clear();
+        }
+        if (options.importRulesAndTags) {
+          await db.rules.clear();
+          await db.tags.clear();
+          await db.tagRuleLinks.clear();
+        }
+        if (options.importMods) await db.mods.clear();
+        if (options.importSyncRepos) await db.syncRepos.clear();
+
+        if (options.importSettings && data.settings) {
+          const settingsToPut: DbAppState[] = Object.entries(data.settings).map(
+            ([key, value]) => ({ key: `settings:${key}`, value }),
+          );
+          await db.appState.bulkPut(settingsToPut);
+        }
+        if (options.importApiKeys && data.apiKeys) {
+          // Wrap ensureDateFields in anonymous function
+          await db.apiKeys.bulkPut(
+            data.apiKeys.map((k) => ensureDateFields(k)),
+          );
+        }
+        if (options.importProviderConfigs && data.providerConfigs) {
+          // Wrap ensureDateFields in anonymous function
+          await db.providerConfigs.bulkPut(
+            data.providerConfigs.map((c) =>
+              ensureDateFields(c, ["modelsLastFetchedAt"]),
+            ),
+          );
+        }
+        if (options.importProjects && data.projects) {
+          // Wrap ensureDateFields in anonymous function
+          await db.projects.bulkPut(
+            data.projects.map((p) => ensureDateFields(p)),
+          );
+        }
+        if (options.importConversations && data.conversations) {
+          // Wrap ensureDateFields in anonymous function
+          await db.conversations.bulkPut(
+            data.conversations.map((c) =>
+              ensureDateFields(c, ["lastSyncedAt"]),
+            ),
+          );
+          if (data.interactions) {
+            // Wrap ensureDateFields in anonymous function
+            await db.interactions.bulkPut(
+              data.interactions.map((i) =>
+                ensureDateFields(i, ["startedAt", "endedAt"]),
+              ),
+            );
+          }
+        }
+        if (options.importRulesAndTags) {
+          if (data.rules) {
+            // Wrap ensureDateFields in anonymous function
+            await db.rules.bulkPut(data.rules.map((r) => ensureDateFields(r)));
+          }
+          if (data.tags) {
+            // Wrap ensureDateFields in anonymous function
+            await db.tags.bulkPut(data.tags.map((t) => ensureDateFields(t)));
+          }
+          if (data.tagRuleLinks) {
+            // No date fields in DbTagRuleLink
+            await db.tagRuleLinks.bulkPut(data.tagRuleLinks);
+          }
+        }
+        if (options.importMods && data.mods) {
+          // Wrap ensureDateFields in anonymous function
+          await db.mods.bulkPut(data.mods.map((m) => ensureDateFields(m)));
+        }
+        if (options.importSyncRepos && data.syncRepos) {
+          // Wrap ensureDateFields in anonymous function
+          await db.syncRepos.bulkPut(
+            data.syncRepos.map((r) =>
+              ensureDateFields(r, ["lastPulledAt", "lastPushedAt"]),
+            ),
+          );
+        }
+      },
+    );
+  }
+  // --- End Full Export/Import ---
+
   // --- Clear All Data ---
   static async clearAllData(): Promise<void> {
     try {
@@ -515,7 +677,6 @@ export class PersistenceService {
           db.apiKeys,
           db.syncRepos,
           db.projects,
-          // Add new tables to transaction
           db.rules,
           db.tags,
           db.tagRuleLinks,
@@ -529,7 +690,6 @@ export class PersistenceService {
           await db.providerConfigs.clear();
           await db.apiKeys.clear();
           await db.syncRepos.clear();
-          // Clear new tables
           await db.rules.clear();
           await db.tags.clear();
           await db.tagRuleLinks.clear();

@@ -1,9 +1,12 @@
 // src/services/import-export.service.ts
-
+// FULL FILE
 import type { Conversation } from "@/types/litechat/chat";
 import type { Interaction } from "@/types/litechat/interaction";
 import type { Project } from "@/types/litechat/project";
-import { PersistenceService } from "@/services/persistence.service";
+import {
+  PersistenceService,
+  type FullExportData, // Import FullExportData type
+} from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { formatBytes } from "@/lib/litechat/file-manager-utils";
@@ -126,6 +129,18 @@ const formatInteractionsToMarkdown = (
   return mdString;
 };
 
+// Options for full import
+export interface FullImportOptions {
+  importSettings: boolean;
+  importApiKeys: boolean;
+  importProviderConfigs: boolean;
+  importProjects: boolean;
+  importConversations: boolean;
+  importRulesAndTags: boolean;
+  importMods: boolean;
+  importSyncRepos: boolean;
+}
+
 export class ImportExportService {
   static async importConversation(
     file: File,
@@ -237,7 +252,6 @@ export class ImportExportService {
 
   static async exportProject(projectId: string): Promise<void> {
     try {
-      // Get state directly from stores
       const { projects, getProjectById } = useProjectStore.getState();
       const { conversations } = useConversationStore.getState();
 
@@ -249,7 +263,6 @@ export class ImportExportService {
       const buildExportTree = async (
         currentProjectId: string,
       ): Promise<ProjectExportNode> => {
-        // Use projects from ProjectStore state
         const project = projects.find(
           (p: Project) => p.id === currentProjectId,
         );
@@ -257,11 +270,9 @@ export class ImportExportService {
           throw new Error(`Project ${currentProjectId} not found in state.`);
         }
 
-        // Use projects from ProjectStore state
         const childProjects = projects.filter(
           (p: Project) => p.parentId === currentProjectId,
         );
-        // Use conversations from ConversationStore state
         const childConversations = conversations.filter(
           (c: Conversation) => c.projectId === currentProjectId,
         );
@@ -332,4 +343,61 @@ export class ImportExportService {
       throw error;
     }
   }
+
+  // --- Full Config Export/Import ---
+  static async exportFullConfiguration(): Promise<void> {
+    try {
+      const exportData = await PersistenceService.getAllDataForExport();
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const filename = `litechat_full_export_${new Date().toISOString().split("T")[0]}.json`;
+      triggerDownload(blob, filename);
+      toast.success("Full configuration exported successfully.");
+    } catch (error) {
+      console.error(
+        "ImportExportService: Error exporting full configuration",
+        error,
+      );
+      toast.error(
+        `Full export failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  static async importFullConfiguration(
+    file: File,
+    options: FullImportOptions,
+  ): Promise<void> {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text) as FullExportData;
+
+      if (!data || typeof data !== "object" || !data.version) {
+        throw new Error(
+          "Invalid import file format. Missing version or basic structure.",
+        );
+      }
+
+      // Add more validation as needed based on FullExportData structure
+
+      await PersistenceService.importAllData(data, options);
+
+      toast.success(
+        "Configuration imported successfully. Reloading application...",
+      );
+      // Reload the application to apply changes
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (error) {
+      console.error(
+        "ImportExportService: Error importing full configuration",
+        error,
+      );
+      toast.error(
+        `Full import failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error; // Re-throw to indicate failure to the caller
+    }
+  }
+  // --- End Full Config Export/Import ---
 }

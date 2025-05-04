@@ -2,13 +2,12 @@
 // FULL FILE
 import type { PromptTurnObject } from "./prompt";
 import type { Metadata } from "./common";
-// Remove direct import of ToolCallPart/ToolResultPart from here
 
 export type InteractionType =
   | "message.user_assistant"
   | "message.assistant_regen"
   | "message.user_edit"
-  | "conversation.title_generation"
+  | "conversation.title_generation" // Added new type
   | "tool.execution"
   | "system.info"
   | "system.error";
@@ -26,10 +25,10 @@ export interface Interaction {
   id: string;
   conversationId: string;
   type: InteractionType;
-  index: number;
+  index: number; // Title generation might have index -1 or similar? Or just not be displayed.
   parentId: string | null;
-  prompt: Readonly<PromptTurnObject> | null;
-  response: any | null;
+  prompt: Readonly<PromptTurnObject> | null; // Title generation might have a simplified prompt
+  response: any | null; // Title generation response is the title string
   status: InteractionStatus;
   startedAt: Date | null;
   endedAt: Date | null;
@@ -61,5 +60,7 @@ export interface Interaction {
     // Add timing metadata
     timeToFirstToken?: number; // Milliseconds
     generationTime?: number; // Milliseconds
+    // Flag for title generation interaction
+    isTitleGeneration?: boolean;
   };
 }

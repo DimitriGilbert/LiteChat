@@ -23,6 +23,8 @@ import { useConversationStore } from "@/store/conversation.store"; // Import Con
 import { useProjectStore } from "@/store/project.store"; // Import ProjectStore
 import { useShallow } from "zustand/react/shallow";
 
+const ChatCanvasHiddenInteractions = ["conversation.title_generation"];
+
 export interface ChatCanvasProps {
   conversationId: string | null;
   interactions: Interaction[];
@@ -191,25 +193,26 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
             const isStreaming = streamingInteractionIds.includes(
               interaction.id,
             );
-
-            if (isStreaming) {
-              return (
-                <StreamingInteractionCard
-                  key={`${interaction.id}-streaming`}
-                  interactionId={interaction.id}
-                  onStop={onStopInteraction}
-                />
-              );
-            } else {
-              return (
-                <InteractionCard
-                  key={interaction.id}
-                  interaction={interaction}
-                  onEdit={onEditInteraction}
-                  onRegenerate={onRegenerateInteraction}
-                  onDelete={undefined} // Delete is handled internally now
-                />
-              );
+            if (!ChatCanvasHiddenInteractions.includes(interaction.type)) {
+              if (isStreaming) {
+                return (
+                  <StreamingInteractionCard
+                    key={`${interaction.id}-streaming`}
+                    interactionId={interaction.id}
+                    onStop={onStopInteraction}
+                  />
+                );
+              } else {
+                return (
+                  <InteractionCard
+                    key={interaction.id}
+                    interaction={interaction}
+                    onEdit={onEditInteraction}
+                    onRegenerate={onRegenerateInteraction}
+                    onDelete={undefined} // Delete is handled internally now
+                  />
+                );
+              }
             }
           })}
           {status === "streaming" &&

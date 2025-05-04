@@ -18,12 +18,18 @@ interface SettingsState {
   enableStreamingMarkdown: boolean;
   enableStreamingCodeBlockParsing: boolean;
   foldStreamingCodeBlocks: boolean;
-  foldUserMessagesOnCompletion: boolean; // New setting
+  foldUserMessagesOnCompletion: boolean;
   streamingRenderFPS: number;
   gitUserName: string | null;
   gitUserEmail: string | null;
   toolMaxSteps: number;
   prismThemeUrl: string | null;
+  // New Auto-Title Settings
+  autoTitleEnabled: boolean;
+  autoTitleModelId: string | null;
+  autoTitlePromptMaxLength: number;
+  autoTitleIncludeFiles: boolean;
+  autoTitleIncludeRules: boolean;
 }
 
 interface SettingsActions {
@@ -39,14 +45,21 @@ interface SettingsActions {
   setEnableStreamingMarkdown: (enabled: boolean) => void;
   setEnableStreamingCodeBlockParsing: (enabled: boolean) => void;
   setFoldStreamingCodeBlocks: (fold: boolean) => void;
-  setFoldUserMessagesOnCompletion: (fold: boolean) => void; // New action
+  setFoldUserMessagesOnCompletion: (fold: boolean) => void;
   setStreamingRenderFPS: (fps: number) => void;
   setGitUserName: (name: string | null) => void;
   setGitUserEmail: (email: string | null) => void;
   setToolMaxSteps: (steps: number) => void;
   setPrismThemeUrl: (url: string | null) => void;
+  // New Auto-Title Actions
+  setAutoTitleEnabled: (enabled: boolean) => void;
+  setAutoTitleModelId: (modelId: string | null) => void;
+  setAutoTitlePromptMaxLength: (length: number) => void;
+  setAutoTitleIncludeFiles: (include: boolean) => void;
+  setAutoTitleIncludeRules: (include: boolean) => void;
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>;
+  resetAssistantSettings: () => Promise<void>; // Add reset for assistant
 }
 
 // Define default constants
@@ -62,12 +75,18 @@ const DEFAULT_ENABLE_ADVANCED_SETTINGS = true;
 const DEFAULT_ENABLE_STREAMING_MARKDOWN = true;
 const DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING = false;
 const DEFAULT_FOLD_STREAMING_CODE_BLOCKS = false;
-const DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION = false; // New default
+const DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION = false;
 const DEFAULT_STREAMING_FPS = 15;
 const DEFAULT_GIT_USER_NAME = null;
 const DEFAULT_GIT_USER_EMAIL = null;
 const DEFAULT_TOOL_MAX_STEPS = 5;
 const DEFAULT_PRISM_THEME_URL = null;
+// New Auto-Title Defaults
+const DEFAULT_AUTO_TITLE_ENABLED = true;
+const DEFAULT_AUTO_TITLE_MODEL_ID = null; // User must select
+const DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH = 768;
+const DEFAULT_AUTO_TITLE_INCLUDE_FILES = false;
+const DEFAULT_AUTO_TITLE_INCLUDE_RULES = false;
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set) => ({
@@ -85,12 +104,18 @@ export const useSettingsStore = create(
     enableStreamingCodeBlockParsing:
       DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
     foldStreamingCodeBlocks: DEFAULT_FOLD_STREAMING_CODE_BLOCKS,
-    foldUserMessagesOnCompletion: DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION, // Initialize new setting
+    foldUserMessagesOnCompletion: DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION,
     streamingRenderFPS: DEFAULT_STREAMING_FPS,
     gitUserName: DEFAULT_GIT_USER_NAME,
     gitUserEmail: DEFAULT_GIT_USER_EMAIL,
     toolMaxSteps: DEFAULT_TOOL_MAX_STEPS,
     prismThemeUrl: DEFAULT_PRISM_THEME_URL,
+    // Initialize new settings
+    autoTitleEnabled: DEFAULT_AUTO_TITLE_ENABLED,
+    autoTitleModelId: DEFAULT_AUTO_TITLE_MODEL_ID,
+    autoTitlePromptMaxLength: DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH,
+    autoTitleIncludeFiles: DEFAULT_AUTO_TITLE_INCLUDE_FILES,
+    autoTitleIncludeRules: DEFAULT_AUTO_TITLE_INCLUDE_RULES,
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -150,7 +175,6 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("foldStreamingCodeBlocks", fold);
     },
 
-    // Implement setter for new fold setting
     setFoldUserMessagesOnCompletion: (fold) => {
       set({ foldUserMessagesOnCompletion: fold });
       PersistenceService.saveSetting("foldUserMessagesOnCompletion", fold);
@@ -185,6 +209,30 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("prismThemeUrl", trimmedUrl);
     },
 
+    // --- Auto-Title Setters ---
+    setAutoTitleEnabled: (enabled) => {
+      set({ autoTitleEnabled: enabled });
+      PersistenceService.saveSetting("autoTitleEnabled", enabled);
+    },
+    setAutoTitleModelId: (modelId) => {
+      set({ autoTitleModelId: modelId });
+      PersistenceService.saveSetting("autoTitleModelId", modelId);
+    },
+    setAutoTitlePromptMaxLength: (length) => {
+      const clampedLength = Math.max(100, Math.min(4000, length)); // Example clamp
+      set({ autoTitlePromptMaxLength: clampedLength });
+      PersistenceService.saveSetting("autoTitlePromptMaxLength", clampedLength);
+    },
+    setAutoTitleIncludeFiles: (include) => {
+      set({ autoTitleIncludeFiles: include });
+      PersistenceService.saveSetting("autoTitleIncludeFiles", include);
+    },
+    setAutoTitleIncludeRules: (include) => {
+      set({ autoTitleIncludeRules: include });
+      PersistenceService.saveSetting("autoTitleIncludeRules", include);
+    },
+    // --- End Auto-Title Setters ---
+
     loadSettings: async () => {
       try {
         const [
@@ -200,12 +248,18 @@ export const useSettingsStore = create(
           enableStreamingMd,
           enableStreamingCodeBlock,
           foldStreamingCodeBlocks,
-          foldUserMessages, // Load new setting
+          foldUserMessages,
           streamingFps,
           gitUserName,
           gitUserEmail,
           toolMaxSteps,
           prismThemeUrl,
+          // Load new settings
+          autoTitleEnabled,
+          autoTitleModelId,
+          autoTitlePromptMaxLength,
+          autoTitleIncludeFiles,
+          autoTitleIncludeRules,
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -249,7 +303,6 @@ export const useSettingsStore = create(
             "foldStreamingCodeBlocks",
             DEFAULT_FOLD_STREAMING_CODE_BLOCKS,
           ),
-          // Load new setting from persistence
           PersistenceService.loadSetting<boolean>(
             "foldUserMessagesOnCompletion",
             DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION,
@@ -274,6 +327,27 @@ export const useSettingsStore = create(
             "prismThemeUrl",
             DEFAULT_PRISM_THEME_URL,
           ),
+          // Load new settings with defaults
+          PersistenceService.loadSetting<boolean>(
+            "autoTitleEnabled",
+            DEFAULT_AUTO_TITLE_ENABLED,
+          ),
+          PersistenceService.loadSetting<string | null>(
+            "autoTitleModelId",
+            DEFAULT_AUTO_TITLE_MODEL_ID,
+          ),
+          PersistenceService.loadSetting<number>(
+            "autoTitlePromptMaxLength",
+            DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH,
+          ),
+          PersistenceService.loadSetting<boolean>(
+            "autoTitleIncludeFiles",
+            DEFAULT_AUTO_TITLE_INCLUDE_FILES,
+          ),
+          PersistenceService.loadSetting<boolean>(
+            "autoTitleIncludeRules",
+            DEFAULT_AUTO_TITLE_INCLUDE_RULES,
+          ),
         ]);
 
         set({
@@ -289,12 +363,18 @@ export const useSettingsStore = create(
           enableStreamingMarkdown: enableStreamingMd,
           enableStreamingCodeBlockParsing: enableStreamingCodeBlock,
           foldStreamingCodeBlocks: foldStreamingCodeBlocks,
-          foldUserMessagesOnCompletion: foldUserMessages, // Set loaded value
+          foldUserMessagesOnCompletion: foldUserMessages,
           streamingRenderFPS: streamingFps,
           gitUserName,
           gitUserEmail,
           toolMaxSteps,
           prismThemeUrl,
+          // Set loaded values for new settings
+          autoTitleEnabled,
+          autoTitleModelId,
+          autoTitlePromptMaxLength,
+          autoTitleIncludeFiles,
+          autoTitleIncludeRules,
         });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);
@@ -310,7 +390,7 @@ export const useSettingsStore = create(
             DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
           foldStreamingCodeBlocks: DEFAULT_FOLD_STREAMING_CODE_BLOCKS,
           foldUserMessagesOnCompletion:
-            DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION, // Reset new setting
+            DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION,
           streamingRenderFPS: DEFAULT_STREAMING_FPS,
           prismThemeUrl: DEFAULT_PRISM_THEME_URL,
         });
@@ -328,7 +408,6 @@ export const useSettingsStore = create(
             "foldStreamingCodeBlocks",
             DEFAULT_FOLD_STREAMING_CODE_BLOCKS,
           ),
-          // Persist reset for new setting
           PersistenceService.saveSetting(
             "foldUserMessagesOnCompletion",
             DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION,
@@ -346,6 +425,77 @@ export const useSettingsStore = create(
       } catch (error) {
         console.error("SettingsStore: Error resetting general settings", error);
         toast.error("Failed to reset general settings.");
+      }
+    },
+
+    resetAssistantSettings: async () => {
+      try {
+        set({
+          globalSystemPrompt: DEFAULT_SYSTEM_PROMPT,
+          temperature: DEFAULT_TEMPERATURE,
+          maxTokens: DEFAULT_MAX_TOKENS,
+          topP: DEFAULT_TOP_P,
+          topK: DEFAULT_TOP_K,
+          presencePenalty: DEFAULT_PRESENCE_PENALTY,
+          frequencyPenalty: DEFAULT_FREQUENCY_PENALTY,
+          toolMaxSteps: DEFAULT_TOOL_MAX_STEPS,
+          // Reset auto-title settings
+          autoTitleEnabled: DEFAULT_AUTO_TITLE_ENABLED,
+          autoTitleModelId: DEFAULT_AUTO_TITLE_MODEL_ID,
+          autoTitlePromptMaxLength: DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH,
+          autoTitleIncludeFiles: DEFAULT_AUTO_TITLE_INCLUDE_FILES,
+          autoTitleIncludeRules: DEFAULT_AUTO_TITLE_INCLUDE_RULES,
+        });
+        await Promise.all([
+          PersistenceService.saveSetting(
+            "globalSystemPrompt",
+            DEFAULT_SYSTEM_PROMPT,
+          ),
+          PersistenceService.saveSetting("temperature", DEFAULT_TEMPERATURE),
+          PersistenceService.saveSetting("maxTokens", DEFAULT_MAX_TOKENS),
+          PersistenceService.saveSetting("topP", DEFAULT_TOP_P),
+          PersistenceService.saveSetting("topK", DEFAULT_TOP_K),
+          PersistenceService.saveSetting(
+            "presencePenalty",
+            DEFAULT_PRESENCE_PENALTY,
+          ),
+          PersistenceService.saveSetting(
+            "frequencyPenalty",
+            DEFAULT_FREQUENCY_PENALTY,
+          ),
+          PersistenceService.saveSetting(
+            "toolMaxSteps",
+            DEFAULT_TOOL_MAX_STEPS,
+          ),
+          // Persist reset for auto-title settings
+          PersistenceService.saveSetting(
+            "autoTitleEnabled",
+            DEFAULT_AUTO_TITLE_ENABLED,
+          ),
+          PersistenceService.saveSetting(
+            "autoTitleModelId",
+            DEFAULT_AUTO_TITLE_MODEL_ID,
+          ),
+          PersistenceService.saveSetting(
+            "autoTitlePromptMaxLength",
+            DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH,
+          ),
+          PersistenceService.saveSetting(
+            "autoTitleIncludeFiles",
+            DEFAULT_AUTO_TITLE_INCLUDE_FILES,
+          ),
+          PersistenceService.saveSetting(
+            "autoTitleIncludeRules",
+            DEFAULT_AUTO_TITLE_INCLUDE_RULES,
+          ),
+        ]);
+        toast.success("Assistant settings reset to defaults.");
+      } catch (error) {
+        console.error(
+          "SettingsStore: Error resetting assistant settings",
+          error,
+        );
+        toast.error("Failed to reset assistant settings.");
       }
     },
   })),

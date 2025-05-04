@@ -6,7 +6,6 @@ import { useInteractionStore } from "@/store/interaction.store";
 import { useProjectStore } from "@/store/project.store";
 import { usePromptStateStore } from "@/store/prompt.store";
 import { useVfsStore } from "@/store/vfs.store";
-// Import the new store
 import { useRulesStore } from "@/store/rules.store";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import {
@@ -18,7 +17,9 @@ import { toast } from "sonner";
 import type { AttachedFileMetadata } from "@/store/input.store";
 import type { fs as FsType } from "@zenfs/core";
 import { useConversationStore } from "@/store/conversation.store";
-import type { DbRule } from "@/types/litechat/rules"; // Import DbRule
+import type { DbRule } from "@/types/litechat/rules";
+import { useSettingsStore } from "@/store/settings.store"; // Import settings store
+import { nanoid } from "nanoid"; // Import nanoid for title generation prompt ID
 
 export const ConversationService = {
   async submitPrompt(turnData: PromptTurnObject): Promise<void> {
@@ -28,8 +29,8 @@ export const ConversationService = {
     const projectStoreState = useProjectStore.getState();
     const promptState = usePromptStateStore.getState();
     const conversationStoreState = useConversationStore.getState();
-    // Get rules state
     const rulesStoreState = useRulesStore.getState();
+    const settingsStoreState = useSettingsStore.getState(); // Get settings state
 
     const conversationId = interactionStoreState.currentConversationId;
     if (!conversationId) {
@@ -43,6 +44,18 @@ export const ConversationService = {
     const currentConversation =
       conversationStoreState.getConversationById(conversationId);
     const currentProjectId = currentConversation?.projectId ?? null;
+
+    // --- Check if this is the first interaction ---
+    const isFirstInteraction =
+      interactionStoreState.interactions.filter(
+        (i) => i.conversationId === conversationId,
+      ).length === 0;
+    const shouldGenerateTitle =
+      isFirstInteraction &&
+      settingsStoreState.autoTitleEnabled &&
+      turnData.metadata?.autoTitleEnabledForTurn === true &&
+      settingsStoreState.autoTitleModelId;
+    // --- End Check ---
 
     // 1. Build History
     const currentHistory = interactionStoreState.interactions;
@@ -81,11 +94,15 @@ export const ConversationService = {
 
     // Apply 'before' rules
     if (beforeRules.length > 0) {
-      userContent = `${beforeRules.join("\n\n")}\n\n${userContent}`;
+      userContent = `${beforeRules.join(`\n`)}
+
+${userContent}`;
     }
     // Apply 'after' rules
     if (afterRules.length > 0) {
-      userContent = `${userContent}\n\n${afterRules.join("\n\n")}`;
+      userContent = `${userContent}
+
+    ${afterRules.join(`\n`)}`;
     }
     // --- End Apply Rules ---
 
@@ -126,7 +143,13 @@ export const ConversationService = {
 
     // Apply 'system' rules
     if (systemRules.length > 0) {
-      baseSystemPrompt = `${baseSystemPrompt ? `${baseSystemPrompt}\n\n` : ""}${systemRules.join("\n\n")}`;
+      baseSystemPrompt = `${
+        baseSystemPrompt
+          ? `${baseSystemPrompt}
+
+        `
+          : ""
+      }${systemRules.join(`\n`)}`;
     }
 
     // 4. Merge Parameters (PromptState + TurnData)
@@ -149,16 +172,21 @@ export const ConversationService = {
       }
     });
 
-    // 5. Construct PromptObject
+    // 5. Construct PromptObject for main interaction
     const promptObject: PromptObject = {
       system: baseSystemPrompt, // Use the system prompt potentially modified by rules
       messages: historyMessages,
       parameters: finalParameters,
       metadata: {
-        // Remove rule/tag activation metadata before sending to AI service
+        // Remove rule/tag/auto-title activation metadata before sending to AI service
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ...(({ turnSystemPrompt, activeTagIds, activeRuleIds, ...restMeta }) =>
-          restMeta)(turnData.metadata ?? {}),
+        ...(({
+          turnSystemPrompt,
+          activeTagIds,
+          activeRuleIds,
+          autoTitleEnabledForTurn,
+          ...restMeta
+        }) => restMeta)(turnData.metadata ?? {}),
         modelId: promptState.modelId,
         // Store only basic file info (no content) in the final prompt metadata sent to AI Service
         attachedFiles: turnData.metadata.attachedFiles?.map(
@@ -169,13 +197,37 @@ export const ConversationService = {
       // toolChoice and tools will be added by InteractionService based on metadata
     };
 
-    // 6. Delegate to InteractionService
+    // 6. Delegate main interaction to InteractionService
     try {
-      await InteractionService.startInteraction(
+      // Don't await this if title generation needs to run in parallel
+      const mainInteractionPromise = InteractionService.startInteraction(
         promptObject,
         conversationId,
         turnData, // Pass original turn data for persistence
       );
+
+      // --- Trigger Title Generation Asynchronously ---
+      if (shouldGenerateTitle) {
+        console.log(
+          "[ConversationService] Triggering asynchronous title generation.",
+        );
+        // Don't await this promise, let it run in the background
+        this.generateConversationTitle(
+          conversationId,
+          turnData,
+          activeRules, // Pass rules if needed based on settings
+        ).catch((titleError) => {
+          console.error(
+            "[ConversationService] Background title generation failed:",
+            titleError,
+          );
+          // Optionally toast a silent error or log it
+        });
+      }
+      // --- End Title Generation Trigger ---
+
+      // Await the main interaction promise *after* potentially starting title gen
+      await mainInteractionPromise;
     } catch (error) {
       console.error("[ConversationService] Error starting interaction:", error);
       toast.error(
@@ -185,6 +237,101 @@ export const ConversationService = {
       throw error;
     }
   },
+
+  // --- New function for Title Generation ---
+  async generateConversationTitle(
+    conversationId: string,
+    originalTurnData: PromptTurnObject,
+    activeRulesForTurn: DbRule[], // Receive rules applied to the original turn
+  ): Promise<void> {
+    const settings = useSettingsStore.getState();
+
+    if (!settings.autoTitleModelId) {
+      console.warn(
+        "[ConversationService] Auto-title generation skipped: No model selected in settings.",
+      );
+      return;
+    }
+
+    // 1. Prepare simplified prompt content
+    let titlePromptContent = originalTurnData.content;
+
+    // Truncate based on settings
+    if (titlePromptContent.length > settings.autoTitlePromptMaxLength) {
+      titlePromptContent =
+        titlePromptContent.substring(0, settings.autoTitlePromptMaxLength) +
+        "...";
+    }
+
+    // Optionally add file info
+    if (
+      settings.autoTitleIncludeFiles &&
+      originalTurnData.metadata?.attachedFiles?.length
+    ) {
+      const fileNames = originalTurnData.metadata.attachedFiles
+        .map((f) => f.name)
+        .join(", ");
+      titlePromptContent += `
+
+[Attached files: ${fileNames}]`;
+    }
+
+    // Optionally add rules info
+    if (settings.autoTitleIncludeRules && activeRulesForTurn.length > 0) {
+      const ruleNames = activeRulesForTurn.map((r) => r.name).join(", ");
+      titlePromptContent += `
+
+[Active rules: ${ruleNames}]`;
+    }
+
+    // 2. Construct Title Generation Prompt Object
+    const titlePromptObject: PromptObject = {
+      // Use a specific system prompt for title generation
+      system:
+        "Generate a concise, descriptive title (max 8-10 words) for the following user prompt. Output ONLY the title text, nothing else.",
+      messages: [{ role: "user", content: titlePromptContent }],
+      parameters: {
+        temperature: 0.5, // Use a lower temp for more deterministic titles
+        max_tokens: 20, // Limit tokens for title
+      },
+      metadata: {
+        modelId: settings.autoTitleModelId,
+        isTitleGeneration: true, // Flag this interaction
+      },
+      // No tools needed for title generation
+      tools: undefined,
+      toolChoice: "none",
+    };
+
+    // 3. Create a dummy PromptTurnObject for the title generation interaction record
+    // This won't be displayed but helps track the request
+    const titleTurnData: PromptTurnObject = {
+      id: nanoid(), // Unique ID for this internal turn
+      content: `[Generate title based on: ${originalTurnData.content.substring(0, 50)}...]`,
+      parameters: titlePromptObject.parameters,
+      metadata: {
+        ...titlePromptObject.metadata,
+        originalTurnId: originalTurnData.id,
+      },
+    };
+
+    // 4. Call InteractionService with specific type
+    try {
+      await InteractionService.startInteraction(
+        titlePromptObject,
+        conversationId,
+        titleTurnData, // Pass the dummy turn data
+        "conversation.title_generation", // Specify the type
+      );
+    } catch (error) {
+      console.error(
+        "[ConversationService] Error starting title generation interaction:",
+        error,
+      );
+      // Don't toast here, as it's a background task
+    }
+  },
+  // --- End Title Generation Function ---
 
   async regenerateInteraction(interactionId: string): Promise<void> {
     console.log(
@@ -196,7 +343,6 @@ export const ConversationService = {
     const projectStoreState = useProjectStore.getState();
     const promptState = usePromptStateStore.getState();
     const conversationStoreState = useConversationStore.getState();
-    // Get rules state
     const rulesStoreState = useRulesStore.getState();
 
     const targetInteraction = interactionStoreState.interactions.find(
@@ -254,11 +400,15 @@ export const ConversationService = {
 
     // Apply 'before' rules
     if (beforeRules.length > 0) {
-      userContent = `${beforeRules.join("\n\n")}\n\n${userContent}`;
+      userContent = `${beforeRules.join(`\n`)}
+
+${userContent}`;
     }
     // Apply 'after' rules
     if (afterRules.length > 0) {
-      userContent = `${userContent}\n\n${afterRules.join("\n\n")}`;
+      userContent = `${userContent}
+
+    ${afterRules.join(`\n`)}`;
     }
     // --- End Apply Rules ---
 
@@ -298,7 +448,13 @@ export const ConversationService = {
       .filter((r) => r.type === "system")
       .map((r) => r.content);
     if (systemRules.length > 0) {
-      baseSystemPrompt = `${baseSystemPrompt ? `${baseSystemPrompt}\n\n` : ""}${systemRules.join("\n\n")}`;
+      baseSystemPrompt = `${
+        baseSystemPrompt
+          ? `${baseSystemPrompt}
+
+        `
+          : ""
+      }${systemRules.join(`\n`)}`;
     }
 
     // 4. Merge Parameters (Current PromptState + Original TurnData Params)
@@ -326,10 +482,15 @@ export const ConversationService = {
       messages: historyMessages,
       parameters: finalParameters,
       metadata: {
-        // Remove rule/tag activation metadata
+        // Remove rule/tag/auto-title activation metadata
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ...(({ turnSystemPrompt, activeTagIds, activeRuleIds, ...restMeta }) =>
-          restMeta)(originalTurnData.metadata ?? {}),
+        ...(({
+          turnSystemPrompt,
+          activeTagIds,
+          activeRuleIds,
+          autoTitleEnabledForTurn,
+          ...restMeta
+        }) => restMeta)(originalTurnData.metadata ?? {}),
         modelId: promptState.modelId, // Use current model selection for regen
         regeneratedFromId: interactionId,
         // Store only basic file info (no content)
@@ -343,10 +504,12 @@ export const ConversationService = {
 
     // 6. Delegate to InteractionService
     try {
+      // Specify the type as regeneration
       await InteractionService.startInteraction(
         promptObject,
         conversationId,
         originalTurnData, // Pass original turn data for persistence
+        "message.assistant_regen", // Specify type
       );
     } catch (error) {
       console.error(

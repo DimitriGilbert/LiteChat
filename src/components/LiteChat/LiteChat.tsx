@@ -22,7 +22,6 @@ import { useModStore } from "@/store/mod.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { useVfsStore } from "@/store/vfs.store";
-// Import the new store
 import { useRulesStore } from "@/store/rules.store";
 import { loadMods } from "@/modding/loader";
 import { Toaster } from "@/components/ui/sonner";
@@ -51,8 +50,9 @@ import { registerStructuredOutputControl } from "@/hooks/litechat/registerStruct
 import { registerUsageDisplayControl } from "@/hooks/litechat/registerUsageDisplayControl";
 import { registerReasoningControl } from "@/hooks/litechat/registerReasoningControl";
 import { registerWebSearchControl } from "@/hooks/litechat/registerWebSearchControl";
-// Import the new control registration function
 import { registerRulesControl } from "@/hooks/litechat/registerRulesControl";
+// Import the new control registration function
+import { registerAutoTitleControl } from "@/hooks/litechat/registerAutoTitleControl";
 
 export const LiteChat: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
@@ -125,7 +125,6 @@ export const LiteChat: React.FC = () => {
       initializePromptState: state.initializePromptState,
     })),
   );
-  // Add hook for the new store
   const { loadRulesAndTags } = useRulesStore(
     useShallow((state) => ({
       loadRulesAndTags: state.loadRulesAndTags,
@@ -147,7 +146,6 @@ export const LiteChat: React.FC = () => {
         await loadProviderData();
         if (!isMounted) return;
         console.log("LiteChat: Provider data loaded.");
-        // Load rules and tags
         await loadRulesAndTags();
         if (!isMounted) return;
         console.log("LiteChat: Rules and Tags loaded.");
@@ -165,6 +163,7 @@ export const LiteChat: React.FC = () => {
 
         // Prompt Controls (Order matters for visual layout)
         registerGlobalModelSelector();
+        registerAutoTitleControl(); // Register new control
         registerUsageDisplayControl(); // High priority
         registerSystemPromptControl();
         registerReasoningControl();
@@ -172,7 +171,6 @@ export const LiteChat: React.FC = () => {
         registerFileControl();
         registerVfsControl(); // Includes prompt trigger and modal panel
         registerToolSelectorControl();
-        // Register the new Rules control
         registerRulesControl();
         registerParameterControl(); // Advanced params lower down
         registerStructuredOutputControl();
@@ -433,7 +431,6 @@ export const LiteChat: React.FC = () => {
         ?.settingsRenderer,
     [chatControls],
   );
-  // Find the VFS modal renderer using its ID
   const vfsModalRenderer = useMemo(
     () => chatControls.find((c) => c.id === "core-vfs-modal-panel")?.renderer,
     [chatControls],
@@ -543,8 +540,6 @@ export const LiteChat: React.FC = () => {
             className="border-t border-[--border] bg-card flex-shrink-0"
           />
         </div>
-
-        {/* Right Drawer Removed */}
       </div>
 
       {/* Render Modals Explicitly */}
@@ -554,7 +549,6 @@ export const LiteChat: React.FC = () => {
       {isProjectSettingsModalOpen &&
         projectSettingsModalRenderer &&
         projectSettingsModalRenderer()}
-      {/* Render VFS modal based on its state */}
       {isVfsModalOpen && vfsModalRenderer && vfsModalRenderer()}
 
       <Toaster richColors position="bottom-right" closeButton />

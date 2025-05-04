@@ -27,7 +27,7 @@ prompt_4_*
 src/test/**/*.notest.*
 *.todo.md
 .proompts/
-src.bak.d
+src.*.d
 .update_scripts/*
 todo.*.md
 public/versions/

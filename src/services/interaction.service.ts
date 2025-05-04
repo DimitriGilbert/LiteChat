@@ -4,6 +4,7 @@ import type { PromptObject, PromptTurnObject } from "@/types/litechat/prompt";
 import type {
   Interaction,
   InteractionStatus,
+  InteractionType, // Import InteractionType
 } from "@/types/litechat/interaction";
 import { AIService, AIServiceCallbacks } from "./ai.service";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -66,7 +67,6 @@ interface AIServiceCallOptions {
 export const InteractionService = {
   _activeControllers: new Map<string, AbortController>(),
   _streamingToolData: new Map<string, { calls: string[]; results: string[] }>(),
-  // Add map to store first chunk timestamps and start times
   _firstChunkTimestamps: new Map<string, number>(),
   _interactionStartTimes: new Map<string, number>(),
 
@@ -74,9 +74,11 @@ export const InteractionService = {
     prompt: PromptObject,
     conversationId: string,
     initiatingTurnData: PromptTurnObject,
+    // Add optional interactionType parameter
+    interactionType: InteractionType = "message.user_assistant",
   ): Promise<string | null> {
     console.log(
-      "[InteractionService] startInteraction called",
+      `[InteractionService] startInteraction called (Type: ${interactionType})`,
       prompt,
       conversationId,
       initiatingTurnData,
@@ -103,7 +105,6 @@ export const InteractionService = {
     const abortController = new AbortController();
     this._activeControllers.set(interactionId, abortController);
     this._streamingToolData.set(interactionId, { calls: [], results: [] });
-    // Clear any previous timestamps for this ID
     this._firstChunkTimestamps.delete(interactionId);
     this._interactionStartTimes.delete(interactionId);
 
@@ -112,13 +113,20 @@ export const InteractionService = {
     const conversationInteractions = currentInteractions.filter(
       (i) => i.conversationId === conversationId,
     );
+    // Adjust index calculation for title generation (might not need display index)
     const newIndex =
-      conversationInteractions.reduce((max, i) => Math.max(max, i.index), -1) +
-      1;
+      interactionType === "conversation.title_generation"
+        ? -1 // Assign a special index or handle differently
+        : conversationInteractions.reduce(
+            (max, i) => Math.max(max, i.index),
+            -1,
+          ) + 1;
     const parentId =
-      conversationInteractions.length > 0
-        ? conversationInteractions[conversationInteractions.length - 1].id
-        : null;
+      interactionType === "conversation.title_generation"
+        ? null // Title generation doesn't have a direct parent in the chat flow
+        : conversationInteractions.length > 0
+          ? conversationInteractions[conversationInteractions.length - 1].id
+          : null;
 
     const startTime = performance.now(); // Record start time
     this._interactionStartTimes.set(interactionId, startTime);
@@ -126,7 +134,7 @@ export const InteractionService = {
     const interactionData: Interaction = {
       id: interactionId,
       conversationId: conversationId,
-      type: "message.user_assistant",
+      type: interactionType, // Use the provided type
       prompt: { ...initiatingTurnData },
       response: null,
       status: "STREAMING",
@@ -139,14 +147,27 @@ export const InteractionService = {
         reasoning: undefined, // Initialize reasoning
         timeToFirstToken: undefined, // Initialize timing
         generationTime: undefined, // Initialize timing
+        // Add isTitleGeneration flag if type matches
+        isTitleGeneration: interactionType === "conversation.title_generation",
       },
       index: newIndex,
       parentId: parentId,
     };
 
     // 3. Update State & Persistence (Initial)
-    interactionStoreState._addInteractionToState(interactionData);
-    interactionStoreState._addStreamingId(interactionId);
+    // Only add to visible interactions if it's not title generation
+    if (interactionType !== "conversation.title_generation") {
+      interactionStoreState._addInteractionToState(interactionData);
+      interactionStoreState._addStreamingId(interactionId);
+    } else {
+      // For title generation, maybe just track the streaming ID without adding to the main list?
+      // Or add it but filter it out in the UI layer. Let's add it for now for consistency.
+      interactionStoreState._addInteractionToState(interactionData);
+      interactionStoreState._addStreamingId(interactionId);
+      console.log(
+        `[InteractionService] Added title generation interaction ${interactionId} to state.`,
+      );
+    }
     PersistenceService.saveInteraction({ ...interactionData }).catch((e) => {
       console.error(
         `[InteractionService] Failed initial persistence for ${interactionId}`,
@@ -168,6 +189,7 @@ export const InteractionService = {
         interactionId,
         "ERROR",
         new Error("No model ID specified in prompt metadata."),
+        interactionType, // Pass type
       );
       return null;
     }
@@ -179,6 +201,7 @@ export const InteractionService = {
         interactionId,
         "ERROR",
         new Error(`Invalid combined model ID format: ${targetModelId}`),
+        interactionType, // Pass type
       );
       return null;
     }
@@ -191,6 +214,7 @@ export const InteractionService = {
         interactionId,
         "ERROR",
         new Error(`Provider configuration not found for ID: ${providerId}`),
+        interactionType, // Pass type
       );
       return null;
     }
@@ -209,6 +233,7 @@ export const InteractionService = {
         new Error(
           `Failed to instantiate model instance for ${targetModelId} from provider ${providerConfig.name}`,
         ),
+        interactionType, // Pass type
       );
       return null;
     }
@@ -216,80 +241,67 @@ export const InteractionService = {
       `[InteractionService] Using model instance for ${targetModelId}`,
     );
 
-    // Prepare Tools
-    const allRegisteredTools = useControlRegistryStore
-      .getState()
-      .getRegisteredTools();
-    const enabledToolNames = finalPrompt.metadata?.enabledTools ?? [];
-
-    const toolsWithExecute = enabledToolNames.reduce(
-      (acc, name) => {
-        const toolInfo = allRegisteredTools[name];
-        if (toolInfo?.implementation) {
-          const toolDefinition: Tool<any> = { ...toolInfo.definition };
-          toolDefinition.execute = async (args: any) => {
-            // VFS Readiness Check using forced initialization
-            const currentConvId =
-              useInteractionStore.getState().currentConversationId;
-            const conversation = currentConvId
-              ? useConversationStore
-                  .getState()
-                  .getConversationById(currentConvId)
-              : null;
-            const targetVfsKey = conversation?.projectId ?? "orphan";
-            let fsInstance: typeof FsType | undefined;
-            try {
-              console.log(
-                `[InteractionService Tool Execute] Ensuring VFS ready for key "${targetVfsKey}"...`,
-              );
-              // Force initialize VFS for the required key
-              // Wrap in try...catch as initializeVFS now throws
-              fsInstance = await useVfsStore
+    // Prepare Tools (Skip for title generation)
+    const toolsWithExecute =
+      interactionType !== "conversation.title_generation"
+        ? (finalPrompt.metadata?.enabledTools ?? []).reduce(
+            (acc, name) => {
+              const allRegisteredTools = useControlRegistryStore
                 .getState()
-                .initializeVFS(targetVfsKey, { force: true });
-
-              console.log(
-                `[InteractionService Tool Execute] VFS ready for key "${targetVfsKey}".`,
-              );
-            } catch (initError: any) {
-              console.error(
-                `[InteractionService Tool Execute] VFS initialization error for key "${targetVfsKey}":`,
-                initError,
-              );
-              // Return error structure if VFS fails
-              return {
-                _isError: true,
-                error: `Filesystem error: ${initError.message}`,
-              };
-            }
-
-            // Execute Original Implementation, passing the fsInstance
-            try {
-              const contextSnapshot = getContextSnapshot();
-              const parsedArgs = toolInfo.definition.parameters.parse(args);
-              const implementation: ToolImplementation<any> =
-                toolInfo.implementation!;
-              // Pass fsInstance via context
-              const contextWithFs = { ...contextSnapshot, fsInstance };
-
-              return await implementation(parsedArgs, contextWithFs as any);
-            } catch (e) {
-              const toolError = e instanceof Error ? e.message : String(e);
-              if (e instanceof z.ZodError) {
-                return {
-                  _isError: true,
-                  error: `Invalid arguments: ${e.errors.map((err) => `${err.path.join(".")} (${err.message})`).join(", ")}`,
+                .getRegisteredTools();
+              const toolInfo = allRegisteredTools[name];
+              if (toolInfo?.implementation) {
+                const toolDefinition: Tool<any> = { ...toolInfo.definition };
+                toolDefinition.execute = async (args: any) => {
+                  const currentConvId =
+                    useInteractionStore.getState().currentConversationId;
+                  const conversation = currentConvId
+                    ? useConversationStore
+                        .getState()
+                        .getConversationById(currentConvId)
+                    : null;
+                  const targetVfsKey = conversation?.projectId ?? "orphan";
+                  let fsInstance: typeof FsType | undefined;
+                  try {
+                    fsInstance = await useVfsStore
+                      .getState()
+                      .initializeVFS(targetVfsKey, { force: true });
+                  } catch (initError: any) {
+                    return {
+                      _isError: true,
+                      error: `Filesystem error: ${initError.message}`,
+                    };
+                  }
+                  try {
+                    const contextSnapshot = getContextSnapshot();
+                    const parsedArgs =
+                      toolInfo.definition.parameters.parse(args);
+                    const implementation: ToolImplementation<any> =
+                      toolInfo.implementation!;
+                    const contextWithFs = { ...contextSnapshot, fsInstance };
+                    return await implementation(
+                      parsedArgs,
+                      contextWithFs as any,
+                    );
+                  } catch (e) {
+                    const toolError =
+                      e instanceof Error ? e.message : String(e);
+                    if (e instanceof z.ZodError) {
+                      return {
+                        _isError: true,
+                        error: `Invalid arguments: ${e.errors.map((err) => `${err.path.join(".")} (${err.message})`).join(", ")}`,
+                      };
+                    }
+                    return { _isError: true, error: toolError };
+                  }
                 };
+                acc[name] = toolDefinition;
               }
-              return { _isError: true, error: toolError };
-            }
-          };
-          acc[name] = toolDefinition;
-        }
-        return acc;
-      },
-      {} as Record<string, Tool<any>>,
-    );
+              return acc;
+            },
+            {} as Record<string, Tool<any>>,
+          )
+        : undefined;
 
     const maxSteps =
       finalPrompt.parameters?.maxSteps ??
@@ -307,7 +319,6 @@ export const InteractionService = {
     });
 
     const callOptions: AIServiceCallOptions = {
-      // Use the wrapped model
       model: wrappedModel,
       messages: finalPrompt.messages,
       abortSignal: abortController.signal,
@@ -319,13 +330,15 @@ export const InteractionService = {
       presencePenalty: finalPrompt.parameters?.presence_penalty,
       frequencyPenalty: finalPrompt.parameters?.frequency_penalty,
       maxSteps: maxSteps,
-      ...(Object.keys(toolsWithExecute).length > 0 && {
-        tools: toolsWithExecute,
-      }),
+      ...(toolsWithExecute &&
+        Object.keys(toolsWithExecute).length > 0 && {
+          tools: toolsWithExecute,
+        }),
       toolChoice:
         finalPrompt.toolChoice ??
-        (Object.keys(toolsWithExecute).length > 0 ? "auto" : "none"),
-      // experimental_middlewares removed
+        (toolsWithExecute && Object.keys(toolsWithExecute).length > 0
+          ? "auto"
+          : "none"),
     };
 
     // 6. Define Callbacks
@@ -334,8 +347,10 @@ export const InteractionService = {
       onToolCall: (toolCall) => this._handleToolCall(interactionId, toolCall),
       onToolResult: (toolResult) =>
         this._handleToolResult(interactionId, toolResult),
-      onFinish: (details) => this._handleFinish(interactionId, details),
-      onError: (error) => this._handleError(interactionId, error),
+      onFinish: (details) =>
+        this._handleFinish(interactionId, details, interactionType), // Pass type
+      onError: (error) =>
+        this._handleError(interactionId, error, interactionType), // Pass type
     };
 
     // 7. Trigger AIService
@@ -353,6 +368,7 @@ export const InteractionService = {
           execError instanceof Error
             ? execError
             : new Error("Failed to start AI execution"),
+          interactionType, // Pass type
         );
       },
     );
@@ -366,11 +382,15 @@ export const InteractionService = {
     if (controller && !controller.signal.aborted) {
       controller.abort();
       toast.info("Interaction cancelled.");
+      // Finalization happens in _handleError when AbortError is caught
     } else {
       console.warn(
         `[InteractionService] No active controller found or already aborted for ${interactionId}.`,
       );
       const interactionStoreState = useInteractionStore.getState();
+      const interaction = interactionStoreState.interactions.find(
+        (i) => i.id === interactionId,
+      );
       if (
         interactionStoreState.streamingInteractionIds.includes(interactionId)
       ) {
@@ -381,6 +401,7 @@ export const InteractionService = {
           interactionId,
           "CANCELLED",
           new Error("Interaction aborted manually (controller missing)"),
+          interaction?.type ?? "message.user_assistant", // Use interaction type if available
         );
       }
     }
@@ -461,19 +482,29 @@ export const InteractionService = {
       finishReason: FinishReason;
       usage?: LanguageModelUsage;
       providerMetadata?: ProviderMetadata;
-      // Middleware might add custom fields here
       reasoning?: string;
     },
+    interactionType: InteractionType, // Receive type
   ): void {
     console.log(
-      `[InteractionService] Finishing interaction ${interactionId}. Reason: ${details.finishReason}`,
+      `[InteractionService] Finishing interaction ${interactionId} (Type: ${interactionType}). Reason: ${details.finishReason}`,
     );
-    this._finalizeInteraction(interactionId, "COMPLETED", undefined, details);
+    this._finalizeInteraction(
+      interactionId,
+      "COMPLETED",
+      undefined,
+      interactionType, // Pass type
+      details,
+    );
   },
 
-  _handleError(interactionId: string, error: Error): void {
+  _handleError(
+    interactionId: string,
+    error: Error,
+    interactionType: InteractionType, // Receive type
+  ): void {
     console.error(
-      `[InteractionService] Handling error for interaction ${interactionId}:`,
+      `[InteractionService] Handling error for interaction ${interactionId} (Type: ${interactionType}):`,
       error,
     );
     const isAbort = error.name === "AbortError";
@@ -481,6 +512,7 @@ export const InteractionService = {
       interactionId,
       isAbort ? "CANCELLED" : "ERROR",
       isAbort ? undefined : error,
+      interactionType, // Pass type
     );
   },
 
@@ -489,11 +521,11 @@ export const InteractionService = {
     interactionId: string,
     status: InteractionStatus,
     error?: Error,
+    interactionType: InteractionType = "message.user_assistant", // Default type
     finishDetails?: {
       finishReason: FinishReason;
       usage?: LanguageModelUsage;
       providerMetadata?: ProviderMetadata;
-      // Include reasoning here if middleware adds it
       reasoning?: string;
     },
   ): void {
@@ -501,7 +533,13 @@ export const InteractionService = {
     const currentInteraction = interactionStore.interactions.find(
       (i) => i.id === interactionId,
     );
-    if (!currentInteraction || currentInteraction.status !== "STREAMING") {
+
+    // Check if already finalized or not found (unless it's title gen which might not be in main list yet)
+    if (
+      !currentInteraction ||
+      (currentInteraction.status !== "STREAMING" &&
+        interactionType !== "conversation.title_generation")
+    ) {
       console.warn(
         `[InteractionService] Interaction ${interactionId} already finalized or not found. Skipping finalization with status ${status}.`,
       );
@@ -518,7 +556,7 @@ export const InteractionService = {
       calls: [],
       results: [],
     };
-    const currentMetadata = currentInteraction.metadata || {};
+    const currentMetadata = currentInteraction?.metadata || {}; // Use optional chaining
 
     console.log(
       `[InteractionService] Finalizing ${interactionId}. Buffered Content Length: ${finalBufferedContent.length}`,
@@ -555,9 +593,7 @@ export const InteractionService = {
         }),
         toolCalls: toolData.calls,
         toolResults: toolData.results,
-        // Store extracted reasoning
         reasoning: reasoningData,
-        // Store timings
         timeToFirstToken: timeToFirstToken,
         generationTime: generationTime,
         ...((status === "ERROR" ||
@@ -568,6 +604,34 @@ export const InteractionService = {
       },
     };
 
+    // --- Handle Title Generation Specifics ---
+    if (
+      interactionType === "conversation.title_generation" &&
+      status === "COMPLETED" &&
+      finalUpdates.response &&
+      typeof finalUpdates.response === "string"
+    ) {
+      const generatedTitle = finalUpdates.response.trim().replace(/^"|"$/g, ""); // Clean up quotes
+      if (generatedTitle && currentInteraction) {
+        console.log(
+          `[InteractionService] Updating conversation ${currentInteraction.conversationId} title to: "${generatedTitle}"`,
+        );
+        useConversationStore
+          .getState()
+          .updateConversation(currentInteraction.conversationId, {
+            title: generatedTitle,
+          })
+          .catch((e) =>
+            console.error("Failed to update conversation title:", e),
+          );
+        // Optionally remove the title generation interaction from state/DB after success?
+        // interactionStore._removeInteractionFromState(interactionId);
+        // PersistenceService.deleteInteraction(interactionId).catch(e => console.error("Failed to delete title gen interaction:", e));
+      }
+    }
+    // --- End Title Generation Specifics ---
+
+    // Update state (even for title gen, might be useful for debugging)
     interactionStore._updateInteractionInState(interactionId, finalUpdates);
     interactionStore._removeStreamingId(interactionId);
 

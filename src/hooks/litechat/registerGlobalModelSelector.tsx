@@ -5,8 +5,8 @@ import { GlobalModelSelector } from "@/components/LiteChat/prompt/control/Global
 import { useControlRegistryStore } from "@/store/control.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useInteractionStore } from "@/store/interaction.store";
-// PromptStateStore removed as we read effective model from ProviderStore now
-// import { usePromptStateStore } from "@/store/prompt.store";
+// Import PromptStateStore for direct update
+import { usePromptStateStore } from "@/store/prompt.store";
 import { useShallow } from "zustand/react/shallow";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { ModEvent } from "@/types/litechat/modding";
@@ -20,6 +20,8 @@ const GlobalModelSelectorTrigger: React.FC = () => {
       selectModel: state.selectModel, // Get the correct action
     })),
   );
+  // Get the action to update the prompt state directly
+  const setPromptModelId = usePromptStateStore((state) => state.setModelId);
 
   // Local state managed by events
   const [isStreaming, setIsStreaming] = useState(
@@ -38,10 +40,15 @@ const GlobalModelSelectorTrigger: React.FC = () => {
     // Listen for changes triggered by the store itself (e.g., on load, reorder)
     const handleModelChange = (payload: { modelId: string | null }) => {
       setCurrentSelectedModelId(payload.modelId);
+      // Also update prompt state if the global selection changes externally
+      setPromptModelId(payload.modelId);
     };
 
     // Initial state sync
-    setCurrentSelectedModelId(useProviderStore.getState().selectedModelId);
+    const initialProviderModelId = useProviderStore.getState().selectedModelId;
+    setCurrentSelectedModelId(initialProviderModelId);
+    // Sync prompt state initially as well
+    setPromptModelId(initialProviderModelId);
 
     // Subscriptions
     emitter.on(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
@@ -52,11 +59,12 @@ const GlobalModelSelectorTrigger: React.FC = () => {
       emitter.off(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
       emitter.off(ModEvent.MODEL_SELECTION_CHANGED, handleModelChange);
     };
-  }, []);
+  }, [setPromptModelId]); // Add setPromptModelId dependency
 
-  // The onChange handler now calls the ProviderStore action
+  // The onChange handler now calls BOTH ProviderStore and PromptStateStore actions
   const handleSelectionChange = (newModelId: string | null) => {
-    selectModel(newModelId); // This will update the store AND emit the event
+    selectModel(newModelId); // This updates the global default and emits event
+    setPromptModelId(newModelId); // Directly update the prompt state for the next turn
   };
 
   return (
@@ -77,7 +85,6 @@ export function registerGlobalModelSelector() {
 
   registerPromptControl({
     id: "core-global-model-selector",
-    // order removed
     // Status depends on ProviderStore loading state
     status: () => (useProviderStore.getState().isLoading ? "loading" : "ready"),
     triggerRenderer: () => React.createElement(GlobalModelSelectorTrigger),
@@ -85,8 +92,6 @@ export function registerGlobalModelSelector() {
     // during submission build in ConversationService/LiteChat component
     getParameters: undefined,
     getMetadata: undefined,
-    // show function removed - component always renders trigger (unless loading)
-    // show: () => true,
   });
 
   console.log("[Function] Registered Core Global Model Selector (Prompt)");
