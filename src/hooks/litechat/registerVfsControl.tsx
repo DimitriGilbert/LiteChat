@@ -5,7 +5,7 @@ import { useControlRegistryStore } from "@/store/control.store";
 import { useUIStateStore } from "@/store/ui.store";
 import { useVfsStore } from "@/store/vfs.store";
 import { Button } from "@/components/ui/button";
-import { HardDriveIcon, PaperclipIcon, XIcon } from "lucide-react";
+import { HardDriveIcon, PaperclipIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -26,7 +26,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
 
 export function registerVfsControl() {

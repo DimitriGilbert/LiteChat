@@ -51,6 +51,7 @@ cp -r dist/* "$TEMP_DIR/"
 
 rm -rf "$TEMP_DIR/release/";
 rm -rf "$TEMP_DIR/versions/";
+rm -rf "$TEMP_DIR/icons/1024.png";
 
 # Create the release zip file
 echo "Creating ZIP archive..."

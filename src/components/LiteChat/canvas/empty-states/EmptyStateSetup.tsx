@@ -3,10 +3,7 @@
 import React, { useState, useCallback, useMemo } from "react";
 import {
   AlertCircleIcon,
-  KeyRoundIcon,
-  ServerIcon,
   SettingsIcon,
-  CheckSquareIcon,
   MessageSquarePlusIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,7 +18,6 @@ import { SetupStep } from "./SetupStep";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ModelEnablementList } from "@/components/LiteChat/settings/ModelEnablementList"; // Import ModelEnablementList
-import { divide } from "lodash-es";
 
 export const EmptyStateSetup: React.FC = () => {
   const {
@@ -60,6 +56,7 @@ export const EmptyStateSetup: React.FC = () => {
   );
 
   const [isSavingKey, setIsSavingKey] = useState(false);
+  // @ts-expect-error I am not using it, but it return an array -_-...
   const [isSavingProvider, setIsSavingProvider] = useState(false);
   const [isStartingChat, setIsStartingChat] = useState(false);
   const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
