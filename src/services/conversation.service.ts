@@ -6,6 +6,8 @@ import { useInteractionStore } from "@/store/interaction.store";
 import { useProjectStore } from "@/store/project.store";
 import { usePromptStateStore } from "@/store/prompt.store";
 import { useVfsStore } from "@/store/vfs.store";
+// Import the new store
+import { useRulesStore } from "@/store/rules.store";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import {
   buildHistoryMessages,
@@ -16,6 +18,7 @@ import { toast } from "sonner";
 import type { AttachedFileMetadata } from "@/store/input.store";
 import type { fs as FsType } from "@zenfs/core";
 import { useConversationStore } from "@/store/conversation.store";
+import type { DbRule } from "@/types/litechat/rules"; // Import DbRule
 
 export const ConversationService = {
   async submitPrompt(turnData: PromptTurnObject): Promise<void> {
@@ -25,6 +28,8 @@ export const ConversationService = {
     const projectStoreState = useProjectStore.getState();
     const promptState = usePromptStateStore.getState();
     const conversationStoreState = useConversationStore.getState();
+    // Get rules state
+    const rulesStoreState = useRulesStore.getState();
 
     const conversationId = interactionStoreState.currentConversationId;
     if (!conversationId) {
@@ -47,12 +52,49 @@ export const ConversationService = {
     const historyMessages: CoreMessage[] =
       buildHistoryMessages(completedHistory);
 
-    // 2. Prepare User Message (Text + Files)
+    // 2. Prepare User Message (Text + Files + Rules)
+    let userContent = turnData.content;
     const userMessageContentParts: (TextPart | ImagePart)[] = [];
-    if (turnData.content) {
-      userMessageContentParts.push({ type: "text", text: turnData.content });
+
+    // --- Apply Rules ---
+    const activeTagIds = turnData.metadata?.activeTagIds ?? [];
+    const activeRuleIds = turnData.metadata?.activeRuleIds ?? [];
+    const allActiveRuleIds = new Set<string>(activeRuleIds);
+    activeTagIds.forEach((tagId: string) => {
+      rulesStoreState
+        .getRulesForTag(tagId)
+        .forEach((rule) => allActiveRuleIds.add(rule.id));
+    });
+
+    const activeRules: DbRule[] =
+      rulesStoreState.getRulesByIds(Array.from(allActiveRuleIds)) || [];
+
+    const systemRules = activeRules
+      .filter((r) => r.type === "system")
+      .map((r) => r.content);
+    const beforeRules = activeRules
+      .filter((r) => r.type === "before")
+      .map((r) => r.content);
+    const afterRules = activeRules
+      .filter((r) => r.type === "after")
+      .map((r) => r.content);
+
+    // Apply 'before' rules
+    if (beforeRules.length > 0) {
+      userContent = `${beforeRules.join("\n\n")}\n\n${userContent}`;
+    }
+    // Apply 'after' rules
+    if (afterRules.length > 0) {
+      userContent = `${userContent}\n\n${afterRules.join("\n\n")}`;
+    }
+    // --- End Apply Rules ---
+
+    // Add processed user text content
+    if (userContent) {
+      userMessageContentParts.push({ type: "text", text: userContent });
     }
 
+    // Process and add file content
     const attachedFilesMeta = turnData.metadata?.attachedFiles ?? [];
     if (attachedFilesMeta.length > 0) {
       const fileContentParts = await this._processFilesForPrompt(
@@ -72,15 +114,20 @@ export const ConversationService = {
       );
     }
 
-    // 3. Get Effective Settings (System Prompt) - Use turn override if present
+    // 3. Get Effective Settings (System Prompt + Rules)
     const turnSystemPrompt = turnData.metadata?.turnSystemPrompt as
       | string
       | undefined;
     const effectiveSettings =
       projectStoreState.getEffectiveProjectSettings(currentProjectId);
     // Prioritize turn prompt, then project, then global
-    const systemPrompt =
+    let baseSystemPrompt =
       turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
+
+    // Apply 'system' rules
+    if (systemRules.length > 0) {
+      baseSystemPrompt = `${baseSystemPrompt ? `${baseSystemPrompt}\n\n` : ""}${systemRules.join("\n\n")}`;
+    }
 
     // 4. Merge Parameters (PromptState + TurnData)
     const finalParameters = {
@@ -104,15 +151,14 @@ export const ConversationService = {
 
     // 5. Construct PromptObject
     const promptObject: PromptObject = {
-      system: systemPrompt,
+      system: baseSystemPrompt, // Use the system prompt potentially modified by rules
       messages: historyMessages,
       parameters: finalParameters,
       metadata: {
-        // Remove turnSystemPrompt from final metadata sent to AI service if desired
+        // Remove rule/tag activation metadata before sending to AI service
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ...(({ turnSystemPrompt, ...restMeta }) => restMeta)(
-          turnData.metadata ?? {},
-        ),
+        ...(({ turnSystemPrompt, activeTagIds, activeRuleIds, ...restMeta }) =>
+          restMeta)(turnData.metadata ?? {}),
         modelId: promptState.modelId,
         // Store only basic file info (no content) in the final prompt metadata sent to AI Service
         attachedFiles: turnData.metadata.attachedFiles?.map(
@@ -128,7 +174,7 @@ export const ConversationService = {
       await InteractionService.startInteraction(
         promptObject,
         conversationId,
-        turnData,
+        turnData, // Pass original turn data for persistence
       );
     } catch (error) {
       console.error("[ConversationService] Error starting interaction:", error);
@@ -150,6 +196,8 @@ export const ConversationService = {
     const projectStoreState = useProjectStore.getState();
     const promptState = usePromptStateStore.getState();
     const conversationStoreState = useConversationStore.getState();
+    // Get rules state
+    const rulesStoreState = useRulesStore.getState();
 
     const targetInteraction = interactionStoreState.interactions.find(
       (i) => i.id === interactionId,
@@ -180,13 +228,42 @@ export const ConversationService = {
     const historyMessages: CoreMessage[] =
       buildHistoryMessages(historyInteractions);
 
-    // 2. Prepare User Message from original turn data
+    // 2. Prepare User Message from original turn data (Apply rules again)
+    let userContent = originalTurnData.content;
     const userMessageContentParts: (TextPart | ImagePart)[] = [];
-    if (originalTurnData.content) {
-      userMessageContentParts.push({
-        type: "text",
-        text: originalTurnData.content,
-      });
+
+    // --- Apply Rules (from original turn data) ---
+    const activeTagIds = originalTurnData.metadata?.activeTagIds ?? [];
+    const activeRuleIds = originalTurnData.metadata?.activeRuleIds ?? [];
+    const allActiveRuleIds = new Set<string>(activeRuleIds);
+    activeTagIds.forEach((tagId: string) => {
+      rulesStoreState
+        .getRulesForTag(tagId)
+        .forEach((rule) => allActiveRuleIds.add(rule.id));
+    });
+
+    const activeRules: DbRule[] =
+      rulesStoreState.getRulesByIds(Array.from(allActiveRuleIds)) || [];
+
+    const beforeRules = activeRules
+      .filter((r) => r.type === "before")
+      .map((r) => r.content);
+    const afterRules = activeRules
+      .filter((r) => r.type === "after")
+      .map((r) => r.content);
+
+    // Apply 'before' rules
+    if (beforeRules.length > 0) {
+      userContent = `${beforeRules.join("\n\n")}\n\n${userContent}`;
+    }
+    // Apply 'after' rules
+    if (afterRules.length > 0) {
+      userContent = `${userContent}\n\n${afterRules.join("\n\n")}`;
+    }
+    // --- End Apply Rules ---
+
+    if (userContent) {
+      userMessageContentParts.push({ type: "text", text: userContent });
     }
     const originalAttachedFiles =
       originalTurnData.metadata?.attachedFiles ?? [];
@@ -206,15 +283,23 @@ export const ConversationService = {
       );
     }
 
-    // 3. Get Effective Settings (System Prompt) - Use turn override if present
+    // 3. Get Effective Settings (System Prompt + Rules)
     const turnSystemPrompt = originalTurnData.metadata?.turnSystemPrompt as
       | string
       | undefined;
     const effectiveSettings =
       projectStoreState.getEffectiveProjectSettings(currentProjectId);
     // Prioritize turn prompt, then project, then global
-    const systemPrompt =
+    let baseSystemPrompt =
       turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
+
+    // Apply 'system' rules (from original turn)
+    const systemRules = activeRules
+      .filter((r) => r.type === "system")
+      .map((r) => r.content);
+    if (systemRules.length > 0) {
+      baseSystemPrompt = `${baseSystemPrompt ? `${baseSystemPrompt}\n\n` : ""}${systemRules.join("\n\n")}`;
+    }
 
     // 4. Merge Parameters (Current PromptState + Original TurnData Params)
     const finalParameters = {
@@ -237,16 +322,15 @@ export const ConversationService = {
 
     // 5. Construct PromptObject
     const promptObject: PromptObject = {
-      system: systemPrompt,
+      system: baseSystemPrompt,
       messages: historyMessages,
       parameters: finalParameters,
       metadata: {
-        // Remove turnSystemPrompt from final metadata sent to AI service if desired
+        // Remove rule/tag activation metadata
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ...(({ turnSystemPrompt, ...restMeta }) => restMeta)(
-          originalTurnData.metadata ?? {},
-        ),
-        modelId: promptState.modelId,
+        ...(({ turnSystemPrompt, activeTagIds, activeRuleIds, ...restMeta }) =>
+          restMeta)(originalTurnData.metadata ?? {}),
+        modelId: promptState.modelId, // Use current model selection for regen
         regeneratedFromId: interactionId,
         // Store only basic file info (no content)
         attachedFiles: originalAttachedFiles.map(
@@ -262,7 +346,7 @@ export const ConversationService = {
       await InteractionService.startInteraction(
         promptObject,
         conversationId,
-        originalTurnData,
+        originalTurnData, // Pass original turn data for persistence
       );
     } catch (error) {
       console.error(

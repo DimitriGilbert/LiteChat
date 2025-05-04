@@ -20,19 +20,17 @@ interface StreamingInteractionCardProps {
 export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
   React.memo(({ interactionId, onStop, className }) => {
     // Get interaction data and buffered content
-    const { interaction, bufferedContent, interactionStatus } =
-      useInteractionStore(
-        useShallow((state) => {
-          const interaction = state.interactions.find(
-            (i) => i.id === interactionId,
-          );
-          return {
-            interaction,
-            bufferedContent: state.activeStreamBuffers[interactionId] ?? "",
-            interactionStatus: interaction?.status, // Get status for final update check
-          };
-        }),
-      );
+    const { interaction, interactionStatus } = useInteractionStore(
+      useShallow((state) => {
+        const interaction = state.interactions.find(
+          (i) => i.id === interactionId,
+        );
+        return {
+          interaction,
+          interactionStatus: interaction?.status, // Get status for final update check
+        };
+      }),
+    );
 
     // Get FPS setting
     const streamingRenderFPS = useSettingsStore(
@@ -47,24 +45,27 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
     // Effect to handle throttled updates
     useEffect(() => {
       const interval = 1000 / streamingRenderFPS;
+      let isMounted = true; // Flag to prevent updates after unmount
 
       const updateDisplay = (timestamp: number) => {
-        if (timestamp - lastUpdateTimeRef.current >= interval) {
-          // Get the latest buffer content directly from the store state
-          // This ensures we always render the most up-to-date complete buffer
-          // when the throttle allows an update.
-          const latestBuffer =
-            useInteractionStore.getState().activeStreamBuffers[interactionId] ??
-            "";
-          setDisplayedContent(latestBuffer);
-          lastUpdateTimeRef.current = timestamp;
-        }
-        // Continue requesting frames as long as the interaction is streaming
-        if (
-          useInteractionStore
-            .getState()
-            .streamingInteractionIds.includes(interactionId)
-        ) {
+        if (!isMounted) return; // Exit if unmounted
+
+        // Check if the interaction is still streaming
+        const isStillStreaming = useInteractionStore
+          .getState()
+          .streamingInteractionIds.includes(interactionId);
+
+        if (isStillStreaming) {
+          if (timestamp - lastUpdateTimeRef.current >= interval) {
+            // Get the latest buffer content directly from the store state
+            const latestBuffer =
+              useInteractionStore.getState().activeStreamBuffers[
+                interactionId
+              ] ?? "";
+            setDisplayedContent(latestBuffer);
+            lastUpdateTimeRef.current = timestamp;
+          }
+          // Continue requesting frames
           animationFrameRef.current = requestAnimationFrame(updateDisplay);
         } else {
           // Ensure the final content is displayed when streaming stops
@@ -72,43 +73,36 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
             useInteractionStore.getState().activeStreamBuffers[interactionId] ??
             "";
           setDisplayedContent(finalBuffer);
+          animationFrameRef.current = null; // Stop the loop
         }
       };
 
-      // Start the animation loop if streaming
-      if (
-        useInteractionStore
-          .getState()
-          .streamingInteractionIds.includes(interactionId)
-      ) {
-        animationFrameRef.current = requestAnimationFrame(updateDisplay);
-      } else {
-        // If not streaming initially, set the final content directly
-        setDisplayedContent(bufferedContent);
-      }
+      // Start the animation loop
+      animationFrameRef.current = requestAnimationFrame(updateDisplay);
 
       // Cleanup function
       return () => {
+        isMounted = false; // Set flag on unmount
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
           animationFrameRef.current = null;
         }
-        // Ensure final update on unmount or dependency change if needed
-        const finalBuffer =
-          useInteractionStore.getState().activeStreamBuffers[interactionId] ??
-          "";
-        setDisplayedContent(finalBuffer);
+        // Ensure final update on unmount if needed (optional, might cause flicker if state is already updated)
+        // const finalBuffer = useInteractionStore.getState().activeStreamBuffers[interactionId] ?? "";
+        // setDisplayedContent(finalBuffer);
       };
       // Re-run effect if interactionId or FPS changes
-    }, [interactionId, streamingRenderFPS, bufferedContent]);
+    }, [interactionId, streamingRenderFPS]);
 
     // Effect to ensure final content is displayed when interaction status changes from STREAMING
+    // This handles the case where the loop might stop slightly before the status update
     useEffect(() => {
       if (interactionStatus && interactionStatus !== "STREAMING") {
         const finalBuffer =
           useInteractionStore.getState().activeStreamBuffers[interactionId] ??
           "";
         setDisplayedContent(finalBuffer);
+        // Ensure the animation loop is stopped if it hasn't already
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
           animationFrameRef.current = null;
@@ -158,7 +152,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       return (
         <div
           className={cn(
-            "group relative rounded-lg border border-primary/30 bg-card p-4 shadow-sm animate-pulse",
+            "group/card relative rounded-lg border border-primary/30 bg-card p-4 shadow-sm animate-pulse",
             className,
           )}
         >
@@ -195,6 +189,8 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
           <UserPromptDisplay
             turnData={interaction.prompt}
             timestamp={interaction.startedAt}
+            // Indicate assistant is not complete
+            isAssistantComplete={false}
           />
         )}
         <div className="mt-3 pt-3 border-t border-border/50">

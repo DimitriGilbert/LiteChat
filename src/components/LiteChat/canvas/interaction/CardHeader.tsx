@@ -7,9 +7,19 @@ import {
   ChevronUpIcon,
   ClipboardIcon,
   CheckIcon,
+  ClockIcon,
+  ZapIcon,
+  CoinsIcon,
 } from "lucide-react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { toast } from "sonner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface CardHeaderProps {
   displayModelName: string;
@@ -18,7 +28,19 @@ interface CardHeaderProps {
   isFolded: boolean;
   toggleFold: () => void;
   canFold: boolean; // Determine if fold button should be shown
+  // Add metadata props
+  promptTokens?: number;
+  completionTokens?: number;
+  timeToFirstToken?: number; // Milliseconds
+  generationTime?: number; // Milliseconds
 }
+
+// Helper to format milliseconds
+const formatMs = (ms: number | undefined): string => {
+  if (ms === undefined) return "?";
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(2)}s`;
+};
 
 export const CardHeader: React.FC<CardHeaderProps> = ({
   displayModelName,
@@ -27,6 +49,10 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
   isFolded,
   toggleFold,
   canFold,
+  promptTokens,
+  completionTokens,
+  timeToFirstToken,
+  generationTime,
 }) => {
   const [isCopied, setIsCopied] = useState(false);
 
@@ -46,15 +72,70 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
     }
   }, [responseContent]);
 
+  const totalTokens =
+    promptTokens !== undefined && completionTokens !== undefined
+      ? promptTokens + completionTokens
+      : undefined;
+
   return (
-    <div className="flex justify-between items-center mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-10 p-1 -m-1 rounded-t">
+    <div className="flex justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-10 p-1 -m-1 rounded-t">
       {/* Left Group: Icon, Name, Actions */}
-      <div className="flex items-center gap-1">
-        <BotIcon className="h-4 w-4 text-secondary flex-shrink-0" />
-        <span className="text-xs font-semibold text-secondary truncate mr-1">
-          Assistant ({displayModelName})
-        </span>
-        {/* Actions moved here */}
+      <div className="flex items-start gap-1 min-w-0">
+        <BotIcon className="h-4 w-4 text-secondary flex-shrink-0 mt-0.5" />
+        <div className="flex flex-col min-w-0">
+          <span className="text-xs font-semibold text-secondary truncate mr-1">
+            Assistant ({displayModelName})
+          </span>
+          {/* Metadata Row */}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
+            {totalTokens !== undefined && (
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger className="flex items-center gap-0.5 cursor-default">
+                    <CoinsIcon className="h-3 w-3" />
+                    <span>{totalTokens.toLocaleString()}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Tokens: {promptTokens ?? "?"} (Prompt) +{" "}
+                    {completionTokens ?? "?"} (Completion) = {totalTokens}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {timeToFirstToken !== undefined && (
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger className="flex items-center gap-0.5 cursor-default">
+                    <ZapIcon className="h-3 w-3" />
+                    <span>{formatMs(timeToFirstToken)}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Time to First Token
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {generationTime !== undefined && (
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger className="flex items-center gap-0.5 cursor-default">
+                    <ClockIcon className="h-3 w-3" />
+                    <span>{formatMs(generationTime)}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Total Generation Time
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Right Group: Timestamp & Actions */}
+      <div className="flex items-start flex-shrink-0 gap-1">
+        <span className="text-xs text-muted-foreground mt-0.5">{timeAgo}</span>
+        {/* Actions */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity">
           {responseContent && typeof responseContent === "string" && (
             <ActionTooltipButton
@@ -82,11 +163,6 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
             />
           )}
         </div>
-      </div>
-
-      {/* Right Group: Timestamp */}
-      <div className="flex items-center flex-shrink-0">
-        <span className="text-xs text-muted-foreground">{timeAgo}</span>
       </div>
     </div>
   );

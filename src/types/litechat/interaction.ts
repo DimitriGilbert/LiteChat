@@ -1,5 +1,5 @@
 // src/types/litechat/interaction.ts
-
+// FULL FILE
 import type { PromptTurnObject } from "./prompt";
 import type { Metadata } from "./common";
 // Remove direct import of ToolCallPart/ToolResultPart from here
@@ -58,5 +58,8 @@ export interface Interaction {
     reasoning?: string;
     // Store raw provider metadata if needed
     providerMetadata?: Record<string, any>;
+    // Add timing metadata
+    timeToFirstToken?: number; // Milliseconds
+    generationTime?: number; // Milliseconds
   };
 }

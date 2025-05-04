@@ -113,6 +113,11 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
             isFolded={isResponseFolded}
             toggleFold={toggleResponseFold}
             canFold={canFoldResponse}
+            // Pass metadata
+            promptTokens={interaction.metadata?.promptTokens}
+            completionTokens={interaction.metadata?.completionTokens}
+            timeToFirstToken={interaction.metadata?.timeToFirstToken}
+            generationTime={interaction.metadata?.generationTime}
           />
           <AssistantResponse
             response={interaction.response}

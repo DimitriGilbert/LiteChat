@@ -134,6 +134,10 @@ export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
   const highlightCode = useCallback(() => {
     if (codeRef.current && code) {
       try {
+        // force pre-wrap DO NOT REMOVE !
+        if (codeRef.current.style.whiteSpace !== "pre-wrap") {
+          codeRef.current.style.whiteSpace = "pre-wrap";
+        }
         codeRef.current.textContent = code;
         Prism.highlightElement(codeRef.current);
       } catch (error) {
@@ -238,11 +242,9 @@ export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
       {!isFolded && (
         <div className="overflow-hidden w-full">
           {/* Ensure pre tag handles horizontal scroll */}
-          <pre className={cn("overflow-x-auto w-full relative")}>
+          <pre className="overflow-x-auto w-full relative break-words">
             {/* Remove min-w-full from code tag */}
-            <code ref={codeRef} className={languageClass + " block"}>
-              {code}
-            </code>
+            <code ref={codeRef} className={languageClass + " block"}></code>
           </pre>
         </div>
       )}

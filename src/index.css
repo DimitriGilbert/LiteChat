@@ -289,9 +289,47 @@
         @apply text-primary underline hover:text-primary/80;
     }
 
-    /* --- THEMED CODEBLOCK STYLING (Container/Header) --- */
     .code-block-container {
-        @apply relative my-4 border border-border rounded-lg;
+        max-width: 100%;
+        width: 100%;
+        position: relative;
+        border: 1px solid hsl(var(--border));
+        border-radius: var(--radius);
+        overflow: hidden; /* Critical for containing the scrollable area */
+    }
+
+    /* Pre element - handle horizontal scrolling */
+    .code-block-container pre {
+        max-width: 100%; /* Ensure it doesn't exceed container */
+        overflow-x: auto; /* Enable horizontal scrolling */
+        margin: 0; /* Remove default margins */
+        padding: 0; /* Remove default padding */
+    }
+
+    /* Code element - ensure proper text behavior */
+    .code-block-container code {
+        display: inline-block; /* Critical for proper sizing */
+        min-width: 100%; /* Ensure it fills the pre element */
+        box-sizing: border-box; /* Include padding in width calculation */
+        padding: 1rem; /* Add padding inside the code block */
+        white-space: pre; /* Preserve whitespace and line breaks */
+        word-break: normal;
+        word-wrap: normal;
+        tab-size: 4;
+    }
+
+    /* Optional: Style the scrollbar for better visibility */
+    .code-block-container pre::-webkit-scrollbar {
+        height: 6px;
+    }
+
+    .code-block-container pre::-webkit-scrollbar-thumb {
+        background-color: hsl(var(--muted-foreground) / 0.3);
+        border-radius: 3px;
+    }
+
+    .code-block-container pre::-webkit-scrollbar-thumb:hover {
+        background-color: hsl(var(--muted-foreground) / 0.5);
     }
 
     /* Header styling */

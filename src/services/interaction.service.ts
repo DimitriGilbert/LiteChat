@@ -66,6 +66,9 @@ interface AIServiceCallOptions {
 export const InteractionService = {
   _activeControllers: new Map<string, AbortController>(),
   _streamingToolData: new Map<string, { calls: string[]; results: string[] }>(),
+  // Add map to store first chunk timestamps and start times
+  _firstChunkTimestamps: new Map<string, number>(),
+  _interactionStartTimes: new Map<string, number>(),
 
   async startInteraction(
     prompt: PromptObject,
@@ -100,6 +103,9 @@ export const InteractionService = {
     const abortController = new AbortController();
     this._activeControllers.set(interactionId, abortController);
     this._streamingToolData.set(interactionId, { calls: [], results: [] });
+    // Clear any previous timestamps for this ID
+    this._firstChunkTimestamps.delete(interactionId);
+    this._interactionStartTimes.delete(interactionId);
 
     const interactionStoreState = useInteractionStore.getState();
     const currentInteractions = interactionStoreState.interactions;
@@ -114,6 +120,9 @@ export const InteractionService = {
         ? conversationInteractions[conversationInteractions.length - 1].id
         : null;
 
+    const startTime = performance.now(); // Record start time
+    this._interactionStartTimes.set(interactionId, startTime);
+
     const interactionData: Interaction = {
       id: interactionId,
       conversationId: conversationId,
@@ -121,13 +130,15 @@ export const InteractionService = {
       prompt: { ...initiatingTurnData },
       response: null,
       status: "STREAMING",
-      startedAt: new Date(),
+      startedAt: new Date(), // Use current Date for DB
       endedAt: null,
       metadata: {
         ...(finalPrompt.metadata || {}),
         toolCalls: [],
         toolResults: [],
         reasoning: undefined, // Initialize reasoning
+        timeToFirstToken: undefined, // Initialize timing
+        generationTime: undefined, // Initialize timing
       },
       index: newIndex,
       parentId: parentId,
@@ -377,6 +388,11 @@ export const InteractionService = {
 
   // --- Callback Implementations ---
   async _handleChunk(interactionId: string, chunk: string): Promise<void> {
+    // Record timestamp of the very first chunk
+    if (!this._firstChunkTimestamps.has(interactionId)) {
+      this._firstChunkTimestamps.set(interactionId, performance.now());
+    }
+
     const chunkPayload = { interactionId, chunk };
     // Use enum member for middleware hook name
     const chunkResult = await runMiddleware(
@@ -491,6 +507,8 @@ export const InteractionService = {
       );
       this._activeControllers.delete(interactionId);
       this._streamingToolData.delete(interactionId);
+      this._interactionStartTimes.delete(interactionId);
+      this._firstChunkTimestamps.delete(interactionId);
       return;
     }
 
@@ -505,6 +523,18 @@ export const InteractionService = {
     console.log(
       `[InteractionService] Finalizing ${interactionId}. Buffered Content Length: ${finalBufferedContent.length}`,
     );
+
+    // Calculate timings
+    const endTime = performance.now();
+    const startTime = this._interactionStartTimes.get(interactionId);
+    const firstChunkTime = this._firstChunkTimestamps.get(interactionId);
+    const generationTime = startTime
+      ? Math.round(endTime - startTime)
+      : undefined;
+    const timeToFirstToken =
+      startTime && firstChunkTime
+        ? Math.round(firstChunkTime - startTime)
+        : undefined;
 
     // Extract reasoning from finishDetails (added by middleware)
     const reasoningData = finishDetails?.reasoning;
@@ -527,6 +557,9 @@ export const InteractionService = {
         toolResults: toolData.results,
         // Store extracted reasoning
         reasoning: reasoningData,
+        // Store timings
+        timeToFirstToken: timeToFirstToken,
+        generationTime: generationTime,
         ...((status === "ERROR" ||
           status === "WARNING" ||
           status === "CANCELLED") && {
@@ -581,8 +614,11 @@ export const InteractionService = {
       toolResults: parsedToolResults,
     });
 
+    // Clean up maps
     this._activeControllers.delete(interactionId);
     this._streamingToolData.delete(interactionId);
+    this._interactionStartTimes.delete(interactionId);
+    this._firstChunkTimestamps.delete(interactionId);
 
     console.log(
       `[InteractionService] Finalized interaction ${interactionId} with status ${status}.`,

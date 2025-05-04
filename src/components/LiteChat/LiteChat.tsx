@@ -22,6 +22,8 @@ import { useModStore } from "@/store/mod.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { useVfsStore } from "@/store/vfs.store";
+// Import the new store
+import { useRulesStore } from "@/store/rules.store";
 import { loadMods } from "@/modding/loader";
 import { Toaster } from "@/components/ui/sonner";
 import { InputArea } from "@/components/LiteChat/prompt/InputArea";
@@ -47,9 +49,10 @@ import { registerGlobalModelSelector } from "@/hooks/litechat/registerGlobalMode
 import { registerSystemPromptControl } from "@/hooks/litechat/registerSystemPromptControl";
 import { registerStructuredOutputControl } from "@/hooks/litechat/registerStructuredOutputControl";
 import { registerUsageDisplayControl } from "@/hooks/litechat/registerUsageDisplayControl";
-// Import new control registration functions
 import { registerReasoningControl } from "@/hooks/litechat/registerReasoningControl";
 import { registerWebSearchControl } from "@/hooks/litechat/registerWebSearchControl";
+// Import the new control registration function
+import { registerRulesControl } from "@/hooks/litechat/registerRulesControl";
 
 export const LiteChat: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
@@ -122,6 +125,12 @@ export const LiteChat: React.FC = () => {
       initializePromptState: state.initializePromptState,
     })),
   );
+  // Add hook for the new store
+  const { loadRulesAndTags } = useRulesStore(
+    useShallow((state) => ({
+      loadRulesAndTags: state.loadRulesAndTags,
+    })),
+  );
 
   // --- Initialization Effect ---
   useEffect(() => {
@@ -138,6 +147,10 @@ export const LiteChat: React.FC = () => {
         await loadProviderData();
         if (!isMounted) return;
         console.log("LiteChat: Provider data loaded.");
+        // Load rules and tags
+        await loadRulesAndTags();
+        if (!isMounted) return;
+        console.log("LiteChat: Rules and Tags loaded.");
         await loadSidebarItems();
         if (!isMounted) return;
         console.log("LiteChat: Sidebar items loaded.");
@@ -154,11 +167,13 @@ export const LiteChat: React.FC = () => {
         registerGlobalModelSelector();
         registerUsageDisplayControl(); // High priority
         registerSystemPromptControl();
-        registerReasoningControl(); // New
-        registerWebSearchControl(); // New
+        registerReasoningControl();
+        registerWebSearchControl();
         registerFileControl();
         registerVfsControl(); // Includes prompt trigger and modal panel
-        registerToolSelectorControl(); // Tools often last
+        registerToolSelectorControl();
+        // Register the new Rules control
+        registerRulesControl();
         registerParameterControl(); // Advanced params lower down
         registerStructuredOutputControl();
         registerGitSyncControl();
@@ -216,7 +231,7 @@ export const LiteChat: React.FC = () => {
       console.log("LiteChat: Unmounting, initialization cancelled if pending.");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Keep dependencies minimal for initialization
 
   // --- Effect to update Prompt State on Context Change ---
   const prevContextRef = useRef<{

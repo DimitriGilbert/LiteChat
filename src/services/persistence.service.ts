@@ -1,4 +1,5 @@
 // src/services/persistence.service.ts
+// FULL FILE
 import { db } from "@/lib/litechat/db";
 import type { Conversation } from "@/types/litechat/chat";
 import type { Interaction } from "@/types/litechat/interaction";
@@ -6,6 +7,8 @@ import type { DbMod } from "@/types/litechat/modding";
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import type { SyncRepo } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project";
+// Import new types
+import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
 
 // Helper function to ensure date fields are Date objects
 const ensureDateFields = <
@@ -348,6 +351,11 @@ export class PersistenceService {
         systemPrompt: p.systemPrompt ?? null,
         modelId: p.modelId ?? null,
         temperature: p.temperature ?? null,
+        maxTokens: p.maxTokens ?? null,
+        topP: p.topP ?? null,
+        topK: p.topK ?? null,
+        presencePenalty: p.presencePenalty ?? null,
+        frequencyPenalty: p.frequencyPenalty ?? null,
         metadata: p.metadata ? { ...p.metadata } : {},
       };
       return await db.projects.put(projectToSave);
@@ -399,6 +407,100 @@ export class PersistenceService {
     }
   }
 
+  // --- Rules ---
+  static async loadRules(): Promise<DbRule[]> {
+    try {
+      const rules = await db.rules.orderBy("name").toArray();
+      return rules.map((r) => ensureDateFields(r));
+    } catch (error) {
+      console.error("PersistenceService: Error loading rules:", error);
+      throw error;
+    }
+  }
+
+  static async saveRule(rule: DbRule): Promise<string> {
+    try {
+      return await db.rules.put(rule);
+    } catch (error) {
+      console.error("PersistenceService: Error saving rule:", error);
+      throw error;
+    }
+  }
+
+  static async deleteRule(id: string): Promise<void> {
+    try {
+      // Also delete associated links in a transaction
+      await db.transaction("rw", [db.rules, db.tagRuleLinks], async () => {
+        await db.tagRuleLinks.where("ruleId").equals(id).delete();
+        await db.rules.delete(id);
+      });
+    } catch (error) {
+      console.error("PersistenceService: Error deleting rule:", error);
+      throw error;
+    }
+  }
+
+  // --- Tags ---
+  static async loadTags(): Promise<DbTag[]> {
+    try {
+      const tags = await db.tags.orderBy("name").toArray();
+      return tags.map((t) => ensureDateFields(t));
+    } catch (error) {
+      console.error("PersistenceService: Error loading tags:", error);
+      throw error;
+    }
+  }
+
+  static async saveTag(tag: DbTag): Promise<string> {
+    try {
+      return await db.tags.put(tag);
+    } catch (error) {
+      console.error("PersistenceService: Error saving tag:", error);
+      throw error;
+    }
+  }
+
+  static async deleteTag(id: string): Promise<void> {
+    try {
+      // Also delete associated links in a transaction
+      await db.transaction("rw", [db.tags, db.tagRuleLinks], async () => {
+        await db.tagRuleLinks.where("tagId").equals(id).delete();
+        await db.tags.delete(id);
+      });
+    } catch (error) {
+      console.error("PersistenceService: Error deleting tag:", error);
+      throw error;
+    }
+  }
+
+  // --- TagRuleLinks ---
+  static async loadTagRuleLinks(): Promise<DbTagRuleLink[]> {
+    try {
+      return await db.tagRuleLinks.toArray();
+    } catch (error) {
+      console.error("PersistenceService: Error loading tag-rule links:", error);
+      throw error;
+    }
+  }
+
+  static async saveTagRuleLink(link: DbTagRuleLink): Promise<string> {
+    try {
+      return await db.tagRuleLinks.put(link);
+    } catch (error) {
+      console.error("PersistenceService: Error saving tag-rule link:", error);
+      throw error;
+    }
+  }
+
+  static async deleteTagRuleLink(id: string): Promise<void> {
+    try {
+      await db.tagRuleLinks.delete(id);
+    } catch (error) {
+      console.error("PersistenceService: Error deleting tag-rule link:", error);
+      throw error;
+    }
+  }
+
   // --- Clear All Data ---
   static async clearAllData(): Promise<void> {
     try {
@@ -413,6 +515,10 @@ export class PersistenceService {
           db.apiKeys,
           db.syncRepos,
           db.projects,
+          // Add new tables to transaction
+          db.rules,
+          db.tags,
+          db.tagRuleLinks,
         ],
         async () => {
           await db.interactions.clear();
@@ -423,6 +529,10 @@ export class PersistenceService {
           await db.providerConfigs.clear();
           await db.apiKeys.clear();
           await db.syncRepos.clear();
+          // Clear new tables
+          await db.rules.clear();
+          await db.tags.clear();
+          await db.tagRuleLinks.clear();
         },
       );
       console.log("PersistenceService: All data cleared.");

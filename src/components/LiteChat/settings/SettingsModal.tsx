@@ -16,7 +16,8 @@ import { SettingsDataManagement } from "./SettingsDataManagement";
 import { SettingsMods } from "./SettingsMods";
 import { SettingsProviders } from "./SettingsProviders";
 import { SettingsGit } from "./SettingsGit";
-// GlobalModelOrganizer removed
+// Import the new settings component
+import { SettingsRulesAndTags } from "./SettingsRulesAndTags";
 import type { CustomSettingTab } from "@/types/litechat/modding";
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
@@ -91,6 +92,12 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
               } as TabDefinition,
             ]
           : []),
+        // Add the new Rules & Tags tab
+        {
+          value: "rules-tags",
+          label: "Rules & Tags",
+          content: <SettingsRulesAndTags />,
+        },
         {
           value: "git",
           label: "Git",
