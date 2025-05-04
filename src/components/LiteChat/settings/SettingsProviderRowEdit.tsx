@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsProviderRowEdit.tsx
-import React, { useCallback, useMemo } from "react"; // Added useMemo
+import React, { useCallback, useMemo } from "react"
 import type {
   DbProviderConfig,
   DbApiKey,
@@ -27,7 +27,7 @@ import {
 } from "@/lib/litechat/provider-helpers";
 import { Separator } from "@/components/ui/separator";
 // Toast removed
-import { ModelEnablementList } from "./ModelEnablementList"; // Import the new component
+import { ModelEnablementList } from "./ModelEnablementList"
 
 interface ProviderRowEditModeProps {
   providerId: string;

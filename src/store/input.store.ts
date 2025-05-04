@@ -1,17 +1,21 @@
 // src/store/input.store.ts
+// FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import { nanoid } from "nanoid"; // Import nanoid
+import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
+import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent
 
 // Define a unified structure for attached file metadata
 export interface AttachedFileMetadata {
-  id: string; // Unique ID for this attachment instance
+  id: string;
   source: "direct" | "vfs";
   name: string;
-  type: string; // MIME type
+  type: string;
   size: number;
   // Store content directly in metadata
-  contentText?: string; // For text files
-  contentBase64?: string; // For non-text files
+  contentText?: string;
+  contentBase64?: string;
   // VFS path is only needed for VFS source
   path?: string;
 }
@@ -19,8 +23,7 @@ export interface AttachedFileMetadata {
 export interface InputState {
   // Store metadata about files attached for the *next* submission
   attachedFilesMetadata: AttachedFileMetadata[];
-  // Store tools enabled for the *next* submission
-  enabledTools: Set<string>;
+  // Other transient states (tools, overrides) are managed locally by controls
 }
 
 export interface InputActions {
@@ -28,25 +31,23 @@ export interface InputActions {
   addAttachedFile: (fileData: Omit<AttachedFileMetadata, "id">) => void;
   // Remove file by its unique attachment ID
   removeAttachedFile: (attachmentId: string) => void;
-  // Clear all attachments for the next prompt
+  // Clear only attached files for the next prompt
   clearAttachedFiles: () => void;
-  // Set enabled tools
-  setEnabledTools: (updater: (prev: Set<string>) => Set<string>) => void;
 }
 
 export const useInputStore = create(
-  immer<InputState & InputActions>((set) => ({
+  immer<InputState & InputActions>((set, get) => ({
     // Initial State
     attachedFilesMetadata: [],
-    enabledTools: new Set<string>(), // Initialize enabledTools
 
     // Actions
     addAttachedFile: (fileData) => {
+      let added = false;
       set((state) => {
-        // Check for duplicates based on source and name/path
+        // Check for duplicates based on source and name/path/size
         const isDuplicate = state.attachedFilesMetadata.some((f) =>
           f.source === "direct" && fileData.source === "direct"
-            ? f.name === fileData.name
+            ? f.name === fileData.name && f.size === fileData.size
             : f.source === "vfs" && fileData.source === "vfs"
               ? f.path === fileData.path
               : false,
@@ -54,33 +55,45 @@ export const useInputStore = create(
 
         if (!isDuplicate) {
           const newAttachment: AttachedFileMetadata = {
-            id: crypto.randomUUID(),
+            id: nanoid(), // Use nanoid for unique IDs
             ...fileData,
           };
           state.attachedFilesMetadata.push(newAttachment);
+          added = true;
         } else {
           console.warn(
             `InputStore: File "${fileData.name}" (source: ${fileData.source}) already attached. Skipping.`,
           );
         }
       });
+      if (added) {
+        emitter.emit(ModEvent.ATTACHED_FILES_CHANGED, {
+          files: get().attachedFilesMetadata,
+        });
+      }
     },
     removeAttachedFile: (attachmentId) => {
+      let removed = false;
       set((state) => {
+        const initialLength = state.attachedFilesMetadata.length;
         state.attachedFilesMetadata = state.attachedFilesMetadata.filter(
           (f) => f.id !== attachmentId,
         );
+        removed = state.attachedFilesMetadata.length < initialLength;
       });
+      if (removed) {
+        emitter.emit(ModEvent.ATTACHED_FILES_CHANGED, {
+          files: get().attachedFilesMetadata,
+        });
+      }
     },
     clearAttachedFiles: () => {
-      // Also clear enabled tools when clearing attachments
-      set({ attachedFilesMetadata: [], enabledTools: new Set<string>() });
-    },
-    // Action to set enabled tools
-    setEnabledTools: (updater) => {
-      set((state) => {
-        state.enabledTools = updater(state.enabledTools);
-      });
+      const hadFiles = get().attachedFilesMetadata.length > 0;
+      // Clear only attached files
+      set({ attachedFilesMetadata: [] });
+      if (hadFiles) {
+        emitter.emit(ModEvent.ATTACHED_FILES_CHANGED, { files: [] });
+      }
     },
   })),
 );

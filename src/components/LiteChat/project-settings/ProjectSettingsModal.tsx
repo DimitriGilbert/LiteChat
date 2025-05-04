@@ -1,6 +1,6 @@
 // src/components/LiteChat/project-settings/ProjectSettingsModal.tsx
-// Entire file content provided
-import React, { useState, useEffect, useCallback } from "react";
+
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,21 +10,20 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
-import { useProjectStore } from "@/store/project.store"; // Use ProjectStore
+import { useProjectStore } from "@/store/project.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { useVfsStore } from "@/store/vfs.store";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import type { Project } from "@/types/litechat/project";
 import { ProjectSettingsPrompt } from "./ProjectSettingsPrompt";
 import { ProjectSettingsParams } from "./ProjectSettingsParams";
 import { ProjectSettingsSync } from "./ProjectSettingsSync";
 import { ProjectSettingsVfs } from "./ProjectSettingsVfs";
-import { useConversationStore } from "@/store/conversation.store"; // Needed for syncRepos
+import { useConversationStore } from "@/store/conversation.store";
+import { TabbedLayout, TabDefinition } from "../common/TabbedLayout";
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
@@ -37,18 +36,18 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   onClose,
   projectId,
 }) => {
-  // Use ProjectStore for project data and actions
-  const { getProjectById, updateProject, getEffectiveProjectSettings } =
-    useProjectStore(
-      useShallow((state) => ({
-        getProjectById: state.getProjectById,
-        updateProject: state.updateProject,
-        getEffectiveProjectSettings: state.getEffectiveProjectSettings,
-      })),
-    );
-  // Get syncRepos from ConversationStore
-  const syncRepos = useConversationStore((state) => state.syncRepos);
-
+  // Select primitive/stable values or stable functions
+  const { getProjectById, updateProject } = useProjectStore(
+    useShallow((state) => ({
+      getProjectById: state.getProjectById, // Function is stable
+      updateProject: state.updateProject, // Function is stable
+    })),
+  );
+  // Use getState for selector function outside hook dependencies
+  const getEffectiveProjectSettings = useProjectStore(
+    (state) => state.getEffectiveProjectSettings,
+  );
+  const syncRepos = useConversationStore((state) => state.syncRepos); // Array ref might change
   const globalDefaults = useSettingsStore(
     useShallow((state) => ({
       globalSystemPrompt: state.globalSystemPrompt,
@@ -81,58 +80,57 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("prompt");
 
-  const project = projectId ? getProjectById(projectId) : null;
-  const effectiveSettings = projectId
-    ? getEffectiveProjectSettings(projectId)
-    : null;
+  // Compute project and effective settings inside useMemo
+  const { project, effectiveSettings } = useMemo(() => {
+    const proj = projectId ? getProjectById(projectId) : null;
+    const effSettings = projectId
+      ? getEffectiveProjectSettings(projectId)
+      : null;
+    return { project: proj, effectiveSettings: effSettings };
+  }, [projectId, getProjectById, getEffectiveProjectSettings]);
 
-  // This recursive helper needs to stay or be moved to ProjectStore if preferred
   const getEffectiveSyncRepoId = useCallback(
     (projId: string | null): string | null => {
       if (!projId) return null;
-      const currentProj = getProjectById(projId); // Use ProjectStore's getter
+      const currentProj = getProjectById(projId);
       if (!currentProj) return null;
       if (currentProj.metadata?.syncRepoId !== undefined) {
         return currentProj.metadata.syncRepoId;
       }
       return getEffectiveSyncRepoId(currentProj.parentId);
     },
-    [getProjectById], // Depend on ProjectStore's getter
+    [getProjectById],
   );
   const effectiveSyncRepoId = projectId
     ? getEffectiveSyncRepoId(projectId)
     : null;
 
   useEffect(() => {
-    if (isOpen && projectId) {
-      console.log(
-        `[ProjectSettingsModal] Opening for ${projectId}. Setting VFS key.`,
-      );
+    if (isOpen && projectId && project && effectiveSettings) {
       setVfsKey(projectId);
-
-      const currentProject = getProjectById(projectId);
-      const effective = getEffectiveProjectSettings(projectId);
-
-      setSystemPrompt(currentProject?.systemPrompt ?? null);
-      setModelId(currentProject?.modelId ?? null);
-      setTemperature(currentProject?.temperature ?? null);
-      setMaxTokens(currentProject?.maxTokens ?? null);
-      setTopP(currentProject?.topP ?? null);
-      setTopK(currentProject?.topK ?? null);
-      setPresencePenalty(currentProject?.presencePenalty ?? null);
-      setFrequencyPenalty(currentProject?.frequencyPenalty ?? null);
-      setSyncRepoId(currentProject?.metadata?.syncRepoId ?? null);
-
-      setLocalTemp(effective?.temperature ?? globalDefaults.temperature);
-      setLocalTopP(effective?.topP ?? globalDefaults.topP ?? 1.0);
+      setSystemPrompt(project.systemPrompt ?? null);
+      setModelId(project.modelId ?? null);
+      setTemperature(project.temperature ?? null);
+      setMaxTokens(project.maxTokens ?? null);
+      setTopP(project.topP ?? null);
+      setTopK(project.topK ?? null);
+      setPresencePenalty(project.presencePenalty ?? null);
+      setFrequencyPenalty(project.frequencyPenalty ?? null);
+      setSyncRepoId(project.metadata?.syncRepoId ?? null);
+      setLocalTemp(effectiveSettings.temperature ?? globalDefaults.temperature);
+      setLocalTopP(effectiveSettings.topP ?? globalDefaults.topP ?? 1.0);
       setLocalPresence(
-        effective?.presencePenalty ?? globalDefaults.presencePenalty ?? 0.0,
+        effectiveSettings.presencePenalty ??
+          globalDefaults.presencePenalty ??
+          0.0,
       );
       setLocalFrequency(
-        effective?.frequencyPenalty ?? globalDefaults.frequencyPenalty ?? 0.0,
+        effectiveSettings.frequencyPenalty ??
+          globalDefaults.frequencyPenalty ??
+          0.0,
       );
+      setActiveTab("prompt");
     } else if (!isOpen) {
-      console.log("[ProjectSettingsModal] Closing. Setting VFS key to null.");
       setVfsKey(null);
       setSystemPrompt(null);
       setModelId(null);
@@ -144,11 +142,12 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
       setFrequencyPenalty(null);
       setSyncRepoId(null);
     }
+    // Depend on computed project/settings
   }, [
     isOpen,
     projectId,
-    getProjectById,
-    getEffectiveProjectSettings,
+    project,
+    effectiveSettings,
     globalDefaults,
     setVfsKey,
   ]);
@@ -191,11 +190,12 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   );
 
   const handleSave = async () => {
-    if (!projectId) return;
+    if (!projectId || !project) return; // Use computed project
     setIsSaving(true);
     try {
-      const parentSettings = project?.parentId
-        ? getEffectiveProjectSettings(project.parentId) // Use ProjectStore getter
+      // Use computed project for parentId
+      const parentSettings = project.parentId
+        ? getEffectiveProjectSettings(project.parentId)
         : {
             systemPrompt: globalDefaults.globalSystemPrompt,
             modelId: globalModelId,
@@ -206,66 +206,42 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
             presencePenalty: globalDefaults.presencePenalty,
             frequencyPenalty: globalDefaults.frequencyPenalty,
           };
-      const parentSyncRepoId = project?.parentId
+      const parentSyncRepoId = project.parentId
         ? getEffectiveSyncRepoId(project.parentId)
         : null;
 
       const updates: Partial<Omit<Project, "id" | "createdAt" | "path">> = {};
       const metadataUpdates: Record<string, any> = {
-        ...(project?.metadata ?? {}),
+        ...(project.metadata ?? {}), // Use computed project
       };
 
-      // Only include the field in updates if it's different from the parent/default
-      if (systemPrompt !== parentSettings.systemPrompt) {
+      if (systemPrompt !== parentSettings.systemPrompt)
         updates.systemPrompt = systemPrompt;
-      } else {
-        updates.systemPrompt = undefined; // Explicitly set to undefined to remove override
-      }
-      if (modelId !== parentSettings.modelId) {
-        updates.modelId = modelId;
-      } else {
-        updates.modelId = undefined;
-      }
-      if (temperature !== parentSettings.temperature) {
+      else updates.systemPrompt = undefined;
+      if (modelId !== parentSettings.modelId) updates.modelId = modelId;
+      else updates.modelId = undefined;
+      if (temperature !== parentSettings.temperature)
         updates.temperature = temperature;
-      } else {
-        updates.temperature = undefined;
-      }
-      if (maxTokens !== parentSettings.maxTokens) {
-        updates.maxTokens = maxTokens;
-      } else {
-        updates.maxTokens = undefined;
-      }
-      if (topP !== parentSettings.topP) {
-        updates.topP = topP;
-      } else {
-        updates.topP = undefined;
-      }
-      if (topK !== parentSettings.topK) {
-        updates.topK = topK;
-      } else {
-        updates.topK = undefined;
-      }
-      if (presencePenalty !== parentSettings.presencePenalty) {
+      else updates.temperature = undefined;
+      if (maxTokens !== parentSettings.maxTokens) updates.maxTokens = maxTokens;
+      else updates.maxTokens = undefined;
+      if (topP !== parentSettings.topP) updates.topP = topP;
+      else updates.topP = undefined;
+      if (topK !== parentSettings.topK) updates.topK = topK;
+      else updates.topK = undefined;
+      if (presencePenalty !== parentSettings.presencePenalty)
         updates.presencePenalty = presencePenalty;
-      } else {
-        updates.presencePenalty = undefined;
-      }
-      if (frequencyPenalty !== parentSettings.frequencyPenalty) {
+      else updates.presencePenalty = undefined;
+      if (frequencyPenalty !== parentSettings.frequencyPenalty)
         updates.frequencyPenalty = frequencyPenalty;
-      } else {
-        updates.frequencyPenalty = undefined;
-      }
-
-      if (syncRepoId !== parentSyncRepoId) {
+      else updates.frequencyPenalty = undefined;
+      if (syncRepoId !== parentSyncRepoId)
         metadataUpdates.syncRepoId = syncRepoId;
-      } else {
-        delete metadataUpdates.syncRepoId; // Remove from metadata if matching parent
-      }
+      else delete metadataUpdates.syncRepoId;
       updates.metadata = metadataUpdates;
 
-      await updateProject(projectId, updates); // Use ProjectStore action
-      toast.success(`Project "${project?.name}" settings updated.`);
+      await updateProject(projectId, updates);
+      toast.success(`Project "${project.name}" settings updated.`); // Use computed project
       onClose();
     } catch (error) {
       toast.error("Failed to save project settings.");
@@ -275,16 +251,120 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
     }
   };
 
-  const tabTriggerClass = cn(
-    "px-3 py-1.5 text-sm font-medium rounded-md",
-    "text-muted-foreground",
-    "border border-transparent",
-    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-    "data-[state=active]:bg-primary/10 data-[state=active]:text-primary",
-    "data-[state=active]:border-primary",
-    "dark:data-[state=active]:bg-primary/20 dark:data-[state=active]:text-primary",
-    "dark:data-[state=active]:border-primary/70",
-    "hover:bg-muted/50 hover:text-primary/80",
+  // Define tabs for the layout
+  const tabs: TabDefinition[] = useMemo(
+    () => [
+      {
+        value: "prompt",
+        label: "Prompt & Model",
+        content: (
+          <ProjectSettingsPrompt
+            systemPrompt={systemPrompt}
+            setSystemPrompt={setSystemPrompt}
+            modelId={modelId}
+            setModelId={setModelId}
+            effectiveSystemPrompt={
+              effectiveSettings?.systemPrompt ??
+              globalDefaults.globalSystemPrompt
+            }
+            effectiveModelId={effectiveSettings?.modelId ?? globalModelId}
+            isSaving={isSaving}
+          />
+        ),
+      },
+      {
+        value: "params",
+        label: "Parameters",
+        content: (
+          <ProjectSettingsParams
+            temperature={temperature}
+            setTemperature={setTemperature}
+            maxTokens={maxTokens}
+            setMaxTokens={setMaxTokens}
+            topP={topP}
+            setTopP={setTopP}
+            topK={topK}
+            setTopK={setTopK}
+            presencePenalty={presencePenalty}
+            setPresencePenalty={setPresencePenalty}
+            frequencyPenalty={frequencyPenalty}
+            setFrequencyPenalty={setFrequencyPenalty}
+            localTemp={localTemp}
+            setLocalTemp={setLocalTemp}
+            localTopP={localTopP}
+            setLocalTopP={setLocalTopP}
+            localPresence={localPresence}
+            setLocalPresence={setLocalPresence}
+            localFrequency={localFrequency}
+            setLocalFrequency={setLocalFrequency}
+            effectiveTemperature={
+              effectiveSettings?.temperature ?? globalDefaults.temperature
+            }
+            effectiveMaxTokens={
+              effectiveSettings?.maxTokens ?? globalDefaults.maxTokens
+            }
+            effectiveTopP={effectiveSettings?.topP ?? globalDefaults.topP}
+            effectiveTopK={effectiveSettings?.topK ?? globalDefaults.topK}
+            effectivePresencePenalty={
+              effectiveSettings?.presencePenalty ??
+              globalDefaults.presencePenalty
+            }
+            effectiveFrequencyPenalty={
+              effectiveSettings?.frequencyPenalty ??
+              globalDefaults.frequencyPenalty
+            }
+            isSaving={isSaving}
+          />
+        ),
+      },
+      {
+        value: "sync",
+        label: "Sync",
+        content: (
+          <ProjectSettingsSync
+            syncRepoId={syncRepoId}
+            setSyncRepoId={setSyncRepoId}
+            effectiveSyncRepoId={effectiveSyncRepoId}
+            syncRepos={syncRepos}
+            isSaving={isSaving}
+          />
+        ),
+      },
+      {
+        value: "vfs",
+        label: "Filesystem",
+        content: (
+          <ProjectSettingsVfs
+            projectId={projectId}
+            projectName={project?.name ?? null} // Use computed project
+            isSaving={isSaving}
+          />
+        ),
+      },
+    ],
+    [
+      systemPrompt,
+      modelId,
+      temperature,
+      maxTokens,
+      topP,
+      topK,
+      presencePenalty,
+      frequencyPenalty,
+      syncRepoId,
+      effectiveSettings, // Depend on computed settings
+      globalDefaults,
+      globalModelId,
+      isSaving,
+      localTemp,
+      localTopP,
+      localPresence,
+      localFrequency,
+      effectiveSyncRepoId,
+      syncRepos,
+      projectId,
+      project?.name, // Depend on computed project name
+    ],
   );
 
   return (
@@ -298,103 +378,15 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs
-          value={activeTab}
+        {/* Use TabbedLayout */}
+        <TabbedLayout
+          tabs={tabs}
+          initialValue={activeTab}
           onValueChange={setActiveTab}
-          className="flex-grow flex flex-col overflow-hidden px-6"
-        >
-          <TabsList className="flex-shrink-0 sticky top-0 bg-background z-10 mb-4 flex-wrap h-auto justify-start border-b gap-1 p-1 -mx-6 px-6">
-            <TabsTrigger value="prompt" className={tabTriggerClass}>
-              Prompt & Model
-            </TabsTrigger>
-            <TabsTrigger value="params" className={tabTriggerClass}>
-              Parameters
-            </TabsTrigger>
-            <TabsTrigger value="sync" className={tabTriggerClass}>
-              Sync
-            </TabsTrigger>
-            <TabsTrigger value="vfs" className={tabTriggerClass}>
-              Filesystem
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="flex-grow overflow-y-auto pb-6 pr-2 -mr-2">
-            <TabsContent value="prompt">
-              <ProjectSettingsPrompt
-                systemPrompt={systemPrompt}
-                setSystemPrompt={setSystemPrompt}
-                modelId={modelId}
-                setModelId={setModelId}
-                effectiveSystemPrompt={
-                  effectiveSettings?.systemPrompt ??
-                  globalDefaults.globalSystemPrompt
-                }
-                effectiveModelId={effectiveSettings?.modelId ?? globalModelId}
-                isSaving={isSaving}
-              />
-            </TabsContent>
-
-            <TabsContent value="params">
-              <ProjectSettingsParams
-                temperature={temperature}
-                setTemperature={setTemperature}
-                maxTokens={maxTokens}
-                setMaxTokens={setMaxTokens}
-                topP={topP}
-                setTopP={setTopP}
-                topK={topK}
-                setTopK={setTopK}
-                presencePenalty={presencePenalty}
-                setPresencePenalty={setPresencePenalty}
-                frequencyPenalty={frequencyPenalty}
-                setFrequencyPenalty={setFrequencyPenalty}
-                localTemp={localTemp}
-                setLocalTemp={setLocalTemp}
-                localTopP={localTopP}
-                setLocalTopP={setLocalTopP}
-                localPresence={localPresence}
-                setLocalPresence={setLocalPresence}
-                localFrequency={localFrequency}
-                setLocalFrequency={setLocalFrequency}
-                effectiveTemperature={
-                  effectiveSettings?.temperature ?? globalDefaults.temperature
-                }
-                effectiveMaxTokens={
-                  effectiveSettings?.maxTokens ?? globalDefaults.maxTokens
-                }
-                effectiveTopP={effectiveSettings?.topP ?? globalDefaults.topP}
-                effectiveTopK={effectiveSettings?.topK ?? globalDefaults.topK}
-                effectivePresencePenalty={
-                  effectiveSettings?.presencePenalty ??
-                  globalDefaults.presencePenalty
-                }
-                effectiveFrequencyPenalty={
-                  effectiveSettings?.frequencyPenalty ??
-                  globalDefaults.frequencyPenalty
-                }
-                isSaving={isSaving}
-              />
-            </TabsContent>
-
-            <TabsContent value="sync">
-              <ProjectSettingsSync
-                syncRepoId={syncRepoId}
-                setSyncRepoId={setSyncRepoId}
-                effectiveSyncRepoId={effectiveSyncRepoId}
-                syncRepos={syncRepos} // Pass syncRepos from ConversationStore
-                isSaving={isSaving}
-              />
-            </TabsContent>
-
-            <TabsContent value="vfs" className="h-full">
-              <ProjectSettingsVfs
-                projectId={projectId}
-                projectName={project?.name ?? null}
-                isSaving={isSaving}
-              />
-            </TabsContent>
-          </div>
-        </Tabs>
+          className="flex-grow overflow-hidden px-6"
+          listClassName="-mx-6 px-6"
+          contentContainerClassName="pb-6 pr-2 -mr-2"
+        />
 
         <DialogFooter className="flex-shrink-0 border-t p-6 pt-4 mt-auto">
           <Button variant="outline" onClick={onClose} disabled={isSaving}>

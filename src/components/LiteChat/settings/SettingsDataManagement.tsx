@@ -6,15 +6,15 @@ import { toast } from "sonner";
 
 import { useShallow } from "zustand/react/shallow";
 // Removed unused sidebar store import
-import { useConversationStore } from "@/store/conversation.store"; // Use ConversationStore
-import { PersistenceService } from "@/services/persistence.service"; // Use PersistenceService
+import { useConversationStore } from "@/store/conversation.store";
+import { PersistenceService } from "@/services/persistence.service";
 
 const SettingsDataManagementComponent: React.FC = () => {
   // --- Fetch actions from stores ---
   const { importConversation, exportAllConversations } = useConversationStore(
     useShallow((state) => ({
-      importConversation: state.importConversation, // Action now exists
-      exportAllConversations: state.exportAllConversations, // Action now exists
+      importConversation: state.importConversation,
+      exportAllConversations: state.exportAllConversations,
     })),
   );
   // No need for useChatStorage hook
@@ -35,7 +35,7 @@ const SettingsDataManagementComponent: React.FC = () => {
         setIsImporting(true);
         try {
           // Call store action
-          await importConversation(file); // Removed null argument
+          await importConversation(file);
         } catch (error) {
           // Error toast handled by action
           console.error("Import failed (from component):", error);
@@ -90,12 +90,12 @@ Really delete everything? Consider exporting first.`,
           toast.error(
             `${errorMsg}: ${error instanceof Error ? error.message : String(error)}`,
           );
-          setIsClearing(false); // Reset loading state on error
+          setIsClearing(false);
         }
         // No finally needed here as reload happens on success
       }
     }
-  }, []); // Removed clearAllData dependency as we call service directly
+  }, []);
 
   return (
     <div className="space-y-6 p-1">

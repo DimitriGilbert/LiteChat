@@ -52,8 +52,8 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
     isEnabled: true,
     apiKeyId: null,
     baseURL: null,
-    enabledModels: null, // Initialize as null
-    autoFetchModels: true,
+    enabledModels: null,
+    autoFetchModels: false,
     fetchedModels: null,
     modelsLastFetchedAt: null,
   });
@@ -70,7 +70,7 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
           updated.apiKeyId = null;
           updated.baseURL = null;
           updated.autoFetchModels = supportsModelFetching(newType);
-          updated.enabledModels = null; // Reset enabled models on type change
+          updated.enabledModels = null;
         }
         if (field === "isEnabled" || field === "autoFetchModels") {
           updated[field] = !!value;
@@ -101,7 +101,7 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
         isEnabled: newProviderData.isEnabled ?? true,
         apiKeyId: newProviderData.apiKeyId ?? null,
         baseURL: newProviderData.baseURL ?? null,
-        enabledModels: null, // Add enabledModels explicitly (initially null)
+        enabledModels: null,
         autoFetchModels: autoFetch,
         fetchedModels: null,
         modelsLastFetchedAt: null,

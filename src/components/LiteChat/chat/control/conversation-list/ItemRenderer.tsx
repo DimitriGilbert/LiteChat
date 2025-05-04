@@ -1,5 +1,6 @@
 // src/components/LiteChat/chat/control/conversation-list/ItemRenderer.tsx
-import React, { useEffect, memo } from "react"; // Import memo
+// Add more detailed logging before rendering the problematic part
+import React, { memo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,21 +16,16 @@ import {
   DownloadIcon,
   Loader2,
   FileJsonIcon,
-  CogIcon, // Import Settings Icon
+  CogIcon,
 } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { getSyncIndicator } from "@/components/LiteChat/chat/control/conversation-list/SyncIndicator";
 import type { SidebarItemType } from "@/types/litechat/chat";
 import type { SyncStatus } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project";
 import { Conversation } from "@/types/litechat/chat";
 import { SidebarItem } from "@/store/conversation.store";
-import { useUIStateStore } from "@/store/ui.store"; // Import UI store
+import { useUIStateStore } from "@/store/ui.store";
+import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 
 interface ConversationItemProps {
   item: SidebarItem;
@@ -56,12 +52,11 @@ interface ConversationItemProps {
     conversations: Conversation[];
   };
   filterText: string;
-  // Inline Editing Props - Updated
   editingItemId: string | null;
   editingItemType: SidebarItemType | null;
-  editingName: string; // Original name (read-only display while editing)
-  localEditingName: string; // Value for the input field
-  setLocalEditingName: (name: string) => void; // Setter for the input field
+  originalName: string;
+  localEditingName: string;
+  setLocalEditingName: (name: string) => void;
   handleStartEditing: (item: SidebarItem) => void;
   handleSaveEdit: () => Promise<void>;
   handleCancelEdit: (isNewProject?: boolean) => void;
@@ -69,7 +64,6 @@ interface ConversationItemProps {
   editInputRef: React.RefObject<HTMLInputElement | null>;
 }
 
-// Wrap the component function with React.memo
 export const ConversationItemRenderer = memo<ConversationItemProps>(
   ({
     item,
@@ -86,12 +80,11 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
     toggleProjectExpansion,
     getChildren,
     filterText,
-    // Inline Editing Props - Destructure new props
     editingItemId,
     editingItemType,
-    editingName, // Original name
-    localEditingName, // Input value
-    setLocalEditingName, // Input setter
+    originalName,
+    localEditingName,
+    setLocalEditingName,
     handleStartEditing,
     handleSaveEdit,
     handleCancelEdit,
@@ -107,7 +100,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
 
     const { projects: childProjects, conversations: childConversations } =
       isProject
-        ? getChildren(item.id, filterText) // getChildren now returns sorted lists
+        ? getChildren(item.id, filterText)
         : { projects: [], conversations: [] };
     const hasChildren =
       childProjects.length > 0 || childConversations.length > 0;
@@ -123,7 +116,6 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
     const syncIndicator =
       !isProject && repoName ? getSyncIndicator(syncStatus, repoName) : null;
 
-    // Get UI store action
     const openProjectSettingsModal = useUIStateStore(
       (state) => state.openProjectSettingsModal,
     );
@@ -147,7 +139,6 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
           onDeleteProject(item.id, e);
         }
       } else {
-        // Confirmation for conversation deletion can be added here if desired
         onDeleteConversation(item.id, e);
       }
     };
@@ -157,12 +148,10 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
       handleStartEditing(item);
     };
 
-    // Handler for project settings button - ENSURE THIS IS CORRECT
     const handleSettingsClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       if (isProject) {
-        console.log(`Opening project settings for: ${item.id}`); // Debug log
-        openProjectSettingsModal(item.id); // Call the action with the project ID
+        openProjectSettingsModal(item.id);
       }
     };
 
@@ -171,20 +160,19 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
         e.preventDefault();
         handleSaveEdit();
       } else if (e.key === "Escape") {
-        handleCancelEdit(isProject && editingName === "New Project");
+        handleCancelEdit();
       }
     };
 
-    // Focus input when editing starts
-    useEffect(() => {
-      if (isEditingThis) {
-        editInputRef.current?.focus();
-        editInputRef.current?.select();
-      }
-    }, [isEditingThis, editInputRef]);
-
-    // Determine display name correctly (uses original name from item prop)
     const displayName = isProject ? item.name : item.title;
+
+    // Define Save Icon component conditionally
+    const SaveIconComponent = isSavingEdit ? Loader2 : CheckIcon;
+    const saveIconClassName = isSavingEdit ? "h-3 w-3 animate-spin" : "h-3 w-3";
+
+    // *** ADDING LOG ***
+    // console.log(`Rendering ItemRenderer for ${item.id} (${displayName}), isEditingThis: ${isEditingThis}`);
+    // *** END LOG ***
 
     return (
       <>
@@ -228,19 +216,16 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
               <MessageSquareIcon className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
             )}
             {isEditingThis ? (
-              // Use localEditingName and setLocalEditingName for the Input
               <Input
                 ref={editInputRef as React.RefObject<HTMLInputElement>}
-                value={localEditingName} // Use local state for value
-                onChange={(e) => setLocalEditingName(e.target.value)} // Update local state
+                value={localEditingName}
+                onChange={(e) => setLocalEditingName(e.target.value)}
                 onKeyDown={handleInputKeyDown}
-                // Removed onBlur handler - rely on Enter/Escape/Save/Cancel buttons
                 className="h-6 px-1 py-0 text-xs flex-grow min-w-0"
-                onClick={(e) => e.stopPropagation()} // Prevent item click when clicking input
+                onClick={(e) => e.stopPropagation()}
                 disabled={isSavingEdit}
               />
             ) : (
-              // Display the original name when not editing
               <span className="truncate pr-1">{displayName}</span>
             )}
             {syncIndicator}
@@ -248,130 +233,74 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
 
           <div className="flex items-center flex-shrink-0">
             {isEditingThis ? (
-              // Edit mode buttons
               <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 text-green-500 hover:text-green-600"
+                {/* Save Button */}
+                <ActionTooltipButton
+                  tooltipText="Save (Enter)"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleSaveEdit();
                   }}
-                  // Disable save if saving, name is empty, or name hasn't changed from original
-                  disabled={
-                    isSavingEdit ||
-                    !localEditingName.trim() ||
-                    localEditingName.trim() === editingName
-                  }
+                  disabled={isSavingEdit || !localEditingName.trim()}
                   aria-label="Save changes"
-                >
-                  {isSavingEdit ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <CheckIcon className="h-3 w-3" />
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                  icon={<SaveIconComponent />}
+                  iconClassName={saveIconClassName}
+                  className="h-5 w-5 text-green-500 hover:text-green-600"
+                />
+                {/* Cancel Button */}
+                <ActionTooltipButton
+                  tooltipText="Cancel (Esc)"
                   onClick={(e) => {
                     e.stopPropagation();
-                    // Pass whether it's a new project based on the *original* name
-                    handleCancelEdit(
-                      isProject && editingName === "New Project",
-                    );
+                    handleCancelEdit();
                   }}
                   disabled={isSavingEdit}
                   aria-label="Cancel edit"
-                >
-                  <XIcon className="h-3 w-3" />
-                </Button>
+                  icon={<XIcon />}
+                  className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                />
               </>
             ) : (
-              // View mode buttons (appear on hover)
               <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                 {/* Project Settings Button */}
                 {isProject && (
-                  <TooltipProvider delayDuration={100}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                          onClick={handleSettingsClick} // Ensure this handler is correct
-                          aria-label={`Settings for ${displayName}`}
-                        >
-                          <CogIcon className="h-3 w-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        Project Settings
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <ActionTooltipButton
+                    tooltipText="Project Settings"
+                    onClick={handleSettingsClick}
+                    aria-label={`Settings for ${displayName}`}
+                    icon={<CogIcon />}
+                    className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                  />
                 )}
-
-                <TooltipProvider delayDuration={100}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                        onClick={handleEditClick}
-                        aria-label={`Edit ${displayName}`}
-                      >
-                        <Edit2Icon className="h-3 w-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Edit</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-
+                {/* Edit Button - Check the icon prop carefully */}
+                <ActionTooltipButton
+                  tooltipText="Edit"
+                  onClick={handleEditClick}
+                  aria-label={`Edit ${displayName}`}
+                  icon={<Edit2Icon />} // Ensure Edit2Icon is valid her/>e
+                  className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                />
                 {/* Export Buttons */}
                 {isProject ? (
-                  <TooltipProvider delayDuration={100}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                          onClick={(e) => onExportProject(item.id, e)}
-                          aria-label={`Export project ${displayName}`}
-                        >
-                          <FileJsonIcon className="h-3 w-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        Export Project (JSON)
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <ActionTooltipButton
+                    tooltipText="Export Project (JSON)"
+                    onClick={(e) => onExportProject(item.id, e)}
+                    aria-label={`Export project ${displayName}`}
+                    icon={<FileJsonIcon />}
+                    className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                  />
                 ) : (
                   <div className="relative group/export">
-                    <TooltipProvider delayDuration={100}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div
-                            className="p-1 rounded hover:bg-muted cursor-pointer"
-                            aria-label={`Export ${displayName}`}
-                          >
-                            <DownloadIcon className="h-3 w-3 text-muted-foreground group-hover/export:text-foreground" />
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          Export Conversation
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <ActionTooltipButton
+                      tooltipText="Export Conversation"
+                      aria-label={`Export ${displayName}`}
+                      icon={<DownloadIcon />}
+                      className="h-5 w-5 text-muted-foreground group-hover/export:text-foreground"
+                    />
                     <div
                       className="absolute right-0 top-full mt-1 hidden group-hover/export:flex
                                    bg-popover border border-border rounded-md shadow-lg p-0.5 z-10 gap-0.5"
-                      onClick={(e) => e.stopPropagation()} // Prevent item click
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <Button
                         variant="ghost"
@@ -394,33 +323,21 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                     </div>
                   </div>
                 )}
-
                 {/* Delete Button */}
-                <TooltipProvider delayDuration={100}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 text-destructive hover:text-destructive/80"
-                        onClick={handleDeleteClick}
-                        aria-label={`Delete ${displayName}`}
-                      >
-                        <Trash2Icon className="h-3 w-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Delete</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <ActionTooltipButton
+                  tooltipText="Delete"
+                  onClick={handleDeleteClick}
+                  aria-label={`Delete ${displayName}`}
+                  icon={<Trash2Icon />}
+                  className="h-5 w-5 text-destructive hover:text-destructive/80"
+                />
               </div>
             )}
           </div>
         </li>
-        {/* Render Children if Project is Expanded */}
         {isProject && isExpanded && (
           <>
             {childProjects
-              // Sort children by updatedAt descending
               .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
               .map((child) => (
                 <ConversationItemRenderer
@@ -439,10 +356,9 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                   toggleProjectExpansion={toggleProjectExpansion}
                   getChildren={getChildren}
                   filterText={filterText}
-                  // Pass down editing props
                   editingItemId={editingItemId}
                   editingItemType={editingItemType}
-                  editingName={editingName}
+                  originalName={originalName}
                   localEditingName={localEditingName}
                   setLocalEditingName={setLocalEditingName}
                   handleStartEditing={handleStartEditing}
@@ -453,7 +369,6 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                 />
               ))}
             {childConversations
-              // Sort children by updatedAt descending
               .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
               .map((child) => (
                 <ConversationItemRenderer
@@ -472,10 +387,9 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                   toggleProjectExpansion={toggleProjectExpansion}
                   getChildren={getChildren}
                   filterText={filterText}
-                  // Pass down editing props
                   editingItemId={editingItemId}
                   editingItemType={editingItemType}
-                  editingName={editingName}
+                  originalName={originalName}
                   localEditingName={localEditingName}
                   setLocalEditingName={setLocalEditingName}
                   handleStartEditing={handleStartEditing}
@@ -491,5 +405,4 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
     );
   },
 );
-// Add display name for React DevTools
 ConversationItemRenderer.displayName = "ConversationItemRenderer";

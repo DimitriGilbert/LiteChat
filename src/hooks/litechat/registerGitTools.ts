@@ -1,9 +1,11 @@
 // src/hooks/litechat/registerGitTools.ts
+// FULL FILE
 import { useControlRegistryStore } from "@/store/control.store";
 import { useSettingsStore } from "@/store/settings.store";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { z } from "zod";
 import { Tool } from "ai";
+import type { ReadonlyChatContextSnapshot } from "@/types/litechat/modding"; // Import context type
 
 // Schemas remain the same
 const gitInitSchema = z.object({
@@ -61,14 +63,31 @@ export function registerGitTools() {
     description: "Initialize an empty Git repository in a VFS directory.",
     parameters: gitInitSchema,
   };
-  registerTool("core", "gitInit", gitInitTool, async ({ path }) => {
-    try {
-      await VfsOps.gitInitOp(path);
-      return { success: true, message: `Repository initialized at ${path}` };
-    } catch (e: any) {
-      return { success: false, error: e.message };
-    }
-  });
+  registerTool(
+    "core",
+    "gitInit",
+    gitInitTool,
+    // Update implementation signature
+    async (
+      { path },
+      context: ReadonlyChatContextSnapshot & { fsInstance?: typeof VfsOps.VFS },
+    ) => {
+      const fsInstance = context?.fsInstance;
+      if (!fsInstance) {
+        return {
+          success: false,
+          error: "Filesystem instance not available in context.",
+        };
+      }
+      try {
+        // Pass fsInstance
+        await VfsOps.gitInitOp(path, { fsInstance });
+        return { success: true, message: `Repository initialized at ${path}` };
+      } catch (e: any) {
+        return { success: false, error: e.message };
+      }
+    },
+  );
 
   // --- Git Commit ---
   const gitCommitTool: Tool<typeof gitCommitSchema> = {
@@ -79,7 +98,18 @@ export function registerGitTools() {
     "core",
     "gitCommit",
     gitCommitTool,
-    async ({ path, message }) => {
+    // Update implementation signature
+    async (
+      { path, message },
+      context: ReadonlyChatContextSnapshot & { fsInstance?: typeof VfsOps.VFS },
+    ) => {
+      const fsInstance = context?.fsInstance;
+      if (!fsInstance) {
+        return {
+          success: false,
+          error: "Filesystem instance not available in context.",
+        };
+      }
       // Re-check settings state inside the implementation
       const currentSettings = useSettingsStore.getState();
       if (!currentSettings.gitUserName || !currentSettings.gitUserEmail) {
@@ -90,7 +120,8 @@ export function registerGitTools() {
         };
       }
       try {
-        await VfsOps.gitCommitOp(path, message);
+        // Pass fsInstance
+        await VfsOps.gitCommitOp(path, message, { fsInstance });
         return { success: true, message: `Changes committed in ${path}` };
       } catch (e: any) {
         return { success: false, error: e.message };
@@ -104,14 +135,33 @@ export function registerGitTools() {
       "Pull changes from the remote repository for the specified branch.",
     parameters: gitPullSchema,
   };
-  registerTool("core", "gitPull", gitPullTool, async ({ path, branch }) => {
-    try {
-      await VfsOps.gitPullOp(path, branch || "main");
-      return { success: true, message: `Pulled changes for ${path}` };
-    } catch (e: any) {
-      return { success: false, error: e.message };
-    }
-  });
+  registerTool(
+    "core",
+    "gitPull",
+    gitPullTool,
+    // Update implementation signature
+    async (
+      { path, branch },
+      context: ReadonlyChatContextSnapshot & { fsInstance?: typeof VfsOps.VFS },
+    ) => {
+      const fsInstance = context?.fsInstance;
+      if (!fsInstance) {
+        return {
+          success: false,
+          error: "Filesystem instance not available in context.",
+        };
+      }
+      try {
+        // Pass fsInstance
+        await VfsOps.gitPullOp(path, branch || "main", undefined, {
+          fsInstance,
+        });
+        return { success: true, message: `Pulled changes for ${path}` };
+      } catch (e: any) {
+        return { success: false, error: e.message };
+      }
+    },
+  );
 
   // --- Git Push ---
   const gitPushTool: Tool<typeof gitPushSchema> = {
@@ -119,29 +169,64 @@ export function registerGitTools() {
       "Push committed changes from the local branch to the remote repository.",
     parameters: gitPushSchema,
   };
-  registerTool("core", "gitPush", gitPushTool, async ({ path, branch }) => {
-    try {
-      await VfsOps.gitPushOp(path, branch || "main");
-      return { success: true, message: `Pushed changes for ${path}` };
-    } catch (e: any) {
-      return { success: false, error: e.message };
-    }
-  });
+  registerTool(
+    "core",
+    "gitPush",
+    gitPushTool,
+    // Update implementation signature
+    async (
+      { path, branch },
+      context: ReadonlyChatContextSnapshot & { fsInstance?: typeof VfsOps.VFS },
+    ) => {
+      const fsInstance = context?.fsInstance;
+      if (!fsInstance) {
+        return {
+          success: false,
+          error: "Filesystem instance not available in context.",
+        };
+      }
+      try {
+        // Pass fsInstance
+        await VfsOps.gitPushOp(path, branch || "main", undefined, {
+          fsInstance,
+        });
+        return { success: true, message: `Pushed changes for ${path}` };
+      } catch (e: any) {
+        return { success: false, error: e.message };
+      }
+    },
+  );
 
   // --- Git Status ---
   const gitStatusTool: Tool<typeof gitStatusSchema> = {
     description: "Get the Git status for a VFS repository.",
     parameters: gitStatusSchema,
   };
-  registerTool("core", "gitStatus", gitStatusTool, async ({ path }) => {
-    try {
-      await VfsOps.gitStatusOp(path);
-      return { success: true, message: `Status checked for ${path}` };
-    } catch (e: any) {
-      return { success: false, error: e.message };
-    }
-  });
+  registerTool(
+    "core",
+    "gitStatus",
+    gitStatusTool,
+    // Update implementation signature
+    async (
+      { path },
+      context: ReadonlyChatContextSnapshot & { fsInstance?: typeof VfsOps.VFS },
+    ) => {
+      const fsInstance = context?.fsInstance;
+      if (!fsInstance) {
+        return {
+          success: false,
+          error: "Filesystem instance not available in context.",
+        };
+      }
+      try {
+        // Pass fsInstance
+        await VfsOps.gitStatusOp(path, { fsInstance });
+        return { success: true, message: `Status checked for ${path}` };
+      } catch (e: any) {
+        return { success: false, error: e.message };
+      }
+    },
+  );
 
   console.log("[Function] Core Git Tools Registered.");
-  // No cleanup function needed or returned
 }

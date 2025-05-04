@@ -1,5 +1,5 @@
 // src/lib/litechat/vfs-git-operations.ts
-// Entire file content provided - Updated gitPullOp
+// FULL FILE
 import { fs } from "@zenfs/core";
 import { toast } from "sonner";
 import {
@@ -23,7 +23,10 @@ const sessionCredentials = new Map<
 
 // --- Helper Functions ---
 
-const ensureGitConfig = async (dir: string): Promise<boolean> => {
+const ensureGitConfig = async (
+  dir: string,
+  fsInstance: typeof fs,
+): Promise<boolean> => {
   const { gitUserName, gitUserEmail } = useSettingsStore.getState();
   if (!gitUserName || !gitUserEmail) {
     toast.error(
@@ -33,15 +36,15 @@ const ensureGitConfig = async (dir: string): Promise<boolean> => {
   }
   try {
     const currentName = await git
-      .getConfig({ fs, dir, path: "user.name" })
+      .getConfig({ fs: fsInstance, dir, path: "user.name" })
       .catch(() => null);
     const currentEmail = await git
-      .getConfig({ fs, dir, path: "user.email" })
+      .getConfig({ fs: fsInstance, dir, path: "user.email" })
       .catch(() => null);
 
     if (currentName !== gitUserName) {
       await git.setConfig({
-        fs,
+        fs: fsInstance,
         dir,
         path: "user.name",
         value: gitUserName,
@@ -49,7 +52,7 @@ const ensureGitConfig = async (dir: string): Promise<boolean> => {
     }
     if (currentEmail !== gitUserEmail) {
       await git.setConfig({
-        fs,
+        fs: fsInstance,
         dir,
         path: "user.email",
         value: gitUserEmail,
@@ -170,11 +173,15 @@ const formatGitHttpError = (error: any): string => {
 
 // --- Exported Git Operations ---
 
-export const isGitRepoOp = async (path: string): Promise<boolean> => {
+export const isGitRepoOp = async (
+  path: string,
+  options?: { fsInstance?: typeof fs },
+): Promise<boolean> => {
+  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
   const normalized = normalizePath(path);
   const gitDirPath = joinPath(normalized, ".git");
   try {
-    const stats = await fs.promises.stat(gitDirPath);
+    const stats = await fsToUse.promises.stat(gitDirPath);
     return stats.isDirectory();
   } catch (err: unknown) {
     if (err instanceof Error && (err as any).code === "ENOENT") {
@@ -193,14 +200,16 @@ export const gitCloneOp = async (
   url: string,
   branch?: string,
   credentials?: { username?: string | null; password?: string | null },
+  options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
+  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
   const dir = normalizePath(targetPath);
   console.log(`[VFS Git Op] Attempting to clone ${url} into ${dir}`);
 
   try {
     let isAlreadyCloned = false;
     try {
-      await fs.promises.stat(joinPath(dir, ".git"));
+      await fsToUse.promises.stat(joinPath(dir, ".git"));
       isAlreadyCloned = true;
     } catch (e: any) {
       if (e.code !== "ENOENT") throw e;
@@ -216,7 +225,7 @@ export const gitCloneOp = async (
     const parentDir = dirname(dir);
     if (parentDir !== "/") {
       try {
-        await fs.promises.mkdir(parentDir, { recursive: true });
+        await fsToUse.promises.mkdir(parentDir, { recursive: true });
       } catch (mkdirErr: any) {
         if (mkdirErr.code !== "EEXIST") throw mkdirErr;
       }
@@ -252,7 +261,7 @@ export const gitCloneOp = async (
     }
 
     await git.clone({
-      fs,
+      fs: fsToUse,
       http,
       dir,
       corsProxy: CORS_PROXY,
@@ -274,17 +283,17 @@ export const gitCloneOp = async (
       },
     });
 
-    await fs.promises.stat(joinPath(dir, ".git"));
+    await fsToUse.promises.stat(joinPath(dir, ".git"));
 
     const currentLocalBranch = await git
-      .currentBranch({ fs, dir, fullname: false })
+      .currentBranch({ fs: fsToUse, dir, fullname: false })
       .catch(() => null);
     if (currentLocalBranch !== branchToCheckout) {
       console.warn(
         `[VFS Git Op] Cloned repo HEAD is at ${currentLocalBranch}, expected ${branchToCheckout}. Checking out...`,
       );
       await git.checkout({
-        fs,
+        fs: fsToUse,
         dir,
         ref: branchToCheckout,
       });
@@ -303,7 +312,7 @@ export const gitCloneOp = async (
     if (!(err instanceof Error && err.message.includes("already cloned"))) {
       try {
         console.log(`[VFS Git Op] Attempting cleanup of failed clone: ${dir}`);
-        await fs.promises.rm(dir, { recursive: true, force: true });
+        await fsToUse.promises.rm(dir, { recursive: true, force: true });
       } catch (cleanupErr) {
         console.warn(
           `[VFS Git Op] Failed cleanup after clone error:`,
@@ -315,10 +324,14 @@ export const gitCloneOp = async (
   }
 };
 
-export const gitInitOp = async (path: string): Promise<void> => {
+export const gitInitOp = async (
+  path: string,
+  options?: { fsInstance?: typeof fs },
+): Promise<void> => {
+  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
   const dir = normalizePath(path);
   try {
-    await git.init({ fs, dir });
+    await git.init({ fs: fsToUse, dir });
     toast.success(`Initialized empty Git repository in "${basename(dir)}"`);
   } catch (err: unknown) {
     console.error(`[VFS Git Op] Git init failed for ${dir}:`, err);
@@ -332,16 +345,18 @@ export const gitInitOp = async (path: string): Promise<void> => {
 export const gitCommitOp = async (
   path: string,
   message: string,
+  options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
+  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
   const dir = normalizePath(path);
   try {
-    const configOK = await ensureGitConfig(dir);
+    const configOK = await ensureGitConfig(dir, fsToUse);
     if (!configOK) {
       throw new Error("Git user configuration is missing or invalid.");
     }
 
-    await git.add({ fs, dir, filepath: "." });
-    const status = await git.statusMatrix({ fs, dir });
+    await git.add({ fs: fsToUse, dir, filepath: "." });
+    const status = await git.statusMatrix({ fs: fsToUse, dir });
     const hasStagedChanges = status.some(([, , stage]) => stage !== 0);
 
     if (!hasStagedChanges) {
@@ -350,7 +365,7 @@ export const gitCommitOp = async (
     }
 
     const sha = await git.commit({
-      fs,
+      fs: fsToUse,
       dir,
       message,
       author: {
@@ -374,16 +389,19 @@ export const gitCommitOp = async (
  * @param path The repository directory path.
  * @param branch The branch name to pull (from SyncRepo config).
  * @param credentials Optional authentication credentials.
+ * @param options Optional parameters, including fsInstance.
  * @throws Throws an error if pull fails.
  */
 export const gitPullOp = async (
   path: string,
   branch: string,
   credentials?: { username?: string | null; password?: string | null },
+  options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
+  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
   const dir = normalizePath(path);
   try {
-    const configOK = await ensureGitConfig(dir);
+    const configOK = await ensureGitConfig(dir, fsToUse);
     if (!configOK) {
       throw new Error("Git user configuration is missing or invalid.");
     }
@@ -395,7 +413,7 @@ export const gitPullOp = async (
 
     // Ensure the target branch exists locally and is checked out
     const currentLocalBranch = await git
-      .currentBranch({ fs, dir, fullname: false })
+      .currentBranch({ fs: fsToUse, dir, fullname: false })
       .catch(() => null);
 
     if (currentLocalBranch !== branch) {
@@ -404,7 +422,7 @@ export const gitPullOp = async (
       );
       try {
         // Try checking out existing local branch
-        await git.checkout({ fs, dir, ref: branch });
+        await git.checkout({ fs: fsToUse, dir, ref: branch });
       } catch (checkoutError: any) {
         // If checkout fails because local branch doesn't exist, try creating it from remote
         if (checkoutError.code === "NotFoundError") {
@@ -414,7 +432,7 @@ export const gitPullOp = async (
           try {
             // Fetch the specific branch first to ensure remote ref exists
             await git.fetch({
-              fs,
+              fs: fsToUse,
               http,
               dir,
               corsProxy: CORS_PROXY,
@@ -429,10 +447,10 @@ export const gitPullOp = async (
             });
             // Create local branch pointing to the fetched remote branch
             await git.branch({
-              fs,
+              fs: fsToUse,
               dir,
               ref: branch,
-              checkout: true, // Checkout after creating
+              checkout: true,
             });
             console.log(
               `[VFS Git Op] Successfully created and checked out local branch ${branch}.`,
@@ -461,11 +479,11 @@ export const gitPullOp = async (
 
     // Now perform the pull operation on the (now checked out) branch
     await git.pull({
-      fs,
+      fs: fsToUse,
       http,
       dir,
-      ref: branch, // Specify the branch to pull
-      singleBranch: true, // Often desired for sync scenarios
+      ref: branch,
+      singleBranch: true,
       author: {
         // Required for potential merge commits
         name: useSettingsStore.getState().gitUserName!,
@@ -506,7 +524,9 @@ export const gitPushOp = async (
   path: string,
   branch: string,
   credentials?: { username?: string | null; password?: string | null },
+  options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
+  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
   const dir = normalizePath(path);
   try {
     if (!branch) {
@@ -514,7 +534,7 @@ export const gitPushOp = async (
     }
     console.log(`[VFS Git Op] Pushing local branch ${branch} for ${dir}`);
     const result = await git.push({
-      fs,
+      fs: fsToUse,
       http,
       dir,
       corsProxy: CORS_PROXY,
@@ -550,11 +570,15 @@ export const gitPushOp = async (
   }
 };
 
-export const gitStatusOp = async (path: string): Promise<void> => {
+export const gitStatusOp = async (
+  path: string,
+  options?: { fsInstance?: typeof fs },
+): Promise<void> => {
+  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
   const dir = normalizePath(path);
   console.log(`[VFS Git Op] Git Status on ${dir}`);
   try {
-    const status = await git.statusMatrix({ fs, dir });
+    const status = await git.statusMatrix({ fs: fsToUse, dir });
     console.log("Git Status Matrix:", status);
 
     const formattedStatus = status
@@ -589,10 +613,18 @@ ${formattedStatus || "No changes"}`,
   }
 };
 
-export const gitCurrentBranchOp = async (path: string): Promise<string> => {
+export const gitCurrentBranchOp = async (
+  path: string,
+  options?: { fsInstance?: typeof fs },
+): Promise<string> => {
+  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
   const dir = normalizePath(path);
   try {
-    const branch = await git.currentBranch({ fs, dir, fullname: false });
+    const branch = await git.currentBranch({
+      fs: fsToUse,
+      dir,
+      fullname: false,
+    });
     if (!branch) {
       throw new Error("Could not determine current branch (Detached HEAD?).");
     }
@@ -607,10 +639,14 @@ export const gitCurrentBranchOp = async (path: string): Promise<string> => {
   }
 };
 
-export const gitListBranchesOp = async (path: string): Promise<string[]> => {
+export const gitListBranchesOp = async (
+  path: string,
+  options?: { fsInstance?: typeof fs },
+): Promise<string[]> => {
+  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
   const dir = normalizePath(path);
   try {
-    const branches = await git.listBranches({ fs, dir });
+    const branches = await git.listBranches({ fs: fsToUse, dir });
     toast.info(`Local branches in "${basename(dir)}":
 ${branches.join(", ")}`);
     return branches;
@@ -625,10 +661,12 @@ ${branches.join(", ")}`);
 
 export const gitListRemotesOp = async (
   path: string,
+  options?: { fsInstance?: typeof fs },
 ): Promise<{ remote: string; url: string }[]> => {
+  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
   const dir = normalizePath(path);
   try {
-    const remotes = await git.listRemotes({ fs, dir });
+    const remotes = await git.listRemotes({ fs: fsToUse, dir });
     toast.info(
       `Remotes in "${basename(dir)}":
 ${remotes.map((r) => `${r.remote}: ${r.url}`).join(`

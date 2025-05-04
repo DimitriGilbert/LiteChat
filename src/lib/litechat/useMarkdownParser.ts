@@ -12,9 +12,9 @@ export type ParsedContent = (string | CodeBlockData)[];
 
 // Create a MarkdownIt parser instance with desired options
 const md = new MarkdownIt({
-  html: false, // disable HTML for security
-  linkify: true, // auto-link URLs
-  breaks: true, // convert '\n' in paragraphs into <br>
+  html: false,
+  linkify: true,
+  breaks: true,
 });
 
 export function useMarkdownParser(

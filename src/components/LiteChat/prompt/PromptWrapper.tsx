@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/PromptWrapper.tsx
-// Entire file content provided due to layout and prop changes
+// FULL FILE
 import React, {
   useState,
   useCallback,
@@ -17,7 +17,7 @@ import { useInputStore } from "@/store/input.store";
 import type {
   PromptTurnObject,
   InputAreaRenderer,
-  InputAreaRef, // Import InputAreaRef from types
+  InputAreaRef,
 } from "@/types/litechat/prompt";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
@@ -25,6 +25,7 @@ import { runMiddleware } from "@/lib/litechat/ai-helpers";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
+import { ModEvent, ModMiddlewareHook } from "@/types/litechat/modding"; // Import Enums
 
 interface PromptWrapperProps {
   InputAreaRenderer: InputAreaRenderer;
@@ -41,6 +42,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
 }) => {
   const inputAreaRef = useRef<InputAreaRef>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Local state to track if input has value for disabling submit button
+  const [hasInputValue, setHasInputValue] = useState(false);
 
   // --- Store Hooks ---
   const registeredPromptControls = useControlRegistryStore(
@@ -62,7 +65,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     })),
   );
 
-  // Focus input when flag is set
+  // --- Focus Handling ---
   useEffect(() => {
     if (focusInputOnNextRender && inputAreaRef.current) {
       inputAreaRef.current.focus();
@@ -70,11 +73,13 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     }
   }, [focusInputOnNextRender, setFocusInputFlag]);
 
-  // Memoize controls
+  // --- Memoized Controls ---
   const promptControls = useMemo(() => {
-    return Object.values(registeredPromptControls)
-      .filter((c) => (c.show ? c.show() : true))
-      .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
+    // Filter based on show function IF IT EXISTS
+    // Rely on registration order, remove sort
+    return Object.values(registeredPromptControls).filter((c) =>
+      c.show ? c.show() : true,
+    );
   }, [registeredPromptControls]);
 
   const panelControls = useMemo(
@@ -86,20 +91,27 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     [promptControls],
   );
 
+  // --- Submission Logic ---
   const handleSubmit = useCallback(async () => {
-    const currentInputValue = inputAreaRef.current?.getValue() ?? "";
-    const trimmedValue = currentInputValue.trim();
+    // Read value directly from ref for submission
+    const valueFromRef = inputAreaRef.current?.getValue() ?? "";
+    const trimmedValue = valueFromRef.trim();
 
-    if (!trimmedValue && attachedFilesMetadata.length === 0) {
+    // Read attached files directly from store state at submission time
+    const currentAttachedFiles = useInputStore.getState().attachedFilesMetadata;
+
+    if (!trimmedValue && currentAttachedFiles.length === 0) {
       return;
     }
     if (isStreaming || isSubmitting) return;
 
     setIsSubmitting(true);
+    // InputArea will clear itself and call onValueChange("")
     try {
       let parameters: Record<string, any> = {};
       let metadata: Record<string, any> = {};
 
+      // Use the memoized promptControls list
       for (const control of promptControls) {
         if (control.getParameters) {
           const params = await control.getParameters();
@@ -111,8 +123,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         }
       }
 
-      if (attachedFilesMetadata.length > 0) {
-        metadata.attachedFiles = [...attachedFilesMetadata];
+      if (currentAttachedFiles.length > 0) {
+        metadata.attachedFiles = [...currentAttachedFiles];
       }
 
       let turnData: PromptTurnObject = {
@@ -122,10 +134,12 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         metadata,
       };
 
-      emitter.emit("prompt:submitted", { turnData });
+      // Use enum member for event name
+      emitter.emit(ModEvent.PROMPT_SUBMITTED, { turnData });
 
+      // Use enum member for middleware hook name
       const middlewareResult = await runMiddleware(
-        "middleware:prompt:turnFinalize",
+        ModMiddlewareHook.PROMPT_TURN_FINALIZE,
         { turnData },
       );
 
@@ -143,16 +157,15 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       await onSubmit(finalTurnData);
 
       // Clear state AFTER successful submission initiation
-      // InputArea clears itself internally now
-      clearAttachedFiles();
-
+      clearAttachedFiles(); // This will emit ATTACHED_FILES_CHANGED
       promptControls.forEach((control) => {
         if (control.clearOnSubmit) {
-          control.clearOnSubmit();
+          control.clearOnSubmit(); // This should trigger relevant state resets/events
         }
       });
-
       setFocusInputFlag(true);
+      // InputArea clears itself internally on submit now
+      setHasInputValue(false); // Reset local state for button disable
     } catch (error) {
       console.error("Error during prompt submission:", error);
       toast.error(
@@ -164,47 +177,46 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   }, [
     isStreaming,
     isSubmitting,
-    promptControls,
+    promptControls, // Use memoized list
     onSubmit,
-    attachedFilesMetadata,
     clearAttachedFiles,
     setFocusInputFlag,
   ]);
 
-  // InputArea handles Enter key internally now
+  // Callback for InputArea to update local state and emit event
+  const handleInputValueChange = useCallback((value: string) => {
+    setHasInputValue(value.trim().length > 0);
+    emitter.emit(ModEvent.PROMPT_INPUT_CHANGE, { value });
+  }, []);
 
   return (
     <div className={cn("p-4 space-y-3", className)}>
-      {/* Panel Controls Area (Above Input) */}
+      {/* Panel Controls Area */}
       {panelControls.length > 0 && (
         <PromptControlWrapper
           controls={panelControls}
           area="panel"
-          className="flex flex-wrap gap-2 items-start mb-2" // Added margin-bottom
+          className="flex flex-wrap gap-2 items-start mb-2"
         />
       )}
 
       {/* Input Area */}
       <InputAreaRenderer
         ref={inputAreaRef}
-        // Pass only the props defined in InputAreaRendererProps
-        onSubmit={handleSubmit}
+        onSubmit={handleSubmit} // Pass the submit handler
         disabled={isStreaming || isSubmitting}
         placeholder={placeholder}
-        // Removed className="flex-grow" as it's on its own row
+        onValueChange={handleInputValueChange} // Pass the callback to update state and emit event
       />
 
-      {/* Trigger Controls and Submit Button Area (Below Input) */}
+      {/* Trigger Controls and Submit Button Area */}
       <div className="flex items-center justify-between gap-2 mt-2">
-        {/* Trigger Controls Area */}
         <PromptControlWrapper
           controls={triggerControls}
           area="trigger"
           className="flex items-center gap-1 flex-shrink-0"
         />
-        {/* Spacer to push button to the right */}
         <div className="flex-grow"></div>
-        {/* Submit Button */}
         <Button
           type="button"
           size="icon"
@@ -212,8 +224,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
           disabled={
             isStreaming ||
             isSubmitting ||
-            ((inputAreaRef.current?.getValue() ?? "").trim().length === 0 &&
-              attachedFilesMetadata.length === 0)
+            (!hasInputValue && attachedFilesMetadata.length === 0) // Use local state for check
           }
           className="h-9 w-9 flex-shrink-0"
           aria-label="Send message"

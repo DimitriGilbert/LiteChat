@@ -1,4 +1,4 @@
-// src/hooks/litechat/registerSettingsControl.ts
+// src/hooks/litechat/registerSettingsControl.tsx
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { SettingsIcon } from "lucide-react";
@@ -36,14 +36,14 @@ export function registerSettingsControl() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => handleOpenSettings()} // Open default tab
+              onClick={() => handleOpenSettings()}
               className="h-8 w-8"
               aria-label="Open Settings"
             >
               <SettingsIcon className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">Settings</TooltipContent>
+          <TooltipContent side="top">Settings</TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );
@@ -59,14 +59,14 @@ export function registerSettingsControl() {
 
   registerChatControl({
     id: "core-settings-trigger",
-    panel: "header",
-    order: 1000,
+    panel: "sidebar-footer",
+    // order removed
     status: () => "ready",
     renderer: () => React.createElement(SettingsTriggerComponent),
+    iconRenderer: () => React.createElement(SettingsTriggerComponent),
     settingsRenderer: () => React.createElement(SettingsModalRenderer),
     show: () => true,
   });
 
   console.log("[Function] Registered Core Settings Control");
-  // No cleanup needed or returned
 }

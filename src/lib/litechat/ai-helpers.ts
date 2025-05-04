@@ -1,5 +1,6 @@
 // src/lib/litechat/ai-helpers.ts
-// Entire file content provided
+// Ensure necessary functions are exported and update imports if needed
+import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
 import type {
   ModMiddlewareHookName,
   ModMiddlewarePayloadMap,
@@ -80,7 +81,7 @@ export function getContextSnapshot(): ReadonlyChatContextSnapshot {
     maxTokens: sS.maxTokens,
     theme: sS.theme,
   };
-  return Object.freeze(snapshot); // Ensure deep freeze if necessary
+  return Object.freeze(snapshot)
 }
 
 /**
@@ -104,62 +105,7 @@ export function base64ToUint8Array(base64: string): Uint8Array {
   }
 }
 
-// List of common text file extensions for content processing
-const COMMON_TEXT_EXTENSIONS = [
-  ".txt",
-  ".md",
-  ".json",
-  ".js",
-  ".ts",
-  ".jsx",
-  ".tsx",
-  ".html",
-  ".css",
-  ".py",
-  ".java",
-  ".c",
-  ".cpp",
-  ".h",
-  ".cs",
-  ".go",
-  ".php",
-  ".rb",
-  ".swift",
-  ".kt",
-  ".rs",
-  ".toml",
-  ".yaml",
-  ".yml",
-  ".xml",
-  ".sh",
-  ".bat",
-  ".ps1",
-  ".gitignore",
-  ".env", // Add other common config/text files
-  ".log",
-  ".csv",
-  ".tsv",
-  ".ini",
-  ".cfg",
-  ".conf",
-];
-
-// Helper function to determine if a file is likely text-based
-export const isLikelyTextFile = (name: string, mimeType?: string): boolean => {
-  const fileNameLower = name.toLowerCase();
-  // Prioritize specific text MIME types
-  if (
-    mimeType?.startsWith("text/") ||
-    mimeType === "application/json" ||
-    mimeType === "application/xml" ||
-    mimeType === "application/javascript" ||
-    mimeType === "application/typescript"
-  ) {
-    return true;
-  }
-  // Fallback: Check extension even if MIME type is generic or missing
-  return COMMON_TEXT_EXTENSIONS.some((ext) => fileNameLower.endsWith(ext));
-};
+// Constants and helper function moved to file-extensions.ts
 
 /**
  * Processes attached file metadata *with its content* into AI SDK compatible parts.
@@ -169,7 +115,7 @@ export const isLikelyTextFile = (name: string, mimeType?: string): boolean => {
  * @returns A TextPart, ImagePart, or null if processing fails critically.
  */
 export function processFileMetaToUserContent(
-  fileMeta: AttachedFileMetadata & { contentBytes?: Uint8Array }, // Allow passing raw bytes
+  fileMeta: AttachedFileMetadata & { contentBytes?: Uint8Array }
 ): TextPart | ImagePart | null {
   try {
     const mimeType = fileMeta.type || "application/octet-stream";
@@ -262,15 +208,37 @@ export function buildHistoryMessages(
   return historyInteractions.flatMap((i): CoreMessage[] => {
     const msgs: CoreMessage[] = [];
 
-    // Add user message if content exists
-    if (i.prompt?.content && typeof i.prompt.content === "string") {
-      msgs.push({ role: "user", content: i.prompt.content });
-    } else if (
-      i.prompt?.metadata?.attachedFiles &&
-      i.prompt.metadata.attachedFiles.length > 0 &&
-      !i.prompt?.content
-    ) {
-      // Omit user turn if only files and no text content
+    // Add user message if content exists or files were attached
+    // Check the original prompt turn data stored in the interaction
+    const userPrompt = i.prompt;
+    if (userPrompt) {
+      const userMessageContentParts: (TextPart | ImagePart)[] = [];
+      // Add file parts first (reconstruct from basic metadata if needed, though ideally not necessary here)
+      // For history, we primarily care about the text content. If files were complex (images),
+      // they might not be fully represented unless stored differently.
+      // Let's assume for history we only need the text part.
+      if (userPrompt.content) {
+        userMessageContentParts.push({
+          type: "text",
+          text: userPrompt.content,
+        });
+      }
+      // Add placeholders for files if they existed, for context
+      if (
+        userPrompt.metadata?.attachedFiles &&
+        userPrompt.metadata.attachedFiles.length > 0
+      ) {
+        userPrompt.metadata.attachedFiles.forEach((f) => {
+          userMessageContentParts.push({
+            type: "text",
+            text: `[User attached file: ${f.name}]`,
+          });
+        });
+      }
+
+      if (userMessageContentParts.length > 0) {
+        msgs.push({ role: "user", content: userMessageContentParts });
+      }
     }
 
     // Add assistant text response
@@ -310,7 +278,7 @@ export function buildHistoryMessages(
       if (validToolCalls.length > 0) {
         msgs.push({
           role: "assistant",
-          content: validToolCalls, // Add the array of valid tool calls
+          content: validToolCalls
         });
       }
     }
@@ -347,7 +315,7 @@ export function buildHistoryMessages(
       if (validToolResults.length > 0) {
         msgs.push({
           role: "tool",
-          content: validToolResults, // Add the array of valid tool results
+          content: validToolResults
         });
       }
     }

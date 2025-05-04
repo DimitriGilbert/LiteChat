@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/InputArea.tsx
-// Entire file content provided
+// FULL FILE
 import React, {
   forwardRef,
   useImperativeHandle,
@@ -13,13 +13,16 @@ import { cn } from "@/lib/utils";
 import { useUIStateStore } from "@/store/ui.store";
 import { useInputStore } from "@/store/input.store";
 import { useShallow } from "zustand/react/shallow";
-import type { InputAreaRef } from "@/types/litechat/prompt"; // Import from types
+import type { InputAreaRef } from "@/types/litechat/prompt";
 
 interface InputAreaProps {
   initialValue?: string;
   onSubmit: () => void;
   disabled?: boolean;
   placeholder?: string;
+  // Add callback prop for value changes
+  onValueChange?: (value: string) => void;
+  className?: string; // Add className prop
   [key: string]: any;
 }
 
@@ -32,6 +35,7 @@ export const InputArea = memo(
         disabled,
         placeholder = "Type message... (Shift+Enter for new line)",
         className,
+        onValueChange, // Destructure the new prop
         ...rest
       },
       ref,
@@ -69,7 +73,11 @@ export const InputArea = memo(
             useInputStore.getState().attachedFilesMetadata.length > 0;
           if (internalValue.trim().length > 0 || hasFiles) {
             onSubmit();
-            setInternalValue(""); // Clear internal state after submit
+            setInternalValue("");
+            // Notify parent of value change after submit clears it
+            if (onValueChange) {
+              onValueChange("");
+            }
           }
         }
       };
@@ -77,7 +85,12 @@ export const InputArea = memo(
       const handleTextareaChange = (
         e: React.ChangeEvent<HTMLTextAreaElement>,
       ) => {
-        setInternalValue(e.target.value);
+        const newValue = e.target.value;
+        setInternalValue(newValue);
+        // Notify parent of value change
+        if (onValueChange) {
+          onValueChange(newValue);
+        }
       };
 
       useEffect(() => {
@@ -94,7 +107,11 @@ export const InputArea = memo(
 
       useEffect(() => {
         setInternalValue(initialValue);
-      }, [initialValue]);
+        // Also notify parent of initial value change
+        if (onValueChange) {
+          onValueChange(initialValue);
+        }
+      }, [initialValue, onValueChange]);
 
       return (
         <Textarea

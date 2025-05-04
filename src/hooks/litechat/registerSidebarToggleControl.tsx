@@ -1,4 +1,4 @@
-// src/hooks/litechat/registerSidebarToggleControl.ts
+// src/hooks/litechat/registerSidebarToggleControl.tsx
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { PanelLeftCloseIcon, PanelRightCloseIcon } from "lucide-react";
@@ -16,7 +16,6 @@ export function registerSidebarToggleControl() {
     useControlRegistryStore.getState().registerChatControl;
 
   const SidebarToggleComponent: React.FC = () => {
-    // Get state and action directly inside the component instance
     const { isSidebarCollapsed, toggleSidebar } = useUIStateStore.getState();
 
     return (
@@ -39,7 +38,7 @@ export function registerSidebarToggleControl() {
               )}
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">
+          <TooltipContent side="top">
             {isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           </TooltipContent>
         </Tooltip>
@@ -49,13 +48,13 @@ export function registerSidebarToggleControl() {
 
   registerChatControl({
     id: "core-sidebar-toggle",
-    panel: "header",
-    order: 10,
+    panel: "sidebar-footer",
+    // order removed
     status: () => "ready",
     renderer: () => React.createElement(SidebarToggleComponent),
-    show: () => true, // Always show the toggle
+    iconRenderer: () => React.createElement(SidebarToggleComponent),
+    show: () => true,
   });
 
   console.log("[Function] Registered Core Sidebar Toggle Control");
-  // No cleanup needed or returned
 }

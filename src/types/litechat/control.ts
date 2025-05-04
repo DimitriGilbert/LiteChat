@@ -17,7 +17,7 @@ interface RegisteredMiddleware<H extends ModMiddlewareHookName> {
   callback: (
     payload: ModMiddlewarePayloadMap[H],
   ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>;
-  order?: number; // Order for middleware execution
+  order?: number;
 }
 
 // Type for the registry, mapping hook names to arrays of registered middleware
@@ -35,30 +35,30 @@ interface ControlState {
     {
       definition: Tool<any>;
       implementation?: ToolImplementation<any>;
-      modId: string; // Track which mod registered the tool
+      modId: string;
     }
   >;
 }
 
 interface ControlActions {
-  registerPromptControl: (control: PromptControl) => () => void; // Returns unregister function
+  registerPromptControl: (control: PromptControl) => () => void;
   unregisterPromptControl: (id: string) => void;
-  registerChatControl: (control: ChatControl) => () => void; // Returns unregister function
+  registerChatControl: (control: ChatControl) => () => void;
   unregisterChatControl: (id: string) => void;
   registerMiddleware: <H extends ModMiddlewareHookName>(
     hookName: H,
     modId: string,
     callback: RegisteredMiddleware<H>["callback"],
-    order?: number, // Optional order parameter
-  ) => () => void; // Returns unregister function
+    order?: number,
+  ) => () => void;
   unregisterMiddleware: <H extends ModMiddlewareHookName>(
     hookName: H,
     modId: string,
-    callback: RegisteredMiddleware<H>["callback"], // Need callback to identify which one to remove
+    callback: RegisteredMiddleware<H>["callback"],
   ) => void;
   getMiddlewareForHook: <H extends ModMiddlewareHookName>(
     hookName: H,
-  ) => ReadonlyArray<RegisteredMiddleware<H>>; // Return a readonly sorted copy
+  ) => ReadonlyArray<RegisteredMiddleware<H>>;
   // Add actions for tools
   registerTool: <P extends z.ZodSchema<any>>(
     modId: string,
@@ -76,7 +76,7 @@ export const useControlRegistryStore = create(
     promptControls: {},
     chatControls: {},
     middlewareRegistry: {},
-    tools: {}, // Initialize tools state
+    tools: {},
 
     // Actions
     registerPromptControl: (control) => {

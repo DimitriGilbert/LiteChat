@@ -1,22 +1,30 @@
 // src/components/LiteChat/prompt/control/GlobalModelSelector.tsx
-// Entire file content provided
-import React, { useMemo } from "react";
+
+import React, { useMemo, useState, useCallback } from "react";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 import { combineModelId } from "@/lib/litechat/provider-helpers";
 
 interface GlobalModelSelectorProps {
   /** The effective model ID for the current context */
-  value: string | null; // Changed from optional - it should always receive the effective value
+  value: string | null;
   /** Callback to update the GLOBAL default model selection */
   onChange: (value: string | null) => void;
   /** Optional flag to disable the selector */
@@ -27,7 +35,9 @@ interface GlobalModelSelectorProps {
 
 export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
   React.memo(({ value, onChange, disabled = false, className }) => {
-    // Select necessary state using useShallow
+    const [open, setOpen] = useState(false);
+    const [filterText, setFilterText] = useState("");
+
     const { dbProviderConfigs, globalModelSortOrder, isLoading } =
       useProviderStore(
         useShallow((state) => ({
@@ -37,7 +47,6 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
         })),
       );
 
-    // Memoize the calculation of ordered models
     const orderedModels = useMemo(() => {
       const enabledModelsMap = new Map<
         string,
@@ -94,52 +103,94 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
       });
 
       return sorted;
-    }, [dbProviderConfigs, globalModelSortOrder]); // Dependencies are stable references or primitives
+    }, [dbProviderConfigs, globalModelSortOrder]);
 
-    // Memoize the details of the currently selected model based on the 'value' prop
+    const filteredModels = useMemo(() => {
+      if (!filterText.trim()) {
+        return orderedModels;
+      }
+      const lowerFilter = filterText.toLowerCase();
+      return orderedModels.filter(
+        (model) =>
+          model.name.toLowerCase().includes(lowerFilter) ||
+          model.providerName.toLowerCase().includes(lowerFilter) ||
+          model.id.toLowerCase().includes(lowerFilter),
+      );
+    }, [orderedModels, filterText]);
+
     const selectedModelDetails = useMemo(() => {
       return orderedModels.find((m) => m.id === value);
-    }, [orderedModels, value]); // Depend on the calculated models and the effective value prop
+    }, [orderedModels, value]);
+
+    const handleSelect = useCallback(
+      (currentValue: string) => {
+        const newValue = currentValue === value ? null : currentValue;
+        onChange(newValue);
+        setOpen(false);
+        setFilterText("");
+      },
+      [onChange, value],
+    );
 
     if (isLoading) {
-      return <Skeleton className={cn("h-9 w-[200px]", className)} />;
+      return <Skeleton className={cn("h-9 w-[250px]", className)} />;
     }
 
     return (
-      <Select
-        value={value ?? "none"} // Use the effective value prop
-        onValueChange={(val) => onChange(val === "none" ? null : val)} // Call the global setter on change
-        disabled={disabled || orderedModels.length === 0}
-      >
-        <SelectTrigger
-          className={cn("w-auto h-9 text-sm", className)}
-          aria-label="Select AI Model"
-        >
-          <SelectValue placeholder="Select Model...">
-            {selectedModelDetails ? (
-              <span className="truncate">
-                {selectedModelDetails.name} ({selectedModelDetails.providerName}
-                )
-              </span>
-            ) : (
-              <span className="text-muted-foreground">Select Model...</span>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            disabled={disabled || orderedModels.length === 0}
+            className={cn(
+              "w-auto justify-between h-9 text-sm font-normal",
+              className,
             )}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {orderedModels.length === 0 ? (
-            <SelectItem value="none" disabled>
-              No models enabled
-            </SelectItem>
-          ) : (
-            orderedModels.map((model) => (
-              <SelectItem key={model.id} value={model.id}>
-                {model.name} ({model.providerName})
-              </SelectItem>
-            ))
-          )}
-        </SelectContent>
-      </Select>
+          >
+            <span className="truncate max-w-[200px] sm:max-w-[300px]">
+              {selectedModelDetails
+                ? `${selectedModelDetails.name} (${selectedModelDetails.providerName})`
+                : "Select Model..."}
+            </span>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0">
+          <Command shouldFilter={false}>
+            {" "}
+            {/* Disable internal filtering */}
+            <CommandInput
+              placeholder="Search model..."
+              value={filterText}
+              onValueChange={setFilterText} // Update local filter state
+            />
+            <CommandList>
+              <CommandEmpty>No model found.</CommandEmpty>
+              <CommandGroup>
+                {filteredModels.map((model) => (
+                  <CommandItem
+                    key={model.id}
+                    value={model.id} // Use combined ID as value
+                    onSelect={handleSelect}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === model.id ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    <span className="truncate">
+                      {model.name} ({model.providerName})
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     );
   });
 GlobalModelSelector.displayName = "GlobalModelSelector";

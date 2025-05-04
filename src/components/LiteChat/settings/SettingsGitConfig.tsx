@@ -1,9 +1,11 @@
 // src/components/LiteChat/settings/SettingsGitConfig.tsx
+
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
+import { SettingsSection } from "../common/SettingsSection";
 
 const SettingsGitConfigComponent: React.FC = () => {
   const { gitUserName, setGitUserName, gitUserEmail, setGitUserEmail } =
@@ -18,13 +20,13 @@ const SettingsGitConfigComponent: React.FC = () => {
 
   return (
     <div className="space-y-6 p-1">
-      <div>
-        <h3 className="text-lg font-medium">Git User Configuration</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          Set your user name and email for Git commits made within the VFS. This
-          is required for committing changes.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg border p-4 shadow-sm bg-card">
+      {/* Use SettingsSection */}
+      <SettingsSection
+        title="Git User Configuration"
+        description="Set your user name and email for Git commits made within the VFS. This is required for committing changes."
+        contentClassName="rounded-lg border p-4 shadow-sm bg-card" // Apply card styling to content
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="git-user-name">Git User Name</Label>
             <Input
@@ -45,7 +47,7 @@ const SettingsGitConfigComponent: React.FC = () => {
             />
           </div>
         </div>
-      </div>
+      </SettingsSection>
     </div>
   );
 };

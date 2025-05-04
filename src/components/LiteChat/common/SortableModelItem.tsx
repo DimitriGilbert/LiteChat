@@ -1,4 +1,4 @@
-// src/components/LiteChat/settings/SortableModelItem.tsx
+// src/components/LiteChat/common/SortableModelItem.tsx
 import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -37,25 +37,25 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes} // Apply attributes to the main div
-      {...listeners} // Apply listeners to the main div
+      {...attributes}
+      {...listeners}
       className={cn(
-        "flex items-center space-x-2 p-2 rounded border border-transparent bg-muted/50 hover:bg-muted mb-1", // Adjusted padding/bg
-        isDragging && "shadow-lg border-primary bg-card", // Style when dragging
-        !disabled && "cursor-grab active:cursor-grabbing", // Cursor styles
+        "flex items-center space-x-2 p-2 rounded border border-transparent bg-muted/50 hover:bg-muted mb-1",
+        isDragging && "shadow-lg border-primary bg-card",
+        !disabled && "cursor-grab active:cursor-grabbing",
         disabled && "cursor-not-allowed opacity-50",
       )}
       aria-label={`Drag to reorder model ${name}`}
     >
       <GripVerticalIcon
         className={cn(
-          "h-5 w-5 text-muted-foreground flex-shrink-0", // Slightly larger icon
+          "h-5 w-5 text-muted-foreground flex-shrink-0",
           !disabled && "hover:text-foreground",
         )}
       />
       <Label
         className={cn(
-          "text-sm font-normal text-foreground flex-grow truncate pointer-events-none", // Prevent label interfering with drag
+          "text-sm font-normal text-foreground flex-grow truncate pointer-events-none",
         )}
       >
         {name || id}

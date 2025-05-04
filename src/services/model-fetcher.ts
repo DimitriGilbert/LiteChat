@@ -1,35 +1,137 @@
 // src/services/model-fetcher.ts
-import type { DbProviderConfig } from "@/types/litechat/provider"; // Corrected path
-import { toast } from "sonner";
-import { ensureV1Path } from "@/lib/litechat/provider-helpers"; // Corrected path
 
-// Define the structure for fetched model information including metadata
-interface FetchedModel {
-  id: string;
-  name: string;
-  metadata?: Record<string, any>; // Add optional metadata field
-}
+import type {
+  DbProviderConfig,
+  OpenRouterModel,
+} from "@/types/litechat/provider";
+import { toast } from "sonner";
+import {
+  ensureV1Path,
+  DEFAULT_SUPPORTED_PARAMS,
+} from "@/lib/litechat/provider-helpers";
+
+// Use OpenRouterModel as the return type
+type FetchedModel = OpenRouterModel;
 
 // Simple in-memory cache for fetched models
 const fetchCache = new Map<string, Promise<FetchedModel[]>>();
-const CACHE_DURATION_MS = 5 * 60 * 1000; // Cache for 5 minutes
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+
+// --- Helper to Map Fetched Data to OpenRouterModel ---
+const mapToOpenRouterModel = (
+  fetchedData: any,
+  providerType: DbProviderConfig["type"],
+): OpenRouterModel => {
+  const modelId = fetchedData.id || fetchedData.name; // Ollama uses 'name' as ID
+  const modelName = fetchedData.name || modelId;
+
+  // Basic structure
+  const model: OpenRouterModel = {
+    id: modelId,
+    name: modelName,
+    created: fetchedData.created ?? null,
+    description: fetchedData.description ?? null,
+    context_length: fetchedData.context_length ?? null,
+    architecture: {
+      modality: fetchedData.architecture?.modality ?? "text->text",
+      input_modalities: fetchedData.architecture?.input_modalities ?? ["text"],
+      output_modalities: fetchedData.architecture?.output_modalities ?? [
+        "text",
+      ],
+      tokenizer: fetchedData.architecture?.tokenizer ?? "Unknown",
+      instruct_type: fetchedData.architecture?.instruct_type ?? null,
+    },
+    pricing: {
+      prompt: fetchedData.pricing?.prompt ?? "0",
+      completion: fetchedData.pricing?.completion ?? "0",
+      request: fetchedData.pricing?.request ?? "0",
+      image: fetchedData.pricing?.image ?? "0",
+      web_search: fetchedData.pricing?.web_search ?? "0",
+      internal_reasoning: fetchedData.pricing?.internal_reasoning ?? "0",
+    },
+    top_provider: {
+      context_length:
+        fetchedData.top_provider?.context_length ??
+        fetchedData.context_length ??
+        null,
+      max_completion_tokens:
+        fetchedData.top_provider?.max_completion_tokens ?? null,
+      is_moderated: fetchedData.top_provider?.is_moderated ?? false,
+    },
+    per_request_limits: fetchedData.per_request_limits ?? null,
+    supported_parameters:
+      fetchedData.supported_parameters ??
+      DEFAULT_SUPPORTED_PARAMS[providerType] ??
+      [],
+  };
+
+  // Specific overrides or defaults based on provider type if needed
+  if (providerType === "ollama") {
+    // Ollama doesn't provide context length via /api/tags easily, might need /api/show
+    // For now, leave it null or set a common default if known (e.g., 4096 for older models)
+    model.context_length = model.context_length ?? 4096; // Example default
+    // Fix: Add null check before accessing properties
+    if (model.top_provider) {
+      model.top_provider.context_length = model.context_length;
+    }
+    if (model.architecture) {
+      model.architecture.tokenizer = "Ollama";
+    }
+  } else if (providerType === "openai") {
+    // OpenAI context lengths (approximate, may change)
+    if (modelId.includes("gpt-4")) model.context_length = 8192;
+    if (modelId.includes("gpt-4-32k")) model.context_length = 32768;
+    if (modelId.includes("gpt-4-turbo")) model.context_length = 128000;
+    if (modelId.includes("gpt-4o")) model.context_length = 128000;
+    if (modelId.includes("gpt-3.5-turbo")) model.context_length = 16385; // Often 16k variant
+    // Fix: Add null check before accessing properties
+    if (model.top_provider) {
+      model.top_provider.context_length = model.context_length;
+    }
+    if (model.architecture) {
+      model.architecture.tokenizer = "OpenAI";
+    }
+  } else if (providerType === "google") {
+    // Google context lengths (approximate)
+    if (modelId.includes("gemini-1.5"))
+      model.context_length = 1048576; // 1M
+    else if (modelId.includes("gemini")) model.context_length = 32768; // Older Gemini
+    // Fix: Add null check before accessing properties
+    if (model.top_provider) {
+      model.top_provider.context_length = model.context_length;
+    }
+    if (model.architecture) {
+      model.architecture.tokenizer = "Google";
+    }
+  } else if (providerType === "openai-compatible") {
+    model.context_length = model.context_length ?? 4096; // Default guess
+    // Fix: Add null check before accessing properties
+    if (model.top_provider) {
+      model.top_provider.context_length = model.context_length;
+    }
+    if (model.architecture) {
+      model.architecture.tokenizer = "Compatible";
+    }
+  }
+
+  return model;
+};
 
 /**
  * Fetches the list of available models for a given provider configuration.
  * Uses a simple time-based cache to avoid redundant requests.
+ * Maps fetched data to the OpenRouterModel structure.
  * @param config The database configuration for the provider.
  * @param apiKey The API key value, if required and available.
- * @returns A promise resolving to an array of FetchedModel objects.
+ * @returns A promise resolving to an array of OpenRouterModel objects.
  */
 export async function fetchModelsForProvider(
   config: DbProviderConfig,
   apiKey: string | undefined,
 ): Promise<FetchedModel[]> {
-  // Generate a cache key based on provider ID and base URL (if applicable)
   const cacheKey = `${config.id}-${config.baseURL || ""}`;
   const cachedPromise = fetchCache.get(cacheKey);
 
-  // Return cached promise if available
   if (cachedPromise) {
     console.log(
       `[ModelFetcher] Using cache for provider ${config.name} (ID: ${config.id})`,
@@ -37,67 +139,52 @@ export async function fetchModelsForProvider(
     return cachedPromise;
   }
 
-  // Create the actual fetch promise
   const fetchPromise = (async (): Promise<FetchedModel[]> => {
     let url: string;
     const headers: Record<string, string> = {
       Accept: "application/json",
     };
 
-    // Add Authorization header if API key is provided and required/useful
     if (apiKey) {
       headers["Authorization"] = `Bearer ${apiKey}`;
     }
 
-    // Determine the correct API endpoint URL based on provider type
     try {
       switch (config.type) {
-        case "openai": {
+        case "openai":
           if (!apiKey) throw new Error("API Key required for OpenAI");
           url = "https://api.openai.com/v1/models";
           break;
-        }
-        case "openrouter": {
+        case "openrouter":
           if (!apiKey) throw new Error("API Key required for OpenRouter");
           url = "https://openrouter.ai/api/v1/models";
-          // Add OpenRouter specific headers
           headers["HTTP-Referer"] =
-            globalThis.location?.origin || "http://localhost:3000"; // Use a reasonable fallback
-          headers["X-Title"] = "LiteChat"; // Optional: Identify your app
+            globalThis.location?.origin || "http://localhost:3000";
+          headers["X-Title"] = "LiteChat";
           break;
-        }
-        case "ollama": {
-          // Use default localhost if baseURL is not provided or empty
+        case "ollama":
           const ollamaBase =
             config.baseURL?.replace(/\/$/, "") || "http://localhost:11434";
           url = new URL("/api/tags", ollamaBase).toString();
-          // No Authorization header typically needed for local Ollama
           delete headers["Authorization"];
           break;
-        }
-        case "openai-compatible": {
+        case "openai-compatible":
           if (!config.baseURL)
             throw new Error("Base URL required for OpenAI-Compatible");
-          // Ensure the base URL includes the /v1 path expected by many compatible APIs
           const baseUrlWithV1 = ensureV1Path(config.baseURL);
-          // Ensure the base path has a trailing slash for correct relative resolution.
           url = new URL(
             "models",
             baseUrlWithV1.endsWith("/") ? baseUrlWithV1 : baseUrlWithV1 + "/",
           ).toString();
-          // Keep Authorization header if apiKey was provided, as many compatible APIs use it
           break;
-        }
-        case "google": // Google Gemini models are often hardcoded or managed differently
-        default: {
+        case "google":
+        default:
           console.log(
             `[ModelFetcher] Model fetching not supported via API for type: ${config.type}. Returning empty list.`,
           );
-          return []; // Return empty array for unsupported types
-        }
+          return [];
       }
     } catch (urlError) {
-      // Handle errors during URL construction (e.g., invalid baseURL)
       console.error(
         `[ModelFetcher] Error constructing URL for ${config.name}:`,
         urlError,
@@ -105,7 +192,7 @@ export async function fetchModelsForProvider(
       toast.error(
         `Invalid Base URL for ${config.name}: ${urlError instanceof Error ? urlError.message : String(urlError)}`,
       );
-      return []; // Return empty array on URL error
+      return [];
     }
 
     console.log(
@@ -113,100 +200,55 @@ export async function fetchModelsForProvider(
     );
 
     try {
-      // Perform the fetch request
       const response = await fetch(url, { headers });
 
-      // Handle non-OK responses
       if (!response.ok) {
         let errorBody = `(${response.status} ${response.statusText})`;
         try {
           const textBody = await response.text();
+          errorBody = textBody || errorBody; // Keep raw text if JSON parse fails
           try {
             const jsonBody = JSON.parse(textBody);
             errorBody =
-              jsonBody?.error?.message || // OpenAI style
-              jsonBody?.message || // General style
-              textBody ||
-              errorBody;
+              jsonBody?.error?.message || jsonBody?.message || errorBody;
           } catch {
-            errorBody = textBody || errorBody;
+            /* ignore json parse error, use textBody */
           }
         } catch (e) {
           console.warn("[ModelFetcher] Failed to read error response body:", e);
         }
-        // Throw an error with the detailed message
         throw new Error(`API Error: ${errorBody}`);
       }
 
-      // Parse the successful JSON response
       const data = await response.json();
+      let rawModels: any[] = [];
 
-      // Extract model data based on expected response structure for each provider type
-      let models: FetchedModel[] = [];
       if (config.type === "ollama") {
-        // Ollama returns { models: [{ name: ..., details: {...} }, ...] }
-        if (data.models && Array.isArray(data.models)) {
-          models = data.models.map((m: any) => ({
-            id: m.name, // Ollama uses 'name' as the ID
-            name: m.name, // Use 'name' for display as well
-            metadata: m.details ?? {}, // Store details object as metadata
-          }));
-        } else {
-          console.warn(
-            `[ModelFetcher] Unexpected response structure from Ollama for ${config.name}:`,
-            data,
-          );
-        }
-      } else if (config.type === "openrouter") {
-        // OpenRouter returns { data: [{ id: ..., name: ..., ... }, ...] }
-        const modelList = data.data || data;
-        if (Array.isArray(modelList)) {
-          models = modelList.map((m: any) => {
-            // Extract known metadata fields, put others in metadata object
-            const { id, name, ...rest } = m;
-            return {
-              id: id,
-              name: name || id,
-              metadata: rest, // Store all other fields in metadata
-            };
-          });
-        } else {
-          console.warn(
-            `[ModelFetcher] Unexpected response structure for ${config.name} (Type: ${config.type}):`,
-            data,
-          );
-        }
+        rawModels = data.models || [];
       } else {
-        // OpenAI, OpenAI-Compatible often return { data: [{ id: ..., ... }, ...] }
-        // Or sometimes just the array [{ id: ..., ... }]
-        const modelList = data.data || data; // Handle both structures
-        if (Array.isArray(modelList)) {
-          models = modelList.map((m: any) => {
-            // Extract known metadata fields, put others in metadata object
-            const { id, name, ...rest } = m;
-            return {
-              id: id,
-              name: name || id, // Use 'name' if available, otherwise 'id'
-              metadata: rest, // Store other fields in metadata
-            };
-          });
-        } else {
-          console.warn(
-            `[ModelFetcher] Unexpected response structure for ${config.name} (Type: ${config.type}):`,
-            data,
-          );
-        }
+        rawModels = data.data || data || []; // Handle {data: []} or just []
       }
 
-      // Sort models alphabetically by name (or ID if name is missing)
+      if (!Array.isArray(rawModels)) {
+        console.warn(
+          `[ModelFetcher] Unexpected non-array response for ${config.name}:`,
+          data,
+        );
+        return [];
+      }
+
+      // Map raw data to OpenRouterModel structure
+      const models: FetchedModel[] = rawModels.map((m) =>
+        mapToOpenRouterModel(m, config.type),
+      );
+
       models.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
 
       console.log(
-        `[ModelFetcher] Fetched ${models.length} models for ${config.name}`,
+        `[ModelFetcher] Fetched and mapped ${models.length} models for ${config.name}`,
       );
       return models;
     } catch (error) {
-      // Handle fetch errors (network issues, parsing errors, API errors thrown above)
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       console.error(
@@ -214,19 +256,13 @@ export async function fetchModelsForProvider(
         errorMessage,
       );
       toast.error(`Failed to fetch models for ${config.name}: ${errorMessage}`);
-      // Remove the failed promise from the cache so retry is possible
       fetchCache.delete(cacheKey);
-      // Return empty list on failure to allow the application to continue
       return [];
-      // Optionally re-throw if the caller needs to handle the error specifically
-      // throw error;
     }
   })();
 
-  // Store the promise in the cache
   fetchCache.set(cacheKey, fetchPromise);
 
-  // Set a timer to clear the cache entry after the duration
   setTimeout(() => {
     if (fetchCache.get(cacheKey) === fetchPromise) {
       fetchCache.delete(cacheKey);
@@ -236,6 +272,5 @@ export async function fetchModelsForProvider(
     }
   }, CACHE_DURATION_MS);
 
-  // Return the promise (either new or cached)
   return fetchPromise;
 }

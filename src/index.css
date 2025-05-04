@@ -246,28 +246,27 @@
 
     /* --- THEMED CODEBLOCK STYLING (Container/Header) --- */
     .code-block-container {
-        @apply relative my-4 overflow-hidden border border-border rounded-lg;
+        @apply relative my-4 border border-border rounded-lg;
     }
 
     /* Header styling */
     .code-block-header {
-        @apply flex items-center justify-between px-4 py-2
-      border-b border-border;
-        background-color: hsl(var(--card));
+        @apply flex items-center justify-between px-3 py-2 
+      border-b border-border bg-muted/50;
     }
 
     /* Code block content - minimal styling to not override external themes */
     .code-block-content {
-        @apply overflow-x-auto text-sm m-0;
+        @apply text-sm m-0 overflow-x-auto;
     }
 
-    /* .code-block-content code {
-        @apply p-4 block font-mono;
-        background-color: transparent;
-    } */
+    /* Ensure code tag within pre takes up space */
+    .code-block-content code {
+        @apply block p-4;
+    }
 
     .folded-content-preview {
-        @apply cursor-pointer text-muted-foreground italic text-xs max-h-20 overflow-hidden relative;
+        @apply cursor-pointer text-muted-foreground italic text-xs max-h-20 overflow-hidden relative w-full;
     }
     .folded-content-preview::after {
         content: "";

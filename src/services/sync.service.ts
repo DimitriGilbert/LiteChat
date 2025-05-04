@@ -1,5 +1,5 @@
 // src/services/sync.service.ts
-// Entire file content provided - Contains the actual sync logic
+// FULL FILE
 import type { Conversation } from "@/types/litechat/chat";
 import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
 import type { Interaction } from "@/types/litechat/interaction";
@@ -20,7 +20,7 @@ const SYNC_REPO_BASE_DIR = "/synced_repos";
  * @param setRepoStatus Function to update the initialization status in the store.
  */
 export async function initializeOrSyncRepoLogic(
-  fsInstance: typeof FsType,
+  fsInstance: typeof FsType, // Accept fsInstance
   repo: SyncRepo,
   setRepoStatus: (repoId: string, status: SyncStatus) => void,
 ): Promise<void> {
@@ -32,6 +32,7 @@ export async function initializeOrSyncRepoLogic(
   try {
     let isRepoCloned = false;
     try {
+      // Use the passed fsInstance
       await fsInstance.promises.stat(joinPath(repoDir, ".git"));
       isRepoCloned = true;
     } catch (e: any) {
@@ -44,17 +45,22 @@ export async function initializeOrSyncRepoLogic(
 
     if (!isRepoCloned) {
       toast.info(`Cloning repository "${repo.name}"...`);
+      // Pass the fsInstance
       await VfsOps.gitCloneOp(
         repoDir,
         repo.remoteUrl,
         branchToUse,
         credentials,
+        { fsInstance },
       );
       toast.success(`Repository "${repo.name}" cloned successfully.`);
       setRepoStatus(repo.id, "idle");
     } else {
       toast.info(`Pulling latest changes for "${repo.name}"...`);
-      await VfsOps.gitPullOp(repoDir, branchToUse, credentials);
+      // Pass the fsInstance
+      await VfsOps.gitPullOp(repoDir, branchToUse, credentials, {
+        fsInstance,
+      });
       toast.success(`Repository "${repo.name}" synced successfully.`);
       setRepoStatus(repo.id, "idle");
     }
@@ -76,7 +82,7 @@ export async function initializeOrSyncRepoLogic(
  * @param getSelectedItemType Function to get the currently selected item type.
  */
 export async function syncConversationLogic(
-  fsInstance: typeof FsType,
+  fsInstance: typeof FsType, // Accept fsInstance
   conversation: Conversation,
   repo: SyncRepo,
   setConversationStatus: (
@@ -103,6 +109,7 @@ export async function syncConversationLogic(
 
   try {
     try {
+      // Use the passed fsInstance
       await fsInstance.promises.stat(joinPath(repoDir, ".git"));
     } catch (e: any) {
       if (e.code === "ENOENT") {
@@ -116,7 +123,8 @@ export async function syncConversationLogic(
     }
 
     toast.info(`Pulling latest changes for "${repo.name}"...`);
-    await VfsOps.gitPullOp(repoDir, branchToUse, credentials);
+    // Pass the fsInstance
+    await VfsOps.gitPullOp(repoDir, branchToUse, credentials, { fsInstance });
 
     let remoteConvoData: {
       conversation: Conversation;
@@ -124,7 +132,10 @@ export async function syncConversationLogic(
     } | null = null;
     let remoteTimestamp: number | null = null;
     try {
-      const fileContent = await VfsOps.readFileOp(convoFilePath);
+      // Pass the fsInstance
+      const fileContent = await VfsOps.readFileOp(convoFilePath, {
+        fsInstance,
+      });
       const jsonString = new TextDecoder().decode(fileContent);
       remoteConvoData = JSON.parse(jsonString);
       remoteTimestamp = remoteConvoData?.conversation?.updatedAt
@@ -167,12 +178,18 @@ export async function syncConversationLogic(
         null,
         2,
       );
-      await VfsOps.writeFileOp(convoFilePath, localData);
+      // Pass the fsInstance
+      await VfsOps.writeFileOp(convoFilePath, localData, { fsInstance });
+      // Pass the fsInstance
       await VfsOps.gitCommitOp(
         repoDir,
         `Sync conversation: ${conversation.title} (${conversation.id})`,
+        { fsInstance },
       );
-      await VfsOps.gitPushOp(repoDir, branchToUse, credentials);
+      // Pass the fsInstance
+      await VfsOps.gitPushOp(repoDir, branchToUse, credentials, {
+        fsInstance,
+      });
       await updateConversation(conversation.id, { lastSyncedAt: new Date() });
       setConversationStatus(conversation.id, "idle");
       toast.success("Conversation synced successfully (pushed).");

@@ -1,13 +1,22 @@
 // src/components/LiteChat/canvas/ChatCanvas.tsx
-// Entire file content provided
-import React, { useMemo, useRef, useEffect } from "react";
+
+import React, { useMemo, useRef, useEffect, useState } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
+// Updated import path for InteractionCard
 import { InteractionCard } from "./InteractionCard";
 import { StreamingInteractionCard } from "./StreamingInteractionCard";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useInteractionStore } from "@/store/interaction.store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { ArrowDownIcon } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export interface ChatCanvasProps {
   conversationId: string | null;
@@ -15,7 +24,7 @@ export interface ChatCanvasProps {
   status: "idle" | "loading" | "streaming" | "error";
   className?: string;
   onRegenerateInteraction?: (interactionId: string) => void;
-  onEditInteraction?: (interactionId: string) => void; // Add onEdit prop
+  onEditInteraction?: (interactionId: string) => void;
   onStopInteraction?: (interactionId: string) => void;
 }
 
@@ -25,73 +34,80 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   status,
   className,
   onRegenerateInteraction,
-  onEditInteraction, // Receive onEdit prop
+  onEditInteraction,
   onStopInteraction,
 }) => {
-  // Ref for the ScrollArea component itself
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+
   const streamingInteractionIds = useInteractionStore(
     (state) => state.streamingInteractionIds,
   );
 
-  // Group interactions by their parentId or index for potential future grouping logic
-  // For now, we'll treat each interaction as its own group for simplicity
   const interactionGroups = useMemo(() => {
     const groups: Interaction[][] = [];
-    // const interactionMap = new Map(interactions.map((i) => [i.id, i]));
     const processedIds = new Set<string>();
-
-    // Create a shallow copy of the interactions array before sorting
     const sortedInteractions = [...interactions].sort(
       (a, b) => a.index - b.index,
     );
-
     sortedInteractions.forEach((interaction) => {
       if (processedIds.has(interaction.id)) return;
-
-      // Simple grouping: each interaction is its own group for now
       const group = [interaction];
       processedIds.add(interaction.id);
       groups.push(group);
-
-      // Example of potential future grouping logic (e.g., by parentId for revisions)
-      // let current = interaction;
-      // const group = [current];
-      // processedIds.add(current.id);
-      // while (current.parentId && interactionMap.has(current.parentId) && !processedIds.has(current.parentId)) {
-      //     const parent = interactionMap.get(current.parentId)!;
-      //     group.unshift(parent); // Add parent to the beginning
-      //     processedIds.add(parent.id);
-      //     current = parent;
-      // }
-      // groups.push(group);
     });
     return groups;
   }, [interactions]);
 
-  // Scroll to bottom effect
-  useEffect(() => {
-    // Find the viewport element within the ScrollArea ref
-    const viewportElement = scrollAreaRef.current?.querySelector(
-      "[data-radix-scroll-area-viewport]",
-    );
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    if (viewportRef.current) {
+      viewportRef.current.scrollTo({
+        top: viewportRef.current.scrollHeight,
+        behavior: behavior,
+      });
+    }
+  };
 
-    if (viewportElement) {
-      // Scroll down only if not already near the bottom (e.g., user scrolled up)
-      // or if a new streaming interaction started
-      const { scrollHeight, clientHeight, scrollTop } = viewportElement;
-      const isAtBottom = scrollHeight - clientHeight <= scrollTop + 100; // Threshold
+  useEffect(() => {
+    if (viewportRef.current) {
+      const { scrollHeight, clientHeight, scrollTop } = viewportRef.current;
+      const isAtBottom = scrollHeight - clientHeight <= scrollTop + 150;
       const isStreamingJustStarted =
         status === "streaming" && streamingInteractionIds.length > 0;
 
       if (isAtBottom || isStreamingJustStarted) {
-        viewportElement.scrollTo({
-          top: scrollHeight,
-          behavior: "smooth",
-        });
+        scrollToBottom(isStreamingJustStarted ? "smooth" : "auto");
       }
     }
-  }, [interactions, status, streamingInteractionIds]); // Depend on interactions and status
+  }, [interactions, status, streamingInteractionIds]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const handleScroll = () => {
+      const { scrollHeight, clientHeight, scrollTop } = viewport;
+      const shouldShow =
+        scrollTop < scrollHeight - clientHeight - clientHeight * 0.5;
+      setShowJumpToBottom(shouldShow);
+    };
+
+    viewport.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      viewport.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      viewportRef.current = scrollAreaRef.current.querySelector(
+        "[data-radix-scroll-area-viewport]",
+      );
+    }
+  }, []);
 
   const renderContent = () => {
     if (status === "loading") {
@@ -125,8 +141,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     return (
       <div className="space-y-4 p-4">
         {interactionGroups.map((group) => {
-          // For now, render each interaction individually
-          const interaction = group[0]; // Get the single interaction from the group
+          const interaction = group[0];
           const isStreaming = streamingInteractionIds.includes(interaction.id);
 
           if (isStreaming) {
@@ -142,19 +157,13 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
               <InteractionCard
                 key={interaction.id}
                 interaction={interaction}
-                // Pass onEdit prop down
                 onEdit={onEditInteraction}
                 onRegenerate={onRegenerateInteraction}
-                onDelete={
-                  interaction.type === "message.user_assistant"
-                    ? useInteractionStore.getState().deleteInteraction
-                    : undefined
-                }
+                onDelete={undefined} // Delete is handled internally now
               />
             );
           }
         })}
-        {/* Render placeholder for newly started streaming interactions not yet in the main list */}
         {status === "streaming" &&
           streamingInteractionIds
             .filter((id) => !interactions.some((i) => i.id === id))
@@ -170,9 +179,28 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   };
 
   return (
-    // Pass the ref to the ScrollArea component itself
-    <ScrollArea className={cn("flex-grow", className)} ref={scrollAreaRef}>
-      {renderContent()}
-    </ScrollArea>
+    <div className={cn("flex-grow relative", className)}>
+      <ScrollArea className="h-full w-full" ref={scrollAreaRef}>
+        {renderContent()}
+      </ScrollArea>
+      {showJumpToBottom && (
+        <TooltipProvider delayDuration={100}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="absolute bottom-4 right-4 z-20 h-8 w-8 rounded-full shadow-md bg-background/80 backdrop-blur-sm hover:bg-muted"
+                onClick={() => scrollToBottom()}
+                aria-label="Scroll to bottom"
+              >
+                <ArrowDownIcon className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">Scroll to Bottom</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </div>
   );
 };

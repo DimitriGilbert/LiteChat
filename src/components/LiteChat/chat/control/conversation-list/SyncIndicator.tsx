@@ -6,7 +6,7 @@ import {
   Loader2,
   AlertCircleIcon,
   CheckCircle2Icon,
-  AlertTriangleIcon, // Import warning icon
+  AlertTriangleIcon
 } from "lucide-react";
 import {
   Tooltip,
@@ -37,7 +37,7 @@ export const getSyncIndicator = (
       tooltipText = `Sync error with ${repoName}`;
       break;
     case "needs-sync":
-      IconComponent = AlertTriangleIcon; // Use warning icon for needs-sync
+      IconComponent = AlertTriangleIcon
       className = "text-orange-500";
       tooltipText = `Needs sync with ${repoName}`;
       break;

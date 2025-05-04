@@ -1,8 +1,8 @@
 // src/components/LiteChat/settings/SettingsProviderRowView.tsx
-import React, { useMemo, useCallback } from "react"; // Added useCallback
+
+import React, { useMemo, useCallback, useState } from "react";
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import { Button } from "@/components/ui/button";
-// ScrollArea removed
 import {
   Edit2Icon,
   Trash2Icon,
@@ -10,6 +10,8 @@ import {
   RefreshCwIcon,
   CheckIcon,
   AlertCircleIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from "lucide-react";
 import {
   Tooltip,
@@ -21,11 +23,13 @@ import {
   requiresApiKey,
   requiresBaseURL,
   supportsModelFetching,
+  combineModelId, // Import combineModelId
 } from "@/lib/litechat/provider-helpers";
 import { cn } from "@/lib/utils";
 import { useProviderStore } from "@/store/provider.store";
-import { ModelEnablementList } from "./ModelEnablementList"; // Import the new component
-import { toast } from "sonner"; // Import toast
+import { ModelEnablementList } from "./ModelEnablementList";
+import { toast } from "sonner";
+import { ActionTooltipButton } from "../common/ActionTooltipButton";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 
@@ -35,9 +39,11 @@ interface ProviderRowViewModeProps {
   onEdit: () => void;
   onDelete: () => Promise<void>;
   onFetchModels: () => Promise<void>;
-  onUpdate: (id: string, changes: Partial<DbProviderConfig>) => Promise<void>; // Add onUpdate prop
+  onUpdate: (id: string, changes: Partial<DbProviderConfig>) => Promise<void>;
   fetchStatus: FetchStatus;
   isDeleting: boolean;
+  // Add callback prop
+  onSelectModelForDetails: (combinedModelId: string | null) => void;
 }
 
 const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
@@ -46,10 +52,13 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   onEdit,
   onDelete,
   onFetchModels,
-  onUpdate, // Receive onUpdate
+  onUpdate,
   fetchStatus,
   isDeleting,
+  onSelectModelForDetails, // Receive callback
 }) => {
+  const [isModelListFolded, setIsModelListFolded] = useState(true);
+
   const needsKey = requiresApiKey(provider.type);
   const needsURL = requiresBaseURL(provider.type);
   const canFetch = supportsModelFetching(provider.type);
@@ -60,6 +69,7 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   const getAllAvailableModelDefsForProvider = useProviderStore(
     (state) => state.getAllAvailableModelDefsForProvider,
   );
+  // Get full model defs here for display/linking
   const allAvailableModels = getAllAvailableModelDefsForProvider(provider.id);
   const enabledModelsSet = useMemo(
     () => new Set(provider.enabledModels ?? []),
@@ -71,7 +81,6 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
     : false;
   const showKeyWarning = needsKey && !apiKeyLinked;
 
-  // Handler for immediate model enable/disable save in View mode
   const handleModelToggle = useCallback(
     async (modelId: string, checked: boolean) => {
       const currentEnabledSet = new Set(provider.enabledModels ?? []);
@@ -84,7 +93,6 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
 
       try {
         await onUpdate(provider.id, { enabledModels: newEnabledModels });
-        // Optional: toast.success(`Model ${checked ? 'enabled' : 'disabled'}`);
       } catch (error) {
         toast.error("Failed to update model status.");
         console.error("Failed to save model toggle:", error);
@@ -92,6 +100,19 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
     },
     [provider.enabledModels, provider.id, onUpdate],
   );
+
+  const toggleFold = () => setIsModelListFolded((prev) => !prev);
+
+  const enabledCount = provider.enabledModels?.length ?? 0;
+  const availableCount = allAvailableModels.length;
+
+  // Handler for clicking a model name
+  const handleModelClick = (modelId: string) => {
+    const combinedId = combineModelId(provider.id, modelId);
+    onSelectModelForDetails(combinedId);
+    // Optionally switch to the details tab (needs communication back up)
+    // This might be better handled in the parent component (SettingsProviders)
+  };
 
   return (
     <div className="space-y-4">
@@ -141,44 +162,28 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
           )}
         </div>
         <div className="flex items-center space-x-1 flex-shrink-0">
-          <TooltipProvider delayDuration={100}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onEdit}
-                  disabled={isEditButtonDisabled}
-                  aria-label="Edit provider"
-                  className="h-8 w-8"
-                >
-                  <Edit2Icon className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Edit</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TooltipProvider delayDuration={100}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onDelete}
-                  disabled={isDeleteButtonDisabled}
-                  className="text-destructive hover:text-destructive/80 h-8 w-8"
-                  aria-label="Delete provider"
-                >
-                  {isDeleting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2Icon className="h-4 w-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Delete</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <ActionTooltipButton
+            tooltipText="Edit"
+            onClick={onEdit}
+            disabled={isEditButtonDisabled}
+            aria-label="Edit provider"
+            icon={<Edit2Icon />}
+            className="h-8 w-8"
+          />
+          <ActionTooltipButton
+            tooltipText="Delete"
+            onClick={onDelete}
+            disabled={isDeleteButtonDisabled}
+            className="text-destructive hover:text-destructive/80 h-8 w-8"
+            aria-label="Delete provider"
+            icon={
+              isDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2Icon />
+              )
+            }
+          />
         </div>
       </div>
 
@@ -219,7 +224,6 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
             </span>
           )}
         </div>
-        {/* Fetch Models Button */}
         {canFetch && (
           <div className="pt-1">
             <Button
@@ -251,20 +255,39 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
         )}
       </div>
 
-      {/* Model Enablement List */}
-      <div className="space-y-1">
-        <span className="font-medium text-card-foreground text-sm">
-          Model Enablement (Saves Immediately):
-        </span>
-        <ModelEnablementList
-          providerId={provider.id}
-          allAvailableModels={allAvailableModels}
-          enabledModelIds={enabledModelsSet}
-          onToggleModel={handleModelToggle} // Use immediate save handler
-          isLoading={fetchStatus === "fetching"} // Show loading skeleton during fetch
-          disabled={isDeleting} // Disable switches if deleting provider
-          listHeightClass="h-64" // Adjust height for view mode
-        />
+      {/* Model Enablement Section */}
+      <div className="space-y-1 pt-2">
+        <div className="flex items-center justify-between">
+          <span className="font-medium text-card-foreground text-sm">
+            Model Enablement ({enabledCount} / {availableCount} enabled)
+          </span>
+          <ActionTooltipButton
+            tooltipText={isModelListFolded ? "Show Models" : "Hide Models"}
+            onClick={toggleFold}
+            aria-label={
+              isModelListFolded ? "Show model list" : "Hide model list"
+            }
+            icon={isModelListFolded ? <ChevronDownIcon /> : <ChevronUpIcon />}
+            className="h-6 w-6"
+          />
+        </div>
+        {!isModelListFolded && (
+          // Pass the model click handler to the list
+          <ModelEnablementList
+            providerId={provider.id}
+            allAvailableModels={allAvailableModels.map((m) => ({
+              id: m.id,
+              name: m.name,
+            }))} // Pass basic info
+            enabledModelIds={enabledModelsSet}
+            onToggleModel={handleModelToggle}
+            isLoading={fetchStatus === "fetching"}
+            disabled={isDeleting}
+            listHeightClass="h-64"
+            // Add the click handler prop
+            onModelClick={handleModelClick}
+          />
+        )}
       </div>
     </div>
   );

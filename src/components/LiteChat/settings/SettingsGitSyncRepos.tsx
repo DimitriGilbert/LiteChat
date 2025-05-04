@@ -1,4 +1,5 @@
 // src/components/LiteChat/settings/SettingsGitSyncRepos.tsx
+
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,24 +19,19 @@ import {
   XIcon,
   Loader2,
   PlusIcon,
-  AlertTriangleIcon, // Import warning icon
-  RefreshCwIcon, // Import refresh icon
-  CheckCircle2Icon, // Import check icon
-  AlertCircleIcon, // Import error icon
+  AlertTriangleIcon,
+  RefreshCwIcon,
+  CheckCircle2Icon,
+  AlertCircleIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { SyncRepo } from "@/types/litechat/sync";
 import { useShallow } from "zustand/react/shallow";
 import { useConversationStore } from "@/store/conversation.store";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Import Alert components
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"; // Import Tooltip
-import { cn } from "@/lib/utils"; // Import cn
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
+import { ActionTooltipButton } from "../common/ActionTooltipButton";
 
 const SettingsGitSyncReposComponent: React.FC = () => {
   const {
@@ -43,8 +39,8 @@ const SettingsGitSyncReposComponent: React.FC = () => {
     addSyncRepo,
     updateSyncRepo,
     deleteSyncRepo,
-    initializeOrSyncRepo, // Get the new action
-    repoInitializationStatus, // Get the repo status
+    initializeOrSyncRepo,
+    repoInitializationStatus,
     isLoading,
   } = useConversationStore(
     useShallow((state) => ({
@@ -52,8 +48,8 @@ const SettingsGitSyncReposComponent: React.FC = () => {
       addSyncRepo: state.addSyncRepo,
       updateSyncRepo: state.updateSyncRepo,
       deleteSyncRepo: state.deleteSyncRepo,
-      initializeOrSyncRepo: state.initializeOrSyncRepo, // Get the new action
-      repoInitializationStatus: state.repoInitializationStatus, // Get the repo status
+      initializeOrSyncRepo: state.initializeOrSyncRepo,
+      repoInitializationStatus: state.repoInitializationStatus,
       isLoading: state.isLoading,
     })),
   );
@@ -65,9 +61,9 @@ const SettingsGitSyncReposComponent: React.FC = () => {
   >({
     name: "",
     remoteUrl: "",
-    branch: "main", // Default branch to main
-    username: "", // Initialize auth fields
-    password: "", // Initialize auth fields
+    branch: "main",
+    username: "",
+    password: "",
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
@@ -76,7 +72,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
     setFormData({
       name: "",
       remoteUrl: "",
-      branch: "main", // Reset branch to main
+      branch: "main",
       username: "",
       password: "",
     });
@@ -102,9 +98,9 @@ const SettingsGitSyncReposComponent: React.FC = () => {
       const dataToSave: Omit<SyncRepo, "id" | "createdAt" | "updatedAt"> = {
         name: formData.name.trim(),
         remoteUrl: formData.remoteUrl.trim(),
-        branch: formData.branch?.trim() || "main", // Ensure default is main
+        branch: formData.branch?.trim() || "main",
         username: formData.username?.trim() || null,
-        password: formData.password || null, // Store password as is (or null)
+        password: formData.password || null,
       };
 
       if (editingId) {
@@ -125,9 +121,9 @@ const SettingsGitSyncReposComponent: React.FC = () => {
     setFormData({
       name: repo.name,
       remoteUrl: repo.remoteUrl,
-      branch: repo.branch || "main", // Ensure branch defaults if null/empty
+      branch: repo.branch || "main",
       username: repo.username ?? "",
-      password: repo.password ?? "", // Populate password for editing (masked)
+      password: repo.password ?? "",
     });
     setIsAdding(false);
   };
@@ -141,7 +137,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
       ) {
         setIsDeleting((prev) => ({ ...prev, [id]: true }));
         try {
-          await deleteSyncRepo(id); // This now handles VFS cleanup
+          await deleteSyncRepo(id);
           if (editingId === id) {
             resetForm();
           }
@@ -155,7 +151,6 @@ const SettingsGitSyncReposComponent: React.FC = () => {
     [deleteSyncRepo, editingId, resetForm],
   );
 
-  // Handler for the new Clone/Sync button
   const handleInitializeOrSync = useCallback(
     async (repoId: string) => {
       await initializeOrSyncRepo(repoId);
@@ -168,7 +163,6 @@ const SettingsGitSyncReposComponent: React.FC = () => {
       <h4 className="font-semibold text-card-foreground">
         {editingId ? "Edit Sync Repository" : "Add New Sync Repository"}
       </h4>
-      {/* Basic Info */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <Label htmlFor="repo-name">Name</Label>
@@ -199,15 +193,14 @@ const SettingsGitSyncReposComponent: React.FC = () => {
           <Label htmlFor="repo-branch">Branch</Label>
           <Input
             id="repo-branch"
-            value={formData.branch || ""} // Display current value or empty
+            value={formData.branch || ""}
             onChange={(e) => handleInputChange("branch", e.target.value)}
-            placeholder="main" // Placeholder indicates default
+            placeholder="main"
             className="mt-1"
             disabled={isSaving}
           />
         </div>
       </div>
-      {/* Authentication */}
       <div className="pt-2">
         <Label className="text-sm font-medium">
           Authentication (Optional - Basic Auth/Token)
@@ -238,7 +231,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
             <Label htmlFor="repo-password">Password / Token</Label>
             <Input
               id="repo-password"
-              type="password" // Mask the input
+              type="password"
               value={formData.password || ""}
               onChange={(e) => handleInputChange("password", e.target.value)}
               placeholder="Password or PAT (Optional)"
@@ -249,7 +242,6 @@ const SettingsGitSyncReposComponent: React.FC = () => {
           </div>
         </div>
       </div>
-      {/* Actions */}
       <div className="flex justify-end space-x-2 pt-2">
         <Button
           variant="ghost"
@@ -355,7 +347,6 @@ const SettingsGitSyncReposComponent: React.FC = () => {
                     );
                     statusTooltip = "Sync Failed";
                   } else {
-                    // Default icon for 'needs-sync' or unknown
                     statusIcon = <RefreshCwIcon className="h-4 w-4 mr-1" />;
                   }
 
@@ -364,7 +355,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
                       key={repo.id}
                       className={cn(
                         isRepoEditing ? "bg-muted/50" : "",
-                        isDisabled && !isRepoEditing ? "opacity-70" : "", // Only dim if not editing
+                        isDisabled && !isRepoEditing ? "opacity-70" : "",
                       )}
                     >
                       <TableCell className="font-medium">{repo.name}</TableCell>
@@ -376,66 +367,37 @@ const SettingsGitSyncReposComponent: React.FC = () => {
                         {hasAuth ? "Configured" : "None"}
                       </TableCell>
                       <TableCell className="text-right space-x-1">
-                        {/* Initialize/Sync Button */}
-                        <TooltipProvider delayDuration={100}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => handleInitializeOrSync(repo.id)}
-                                className="h-8 w-8"
-                                aria-label={`Initialize or Sync repo ${repo.name}`}
-                                disabled={isDisabled}
-                              >
-                                {statusIcon}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              {statusTooltip}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        {/* Edit Button */}
-                        <TooltipProvider delayDuration={100}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEdit(repo)}
-                                className="h-8 w-8"
-                                aria-label={`Edit repo ${repo.name}`}
-                                disabled={isDisabled}
-                              >
-                                <Edit2Icon className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">Edit</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        {/* Delete Button */}
-                        <TooltipProvider delayDuration={100}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDelete(repo.id, repo.name)}
-                                className="text-destructive hover:text-destructive/80 h-8 w-8"
-                                aria-label={`Delete repo ${repo.name}`}
-                                disabled={isDisabled}
-                              >
-                                {isRepoDeleting ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2Icon className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">Delete</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <ActionTooltipButton
+                          tooltipText={statusTooltip}
+                          onClick={() => handleInitializeOrSync(repo.id)}
+                          aria-label={`Initialize or Sync repo ${repo.name}`}
+                          disabled={isDisabled}
+                          icon={statusIcon}
+                          variant="outline"
+                          className="h-8 w-8"
+                        />
+                        <ActionTooltipButton
+                          tooltipText="Edit"
+                          onClick={() => handleEdit(repo)}
+                          aria-label={`Edit repo ${repo.name}`}
+                          disabled={isDisabled}
+                          icon={<Edit2Icon />}
+                          className="h-8 w-8"
+                        />
+                        <ActionTooltipButton
+                          tooltipText="Delete"
+                          onClick={() => handleDelete(repo.id, repo.name)}
+                          aria-label={`Delete repo ${repo.name}`}
+                          disabled={isDisabled}
+                          icon={
+                            isRepoDeleting ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2Icon />
+                            )
+                          }
+                          className="text-destructive hover:text-destructive/80 h-8 w-8"
+                        />
                       </TableCell>
                     </TableRow>
                   );

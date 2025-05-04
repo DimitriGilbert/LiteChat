@@ -30,3 +30,4 @@ src/test/**/*.notest.*
 src.bak.d
 .update_scripts/*
 todo.*.md
+public/versions/

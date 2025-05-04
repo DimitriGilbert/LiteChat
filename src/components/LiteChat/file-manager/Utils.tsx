@@ -6,7 +6,7 @@ import {
   FileVideo,
   FileArchive,
   FileQuestion,
-  Folder as FolderIcon, // Alias Folder type import
+  Folder as FolderIcon,
   LucideProps,
 } from "lucide-react";
 
@@ -35,5 +35,5 @@ export function getFileIcon(
   if (mimeTypeOrType.includes("zip") || mimeTypeOrType.includes("archive")) {
     return <FileArchive {...props} />;
   }
-  return <FileQuestion {...props} />; // Default icon
+  return <FileQuestion {...props} />;
 }

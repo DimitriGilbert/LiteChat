@@ -5,7 +5,7 @@ import type {
   DbMod,
   ModState as ModStoreState,
   ModActions as ModStoreActions,
-} from "@/types/litechat/modding"; // Correct path
+} from "@/types/litechat/modding"
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
@@ -71,7 +71,7 @@ export const useModStore = create(
       set((state) => {
         modIndex = state.dbMods.findIndex((m) => m.id === id);
         if (modIndex !== -1) {
-          originalMod = { ...state.dbMods[modIndex] }; // Store original for potential revert
+          originalMod = { ...state.dbMods[modIndex] }
           // Directly update the mod in the state array
           state.dbMods[modIndex] = { ...state.dbMods[modIndex], ...changes };
           if (changes.loadOrder !== undefined) {
@@ -98,13 +98,13 @@ export const useModStore = create(
           set((state) => {
             const revertIndex = state.dbMods.findIndex((m) => m.id === id);
             if (revertIndex !== -1 && originalMod) {
-              state.dbMods[revertIndex] = originalMod; // Revert state
+              state.dbMods[revertIndex] = originalMod
               state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
             }
             state.error = errorMsg;
           });
           toast.error(errorMsg);
-          throw e; // Re-throw the error after handling state revert
+          throw e
         }
       }
     },

@@ -1,5 +1,5 @@
 // src/components/LiteChat/project-settings/ProjectSettingsParams.tsx
-// Entire file content provided due to multiple changes
+
 import React, { useCallback } from "react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";

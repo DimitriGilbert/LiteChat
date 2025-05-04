@@ -1,8 +1,9 @@
 // src/store/settings.store.ts
+
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { PersistenceService } from "@/services/persistence.service";
-import { toast } from "sonner"; // Import toast for feedback
+import { toast } from "sonner";
 
 interface SettingsState {
   theme: "light" | "dark" | "system";
@@ -15,12 +16,13 @@ interface SettingsState {
   frequencyPenalty: number | null;
   enableAdvancedSettings: boolean;
   enableStreamingMarkdown: boolean;
-  streamingRenderFPS: number; // General FPS
-  streamingCodeRenderFPS: number; // FPS specifically for code blocks
+  enableStreamingCodeBlockParsing: boolean;
+  foldStreamingCodeBlocks: boolean; // New setting
+  streamingRenderFPS: number;
   gitUserName: string | null;
   gitUserEmail: string | null;
   toolMaxSteps: number;
-  prismThemeUrl: string | null; // Added for Prism theme URL
+  prismThemeUrl: string | null;
 }
 
 interface SettingsActions {
@@ -34,12 +36,13 @@ interface SettingsActions {
   setFrequencyPenalty: (penalty: number | null) => void;
   setEnableAdvancedSettings: (enabled: boolean) => void;
   setEnableStreamingMarkdown: (enabled: boolean) => void;
+  setEnableStreamingCodeBlockParsing: (enabled: boolean) => void;
+  setFoldStreamingCodeBlocks: (fold: boolean) => void; // New action
   setStreamingRenderFPS: (fps: number) => void;
-  setStreamingCodeRenderFPS: (fps: number) => void;
   setGitUserName: (name: string | null) => void;
   setGitUserEmail: (email: string | null) => void;
   setToolMaxSteps: (steps: number) => void;
-  setPrismThemeUrl: (url: string | null) => void; // Added setter for Prism theme
+  setPrismThemeUrl: (url: string | null) => void;
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>;
 }
@@ -55,12 +58,13 @@ const DEFAULT_PRESENCE_PENALTY = 0.0;
 const DEFAULT_FREQUENCY_PENALTY = 0.0;
 const DEFAULT_ENABLE_ADVANCED_SETTINGS = true;
 const DEFAULT_ENABLE_STREAMING_MARKDOWN = true;
-const DEFAULT_STREAMING_FPS = 30;
-const DEFAULT_STREAMING_CODE_FPS = 10;
+const DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING = false;
+const DEFAULT_FOLD_STREAMING_CODE_BLOCKS = false; // New default
+const DEFAULT_STREAMING_FPS = 15;
 const DEFAULT_GIT_USER_NAME = null;
 const DEFAULT_GIT_USER_EMAIL = null;
 const DEFAULT_TOOL_MAX_STEPS = 5;
-const DEFAULT_PRISM_THEME_URL = null; // Default Prism theme URL
+const DEFAULT_PRISM_THEME_URL = null;
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set) => ({
@@ -75,12 +79,14 @@ export const useSettingsStore = create(
     frequencyPenalty: DEFAULT_FREQUENCY_PENALTY,
     enableAdvancedSettings: DEFAULT_ENABLE_ADVANCED_SETTINGS,
     enableStreamingMarkdown: DEFAULT_ENABLE_STREAMING_MARKDOWN,
+    enableStreamingCodeBlockParsing:
+      DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
+    foldStreamingCodeBlocks: DEFAULT_FOLD_STREAMING_CODE_BLOCKS, // Initialize new setting
     streamingRenderFPS: DEFAULT_STREAMING_FPS,
-    streamingCodeRenderFPS: DEFAULT_STREAMING_CODE_FPS,
     gitUserName: DEFAULT_GIT_USER_NAME,
     gitUserEmail: DEFAULT_GIT_USER_EMAIL,
     toolMaxSteps: DEFAULT_TOOL_MAX_STEPS,
-    prismThemeUrl: DEFAULT_PRISM_THEME_URL, // Initialize Prism theme URL
+    prismThemeUrl: DEFAULT_PRISM_THEME_URL,
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -127,16 +133,24 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("enableStreamingMarkdown", enabled);
     },
 
-    setStreamingRenderFPS: (fps) => {
-      const clampedFps = Math.max(1, Math.min(60, fps));
-      set({ streamingRenderFPS: clampedFps });
-      PersistenceService.saveSetting("streamingRenderFPS", clampedFps);
+    setEnableStreamingCodeBlockParsing: (enabled) => {
+      set({ enableStreamingCodeBlockParsing: enabled });
+      PersistenceService.saveSetting(
+        "enableStreamingCodeBlockParsing",
+        enabled,
+      );
     },
 
-    setStreamingCodeRenderFPS: (fps) => {
-      const clampedFps = Math.max(1, Math.min(60, fps));
-      set({ streamingCodeRenderFPS: clampedFps });
-      PersistenceService.saveSetting("streamingCodeRenderFPS", clampedFps);
+    // Implement setter for fold setting
+    setFoldStreamingCodeBlocks: (fold) => {
+      set({ foldStreamingCodeBlocks: fold });
+      PersistenceService.saveSetting("foldStreamingCodeBlocks", fold);
+    },
+
+    setStreamingRenderFPS: (fps) => {
+      const clampedFps = Math.max(3, Math.min(60, fps));
+      set({ streamingRenderFPS: clampedFps });
+      PersistenceService.saveSetting("streamingRenderFPS", clampedFps);
     },
 
     setGitUserName: (name) => {
@@ -156,7 +170,6 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("toolMaxSteps", clampedSteps);
     },
 
-    // Setter for Prism theme URL
     setPrismThemeUrl: (url) => {
       const trimmedUrl = url?.trim() || null;
       set({ prismThemeUrl: trimmedUrl });
@@ -176,12 +189,13 @@ export const useSettingsStore = create(
           systemPrompt,
           enableAdvanced,
           enableStreamingMd,
+          enableStreamingCodeBlock,
+          foldStreamingCodeBlocks, // Load new setting
           streamingFps,
-          streamingCodeFps,
           gitUserName,
           gitUserEmail,
           toolMaxSteps,
-          prismThemeUrl, // Load Prism theme URL
+          prismThemeUrl,
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -217,13 +231,18 @@ export const useSettingsStore = create(
             "enableStreamingMarkdown",
             DEFAULT_ENABLE_STREAMING_MARKDOWN,
           ),
+          PersistenceService.loadSetting<boolean>(
+            "enableStreamingCodeBlockParsing",
+            DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
+          ),
+          // Load new setting from persistence
+          PersistenceService.loadSetting<boolean>(
+            "foldStreamingCodeBlocks",
+            DEFAULT_FOLD_STREAMING_CODE_BLOCKS,
+          ),
           PersistenceService.loadSetting<number>(
             "streamingRenderFPS",
             DEFAULT_STREAMING_FPS,
-          ),
-          PersistenceService.loadSetting<number>(
-            "streamingCodeRenderFPS",
-            DEFAULT_STREAMING_CODE_FPS,
           ),
           PersistenceService.loadSetting<string | null>(
             "gitUserName",
@@ -237,7 +256,6 @@ export const useSettingsStore = create(
             "toolMaxSteps",
             DEFAULT_TOOL_MAX_STEPS,
           ),
-          // Load Prism theme URL setting
           PersistenceService.loadSetting<string | null>(
             "prismThemeUrl",
             DEFAULT_PRISM_THEME_URL,
@@ -255,12 +273,13 @@ export const useSettingsStore = create(
           globalSystemPrompt: systemPrompt,
           enableAdvancedSettings: enableAdvanced,
           enableStreamingMarkdown: enableStreamingMd,
+          enableStreamingCodeBlockParsing: enableStreamingCodeBlock,
+          foldStreamingCodeBlocks: foldStreamingCodeBlocks, // Set loaded value
           streamingRenderFPS: streamingFps,
-          streamingCodeRenderFPS: streamingCodeFps,
           gitUserName,
           gitUserEmail,
           toolMaxSteps,
-          prismThemeUrl, // Set loaded Prism theme URL
+          prismThemeUrl,
         });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);
@@ -272,9 +291,11 @@ export const useSettingsStore = create(
         set({
           theme: DEFAULT_THEME,
           enableStreamingMarkdown: DEFAULT_ENABLE_STREAMING_MARKDOWN,
+          enableStreamingCodeBlockParsing:
+            DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
+          foldStreamingCodeBlocks: DEFAULT_FOLD_STREAMING_CODE_BLOCKS, // Reset new setting
           streamingRenderFPS: DEFAULT_STREAMING_FPS,
-          streamingCodeRenderFPS: DEFAULT_STREAMING_CODE_FPS,
-          prismThemeUrl: DEFAULT_PRISM_THEME_URL, // Reset Prism theme URL
+          prismThemeUrl: DEFAULT_PRISM_THEME_URL,
         });
         await Promise.all([
           PersistenceService.saveSetting("theme", DEFAULT_THEME),
@@ -283,14 +304,18 @@ export const useSettingsStore = create(
             DEFAULT_ENABLE_STREAMING_MARKDOWN,
           ),
           PersistenceService.saveSetting(
+            "enableStreamingCodeBlockParsing",
+            DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
+          ),
+          // Persist reset for new setting
+          PersistenceService.saveSetting(
+            "foldStreamingCodeBlocks",
+            DEFAULT_FOLD_STREAMING_CODE_BLOCKS,
+          ),
+          PersistenceService.saveSetting(
             "streamingRenderFPS",
             DEFAULT_STREAMING_FPS,
           ),
-          PersistenceService.saveSetting(
-            "streamingCodeRenderFPS",
-            DEFAULT_STREAMING_CODE_FPS,
-          ),
-          // Reset Prism theme URL in persistence
           PersistenceService.saveSetting(
             "prismThemeUrl",
             DEFAULT_PRISM_THEME_URL,

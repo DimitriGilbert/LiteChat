@@ -1,28 +1,27 @@
 // src/components/LiteChat/chat/ChatControlWrapper.tsx
+// FULL FILE
 import React from "react";
 import type { ChatControl } from "@/types/litechat/chat";
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils";
 
 interface ChatControlWrapperProps {
   controls: ChatControl[];
   panelId: string;
-  renderMode?: "full" | "icon"; // Added renderMode prop
+  renderMode?: "full" | "icon";
   className?: string;
 }
 
 export const ChatControlWrapper: React.FC<ChatControlWrapperProps> = ({
   controls,
   panelId,
-  renderMode = "full", // Default to full rendering
+  renderMode = "full",
   className,
 }) => {
   // Filter controls based on panelId and the show condition
-  const relevantControls = controls
-    .filter(
-      (c) => (c.panel ?? "main") === panelId && (c.show ? c.show() : true),
-    )
-    // Sort controls by the order property (ascending)
-    .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
+  // Rely on registration order, remove sort
+  const relevantControls = controls.filter(
+    (c) => (c.panel ?? "main") === panelId && (c.show ? c.show() : true),
+  );
 
   // Return null if no controls match the criteria
   if (relevantControls.length === 0) {

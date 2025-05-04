@@ -1,4 +1,5 @@
 // src/components/LiteChat/settings/ModelEnablementList.tsx
+
 import React, { useState, useMemo } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -9,11 +10,12 @@ import { Input } from "@/components/ui/input";
 interface ModelEnablementListProps {
   providerId: string;
   allAvailableModels: { id: string; name: string }[];
-  enabledModelIds: Set<string>; // Use a Set for efficient lookup
+  enabledModelIds: Set<string>;
   onToggleModel: (modelId: string, isEnabled: boolean) => void;
-  isLoading?: boolean; // Optional loading state
-  disabled?: boolean; // Optional disabled state for switches
-  listHeightClass?: string; // Allow customizing height
+  isLoading?: boolean;
+  disabled?: boolean;
+  listHeightClass?: string;
+  onModelClick?: (modelId: string) => void; // Add optional click handler
 }
 
 export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
@@ -23,14 +25,13 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   onToggleModel,
   isLoading = false,
   disabled = false,
-  listHeightClass = "h-48", // Default height
+  listHeightClass = "h-48",
+  onModelClick, // Destructure the handler
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  // Filter models based on search query
   const filteredModels = useMemo(() => {
     if (!searchQuery) return allAvailableModels;
-
     const query = searchQuery.toLowerCase();
     return allAvailableModels.filter(
       (model) =>
@@ -79,17 +80,28 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
                 htmlFor={`enable-model-${providerId}-${model.id}`}
                 className="text-sm font-normal text-card-foreground flex-grow cursor-pointer truncate"
                 title={model.name || model.id}
+                // Use onClick for the label to trigger model details
+                onClick={
+                  onModelClick ? () => onModelClick(model.id) : undefined
+                }
               >
                 {model.name || model.id}
               </Label>
-              <Switch
-                id={`enable-model-${providerId}-${model.id}`}
-                checked={enabledModelIds.has(model.id)}
-                onCheckedChange={(checked) => onToggleModel(model.id, checked)}
-                className="flex-shrink-0"
-                disabled={disabled}
-                aria-label={`Enable model ${model.name || model.id}`}
-              />
+              <div className="flex items-center flex-shrink-0 gap-1">
+                {/* Info Button - Removed as Label is now clickable */}
+                {/* Enable Switch */}
+                <Switch
+                  id={`enable-model-${providerId}-${model.id}`}
+                  checked={enabledModelIds.has(model.id)}
+                  onCheckedChange={(checked) =>
+                    onToggleModel(model.id, checked)
+                  }
+                  disabled={disabled}
+                  aria-label={`Enable model ${model.name || model.id}`}
+                  // Prevent label click from toggling switch
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
             </div>
           ))}
         </div>

@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/ProjectSettingsPrompt.tsx
-// NEW FILE
+
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";

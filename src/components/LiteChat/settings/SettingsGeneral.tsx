@@ -1,4 +1,5 @@
 // src/components/LiteChat/settings/SettingsGeneral.tsx
+
 import React, { useCallback, useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -21,40 +22,38 @@ const SettingsGeneralComponent: React.FC = () => {
   const {
     theme,
     setTheme,
-    enableAdvancedSettings,
-    setEnableAdvancedSettings,
     enableStreamingMarkdown,
     setEnableStreamingMarkdown,
+    enableStreamingCodeBlockParsing,
+    setEnableStreamingCodeBlockParsing,
+    foldStreamingCodeBlocks, // Get new setting state
+    setFoldStreamingCodeBlocks, // Get new setting action
     streamingRenderFPS,
     setStreamingRenderFPS,
-    streamingCodeRenderFPS,
-    setStreamingCodeRenderFPS,
-    prismThemeUrl, // Get Prism theme URL
-    setPrismThemeUrl, // Get setter for Prism theme URL
+    prismThemeUrl,
+    setPrismThemeUrl,
     resetGeneralSettings,
   } = useSettingsStore(
     useShallow((state) => ({
       theme: state.theme,
       setTheme: state.setTheme,
-      enableAdvancedSettings: state.enableAdvancedSettings,
-      setEnableAdvancedSettings: state.setEnableAdvancedSettings,
       enableStreamingMarkdown: state.enableStreamingMarkdown,
       setEnableStreamingMarkdown: state.setEnableStreamingMarkdown,
+      enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing,
+      setEnableStreamingCodeBlockParsing:
+        state.setEnableStreamingCodeBlockParsing,
+      foldStreamingCodeBlocks: state.foldStreamingCodeBlocks, // Get new state
+      setFoldStreamingCodeBlocks: state.setFoldStreamingCodeBlocks, // Get new action
       streamingRenderFPS: state.streamingRenderFPS,
       setStreamingRenderFPS: state.setStreamingRenderFPS,
-      streamingCodeRenderFPS: state.streamingCodeRenderFPS,
-      setStreamingCodeRenderFPS: state.setStreamingCodeRenderFPS,
-      prismThemeUrl: state.prismThemeUrl, // Get Prism theme URL
-      setPrismThemeUrl: state.setPrismThemeUrl, // Get setter
+      prismThemeUrl: state.prismThemeUrl,
+      setPrismThemeUrl: state.setPrismThemeUrl,
       resetGeneralSettings: state.resetGeneralSettings,
     })),
   );
 
-  // Local state for sliders
   const [localFps, setLocalFps] = useState(streamingRenderFPS);
-  const [localCodeFps, setLocalCodeFps] = useState(streamingCodeRenderFPS);
 
-  // General FPS Handlers
   const handleFpsSliderVisualChange = useCallback((value: number[]) => {
     setLocalFps(value[0]);
   }, []);
@@ -68,9 +67,9 @@ const SettingsGeneralComponent: React.FC = () => {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
       const numValue =
-        value === "" ? 30 : parseInt(value.replace(/[^0-9]/g, ""), 10);
+        value === "" ? 15 : parseInt(value.replace(/[^0-9]/g, ""), 10);
       if (!isNaN(numValue)) {
-        const clampedFps = Math.max(1, Math.min(60, numValue));
+        const clampedFps = Math.max(3, Math.min(60, numValue));
         setStreamingRenderFPS(clampedFps);
         setLocalFps(clampedFps);
       }
@@ -78,39 +77,10 @@ const SettingsGeneralComponent: React.FC = () => {
     [setStreamingRenderFPS],
   );
 
-  // Code FPS Handlers
-  const handleCodeFpsSliderVisualChange = useCallback((value: number[]) => {
-    setLocalCodeFps(value[0]);
-  }, []);
-  const handleCodeFpsSliderCommit = useCallback(
-    (value: number[]) => {
-      setStreamingCodeRenderFPS(value[0]);
-    },
-    [setStreamingCodeRenderFPS],
-  );
-  const handleCodeFpsInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      const numValue =
-        value === "" ? 10 : parseInt(value.replace(/[^0-9]/g, ""), 10);
-      if (!isNaN(numValue)) {
-        const clampedFps = Math.max(1, Math.min(60, numValue));
-        setStreamingCodeRenderFPS(clampedFps);
-        setLocalCodeFps(clampedFps);
-      }
-    },
-    [setStreamingCodeRenderFPS],
-  );
-
-  // Sync local states if store changes from elsewhere
   useEffect(() => {
     setLocalFps(streamingRenderFPS);
   }, [streamingRenderFPS]);
-  useEffect(() => {
-    setLocalCodeFps(streamingCodeRenderFPS);
-  }, [streamingCodeRenderFPS]);
 
-  // Handler for the reset button
   const handleResetClick = () => {
     if (
       window.confirm(
@@ -161,6 +131,13 @@ const SettingsGeneralComponent: React.FC = () => {
             onChange={(e) => setPrismThemeUrl(e.target.value)}
           />
         </div>
+      </div>
+
+      <Separator />
+
+      {/* Streaming Settings */}
+      <div className="space-y-2">
+        <h3 className="text-lg font-medium">Streaming</h3>
         {/* Streaming Markdown Toggle */}
         <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
           <div>
@@ -178,20 +155,57 @@ const SettingsGeneralComponent: React.FC = () => {
             onCheckedChange={setEnableStreamingMarkdown}
           />
         </div>
-        {/* General Streaming FPS Setting */}
-        <div className="rounded-lg border p-3 shadow-sm space-y-2 hidden">
+        {/* Streaming Code Block Parsing Toggle */}
+        <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
           <div>
-            <Label htmlFor="streaming-fps-slider" className="font-medium">
-              General Streaming Update Rate ({localFps} FPS)
+            <Label htmlFor="streaming-codeblock-switch" className="font-medium">
+              Use Full Code Blocks While Streaming
             </Label>
             <p className="text-xs text-muted-foreground">
-              Controls how smoothly streaming text appears. (Default: 30)
+              Use the syntax-highlighting component for code blocks during
+              streaming. Disable for potentially smoother streaming on complex
+              code, using a basic block instead.
+            </p>
+          </div>
+          <Switch
+            id="streaming-codeblock-switch"
+            checked={enableStreamingCodeBlockParsing ?? false}
+            onCheckedChange={setEnableStreamingCodeBlockParsing}
+          />
+        </div>
+        {/* Fold Streaming Code Blocks Toggle */}
+        <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+          <div>
+            <Label htmlFor="fold-codeblock-switch" className="font-medium">
+              Fold Code Blocks by Default During Streaming
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Automatically collapse code blocks as they stream in. Useful for
+              long code outputs.
+            </p>
+          </div>
+          <Switch
+            id="fold-codeblock-switch"
+            checked={foldStreamingCodeBlocks ?? false}
+            onCheckedChange={setFoldStreamingCodeBlocks} // Use new action
+          />
+        </div>
+        {/* Combined Streaming FPS Setting */}
+        <div className="rounded-lg border p-3 shadow-sm space-y-2">
+          <div>
+            <Label htmlFor="streaming-fps-slider" className="font-medium">
+              Streaming Update Rate ({localFps} FPS)
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Controls how frequently the UI updates during streaming (3-60
+              FPS). Lower values may feel less smooth but reduce CPU usage.
+              (Default: 15)
             </p>
           </div>
           <div className="flex items-center gap-4">
             <Slider
               id="streaming-fps-slider"
-              min={1}
+              min={3}
               max={60}
               step={1}
               value={[localFps]}
@@ -201,7 +215,7 @@ const SettingsGeneralComponent: React.FC = () => {
             />
             <Input
               type="number"
-              min={1}
+              min={3}
               max={60}
               step={1}
               value={localFps}
@@ -210,62 +224,6 @@ const SettingsGeneralComponent: React.FC = () => {
             />
             <span className="text-xs text-muted-foreground">FPS</span>
           </div>
-        </div>
-        {/* Code Block Streaming FPS Setting */}
-        <div className="rounded-lg border p-3 shadow-sm space-y-2 hidden">
-          <div>
-            <Label htmlFor="streaming-code-fps-slider" className="font-medium">
-              Code Block Streaming Update Rate ({localCodeFps} FPS)
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Specific update rate when code blocks are streaming (lower values
-              reduce lag). (Default: 10)
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Slider
-              id="streaming-code-fps-slider"
-              min={1}
-              max={60}
-              step={1}
-              value={[localCodeFps]}
-              onValueChange={handleCodeFpsSliderVisualChange}
-              onValueCommit={handleCodeFpsSliderCommit}
-              className="flex-grow"
-            />
-            <Input
-              type="number"
-              min={1}
-              max={60}
-              step={1}
-              value={localCodeFps}
-              onChange={handleCodeFpsInputChange}
-              className="w-20 h-8 text-xs"
-            />
-            <span className="text-xs text-muted-foreground">FPS</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Advanced Settings */}
-      <Separator />
-      <div className="space-y-2 hidden">
-        <h3 className="text-lg font-medium">Advanced Settings</h3>
-        <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-          <div>
-            <Label htmlFor="advanced-settings-switch" className="font-medium">
-              Enable Advanced Controls
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Show controls for AI parameters (temperature, etc.) and Assistant
-              settings tab.
-            </p>
-          </div>
-          <Switch
-            id="advanced-settings-switch"
-            checked={enableAdvancedSettings ?? false}
-            onCheckedChange={setEnableAdvancedSettings}
-          />
         </div>
       </div>
 

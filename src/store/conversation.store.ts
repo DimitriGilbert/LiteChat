@@ -1,5 +1,5 @@
 // src/store/conversation.store.ts
-// Entire file content provided - Significantly reduced
+// FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { Conversation, SidebarItemType } from "@/types/litechat/chat";
@@ -18,12 +18,14 @@ import {
 // Import import/export service
 import { ImportExportService } from "@/services/import-export.service";
 // Import the key from the constants file
-import { SYNC_VFS_KEY } from "@/lib/litechat/constants"; // Assuming constants file exists
+import { SYNC_VFS_KEY } from "@/lib/litechat/constants";
 import { useVfsStore } from "./vfs.store";
 import type { fs as FsType } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 // Import ProjectStore for interaction
 import { useProjectStore } from "./project.store";
+import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
+import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent
 
 // Define a union type for items in the sidebar (now includes Project from ProjectStore)
 export type SidebarItem =
@@ -42,7 +44,7 @@ interface ConversationState {
   error: string | null;
 }
 interface ConversationActions {
-  loadSidebarItems: () => Promise<void>; // Will now load projects from ProjectStore too
+  loadSidebarItems: () => Promise<void>;
   addConversation: (
     conversationData: Partial<Omit<Conversation, "id" | "createdAt">> & {
       title: string;
@@ -94,7 +96,7 @@ interface ConversationActions {
     enabledTools?: string[];
     toolMaxStepsOverride?: number | null;
   }) => Promise<void>;
-  _ensureSyncVfsReady: () => Promise<typeof FsType | null>;
+  _ensureSyncVfsReady: () => Promise<typeof FsType>; // Return type allows undefined on failure
   // getEffectiveProjectSettings removed - use ProjectStore
   // Internal action for project deletion side effects
   _unlinkConversationsFromProjects: (projectIds: string[]) => void;
@@ -115,36 +117,24 @@ export const useConversationStore = create(
     error: null,
 
     _ensureSyncVfsReady: async () => {
-      const vfsStore = useVfsStore.getState();
-      if (
-        vfsStore.fs &&
-        vfsStore.configuredVfsKey === SYNC_VFS_KEY &&
-        !vfsStore.loading
-      ) {
-        return vfsStore.fs;
-      }
-
-      console.log(
-        `[ConversationStore] Sync VFS not ready (key: ${vfsStore.configuredVfsKey}, fs: ${!!vfsStore.fs}, loading: ${vfsStore.loading}). Initializing...`,
-      );
+      console.log("[ConversationStore] Ensuring Sync VFS is ready...");
       try {
-        await vfsStore.initializeVFS(SYNC_VFS_KEY);
-        const updatedVfsStore = useVfsStore.getState();
-        if (
-          updatedVfsStore.fs &&
-          updatedVfsStore.configuredVfsKey === SYNC_VFS_KEY
-        ) {
-          console.log("[ConversationStore] Sync VFS initialized successfully.");
-          return updatedVfsStore.fs;
-        } else {
-          throw new Error("VFS initialization did not complete successfully.");
-        }
+        // Use forced initialization to get an instance without affecting UI state
+        // Wrap in try...catch as initializeVFS now throws on error
+        const fsInstance = await useVfsStore
+          .getState()
+          .initializeVFS(SYNC_VFS_KEY, { force: true });
+
+        console.log(
+          `[ConversationStore] Sync VFS ready for key ${SYNC_VFS_KEY}.`,
+        );
+        return fsInstance;
       } catch (error) {
         console.error("[ConversationStore] Failed to ensure Sync VFS:", error);
         toast.error(
           `Filesystem error for sync: ${error instanceof Error ? error.message : String(error)}`,
         );
-        return null;
+        throw error;
       }
     },
 
@@ -222,6 +212,9 @@ export const useConversationStore = create(
         const conversationToSave = get().getConversationById(newId);
         if (conversationToSave) {
           await PersistenceService.saveConversation(conversationToSave);
+          emitter.emit(ModEvent.CONVERSATION_ADDED, {
+            conversation: conversationToSave,
+          });
         } else {
           throw new Error("Failed to retrieve newly added conversation state");
         }
@@ -295,6 +288,10 @@ export const useConversationStore = create(
         try {
           const plainData = JSON.parse(JSON.stringify(updatedConversationData));
           await PersistenceService.saveConversation(plainData);
+          emitter.emit(ModEvent.CONVERSATION_UPDATED, {
+            conversationId: id,
+            updates: updates,
+          });
         } catch (e) {
           console.error("ConversationStore: Error updating conversation", e);
           set((state) => {
@@ -374,12 +371,18 @@ export const useConversationStore = create(
       try {
         await PersistenceService.deleteConversation(id);
         await PersistenceService.deleteInteractionsForConversation(id);
+        emitter.emit(ModEvent.CONVERSATION_DELETED, { conversationId: id });
 
         if (
           currentSelectedId === id &&
           currentSelectedType === "conversation"
         ) {
           await useInteractionStore.getState().setCurrentConversationId(null);
+          // Emit context change if selection was cleared
+          emitter.emit(ModEvent.CONTEXT_CHANGED, {
+            selectedItemId: null,
+            selectedItemType: null,
+          });
         }
       } catch (e) {
         console.error("ConversationStore: Error deleting conversation", e);
@@ -422,6 +425,21 @@ export const useConversationStore = create(
         await useInteractionStore
           .getState()
           .setCurrentConversationId(type === "conversation" ? id : null);
+        // Emit context change event
+        emitter.emit(ModEvent.CONTEXT_CHANGED, {
+          selectedItemId: id,
+          selectedItemType: type,
+        });
+        if (type === "conversation") {
+          emitter.emit(ModEvent.CONVERSATION_SELECTED, { conversationId: id });
+        } else if (type === "project") {
+          emitter.emit(ModEvent.PROJECT_SELECTED, { projectId: id });
+        } else {
+          emitter.emit(ModEvent.CONVERSATION_SELECTED, {
+            conversationId: null,
+          });
+          emitter.emit(ModEvent.PROJECT_SELECTED, { projectId: null });
+        }
       } else {
         console.log(`Item ${id} (${type}) already selected.`);
       }
@@ -479,6 +497,10 @@ export const useConversationStore = create(
         if (repoToSave) {
           const plainData = JSON.parse(JSON.stringify(repoToSave));
           await PersistenceService.saveSyncRepo(plainData);
+          emitter.emit(ModEvent.SYNC_REPO_CHANGED, {
+            repoId: newId,
+            action: "added",
+          });
         } else {
           throw new Error("Failed to retrieve newly added sync repo state");
         }
@@ -518,6 +540,10 @@ export const useConversationStore = create(
         try {
           const plainData = JSON.parse(JSON.stringify(repoToSave));
           await PersistenceService.saveSyncRepo(plainData);
+          emitter.emit(ModEvent.SYNC_REPO_CHANGED, {
+            repoId: id,
+            action: "updated",
+          });
           toast.success(`Sync repository "${repoToSave.name}" updated.`);
         } catch (e) {
           console.error("ConversationStore: Error updating sync repo", e);
@@ -550,10 +576,12 @@ export const useConversationStore = create(
 
       const repoDir = normalizePath(`${SYNC_REPO_BASE_DIR}/${id}`);
 
-      const fsInstance = await get()._ensureSyncVfsReady();
-      if (!fsInstance) {
-        toast.error("Filesystem not ready, cannot delete repository folder.");
-        return;
+      let fsInstance: typeof FsType | undefined;
+      try {
+        fsInstance = await get()._ensureSyncVfsReady();
+      } catch (fsError) {
+        // Error already toasted by _ensureSyncVfsReady
+        return; // Don't proceed if FS isn't ready
       }
 
       set((state) => ({
@@ -567,11 +595,16 @@ export const useConversationStore = create(
 
       try {
         await PersistenceService.deleteSyncRepo(id);
+        emitter.emit(ModEvent.SYNC_REPO_CHANGED, {
+          repoId: id,
+          action: "deleted",
+        });
         toast.success(`Sync repository "${repoToDelete.name}" deleted.`);
 
         try {
           console.log(`[ConversationStore] Deleting VFS directory: ${repoDir}`);
-          await VfsOps.deleteItemOp(repoDir, true);
+          // Pass the specific fsInstance
+          await VfsOps.deleteItemOp(repoDir, true, { fsInstance });
           toast.info(`Removed local sync folder for "${repoToDelete.name}".`);
         } catch (vfsError: any) {
           console.error(
@@ -617,25 +650,33 @@ export const useConversationStore = create(
           console.error(`Sync error for ${conversationId}: ${error}`);
         }
       });
+      emitter.emit(ModEvent.CONVERSATION_SYNC_STATUS_CHANGED, {
+        conversationId,
+        status,
+      });
     },
 
     _setRepoInitializationStatus: (repoId, status) => {
       set((state) => {
         state.repoInitializationStatus[repoId] = status;
       });
+      emitter.emit(ModEvent.REPO_INIT_STATUS_CHANGED, { repoId, status });
     },
 
     initializeOrSyncRepo: async (repoId) => {
       const repo = get().syncRepos.find((r) => r.id === repoId);
       if (!repo) {
-        toast.error("Sync repository configuration not found.");
+        toast.error("Sync repsitory configuration not found.");
         return;
       }
-      const fsInstance = await get()._ensureSyncVfsReady();
-      if (!fsInstance) {
+      let fsInstance: typeof FsType;
+      try {
+        fsInstance = await get()._ensureSyncVfsReady();
+      } catch (fsError) {
         get()._setRepoInitializationStatus(repoId, "error");
-        return;
+        return; // Don't proceed if FS isn't ready
       }
+      // Pass the specific fsInstance
       await initializeOrSyncRepoLogic(
         fsInstance,
         repo,
@@ -666,16 +707,19 @@ export const useConversationStore = create(
         return;
       }
 
-      const fsInstance = await get()._ensureSyncVfsReady();
-      if (!fsInstance) {
+      let fsInstance: typeof FsType | undefined;
+      try {
+        fsInstance = await get()._ensureSyncVfsReady();
+      } catch (fsError) {
         get()._setConversationSyncStatus(
           conversationId,
           "error",
           "Filesystem not ready",
         );
-        return;
+        return; // Don't proceed if FS isn't ready
       }
 
+      // Pass the specific fsInstance
       await syncConversationLogic(
         fsInstance,
         conversation,
