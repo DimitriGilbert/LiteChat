@@ -1,4 +1,5 @@
 /* src/index.css */
+/* FULL FILE */
 @import "tailwindcss";
 @import "tw-animate-css";
 /* Import the default Prism theme as a fallback */
@@ -332,10 +333,14 @@
         background-color: hsl(var(--muted-foreground) / 0.5);
     }
 
-    /* Header styling */
+    /* Header styling using @apply */
     .code-block-header {
         @apply flex items-center justify-between px-3 py-2
-      border-b border-border bg-muted/50;
+      border-b border-border bg-muted/80 /* Use slightly less transparent bg */
+      sticky top-0 z-10; /* Lower z-index than CardHeader */
+        /* Apply backdrop blur for better visual separation */
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px); /* Safari support */
     }
 
     /* Code block content - minimal styling to not override external themes */

@@ -78,7 +78,8 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
       : undefined;
 
   return (
-    <div className="flex justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-10 p-1 -m-1 rounded-t">
+    // Apply sticky positioning and z-index here
+    <div className="flex justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-20 p-1 -m-1 rounded-t">
       {/* Left Group: Icon, Name, Actions */}
       <div className="flex items-start gap-1 min-w-0">
         <BotIcon className="h-4 w-4 text-secondary flex-shrink-0 mt-0.5" />

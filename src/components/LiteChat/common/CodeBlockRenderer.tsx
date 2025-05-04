@@ -6,6 +6,7 @@ import React, {
   useRef,
   useMemo,
   useCallback,
+  memo, // Import memo
 } from "react";
 import Prism from "prismjs";
 import "prismjs/components/prism-typescript";
@@ -21,7 +22,6 @@ import "prismjs/components/prism-sql";
 // Import base Prism styles
 import "prismjs/themes/prism.css";
 
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CheckIcon, ClipboardIcon, ChevronsUpDownIcon } from "lucide-react";
 import {
@@ -58,7 +58,8 @@ const getRawGitHubUrl = (url: string): string => {
     .replace("/blob/", "/");
 };
 
-export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
+// Wrap the component logic in a named function before memo
+const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
   lang,
   code,
   isStreaming = false, // Default to false
@@ -190,7 +191,8 @@ export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
 
   return (
     <div className="code-block-container group/codeblock my-4 max-w-full">
-      <div className="code-block-header flex items-center justify-between">
+      {/* Apply sticky positioning and background to the header */}
+      <div className="code-block-header sticky top-0 z-10 flex items-center justify-between">
         <div className="flex items-center gap-1">
           <div className="text-sm font-medium">
             {lang ? lang.toUpperCase() : "CODE"}
@@ -261,3 +263,6 @@ export const CodeBlockRenderer: React.FC<CodeBlockRendererProps> = ({
     </div>
   );
 };
+
+// Export the memoized component
+export const CodeBlockRenderer = memo(CodeBlockRendererComponent);
