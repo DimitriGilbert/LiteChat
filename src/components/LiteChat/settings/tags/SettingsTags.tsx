@@ -82,7 +82,7 @@ export const SettingsTags: React.FC = () => {
   );
 
   const handleDelete = useCallback(
-    async (id: string, name: string) => {
+    async (id: string) => {
       setIsDeleting((prev) => ({ ...prev, [id]: true }));
       try {
         await deleteTag(id);

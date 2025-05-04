@@ -9,7 +9,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Edit2Icon, Trash2Icon, Loader2 } from "lucide-react";
 import type { DbRule } from "@/types/litechat/rules";
 import { Skeleton } from "@/components/ui/skeleton";

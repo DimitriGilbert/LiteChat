@@ -2,12 +2,7 @@
 // FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import type {
-  DbRule,
-  DbTag,
-  DbTagRuleLink,
-  RuleType,
-} from "@/types/litechat/rules";
+import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
 // Import PersistenceService instead of db
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
@@ -51,22 +46,6 @@ interface RulesActions {
   getTagById: (tagId: string) => DbTag | undefined;
   getRulesByIds: (ruleIds: string[]) => DbRule[];
 }
-
-// Helper function to ensure date fields are Date objects (remains the same)
-const ensureDateFields = <
-  T extends { createdAt?: any; updatedAt?: any; [key: string]: any },
->(
-  item: T,
-): T => {
-  const newItem = { ...item };
-  if (item.createdAt && !(item.createdAt instanceof Date)) {
-    newItem.createdAt = new Date(item.createdAt);
-  }
-  if (item.updatedAt && !(item.updatedAt instanceof Date)) {
-    newItem.updatedAt = new Date(item.updatedAt);
-  }
-  return newItem;
-};
 
 export const useRulesStore = create(
   immer<RulesState & RulesActions>((set, get) => ({

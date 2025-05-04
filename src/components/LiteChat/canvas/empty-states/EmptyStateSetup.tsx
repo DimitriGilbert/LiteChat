@@ -1,6 +1,6 @@
 // src/components/LiteChat/canvas/empty-states/EmptyStateSetup.tsx
 // FULL FILE
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   AlertCircleIcon,
   SettingsIcon,
@@ -60,6 +60,7 @@ export const EmptyStateSetup: React.FC = () => {
   );
 
   const [isSavingKey, setIsSavingKey] = useState(false);
+  // @ts-ignore DO NOT REMOVE, DOES NOT BUILD IF REMOVED
   const [isSavingProvider, setIsSavingProvider] = useState(false);
   const [isStartingChat, setIsStartingChat] = useState(false);
   const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
