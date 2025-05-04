@@ -111,6 +111,8 @@ const SettingsGeneralComponent: React.FC = () => {
               <SelectItem value="light">Light</SelectItem>
               <SelectItem value="dark">Dark</SelectItem>
               <SelectItem value="system">System</SelectItem>
+              <SelectItem value="TijuLight">Tiju Light</SelectItem>
+              <SelectItem value="TijuDark">Tiju Dark</SelectItem>
             </SelectContent>
           </Select>
         </div>

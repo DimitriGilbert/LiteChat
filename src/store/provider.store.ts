@@ -288,6 +288,16 @@ export const useProviderStore = create(
           providerId: newId,
           config: newConfig,
         });
+        // Trigger initial fetch after adding
+        get()
+          .fetchModels(newId)
+          .catch((fetchError) => {
+            console.warn(
+              `[ProviderStore] Initial model fetch failed for new provider ${newId}:`,
+              fetchError,
+            );
+            // Toast handled by fetchModels
+          });
         return newId;
       } catch (e) {
         console.error("ProviderStore: Error adding provider config", e);

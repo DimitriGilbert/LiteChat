@@ -1,4 +1,5 @@
 // src/components/LiteChat/LiteChat.tsx
+// FULL FILE
 import React, {
   useEffect,
   useCallback,
@@ -82,15 +83,16 @@ export const LiteChat: React.FC = () => {
     isSidebarCollapsed,
     isChatControlPanelOpen,
     isProjectSettingsModalOpen,
+    isVfsModalOpen,
   } = useUIStateStore(
     useShallow((state) => ({
       globalError: state.globalError,
       isSidebarCollapsed: state.isSidebarCollapsed,
       isChatControlPanelOpen: state.isChatControlPanelOpen,
       isProjectSettingsModalOpen: state.isProjectSettingsModalOpen,
+      isVfsModalOpen: state.isVfsModalOpen,
     })),
   );
-  const isVfsPanelOpen = isChatControlPanelOpen["vfs"] ?? false;
   const chatControls = useControlRegistryStore(
     useShallow((state) => Object.values(state.chatControls)),
   );
@@ -155,7 +157,7 @@ export const LiteChat: React.FC = () => {
         registerReasoningControl(); // New
         registerWebSearchControl(); // New
         registerFileControl();
-        registerVfsControl(); // Includes prompt trigger and panel
+        registerVfsControl(); // Includes prompt trigger and modal panel
         registerToolSelectorControl(); // Tools often last
         registerParameterControl(); // Advanced params lower down
         registerStructuredOutputControl();
@@ -265,7 +267,8 @@ export const LiteChat: React.FC = () => {
   // --- VFS Context Management Effect ---
   useEffect(() => {
     let targetVfsKey: string | null = null;
-    if (isVfsPanelOpen) {
+    // Check if VFS modal is open OR if a project is selected
+    if (isVfsModalOpen || selectedItemType === "project") {
       if (selectedItemType === "project") {
         targetVfsKey = selectedItemId;
       } else if (selectedItemType === "conversation") {
@@ -274,21 +277,23 @@ export const LiteChat: React.FC = () => {
           .getConversationById(selectedItemId);
         targetVfsKey = convo?.projectId ?? "orphan";
       } else {
+        // If modal is open but no project/convo selected, use orphan
         targetVfsKey = "orphan";
       }
       console.log(
-        `[LiteChat Effect] VFS Panel Opened/Context Changed. Setting target key: ${targetVfsKey}`,
+        `[LiteChat Effect] VFS Context Required. Setting target key: ${targetVfsKey}`,
       );
     } else {
       targetVfsKey = null;
       console.log(
-        "[LiteChat Effect] VFS Panel Closed. Setting target key: null",
+        "[LiteChat Effect] VFS Context Not Required. Setting target key: null",
       );
     }
     if (useVfsStore.getState().vfsKey !== targetVfsKey) {
       setVfsKey(targetVfsKey);
     }
-  }, [isVfsPanelOpen, selectedItemId, selectedItemType, setVfsKey]);
+    // Depend on modal state and selection state
+  }, [isVfsModalOpen, selectedItemId, selectedItemType, setVfsKey]);
 
   // --- Prompt Submission Handler ---
   const handlePromptSubmit = useCallback(async (turnData: PromptTurnObject) => {
@@ -380,8 +385,7 @@ export const LiteChat: React.FC = () => {
           (c) =>
             (c.panel ?? "main") === "sidebar" && (c.show ? c.show() : true),
         )
-        // Sort removed - rely on registration order
-        .map((c) => c), // Create new array reference if needed
+        .map((c) => c),
     [chatControls],
   );
   const sidebarFooterControls = useMemo(
@@ -390,7 +394,6 @@ export const LiteChat: React.FC = () => {
         .filter(
           (c) => c.panel === "sidebar-footer" && (c.show ? c.show() : true),
         )
-        // Sort removed
         .map((c) => c),
     [chatControls],
   );
@@ -398,12 +401,11 @@ export const LiteChat: React.FC = () => {
     () =>
       chatControls
         .filter((c) => c.panel === "header" && (c.show ? c.show() : true))
-        // Sort removed
         .map((c) => c),
     [chatControls],
   );
 
-  // --- Memoized Modal Renderers ---
+  // --- Memoized Modal Renderers (Reverted Logic) ---
   const settingsModalRenderer = useMemo(
     () =>
       chatControls.find((c) => c.id === "core-settings-trigger")
@@ -414,6 +416,11 @@ export const LiteChat: React.FC = () => {
     () =>
       chatControls.find((c) => c.id === "core-project-settings-trigger")
         ?.settingsRenderer,
+    [chatControls],
+  );
+  // Find the VFS modal renderer using its ID
+  const vfsModalRenderer = useMemo(
+    () => chatControls.find((c) => c.id === "core-vfs-modal-panel")?.renderer,
     [chatControls],
   );
 
@@ -522,21 +529,18 @@ export const LiteChat: React.FC = () => {
           />
         </div>
 
-        {/* Right Drawer (VFS) */}
-        <ChatControlWrapper
-          controls={chatControls}
-          panelId="drawer_right"
-          renderMode="full"
-        />
+        {/* Right Drawer Removed */}
       </div>
 
-      {/* Render Modals */}
+      {/* Render Modals Explicitly */}
       {isChatControlPanelOpen["settingsModal"] &&
         settingsModalRenderer &&
         settingsModalRenderer()}
       {isProjectSettingsModalOpen &&
         projectSettingsModalRenderer &&
         projectSettingsModalRenderer()}
+      {/* Render VFS modal based on its state */}
+      {isVfsModalOpen && vfsModalRenderer && vfsModalRenderer()}
 
       <Toaster richColors position="bottom-right" closeButton />
     </>

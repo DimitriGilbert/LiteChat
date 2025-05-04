@@ -1,8 +1,7 @@
 // src/components/LiteChat/canvas/ChatCanvas.tsx
-
+// FULL FILE
 import React, { useMemo, useRef, useEffect, useState } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
-// Updated import path for InteractionCard
 import { InteractionCard } from "./InteractionCard";
 import { StreamingInteractionCard } from "./StreamingInteractionCard";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,6 +16,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { EmptyStateReady } from "./empty-states/EmptyStateReady";
+import { EmptyStateSetup } from "./empty-states/EmptyStateSetup";
+import { useProviderStore } from "@/store/provider.store";
+import { useConversationStore } from "@/store/conversation.store"; // Import ConversationStore
+import { useProjectStore } from "@/store/project.store"; // Import ProjectStore
+import { useShallow } from "zustand/react/shallow";
 
 export interface ChatCanvasProps {
   conversationId: string | null;
@@ -44,6 +49,47 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   const streamingInteractionIds = useInteractionStore(
     (state) => state.streamingInteractionIds,
   );
+
+  // --- State for Setup Check ---
+  const { isLoading: isProviderLoading } = useProviderStore(
+    useShallow((state) => ({
+      providers: state.dbProviderConfigs,
+      apiKeys: state.dbApiKeys,
+      isLoading: state.isLoading,
+      enableApiKeyManagement: state.enableApiKeyManagement,
+    })),
+  );
+
+  // Get conversation and project counts
+  const { conversationCount, isConversationLoading } = useConversationStore(
+    useShallow((state) => ({
+      conversationCount: state.conversations.length,
+      isConversationLoading: state.isLoading,
+    })),
+  );
+  const { projectCount, isProjectLoading } = useProjectStore(
+    useShallow((state) => ({
+      projectCount: state.projects.length,
+      isProjectLoading: state.isLoading,
+    })),
+  );
+
+  // --- Determine if initial setup state should be shown ---
+  const showSetupState = useMemo(() => {
+    // Don't show setup if core data is still loading
+    if (isProviderLoading || isConversationLoading || isProjectLoading) {
+      return false;
+    }
+    // Show setup if there are no conversations AND no projects
+    return conversationCount === 0 && projectCount === 0;
+  }, [
+    conversationCount,
+    projectCount,
+    isProviderLoading,
+    isConversationLoading,
+    isProjectLoading,
+  ]);
+  // --- End Setup Status ---
 
   const interactionGroups = useMemo(() => {
     const groups: Interaction[][] = [];
@@ -110,7 +156,8 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   }, []);
 
   const renderContent = () => {
-    if (status === "loading") {
+    // Show loading if any core data is loading
+    if (isProviderLoading || isConversationLoading || isProjectLoading) {
       return (
         <div className="space-y-4 p-4">
           <Skeleton className="h-24 w-full" />
@@ -120,62 +167,67 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
       );
     }
 
+    // Show setup guide if no conversations or projects exist yet
+    if (showSetupState) {
+      return <EmptyStateSetup />;
+    }
+
+    // If setup is done (or skipped), but no conversation is selected, show ready state
     if (!conversationId) {
+      return <EmptyStateReady />;
+    }
+
+    // Render conversation content if conversationId exists
+    if (conversationId) {
+      if (interactions.length === 0 && status !== "streaming") {
+        // Show ready state even if conversation selected but has no messages
+        return <EmptyStateReady />;
+      }
+
       return (
-        <div className="flex h-full items-center justify-center">
-          <p className="text-muted-foreground">
-            Select a conversation or start a new one.
-          </p>
+        <div className="space-y-4 p-4">
+          {interactionGroups.map((group) => {
+            const interaction = group[0];
+            const isStreaming = streamingInteractionIds.includes(
+              interaction.id,
+            );
+
+            if (isStreaming) {
+              return (
+                <StreamingInteractionCard
+                  key={`${interaction.id}-streaming`}
+                  interactionId={interaction.id}
+                  onStop={onStopInteraction}
+                />
+              );
+            } else {
+              return (
+                <InteractionCard
+                  key={interaction.id}
+                  interaction={interaction}
+                  onEdit={onEditInteraction}
+                  onRegenerate={onRegenerateInteraction}
+                  onDelete={undefined} // Delete is handled internally now
+                />
+              );
+            }
+          })}
+          {status === "streaming" &&
+            streamingInteractionIds
+              .filter((id) => !interactions.some((i) => i.id === id))
+              .map((id) => (
+                <StreamingInteractionCard
+                  key={`${id}-streaming-new`}
+                  interactionId={id}
+                  onStop={onStopInteraction}
+                />
+              ))}
         </div>
       );
     }
 
-    if (interactions.length === 0 && status !== "streaming") {
-      return (
-        <div className="flex h-full items-center justify-center">
-          <p className="text-muted-foreground">No messages yet.</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-4 p-4">
-        {interactionGroups.map((group) => {
-          const interaction = group[0];
-          const isStreaming = streamingInteractionIds.includes(interaction.id);
-
-          if (isStreaming) {
-            return (
-              <StreamingInteractionCard
-                key={`${interaction.id}-streaming`}
-                interactionId={interaction.id}
-                onStop={onStopInteraction}
-              />
-            );
-          } else {
-            return (
-              <InteractionCard
-                key={interaction.id}
-                interaction={interaction}
-                onEdit={onEditInteraction}
-                onRegenerate={onRegenerateInteraction}
-                onDelete={undefined} // Delete is handled internally now
-              />
-            );
-          }
-        })}
-        {status === "streaming" &&
-          streamingInteractionIds
-            .filter((id) => !interactions.some((i) => i.id === id))
-            .map((id) => (
-              <StreamingInteractionCard
-                key={`${id}-streaming-new`}
-                interactionId={id}
-                onStop={onStopInteraction}
-              />
-            ))}
-      </div>
-    );
+    // Fallback (shouldn't be reached with the above logic)
+    return null;
   };
 
   return (

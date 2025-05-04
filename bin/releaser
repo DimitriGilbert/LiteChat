@@ -50,6 +50,7 @@ echo "Copying distribution files..."
 cp -r dist/* "$TEMP_DIR/"
 
 rm -rf "$TEMP_DIR/release/";
+rm -rf "$TEMP_DIR/versions/";
 
 # Create the release zip file
 echo "Creating ZIP archive..."

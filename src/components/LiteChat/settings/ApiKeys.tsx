@@ -1,16 +1,7 @@
-// src/components/LiteChat/settings/SettingsApiKeys.tsx
-
-import React, { useState, useMemo, useCallback } from "react";
+// src/components/LiteChat/settings/ApiKeys.tsx
+// FULL FILE
+import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -19,93 +10,62 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Trash2Icon,
-  EyeIcon,
-  EyeOffIcon,
-  InfoIcon,
-  Loader2,
-} from "lucide-react";
-import { toast } from "sonner";
-import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
+import { Trash2Icon, Loader2, PlusIcon } from "lucide-react";
+import type { DbApiKey } from "@/types/litechat/provider";
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
-import {
-  LoadingStateWrapper,
-  DefaultListLoadingSkeleton,
-} from "../common/LoadingStateWrapper";
-import { ActionTooltipButton } from "../common/ActionTooltipButton";
+import { Skeleton } from "@/components/ui/skeleton";
+import { format } from "date-fns";
+import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
+// Import the new form component
+import { ApiKeyForm } from "@/components/LiteChat/common/ApiKeysForm";
 
 const SettingsApiKeysComponent: React.FC = () => {
-  const {
-    addApiKey,
-    deleteApiKey,
-    enableApiKeyManagement,
-    dbApiKeys,
-    dbProviderConfigs,
-    isLoading,
-  } = useProviderStore(
+  const { apiKeys, addApiKey, deleteApiKey, isLoading } = useProviderStore(
     useShallow((state) => ({
+      apiKeys: state.dbApiKeys,
       addApiKey: state.addApiKey,
       deleteApiKey: state.deleteApiKey,
-      enableApiKeyManagement: state.enableApiKeyManagement,
-      dbApiKeys: state.dbApiKeys,
-      dbProviderConfigs: state.dbProviderConfigs,
       isLoading: state.isLoading,
     })),
   );
 
-  const [newKeyName, setNewKeyName] = useState("");
-  const [newKeyValue, setNewKeyValue] = useState("");
-  const [newKeyProviderType, setNewKeyProviderType] = useState<string>("");
   const [isAdding, setIsAdding] = useState(false);
+  const [isSavingNew, setIsSavingNew] = useState(false);
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
-  const [showValues, setShowValues] = useState<Record<string, boolean>>({});
 
-  const handleAddKey = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!newKeyName.trim() || !newKeyValue.trim() || !newKeyProviderType) {
-        toast.error("Please fill in all fields for the API key.");
-        return;
-      }
-      setIsAdding(true);
+  const handleSaveNewKey = useCallback(
+    async (name: string, providerId: string, value: string) => {
+      setIsSavingNew(true);
       try {
-        await addApiKey(
-          newKeyName.trim(),
-          newKeyProviderType,
-          newKeyValue.trim(),
-        );
-        setNewKeyName("");
-        setNewKeyValue("");
-        setNewKeyProviderType("");
-      } catch (error: unknown) {
+        await addApiKey(name, providerId, value);
+        setIsAdding(false); // Close form on success
+      } catch (error) {
         console.error("Failed to add API key (from component):", error);
+        // Toast handled by store action
       } finally {
-        setIsAdding(false);
+        setIsSavingNew(false);
       }
     },
-    [addApiKey, newKeyName, newKeyValue, newKeyProviderType],
+    [addApiKey],
   );
 
-  const handleDeleteKey = useCallback(
+  const handleDelete = useCallback(
     async (id: string, name: string) => {
       if (
         window.confirm(
-          `Are you sure you want to delete the API key "${name}"? This will also unlink it from any providers using it. This action cannot be undone.`,
+          `Are you sure you want to delete the API key "${name}"? This will unlink it from any providers using it.`,
         )
       ) {
         setIsDeleting((prev) => ({ ...prev, [id]: true }));
         try {
           await deleteApiKey(id);
-          setShowValues((prev) => {
-            const next = { ...prev };
-            delete next[id];
-            return next;
-          });
-        } catch (error: unknown) {
+          // Toast handled by store action
+        } catch (error) {
           console.error("Failed to delete API key (from component):", error);
+          // Toast handled by store action
         } finally {
+          // Reset deleting state regardless of success/failure if error is caught
           setIsDeleting((prev) => ({ ...prev, [id]: false }));
         }
       }
@@ -113,174 +73,84 @@ const SettingsApiKeysComponent: React.FC = () => {
     [deleteApiKey],
   );
 
-  const linkedProviderNames = useMemo(() => {
-    const map = new Map<string, string>();
-    (dbApiKeys || []).forEach((key: DbApiKey) => {
-      const linkedConfigs = (dbProviderConfigs || []).filter(
-        (config: DbProviderConfig) => config.apiKeyId === key.id,
-      );
-      map.set(
-        key.id,
-        linkedConfigs.length === 0
-          ? "Not linked"
-          : linkedConfigs.map((c: DbProviderConfig) => c.name).join(", "),
-      );
-    });
-    return map;
-  }, [dbApiKeys, dbProviderConfigs]);
-
-  if (!enableApiKeyManagement) {
-    return (
-      <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2 bg-gray-800/30 rounded-md border border-dashed border-gray-700 min-h-[200px]">
-        <InfoIcon className="h-5 w-5" />
-        API Key Management is disabled in the configuration.
-      </div>
-    );
-  }
-
-  const toggleShowValue = (id: string) => {
-    setShowValues((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const getKeyTypeLabel = (providerIdOrType: string): string => {
-    const knownTypes: Record<string, string> = {
-      openai: "OpenAI",
-      google: "Google",
-      openrouter: "OpenRouter",
-      "openai-compatible": "OpenAI-Compatible",
-    };
-    return knownTypes[providerIdOrType] || "Unknown/Custom";
-  };
-
-  const emptyKeysComponent = (
-    <p className="text-sm text-gray-500 dark:text-gray-400 p-4 text-center">
-      No API keys stored yet. Add one above. Link keys to providers in the
-      'Providers' tab.
-    </p>
-  );
-
   return (
     <div className="space-y-6 p-1">
-      {/* Add Key Form */}
-      <form onSubmit={handleAddKey} className="space-y-4">
-        <h3 className="text-lg font-medium mb-2">Add New API Key</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <Label htmlFor="new-key-name">Name</Label>
-            <Input
-              id="new-key-name"
-              value={newKeyName}
-              onChange={(e) => setNewKeyName(e.target.value)}
-              placeholder="e.g., My Personal Key"
-              required
-              className="mt-1"
-              disabled={isAdding}
-            />
-          </div>
-          <div>
-            <Label htmlFor="new-key-provider-type">
-              Intended Provider Type
-            </Label>
-            <Select
-              value={newKeyProviderType}
-              onValueChange={setNewKeyProviderType}
-              required
-              disabled={isAdding}
-            >
-              <SelectTrigger id="new-key-provider-type" className="mt-1">
-                <SelectValue placeholder="Select Type..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="openai">OpenAI</SelectItem>
-                <SelectItem value="google">Google</SelectItem>
-                <SelectItem value="openrouter">OpenRouter</SelectItem>
-                <SelectItem value="openai-compatible">
-                  OpenAI-Compatible
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="new-key-value">API Key Value</Label>
-            <Input
-              id="new-key-value"
-              type="password"
-              value={newKeyValue}
-              onChange={(e) => setNewKeyValue(e.target.value)}
-              placeholder="Paste your API key here"
-              required
-              className="mt-1"
-              disabled={isAdding}
-            />
-          </div>
-        </div>
-        <Button type="submit" disabled={isAdding}>
-          {isAdding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {isAdding ? "Adding..." : "Add Key"}
-        </Button>
-      </form>
-
-      {/* Stored Keys Table */}
       <div>
-        <h3 className="text-lg font-medium mb-2">Stored API Keys</h3>
-        {/* Use LoadingStateWrapper */}
-        <LoadingStateWrapper
-          isLoading={isLoading}
-          data={dbApiKeys}
-          loadingComponent={<DefaultListLoadingSkeleton count={2} />}
-          emptyComponent={emptyKeysComponent}
+        <h3 className="text-lg font-medium">API Key Management</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Manage API keys for different providers. Keys are stored securely in
+          your browser's local storage and never sent to any server other than
+          the intended AI provider.
+        </p>
+      </div>
+
+      {!isAdding && (
+        <Button
+          onClick={() => setIsAdding(true)}
+          variant="outline"
+          className="w-full mb-4"
+          disabled={isLoading}
         >
+          <PlusIcon className="h-4 w-4 mr-1" /> Add New API Key
+        </Button>
+      )}
+
+      {isAdding && (
+        <div className="border rounded-md p-4 space-y-3 bg-card shadow-md mb-4">
+          <h4 className="font-semibold text-card-foreground">Add New Key</h4>
+          <ApiKeyForm
+            onSave={handleSaveNewKey}
+            onCancel={() => setIsAdding(false)}
+            isSaving={isSavingNew}
+          />
+        </div>
+      )}
+
+      <div>
+        <h4 className="text-md font-medium mb-2">Stored API Keys</h4>
+        {isLoading && !isAdding ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : (apiKeys || []).length === 0 && !isAdding ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No API keys stored yet.
+          </p>
+        ) : (
           <div className="border rounded-md overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Linked To</TableHead>
-                  <TableHead>Key Value</TableHead>
+                  <TableHead>Provider Type</TableHead>
+                  <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(dbApiKeys || []).map((key: DbApiKey) => {
+                {(apiKeys || []).map((key: DbApiKey) => {
                   const isKeyDeleting = isDeleting[key.id];
                   return (
-                    <TableRow key={key.id}>
-                      <TableCell className="font-medium">{key.name}</TableCell>
-                      <TableCell>{getKeyTypeLabel(key.providerId)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {linkedProviderNames.get(key.id) ?? "Not linked"}
+                    <TableRow
+                      key={key.id}
+                      className={isKeyDeleting ? "opacity-50" : ""}
+                    >
+                      <TableCell className="font-medium">
+                        {key.name || "Unnamed Key"}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <span className="font-mono text-xs">
-                            {showValues[key.id]
-                              ? key.value
-                              : "••••••••••••••••"}
-                          </span>
-                          {/* Use ActionTooltipButton */}
-                          <ActionTooltipButton
-                            tooltipText={
-                              showValues[key.id] ? "Hide key" : "Show key"
-                            }
-                            onClick={() => toggleShowValue(key.id)}
-                            aria-label={
-                              showValues[key.id] ? "Hide key" : "Show key"
-                            }
-                            icon={
-                              showValues[key.id] ? <EyeOffIcon /> : <EyeIcon />
-                            }
-                            disabled={isKeyDeleting}
-                            className="h-6 w-6"
-                          />
-                        </div>
+                      <TableCell>{key.providerId || "Unknown"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {format(new Date(key.createdAt), "PPp")}
                       </TableCell>
                       <TableCell className="text-right">
-                        {/* Use ActionTooltipButton */}
                         <ActionTooltipButton
-                          tooltipText="Delete"
-                          onClick={() => handleDeleteKey(key.id, key.name)}
-                          aria-label={`Delete key ${key.name}`}
+                          tooltipText="Delete Key"
+                          onClick={() =>
+                            handleDelete(key.id, key.name || "Unnamed Key")
+                          }
+                          disabled={isKeyDeleting}
+                          aria-label={`Delete key ${key.name || "Unnamed Key"}`}
                           icon={
                             isKeyDeleting ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -288,8 +158,7 @@ const SettingsApiKeysComponent: React.FC = () => {
                               <Trash2Icon />
                             )
                           }
-                          disabled={isKeyDeleting}
-                          className="text-red-600 hover:text-red-700 h-8 w-8"
+                          className="text-destructive hover:text-destructive/80 h-8 w-8"
                         />
                       </TableCell>
                     </TableRow>
@@ -298,7 +167,7 @@ const SettingsApiKeysComponent: React.FC = () => {
               </TableBody>
             </Table>
           </div>
-        </LoadingStateWrapper>
+        )}
       </div>
     </div>
   );

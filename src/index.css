@@ -53,6 +53,51 @@
         --input: 200 30% 30%;
         --ring: 160 48% 45%;
     }
+    .TijuLight {
+        /* CSS Variables */
+        --background: var(--eggshell);
+        --foreground: var(--dim-gray);
+        --card: var(--eggshell);
+        --card-foreground: var(--dim-gray);
+        --popover: var(--eggshell);
+        --popover-foreground: var(--dim-gray);
+        --primary: var(--xanthous);
+        --primary-foreground: var(--black-olive);
+        --secondary: var(--taupe-gray);
+        --secondary-foreground: var(--black-olive);
+        --muted: var(--eggshell);
+        --muted-foreground: var(--dim-gray);
+        --accent: var(--xanthous);
+        --accent-foreground: var(--black-olive);
+        --destructive: var(--black-olive);
+        --destructive-foreground: var(--eggshell);
+        --border: var(--taupe-gray);
+        --input: var(--eggshell);
+        --ring: var(--xanthous);
+        --radius: 0.5rem;
+    }
+
+    .TijuDark {
+        --background: var(--black-olive);
+        --foreground: var(--eggshell);
+        --card: var(--taupe-gray);
+        --card-foreground: var(--eggshell);
+        --popover: var(--taupe-gray);
+        --popover-foreground: var(--eggshell);
+        --primary: var(--xanthous);
+        --primary-foreground: var(--black-olive);
+        --secondary: var(--dim-gray);
+        --secondary-foreground: var(--eggshell);
+        --muted: var(--taupe-gray);
+        --muted-foreground: var(--eggshell);
+        --accent: var(--xanthous);
+        --accent-foreground: var(--black-olive);
+        --destructive: var(--eggshell);
+        --destructive-foreground: var(--black-olive);
+        --border: var(--dim-gray);
+        --input: var(--taupe-gray);
+        --ring: var(--xanthous);
+    }
 }
 
 @layer base {
@@ -251,7 +296,7 @@
 
     /* Header styling */
     .code-block-header {
-        @apply flex items-center justify-between px-3 py-2 
+        @apply flex items-center justify-between px-3 py-2
       border-b border-border bg-muted/50;
     }
 

@@ -1,4 +1,5 @@
 // src/store/ui.store.ts
+// FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
@@ -11,9 +12,10 @@ interface UIState {
   focusInputOnNextRender: boolean;
   initialSettingsTab: string | null;
   initialSettingsSubTab: string | null;
-  // Added state for project settings modal
   isProjectSettingsModalOpen: boolean;
   projectSettingsModalTargetId: string | null;
+  // Add state for VFS modal
+  isVfsModalOpen: boolean;
 }
 
 interface UIActions {
@@ -25,9 +27,10 @@ interface UIActions {
   setFocusInputFlag: (focus: boolean) => void;
   setInitialSettingsTabs: (tab: string | null, subTab?: string | null) => void;
   clearInitialSettingsTabs: () => void;
-  // Added actions for project settings modal
   openProjectSettingsModal: (projectId: string) => void;
   closeProjectSettingsModal: () => void;
+  // Add actions for VFS modal
+  toggleVfsModal: (isOpen?: boolean) => void;
 }
 
 export const useUIStateStore = create(
@@ -41,9 +44,10 @@ export const useUIStateStore = create(
     focusInputOnNextRender: false,
     initialSettingsTab: null,
     initialSettingsSubTab: null,
-    // Initialize project settings modal state
     isProjectSettingsModalOpen: false,
     projectSettingsModalTargetId: null,
+    // Initialize VFS modal state
+    isVfsModalOpen: false,
 
     // Actions
     toggleChatControlPanel: (panelId, isOpen) => {
@@ -94,7 +98,6 @@ export const useUIStateStore = create(
       set({ initialSettingsTab: null, initialSettingsSubTab: null });
     },
 
-    // Actions for project settings modal
     openProjectSettingsModal: (projectId) => {
       set({
         isProjectSettingsModalOpen: true,
@@ -105,6 +108,13 @@ export const useUIStateStore = create(
       set({
         isProjectSettingsModalOpen: false,
         projectSettingsModalTargetId: null,
+      });
+    },
+
+    // Actions for VFS modal
+    toggleVfsModal: (isOpen) => {
+      set((state) => {
+        state.isVfsModalOpen = isOpen ?? !state.isVfsModalOpen;
       });
     },
   })),

@@ -1,5 +1,5 @@
 // src/components/LiteChat/file-manager/FileManagerRow.tsx
-
+// FULL FILE
 import React from "react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -79,7 +79,10 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
   handleGitPush,
   handleGitStatus,
 }) => {
+  const isDirectory = entry.type === "folder";
+
   const handleRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
+    // Prevent navigation/selection if clicking on interactive elements
     if (
       (e.target as HTMLElement).closest(
         'input[type="checkbox"], button, input[type="text"], [data-radix-context-menu-trigger]',
@@ -87,8 +90,14 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
     ) {
       return;
     }
-    if (!isEditingThis && !isOperationLoading) {
+    if (isEditingThis || isOperationLoading) return;
+
+    // If it's a directory, navigate
+    if (isDirectory) {
       handleNavigate(entry);
+    } else {
+      // If it's a file, toggle its selection state
+      handleCheckboxChange(!isChecked, entry.id);
     }
   };
 
@@ -99,8 +108,6 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
       cancelEditing();
     }
   };
-
-  const isDirectory = entry.type === "folder";
 
   const Icon = isDirectory
     ? isGitRepo
@@ -120,6 +127,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
         "group hover:bg-muted/50",
         isEditingThis && "bg-muted ring-1 ring-primary",
         isOperationLoading && "opacity-70 cursor-not-allowed",
+        !isDirectory && "cursor-pointer", // Add cursor pointer for files
       )}
       onClick={handleRowClick}
       onDoubleClick={() =>
@@ -134,7 +142,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
           }
           aria-label={`Select ${entry.name}`}
           className="border-border data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-          disabled={isOperationLoading || isDirectory}
+          disabled={isOperationLoading || isDirectory} // Keep disabled for folders
         />
       </TableCell>
       <TableCell className="px-2 py-1">
@@ -159,6 +167,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
               isDirectory && "cursor-pointer hover:underline",
             )}
             title={entry.name}
+            // Keep folder navigation on name click
             onClick={(e) => {
               if (isDirectory) {
                 e.stopPropagation();
@@ -347,6 +356,48 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
       </ContextMenu>
     );
   } else {
-    return rowContent;
+    // For files, wrap the row content in the ContextMenuTrigger directly
+    // This allows right-clicking the file row for potential future file-specific actions
+    return (
+      <ContextMenu key={entry.id}>
+        <ContextMenuTrigger
+          disabled={isEditingThis || isOperationLoading}
+          asChild
+        >
+          {rowContent}
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          {/* Add file-specific context menu items here if needed later */}
+          <ContextMenuItem
+            onSelect={() => handleCheckboxChange(!isChecked, entry.id)}
+            disabled={isOperationLoading}
+          >
+            {isChecked ? "Deselect" : "Select"} File
+          </ContextMenuItem>
+          <ContextMenuItem
+            onSelect={() => startEditing(entry)}
+            disabled={isOperationLoading}
+          >
+            <EditIcon className="mr-2 h-4 w-4" />
+            Rename
+          </ContextMenuItem>
+          <ContextMenuItem
+            onSelect={() => handleDownload(entry)}
+            disabled={isOperationLoading}
+          >
+            <DownloadIcon className="mr-2 h-4 w-4" />
+            Download File
+          </ContextMenuItem>
+          <ContextMenuItem
+            className="text-red-600 focus:text-red-600 focus:bg-red-100 dark:focus:bg-red-900/20"
+            onSelect={() => handleDelete(entry)}
+            disabled={isOperationLoading}
+          >
+            <Trash2Icon className="mr-2 h-4 w-4" />
+            Delete File
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    );
   }
 };
