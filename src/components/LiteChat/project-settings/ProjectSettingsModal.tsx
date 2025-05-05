@@ -1,5 +1,5 @@
 // src/components/LiteChat/project-settings/ProjectSettingsModal.tsx
-
+// FULL FILE - Adjusted DialogContent sizing
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Dialog,
@@ -24,6 +24,7 @@ import { ProjectSettingsSync } from "./ProjectSettingsSync";
 import { ProjectSettingsVfs } from "./ProjectSettingsVfs";
 import { useConversationStore } from "@/store/conversation.store";
 import { TabbedLayout, TabDefinition } from "../common/TabbedLayout";
+import { cn } from "@/lib/utils"; // Import cn
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
@@ -369,8 +370,17 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] w-[90vw] h-[70vh] min-h-[500px] max-h-[80vh] flex flex-col p-0">
-        <DialogHeader className="p-6 pb-4 flex-shrink-0">
+      <DialogContent
+        className={cn(
+          // Base styles
+          "w-[95vw] h-[85vh] flex flex-col p-0",
+          // Responsive overrides
+          "sm:w-[90vw] sm:max-w-[800px]",
+          "md:h-[75vh]",
+          "min-h-[500px] max-h-[90vh]", // Ensure min/max height
+        )}
+      >
+        <DialogHeader className="p-4 md:p-6 pb-2 md:pb-4 flex-shrink-0">
           <DialogTitle>Project Settings: {project?.name}</DialogTitle>
           <DialogDescription>
             Configure default settings for this project. Settings inherit from
@@ -383,12 +393,13 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
           tabs={tabs}
           initialValue={activeTab}
           onValueChange={setActiveTab}
-          className="flex-grow overflow-hidden px-6"
-          listClassName="-mx-6 px-6"
-          contentContainerClassName="pb-6 pr-2 -mr-2"
+          className="flex-grow overflow-hidden px-4 md:px-6"
+          listClassName="-mx-4 md:-mx-6 px-4 md:px-6"
+          contentContainerClassName="pb-4 md:pb-6 pr-2 -mr-2"
+          scrollable={true}
         />
 
-        <DialogFooter className="flex-shrink-0 border-t p-6 pt-4 mt-auto">
+        <DialogFooter className="flex-shrink-0 border-t p-4 md:p-6 pt-3 md:pt-4 mt-auto">
           <Button variant="outline" onClick={onClose} disabled={isSaving}>
             Cancel
           </Button>

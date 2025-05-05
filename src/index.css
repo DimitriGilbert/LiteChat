@@ -1,4 +1,5 @@
 /* src/index.css */
+/* FULL FILE - Added Mobile Sidebar Animations */
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -329,6 +330,37 @@
 .animate-fadeIn {
     animation: fadeIn 0.3s ease-out forwards;
 }
+
+@keyframes slideInFromLeft {
+    from {
+        transform: translateX(-100%);
+        opacity: 0.8;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+.animate-slideInFromLeft {
+    animation: slideInFromLeft 0.3s ease-out forwards;
+}
+
+/* Add slideOutToLeft if needed for closing animation */
+@keyframes slideOutToLeft {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(-100%);
+        opacity: 0.8;
+    }
+}
+.animate-slideOutToLeft {
+    animation: slideOutToLeft 0.3s ease-out forwards;
+}
+
+/* Keep slideInFromTop for other elements */
 @keyframes slideInFromTop {
     from {
         transform: translateY(-10px);

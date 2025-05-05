@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/UserPromptDisplay.tsx
-// FULL FILE
+// FULL FILE - Adjusted padding for mobile
 import React, { useState, useCallback, useEffect } from "react";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
 import { FilePreviewRenderer } from "../common/FilePreviewRenderer";
@@ -72,9 +72,13 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
 
     return (
       <div className={cn("user-prompt relative group/user", className)}>
-        <div className="flex justify-between items-center mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-10 p-1 -m-1 rounded-t">
+        <div
+          className={cn(
+            "flex flex-col sm:flex-row justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-10 p-1 -m-1 rounded-t",
+          )}
+        >
           {/* Left Group: Icon, Name, Actions */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 mb-1 sm:mb-0">
             <UserIcon className="h-4 w-4 text-primary flex-shrink-0" />
             <span className="text-xs font-semibold text-primary mr-1">
               User
@@ -109,7 +113,7 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
             </div>
           </div>
           {/* Right Group: Timestamp */}
-          <div className="flex items-center flex-shrink-0">
+          <div className="flex items-center flex-shrink-0 self-end sm:self-start">
             <span className="text-xs text-muted-foreground">{timeAgo}</span>
           </div>
         </div>

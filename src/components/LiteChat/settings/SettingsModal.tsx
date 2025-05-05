@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsModal.tsx
-// FULL FILE
+// FULL FILE - Adjusted DialogContent sizing
 import React, { memo, useState, useEffect, useMemo } from "react";
 import {
   Dialog,
@@ -24,6 +24,7 @@ import { useSettingsStore } from "@/store/settings.store";
 import { useModStore } from "@/store/mod.store";
 import { useUIStateStore } from "@/store/ui.store";
 import { TabbedLayout, TabDefinition } from "../common/TabbedLayout";
+import { cn } from "@/lib/utils"; // Import cn
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -133,8 +134,18 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
 
     return (
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-[1200px] w-[90vw] h-[80vh] min-h-[550px] max-h-[90vh] flex flex-col p-0">
-          <DialogHeader className="p-6 pb-4 flex-shrink-0">
+        <DialogContent
+          className={cn(
+            // Base styles
+            "w-[95vw] h-[90vh] flex flex-col p-0",
+            // Responsive overrides
+            "sm:w-[90vw] sm:h-[85vh]",
+            "md:w-[85vw] md:max-w-[1200px] md:h-[80vh]",
+            "lg:w-[75vw]",
+            "min-h-[500px] max-h-[95vh]", // Ensure min/max height
+          )}
+        >
+          <DialogHeader className="p-4 md:p-6 pb-2 md:pb-4 flex-shrink-0">
             <DialogTitle>Settings</DialogTitle>
             <DialogDescription>
               Manage application settings, AI behavior, API keys, providers, and
@@ -146,13 +157,13 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
             tabs={tabs}
             initialValue={activeTab}
             onValueChange={handleTabChange}
-            className="flex-grow overflow-hidden px-6"
-            listClassName="-mx-6 px-6"
-            contentContainerClassName="flex-grow overflow-y-auto pb-6 pr-2 -mr-2"
+            className="flex-grow overflow-hidden px-4 md:px-6"
+            listClassName="-mx-4 md:-mx-6 px-4 md:px-6"
+            contentContainerClassName="flex-grow overflow-y-auto pb-4 md:pb-6 pr-2 -mr-2"
             scrollable={true}
           />
 
-          <DialogFooter className="flex-shrink-0 border-t p-6 pt-4 mt-auto">
+          <DialogFooter className="flex-shrink-0 border-t p-4 md:p-6 pt-3 md:pt-4 mt-auto">
             <Button variant="outline" onClick={() => handleOpenChange(false)}>
               Close
             </Button>

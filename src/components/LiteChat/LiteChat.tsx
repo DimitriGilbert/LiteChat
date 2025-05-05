@@ -1,5 +1,5 @@
 // src/components/LiteChat/LiteChat.tsx
-// FULL FILE - Verified border and rounding on main container
+// FULL FILE - Adapted for Mobile Responsiveness
 import React, {
   useEffect,
   useCallback,
@@ -29,7 +29,7 @@ import { InputArea } from "@/components/LiteChat/prompt/InputArea";
 import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Menu, X } from "lucide-react";
 import { usePromptStateStore } from "@/store/prompt.store";
 
 // Define the type for the registration functions prop
@@ -43,6 +43,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
   controls = [], // Default to empty array
 }) => {
   const [isInitializing, setIsInitializing] = useState(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const inputAreaRef = useRef<InputAreaRef>(null); // Ref for InputArea
 
   // --- Store Hooks ---
@@ -118,6 +119,20 @@ export const LiteChat: React.FC<LiteChatProps> = ({
       loadRulesAndTags: state.loadRulesAndTags,
     })),
   );
+
+  // --- Mobile Sidebar Toggle Handler ---
+  const toggleMobileSidebar = useCallback(() => {
+    setIsMobileSidebarOpen((prev) => !prev);
+  }, []);
+
+  // Close mobile sidebar when an item is selected (e.g., conversation)
+  useEffect(() => {
+    if (isMobileSidebarOpen) {
+      setIsMobileSidebarOpen(false);
+    }
+    // Intentionally only run when selection changes, not when sidebar opens/closes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItemId, selectedItemType]);
 
   // --- Focus Input Helper ---
   const focusInput = useCallback(() => {
@@ -450,13 +465,9 @@ export const LiteChat: React.FC<LiteChatProps> = ({
 
   return (
     <>
-      {/* Apply border and rounding to the main container */}
-      <div
-        className={cn(
-          "flex h-full w-full border border-border rounded-lg overflow-hidden bg-background text-foreground",
-        )}
-      >
-        {/* Sidebar */}
+      {/* Main container */}
+      <div className="flex h-full w-full border border-border rounded-lg overflow-hidden bg-background text-foreground">
+        {/* Desktop Sidebar */}
         <div
           className={cn(
             "hidden md:flex flex-col border-r border-border bg-card",
@@ -465,7 +476,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
             isSidebarCollapsed ? "w-16" : "w-64",
           )}
         >
-          <div className={cn("flex-grow overflow-y-auto overflow-x-hidden")}>
+          <div className="flex-grow overflow-y-auto overflow-x-hidden">
             <div className={cn(isSidebarCollapsed ? "hidden" : "block")}>
               <ChatControlWrapper
                 controls={sidebarControls}
@@ -505,13 +516,69 @@ export const LiteChat: React.FC<LiteChatProps> = ({
           </div>
         </div>
 
+        {/* Mobile Sidebar (Overlay) */}
+        {isMobileSidebarOpen && (
+          <div className="md:hidden fixed inset-0 z-50 flex">
+            {/* Backdrop/overlay */}
+            <div
+              className="fixed inset-0 bg-background/80 backdrop-blur-sm animate-fadeIn"
+              onClick={toggleMobileSidebar}
+            ></div>
+
+            {/* Mobile sidebar content */}
+            <div className="relative w-4/5 max-w-xs bg-card border-r border-border h-full flex flex-col animate-slideInFromLeft">
+              {/* Close button */}
+              <div className="flex justify-between items-center p-4 border-b border-border">
+                <h2 className="font-semibold">LiteChat Menu</h2>
+                <button
+                  onClick={toggleMobileSidebar}
+                  className="p-1 rounded-md hover:bg-muted"
+                  aria-label="Close menu"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Sidebar content */}
+              <div className="flex-grow overflow-y-auto overflow-x-hidden">
+                <ChatControlWrapper
+                  controls={sidebarControls}
+                  panelId="sidebar"
+                  renderMode="full"
+                  className="h-full"
+                />
+              </div>
+
+              {/* Footer controls */}
+              <div className="flex-shrink-0 border-t border-border p-4">
+                <ChatControlWrapper
+                  controls={sidebarFooterControls}
+                  panelId="sidebar-footer"
+                  renderMode="full"
+                  className="flex items-center justify-between"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Main Chat Area */}
         <div className="flex flex-col flex-grow min-w-0">
-          <div className="flex items-center justify-end p-2 border-b border-border bg-card flex-shrink-0">
+          <div className="flex items-center justify-between p-2 border-b border-border bg-card flex-shrink-0">
+            {/* Mobile menu button */}
+            <button
+              className="md:hidden p-2 rounded-md hover:bg-muted"
+              onClick={toggleMobileSidebar}
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            {/* Header controls (right-aligned) */}
             <ChatControlWrapper
               controls={headerControls}
               panelId="header"
-              className="flex items-center justify-end gap-1"
+              className="flex items-center justify-end gap-1 flex-grow" // Ensure it takes space
             />
           </div>
 
@@ -521,7 +588,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
             onRegenerateInteraction={onRegenerateInteraction}
             onStopInteraction={onStopInteraction}
             status={interactionStatus}
-            className="flex-grow overflow-y-hidden" // Removed p-4, space-y-4 from here
+            className="flex-grow overflow-y-hidden"
           />
 
           {globalError && (
@@ -534,7 +601,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({
             InputAreaRenderer={InputArea}
             onSubmit={handlePromptSubmit}
             className="border-t border-border bg-card flex-shrink-0"
-            // Pass the ref down
             inputAreaRef={inputAreaRef}
           />
         </div>

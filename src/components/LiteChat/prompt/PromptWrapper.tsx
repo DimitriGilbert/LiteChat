@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/PromptWrapper.tsx
-// FULL FILE
+// FULL FILE - Adjusted padding and layout for mobile
 import React, { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { SendHorizonalIcon, Loader2 } from "lucide-react";
@@ -164,31 +164,25 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   }, []);
 
   return (
-    <div className={cn("p-4 space-y-3", className)}>
+    <div className={cn("p-2 md:p-4 space-y-2 md:space-y-3", className)}>
       {panelControls.length > 0 && (
         <PromptControlWrapper
           controls={panelControls}
           area="panel"
-          className="flex flex-wrap gap-2 items-start mb-2"
+          className="flex flex-wrap gap-1 md:gap-2 items-start mb-1 md:mb-2" // Adjusted gap/margin
         />
       )}
 
-      <InputAreaRenderer
-        // Pass the ref down to the actual InputArea component
-        ref={inputAreaRef}
-        onSubmit={handleSubmit}
-        disabled={isStreaming || isSubmitting}
-        placeholder={placeholder}
-        onValueChange={handleInputValueChange}
-      />
-
-      <div className="flex items-center justify-between gap-2 mt-2">
-        <PromptControlWrapper
-          controls={triggerControls}
-          area="trigger"
-          className="flex items-center gap-1 flex-shrink-0"
+      <div className="flex items-end gap-2">
+        <InputAreaRenderer
+          // Pass the ref down to the actual InputArea component
+          ref={inputAreaRef}
+          onSubmit={handleSubmit}
+          disabled={isStreaming || isSubmitting}
+          placeholder={placeholder}
+          onValueChange={handleInputValueChange}
+          className="flex-grow" // Allow textarea to grow
         />
-        <div className="flex-grow"></div>
         <Button
           type="button"
           size="icon"
@@ -198,7 +192,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
             isSubmitting ||
             (!hasInputValue && attachedFilesMetadata.length === 0)
           }
-          className="h-9 w-9 flex-shrink-0"
+          className="h-9 w-9 flex-shrink-0" // Consistent size
           aria-label="Send message"
         >
           {isSubmitting ? (
@@ -208,6 +202,12 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
           )}
         </Button>
       </div>
+
+      <PromptControlWrapper
+        controls={triggerControls}
+        area="trigger"
+        className="flex items-center gap-1 flex-wrap flex-shrink-0 mt-1 md:mt-2" // Allow wrapping, adjusted margin
+      />
     </div>
   );
 };

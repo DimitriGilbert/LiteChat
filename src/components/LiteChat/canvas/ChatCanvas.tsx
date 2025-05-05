@@ -1,4 +1,5 @@
 // src/components/LiteChat/canvas/ChatCanvas.tsx
+// FULL FILE - Adjusted padding for mobile
 import React, { useMemo, useRef, useEffect, useState } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { InteractionCard } from "./InteractionCard";
@@ -165,7 +166,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   const renderContent = () => {
     if (isProviderLoading || isConversationLoading || isProjectLoading) {
       return (
-        <div className="space-y-4 p-4">
+        <div className="space-y-4 p-2 md:p-4">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-20 w-full" />
@@ -188,7 +189,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
 
     // --- USING THE CORRECTED RENDER LOGIC ---
     return (
-      <div className="space-y-4 p-4">
+      <div className="space-y-4 p-2 md:p-4">
         {interactionGroups.map((group) => {
           const interaction = group[0];
           const isStreaming = streamingInteractionIds.includes(interaction.id);

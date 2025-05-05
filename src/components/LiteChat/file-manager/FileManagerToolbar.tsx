@@ -1,4 +1,5 @@
 // src/components/LiteChat/file-manager/FileManagerToolbar.tsx
+// FULL FILE - Adjusted layout for mobile
 import React from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -127,7 +128,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             <FolderUpIcon className="h-4 w-4" />
           </Button>
           <span
-            className="text-sm font-mono text-muted-foreground truncate flex-shrink min-w-0 px-2 py-1 rounded bg-muted/50 max-w-[200px] sm:max-w-xs md:max-w-sm lg:max-w-md"
+            className="text-sm font-mono text-muted-foreground truncate flex-shrink min-w-0 px-2 py-1 rounded bg-muted/50 max-w-[150px] sm:max-w-xs md:max-w-sm lg:max-w-md" // Adjusted max-width for mobile
             title={currentPath}
           >
             {currentPath}
@@ -138,7 +139,9 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
         <div className="flex-grow" />
 
         {/* Actions */}
-        <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
+        <div className="flex items-center gap-1 flex-shrink-0 flex-wrap justify-end">
+          {" "}
+          {/* Added justify-end */}
           <Button
             variant="ghost"
             size="icon"
@@ -178,7 +181,8 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             ) : (
               <FolderPlusIcon className="h-4 w-4 mr-1" />
             )}
-            Folder
+            <span className="hidden sm:inline">Folder</span>{" "}
+            {/* Hide text on small screens */}
           </Button>
           <Button
             variant="outline"
@@ -199,7 +203,8 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             ) : (
               <UploadCloudIcon className="h-4 w-4 mr-1" />
             )}
-            Files
+            <span className="hidden sm:inline">Files</span>{" "}
+            {/* Hide text on small screens */}
           </Button>
           <Button
             variant="outline"
@@ -220,7 +225,8 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             ) : (
               <FolderIcon className="h-4 w-4 mr-1" />
             )}
-            Folder
+            <span className="hidden sm:inline">Folder</span>{" "}
+            {/* Hide text on small screens */}
           </Button>
           <Button
             variant="outline"
@@ -241,7 +247,8 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             ) : (
               <FileArchiveIcon className="h-4 w-4 mr-1" />
             )}
-            ZIP
+            <span className="hidden sm:inline">ZIP</span>{" "}
+            {/* Hide text on small screens */}
           </Button>
           <Button
             variant="outline"
@@ -262,7 +269,8 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             ) : (
               <GitBranchIcon className="h-4 w-4 mr-1" />
             )}
-            Clone
+            <span className="hidden sm:inline">Clone</span>{" "}
+            {/* Hide text on small screens */}
           </Button>
           <Button
             variant="outline"
@@ -283,7 +291,8 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             ) : (
               <ArchiveIcon className="h-4 w-4 mr-1" />
             )}
-            Export
+            <span className="hidden sm:inline">Export</span>{" "}
+            {/* Hide text on small screens */}
           </Button>
         </div>
       </div>

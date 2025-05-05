@@ -1,7 +1,8 @@
 // src/components/LiteChat/prompt/PromptControlWrapper.tsx
+// FULL FILE - No changes needed here, already supports wrapping via flex-wrap in parent
 import React from "react";
 import type { PromptControl } from "@/types/litechat/prompt";
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 interface PromptControlWrapperProps {
   controls: PromptControl[];

@@ -1,5 +1,5 @@
 // src/components/LiteChat/project-settings/ProjectSettingsVfs.tsx
-
+// FULL FILE - Adjusted layout for mobile
 import React, { useMemo } from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { AlertCircleIcon } from "lucide-react";
 import { toast } from "sonner";
 import { FileManager } from "@/components/LiteChat/file-manager/FileManager";
 import { TabbedLayout, TabDefinition } from "../common/TabbedLayout";
+import { cn } from "@/lib/utils"; // Import cn
 
 interface ProjectSettingsVfsProps {
   projectId: string | null;
@@ -46,7 +47,7 @@ export const ProjectSettingsVfs: React.FC<ProjectSettingsVfsProps> = ({
       },
       {
         value: "settings",
-        label: "Settings & Danger Zone",
+        label: "Settings", // Simplified label for mobile
         content: (
           <div className="space-y-4">
             <div>
@@ -54,7 +55,9 @@ export const ProjectSettingsVfs: React.FC<ProjectSettingsVfsProps> = ({
               <p className="text-xs text-muted-foreground mb-2">
                 Each project has its own dedicated Virtual File System (VFS).
               </p>
-              <div className="p-3 border rounded bg-muted/30 text-sm mb-2">
+              <div className="p-3 border rounded bg-muted/30 text-sm mb-2 break-all">
+                {" "}
+                {/* Added break-all */}
                 <p>
                   <span className="font-medium">Project ID (VFS Key):</span>{" "}
                   <code className="text-xs">{projectId || "N/A"}</code>
@@ -90,7 +93,10 @@ export const ProjectSettingsVfs: React.FC<ProjectSettingsVfsProps> = ({
       tabs={tabs}
       defaultValue="manage"
       className="h-full" // Ensure it fills height
-      listClassName="bg-muted/50 rounded-md" // Example custom list style
+      listClassName={cn(
+        "bg-muted/50 rounded-md",
+        "flex-wrap justify-start h-auto", // Allow wrapping on mobile
+      )}
       contentContainerClassName="mt-3 flex-grow flex flex-col" // Ensure content area grows
     />
   );

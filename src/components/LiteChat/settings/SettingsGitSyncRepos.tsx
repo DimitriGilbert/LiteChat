@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsGitSyncRepos.tsx
-
+// FULL FILE - Adjusted layout for mobile
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -163,20 +163,21 @@ const SettingsGitSyncReposComponent: React.FC = () => {
       <h4 className="font-semibold text-card-foreground">
         {editingId ? "Edit Sync Repository" : "Add New Sync Repository"}
       </h4>
+      {/* Use responsive grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
+        <div className="sm:col-span-1">
           <Label htmlFor="repo-name">Name</Label>
           <Input
             id="repo-name"
             value={formData.name || ""}
             onChange={(e) => handleInputChange("name", e.target.value)}
-            placeholder="e.g., My Conversation Backup"
+            placeholder="e.g., My Backup"
             required
             className="mt-1"
             disabled={isSaving}
           />
         </div>
-        <div>
+        <div className="sm:col-span-2">
           <Label htmlFor="repo-url">Remote URL (HTTPS)</Label>
           <Input
             id="repo-url"
@@ -189,7 +190,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
             disabled={isSaving}
           />
         </div>
-        <div>
+        <div className="sm:col-span-1">
           <Label htmlFor="repo-branch">Branch</Label>
           <Input
             id="repo-branch"
@@ -214,6 +215,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
             only for private repositories.
           </AlertDescription>
         </Alert>
+        {/* Use responsive grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="repo-username">Username</Label>
@@ -307,14 +309,25 @@ const SettingsGitSyncReposComponent: React.FC = () => {
             No sync repositories configured yet.
           </p>
         ) : (
-          <div className="border rounded-md overflow-hidden">
+          <div className="border rounded-md overflow-x-auto">
+            {" "}
+            {/* Added overflow-x-auto */}
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Remote URL</TableHead>
-                  <TableHead>Branch</TableHead>
-                  <TableHead>Auth</TableHead>
+                  <TableHead className="hidden md:table-cell">
+                    Remote URL
+                  </TableHead>{" "}
+                  {/* Hide on mobile */}
+                  <TableHead className="hidden lg:table-cell">
+                    Branch
+                  </TableHead>{" "}
+                  {/* Hide on small/medium */}
+                  <TableHead className="hidden lg:table-cell">
+                    Auth
+                  </TableHead>{" "}
+                  {/* Hide on small/medium */}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -358,12 +371,16 @@ const SettingsGitSyncReposComponent: React.FC = () => {
                         isDisabled && !isRepoEditing ? "opacity-70" : "",
                       )}
                     >
-                      <TableCell className="font-medium">{repo.name}</TableCell>
-                      <TableCell className="text-xs truncate max-w-xs">
+                      <TableCell className="font-medium truncate max-w-[100px] sm:max-w-xs">
+                        {repo.name}
+                      </TableCell>
+                      <TableCell className="text-xs truncate max-w-[100px] sm:max-w-xs hidden md:table-cell">
                         {repo.remoteUrl}
                       </TableCell>
-                      <TableCell>{repo.branch || "main"}</TableCell>
-                      <TableCell className="text-xs">
+                      <TableCell className="hidden lg:table-cell">
+                        {repo.branch || "main"}
+                      </TableCell>
+                      <TableCell className="text-xs hidden lg:table-cell">
                         {hasAuth ? "Configured" : "None"}
                       </TableCell>
                       <TableCell className="text-right space-x-1">

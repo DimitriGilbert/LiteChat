@@ -1,5 +1,5 @@
 // src/components/LiteChat/file-manager/FileManager.tsx
-
+// FULL FILE - Added mobile view logic
 import React, {
   useState,
   useEffect,
@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { FileManagerList } from "./FileManagerList"; // Import mobile list view
 
 export const FileManager = memo(() => {
   // --- VFS Store State & Actions ---
@@ -577,10 +578,41 @@ WARNING: This will delete all contents inside`
         handleArchiveChange={handleArchiveChange}
       />
 
-      {/* Table container should grow and handle overflow */}
-      {/* Changed overflow-hidden back to overflow-auto */}
-      <div className="flex-grow overflow-auto">
+      {/* Table container (Desktop) */}
+      <div className="flex-grow overflow-auto hidden md:block">
         <FileManagerTable
+          entries={currentNodes}
+          editingPath={editingPath}
+          newName={newName}
+          creatingFolder={creatingFolder}
+          newFolderName={newFolderName}
+          selectedFileIds={selectedFileIds}
+          isOperationLoading={isAnyOperationLoading}
+          handleNavigate={handleNavigate}
+          handleCheckboxChange={handleCheckboxChange}
+          startEditing={startEditing}
+          cancelEditing={cancelEditing}
+          handleRename={handleRename}
+          cancelCreatingFolder={cancelCreatingFolder}
+          handleCreateFolder={handleCreateFolder}
+          handleDownload={handleDownload}
+          handleDelete={handleDelete}
+          setNewName={setNewName}
+          setNewFolderName={setNewFolderName}
+          renameInputRef={renameInputRef}
+          newFolderInputRef={newFolderInputRef}
+          gitRepoStatus={gitRepoStatus}
+          handleGitInit={handleGitInit}
+          handleGitPull={handleGitPull}
+          handleGitCommit={handleGitCommit}
+          handleGitPush={handleGitPush}
+          handleGitStatus={handleGitStatus}
+        />
+      </div>
+
+      {/* List container (Mobile) */}
+      <div className="flex-grow overflow-auto block md:hidden">
+        <FileManagerList
           entries={currentNodes}
           editingPath={editingPath}
           newName={newName}

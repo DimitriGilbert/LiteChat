@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/InteractionCard.tsx
-// FULL FILE
+// FULL FILE - Adjusted padding for mobile
 import React, { useMemo, useState, useCallback } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { UserPromptDisplay } from "@/components/LiteChat/canvas/UserPromptDisplay";
@@ -85,7 +85,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
     return (
       <div
         className={cn(
-          "group/card relative rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-muted/50",
+          "group/card relative rounded-lg border bg-card p-3 md:p-4 shadow-sm transition-colors hover:bg-muted/50", // Adjusted padding
           isError ? "border-destructive/50 bg-destructive/5" : "border-border",
           className,
         )}

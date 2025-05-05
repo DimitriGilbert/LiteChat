@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/interaction/CardHeader.tsx
-// FULL FILE
+// FULL FILE - Adjusted layout for mobile
 import React, { useState, useCallback } from "react";
 import {
   BotIcon,
@@ -19,6 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils"; // Import cn
 
 interface CardHeaderProps {
   displayModelName: string;
@@ -78,9 +79,13 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
 
   return (
     // Apply sticky positioning and z-index here
-    <div className="flex justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-20 p-1 -m-1 rounded-t">
-      {/* Left Group: Icon, Name, Actions */}
-      <div className="flex items-start gap-1 min-w-0">
+    <div
+      className={cn(
+        "flex flex-col sm:flex-row justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-20 p-1 -m-1 rounded-t",
+      )}
+    >
+      {/* Left Group: Icon, Name, Metadata */}
+      <div className="flex items-start gap-1 min-w-0 mb-1 sm:mb-0">
         <BotIcon className="h-4 w-4 text-secondary flex-shrink-0 mt-0.5" />
         <div className="flex flex-col min-w-0">
           <span className="text-xs font-semibold text-secondary truncate mr-1">
@@ -133,7 +138,7 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
       </div>
 
       {/* Right Group: Timestamp & Actions */}
-      <div className="flex items-start flex-shrink-0 gap-1">
+      <div className="flex items-start flex-shrink-0 gap-1 self-end sm:self-start">
         <span className="text-xs text-muted-foreground mt-0.5">{timeAgo}</span>
         {/* Actions */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity">

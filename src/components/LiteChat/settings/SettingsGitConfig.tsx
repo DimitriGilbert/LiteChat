@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsGitConfig.tsx
-
+// FULL FILE - Adjusted layout for mobile
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ const SettingsGitConfigComponent: React.FC = () => {
         description="Set your user name and email for Git commits made within the VFS. This is required for committing changes."
         contentClassName="rounded-lg border p-4 shadow-sm bg-card" // Apply card styling to content
       >
+        {/* Use responsive grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="git-user-name">Git User Name</Label>
