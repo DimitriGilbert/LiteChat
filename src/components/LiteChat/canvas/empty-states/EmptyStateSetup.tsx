@@ -21,7 +21,7 @@ import { SetupStep } from "./SetupStep";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ModelEnablementList } from "@/components/LiteChat/settings/ModelEnablementList";
-import { Lnk } from "@/components/ui/lnk"; // Import the new Lnk component
+import { Lnk } from "@/components/ui/lnk";
 
 export const EmptyStateSetup: React.FC = () => {
   const {
@@ -60,12 +60,11 @@ export const EmptyStateSetup: React.FC = () => {
   );
 
   const [isSavingKey, setIsSavingKey] = useState(false);
-  // @ts-ignore DO NOT REMOVE, DOES NOT BUILD IF REMOVED
+  // @ts-expect-error @AI DO NOT REMOVE, DOES NOT BUILD IF REMOVED
   const [isSavingProvider, setIsSavingProvider] = useState(false);
   const [isStartingChat, setIsStartingChat] = useState(false);
-  const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
+  // setFocusInputFlag removed
   const [isUpdatingModels, setIsUpdatingModels] = useState(false);
-  // State to hold the provider type of the last added key
   const [lastAddedKeyProviderType, setLastAddedKeyProviderType] =
     useState<DbProviderType | null>(null);
 
@@ -110,7 +109,6 @@ export const EmptyStateSetup: React.FC = () => {
       setIsSavingKey(true);
       try {
         await addApiKey(name, providerId, value);
-        // Store the provider type of the added key
         setLastAddedKeyProviderType(providerId as DbProviderType);
       } finally {
         setIsSavingKey(false);
@@ -126,7 +124,6 @@ export const EmptyStateSetup: React.FC = () => {
       setIsSavingProvider(true);
       try {
         const newId = await addProviderConfig(config);
-        // Reset the last added key type after provider is added
         setLastAddedKeyProviderType(null);
         return newId;
       } finally {
@@ -165,17 +162,15 @@ export const EmptyStateSetup: React.FC = () => {
     setIsStartingChat(true);
     try {
       const newId = await addConversation({ title: "New Chat" });
+      // Selection will trigger focus via LiteChat's context change effect
       await selectItem(newId, "conversation");
-      // Focus flag is set correctly, ensure selection update doesn't interfere
-      setTimeout(() => setFocusInputFlag(true), 0);
     } catch (error) {
       toast.error("Failed to start your first chat.");
       console.error("Failed to start first chat:", error);
-    } finally {
-      // Only set loading false if it didn't succeed (otherwise component unmounts)
-      setIsStartingChat(false);
+      setIsStartingChat(false); // Only set false on error
     }
-  }, [addConversation, selectItem, setFocusInputFlag]);
+    // Don't set loading false on success, component will unmount
+  }, [addConversation, selectItem]);
 
   const openSettings = (tab: string, subTab?: string) => {
     setInitialSettingsTabs(tab, subTab);
@@ -184,7 +179,6 @@ export const EmptyStateSetup: React.FC = () => {
 
   // Define steps
   const steps = [
-    // Step 1: API Keys (Conditional)
     ...(enableApiKeyManagement
       ? [
           {
@@ -227,7 +221,6 @@ export const EmptyStateSetup: React.FC = () => {
           },
         ]
       : []),
-    // Step 2: Add Provider
     {
       id: "add-provider",
       title: "Add AI Provider",
@@ -243,12 +236,10 @@ export const EmptyStateSetup: React.FC = () => {
             ) => Promise<string>
           }
           onCancel={() => {}}
-          // Pass the last added key's provider type as initial type
           initialType={lastAddedKeyProviderType ?? undefined}
         />
       ),
     },
-    // Step 3: Enable Models
     {
       id: "enable-models",
       title: "Enable Models",
@@ -276,7 +267,6 @@ export const EmptyStateSetup: React.FC = () => {
         </p>
       ),
     },
-    // Step 4: Start Chatting
     {
       id: "start-chat",
       title: "Start Chatting",
@@ -292,12 +282,10 @@ export const EmptyStateSetup: React.FC = () => {
           {isStartingChat ? "Starting..." : "Start First Chat"}
         </Button>
       ),
-      // Remove specific content class for this step
       contentClassName: "",
     },
   ];
 
-  // Determine the first incomplete step
   const activeStepIndex = steps.findIndex((step) => !step.isComplete);
 
   if (isProviderLoading) {
@@ -339,7 +327,7 @@ export const EmptyStateSetup: React.FC = () => {
                     ? "p-0 border-none shadow-none bg-transparent"
                     : step.id === "enable-models"
                       ? "p-0"
-                      : step.contentClassName // Use specific class if provided, else default
+                      : step.contentClassName
                 }
               >
                 {step.content}
@@ -348,7 +336,6 @@ export const EmptyStateSetup: React.FC = () => {
           })}
         </div>
 
-        {/* Fallback Error Message */}
         {!isProviderLoading &&
           !enableApiKeyManagement &&
           !isProviderStepComplete &&

@@ -1,5 +1,5 @@
 // src/components/LiteChat/chat/control/conversation-list/IconRenderer.tsx
-
+// FULL FILE
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { PlusIcon, FolderPlusIcon } from "lucide-react";
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useConversationStore } from "@/store/conversation.store";
 import { useProjectStore } from "@/store/project.store";
-import { useUIStateStore } from "@/store/ui.store";
+// UIStateStore removed
 import { useShallow } from "zustand/react/shallow";
 
 export const ConversationListIconRenderer: React.FC = () => {
@@ -32,13 +32,12 @@ export const ConversationListIconRenderer: React.FC = () => {
       getProjectById: state.getProjectById,
     })),
   );
-  const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
+  // setFocusInputFlag removed
 
   const getParentProjectId = () => {
     if (selectedItemType === "project") {
       return selectedItemId;
     } else if (selectedItemType === "conversation" && selectedItemId) {
-      // Need getConversationById from ConversationStore here
       const convo = useConversationStore
         .getState()
         .getConversationById(selectedItemId);
@@ -54,8 +53,8 @@ export const ConversationListIconRenderer: React.FC = () => {
         title: "New Chat",
         projectId: parentProjectId,
       });
+      // Selection will trigger focus via LiteChat's context change effect
       selectItem(newId, "conversation");
-      setTimeout(() => setFocusInputFlag(true), 0);
     } catch (error) {
       console.error("Failed to create new chat:", error);
     }
@@ -64,13 +63,11 @@ export const ConversationListIconRenderer: React.FC = () => {
   const handleNewProject = async () => {
     try {
       const parentProjectId = getParentProjectId();
-      // Use addProject from ProjectStore
       const newId = await addProject({
         name: "New Project",
         parentId: parentProjectId,
       });
       selectItem(newId, "project");
-      // Cannot trigger inline edit from here easily
     } catch (error) {
       console.error("Failed to create new project:", error);
     }

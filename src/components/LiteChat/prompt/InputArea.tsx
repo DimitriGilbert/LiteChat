@@ -10,9 +10,9 @@ import React, {
 } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { useUIStateStore } from "@/store/ui.store";
+// UIStateStore import removed
 import { useInputStore } from "@/store/input.store";
-import { useShallow } from "zustand/react/shallow";
+// useShallow removed
 import type { InputAreaRef } from "@/types/litechat/prompt";
 
 interface InputAreaProps {
@@ -20,9 +20,8 @@ interface InputAreaProps {
   onSubmit: () => void;
   disabled?: boolean;
   placeholder?: string;
-  // Add callback prop for value changes
   onValueChange?: (value: string) => void;
-  className?: string; // Add className prop
+  className?: string;
   [key: string]: any;
 }
 
@@ -35,7 +34,7 @@ export const InputArea = memo(
         disabled,
         placeholder = "Type message... (Shift+Enter for new line)",
         className,
-        onValueChange, // Destructure the new prop
+        onValueChange,
         ...rest
       },
       ref,
@@ -43,38 +42,22 @@ export const InputArea = memo(
       const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
       const [internalValue, setInternalValue] = useState(initialValue);
 
-      // Expose methods via ref (removed setValue)
+      // Expose methods via ref
       useImperativeHandle(ref, () => ({
         getValue: () => internalValue,
         focus: () => internalTextareaRef.current?.focus(),
       }));
 
-      const { focusInputOnNextRender, setFocusInputFlag } = useUIStateStore(
-        useShallow((state) => ({
-          focusInputOnNextRender: state.focusInputOnNextRender,
-          setFocusInputFlag: state.setFocusInputFlag,
-        })),
-      );
-
-      useEffect(() => {
-        if (focusInputOnNextRender && internalTextareaRef.current) {
-          setFocusInputFlag(false);
-          requestAnimationFrame(() => {
-            internalTextareaRef.current?.focus();
-          });
-        }
-      }, [focusInputOnNextRender, setFocusInputFlag]);
+      // focusInputOnNextRender logic removed
 
       const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === "Enter" && !e.shiftKey && !disabled) {
           e.preventDefault();
-          // Check if value is empty OR if files are attached before submitting
           const hasFiles =
             useInputStore.getState().attachedFilesMetadata.length > 0;
           if (internalValue.trim().length > 0 || hasFiles) {
             onSubmit();
             setInternalValue("");
-            // Notify parent of value change after submit clears it
             if (onValueChange) {
               onValueChange("");
             }
@@ -87,7 +70,6 @@ export const InputArea = memo(
       ) => {
         const newValue = e.target.value;
         setInternalValue(newValue);
-        // Notify parent of value change
         if (onValueChange) {
           onValueChange(newValue);
         }
@@ -107,7 +89,6 @@ export const InputArea = memo(
 
       useEffect(() => {
         setInternalValue(initialValue);
-        // Also notify parent of initial value change
         if (onValueChange) {
           onValueChange(initialValue);
         }

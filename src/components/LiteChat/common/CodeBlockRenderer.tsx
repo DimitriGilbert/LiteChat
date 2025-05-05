@@ -19,8 +19,6 @@ import "prismjs/components/prism-go";
 import "prismjs/components/prism-yaml";
 import "prismjs/components/prism-rust";
 import "prismjs/components/prism-sql";
-// Import base Prism styles
-import "prismjs/themes/prism.css";
 
 import { Button } from "@/components/ui/button";
 import { CheckIcon, ClipboardIcon, ChevronsUpDownIcon } from "lucide-react";
@@ -47,9 +45,9 @@ const DEFAULT_DARK_THEME_LINK_ID = "prism-default-dark-theme-link";
 
 // Default theme URLs as specified
 const DEFAULT_LIGHT_THEME_URL =
-  "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.5.0/prism-material-light.min.css";
+  "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-material-light.min.css";
 const DEFAULT_DARK_THEME_URL =
-  "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.5.0/prism-coldark-dark.min.css";
+  "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-coldark-dark.min.css";
 
 // Helper function to get raw content URL from GitHub
 const getRawGitHubUrl = (url: string): string => {

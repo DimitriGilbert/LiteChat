@@ -1,5 +1,5 @@
 // src/components/LiteChat/chat/control/ConversationList.tsx
-
+// FULL FILE
 import React, { useMemo, useState, useCallback } from "react";
 import {
   useConversationStore,
@@ -13,7 +13,7 @@ import { PlusIcon, FolderPlusIcon, SearchIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { SidebarItemType } from "@/types/litechat/chat";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useUIStateStore } from "@/store/ui.store";
+// UIStateStore removed
 import {
   Tooltip,
   TooltipContent,
@@ -27,7 +27,6 @@ import { ConversationItemRenderer } from "@/components/LiteChat/chat/control/con
 import { useItemEditing } from "@/hooks/litechat/useItemEditing";
 
 // --- Recursive Filtering Helper ---
-// Memoize the helper itself if its dependencies are stable
 const itemMatchesFilterOrHasMatchingDescendant = (
   itemId: string,
   itemType: SidebarItemType,
@@ -102,7 +101,6 @@ const itemMatchesFilterOrHasMatchingDescendant = (
 // --- Main Control Component ---
 export const ConversationListControlComponent: React.FC = () => {
   // --- State Selection ---
-  // Select primitive/stable values directly
   const selectedItemId = useConversationStore((state) => state.selectedItemId);
   const selectedItemType = useConversationStore(
     (state) => state.selectedItemType,
@@ -111,9 +109,8 @@ export const ConversationListControlComponent: React.FC = () => {
     (state) => state.isLoading,
   );
   const isProjectLoading = useProjectStore((state) => state.isLoading);
-  const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
+  // setFocusInputFlag removed
 
-  // Select potentially changing arrays/objects with useShallow
   const { conversations, syncRepos, conversationSyncStatus } =
     useConversationStore(
       useShallow((state) => ({
@@ -124,7 +121,6 @@ export const ConversationListControlComponent: React.FC = () => {
     );
   const projects = useProjectStore((state) => state.projects);
 
-  // Select actions (these are stable references)
   const selectItem = useConversationStore((state) => state.selectItem);
   const addConversation = useConversationStore(
     (state) => state.addConversation,
@@ -153,11 +149,9 @@ export const ConversationListControlComponent: React.FC = () => {
   );
   const [filterText, setFilterText] = useState("");
 
-  // Combined loading state
   const isLoading = isConversationLoading || isProjectLoading;
 
   // --- Use the Item Editing Hook ---
-  // Pass stable action references
   const editingState = useItemEditing({
     updateProject,
     updateConversation,
@@ -180,7 +174,6 @@ export const ConversationListControlComponent: React.FC = () => {
   // --- End Item Editing Hook ---
 
   // --- Callbacks ---
-  // Wrap callbacks that depend on state/props in useCallback
   const toggleProjectExpansion = useCallback((projectId: string) => {
     setExpandedProjects((prev) => {
       const next = new Set(prev);
@@ -211,19 +204,13 @@ export const ConversationListControlComponent: React.FC = () => {
         title: "New Chat",
         projectId: parentProjectId,
       });
+      // Selection will trigger focus via LiteChat's context change effect
       selectItem(newId, "conversation");
-      setTimeout(() => setFocusInputFlag(true), 0);
     } catch (error) {
       console.error("Failed to create new chat:", error);
       toast.error("Failed to create new chat.");
     }
-  }, [
-    editingItemId,
-    getParentProjectId,
-    addConversation,
-    selectItem,
-    setFocusInputFlag,
-  ]);
+  }, [editingItemId, getParentProjectId, addConversation, selectItem]);
 
   const handleNewProject = useCallback(async () => {
     if (editingItemId) return;
@@ -237,7 +224,6 @@ export const ConversationListControlComponent: React.FC = () => {
       if (parentProjectId) {
         setExpandedProjects((prev) => new Set(prev).add(parentProjectId));
       }
-      // Delay starting edit slightly to allow state updates
       setTimeout(() => {
         const newProjectData = getProjectById(newId);
         if (newProjectData) {
@@ -274,10 +260,8 @@ export const ConversationListControlComponent: React.FC = () => {
       }
 
       if (id !== selectedItemId || type !== selectedItemType) {
+        // Selection will trigger focus via LiteChat's context change effect
         selectItem(id, type);
-        if (type === "conversation") {
-          setTimeout(() => setFocusInputFlag(true), 0);
-        }
       }
     },
     [
@@ -289,7 +273,6 @@ export const ConversationListControlComponent: React.FC = () => {
       handleSaveEdit,
       handleCancelEdit,
       selectItem,
-      setFocusInputFlag,
     ],
   );
 
@@ -343,7 +326,6 @@ export const ConversationListControlComponent: React.FC = () => {
   );
 
   // --- Memoized Derived Data ---
-  // Memoize maps and structures derived from store state
   const repoNameMap = useMemo(() => {
     return new Map((syncRepos || []).map((r) => [r.id, r.name]));
   }, [syncRepos]);
@@ -374,7 +356,6 @@ export const ConversationListControlComponent: React.FC = () => {
       };
     }, [projects, conversations]);
 
-  // Memoize the getChildren function itself, ensuring its dependencies are stable
   const getChildren = useCallback(
     (
       parentId: string | null,
@@ -405,7 +386,6 @@ export const ConversationListControlComponent: React.FC = () => {
         conversationsByProjectId.get(parentId) || []
       ).filter((c) => c.title.toLowerCase().includes(lowerCaseFilter));
 
-      // Sorting can be done here or memoized separately if needed
       childProjects.sort(
         (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
       );
@@ -424,7 +404,6 @@ export const ConversationListControlComponent: React.FC = () => {
     ],
   );
 
-  // Memoize the calculation of root items
   const rootItems = useMemo(() => {
     const lowerCaseFilter = filterText.toLowerCase();
     const memoCache: Record<string, boolean> = {};
@@ -551,9 +530,8 @@ export const ConversationListControlComponent: React.FC = () => {
                 onExportProject={handleExportProject}
                 expandedProjects={expandedProjects}
                 toggleProjectExpansion={toggleProjectExpansion}
-                getChildren={getChildren} // Pass memoized function
+                getChildren={getChildren}
                 filterText={filterText}
-                // Pass editing state and handlers from the hook
                 editingItemId={editingItemId}
                 editingItemType={editingItemType}
                 originalName={originalName}

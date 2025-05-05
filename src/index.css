@@ -2,14 +2,17 @@
 /* FULL FILE */
 @import "tailwindcss";
 @import "tw-animate-css";
-/* Import the default Prism theme as a fallback */
-@import "prismjs/themes/prism.css";
 
 @custom-variant dark (&:is(.dark *));
 @tailwind utilities;
 
 /* Base Layers */
 @layer base {
+    --eggshell: #f0ead6;
+    --dim-gray: #696969;
+    --xanthous: #f1c40f; /* A vivid yellow-golden color */
+    --black-olive: #3b3c36;
+    --taupe-gray: #8b8589;
     :root {
         --background: 0 0% 100%;
         --foreground: 200 50% 20%;
@@ -53,51 +56,6 @@
         --border: 200 30% 30%;
         --input: 200 30% 30%;
         --ring: 160 48% 45%;
-    }
-    .TijuLight {
-        /* CSS Variables */
-        --background: var(--eggshell);
-        --foreground: var(--dim-gray);
-        --card: var(--eggshell);
-        --card-foreground: var(--dim-gray);
-        --popover: var(--eggshell);
-        --popover-foreground: var(--dim-gray);
-        --primary: var(--xanthous);
-        --primary-foreground: var(--black-olive);
-        --secondary: var(--taupe-gray);
-        --secondary-foreground: var(--black-olive);
-        --muted: var(--eggshell);
-        --muted-foreground: var(--dim-gray);
-        --accent: var(--xanthous);
-        --accent-foreground: var(--black-olive);
-        --destructive: var(--black-olive);
-        --destructive-foreground: var(--eggshell);
-        --border: var(--taupe-gray);
-        --input: var(--eggshell);
-        --ring: var(--xanthous);
-        --radius: 0.5rem;
-    }
-
-    .TijuDark {
-        --background: var(--black-olive);
-        --foreground: var(--eggshell);
-        --card: var(--taupe-gray);
-        --card-foreground: var(--eggshell);
-        --popover: var(--taupe-gray);
-        --popover-foreground: var(--eggshell);
-        --primary: var(--xanthous);
-        --primary-foreground: var(--black-olive);
-        --secondary: var(--dim-gray);
-        --secondary-foreground: var(--eggshell);
-        --muted: var(--taupe-gray);
-        --muted-foreground: var(--eggshell);
-        --accent: var(--xanthous);
-        --accent-foreground: var(--black-olive);
-        --destructive: var(--eggshell);
-        --destructive-foreground: var(--black-olive);
-        --border: var(--dim-gray);
-        --input: var(--taupe-gray);
-        --ring: var(--xanthous);
     }
 }
 
@@ -223,6 +181,51 @@
     --sidebar-border: oklch(0.3 0.05 230);
     --sidebar-ring: oklch(0.7 0.2 140);
 }
+.TijuLight {
+    /* CSS Variables */
+    --background: var(--eggshell);
+    --foreground: var(--dim-gray);
+    --card: var(--eggshell);
+    --card-foreground: var(--dim-gray);
+    --popover: var(--eggshell);
+    --popover-foreground: var(--dim-gray);
+    --primary: var(--xanthous);
+    --primary-foreground: var(--black-olive);
+    --secondary: var(--taupe-gray);
+    --secondary-foreground: var(--black-olive);
+    --muted: var(--eggshell);
+    --muted-foreground: var(--dim-gray);
+    --accent: var(--xanthous);
+    --accent-foreground: var(--black-olive);
+    --destructive: var(--black-olive);
+    --destructive-foreground: var(--eggshell);
+    --border: var(--taupe-gray);
+    --input: var(--eggshell);
+    --ring: var(--xanthous);
+    --radius: 0.5rem;
+}
+
+.TijuDark {
+    --background: var(--black-olive);
+    --foreground: var(--eggshell);
+    --card: var(--taupe-gray);
+    --card-foreground: var(--eggshell);
+    --popover: var(--taupe-gray);
+    --popover-foreground: var(--eggshell);
+    --primary: var(--xanthous);
+    --primary-foreground: var(--black-olive);
+    --secondary: var(--dim-gray);
+    --secondary-foreground: var(--eggshell);
+    --muted: var(--taupe-gray);
+    --muted-foreground: var(--eggshell);
+    --accent: var(--xanthous);
+    --accent-foreground: var(--black-olive);
+    --destructive: var(--eggshell);
+    --destructive-foreground: var(--black-olive);
+    --border: var(--dim-gray);
+    --input: var(--taupe-gray);
+    --ring: var(--xanthous);
+}
 
 @layer base {
     * {
@@ -290,57 +293,10 @@
         @apply text-primary underline hover:text-primary/80;
     }
 
-    .code-block-container {
-        max-width: 100%;
-        width: 100%;
-        position: relative;
-        border: 1px solid hsl(var(--border));
-        border-radius: var(--radius);
-        overflow: hidden; /* Critical for containing the scrollable area */
-    }
-
-    /* Pre element - handle horizontal scrolling */
-    .code-block-container pre {
-        max-width: 100%; /* Ensure it doesn't exceed container */
-        overflow-x: auto; /* Enable horizontal scrolling */
-        margin: 0; /* Remove default margins */
-        padding: 0; /* Remove default padding */
-    }
-
-    /* Code element - ensure proper text behavior */
-    .code-block-container code {
-        display: inline-block; /* Critical for proper sizing */
-        min-width: 100%; /* Ensure it fills the pre element */
-        box-sizing: border-box; /* Include padding in width calculation */
-        padding: 1rem; /* Add padding inside the code block */
-        white-space: pre; /* Preserve whitespace and line breaks */
-        word-break: normal;
-        word-wrap: normal;
-        tab-size: 4;
-    }
-
-    /* Optional: Style the scrollbar for better visibility */
-    .code-block-container pre::-webkit-scrollbar {
-        height: 6px;
-    }
-
-    .code-block-container pre::-webkit-scrollbar-thumb {
-        background-color: hsl(var(--muted-foreground) / 0.3);
-        border-radius: 3px;
-    }
-
-    .code-block-container pre::-webkit-scrollbar-thumb:hover {
-        background-color: hsl(var(--muted-foreground) / 0.5);
-    }
-
     /* Header styling using @apply */
     .code-block-header {
         @apply flex items-center justify-between px-3 py-2
-      border-b border-border bg-muted/80 /* Use slightly less transparent bg */
-      sticky top-0 z-10; /* Lower z-index than CardHeader */
-        /* Apply backdrop blur for better visual separation */
-        backdrop-filter: blur(4px);
-        -webkit-backdrop-filter: blur(4px); /* Safari support */
+      border-b border-border bg-muted/80;
     }
 
     /* Code block content - minimal styling to not override external themes */
