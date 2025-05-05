@@ -50,7 +50,7 @@ export const SettingsRules: React.FC = () => {
         } else {
           await addRule(data);
         }
-        handleCancel(); // Close form on success
+        handleCancel();
       } catch (error) {
         // Error handled by store
       } finally {

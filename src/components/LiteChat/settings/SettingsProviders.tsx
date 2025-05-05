@@ -9,9 +9,9 @@ import { PlusIcon } from "lucide-react";
 import { ProviderRow } from "./SettingsProviderRow";
 import { AddProviderForm } from "./AddProviderForm";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TabbedLayout, TabDefinition } from "../common/TabbedLayout"; // Import TabbedLayout
-import { GlobalModelOrganizer } from "./GlobalModelOrganizer"; // Import Organizer
-import { ModelDataDisplay } from "./ModelDataDisplay"; // Import new component
+import { TabbedLayout, TabDefinition } from "../common/TabbedLayout";
+import { GlobalModelOrganizer } from "./GlobalModelOrganizer";
+import { ModelDataDisplay } from "./ModelDataDisplay";
 import { SettingsApiKeys } from "./ApiKeys";
 
 // This component now focuses solely on the list and adding providers
@@ -149,7 +149,7 @@ const SettingsProvidersComponent: React.FC = () => {
     (combinedId: string | null) => {
       setSelectedModelForDetails(combinedId);
       if (combinedId) {
-        setActiveTab("providers-details"); // Switch to details tab
+        setActiveTab("providers-details");
       }
     },
     [setSelectedModelForDetails],

@@ -175,7 +175,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
         <li
           key={item.id}
           className={cn(
-            "relative flex justify-between items-center group p-1.5 text-xs rounded", // Added relative
+            "relative flex justify-between items-center group p-1.5 text-xs rounded",
             "border border-transparent",
             !isEditingThis && "hover:bg-muted/50 hover:text-primary/80",
             isSelected && !isEditingThis
@@ -234,8 +234,8 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
             className={cn(
               "absolute right-1 top-1/2 -translate-y-1/2 flex items-center flex-shrink-0",
               "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
-              "bg-card/80 backdrop-blur-sm p-0.5 rounded", // Add background for visibility
-              isEditingThis ? "opacity-100" : "", // Keep visible when editing
+              "bg-card/80 backdrop-blur-sm p-0.5 rounded",
+              isEditingThis ? "opacity-100" : "",
             )}
             onClick={(e) => e.stopPropagation()} // Prevent click through to li
           >

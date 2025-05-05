@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/control/vfs/VfsTriggerButton.tsx
-// FULL FILE - Moved from registerVfsControl.tsx
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { HardDriveIcon, PaperclipIcon } from "lucide-react";
@@ -59,7 +59,7 @@ export const VfsTriggerButton: React.FC = () => {
         `Attached ${attachedCount} file(s) from VFS to the next prompt.`,
       );
       clearSelection();
-      toggleVfsModal(false); // Close modal after attaching
+      toggleVfsModal(false);
     }
   };
 

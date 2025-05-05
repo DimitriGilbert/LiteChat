@@ -17,7 +17,7 @@ import {
 import { useControlRegistryStore } from "@/store/control.store";
 import { useInteractionStore } from "@/store/interaction.store";
 import { RulesControlDialogContent } from "@/components/LiteChat/prompt/control/rules/RulesControlDialogContent";
-import { useRulesStore } from "@/store/rules.store"; // Import rules store
+import { useRulesStore } from "@/store/rules.store";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { ModEvent } from "@/types/litechat/modding";
 
@@ -59,7 +59,7 @@ const RulesControlTrigger: React.FC = () => {
       });
       transientActiveTagIds = newState.activeTagIds;
       transientActiveRuleIds = newState.activeRuleIds;
-      setLocalState(newState); // Update component state
+      setLocalState(newState);
     };
     // Sync initial local state
     setLocalState({
@@ -67,7 +67,7 @@ const RulesControlTrigger: React.FC = () => {
       activeRuleIds: transientActiveRuleIds,
     });
     return () => {
-      updateScopedState = () => {}; // Cleanup on unmount
+      updateScopedState = () => {};
     };
   }, []);
 
@@ -84,32 +84,26 @@ const RulesControlTrigger: React.FC = () => {
     return () => {
       emitter.off(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
     };
-  }, []); // Empty dependency array ensures this runs once
+  }, []);
 
   // --- Event Handlers ---
-  const handleToggleTag = useCallback(
-    (tagId: string, isActive: boolean) => {
-      updateScopedState((prev) => {
-        const nextTags = new Set(prev.activeTagIds);
-        if (isActive) nextTags.add(tagId);
-        else nextTags.delete(tagId);
-        return { ...prev, activeTagIds: nextTags };
-      });
-    },
-    [], // updateScopedState is stable
-  );
+  const handleToggleTag = useCallback((tagId: string, isActive: boolean) => {
+    updateScopedState((prev) => {
+      const nextTags = new Set(prev.activeTagIds);
+      if (isActive) nextTags.add(tagId);
+      else nextTags.delete(tagId);
+      return { ...prev, activeTagIds: nextTags };
+    });
+  }, []);
 
-  const handleToggleRule = useCallback(
-    (ruleId: string, isActive: boolean) => {
-      updateScopedState((prev) => {
-        const nextRules = new Set(prev.activeRuleIds);
-        if (isActive) nextRules.add(ruleId);
-        else nextRules.delete(ruleId);
-        return { ...prev, activeRuleIds: nextRules };
-      });
-    },
-    [], // updateScopedState is stable
-  );
+  const handleToggleRule = useCallback((ruleId: string, isActive: boolean) => {
+    updateScopedState((prev) => {
+      const nextRules = new Set(prev.activeRuleIds);
+      if (isActive) nextRules.add(ruleId);
+      else nextRules.delete(ruleId);
+      return { ...prev, activeRuleIds: nextRules };
+    });
+  }, []);
 
   // --- Derived State for Rendering ---
   const hasActiveSettings =
@@ -117,7 +111,7 @@ const RulesControlTrigger: React.FC = () => {
   const isDisabled = isStreaming || !hasRulesOrTags;
 
   if (!hasRulesOrTags) {
-    return null; // Don't render if no rules or tags exist
+    return null;
   }
 
   return (

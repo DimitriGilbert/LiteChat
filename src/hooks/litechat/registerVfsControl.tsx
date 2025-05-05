@@ -1,5 +1,5 @@
 // src/hooks/litechat/registerVfsControl.tsx
-// FULL FILE - Updated Registration Logic
+
 import React from "react";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useUIStateStore } from "@/store/ui.store";
@@ -25,9 +25,9 @@ export function registerVfsControl() {
   // so LiteChat can find its renderer.
   registerChatControl({
     id: "core-vfs-modal-panel",
-    panel: undefined, // Not directly in a layout panel
-    show: () => useUIStateStore.getState().isVfsModalOpen, // Show based on UI state
-    renderer: () => React.createElement(VfsModalPanel), // Render the modal
+    panel: undefined,
+    show: () => useUIStateStore.getState().isVfsModalOpen,
+    renderer: () => React.createElement(VfsModalPanel),
     status: () => "ready",
   });
 

@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsModal.tsx
-// FULL FILE - Adjusted DialogContent sizing
+
 import React, { memo, useState, useEffect, useMemo } from "react";
 import {
   Dialog,
@@ -17,14 +17,14 @@ import { SettingsMods } from "./SettingsMods";
 import { SettingsProviders } from "./SettingsProviders";
 import { SettingsGit } from "./SettingsGit";
 import { SettingsRulesAndTags } from "./SettingsRulesAndTags";
-import { SettingsTheme } from "./SettingsTheme"; // Import the new component
+import { SettingsTheme } from "./SettingsTheme";
 import type { CustomSettingTab } from "@/types/litechat/modding";
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
 import { useModStore } from "@/store/mod.store";
 import { useUIStateStore } from "@/store/ui.store";
 import { TabbedLayout, TabDefinition } from "../common/TabbedLayout";
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -50,11 +50,11 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
       })),
     );
 
-    const [activeTab, setActiveTab] = useState(initialSettingsTab || "theme"); // Default to theme
+    const [activeTab, setActiveTab] = useState(initialSettingsTab || "theme");
 
     useEffect(() => {
       if (isOpen) {
-        setActiveTab(initialSettingsTab || "theme"); // Default to theme
+        setActiveTab(initialSettingsTab || "theme");
       }
     }, [isOpen, initialSettingsTab]);
 
@@ -142,7 +142,7 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
             "sm:w-[90vw] sm:h-[85vh]",
             "md:w-[85vw] md:max-w-[1200px] md:h-[80vh]",
             "lg:w-[75vw]",
-            "min-h-[500px] max-h-[95vh]", // Ensure min/max height
+            "min-h-[500px] max-h-[95vh]",
           )}
         >
           <DialogHeader className="p-4 md:p-6 pb-2 md:pb-4 flex-shrink-0">
@@ -158,8 +158,10 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
             initialValue={activeTab}
             onValueChange={handleTabChange}
             className="flex-grow overflow-hidden px-4 md:px-6"
-            listClassName="-mx-4 md:-mx-6 px-4 md:px-6"
-            contentContainerClassName="flex-grow overflow-y-auto pb-4 md:pb-6 pr-2 -mr-2"
+            // Adjust list padding for mobile
+            listClassName="-mx-4 md:-mx-6 px-2 md:px-6 py-1 md:py-0"
+            // Adjust content padding for mobile
+            contentContainerClassName="flex-grow overflow-y-auto pb-4 md:pb-6 pr-1 md:pr-2 -mr-1 md:-mr-2"
             scrollable={true}
           />
 

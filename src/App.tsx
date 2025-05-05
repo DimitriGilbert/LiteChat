@@ -1,9 +1,9 @@
 // src/App.tsx
-// FULL FILE - Corrected ThemeManager Placement
+
 import { LiteChat, RegistrationFunction } from "@/components/LiteChat/LiteChat";
 import { PrismThemeLoader } from "@/components/LiteChat/common/PrismThemeLoader";
-import { ThemeManager } from "@/components/LiteChat/common/ThemeManager"; // Import ThemeManager
-import { ErrorBoundary } from "@/components/LiteChat/common/ErrorBoundary"; // Import ErrorBoundary
+import { ThemeManager } from "@/components/LiteChat/common/ThemeManager";
+import { ErrorBoundary } from "@/components/LiteChat/common/ErrorBoundary";
 
 // Import ALL registration functions needed by this specific App instance
 import { registerConversationListControl } from "@/hooks/litechat/registerConversationListControl";
@@ -32,7 +32,7 @@ const controlsToRegister: RegistrationFunction[] = [
   registerConversationListControl,
   registerSidebarToggleControl,
   registerSettingsControl,
-  registerProjectSettingsControl, // Modal, order less critical
+  registerProjectSettingsControl,
 
   // Prompt Controls (Order matters for visual layout)
   registerGlobalModelSelector,

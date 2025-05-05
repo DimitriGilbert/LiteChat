@@ -21,7 +21,7 @@ const renderBlock = (
   item: string | CodeBlockData,
   index: number,
   useFullCodeBlock: boolean,
-  isStreamingBlock: boolean, // Indicate if this is the actively streaming block
+  isStreamingBlock: boolean,
 ): React.ReactNode | null => {
   // Use ReactNode type
   if (typeof item === "string") {
@@ -111,7 +111,7 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
     // If markdown streaming is off, handle raw content display
     if (!enableStreamingMarkdown) {
       setFinalizedElements([]);
-      setStreamingBlockData(markdownContent ?? null); // Store raw content
+      setStreamingBlockData(markdownContent ?? null);
       finalizedBlockCountRef.current = 0;
       return;
     }
@@ -130,12 +130,12 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
         .map((block, index) =>
           renderBlock(
             block,
-            currentFinalizedCount + index, // Use absolute index for keys
+            currentFinalizedCount + index,
             enableStreamingCodeBlockParsing,
-            false, // These are finalized, not streaming
+            false,
           ),
         )
-        .filter((el): el is React.ReactNode => el !== null); // Use ReactNode
+        .filter((el): el is React.ReactNode => el !== null);
 
       // Append new finalized elements
       setFinalizedElements((prev) => [...prev, ...newElements]);
@@ -158,28 +158,28 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
       finalizedBlockCountRef.current = 0;
     }
   }, [
-    parsedContent, // Depend on the result of the hook
+    parsedContent,
     enableStreamingMarkdown,
     enableStreamingCodeBlockParsing,
     streamingBlockData,
-    markdownContent, // Also depend on raw content for resets
+    markdownContent,
   ]);
 
   // Render the streaming block separately using useMemo
   const streamingElement = useMemo(() => {
-    if (!streamingBlockData || !enableStreamingMarkdown) return null; // Don't render if markdown disabled
+    if (!streamingBlockData || !enableStreamingMarkdown) return null;
     // Render the last block, indicating it's the one actively streaming
     return renderBlock(
       streamingBlockData,
-      finalizedBlockCountRef.current, // Key based on its position
+      finalizedBlockCountRef.current,
       enableStreamingCodeBlockParsing,
-      true, // Mark this as the streaming block
+      true,
     );
   }, [
     streamingBlockData,
     enableStreamingCodeBlockParsing,
     enableStreamingMarkdown,
-  ]); // Depend only on the data and settings
+  ]);
 
   // Fallback for empty content
   if (!markdownContent?.trim() && finalizedElements.length === 0) {

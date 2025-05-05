@@ -5,7 +5,7 @@ import { useSettingsStore } from "@/store/settings.store";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { z } from "zod";
 import { Tool } from "ai";
-import type { ReadonlyChatContextSnapshot } from "@/types/litechat/modding"; // Import context type
+import type { ReadonlyChatContextSnapshot } from "@/types/litechat/modding";
 
 // Schemas remain the same
 const gitInitSchema = z.object({

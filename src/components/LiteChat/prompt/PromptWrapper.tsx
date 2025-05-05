@@ -1,12 +1,11 @@
 // src/components/LiteChat/prompt/PromptWrapper.tsx
-// FULL FILE - Adjusted padding and layout for mobile
+
 import React, { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { SendHorizonalIcon, Loader2 } from "lucide-react";
 import { PromptControlWrapper } from "./PromptControlWrapper";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useInteractionStore } from "@/store/interaction.store";
-// UIStateStore import removed
 import { useInputStore } from "@/store/input.store";
 import type {
   PromptTurnObject,
@@ -20,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 import { ModEvent, ModMiddlewareHook } from "@/types/litechat/modding";
+import { FilePreviewRenderer } from "../common/FilePreviewRenderer";
 
 interface PromptWrapperProps {
   InputAreaRenderer: InputAreaRenderer;
@@ -35,7 +35,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   onSubmit,
   className,
   placeholder = "Send a message...",
-  inputAreaRef, // Receive the ref
+  inputAreaRef,
 }) => {
   // inputAreaRef is now passed from parent
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,16 +48,14 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   const isStreaming = useInteractionStore(
     useShallow((state) => state.status === "streaming"),
   );
-  // focusInputOnNextRender/setFocusInputFlag removed
-  const { attachedFilesMetadata, clearAttachedFiles } = useInputStore(
-    useShallow((state) => ({
-      attachedFilesMetadata: state.attachedFilesMetadata,
-      clearAttachedFiles: state.clearAttachedFiles,
-    })),
-  );
-
-  // --- Focus Handling Removed ---
-  // useEffect for focusInputOnNextRender removed
+  const { attachedFilesMetadata, clearAttachedFiles, removeAttachedFile } =
+    useInputStore(
+      useShallow((state) => ({
+        attachedFilesMetadata: state.attachedFilesMetadata,
+        clearAttachedFiles: state.clearAttachedFiles,
+        removeAttachedFile: state.removeAttachedFile,
+      })),
+    );
 
   // --- Memoized Controls ---
   const promptControls = useMemo(() => {
@@ -150,7 +148,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       setIsSubmitting(false);
     }
   }, [
-    inputAreaRef, // Add ref dependency
+    inputAreaRef,
     isStreaming,
     isSubmitting,
     promptControls,
@@ -171,6 +169,20 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
           area="panel"
           className="flex flex-wrap gap-1 md:gap-2 items-start mb-1 md:mb-2" // Adjusted gap/margin
         />
+      )}
+
+      {/* Attached Files Preview Area */}
+      {attachedFilesMetadata.length > 0 && (
+        <div className="max-h-40 overflow-y-auto space-y-1 border rounded-md p-2 bg-muted/20 mb-2">
+          {attachedFilesMetadata.map((fileMeta) => (
+            <FilePreviewRenderer
+              key={fileMeta.id}
+              fileMeta={fileMeta}
+              onRemove={removeAttachedFile} // Pass remove function
+              isReadOnly={false}
+            />
+          ))}
+        </div>
       )}
 
       <div className="flex items-end gap-2">

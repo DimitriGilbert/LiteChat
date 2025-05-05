@@ -141,7 +141,7 @@ export const useRulesStore = create(
         set((state) => {
           const index = state.rules.findIndex((r) => r.id === id);
           if (index !== -1) {
-            state.rules[index] = originalRule; // Revert
+            state.rules[index] = originalRule;
             state.rules.sort((a, b) => a.name.localeCompare(b.name));
           }
           state.error = "Failed to save rule update";
@@ -174,7 +174,7 @@ export const useRulesStore = create(
         set((state) => {
           state.rules.push(ruleToDelete);
           state.rules.sort((a, b) => a.name.localeCompare(b.name));
-          state.tagRuleLinks.push(...originalLinks); // Restore links
+          state.tagRuleLinks.push(...originalLinks);
           state.error = "Failed to delete rule";
         });
         toast.error("Failed to delete rule.");
@@ -243,7 +243,7 @@ export const useRulesStore = create(
         set((state) => {
           const index = state.tags.findIndex((t) => t.id === id);
           if (index !== -1) {
-            state.tags[index] = originalTag; // Revert
+            state.tags[index] = originalTag;
             state.tags.sort((a, b) => a.name.localeCompare(b.name));
           }
           state.error = "Failed to save tag update";
@@ -276,7 +276,7 @@ export const useRulesStore = create(
         set((state) => {
           state.tags.push(tagToDelete);
           state.tags.sort((a, b) => a.name.localeCompare(b.name));
-          state.tagRuleLinks.push(...originalLinks); // Restore links
+          state.tagRuleLinks.push(...originalLinks);
           state.error = "Failed to delete tag";
         });
         toast.error("Failed to delete tag.");
@@ -286,9 +286,9 @@ export const useRulesStore = create(
 
     // --- Link Actions ---
     linkTagToRule: async (tagId, ruleId) => {
-      const linkId = `${tagId}-${ruleId}`; // Simple compound key
+      const linkId = `${tagId}-${ruleId}`;
       const existingLink = get().tagRuleLinks.find((l) => l.id === linkId);
-      if (existingLink) return; // Already linked
+      if (existingLink) return;
 
       const newLink: DbTagRuleLink = { id: linkId, tagId, ruleId };
       // Optimistic UI update
@@ -313,7 +313,7 @@ export const useRulesStore = create(
     unlinkTagFromRule: async (tagId, ruleId) => {
       const linkId = `${tagId}-${ruleId}`;
       const linkToDelete = get().tagRuleLinks.find((l) => l.id === linkId);
-      if (!linkToDelete) return; // Not linked
+      if (!linkToDelete) return;
 
       // Optimistic UI update
       set((state) => ({
@@ -326,7 +326,7 @@ export const useRulesStore = create(
         console.error("RulesStore: Error unlinking tag from rule", e);
         // Revert optimistic update
         set((state) => {
-          state.tagRuleLinks.push(linkToDelete); // Revert
+          state.tagRuleLinks.push(linkToDelete);
           state.error = "Failed to unlink tag and rule";
         });
         toast.error("Failed to unlink tag and rule.");

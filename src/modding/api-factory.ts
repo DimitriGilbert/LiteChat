@@ -6,10 +6,10 @@ import type {
   ReadonlyChatContextSnapshot,
   CustomSettingTab,
   ToolImplementation,
-  ModMiddlewareHookName, // Import hook name type
+  ModMiddlewareHookName,
 } from "@/types/litechat/modding";
-import type { PromptControl } from "@/types/litechat/prompt"; // Import correct PromptControl type
-import type { ChatControl } from "@/types/litechat/chat"; // Import correct ChatControl type
+import type { PromptControl } from "@/types/litechat/prompt";
+import type { ChatControl } from "@/types/litechat/chat";
 import { Tool } from "ai";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -43,7 +43,7 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       // Provide a default status function if the mod doesn't, to satisfy the stricter type
       const controlWithDefaults: ChatControl = {
         ...c,
-        status: c.status ?? (() => "ready"), // Provide default status
+        status: c.status ?? (() => "ready"),
       };
       const u = controlStoreActions.registerChatControl(controlWithDefaults);
       unsubscribers.push(u);

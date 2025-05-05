@@ -61,14 +61,14 @@ export const TagRuleLinker: React.FC<TagRuleLinkerProps> = ({
       onLinkChange(tag.id, ruleId, !isCurrentlyLinked);
       // Keep popover open after selection
       // setOpen(false);
-      setFilterText(""); // Clear filter after selection
+      setFilterText("");
     },
     [linkedRuleIds, onLinkChange, tag.id],
   );
 
   const handleUnlink = useCallback(
     (ruleId: string, e: React.MouseEvent) => {
-      e.stopPropagation(); // Prevent badge click from triggering combobox
+      e.stopPropagation();
       onLinkChange(tag.id, ruleId, false);
     },
     [onLinkChange, tag.id],

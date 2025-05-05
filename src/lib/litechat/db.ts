@@ -27,7 +27,7 @@ export class LiteChatDatabase extends Dexie {
   // Add new tables
   rules!: Table<DbRule, string>;
   tags!: Table<DbTag, string>;
-  tagRuleLinks!: Table<DbTagRuleLink, string>; // Use compound key or UUID for 'id'
+  tagRuleLinks!: Table<DbTagRuleLink, string>;
 
   constructor() {
     super("LiteChatDatabase_Rewrite_v1");
@@ -44,9 +44,9 @@ export class LiteChatDatabase extends Dexie {
         syncRepos: "++id, &name, remoteUrl, username",
         projects: "++id, &path, parentId, createdAt, updatedAt, name",
         // Define new tables and indices
-        rules: "++id, &name, type, createdAt, updatedAt", // Index name and type
-        tags: "++id, &name, createdAt, updatedAt", // Index name
-        tagRuleLinks: "++id, tagId, ruleId, &[tagId+ruleId]", // Compound index for uniqueness
+        rules: "++id, &name, type, createdAt, updatedAt",
+        tags: "++id, &name, createdAt, updatedAt",
+        tagRuleLinks: "++id, tagId, ruleId, &[tagId+ruleId]",
       });
     // Define previous versions explicitly for Dexie's upgrade path
     this.version(6).stores({

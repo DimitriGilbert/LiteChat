@@ -1,5 +1,5 @@
 // src/components/LiteChat/chat/control/ConversationList.tsx
-// FULL FILE
+
 import React, { useMemo, useState, useCallback } from "react";
 import {
   useConversationStore,
@@ -13,7 +13,6 @@ import { PlusIcon, FolderPlusIcon, SearchIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { SidebarItemType } from "@/types/litechat/chat";
 import { Skeleton } from "@/components/ui/skeleton";
-// UIStateStore removed
 import {
   Tooltip,
   TooltipContent,
@@ -109,7 +108,6 @@ export const ConversationListControlComponent: React.FC = () => {
     (state) => state.isLoading,
   );
   const isProjectLoading = useProjectStore((state) => state.isLoading);
-  // setFocusInputFlag removed
 
   const { conversations, syncRepos, conversationSyncStatus } =
     useConversationStore(
@@ -356,6 +354,7 @@ export const ConversationListControlComponent: React.FC = () => {
       };
     }, [projects, conversations]);
 
+  // Memoize getChildren to prevent re-renders of items when filter text changes but children don't
   const getChildren = useCallback(
     (
       parentId: string | null,
@@ -386,6 +385,7 @@ export const ConversationListControlComponent: React.FC = () => {
         conversationsByProjectId.get(parentId) || []
       ).filter((c) => c.title.toLowerCase().includes(lowerCaseFilter));
 
+      // Sorting is cheap, can stay inside if needed, or memoize separately if complex
       childProjects.sort(
         (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
       );
@@ -404,6 +404,7 @@ export const ConversationListControlComponent: React.FC = () => {
     ],
   );
 
+  // Memoize the root items calculation
   const rootItems = useMemo(() => {
     const lowerCaseFilter = filterText.toLowerCase();
     const memoCache: Record<string, boolean> = {};
@@ -530,7 +531,7 @@ export const ConversationListControlComponent: React.FC = () => {
                 onExportProject={handleExportProject}
                 expandedProjects={expandedProjects}
                 toggleProjectExpansion={toggleProjectExpansion}
-                getChildren={getChildren}
+                getChildren={getChildren} // Pass memoized getChildren
                 filterText={filterText}
                 editingItemId={editingItemId}
                 editingItemType={editingItemType}

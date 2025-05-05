@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/control/vfs/VfsModalPanel.tsx
-// FULL FILE - Moved from registerVfsControl.tsx
+
 import React from "react";
 import { useUIStateStore } from "@/store/ui.store";
 import { useVfsStore } from "@/store/vfs.store";
@@ -17,8 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { FileManager } from "@/components/LiteChat/file-manager/FileManager";
 import { FileManagerBanner } from "@/components/LiteChat/file-manager/FileManagerBanner";
-import { useInputStore } from "@/store/input.store"; // Import input store
-import { toast } from "sonner"; // Import toast
+import { useInputStore } from "@/store/input.store";
+import { toast } from "sonner";
 
 export const VfsModalPanel: React.FC = () => {
   const { isVfsModalOpen, toggleVfsModal } = useUIStateStore(
@@ -32,13 +32,13 @@ export const VfsModalPanel: React.FC = () => {
       vfsKey: state.vfsKey,
       selectedFileIds: state.selectedFileIds,
       clearSelection: state.clearSelection,
-      nodes: state.nodes, // Need nodes to get file details
+      nodes: state.nodes,
     })),
   );
   const selectedItemType = useConversationStore(
     (state) => state.selectedItemType,
   );
-  const addAttachedFile = useInputStore.getState().addAttachedFile; // Get action
+  const addAttachedFile = useInputStore.getState().addAttachedFile;
 
   // Move attach logic here
   const handleAttachAndClose = () => {
@@ -67,7 +67,7 @@ export const VfsModalPanel: React.FC = () => {
         `Attached ${attachedCount} file(s) from VFS to the next prompt.`,
       );
       clearSelection();
-      toggleVfsModal(false); // Close modal after attaching
+      toggleVfsModal(false);
     } else {
       // Handle case where selected IDs might be invalid (e.g., folders)
       toast.warning("No valid files were selected to attach.");
@@ -75,7 +75,7 @@ export const VfsModalPanel: React.FC = () => {
   };
 
   const handleClose = () => {
-    clearSelection(); // Clear selection when closing modal via X or Cancel
+    clearSelection();
     toggleVfsModal(false);
   };
 

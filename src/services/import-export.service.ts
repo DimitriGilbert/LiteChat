@@ -5,7 +5,7 @@ import type { Interaction } from "@/types/litechat/interaction";
 import type { Project } from "@/types/litechat/project";
 import {
   PersistenceService,
-  type FullExportData, // Import FullExportData type
+  type FullExportData,
 } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
@@ -140,7 +140,7 @@ export interface FullImportOptions {
   importMods: boolean;
   importSyncRepos: boolean;
 }
-export type FullExportOptions = FullImportOptions; // Alias for clarity
+export type FullExportOptions = FullImportOptions;
 
 export class ImportExportService {
   static async importConversation(
@@ -347,7 +347,7 @@ export class ImportExportService {
 
   // --- Full Config Export/Import ---
   static async exportFullConfiguration(
-    options: FullExportOptions, // Accept export options
+    options: FullExportOptions,
   ): Promise<void> {
     try {
       // Pass options to persistence service
@@ -400,7 +400,7 @@ export class ImportExportService {
       toast.error(
         `Full import failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-      throw error; // Re-throw to indicate failure to the caller
+      throw error;
     }
   }
   // --- End Full Config Export/Import ---

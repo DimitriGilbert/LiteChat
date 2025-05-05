@@ -1,5 +1,5 @@
 // src/components/LiteChat/LiteChat.tsx
-// FULL FILE - Adapted for Mobile Responsiveness
+
 import React, {
   useEffect,
   useCallback,
@@ -36,15 +36,13 @@ import { usePromptStateStore } from "@/store/prompt.store";
 export type RegistrationFunction = () => void;
 
 interface LiteChatProps {
-  controls?: RegistrationFunction[]; // Use the correct prop name 'controls'
+  controls?: RegistrationFunction[];
 }
 
-export const LiteChat: React.FC<LiteChatProps> = ({
-  controls = [], // Default to empty array
-}) => {
+export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const inputAreaRef = useRef<InputAreaRef>(null); // Ref for InputArea
+  const inputAreaRef = useRef<InputAreaRef>(null);
 
   // --- Store Hooks ---
   const selectedItemId = useConversationStore((state) => state.selectedItemId);
@@ -226,7 +224,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
       console.log("LiteChat: Unmounting, initialization cancelled if pending.");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [controls]); // Depend on the 'controls' prop
+  }, [controls]);
 
   // --- Effect to update Prompt State on Context Change ---
   const prevContextRef = useRef<{
@@ -363,10 +361,10 @@ export const LiteChat: React.FC<LiteChatProps> = ({
 
         await ConversationService.submitPrompt(finalTurnData);
         console.log("LiteChat: ConversationService processing initiated.");
-        focusInput(); // Focus after submitting
+        focusInput();
       } catch (error) {
         console.error("LiteChat: Error submitting prompt:", error);
-        focusInput(); // Focus even on error
+        focusInput();
       }
     },
     [focusInput],
@@ -381,10 +379,10 @@ export const LiteChat: React.FC<LiteChatProps> = ({
         console.log(
           `LiteChat: ConversationService regeneration initiated for ${interactionId}.`,
         );
-        focusInput(); // Focus after regenerating
+        focusInput();
       } catch (error) {
         console.error("LiteChat: Error regenerating interaction:", error);
-        focusInput(); // Focus even on error
+        focusInput();
       }
     },
     [focusInput],
@@ -395,7 +393,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
     (interactionId: string) => {
       console.log(`LiteChat: Stopping interaction ${interactionId}`);
       InteractionService.abortInteraction(interactionId);
-      focusInput(); // Focus after stopping
+      focusInput();
     },
     [focusInput],
   );

@@ -6,13 +6,13 @@ import type { Tool, ToolCallPart, ToolResultPart } from "ai";
 import type { z } from "zod";
 import type { Conversation, SidebarItemType } from "./chat";
 import type { Project } from "./project";
-import type { DbProviderConfig } from "./provider"; // DbApiKey removed
-import type { SyncStatus } from "./sync"; // SyncRepo removed
+import type { DbProviderConfig } from "./provider";
+import type { SyncStatus } from "./sync";
 import type { AttachedFileMetadata } from "@/store/input.store";
 import type { PromptState } from "@/store/prompt.store";
 import type { InteractionState } from "@/store/interaction.store";
-import type { PromptControl as ModPromptControl } from "./prompt"; // Use alias for modding PromptControl
-import type { ChatControl as ModChatControl } from "./chat"; // Use alias for modding ChatControl
+import type { PromptControl as ModPromptControl } from "./prompt";
+import type { ChatControl as ModChatControl } from "./chat";
 
 // --- Mod Definition & Instance ---
 
@@ -32,7 +32,7 @@ export interface ModInstance {
   id: string;
   name: string;
   api: LiteChatModApi;
-  error?: Error | string; // Error encountered during loading/execution
+  error?: Error | string;
 }
 
 // --- Mod Store State & Actions ---
@@ -84,8 +84,8 @@ export interface LiteChatModApi {
   readonly modName: string;
 
   // Control Registration
-  registerPromptControl: (control: ModPromptControl) => () => void; // Use aliased type
-  registerChatControl: (control: ModChatControl) => () => void; // Use aliased type
+  registerPromptControl: (control: ModPromptControl) => () => void;
+  registerChatControl: (control: ModChatControl) => () => void;
 
   // Tool Registration
   registerTool: <P extends z.ZodSchema<any>>(
@@ -134,10 +134,10 @@ export type ToolImplementation<P extends z.ZodSchema<any>> = (
 // --- Custom Settings Tab ---
 
 export interface CustomSettingTab {
-  id: string; // Unique ID (e.g., "my-mod-settings")
-  title: string; // Tab title
-  component: React.ComponentType; // React component to render
-  order?: number; // Optional display order
+  id: string;
+  title: string;
+  component: React.ComponentType;
+  order?: number;
 }
 
 // --- Event Emitter ---
@@ -145,59 +145,59 @@ export interface CustomSettingTab {
 /** Defines the names of events mods can subscribe to */
 export enum ModEvent {
   // App Lifecycle
-  APP_LOADED = "app:loaded", // Payload: undefined
-  MOD_LOADED = "mod:loaded", // Payload: { id: string, name: string }
-  MOD_ERROR = "mod:error", // Payload: { id: string, name: string, error: Error | string }
+  APP_LOADED = "app:loaded",
+  MOD_LOADED = "mod:loaded",
+  MOD_ERROR = "mod:error",
 
   // Conversation Lifecycle
-  CONVERSATION_SELECTED = "conversation:selected", // Payload: { conversationId: string | null }
-  CONVERSATION_ADDED = "conversation:added", // Payload: { conversation: Conversation }
-  CONVERSATION_UPDATED = "conversation:updated", // Payload: { conversationId: string, updates: Partial<Conversation> }
-  CONVERSATION_DELETED = "conversation:deleted", // Payload: { conversationId: string }
+  CONVERSATION_SELECTED = "conversation:selected",
+  CONVERSATION_ADDED = "conversation:added",
+  CONVERSATION_UPDATED = "conversation:updated",
+  CONVERSATION_DELETED = "conversation:deleted",
 
   // Project Lifecycle
-  PROJECT_SELECTED = "project:selected", // Payload: { projectId: string | null }
-  PROJECT_ADDED = "project:added", // Payload: { project: Project }
-  PROJECT_UPDATED = "project:updated", // Payload: { projectId: string, updates: Partial<Project> }
-  PROJECT_DELETED = "project:deleted", // Payload: { projectId: string }
+  PROJECT_SELECTED = "project:selected",
+  PROJECT_ADDED = "project:added",
+  PROJECT_UPDATED = "project:updated",
+  PROJECT_DELETED = "project:deleted",
 
   // Interaction Lifecycle
-  INTERACTION_STARTED = "interaction:started", // Payload: { interactionId: string, conversationId: string, type: string }
-  INTERACTION_STREAM_CHUNK = "interaction:stream_chunk", // Payload: { interactionId: string, chunk: string }
-  INTERACTION_COMPLETED = "interaction:completed", // Payload: { interactionId: string, status: InteractionStatus, error?: string, toolCalls?: ToolCallPart[], toolResults?: ToolResultPart[] }
+  INTERACTION_STARTED = "interaction:started",
+  INTERACTION_STREAM_CHUNK = "interaction:stream_chunk",
+  INTERACTION_COMPLETED = "interaction:completed",
 
   // Prompt Lifecycle
-  PROMPT_SUBMITTED = "prompt:submitted", // Payload: { turnData: PromptTurnObject }
-  PROMPT_INPUT_CHANGE = "prompt:input_change", // Payload: { value: string }
+  PROMPT_SUBMITTED = "prompt:submitted",
+  PROMPT_INPUT_CHANGE = "prompt:input_change",
 
   // Settings Changes
-  SETTINGS_CHANGED = "settings:changed", // Payload: { key: string, value: any }
+  SETTINGS_CHANGED = "settings:changed",
 
   // Provider/Model Changes
-  PROVIDER_CONFIG_CHANGED = "provider:config_changed", // Payload: { providerId: string, config: DbProviderConfig }
-  API_KEY_CHANGED = "provider:api_key_changed", // Payload: { keyId: string, action: 'added' | 'deleted' }
-  MODEL_SELECTION_CHANGED = "provider:model_selection_changed", // Payload: { modelId: string | null }
+  PROVIDER_CONFIG_CHANGED = "provider:config_changed",
+  API_KEY_CHANGED = "provider:api_key_changed",
+  MODEL_SELECTION_CHANGED = "provider:model_selection_changed",
 
   // VFS Events
-  VFS_FILE_WRITTEN = "vfs:file_written", // Payload: { path: string }
-  VFS_FILE_READ = "vfs:file_read", // Payload: { path: string }
-  VFS_FILE_DELETED = "vfs:file_deleted", // Payload: { path: string }
-  VFS_CONTEXT_CHANGED = "vfs:context_changed", // Payload: { vfsKey: string | null }
+  VFS_FILE_WRITTEN = "vfs:file_written",
+  VFS_FILE_READ = "vfs:file_read",
+  VFS_FILE_DELETED = "vfs:file_deleted",
+  VFS_CONTEXT_CHANGED = "vfs:context_changed",
 
   // Sync Events
-  SYNC_REPO_CHANGED = "sync:repo_changed", // Payload: { repoId: string, action: 'added' | 'updated' | 'deleted' }
-  CONVERSATION_SYNC_STATUS_CHANGED = "sync:conversation_status_changed", // Payload: { conversationId: string, status: SyncStatus }
-  REPO_INIT_STATUS_CHANGED = "sync:repo_init_status_changed", // Payload: { repoId: string, status: SyncStatus }
+  SYNC_REPO_CHANGED = "sync:repo_changed",
+  CONVERSATION_SYNC_STATUS_CHANGED = "sync:conversation_status_changed",
+  REPO_INIT_STATUS_CHANGED = "sync:repo_init_status_changed",
 
   // Input State Changes
-  ATTACHED_FILES_CHANGED = "input:attached_files_changed", // Payload: { files: AttachedFileMetadata[] }
-  PROMPT_PARAMS_CHANGED = "input:prompt_params_changed", // Payload: { params: Partial<PromptState> }
+  ATTACHED_FILES_CHANGED = "input:attached_files_changed",
+  PROMPT_PARAMS_CHANGED = "input:prompt_params_changed",
 
   // Interaction State Changes
-  INTERACTION_STATUS_CHANGED = "interaction:status_changed", // Payload: { status: InteractionState['status'] }
+  INTERACTION_STATUS_CHANGED = "interaction:status_changed",
 
   // UI State Changes
-  CONTEXT_CHANGED = "ui:context_changed", // Payload: { selectedItemId: string | null, selectedItemType: SidebarItemType | null }
+  CONTEXT_CHANGED = "ui:context_changed",
 }
 
 /** Maps event names to their expected payload types */
@@ -271,9 +271,9 @@ export type ModEventName = ModEvent;
 
 /** Defines the names of available middleware hooks */
 export enum ModMiddlewareHook {
-  PROMPT_TURN_FINALIZE = "middleware:prompt:turnFinalize", // Before sending to AI service
-  INTERACTION_BEFORE_START = "middleware:interaction:beforeStart", // Before calling AI SDK
-  INTERACTION_PROCESS_CHUNK = "middleware:interaction:processChunk", // Processing incoming stream chunk
+  PROMPT_TURN_FINALIZE = "middleware:prompt:turnFinalize",
+  INTERACTION_BEFORE_START = "middleware:interaction:beforeStart",
+  INTERACTION_PROCESS_CHUNK = "middleware:interaction:processChunk",
 }
 
 /** Maps middleware hook names to their expected payload types */
@@ -309,31 +309,31 @@ export type ModMiddlewareHookName = ModMiddlewareHook;
 
 /** Base definition for UI controls registered by mods or core */
 interface BaseControl {
-  id: string; // Unique ID (e.g., "core-model-selector", "my-mod-input-enhancer")
+  id: string;
   // order removed
-  status?: () => "ready" | "loading" | "error"; // Optional status indicator
-  show?: () => boolean; // Optional function to determine visibility
+  status?: () => "ready" | "loading" | "error";
+  show?: () => boolean;
 }
 
 /** Definition for controls appearing in the prompt input area */
 export interface PromptControl extends BaseControl {
-  triggerRenderer?: () => React.ReactNode; // Renders the button/trigger in the main bar
-  renderer?: () => React.ReactNode; // Renders the panel/content area above the input
+  triggerRenderer?: () => React.ReactNode;
+  renderer?: () => React.ReactNode;
   getParameters?: () =>
     | Record<string, any>
     | undefined
-    | Promise<Record<string, any> | undefined>; // Contribute parameters to the AI call
+    | Promise<Record<string, any> | undefined>;
   getMetadata?: () =>
     | Record<string, any>
     | undefined
-    | Promise<Record<string, any> | undefined>; // Contribute metadata to the turn object
-  clearOnSubmit?: () => void; // Action to clear transient state after submission
+    | Promise<Record<string, any> | undefined>;
+  clearOnSubmit?: () => void;
 }
 
 /** Definition for controls appearing in other chat layout areas */
 export interface ChatControl extends BaseControl {
-  panel?: "sidebar" | "sidebar-footer" | "header" | "drawer_right" | "main"; // Target panel ID
-  renderer?: () => React.ReactNode; // Renders the full control
-  iconRenderer?: () => React.ReactNode; // Renders an icon-only version (e.g., for collapsed sidebar)
-  settingsRenderer?: () => React.ReactNode; // Renders content when control is used as a settings modal trigger
+  panel?: "sidebar" | "sidebar-footer" | "header" | "drawer_right" | "main";
+  renderer?: () => React.ReactNode;
+  iconRenderer?: () => React.ReactNode;
+  settingsRenderer?: () => React.ReactNode;
 }

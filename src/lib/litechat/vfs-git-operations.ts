@@ -177,7 +177,7 @@ export const isGitRepoOp = async (
   path: string,
   options?: { fsInstance?: typeof fs },
 ): Promise<boolean> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const normalized = normalizePath(path);
   const gitDirPath = joinPath(normalized, ".git");
   try {
@@ -202,7 +202,7 @@ export const gitCloneOp = async (
   credentials?: { username?: string | null; password?: string | null },
   options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const dir = normalizePath(targetPath);
   console.log(`[VFS Git Op] Attempting to clone ${url} into ${dir}`);
 
@@ -328,7 +328,7 @@ export const gitInitOp = async (
   path: string,
   options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const dir = normalizePath(path);
   try {
     await git.init({ fs: fsToUse, dir });
@@ -347,7 +347,7 @@ export const gitCommitOp = async (
   message: string,
   options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const dir = normalizePath(path);
   try {
     const configOK = await ensureGitConfig(dir, fsToUse);
@@ -398,7 +398,7 @@ export const gitPullOp = async (
   credentials?: { username?: string | null; password?: string | null },
   options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const dir = normalizePath(path);
   try {
     const configOK = await ensureGitConfig(dir, fsToUse);
@@ -526,7 +526,7 @@ export const gitPushOp = async (
   credentials?: { username?: string | null; password?: string | null },
   options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const dir = normalizePath(path);
   try {
     if (!branch) {
@@ -574,7 +574,7 @@ export const gitStatusOp = async (
   path: string,
   options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const dir = normalizePath(path);
   console.log(`[VFS Git Op] Git Status on ${dir}`);
   try {
@@ -617,7 +617,7 @@ export const gitCurrentBranchOp = async (
   path: string,
   options?: { fsInstance?: typeof fs },
 ): Promise<string> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const dir = normalizePath(path);
   try {
     const branch = await git.currentBranch({
@@ -643,7 +643,7 @@ export const gitListBranchesOp = async (
   path: string,
   options?: { fsInstance?: typeof fs },
 ): Promise<string[]> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const dir = normalizePath(path);
   try {
     const branches = await git.listBranches({ fs: fsToUse, dir });
@@ -663,7 +663,7 @@ export const gitListRemotesOp = async (
   path: string,
   options?: { fsInstance?: typeof fs },
 ): Promise<{ remote: string; url: string }[]> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const dir = normalizePath(path);
   try {
     const remotes = await git.listRemotes({ fs: fsToUse, dir });

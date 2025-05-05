@@ -24,12 +24,12 @@ import { useConversationStore } from "@/store/conversation.store";
 import { PersistenceService } from "@/services/persistence.service";
 import {
   ImportExportService,
-  type FullImportOptions, // Import options type
-  type FullExportOptions, // Import export options type
-} from "@/services/import-export.service"; // Import service
-import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
-import { Label } from "@/components/ui/label"; // Import Label
-import { Separator } from "@/components/ui/separator"; // Import Separator
+  type FullImportOptions,
+  type FullExportOptions,
+} from "@/services/import-export.service";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 
 const SettingsDataManagementComponent: React.FC = () => {
   // --- Fetch actions from stores ---
@@ -61,7 +61,7 @@ const SettingsDataManagementComponent: React.FC = () => {
   });
   // State for export options checkboxes
   const [exportOptions, setExportOptions] = useState<FullExportOptions>({
-    importSettings: true, // Keep names consistent for mapping
+    importSettings: true,
     importApiKeys: true,
     importProviderConfigs: true,
     importProjects: true,
@@ -133,7 +133,7 @@ const SettingsDataManagementComponent: React.FC = () => {
         }
       }
     },
-    [importOptions], // Depend on selected import options
+    [importOptions],
   );
 
   const handleExportAllClick = useCallback(async () => {
@@ -158,7 +158,7 @@ const SettingsDataManagementComponent: React.FC = () => {
     } finally {
       setIsFullExporting(false);
     }
-  }, [exportOptions]); // Depend on selected export options
+  }, [exportOptions]);
 
   const handleClearAllDataClick = useCallback(async () => {
     if (
@@ -208,7 +208,7 @@ Really delete everything? Consider exporting first.`,
 
   const renderOptionCheckbox = (
     type: "import" | "export",
-    id: keyof FullImportOptions, // Use one type, they are the same structure
+    id: keyof FullImportOptions,
     label: string,
     Icon: React.ElementType,
   ) => {

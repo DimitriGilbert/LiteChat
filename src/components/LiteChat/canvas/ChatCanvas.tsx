@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/ChatCanvas.tsx
-// FULL FILE - Adjusted padding for mobile
+
 import React, { useMemo, useRef, useEffect, useState } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { InteractionCard } from "./InteractionCard";
@@ -147,12 +147,12 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     };
 
     viewport.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll(); // Initial check
+    handleScroll();
 
     return () => {
       viewport.removeEventListener("scroll", handleScroll);
     };
-  }, []); // Run only once
+  }, []);
 
   useEffect(() => {
     // Find the viewport element once the ScrollArea is mounted
@@ -161,7 +161,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
         "[data-radix-scroll-area-viewport]",
       );
     }
-  }, []); // Run only once
+  }, []);
 
   const renderContent = () => {
     if (isProviderLoading || isConversationLoading || isProjectLoading) {
@@ -189,7 +189,8 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
 
     // --- USING THE CORRECTED RENDER LOGIC ---
     return (
-      <div className="space-y-4 p-2 md:p-4">
+      // Add break-words to allow long words/URLs to wrap
+      <div className="space-y-4 p-2 md:p-4 break-words">
         {interactionGroups.map((group) => {
           const interaction = group[0];
           const isStreaming = streamingInteractionIds.includes(interaction.id);

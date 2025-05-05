@@ -1,5 +1,5 @@
 // src/store/settings.store.ts
-// FULL FILE - Refactored chatMaxWidth to use Tailwind class strings
+
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { PersistenceService } from "@/services/persistence.service";
@@ -25,6 +25,19 @@ export interface CustomThemeColors {
   border?: string;
   input?: string;
   ring?: string;
+  sidebar?: string;
+  sidebarForeground?: string;
+  sidebarPrimary?: string;
+  sidebarPrimaryForeground?: string;
+  sidebarAccent?: string;
+  sidebarAccentForeground?: string;
+  sidebarBorder?: string;
+  sidebarRing?: string;
+  chart1?: string;
+  chart2?: string;
+  chart3?: string;
+  chart4?: string;
+  chart5?: string;
 }
 
 // Define the SettingsState interface here so it can be imported
@@ -54,7 +67,7 @@ export interface SettingsState {
   autoTitleIncludeRules: boolean;
   customFontFamily: string | null;
   customFontSize: number | null;
-  chatMaxWidth: string | null; // Store the Tailwind class string (e.g., 'max-w-7xl', 'max-w-full')
+  chatMaxWidth: string | null;
   customThemeColors: CustomThemeColors | null;
 }
 
@@ -84,7 +97,7 @@ interface SettingsActions {
   setAutoTitleIncludeRules: (include: boolean) => void;
   setCustomFontFamily: (fontFamily: string | null) => void;
   setCustomFontSize: (fontSize: number | null) => void;
-  setChatMaxWidth: (maxWidthClass: string | null) => void; // Accept Tailwind class string
+  setChatMaxWidth: (maxWidthClass: string | null) => void;
   setCustomThemeColors: (colors: CustomThemeColors | null) => void;
   setCustomThemeColor: (
     colorName: keyof CustomThemeColors,
@@ -122,7 +135,7 @@ const DEFAULT_AUTO_TITLE_INCLUDE_FILES = false;
 const DEFAULT_AUTO_TITLE_INCLUDE_RULES = false;
 const DEFAULT_CUSTOM_FONT_FAMILY = null;
 const DEFAULT_CUSTOM_FONT_SIZE = 16;
-const DEFAULT_CHAT_MAX_WIDTH = "max-w-7xl"; // Store Tailwind class
+const DEFAULT_CHAT_MAX_WIDTH = "max-w-7xl";
 const DEFAULT_CUSTOM_THEME_COLORS = null;
 
 export const useSettingsStore = create(
@@ -154,7 +167,7 @@ export const useSettingsStore = create(
     autoTitleIncludeRules: DEFAULT_AUTO_TITLE_INCLUDE_RULES,
     customFontFamily: DEFAULT_CUSTOM_FONT_FAMILY,
     customFontSize: DEFAULT_CUSTOM_FONT_SIZE,
-    chatMaxWidth: DEFAULT_CHAT_MAX_WIDTH, // Use Tailwind class
+    chatMaxWidth: DEFAULT_CHAT_MAX_WIDTH,
     customThemeColors: DEFAULT_CUSTOM_THEME_COLORS,
 
     // --- Existing Setters ---
@@ -461,7 +474,7 @@ export const useSettingsStore = create(
           autoTitleIncludeRules,
           customFontFamily,
           customFontSize,
-          chatMaxWidth, // Set loaded string
+          chatMaxWidth,
           customThemeColors,
         });
       } catch (error) {
@@ -584,7 +597,7 @@ export const useSettingsStore = create(
           prismThemeUrl: DEFAULT_PRISM_THEME_URL,
           customFontFamily: DEFAULT_CUSTOM_FONT_FAMILY,
           customFontSize: DEFAULT_CUSTOM_FONT_SIZE,
-          chatMaxWidth: DEFAULT_CHAT_MAX_WIDTH, // Reset to Tailwind class
+          chatMaxWidth: DEFAULT_CHAT_MAX_WIDTH,
           customThemeColors: DEFAULT_CUSTOM_THEME_COLORS,
         });
         await Promise.all([
@@ -603,7 +616,7 @@ export const useSettingsStore = create(
           ),
           PersistenceService.saveSetting(
             "chatMaxWidth",
-            DEFAULT_CHAT_MAX_WIDTH, // Save Tailwind class
+            DEFAULT_CHAT_MAX_WIDTH,
           ),
           PersistenceService.saveSetting(
             "customThemeColors",

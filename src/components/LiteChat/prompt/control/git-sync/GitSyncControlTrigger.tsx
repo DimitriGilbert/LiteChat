@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/control/git-sync/GitSyncControlTrigger.tsx
-// FULL FILE - Moved from registerGitSyncControl.tsx
+
 import React, { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { GitBranchIcon, GitPullRequestIcon, Loader2 } from "lucide-react";

@@ -1,5 +1,5 @@
 // src/hooks/litechat/registerGitSyncControl.tsx
-// FULL FILE - Updated Registration Logic
+
 import React from "react";
 import { useControlRegistryStore } from "@/store/control.store";
 import { GitSyncControlTrigger } from "@/components/LiteChat/prompt/control/git-sync/GitSyncControlTrigger";

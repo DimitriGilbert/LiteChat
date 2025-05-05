@@ -7,7 +7,7 @@ import type {
   DbApiKey,
   AiProviderConfig,
   AiModelConfig,
-  OpenRouterModel, // Import the detailed model type
+  OpenRouterModel,
 } from "@/types/litechat/provider";
 import { PersistenceService } from "@/services/persistence.service";
 import {
@@ -20,8 +20,8 @@ import {
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
-import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
-import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent
+import { emitter } from "@/lib/litechat/event-emitter";
+import { ModEvent } from "@/types/litechat/modding";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 const LAST_SELECTION_KEY = "provider:lastModelSelection";
@@ -30,9 +30,9 @@ const GLOBAL_MODEL_SORT_ORDER_KEY = "provider:globalModelSortOrder";
 export interface ProviderState {
   dbProviderConfigs: DbProviderConfig[];
   dbApiKeys: DbApiKey[];
-  selectedModelId: string | null; // Combined ID
-  globalModelSortOrder: string[]; // Array of combined IDs
-  providerFetchStatus: Record<string, FetchStatus>; // Keyed by providerConfigId
+  selectedModelId: string | null;
+  globalModelSortOrder: string[];
+  providerFetchStatus: Record<string, FetchStatus>;
   isLoading: boolean;
   error: string | null;
   enableApiKeyManagement: boolean;
@@ -45,7 +45,7 @@ export interface ProviderActions {
   selectModel: (combinedId: string | null) => void;
   addApiKey: (
     name: string,
-    providerId: string, // Changed from providerType to providerId for clarity
+    providerId: string,
     value: string,
   ) => Promise<string>;
   deleteApiKey: (id: string) => Promise<void>;
@@ -83,7 +83,7 @@ export const useProviderStore = create(
     isLoading: true,
     error: null,
     enableApiKeyManagement: true,
-    _selectedModelForDetails: null, // Initialize temporary state
+    _selectedModelForDetails: null,
 
     setEnableApiKeyManagement: (enabled) => {
       set({ enableApiKeyManagement: enabled });
@@ -185,7 +185,7 @@ export const useProviderStore = create(
       const currentId = get().selectedModelId;
       console.log(
         `[ProviderStore] selectModel called. Current: ${currentId}, New: ${combinedId}`,
-      ); // Log call
+      );
       if (currentId !== combinedId) {
         set({ selectedModelId: combinedId });
         PersistenceService.saveSetting(LAST_SELECTION_KEY, combinedId);
@@ -193,7 +193,7 @@ export const useProviderStore = create(
         console.log(
           `[ProviderStore] Emitting ${ModEvent.MODEL_SELECTION_CHANGED} with payload:`,
           { modelId: combinedId },
-        ); // Log emission
+        );
         emitter.emit(ModEvent.MODEL_SELECTION_CHANGED, {
           modelId: combinedId,
         });
@@ -211,7 +211,7 @@ export const useProviderStore = create(
         id: newId,
         name,
         value: value,
-        providerId: providerId, // Store the intended provider ID
+        providerId: providerId,
         createdAt: now,
         updatedAt: now,
       };
@@ -336,7 +336,7 @@ export const useProviderStore = create(
 
         // --- Recalculate valid order and selection after update ---
         const currentOrder = get().globalModelSortOrder;
-        const configs = get().dbProviderConfigs; // Get updated configs
+        const configs = get().dbProviderConfigs;
 
         let newOrder = [...currentOrder];
 
@@ -359,12 +359,12 @@ export const useProviderStore = create(
         // Add any newly enabled models that aren't in the order yet
         enabledSet.forEach((mId) => {
           if (!newOrder.includes(mId)) {
-            newOrder.push(mId); // Add to the end for now
+            newOrder.push(mId);
           }
         });
 
         // Update order and potentially the selected model
-        await get().setGlobalModelSortOrder(newOrder); // This handles selection validation
+        await get().setGlobalModelSortOrder(newOrder);
       } catch (e) {
         console.error("ProviderStore: Error updating provider config", e);
         toast.error(
@@ -391,11 +391,11 @@ export const useProviderStore = create(
         });
         emitter.emit(ModEvent.PROVIDER_CONFIG_CHANGED, {
           providerId: id,
-          config: { ...config, isEnabled: false }, // Indicate deletion via event
+          config: { ...config, isEnabled: false },
         });
 
         // --- Recalculate valid order and selection after delete ---
-        const configs = get().dbProviderConfigs; // Get updated configs
+        const configs = get().dbProviderConfigs;
         const currentGloballyEnabledModels = configs.reduce(
           (acc: string[], provider) => {
             if (provider.isEnabled && provider.enabledModels) {
@@ -412,7 +412,7 @@ export const useProviderStore = create(
         const newOrder = currentOrder.filter((mId) => enabledSet.has(mId));
         // --- End Recalculation ---
 
-        await get().setGlobalModelSortOrder(newOrder); // This handles selection validation
+        await get().setGlobalModelSortOrder(newOrder);
 
         toast.success(`Provider "${configName}" deleted.`);
       } catch (e) {
@@ -499,7 +499,7 @@ export const useProviderStore = create(
           console.log(
             `[ProviderStore] Selection ${currentSelected} invalidated or missing. Selecting ${newSelection}`,
           );
-          get().selectModel(newSelection); // This also saves the new selection and emits event
+          get().selectModel(newSelection);
         }
       }
       // --- End Selection Validation ---
@@ -560,7 +560,7 @@ export const useProviderStore = create(
       if (!config) return [];
       // Return fetchedModels if available, otherwise fallback to defaults (mapped)
       if (config.fetchedModels && config.fetchedModels.length > 0) {
-        return [...config.fetchedModels]; // Return a copy
+        return [...config.fetchedModels];
       }
       // Fallback to default models if fetchedModels is null or empty
       const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
@@ -569,9 +569,9 @@ export const useProviderStore = create(
       return defaultDefs.map((m) => ({
         id: m.id,
         name: m.name,
-        // metadata: m.metadata, // Fix: metadata doesn't exist on the simplified default type
+        // metadata: m.metadata,
         // Add other default fields based on mapToOpenRouterModel logic if needed
-        context_length: 4096, // Example default
+        context_length: 4096,
         architecture: {
           modality: "text->text",
           input_modalities: ["text"],

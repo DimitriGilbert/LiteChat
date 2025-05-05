@@ -9,7 +9,7 @@ import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
 import { useProviderStore } from "@/store/provider.store";
 import { splitModelId } from "@/lib/litechat/provider-helpers";
-import { useSettingsStore } from "@/store/settings.store"; // Import settings store
+import { useSettingsStore } from "@/store/settings.store";
 
 interface StreamingInteractionCardProps {
   interactionId: string;
@@ -27,7 +27,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
         );
         return {
           interaction,
-          interactionStatus: interaction?.status, // Get status for final update check
+          interactionStatus: interaction?.status,
         };
       }),
     );
@@ -45,10 +45,10 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
     // Effect to handle throttled updates
     useEffect(() => {
       const interval = 1000 / streamingRenderFPS;
-      let isMounted = true; // Flag to prevent updates after unmount
+      let isMounted = true;
 
       const updateDisplay = (timestamp: number) => {
-        if (!isMounted) return; // Exit if unmounted
+        if (!isMounted) return;
 
         // Check if the interaction is still streaming
         const isStillStreaming = useInteractionStore
@@ -73,7 +73,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
             useInteractionStore.getState().activeStreamBuffers[interactionId] ??
             "";
           setDisplayedContent(finalBuffer);
-          animationFrameRef.current = null; // Stop the loop
+          animationFrameRef.current = null;
         }
       };
 
@@ -82,7 +82,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
 
       // Cleanup function
       return () => {
-        isMounted = false; // Set flag on unmount
+        isMounted = false;
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
           animationFrameRef.current = null;

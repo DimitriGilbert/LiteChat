@@ -26,7 +26,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   onDelete,
   onFetchModels,
   fetchStatus,
-  onSelectModelForDetails, // Receive the callback
+  onSelectModelForDetails,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -74,7 +74,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     provider.baseURL,
     provider.enabledModels,
     provider.autoFetchModels,
-    getAllAvailableModelDefsForProvider, // Dependency added
+    getAllAvailableModelDefsForProvider,
   ]);
 
   const handleEdit = () => setIsEditing(true);

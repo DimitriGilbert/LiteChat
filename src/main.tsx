@@ -3,8 +3,8 @@ import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { useSettingsStore } from "./store/settings.store.ts"; // Import store
-import { enableMapSet } from "immer"; // Import enableMapSet
+import { useSettingsStore } from "./store/settings.store.ts";
+import { enableMapSet } from "immer";
 
 enableMapSet();
 

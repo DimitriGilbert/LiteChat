@@ -33,7 +33,7 @@ const createDirectoryRecursive = async (
   path: string,
   options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const normalized = normalizePath(path);
   if (normalized === "/") return;
   try {
@@ -96,7 +96,7 @@ export const listFilesOp = async (
   path: string,
   options?: { fsInstance?: typeof fs },
 ): Promise<FileSystemEntry[]> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const normalized = normalizePath(path);
   try {
     // Ensure the directory exists before listing
@@ -159,7 +159,7 @@ export const readFileOp = async (
   path: string,
   options?: { fsInstance?: typeof fs },
 ): Promise<Uint8Array> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const normalizedPath = normalizePath(path);
   try {
     const data = await fsToUse.promises.readFile(normalizedPath);
@@ -186,7 +186,7 @@ export const writeFileOp = async (
   data: Uint8Array | string,
   options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const normalized = normalizePath(path);
   const parentDir = dirname(normalized);
   try {
@@ -225,7 +225,7 @@ export const deleteItemOp = async (
   recursive: boolean = false,
   options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const normalized = normalizePath(path);
   if (normalized === "/") {
     toast.error("Cannot delete the root directory.");
@@ -318,7 +318,7 @@ export const uploadFilesOp = async (
   targetPath: string,
   options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const normalizedTargetPath = normalizePath(targetPath);
   let successCount = 0;
   let errorCount = 0;
@@ -382,7 +382,7 @@ export const uploadAndExtractZipOp = async (
   targetPath: string,
   options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   if (!file.name.toLowerCase().endsWith(".zip")) {
     toast.error("Please select a valid ZIP file.");
     return;
@@ -474,7 +474,7 @@ export const downloadAllAsZipOp = async (
   rootPath: string = "/",
   options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const zip = new JSZip();
   const normalizedRoot = normalizePath(rootPath);
   const rootDirName = basename(normalizedRoot) || "root";
@@ -576,7 +576,7 @@ export const renameOp = async (
   newPath: string,
   options?: { fsInstance?: typeof fs },
 ): Promise<void> => {
-  const fsToUse = options?.fsInstance ?? fs; // Use provided or global fs
+  const fsToUse = options?.fsInstance ?? fs;
   const normalizedOld = normalizePath(oldPath);
   const normalizedNew = normalizePath(newPath);
 

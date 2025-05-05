@@ -28,8 +28,8 @@ const SettingsGeneralComponent: React.FC = () => {
     setEnableStreamingCodeBlockParsing,
     foldStreamingCodeBlocks,
     setFoldStreamingCodeBlocks,
-    foldUserMessagesOnCompletion, // Get new setting state
-    setFoldUserMessagesOnCompletion, // Get new setting action
+    foldUserMessagesOnCompletion,
+    setFoldUserMessagesOnCompletion,
     streamingRenderFPS,
     setStreamingRenderFPS,
     prismThemeUrl,
@@ -46,8 +46,8 @@ const SettingsGeneralComponent: React.FC = () => {
         state.setEnableStreamingCodeBlockParsing,
       foldStreamingCodeBlocks: state.foldStreamingCodeBlocks,
       setFoldStreamingCodeBlocks: state.setFoldStreamingCodeBlocks,
-      foldUserMessagesOnCompletion: state.foldUserMessagesOnCompletion, // Get new state
-      setFoldUserMessagesOnCompletion: state.setFoldUserMessagesOnCompletion, // Get new action
+      foldUserMessagesOnCompletion: state.foldUserMessagesOnCompletion,
+      setFoldUserMessagesOnCompletion: state.setFoldUserMessagesOnCompletion,
       streamingRenderFPS: state.streamingRenderFPS,
       setStreamingRenderFPS: state.setStreamingRenderFPS,
       prismThemeUrl: state.prismThemeUrl,

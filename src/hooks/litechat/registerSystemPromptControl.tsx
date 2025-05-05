@@ -1,5 +1,5 @@
 // src/hooks/litechat/registerSystemPromptControl.tsx
-// FULL FILE - Updated Registration Logic
+
 import React from "react";
 import { useControlRegistryStore } from "@/store/control.store";
 import { SystemPromptControlTrigger } from "@/components/LiteChat/prompt/control/system-prompt/SystemPromptControlTrigger";

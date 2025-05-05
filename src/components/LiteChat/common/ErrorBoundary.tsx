@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 interface Props {
   children: ReactNode;
-  fallback?: ReactNode; // Optional custom fallback UI
+  fallback?: ReactNode;
 }
 
 interface State {
@@ -17,7 +17,7 @@ interface State {
 }
 
 // Define package version (replace with actual dynamic injection if possible)
-const LITECHAT_VERSION = "0.1.0-dev"; // Placeholder
+const LITECHAT_VERSION = "0.1.0-dev";
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
@@ -37,7 +37,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private getGitHubIssueUrl(): string {
-    const repoUrl = "https://github.com/YOUR_GITHUB_USERNAME/litechat/issues"; // Replace with actual repo URL
+    const repoUrl = "https://github.com/YOUR_GITHUB_USERNAME/litechat/issues";
     const title = encodeURIComponent(
       `Crash Report: ${this.state.error?.message.substring(0, 50) ?? "Unknown Error"}`,
     );
@@ -50,8 +50,8 @@ export class ErrorBoundary extends Component<Props, State> {
     const nl = forGithub
       ? "\n"
       : `
-`; // Newline character
-    const codeBlock = forGithub ? "```" : ""; // Code block marker
+`;
+    const codeBlock = forGithub ? "```" : "";
 
     let report = `## LiteChat Error Report${nl}${nl}`;
     report += `**Version:** ${LITECHAT_VERSION}${nl}`;

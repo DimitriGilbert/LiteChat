@@ -1,8 +1,8 @@
 // src/components/LiteChat/canvas/UserPromptDisplay.tsx
-// FULL FILE - Adjusted padding for mobile
+
 import React, { useState, useCallback, useEffect } from "react";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
-import { FilePreviewRenderer } from "../common/FilePreviewRenderer";
+import { FilePreviewRenderer } from "@/components/LiteChat/common/FilePreviewRenderer";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
@@ -13,8 +13,8 @@ import {
   CheckIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ActionTooltipButton } from "../common/ActionTooltipButton";
-import { useSettingsStore } from "@/store/settings.store"; // Import settings store
+import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
+import { useSettingsStore } from "@/store/settings.store";
 
 interface UserPromptDisplayProps {
   turnData: Readonly<PromptTurnObject>;
@@ -71,7 +71,12 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
     }, [turnData.content]);
 
     return (
-      <div className={cn("user-prompt relative group/user", className)}>
+      <div
+        className={cn(
+          "user-prompt relative group/user overflow-wrap-anywhere",
+          className,
+        )}
+      >
         <div
           className={cn(
             "flex flex-col sm:flex-row justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-10 p-1 -m-1 rounded-t",

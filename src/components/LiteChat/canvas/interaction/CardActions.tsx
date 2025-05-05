@@ -1,9 +1,9 @@
 // src/components/LiteChat/canvas/interaction/CardActions.tsx
-// FULL FILE - Adjusted positioning for mobile
+
 import React from "react";
 import { RefreshCwIcon, Trash2Icon, EditIcon } from "lucide-react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils";
 
 interface CardActionsProps {
   interactionId: string;
@@ -42,8 +42,8 @@ export const CardActions: React.FC<CardActionsProps> = ({
   return (
     <div
       className={cn(
-        "absolute bottom-1 right-1 md:bottom-2 md:right-2 flex items-center space-x-0.5 md:space-x-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200", // Adjust spacing for mobile
-        "bg-card/80 backdrop-blur-sm p-0.5 md:p-1 rounded-md shadow-md z-20", // Adjust padding
+        "absolute bottom-1 right-1 md:bottom-2 md:right-2 flex items-center space-x-0.5 md:space-x-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200",
+        "bg-card/80 backdrop-blur-sm p-0.5 md:p-1 rounded-md shadow-md z-20",
       )}
     >
       {onEdit && (

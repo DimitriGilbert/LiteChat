@@ -20,7 +20,7 @@ export interface DbTag extends DbBase {
 
 // Many-to-many link table
 export interface DbTagRuleLink {
-  id: string; // Use a compound key like `${tagId}-${ruleId}` or a UUID
+  id: string;
   tagId: string;
   ruleId: string;
 }

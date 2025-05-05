@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/control/system-prompt/SystemPromptControlTrigger.tsx
-// FULL FILE - Moved from registerSystemPromptControl.tsx
+
 import React, { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { TextIcon } from "lucide-react";
@@ -126,13 +126,13 @@ export const SystemPromptControlTrigger: React.FC<
   }, []);
 
   const handleSave = useCallback(() => {
-    onPromptChange(localPrompt.trim()); // Update scoped state via callback
+    onPromptChange(localPrompt.trim());
     setPopoverOpen(false);
   }, [localPrompt, onPromptChange]);
 
   const handleClear = useCallback(() => {
-    setLocalPrompt(""); // Clear local state first
-    onPromptChange(""); // Update scoped state via callback
+    setLocalPrompt("");
+    onPromptChange("");
     setPopoverOpen(false);
   }, [onPromptChange]);
 

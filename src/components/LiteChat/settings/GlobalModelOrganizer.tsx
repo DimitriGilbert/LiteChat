@@ -35,7 +35,7 @@ export const GlobalModelOrganizer: React.FC = () => {
     dbProviderConfigs,
     globalModelSortOrder,
     isLoading,
-    getAllAvailableModelDefsForProvider, // Get the selector
+    getAllAvailableModelDefsForProvider,
   } = useProviderStore(
     useShallow((state) => ({
       setGlobalModelSortOrder: state.setGlobalModelSortOrder,
@@ -43,7 +43,7 @@ export const GlobalModelOrganizer: React.FC = () => {
       globalModelSortOrder: state.globalModelSortOrder,
       isLoading: state.isLoading,
       getAllAvailableModelDefsForProvider:
-        state.getAllAvailableModelDefsForProvider, // Get the selector
+        state.getAllAvailableModelDefsForProvider,
     })),
   );
 
@@ -75,7 +75,7 @@ export const GlobalModelOrganizer: React.FC = () => {
             name: modelDef.name || modelId,
             providerId: config.id,
             providerName: config.name,
-            metadata: modelDef, // Store the full OpenRouterModel
+            metadata: modelDef,
           });
         }
       });

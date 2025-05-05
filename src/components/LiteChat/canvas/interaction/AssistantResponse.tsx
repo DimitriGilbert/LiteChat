@@ -23,7 +23,8 @@ const StaticContentView: React.FC<{ markdownContent: string | null }> = ({
   }
 
   return (
-    <div>
+    // Add overflow-wrap here for the main text content
+    <div className="overflow-wrap-anywhere">
       {parsedContent.map((item, index) => {
         if (typeof item === "string") {
           return (
@@ -128,7 +129,8 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
             />
           </div>
           {!isReasoningFolded && (
-            <pre className="whitespace-pre-wrap text-xs font-mono p-2 bg-background/30 rounded mt-1">
+            // Add overflow-wrap to pre tag for reasoning
+            <pre className="whitespace-pre-wrap text-xs font-mono p-2 bg-background/30 rounded mt-1 overflow-wrap-anywhere">
               {reasoning!}
             </pre>
           )}

@@ -1,5 +1,5 @@
 // src/components/LiteChat/project-settings/ProjectSettingsModal.tsx
-// FULL FILE - Adjusted DialogContent sizing
+
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Dialog,
@@ -24,7 +24,7 @@ import { ProjectSettingsSync } from "./ProjectSettingsSync";
 import { ProjectSettingsVfs } from "./ProjectSettingsVfs";
 import { useConversationStore } from "@/store/conversation.store";
 import { TabbedLayout, TabDefinition } from "../common/TabbedLayout";
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils";
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
@@ -40,15 +40,15 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   // Select primitive/stable values or stable functions
   const { getProjectById, updateProject } = useProjectStore(
     useShallow((state) => ({
-      getProjectById: state.getProjectById, // Function is stable
-      updateProject: state.updateProject, // Function is stable
+      getProjectById: state.getProjectById,
+      updateProject: state.updateProject,
     })),
   );
   // Use getState for selector function outside hook dependencies
   const getEffectiveProjectSettings = useProjectStore(
     (state) => state.getEffectiveProjectSettings,
   );
-  const syncRepos = useConversationStore((state) => state.syncRepos); // Array ref might change
+  const syncRepos = useConversationStore((state) => state.syncRepos);
   const globalDefaults = useSettingsStore(
     useShallow((state) => ({
       globalSystemPrompt: state.globalSystemPrompt,
@@ -191,7 +191,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   );
 
   const handleSave = async () => {
-    if (!projectId || !project) return; // Use computed project
+    if (!projectId || !project) return;
     setIsSaving(true);
     try {
       // Use computed project for parentId
@@ -213,7 +213,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
 
       const updates: Partial<Omit<Project, "id" | "createdAt" | "path">> = {};
       const metadataUpdates: Record<string, any> = {
-        ...(project.metadata ?? {}), // Use computed project
+        ...(project.metadata ?? {}),
       };
 
       if (systemPrompt !== parentSettings.systemPrompt)
@@ -242,7 +242,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
       updates.metadata = metadataUpdates;
 
       await updateProject(projectId, updates);
-      toast.success(`Project "${project.name}" settings updated.`); // Use computed project
+      toast.success(`Project "${project.name}" settings updated.`);
       onClose();
     } catch (error) {
       toast.error("Failed to save project settings.");
@@ -353,7 +353,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
       presencePenalty,
       frequencyPenalty,
       syncRepoId,
-      effectiveSettings, // Depend on computed settings
+      effectiveSettings,
       globalDefaults,
       globalModelId,
       isSaving,
@@ -364,7 +364,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
       effectiveSyncRepoId,
       syncRepos,
       projectId,
-      project?.name, // Depend on computed project name
+      project?.name,
     ],
   );
 
@@ -377,7 +377,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
           // Responsive overrides
           "sm:w-[90vw] sm:max-w-[800px]",
           "md:h-[75vh]",
-          "min-h-[500px] max-h-[90vh]", // Ensure min/max height
+          "min-h-[500px] max-h-[90vh]",
         )}
       >
         <DialogHeader className="p-4 md:p-6 pb-2 md:pb-4 flex-shrink-0">
@@ -394,8 +394,10 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
           initialValue={activeTab}
           onValueChange={setActiveTab}
           className="flex-grow overflow-hidden px-4 md:px-6"
-          listClassName="-mx-4 md:-mx-6 px-4 md:px-6"
-          contentContainerClassName="pb-4 md:pb-6 pr-2 -mr-2"
+          // Adjust list padding for mobile
+          listClassName="-mx-4 md:-mx-6 px-2 md:px-6 py-1 md:py-0"
+          // Adjust content padding for mobile
+          contentContainerClassName="pb-4 md:pb-6 pr-1 md:pr-2 -mr-1 md:-mr-2"
           scrollable={true}
         />
 

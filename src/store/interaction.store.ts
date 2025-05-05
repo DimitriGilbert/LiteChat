@@ -4,8 +4,8 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { Interaction } from "@/types/litechat/interaction";
 import { PersistenceService } from "@/services/persistence.service";
-import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
-import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent
+import { emitter } from "@/lib/litechat/event-emitter";
+import { ModEvent } from "@/types/litechat/modding";
 
 export interface InteractionState {
   interactions: Interaction[];
@@ -216,7 +216,7 @@ export const useInteractionStore = create(
             state.streamingInteractionIds.length > 0 ? "streaming" : "idle";
           state.status = newStatus;
         } else {
-          newStatus = state.status; // Keep current status if not error
+          newStatus = state.status;
         }
       });
       if (previousStatus !== newStatus) {

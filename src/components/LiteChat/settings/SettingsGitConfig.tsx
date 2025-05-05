@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsGitConfig.tsx
-// FULL FILE - Adjusted layout for mobile
+
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";

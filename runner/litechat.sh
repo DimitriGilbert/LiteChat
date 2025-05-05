@@ -131,7 +131,7 @@ elif command -v php &> /dev/null; then
 $path = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
 $file = __DIR__ . $path;
 if (is_file($file)) {
-    return false; // Serve the requested file
+    return false;
 } else {
     include __DIR__ . "/index.html";
 }

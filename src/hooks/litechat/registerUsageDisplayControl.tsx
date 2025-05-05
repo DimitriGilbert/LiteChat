@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { CircleIcon } from "lucide-react";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { ModEvent } from "@/types/litechat/modding"; // ModEventPayloadMap removed
+import { ModEvent } from "@/types/litechat/modding";
 import {
   createAiModelConfig,
   splitModelId,
@@ -36,7 +36,7 @@ const estimateHistoryTokens = (interactions: Interaction[]): number => {
       totalBytes += new TextEncoder().encode(i.prompt.content).length;
     }
     i.prompt?.metadata?.attachedFiles?.forEach((f) => {
-      totalBytes += f.size; // Add file sizes
+      totalBytes += f.size;
     });
     // Estimate assistant response bytes
     if (i.response && typeof i.response === "string") {
@@ -125,7 +125,7 @@ export const UsageDisplayControl: React.FC = () => {
       emitter.off(ModEvent.INTERACTION_COMPLETED, handleInteractionCompleted);
       emitter.off(ModEvent.CONTEXT_CHANGED, handleContextChanged);
     };
-  }, []); // Run only on mount
+  }, []);
 
   // --- Effect to update contextLength when selectedModelId changes ---
   useEffect(() => {
@@ -156,7 +156,7 @@ export const UsageDisplayControl: React.FC = () => {
     const length =
       meta?.top_provider?.context_length ?? meta?.context_length ?? 0;
     setContextLength(length);
-  }, [selectedModelId]); // Re-run only when selectedModelId changes
+  }, [selectedModelId]);
 
   // --- Memoized Calculations ---
   const { estimatedInputTokens, totalEstimatedTokens, contextPercentage } =

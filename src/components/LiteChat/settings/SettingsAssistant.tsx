@@ -8,10 +8,10 @@ import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
 import { ParameterControlComponent } from "@/components/LiteChat/prompt/control/ParameterControlComponent";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch"; // Import Switch
-import { GlobalModelSelector } from "@/components/LiteChat/prompt/control/GlobalModelSelector"; // Import Model Selector
-import { Button } from "@/components/ui/button"; // Import Button
-import { RotateCcwIcon } from "lucide-react"; // Import Icon
+import { Switch } from "@/components/ui/switch";
+import { GlobalModelSelector } from "@/components/LiteChat/prompt/control/GlobalModelSelector";
+import { Button } from "@/components/ui/button";
+import { RotateCcwIcon } from "lucide-react";
 
 const SettingsAssistantComponent: React.FC = () => {
   // --- Fetch state/actions from store ---

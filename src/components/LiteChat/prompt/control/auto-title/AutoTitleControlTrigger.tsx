@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/control/auto-title/AutoTitleControlTrigger.tsx
-// FULL FILE - Moved from registerAutoTitleControl.tsx
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { SparklesIcon } from "lucide-react";
@@ -62,7 +62,7 @@ export const AutoTitleControlTrigger: React.FC<
       setIsFirstInteraction(isFirst);
       // Reset turn state via callback if it's not the first interaction anymore
       if (!isFirst && localAutoTitleEnabled) {
-        handleToggle(); // This calls the parent's toggle logic
+        handleToggle();
       }
     };
 
@@ -72,7 +72,7 @@ export const AutoTitleControlTrigger: React.FC<
     // Subscriptions
     emitter.on(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
     emitter.on(ModEvent.CONTEXT_CHANGED, checkFirstInteraction);
-    emitter.on(ModEvent.INTERACTION_COMPLETED, checkFirstInteraction); // Re-check after completion
+    emitter.on(ModEvent.INTERACTION_COMPLETED, checkFirstInteraction);
 
     // Cleanup
     return () => {
@@ -86,13 +86,13 @@ export const AutoTitleControlTrigger: React.FC<
   const handleToggle = () => {
     const newState = !localAutoTitleEnabled;
     setLocalAutoTitleEnabled(newState);
-    onToggle(newState); // Call the callback passed from registration
+    onToggle(newState);
   };
 
   // --- Visibility Logic moved into the component ---
   // Only show if globally enabled AND it's the first interaction
   if (!globalAutoTitleEnabled || !isFirstInteraction) {
-    return null; // Render nothing if conditions aren't met
+    return null;
   }
   // --- End Visibility Logic ---
 

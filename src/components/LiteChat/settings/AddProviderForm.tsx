@@ -51,7 +51,7 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
   const [isSavingNew, setIsSavingNew] = useState(false);
   const [newProviderData, setNewProviderData] = useState<
     Partial<DbProviderConfig> & {
-      type: DbProviderType | null; // Allow null initially
+      type: DbProviderType | null;
       isEnabled: boolean;
       autoFetchModels: boolean;
     }
@@ -71,7 +71,7 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
   useEffect(() => {
     setNewProviderData((prev) => ({
       ...prev,
-      name: initialName || prev.name || "", // Prioritize prop, then existing, then empty
+      name: initialName || prev.name || "",
       type: initialType || prev.type || null,
       apiKeyId: initialApiKeyId || prev.apiKeyId || null,
       autoFetchModels: initialType
@@ -96,8 +96,8 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
             (p) => p.value === prev.type,
           )?.label;
 
-          updated.apiKeyId = null; // Reset API key on type change
-          updated.baseURL = null; // Reset Base URL
+          updated.apiKeyId = null;
+          updated.baseURL = null;
           updated.autoFetchModels = newType
             ? supportsModelFetching(newType)
             : false;
@@ -131,7 +131,7 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
         return updated;
       });
     },
-    [apiKeys], // Add apiKeys dependency for auto-selection logic
+    [apiKeys],
   );
 
   const handleSaveNew = useCallback(async () => {
@@ -154,14 +154,14 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
         isEnabled: newProviderData.isEnabled ?? true,
         apiKeyId: newProviderData.apiKeyId ?? null,
         baseURL: newProviderData.baseURL?.trim() || null,
-        enabledModels: null, // Start with no models enabled
+        enabledModels: null,
         autoFetchModels: autoFetch,
         fetchedModels: null,
         modelsLastFetchedAt: null,
       };
 
       await onAddProvider(configToAdd);
-      onCancel(); // Close form on success
+      onCancel();
     } catch (error) {
       console.error("Failed to add provider (from form component):", error);
       // Toast handled by store action or caller

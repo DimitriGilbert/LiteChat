@@ -1,13 +1,13 @@
 // src/components/LiteChat/project-settings/ProjectSettingsVfs.tsx
-// FULL FILE - Adjusted layout for mobile
+
 import React, { useMemo } from "react";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { AlertCircleIcon } from "lucide-react";
-import { toast } from "sonner";
+// import { Button } from "@/components/ui/button";
+// import { AlertCircleIcon } from "lucide-react";
+// import { toast } from "sonner";
 import { FileManager } from "@/components/LiteChat/file-manager/FileManager";
 import { TabbedLayout, TabDefinition } from "../common/TabbedLayout";
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils";
 
 interface ProjectSettingsVfsProps {
   projectId: string | null;
@@ -17,14 +17,13 @@ interface ProjectSettingsVfsProps {
 
 export const ProjectSettingsVfs: React.FC<ProjectSettingsVfsProps> = ({
   projectId,
-  projectName,
-  isSaving,
+  // isSaving,
 }) => {
-  const handleClearVfs = () => {
-    toast.info(
-      `VFS clearing for project "${projectName}" is not yet implemented.`,
-    );
-  };
+  // const handleClearVfs = () => {
+  //   toast.info(
+  //     `VFS clearing for project "${projectName}" is not yet implemented.`,
+  //   );
+  // };
 
   // Define tabs for the layout
   const tabs: TabDefinition[] = useMemo(
@@ -47,7 +46,7 @@ export const ProjectSettingsVfs: React.FC<ProjectSettingsVfsProps> = ({
       },
       {
         value: "settings",
-        label: "Settings", // Simplified label for mobile
+        label: "Settings",
         content: (
           <div className="space-y-4">
             <div>
@@ -70,21 +69,21 @@ export const ProjectSettingsVfs: React.FC<ProjectSettingsVfsProps> = ({
                 Clearing the VFS will permanently delete all files stored
                 specifically for this project. This cannot be undone.
               </p>
-              <Button
+              {/* <Button
                 variant="destructive"
                 size="sm"
-                onClick={handleClearVfs}
+                onClick={()=>{}}
                 disabled={isSaving || !projectId}
               >
                 <AlertCircleIcon className="h-4 w-4 mr-1" />
                 Clear Project VFS (Not Implemented)
-              </Button>
+              </Button> */}
             </div>
           </div>
         ),
       },
     ],
-    [projectId, projectName, isSaving],
+    [projectId],
   );
 
   return (
@@ -92,12 +91,13 @@ export const ProjectSettingsVfs: React.FC<ProjectSettingsVfsProps> = ({
     <TabbedLayout
       tabs={tabs}
       defaultValue="manage"
-      className="h-full" // Ensure it fills height
+      className="h-full flex flex-col" // Ensure it fills height and uses flex-col
       listClassName={cn(
         "bg-muted/50 rounded-md",
-        "flex-wrap justify-start h-auto", // Allow wrapping on mobile
+        "flex-wrap justify-start h-auto",
+        "p-1 gap-1",
       )}
-      contentContainerClassName="mt-3 flex-grow flex flex-col" // Ensure content area grows
+      contentContainerClassName="mt-3 flex-grow flex flex-col overflow-y-auto" // Ensure content area grows and scrolls
     />
   );
 };

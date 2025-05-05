@@ -39,7 +39,7 @@ const SettingsApiKeysComponent: React.FC = () => {
       setIsSavingNew(true);
       try {
         await addApiKey(name, providerId, value);
-        setIsAdding(false); // Close form on success
+        setIsAdding(false);
       } catch (error) {
         console.error("Failed to add API key (from component):", error);
         // Toast handled by store action

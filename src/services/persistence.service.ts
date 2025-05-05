@@ -8,8 +8,8 @@ import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import type { SyncRepo } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project";
 import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
-import type { DbAppState } from "@/lib/litechat/db"; // Import DbAppState
-import type { FullExportOptions } from "./import-export.service"; // Import options type
+import type { DbAppState } from "@/lib/litechat/db";
+import type { FullExportOptions } from "./import-export.service";
 
 // Helper function to ensure date fields are Date objects
 const ensureDateFields = <
@@ -42,7 +42,7 @@ const ensureDateFields = <
 
 // Structure for full export
 export interface FullExportData {
-  version: number; // To handle future format changes
+  version: number;
   exportedAt: string;
   settings?: Record<string, any>;
   apiKeys?: DbApiKey[];
@@ -490,7 +490,7 @@ export class PersistenceService {
 
   // --- Full Export/Import ---
   static async getAllDataForExport(
-    options: FullExportOptions, // Accept options
+    options: FullExportOptions,
   ): Promise<FullExportData> {
     const exportData: FullExportData = {
       version: 1,

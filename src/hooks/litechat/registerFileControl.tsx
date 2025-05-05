@@ -45,7 +45,7 @@ const FileControlTrigger: React.FC = () => {
 
     const handleModelChange = (payload: { modelId: string | null }) => {
       if (!payload.modelId) {
-        setModelSupportsNonText(false); // Default to false if no model
+        setModelSupportsNonText(false);
         return;
       }
       const { getSelectedModel } = useProviderStore.getState();
@@ -96,7 +96,7 @@ const FileControlTrigger: React.FC = () => {
           toast.warning(
             `File "${file.name}" (${file.type}) cannot be uploaded. The current model only supports text input.`,
           );
-          continue; // Skip this file
+          continue;
         }
 
         try {
@@ -154,7 +154,7 @@ const FileControlTrigger: React.FC = () => {
         event.target.value = "";
       }
     },
-    [addAttachedFile, modelSupportsNonText], // Depend on model support status
+    [addAttachedFile, modelSupportsNonText],
   );
 
   const handleButtonClick = () => {

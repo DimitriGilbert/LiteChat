@@ -5,7 +5,7 @@ import type {
   DbProviderConfig,
   DbProviderType,
   AiModelConfig,
-  // OpenRouterModel, // Removed unused import
+  // OpenRouterModel,
 } from "@/types/litechat/provider";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -87,9 +87,9 @@ export const DEFAULT_MODELS: Record<
     { id: "gemini-1.5-flash-latest", name: "Gemini 1.5 Flash" },
     { id: "gemini-1.5-pro-latest", name: "Gemini 1.5 Pro" },
   ],
-  openrouter: [], // Fetched directly
+  openrouter: [],
   ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }],
-  "openai-compatible": [], // Needs fetching
+  "openai-compatible": [],
 };
 
 // --- Instantiation and Configuration Helpers ---
@@ -99,7 +99,7 @@ export const ensureV1Path = (baseUrl: string): string => {
     const trimmed = baseUrl.replace(/\/+$/, "");
     // More robust check for existing /vN path
     if (/\/(v\d+(\.\d+)*)$/.test(trimmed)) {
-      return trimmed; // Already has a version path
+      return trimmed;
     }
     return trimmed + "/v1";
   } catch (e) {
@@ -177,11 +177,11 @@ export function createAiModelConfig(
   // Construct the AiModelConfig object
   return {
     id: combineModelId(config.id, modelId),
-    name: modelInfo.name, // Use name from the model definition
+    name: modelInfo.name,
     providerId: config.id,
     providerName: config.name,
     instance,
-    metadata: modelInfo, // Store the full OpenRouterModel object
+    metadata: modelInfo,
   };
 }
 export const DEFAULT_SUPPORTED_PARAMS: Record<string, string[]> = {
@@ -197,29 +197,29 @@ export const DEFAULT_SUPPORTED_PARAMS: Record<string, string[]> = {
     "response_format",
     "tools",
     "tool_choice",
-    "logprobs", // Often supported
-    "top_logprobs", // Often supported
+    "logprobs",
+    "top_logprobs",
   ],
   google: [
-    "max_tokens", // maxOutputTokens
-    "temperature",
-    "top_p",
-    "top_k",
-    "stop", // stopSequences
-    "tools",
-    "tool_choice",
-  ],
-  ollama: [
-    "max_tokens", // num_predict
+    "max_tokens",
     "temperature",
     "top_p",
     "top_k",
     "stop",
-    "presence_penalty", // Not standard, but some models might support via template
-    "frequency_penalty", // Not standard, but some models might support via template
+    "tools",
+    "tool_choice",
+  ],
+  ollama: [
+    "max_tokens",
+    "temperature",
+    "top_p",
+    "top_k",
+    "stop",
+    "presence_penalty",
+    "frequency_penalty",
     "seed",
-    "repetition_penalty", // mirostat_tau, mirostat_eta control this indirectly
-    "response_format", // format: json
+    "repetition_penalty",
+    "response_format",
   ],
   "openai-compatible": [
     // Assume similar to OpenAI, but may vary widely
@@ -232,13 +232,13 @@ export const DEFAULT_SUPPORTED_PARAMS: Record<string, string[]> = {
     "seed",
     "logit_bias",
     "response_format",
-    "tools", // Less common
-    "tool_choice", // Less common
+    "tools",
+    "tool_choice",
     "logprobs",
     "top_logprobs",
     "repetition_penalty",
     "min_p",
     "top_k",
   ],
-  openrouter: [], // OpenRouter provides this directly
+  openrouter: [],
 };

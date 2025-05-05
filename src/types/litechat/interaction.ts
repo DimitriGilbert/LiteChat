@@ -25,10 +25,10 @@ export interface Interaction {
   id: string;
   conversationId: string;
   type: InteractionType;
-  index: number; // Title generation might have index -1 or similar? Or just not be displayed.
+  index: number;
   parentId: string | null;
-  prompt: Readonly<PromptTurnObject> | null; // Title generation might have a simplified prompt
-  response: any | null; // Title generation response is the title string
+  prompt: Readonly<PromptTurnObject> | null;
+  response: any | null;
   status: InteractionStatus;
   startedAt: Date | null;
   endedAt: Date | null;
@@ -58,8 +58,8 @@ export interface Interaction {
     // Store raw provider metadata if needed
     providerMetadata?: Record<string, any>;
     // Add timing metadata
-    timeToFirstToken?: number; // Milliseconds
-    generationTime?: number; // Milliseconds
+    timeToFirstToken?: number;
+    generationTime?: number;
     // Flag for title generation interaction
     isTitleGeneration?: boolean;
   };

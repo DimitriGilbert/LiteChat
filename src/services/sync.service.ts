@@ -20,7 +20,7 @@ const SYNC_REPO_BASE_DIR = "/synced_repos";
  * @param setRepoStatus Function to update the initialization status in the store.
  */
 export async function initializeOrSyncRepoLogic(
-  fsInstance: typeof FsType, // Accept fsInstance
+  fsInstance: typeof FsType,
   repo: SyncRepo,
   setRepoStatus: (repoId: string, status: SyncStatus) => void,
 ): Promise<void> {
@@ -82,7 +82,7 @@ export async function initializeOrSyncRepoLogic(
  * @param getSelectedItemType Function to get the currently selected item type.
  */
 export async function syncConversationLogic(
-  fsInstance: typeof FsType, // Accept fsInstance
+  fsInstance: typeof FsType,
   conversation: Conversation,
   repo: SyncRepo,
   setConversationStatus: (

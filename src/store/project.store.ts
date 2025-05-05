@@ -193,7 +193,7 @@ export const useProjectStore = create(
           // Re-add the deleted projects if deletion failed
           const projectsToAddBack = get()
             .projects.filter((p) => allIdsToDelete.includes(p.id))
-            .concat(projectToDelete); // Ensure the main one is added back too
+            .concat(projectToDelete);
           state.projects.push(...projectsToAddBack);
           state.projects.sort(
             (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),

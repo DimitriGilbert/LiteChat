@@ -20,8 +20,8 @@ interface SetupStepProps {
   title: string;
   description: string | React.ReactNode;
   isComplete: boolean;
-  isActive: boolean; // Is this the current step to focus on?
-  children?: React.ReactNode; // Content/form for the step
+  isActive: boolean;
+  children?: React.ReactNode;
   contentClassName?: string;
   openOnComplete?: boolean;
 }
@@ -84,7 +84,7 @@ export const SetupStep: React.FC<SetupStepProps> = ({
       <CollapsibleContent className="space-y-2">
         <div
           className={cn(
-            "rounded-md border px-4 py-3 font-mono text-sm shadow-sm bg-card ml-8", // Indent content
+            "rounded-md border px-4 py-3 font-mono text-sm shadow-sm bg-card ml-8",
             contentClassName,
           )}
         >

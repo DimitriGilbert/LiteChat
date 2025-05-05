@@ -27,10 +27,10 @@ export interface ParameterControlComponentProps {
   frequencyPenalty: number | null;
   setFrequencyPenalty: (value: number | null) => void;
   // Props for reasoning/web search removed
-  reasoningEnabled: boolean | null; // Keep for type compatibility if needed elsewhere, but unused here
-  setReasoningEnabled: (enabled: boolean | null) => void; // Keep for type compatibility
-  webSearchEnabled: boolean | null; // Keep for type compatibility
-  setWebSearchEnabled: (enabled: boolean | null) => void; // Keep for type compatibility
+  reasoningEnabled: boolean | null;
+  setReasoningEnabled: (enabled: boolean | null) => void;
+  webSearchEnabled: boolean | null;
+  setWebSearchEnabled: (enabled: boolean | null) => void;
   defaultTemperature?: number;
   defaultTopP?: number | null;
   defaultMaxTokens?: number | null;

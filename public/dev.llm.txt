@@ -243,14 +243,14 @@ adding_middleware (via Mod):
   1. Mod Script: Inside the mod's main function (`modApi`):
      ```javascript
      modApi.addMiddleware(
-       'middleware:prompt:turnFinalize', // Hook name from ModMiddlewareHook
+       'middleware:prompt:turnFinalize',
        async (payload) => { // Payload type from ModMiddlewarePayloadMap
          console.log('Processing turn:', payload.turnData.id);
          // Modify payload.turnData directly (Immer handled by store if needed, but often direct mutation is fine here)
          payload.turnData.metadata.myModData = 'processed';
          // Return modified payload (or original if no changes)
          // Return false to cancel the action
-         return payload; // Or return { turnData: modifiedTurnData };
+         return payload;
        }
      );
      ```

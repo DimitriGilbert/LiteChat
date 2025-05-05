@@ -41,7 +41,7 @@ export const StructuredOutputControl: React.FC = () => {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [entryJson, setEntryJson] = useState(structuredOutputJson ?? "");
   const [entryName, setEntryName] = useState("");
-  const [libraryItems, setLibraryItems] = useState<StructuredOutputItem[]>([]); // Placeholder
+  const [libraryItems, setLibraryItems] = useState<StructuredOutputItem[]>([]);
 
   const handleApply = useCallback(() => {
     try {
@@ -68,13 +68,13 @@ export const StructuredOutputControl: React.FC = () => {
       return;
     }
     try {
-      JSON.parse(entryJson); // Validate JSON
+      JSON.parse(entryJson);
       const newItem: StructuredOutputItem = {
-        id: Date.now().toString(), // Simple ID for now
+        id: Date.now().toString(),
         name: entryName.trim(),
         json: entryJson,
       };
-      setLibraryItems((prev) => [...prev, newItem]); // Add to placeholder state
+      setLibraryItems((prev) => [...prev, newItem]);
       setEntryName("");
       toast.success(`"${newItem.name}" saved to library.`);
       // TODO: Persist libraryItems
@@ -86,7 +86,7 @@ export const StructuredOutputControl: React.FC = () => {
   const handleUseFromLibrary = useCallback(
     (item: StructuredOutputItem) => {
       setEntryJson(item.json);
-      setStructuredOutputJson(item.json); // Apply immediately
+      setStructuredOutputJson(item.json);
       setPopoverOpen(false);
       toast.success(`Loaded "${item.name}" from library.`);
     },

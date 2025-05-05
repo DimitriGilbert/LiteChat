@@ -127,7 +127,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
         "group hover:bg-muted/50",
         isEditingThis && "bg-muted ring-1 ring-primary",
         isOperationLoading && "opacity-70 cursor-not-allowed",
-        !isDirectory && "cursor-pointer", // Add cursor pointer for files
+        !isDirectory && "cursor-pointer",
       )}
       onClick={handleRowClick}
       onDoubleClick={() =>

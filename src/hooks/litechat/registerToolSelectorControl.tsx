@@ -19,7 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useProviderStore } from "@/store/provider.store"; // Import provider store
+import { useProviderStore } from "@/store/provider.store";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { ModEvent } from "@/types/litechat/modding";
 import type { SidebarItemType } from "@/types/litechat/chat";
@@ -55,7 +55,7 @@ const ToolSelectorTrigger: React.FC = () => {
   const [isStreaming, setIsStreaming] = useState(
     () => useInteractionStore.getState().status === "streaming",
   );
-  const [isVisible, setIsVisible] = useState(true); // Assume visible initially
+  const [isVisible, setIsVisible] = useState(true);
   const [selectedItemType, setSelectedItemType] =
     useState<SidebarItemType | null>(
       () => useConversationStore.getState().selectedItemType,
@@ -78,7 +78,7 @@ const ToolSelectorTrigger: React.FC = () => {
       });
       transientEnabledTools = newState.enabledTools;
       transientMaxStepsOverride = newState.maxStepsOverride;
-      setLocalState(newState); // Update component state
+      setLocalState(newState);
     };
     // Sync initial local state
     setLocalState({
@@ -86,7 +86,7 @@ const ToolSelectorTrigger: React.FC = () => {
       maxStepsOverride: transientMaxStepsOverride,
     });
     return () => {
-      updateScopedState = () => {}; // Cleanup on unmount
+      updateScopedState = () => {};
     };
   }, []);
 
@@ -165,7 +165,7 @@ const ToolSelectorTrigger: React.FC = () => {
         enabledTools: updater(prev.enabledTools),
       }));
     },
-    [], // updateScopedState is stable within the effect scope
+    [],
   );
 
   // --- Derived State for Rendering ---
@@ -175,7 +175,7 @@ const ToolSelectorTrigger: React.FC = () => {
     isStreaming || allToolsCount === 0 || selectedItemType !== "conversation";
 
   if (!isVisible) {
-    return null; // Don't render if not supported
+    return null;
   }
 
   return (

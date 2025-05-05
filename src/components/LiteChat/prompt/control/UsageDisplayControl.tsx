@@ -11,13 +11,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { CircleIcon } from "lucide-react"; // Using CircleIcon for indicator
+import { CircleIcon } from "lucide-react";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { ModEvent } from "@/types/litechat/modding";
 import {
   createAiModelConfig,
   splitModelId,
-} from "@/lib/litechat/provider-helpers"; // Import helper
+} from "@/lib/litechat/provider-helpers";
 
 // Rough estimation: 1 token ~ 4 bytes
 const BYTES_PER_TOKEN_ESTIMATE = 4;
@@ -30,8 +30,8 @@ export const UsageDisplayControl: React.FC = () => {
   const { selectedModelId, dbProviderConfigs, dbApiKeys } = useProviderStore(
     useShallow((state) => ({
       selectedModelId: state.selectedModelId,
-      dbProviderConfigs: state.dbProviderConfigs, // Array reference might change, but less often than computed object
-      dbApiKeys: state.dbApiKeys, // Array reference might change
+      dbProviderConfigs: state.dbProviderConfigs,
+      dbApiKeys: state.dbApiKeys,
     })),
   );
   const attachedFiles = useInputStore(
@@ -50,7 +50,7 @@ export const UsageDisplayControl: React.FC = () => {
     return () => {
       emitter.off(ModEvent.PROMPT_INPUT_CHANGE, handleInputChange);
     };
-  }, []); // Empty dependency array ensures this runs only once on mount/unmount
+  }, []);
 
   // --- Compute selectedModel *inside* useMemo based on stable IDs/configs ---
   const selectedModel = useMemo(() => {
@@ -63,7 +63,7 @@ export const UsageDisplayControl: React.FC = () => {
     const apiKeyRecord = dbApiKeys.find((k) => k.id === config.apiKeyId);
     // Use createAiModelConfig helper here
     return createAiModelConfig(config, specificModelId, apiKeyRecord?.value);
-  }, [selectedModelId, dbProviderConfigs, dbApiKeys]); // Depend on stable values/arrays
+  }, [selectedModelId, dbProviderConfigs, dbApiKeys]);
 
   // Memoized calculations based on internal state and computed model data
   const {
@@ -72,7 +72,7 @@ export const UsageDisplayControl: React.FC = () => {
     estimatedInputTokens,
     contextPercentage,
   } = useMemo(() => {
-    const meta = selectedModel?.metadata; // Use computed model
+    const meta = selectedModel?.metadata;
     const length =
       meta?.top_provider?.context_length ?? meta?.context_length ?? 0;
     let price = 0;

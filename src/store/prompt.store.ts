@@ -2,8 +2,8 @@
 // FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
-import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent
+import { emitter } from "@/lib/litechat/event-emitter";
+import { ModEvent } from "@/types/litechat/modding";
 
 // State for the *next* prompt submission
 export interface PromptState {
@@ -15,9 +15,9 @@ export interface PromptState {
   presencePenalty: number | null;
   frequencyPenalty: number | null;
   // New transient states
-  reasoningEnabled: boolean | null; // Use null for 'default/unset'
-  webSearchEnabled: boolean | null; // Use null for 'default/unset'
-  structuredOutputJson: string | null; // Store the JSON string
+  reasoningEnabled: boolean | null;
+  webSearchEnabled: boolean | null;
+  structuredOutputJson: string | null;
 }
 
 interface PromptActions {
@@ -65,9 +65,9 @@ export const usePromptStateStore = create(
     topK: null,
     presencePenalty: null,
     frequencyPenalty: null,
-    reasoningEnabled: null, // Initialize new state
-    webSearchEnabled: null, // Initialize new state
-    structuredOutputJson: null, // Initialize new state
+    reasoningEnabled: null,
+    webSearchEnabled: null,
+    structuredOutputJson: null,
 
     // Actions
     setModelId: (id) => {

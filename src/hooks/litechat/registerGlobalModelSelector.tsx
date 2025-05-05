@@ -17,7 +17,7 @@ const GlobalModelSelectorTrigger: React.FC = () => {
   const { selectedModelId, selectModel } = useProviderStore(
     useShallow((state) => ({
       selectedModelId: state.selectedModelId,
-      selectModel: state.selectModel, // Get the correct action
+      selectModel: state.selectModel,
     })),
   );
   // Get the action to update the prompt state directly
@@ -59,12 +59,12 @@ const GlobalModelSelectorTrigger: React.FC = () => {
       emitter.off(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
       emitter.off(ModEvent.MODEL_SELECTION_CHANGED, handleModelChange);
     };
-  }, [setPromptModelId]); // Add setPromptModelId dependency
+  }, [setPromptModelId]);
 
   // The onChange handler now calls BOTH ProviderStore and PromptStateStore actions
   const handleSelectionChange = (newModelId: string | null) => {
-    selectModel(newModelId); // This updates the global default and emits event
-    setPromptModelId(newModelId); // Directly update the prompt state for the next turn
+    selectModel(newModelId);
+    setPromptModelId(newModelId);
   };
 
   return (

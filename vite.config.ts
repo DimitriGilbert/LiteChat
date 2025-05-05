@@ -13,7 +13,7 @@ export default defineConfig({
     nodePolyfills({
       // Optionally specify which globals to polyfill (true by default)
       globals: {
-        Buffer: true, // Ensure Buffer is polyfilled
+        Buffer: true,
         global: true,
         process: true,
       },
@@ -27,16 +27,16 @@ export default defineConfig({
     },
   },
   test: {
-    globals: true, // Use Vitest global APIs (describe, it, expect, etc.)
-    environment: "jsdom", // Simulate DOM environment
-    setupFiles: "./src/test/setup.ts", // Path to your setup file
-    css: true, // Enable CSS processing if needed for tests (e.g., snapshot testing with styles)
+    globals: true,
+    environment: "jsdom",
+    setupFiles: "./src/test/setup.ts",
+    css: true,
     // Optional: Configure coverage
     // coverage: {
-    //   provider: 'v8', // or 'istanbul'
+    //   provider: 'v8',
     //   reporter: ['text', 'json', 'html'],
     //   include: ['src/**/*.{ts,tsx}'],
-    //   exclude: ['src/main.tsx', 'src/vite-env.d.ts', 'src/test/setup.ts', 'src/lib/db.ts', 'src/**/*.d.ts', 'src/components/ui/**'], // Exclude UI primitives, setup, etc.
+    //   exclude: ['src/main.tsx', 'src/vite-env.d.ts', 'src/test/setup.ts', 'src/lib/db.ts', 'src/**/*.d.ts', 'src/components/ui/**'],
     // },
   },
 });

@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsTheme.tsx
-// FULL FILE - Updated max width options to use Tailwind classes
+
 import React, { useState, useEffect, useCallback } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -19,11 +19,11 @@ import { Separator } from "@/components/ui/separator";
 import { SettingsSection } from "../common/SettingsSection";
 import type { CustomThemeColors, SettingsState } from "@/store/settings.store";
 
-// Helper component for color input (remains the same)
+// Helper component for color input
 const ColorInput: React.FC<{
   label: string;
   colorKey: keyof CustomThemeColors;
-  value: string | undefined;
+  value: string | undefined | null;
   onChange: (key: keyof CustomThemeColors, value: string | null) => void;
 }> = ({ label, colorKey, value, onChange }) => {
   const [localValue, setLocalValue] = useState(value ?? "");
@@ -56,12 +56,12 @@ const ColorInput: React.FC<{
       />
       <Input
         type="color"
-        value={localValue.startsWith("#") ? localValue : "#000000"}
+        value={localValue?.startsWith("#") ? localValue : "#000000"} // Default picker to black if not hex
         onChange={(e) => {
           setLocalValue(e.target.value);
           onChange(colorKey, e.target.value);
         }}
-        className="h-8 w-10 p-1 border-none cursor-pointer"
+        className="h-8 w-10 p-1 border-none cursor-pointer bg-transparent" // Ensure picker is usable
         aria-label={`Pick ${label} color`}
       />
     </div>
@@ -78,7 +78,7 @@ const SettingsThemeComponent: React.FC = () => {
     setCustomFontFamily,
     customFontSize,
     setCustomFontSize,
-    chatMaxWidth, // This is the Tailwind class string (e.g., 'max-w-7xl')
+    chatMaxWidth,
     setChatMaxWidth,
     customThemeColors,
     setCustomThemeColor,
@@ -154,6 +154,20 @@ const SettingsThemeComponent: React.FC = () => {
     { key: "border", label: "Border" },
     { key: "input", label: "Input BG" },
     { key: "ring", label: "Ring (Focus)" },
+    // Add sidebar/chart colors if needed
+    { key: "sidebar", label: "Sidebar BG" },
+    { key: "sidebarForeground", label: "Sidebar FG" },
+    { key: "sidebarPrimary", label: "Sidebar Primary" },
+    { key: "sidebarPrimaryForeground", label: "Sidebar Primary FG" },
+    { key: "sidebarAccent", label: "Sidebar Accent" },
+    { key: "sidebarAccentForeground", label: "Sidebar Accent FG" },
+    { key: "sidebarBorder", label: "Sidebar Border" },
+    { key: "sidebarRing", label: "Sidebar Ring" },
+    { key: "chart1", label: "Chart 1" },
+    { key: "chart2", label: "Chart 2" },
+    { key: "chart3", label: "Chart 3" },
+    { key: "chart4", label: "Chart 4" },
+    { key: "chart5", label: "Chart 5" },
   ];
 
   return (
@@ -200,7 +214,7 @@ const SettingsThemeComponent: React.FC = () => {
           <Input
             id="custom-font-family"
             value={customFontFamily ?? ""}
-            onChange={(e) => setCustomFontFamily(e.target.value)}
+            onChange={(e) => setCustomFontFamily(e.target.value || null)} // Set null if empty
             placeholder="e.g., 'Inter', sans-serif (Leave blank for default)"
             className="mt-1"
           />
@@ -262,7 +276,7 @@ const SettingsThemeComponent: React.FC = () => {
           type="url"
           placeholder="e.g., https://.../prism-okaidia.min.css"
           value={prismThemeUrl ?? ""}
-          onChange={(e) => setPrismThemeUrl(e.target.value)}
+          onChange={(e) => setPrismThemeUrl(e.target.value || null)} // Set null if empty
           className="mt-1"
         />
         <p className="text-xs text-muted-foreground mt-1">

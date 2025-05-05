@@ -15,14 +15,14 @@ type FetchedModel = OpenRouterModel;
 
 // Simple in-memory cache for fetched models
 const fetchCache = new Map<string, Promise<FetchedModel[]>>();
-const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION_MS = 5 * 60 * 1000;
 
 // --- Helper to Map Fetched Data to OpenRouterModel ---
 const mapToOpenRouterModel = (
   fetchedData: any,
   providerType: DbProviderConfig["type"],
 ): OpenRouterModel => {
-  const modelId = fetchedData.id || fetchedData.name; // Ollama uses 'name' as ID
+  const modelId = fetchedData.id || fetchedData.name;
   const modelName = fetchedData.name || modelId;
 
   // Basic structure
@@ -69,7 +69,7 @@ const mapToOpenRouterModel = (
   if (providerType === "ollama") {
     // Ollama doesn't provide context length via /api/tags easily, might need /api/show
     // For now, leave it null or set a common default if known (e.g., 4096 for older models)
-    model.context_length = model.context_length ?? 4096; // Example default
+    model.context_length = model.context_length ?? 4096;
     // Fix: Add null check before accessing properties
     if (model.top_provider) {
       model.top_provider.context_length = model.context_length;
@@ -83,7 +83,7 @@ const mapToOpenRouterModel = (
     if (modelId.includes("gpt-4-32k")) model.context_length = 32768;
     if (modelId.includes("gpt-4-turbo")) model.context_length = 128000;
     if (modelId.includes("gpt-4o")) model.context_length = 128000;
-    if (modelId.includes("gpt-3.5-turbo")) model.context_length = 16385; // Often 16k variant
+    if (modelId.includes("gpt-3.5-turbo")) model.context_length = 16385;
     // Fix: Add null check before accessing properties
     if (model.top_provider) {
       model.top_provider.context_length = model.context_length;
@@ -93,9 +93,8 @@ const mapToOpenRouterModel = (
     }
   } else if (providerType === "google") {
     // Google context lengths (approximate)
-    if (modelId.includes("gemini-1.5"))
-      model.context_length = 1048576; // 1M
-    else if (modelId.includes("gemini")) model.context_length = 32768; // Older Gemini
+    if (modelId.includes("gemini-1.5")) model.context_length = 1048576;
+    else if (modelId.includes("gemini")) model.context_length = 32768;
     // Fix: Add null check before accessing properties
     if (model.top_provider) {
       model.top_provider.context_length = model.context_length;
@@ -104,7 +103,7 @@ const mapToOpenRouterModel = (
       model.architecture.tokenizer = "Google";
     }
   } else if (providerType === "openai-compatible") {
-    model.context_length = model.context_length ?? 4096; // Default guess
+    model.context_length = model.context_length ?? 4096;
     // Fix: Add null check before accessing properties
     if (model.top_provider) {
       model.top_provider.context_length = model.context_length;
@@ -206,7 +205,7 @@ export async function fetchModelsForProvider(
         let errorBody = `(${response.status} ${response.statusText})`;
         try {
           const textBody = await response.text();
-          errorBody = textBody || errorBody; // Keep raw text if JSON parse fails
+          errorBody = textBody || errorBody;
           try {
             const jsonBody = JSON.parse(textBody);
             errorBody =
@@ -226,7 +225,7 @@ export async function fetchModelsForProvider(
       if (config.type === "ollama") {
         rawModels = data.models || [];
       } else {
-        rawModels = data.data || data || []; // Handle {data: []} or just []
+        rawModels = data.data || data || [];
       }
 
       if (!Array.isArray(rawModels)) {

@@ -25,7 +25,7 @@ interface ApiKeyFormProps {
     name: string,
     providerId: string,
     value: string,
-  ) => Promise<string | void>; // Allow void return
+  ) => Promise<string | void>;
   onCancel: () => void;
   isSaving: boolean;
   className?: string;
@@ -62,7 +62,7 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
         (p) => p.value === newType,
       )?.label;
       const oldProviderLabel = PROVIDER_TYPES.find(
-        (p) => p.value === providerType, // Use previous type for comparison
+        (p) => p.value === providerType,
       )?.label;
 
       if (
@@ -76,7 +76,7 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
         keyInputRef.current?.focus();
       });
     },
-    [keyName, providerType], // Include providerType in dependencies
+    [keyName, providerType],
   );
 
   const handleSaveClick = useCallback(async () => {

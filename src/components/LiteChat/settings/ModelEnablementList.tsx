@@ -15,7 +15,7 @@ interface ModelEnablementListProps {
   isLoading?: boolean;
   disabled?: boolean;
   listHeightClass?: string;
-  onModelClick?: (modelId: string) => void; // Add optional click handler
+  onModelClick?: (modelId: string) => void;
 }
 
 export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
@@ -26,7 +26,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   isLoading = false,
   disabled = false,
   listHeightClass = "h-48",
-  onModelClick, // Destructure the handler
+  onModelClick,
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>("");
 

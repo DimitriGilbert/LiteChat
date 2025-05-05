@@ -32,7 +32,7 @@ export interface OpenRouterModel {
   name: string;
   created?: number | null;
   description?: string | null;
-  context_length?: number | null; // Top-level context length
+  context_length?: number | null;
   architecture?: OpenRouterModelArchitecture | null;
   pricing?: OpenRouterModelPricing | null;
   top_provider?: OpenRouterTopProvider | null;
@@ -53,7 +53,7 @@ export type DbProviderType =
 export interface DbApiKey extends DbBase {
   name: string;
   value: string;
-  providerId: string; // Store the intended provider type/ID for context
+  providerId: string;
 }
 
 // Stored in DB for Provider Configurations
@@ -72,13 +72,13 @@ export interface DbProviderConfig extends DbBase {
 
 // Runtime representation of a Model
 export interface AiModelConfig {
-  id: string; // Combined ID: providerId:modelId
+  id: string;
   name: string;
   providerId: string;
   providerName: string;
-  instance: any; // The instantiated AI SDK model object
+  instance: any;
   // Add the full metadata object
-  metadata: OpenRouterModel | null; // Store the full details
+  metadata: OpenRouterModel | null;
   // Deprecate these individual fields in favor of metadata
   // contextWindow?: number;
   // supportsImageGeneration?: boolean;

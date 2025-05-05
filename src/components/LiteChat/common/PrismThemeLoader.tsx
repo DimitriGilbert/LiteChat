@@ -1,5 +1,5 @@
-// src/components/common/PrismThemeLoader.tsx
-// NEW FILE
+// src/components/LiteChat/common/PrismThemeLoader.tsx
+
 import { useEffect, useMemo } from "react";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
@@ -34,10 +34,20 @@ export const PrismThemeLoader: React.FC = () => {
         ? "dark"
         : "light";
     }
-    return "light"; // Default server-side or if window is undefined
+    return "light";
   }, []);
 
-  const currentTheme = appTheme === "system" ? systemTheme : appTheme;
+  // Determine the effective theme mode (light/dark)
+  const currentThemeMode = useMemo(() => {
+    if (appTheme === "system") {
+      return systemTheme;
+    }
+    if (appTheme === "TijuDark" || appTheme === "dark") {
+      return "dark";
+    }
+    // Default to light for 'light', 'TijuLight', 'custom', or unknown
+    return "light";
+  }, [appTheme, systemTheme]);
 
   useEffect(() => {
     const loadTheme = (url: string, id: string): void => {
@@ -62,12 +72,14 @@ export const PrismThemeLoader: React.FC = () => {
     };
 
     if (prismThemeUrl) {
+      // User provided a custom theme URL
       loadTheme(prismThemeUrl, PRISM_THEME_LINK_ID);
       disableTheme(DEFAULT_LIGHT_THEME_LINK_ID);
       disableTheme(DEFAULT_DARK_THEME_LINK_ID);
     } else {
+      // Use default themes based on the effective light/dark mode
       disableTheme(PRISM_THEME_LINK_ID);
-      if (currentTheme === "dark") {
+      if (currentThemeMode === "dark") {
         loadTheme(DEFAULT_DARK_THEME_URL, DEFAULT_DARK_THEME_LINK_ID);
         disableTheme(DEFAULT_LIGHT_THEME_LINK_ID);
       } else {
@@ -75,7 +87,7 @@ export const PrismThemeLoader: React.FC = () => {
         disableTheme(DEFAULT_DARK_THEME_LINK_ID);
       }
     }
-  }, [prismThemeUrl, currentTheme]);
+  }, [prismThemeUrl, currentThemeMode]);
 
   // This component doesn't render anything itself
   return null;

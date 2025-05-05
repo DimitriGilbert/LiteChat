@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsGitSyncRepos.tsx
-// FULL FILE - Adjusted layout for mobile
+
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

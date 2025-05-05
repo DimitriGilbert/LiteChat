@@ -34,7 +34,7 @@ export interface ChatControl {
     tabId: string;
     title: string;
     icon?: React.ReactElement;
-    order?: number; // Keep order for settings tabs specifically
+    order?: number;
   };
   settingsRenderer?: () => React.ReactElement | null;
   onSettingSubmit?: (settingsData: any) => void | Promise<void>;

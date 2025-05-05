@@ -24,8 +24,8 @@ import type { fs as FsType } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 // Import ProjectStore for interaction
 import { useProjectStore } from "./project.store";
-import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
-import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent
+import { emitter } from "@/lib/litechat/event-emitter";
+import { ModEvent } from "@/types/litechat/modding";
 
 // Define a union type for items in the sidebar (now includes Project from ProjectStore)
 export type SidebarItem =
@@ -96,7 +96,7 @@ interface ConversationActions {
     enabledTools?: string[];
     toolMaxStepsOverride?: number | null;
   }) => Promise<void>;
-  _ensureSyncVfsReady: () => Promise<typeof FsType>; // Return type allows undefined on failure
+  _ensureSyncVfsReady: () => Promise<typeof FsType>;
   // getEffectiveProjectSettings removed - use ProjectStore
   // Internal action for project deletion side effects
   _unlinkConversationsFromProjects: (projectIds: string[]) => void;
@@ -581,7 +581,7 @@ export const useConversationStore = create(
         fsInstance = await get()._ensureSyncVfsReady();
       } catch (fsError) {
         // Error already toasted by _ensureSyncVfsReady
-        return; // Don't proceed if FS isn't ready
+        return;
       }
 
       set((state) => ({
@@ -674,7 +674,7 @@ export const useConversationStore = create(
         fsInstance = await get()._ensureSyncVfsReady();
       } catch (fsError) {
         get()._setRepoInitializationStatus(repoId, "error");
-        return; // Don't proceed if FS isn't ready
+        return;
       }
       // Pass the specific fsInstance
       await initializeOrSyncRepoLogic(
@@ -716,7 +716,7 @@ export const useConversationStore = create(
           "error",
           "Filesystem not ready",
         );
-        return; // Don't proceed if FS isn't ready
+        return;
       }
 
       // Pass the specific fsInstance

@@ -2,9 +2,9 @@
 // FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import { nanoid } from "nanoid"; // Import nanoid
-import { emitter } from "@/lib/litechat/event-emitter"; // Import emitter
-import { ModEvent } from "@/types/litechat/modding"; // Import ModEvent
+import { nanoid } from "nanoid";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { ModEvent } from "@/types/litechat/modding";
 
 // Define a unified structure for attached file metadata
 export interface AttachedFileMetadata {
@@ -55,7 +55,7 @@ export const useInputStore = create(
 
         if (!isDuplicate) {
           const newAttachment: AttachedFileMetadata = {
-            id: nanoid(), // Use nanoid for unique IDs
+            id: nanoid(),
             ...fileData,
           };
           state.attachedFilesMetadata.push(newAttachment);

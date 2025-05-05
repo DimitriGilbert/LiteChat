@@ -4,7 +4,7 @@ import {
   type DbMod,
   type ModInstance,
   type LiteChatModApi,
-  ModEvent, // Import ModEvent enum
+  ModEvent,
 } from "@/types/litechat/modding";
 import { createModApi } from "./api-factory";
 import { toast } from "sonner";

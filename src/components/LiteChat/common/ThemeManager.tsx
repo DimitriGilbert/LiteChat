@@ -1,5 +1,5 @@
 // src/components/LiteChat/common/ThemeManager.tsx
-// FULL FILE - Verified logic for applying custom styles via CSS variables
+
 import { useEffect } from "react";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
@@ -31,8 +31,19 @@ const ALL_THEME_COLOR_KEYS: (keyof CustomThemeColors)[] = [
   "input",
   "ring",
   // Add chart and sidebar keys if they are intended to be customizable
-  // "chart1", "chart2", ...
-  // "sidebarBackground", "sidebarForeground", ...
+  "chart1",
+  "chart2",
+  "chart3",
+  "chart4",
+  "chart5",
+  "sidebar",
+  "sidebarForeground",
+  "sidebarPrimary",
+  "sidebarPrimaryForeground",
+  "sidebarAccent",
+  "sidebarAccentForeground",
+  "sidebarBorder",
+  "sidebarRing",
 ];
 
 export const ThemeManager: React.FC = () => {
@@ -71,16 +82,22 @@ export const ThemeManager: React.FC = () => {
     } else if (theme === "TijuDark") {
       body.classList.add("TijuDark");
     } else if (theme === "custom") {
-      body.classList.add("custom"); // Add 'custom' class marker
+      body.classList.add("custom");
 
       // Apply custom styles only if theme is 'custom' by setting CSS variables on :root
       // Font Family
       if (customFontFamily) {
         root.style.setProperty("--custom-font-family", customFontFamily);
+      } else {
+        // Explicitly remove if null/empty to revert to base CSS
+        root.style.removeProperty("--custom-font-family");
       }
       // Font Size
       if (customFontSize) {
         root.style.setProperty("--custom-font-size", `${customFontSize}px`);
+      } else {
+        // Explicitly remove if null/empty
+        root.style.removeProperty("--custom-font-size");
       }
       // Custom Colors (as CSS Variables)
       if (customThemeColors) {
@@ -93,6 +110,12 @@ export const ThemeManager: React.FC = () => {
             const cssVarName = `--${camelToKebab(key)}`;
             // Set the variable on the root element's inline style
             root.style.setProperty(cssVarName, value);
+          } else if (
+            ALL_THEME_COLOR_KEYS.includes(key as keyof CustomThemeColors)
+          ) {
+            // Explicitly remove if value is null/empty for a known key
+            const cssVarName = `--${camelToKebab(key)}`;
+            root.style.removeProperty(cssVarName);
           }
         });
       }
@@ -114,5 +137,5 @@ export const ThemeManager: React.FC = () => {
     }
   }, [theme, customFontFamily, customFontSize, customThemeColors]);
 
-  return null; // This component doesn't render anything itself
+  return null;
 };

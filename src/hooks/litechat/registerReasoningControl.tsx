@@ -1,5 +1,5 @@
 // src/hooks/litechat/registerReasoningControl.tsx
-// FULL FILE - Updated Registration Logic
+
 import React from "react";
 import { useControlRegistryStore } from "@/store/control.store";
 import { usePromptStateStore } from "@/store/prompt.store";

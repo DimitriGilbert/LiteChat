@@ -18,8 +18,8 @@ import type { AttachedFileMetadata } from "@/store/input.store";
 import type { fs as FsType } from "@zenfs/core";
 import { useConversationStore } from "@/store/conversation.store";
 import type { DbRule } from "@/types/litechat/rules";
-import { useSettingsStore } from "@/store/settings.store"; // Import settings store
-import { nanoid } from "nanoid"; // Import nanoid for title generation prompt ID
+import { useSettingsStore } from "@/store/settings.store";
+import { nanoid } from "nanoid";
 
 export const ConversationService = {
   async submitPrompt(turnData: PromptTurnObject): Promise<void> {
@@ -30,7 +30,7 @@ export const ConversationService = {
     const promptState = usePromptStateStore.getState();
     const conversationStoreState = useConversationStore.getState();
     const rulesStoreState = useRulesStore.getState();
-    const settingsStoreState = useSettingsStore.getState(); // Get settings state
+    const settingsStoreState = useSettingsStore.getState();
 
     const conversationId = interactionStoreState.currentConversationId;
     if (!conversationId) {
@@ -174,7 +174,7 @@ ${userContent}`;
 
     // 5. Construct PromptObject for main interaction
     const promptObject: PromptObject = {
-      system: baseSystemPrompt, // Use the system prompt potentially modified by rules
+      system: baseSystemPrompt,
       messages: historyMessages,
       parameters: finalParameters,
       metadata: {
@@ -203,7 +203,7 @@ ${userContent}`;
       const mainInteractionPromise = InteractionService.startInteraction(
         promptObject,
         conversationId,
-        turnData, // Pass original turn data for persistence
+        turnData,
       );
 
       // --- Trigger Title Generation Asynchronously ---
@@ -215,7 +215,7 @@ ${userContent}`;
         this.generateConversationTitle(
           conversationId,
           turnData,
-          activeRules, // Pass rules if needed based on settings
+          activeRules,
         ).catch((titleError) => {
           console.error(
             "[ConversationService] Background title generation failed:",
@@ -242,7 +242,7 @@ ${userContent}`;
   async generateConversationTitle(
     conversationId: string,
     originalTurnData: PromptTurnObject,
-    activeRulesForTurn: DbRule[], // Receive rules applied to the original turn
+    activeRulesForTurn: DbRule[],
   ): Promise<void> {
     const settings = useSettingsStore.getState();
 
@@ -291,12 +291,12 @@ ${userContent}`;
         "Generate a concise, descriptive title (max 8-10 words) for the following user prompt. Output ONLY the title text, nothing else.",
       messages: [{ role: "user", content: titlePromptContent }],
       parameters: {
-        temperature: 0.5, // Use a lower temp for more deterministic titles
-        max_tokens: 20, // Limit tokens for title
+        temperature: 0.5,
+        max_tokens: 20,
       },
       metadata: {
         modelId: settings.autoTitleModelId,
-        isTitleGeneration: true, // Flag this interaction
+        isTitleGeneration: true,
       },
       // No tools needed for title generation
       tools: undefined,
@@ -306,7 +306,7 @@ ${userContent}`;
     // 3. Create a dummy PromptTurnObject for the title generation interaction record
     // This won't be displayed but helps track the request
     const titleTurnData: PromptTurnObject = {
-      id: nanoid(), // Unique ID for this internal turn
+      id: nanoid(),
       content: `[Generate title based on: ${originalTurnData.content.substring(0, 50)}...]`,
       parameters: titlePromptObject.parameters,
       metadata: {
@@ -320,8 +320,8 @@ ${userContent}`;
       await InteractionService.startInteraction(
         titlePromptObject,
         conversationId,
-        titleTurnData, // Pass the dummy turn data
-        "conversation.title_generation", // Specify the type
+        titleTurnData,
+        "conversation.title_generation",
       );
     } catch (error) {
       console.error(
@@ -491,7 +491,7 @@ ${userContent}`;
           autoTitleEnabledForTurn,
           ...restMeta
         }) => restMeta)(originalTurnData.metadata ?? {}),
-        modelId: promptState.modelId, // Use current model selection for regen
+        modelId: promptState.modelId,
         regeneratedFromId: interactionId,
         // Store only basic file info (no content)
         attachedFiles: originalAttachedFiles.map(
@@ -508,8 +508,8 @@ ${userContent}`;
       await InteractionService.startInteraction(
         promptObject,
         conversationId,
-        originalTurnData, // Pass original turn data for persistence
-        "message.assistant_regen", // Specify type
+        originalTurnData,
+        "message.assistant_regen",
       );
     } catch (error) {
       console.error(

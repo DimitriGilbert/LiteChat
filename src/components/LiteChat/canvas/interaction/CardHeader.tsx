@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/interaction/CardHeader.tsx
-// FULL FILE - Adjusted layout for mobile
+
 import React, { useState, useCallback } from "react";
 import {
   BotIcon,
@@ -19,20 +19,20 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils";
 
 interface CardHeaderProps {
   displayModelName: string;
   timeAgo: string;
-  responseContent: string | null; // Needed for copy functionality
+  responseContent: string | null;
   isFolded: boolean;
   toggleFold: () => void;
-  canFold: boolean; // Determine if fold button should be shown
+  canFold: boolean;
   // Add metadata props
   promptTokens?: number;
   completionTokens?: number;
-  timeToFirstToken?: number; // Milliseconds
-  generationTime?: number; // Milliseconds
+  timeToFirstToken?: number;
+  generationTime?: number;
 }
 
 // Helper to format milliseconds

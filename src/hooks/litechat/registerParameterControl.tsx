@@ -53,8 +53,8 @@ const ParameterPopoverContent: React.FC = () => {
   const globalDefaults = useSettingsStore.getState();
 
   // Local state to hold current prompt parameters, updated by events
-  const [currentParams, setCurrentParams] = useState<Partial<PromptState>>(
-    () => usePromptStateStore.getState(), // Initial state
+  const [currentParams, setCurrentParams] = useState<Partial<PromptState>>(() =>
+    usePromptStateStore.getState(),
   );
 
   // Subscribe to parameter changes
@@ -105,7 +105,7 @@ const ParameterControlTrigger: React.FC = () => {
   const [isStreaming, setIsStreaming] = useState(
     () => useInteractionStore.getState().status === "streaming",
   );
-  const [isVisible, setIsVisible] = useState(true); // Start visible, update based on model
+  const [isVisible, setIsVisible] = useState(true);
 
   // Subscribe to relevant events
   useEffect(() => {
@@ -139,7 +139,7 @@ const ParameterControlTrigger: React.FC = () => {
         return;
       }
       const { getSelectedModel } = useProviderStore.getState();
-      const selectedModel = getSelectedModel(); // Get current model details
+      const selectedModel = getSelectedModel();
       const supported = selectedModel?.metadata?.supported_parameters ?? [];
       const controlledParams = [
         "temperature",
@@ -160,13 +160,13 @@ const ParameterControlTrigger: React.FC = () => {
       if (payload.key === "enableAdvancedSettings") {
         handleModelChange({
           modelId: useProviderStore.getState().selectedModelId,
-        }); // Re-check visibility
+        });
       }
     };
 
     // Initial check
-    // handleParamsChanged({ params: {} }); // Check initial state
-    handleModelChange({ modelId: useProviderStore.getState().selectedModelId }); // Check initial model
+    // handleParamsChanged({ params: {} });
+    handleModelChange({ modelId: useProviderStore.getState().selectedModelId });
 
     // Subscriptions
     // emitter.on(ModEvent.PROMPT_PARAMS_CHANGED, handleParamsChanged);
@@ -184,7 +184,7 @@ const ParameterControlTrigger: React.FC = () => {
   }, []);
 
   if (!isVisible) {
-    return null; // Don't render the button if not visible
+    return null;
   }
 
   return (

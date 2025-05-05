@@ -10,15 +10,13 @@ import { ModEvent } from "@/types/litechat/modding";
 
 // --- Wrapper Component to Handle Visibility ---
 const VisibleStructuredOutputControl: React.FC = () => {
-  const [isVisible, setIsVisible] = useState(true); // Assume visible initially
+  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    console.log(
-      "[VisibleStructuredOutputControl] useEffect setup running.", // Log setup
-    );
+    console.log("[VisibleStructuredOutputControl] useEffect setup running.");
     const handleModelChange = (payload: { modelId: string | null }) => {
       console.log(
-        "[VisibleStructuredOutputControl] handleModelChange triggered:", // Log trigger
+        "[VisibleStructuredOutputControl] handleModelChange triggered:",
         payload,
       );
       if (!payload.modelId) {
@@ -32,11 +30,11 @@ const VisibleStructuredOutputControl: React.FC = () => {
       const supportedParams = selectedModel?.metadata?.supported_parameters;
       const isSupported =
         Array.isArray(supportedParams) &&
-        supportedParams.includes("structured_output"); // Check if it's an array first
+        supportedParams.includes("structured_output");
 
       console.log(
         `[VisibleStructuredOutputControl] Model ${payload.modelId} supports structured_output: ${isSupported}`,
-      ); // Log check result
+      );
       setIsVisible(isSupported);
     };
 
@@ -46,17 +44,17 @@ const VisibleStructuredOutputControl: React.FC = () => {
     // Subscription
     console.log(
       `[VisibleStructuredOutputControl] Subscribing to ${ModEvent.MODEL_SELECTION_CHANGED}`,
-    ); // Log subscription
+    );
     emitter.on(ModEvent.MODEL_SELECTION_CHANGED, handleModelChange);
 
     // Cleanup
     return () => {
       console.log(
-        "[VisibleStructuredOutputControl] useEffect cleanup running.", // Log cleanup
+        "[VisibleStructuredOutputControl] useEffect cleanup running.",
       );
       emitter.off(ModEvent.MODEL_SELECTION_CHANGED, handleModelChange);
     };
-  }, []); // Empty dependency array ensures it runs once on mount
+  }, []);
 
   if (!isVisible) {
     return null;

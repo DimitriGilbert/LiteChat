@@ -1,5 +1,5 @@
 // src/components/LiteChat/file-manager/FileManagerList.tsx
-// NEW FILE - Mobile List View
+
 import React from "react";
 import {
   FolderIcon,
@@ -31,7 +31,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/litechat/file-manager-utils";
 import type { VfsNode } from "@/types/litechat/vfs";
-import { NewFolderRow } from "./NewFolderRow"; // Reuse for consistency
+import { NewFolderRow } from "./NewFolderRow";
 
 interface FileManagerListProps {
   entries: VfsNode[];
@@ -118,6 +118,7 @@ export const FileManagerList: React.FC<FileManagerListProps> = ({
             cancelCreatingFolder={cancelCreatingFolder}
             newFolderInputRef={newFolderInputRef}
             isOperationLoading={isOperationLoading}
+            isMobile={true} // Indicate mobile context if styling needs adjustment
           />
         </div>
       )}
@@ -145,6 +146,7 @@ export const FileManagerList: React.FC<FileManagerListProps> = ({
               isEditingThis && "bg-muted ring-1 ring-primary",
               isOperationLoading && "opacity-70 cursor-not-allowed",
               !isEditingThis && "hover:bg-muted/50",
+              !isEditingThis && "cursor-pointer",
             )}
             onClick={() => {
               if (isEditingThis || isOperationLoading) return;
@@ -162,8 +164,11 @@ export const FileManagerList: React.FC<FileManagerListProps> = ({
                   aria-label={`Select ${entry.name}`}
                   className="border-border data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground flex-shrink-0"
                   disabled={isOperationLoading}
-                  onClick={(e) => e.stopPropagation()} // Prevent row click
+                  onClick={(e) => e.stopPropagation()} // Prevent row click from toggling checkbox twice
                 />
+              )}
+              {isDirectory && (
+                <div className="w-6 flex-shrink-0" /> // Placeholder for checkbox space
               )}
               <Icon className={cn("h-5 w-5 flex-shrink-0", iconColor)} />
               <div className="flex flex-col min-w-0 flex-grow">

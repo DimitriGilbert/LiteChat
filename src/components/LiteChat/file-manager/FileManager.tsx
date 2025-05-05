@@ -1,5 +1,5 @@
 // src/components/LiteChat/file-manager/FileManager.tsx
-// FULL FILE - Added mobile view logic
+
 import React, {
   useState,
   useEffect,
@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { FileManagerList } from "./FileManagerList"; // Import mobile list view
+import { FileManagerList } from "./FileManagerList";
 
 export const FileManager = memo(() => {
   // --- VFS Store State & Actions ---

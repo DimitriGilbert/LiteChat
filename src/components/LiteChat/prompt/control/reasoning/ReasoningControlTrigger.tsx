@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/control/reasoning/ReasoningControlTrigger.tsx
-// FULL FILE - Moved from registerReasoningControl.tsx
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { BrainCircuitIcon } from "lucide-react";

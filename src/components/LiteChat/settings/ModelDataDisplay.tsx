@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ModelDataDisplayProps {
-  modelId: string | null; // Combined ID
+  modelId: string | null;
 }
 
 export const ModelDataDisplay: React.FC<ModelDataDisplayProps> = ({

@@ -4,7 +4,7 @@ import type { PromptObject, PromptTurnObject } from "@/types/litechat/prompt";
 import type {
   Interaction,
   InteractionStatus,
-  InteractionType, // Import InteractionType
+  InteractionType,
 } from "@/types/litechat/interaction";
 import { AIService, AIServiceCallbacks } from "./ai.service";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -40,7 +40,7 @@ import {
   extractReasoningMiddleware,
   wrapLanguageModel,
 } from "ai";
-import type { fs as FsType } from "@zenfs/core"; // Import FsType
+import type { fs as FsType } from "@zenfs/core";
 
 // Define the structure for options passed to executeInteraction
 // Remove experimental_middlewares
@@ -128,25 +128,25 @@ export const InteractionService = {
           ? conversationInteractions[conversationInteractions.length - 1].id
           : null;
 
-    const startTime = performance.now(); // Record start time
+    const startTime = performance.now();
     this._interactionStartTimes.set(interactionId, startTime);
 
     const interactionData: Interaction = {
       id: interactionId,
       conversationId: conversationId,
-      type: interactionType, // Use the provided type
+      type: interactionType,
       prompt: { ...initiatingTurnData },
       response: null,
       status: "STREAMING",
-      startedAt: new Date(), // Use current Date for DB
+      startedAt: new Date(),
       endedAt: null,
       metadata: {
         ...(finalPrompt.metadata || {}),
         toolCalls: [],
         toolResults: [],
-        reasoning: undefined, // Initialize reasoning
-        timeToFirstToken: undefined, // Initialize timing
-        generationTime: undefined, // Initialize timing
+        reasoning: undefined,
+        timeToFirstToken: undefined,
+        generationTime: undefined,
         // Add isTitleGeneration flag if type matches
         isTitleGeneration: interactionType === "conversation.title_generation",
       },
@@ -189,7 +189,7 @@ export const InteractionService = {
         interactionId,
         "ERROR",
         new Error("No model ID specified in prompt metadata."),
-        interactionType, // Pass type
+        interactionType,
       );
       return null;
     }
@@ -201,7 +201,7 @@ export const InteractionService = {
         interactionId,
         "ERROR",
         new Error(`Invalid combined model ID format: ${targetModelId}`),
-        interactionType, // Pass type
+        interactionType,
       );
       return null;
     }
@@ -214,7 +214,7 @@ export const InteractionService = {
         interactionId,
         "ERROR",
         new Error(`Provider configuration not found for ID: ${providerId}`),
-        interactionType, // Pass type
+        interactionType,
       );
       return null;
     }
@@ -233,7 +233,7 @@ export const InteractionService = {
         new Error(
           `Failed to instantiate model instance for ${targetModelId} from provider ${providerConfig.name}`,
         ),
-        interactionType, // Pass type
+        interactionType,
       );
       return null;
     }
@@ -348,9 +348,9 @@ export const InteractionService = {
       onToolResult: (toolResult) =>
         this._handleToolResult(interactionId, toolResult),
       onFinish: (details) =>
-        this._handleFinish(interactionId, details, interactionType), // Pass type
+        this._handleFinish(interactionId, details, interactionType),
       onError: (error) =>
-        this._handleError(interactionId, error, interactionType), // Pass type
+        this._handleError(interactionId, error, interactionType),
     };
 
     // 7. Trigger AIService
@@ -368,7 +368,7 @@ export const InteractionService = {
           execError instanceof Error
             ? execError
             : new Error("Failed to start AI execution"),
-          interactionType, // Pass type
+          interactionType,
         );
       },
     );
@@ -401,7 +401,7 @@ export const InteractionService = {
           interactionId,
           "CANCELLED",
           new Error("Interaction aborted manually (controller missing)"),
-          interaction?.type ?? "message.user_assistant", // Use interaction type if available
+          interaction?.type ?? "message.user_assistant",
         );
       }
     }
@@ -484,7 +484,7 @@ export const InteractionService = {
       providerMetadata?: ProviderMetadata;
       reasoning?: string;
     },
-    interactionType: InteractionType, // Receive type
+    interactionType: InteractionType,
   ): void {
     console.log(
       `[InteractionService] Finishing interaction ${interactionId} (Type: ${interactionType}). Reason: ${details.finishReason}`,
@@ -493,7 +493,7 @@ export const InteractionService = {
       interactionId,
       "COMPLETED",
       undefined,
-      interactionType, // Pass type
+      interactionType,
       details,
     );
   },
@@ -501,7 +501,7 @@ export const InteractionService = {
   _handleError(
     interactionId: string,
     error: Error,
-    interactionType: InteractionType, // Receive type
+    interactionType: InteractionType,
   ): void {
     console.error(
       `[InteractionService] Handling error for interaction ${interactionId} (Type: ${interactionType}):`,
@@ -512,7 +512,7 @@ export const InteractionService = {
       interactionId,
       isAbort ? "CANCELLED" : "ERROR",
       isAbort ? undefined : error,
-      interactionType, // Pass type
+      interactionType,
     );
   },
 
@@ -521,7 +521,7 @@ export const InteractionService = {
     interactionId: string,
     status: InteractionStatus,
     error?: Error,
-    interactionType: InteractionType = "message.user_assistant", // Default type
+    interactionType: InteractionType = "message.user_assistant",
     finishDetails?: {
       finishReason: FinishReason;
       usage?: LanguageModelUsage;
@@ -556,7 +556,7 @@ export const InteractionService = {
       calls: [],
       results: [],
     };
-    const currentMetadata = currentInteraction?.metadata || {}; // Use optional chaining
+    const currentMetadata = currentInteraction?.metadata || {};
 
     console.log(
       `[InteractionService] Finalizing ${interactionId}. Buffered Content Length: ${finalBufferedContent.length}`,
@@ -611,7 +611,7 @@ export const InteractionService = {
       finalUpdates.response &&
       typeof finalUpdates.response === "string"
     ) {
-      const generatedTitle = finalUpdates.response.trim().replace(/^"|"$/g, ""); // Clean up quotes
+      const generatedTitle = finalUpdates.response.trim().replace(/^"|"$/g, "");
       if (generatedTitle && currentInteraction) {
         console.log(
           `[InteractionService] Updating conversation ${currentInteraction.conversationId} title to: "${generatedTitle}"`,

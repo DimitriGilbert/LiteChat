@@ -5,7 +5,7 @@ import {
   Check,
   ChevronsUpDown,
   BrainCircuitIcon,
-  SearchIcon as SearchIconLucide, // Rename Lucide's SearchIcon
+  SearchIcon as SearchIconLucide,
   WrenchIcon,
   ImageIcon,
 } from "lucide-react";
@@ -28,7 +28,7 @@ import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import { Skeleton } from "@/components/ui/skeleton";
 import { combineModelId } from "@/lib/litechat/provider-helpers";
-import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton"; // Import ActionTooltipButton
+import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 
 interface GlobalModelSelectorProps {
   /** The effective model ID for the current context */
@@ -72,7 +72,7 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
         {
           name: string;
           providerName: string;
-          metadata: import("@/types/litechat/provider").OpenRouterModel | null; // Include metadata
+          metadata: import("@/types/litechat/provider").OpenRouterModel | null;
         }
       >();
       const enabledIds = new Set<string>();
@@ -94,7 +94,7 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
             enabledModelsMap.set(combinedId, {
               name: modelDef.name || modelId,
               providerName: config.name,
-              metadata: modelDef, // Store full metadata
+              metadata: modelDef,
             });
           }
         });
@@ -149,7 +149,7 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
         .map(([key]) => key as CapabilityFilter);
 
       if (activeFilters.length === 0) {
-        return textFiltered; // No capability filters active
+        return textFiltered;
       }
 
       return textFiltered.filter((model) => {

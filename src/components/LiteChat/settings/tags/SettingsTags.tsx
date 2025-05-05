@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/tags/SettingsTags.tsx
-// FULL FILE - No structural changes needed, just ensure TagRuleLinker is used correctly.
+
 import React, { useState, useCallback, useMemo } from "react";
 import { useRulesStore } from "@/store/rules.store";
 import { useShallow } from "zustand/react/shallow";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { TagForm } from "./TagForm";
 import { TagsList } from "./TagsList";
-import { TagRuleLinker } from "./TagRuleLinker"; // Ensure this is imported
+import { TagRuleLinker } from "./TagRuleLinker";
 import type { DbTag, DbRule } from "@/types/litechat/rules";
 import { Separator } from "@/components/ui/separator";
 

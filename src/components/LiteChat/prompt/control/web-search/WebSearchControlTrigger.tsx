@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/control/web-search/WebSearchControlTrigger.tsx
-// FULL FILE - Moved from registerWebSearchControl.tsx
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { SearchIcon } from "lucide-react";

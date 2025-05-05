@@ -19,10 +19,10 @@ interface ToolSelectorControlComponentProps {
   // Accept transient state from parent component (which reads from scoped variable)
   enabledTools: Set<string>;
   setEnabledTools: (updater: (prev: Set<string>) => Set<string>) => void;
-  localMaxSteps: number | null; // This is the popover's input state
-  setLocalMaxSteps: (steps: number | null) => void; // Setter for popover's input state
-  conversationId: string | null; // Keep for context if needed
-  conversationType: SidebarItemType | null; // Keep for context if needed
+  localMaxSteps: number | null;
+  setLocalMaxSteps: (steps: number | null) => void;
+  conversationId: string | null;
+  conversationType: SidebarItemType | null;
 }
 
 export const ToolSelectorControlComponent: React.FC<
@@ -104,16 +104,16 @@ export const ToolSelectorControlComponent: React.FC<
   const handleMaxStepsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value === "") {
-      setLocalMaxSteps(null); // Update popover state
+      setLocalMaxSteps(null);
       return;
     }
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue)) {
       // Clamp value between 1 and 20
       const clampedValue = Math.max(1, Math.min(20, numValue));
-      setLocalMaxSteps(clampedValue); // Update popover state
+      setLocalMaxSteps(clampedValue);
     } else {
-      setLocalMaxSteps(null); // Update popover state
+      setLocalMaxSteps(null);
     }
   };
 

@@ -1,12 +1,12 @@
 // src/components/LiteChat/common/CodeBlockRenderer.tsx
-// FULL FILE
+
 import React, {
   useState,
   useEffect,
   useRef,
   useMemo,
   useCallback,
-  memo, // Import memo
+  memo,
 } from "react";
 import Prism from "prismjs";
 import "prismjs/components/prism-typescript";
@@ -35,7 +35,7 @@ import { useShallow } from "zustand/react/shallow";
 interface CodeBlockRendererProps {
   lang: string | undefined;
   code: string;
-  isStreaming?: boolean; // Add prop to indicate streaming context
+  isStreaming?: boolean;
 }
 
 // IDs for theme link elements
@@ -60,7 +60,7 @@ const getRawGitHubUrl = (url: string): string => {
 const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
   lang,
   code,
-  isStreaming = false, // Default to false
+  isStreaming = false,
 }) => {
   const {
     prismThemeUrl,
@@ -241,8 +241,8 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
 
       {!isFolded && (
         <div className="overflow-hidden w-full">
-          {/* Ensure pre tag handles horizontal scroll */}
-          <pre className="overflow-x-auto w-full relative break-words">
+          {/* Ensure pre tag handles horizontal scroll and word breaks */}
+          <pre className="overflow-x-auto w-full relative overflow-wrap-anywhere">
             {/* Remove min-w-full from code tag */}
             <code ref={codeRef} className={languageClass + " block"}></code>
           </pre>

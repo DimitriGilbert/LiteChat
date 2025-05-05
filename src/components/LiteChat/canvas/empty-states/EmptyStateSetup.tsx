@@ -167,7 +167,7 @@ export const EmptyStateSetup: React.FC = () => {
     } catch (error) {
       toast.error("Failed to start your first chat.");
       console.error("Failed to start first chat:", error);
-      setIsStartingChat(false); // Only set false on error
+      setIsStartingChat(false);
     }
     // Don't set loading false on success, component will unmount
   }, [addConversation, selectItem]);

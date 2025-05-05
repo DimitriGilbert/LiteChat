@@ -23,7 +23,7 @@ import {
   requiresApiKey,
   requiresBaseURL,
   supportsModelFetching,
-  combineModelId, // Import combineModelId
+  combineModelId,
 } from "@/lib/litechat/provider-helpers";
 import { cn } from "@/lib/utils";
 import { useProviderStore } from "@/store/provider.store";
@@ -55,7 +55,7 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   onUpdate,
   fetchStatus,
   isDeleting,
-  onSelectModelForDetails, // Receive callback
+  onSelectModelForDetails,
 }) => {
   const [isModelListFolded, setIsModelListFolded] = useState(true);
 
