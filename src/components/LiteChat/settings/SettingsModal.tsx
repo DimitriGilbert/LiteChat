@@ -50,11 +50,11 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
       })),
     );
 
-    const [activeTab, setActiveTab] = useState(initialSettingsTab || "theme");
+    const [activeTab, setActiveTab] = useState(initialSettingsTab || "general");
 
     useEffect(() => {
       if (isOpen) {
-        setActiveTab(initialSettingsTab || "theme");
+        setActiveTab(initialSettingsTab || "general");
       }
     }, [isOpen, initialSettingsTab]);
 

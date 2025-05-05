@@ -166,7 +166,6 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
 
     const displayName = isProject ? item.name : item.title;
 
-    // Define Save Icon component conditionally
     const SaveIconComponent = isSavingEdit ? Loader2 : CheckIcon;
     const saveIconClassName = isSavingEdit ? "h-3 w-3 animate-spin" : "h-3 w-3";
 
@@ -175,6 +174,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
         <li
           key={item.id}
           className={cn(
+            // Use flex, justify-between, items-center for the main layout
             "relative flex justify-between items-center group p-1.5 text-xs rounded",
             "border border-transparent",
             !isEditingThis && "hover:bg-muted/50 hover:text-primary/80",
@@ -183,13 +183,14 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
               : "",
             isEditingThis && "bg-muted ring-1 ring-primary",
             !isEditingThis && "cursor-pointer",
+            "overflow-hidden", // Keep overflow hidden on the li
           )}
           style={{ paddingLeft: `${0.375 + level * 0.75}rem` }}
           onClick={handleItemClick}
-          title={!isEditingThis ? displayName : ""} // Add title attribute for hover
+          title={!isEditingThis ? displayName : ""}
         >
-          {/* Main Content Area */}
-          <div className="flex items-center min-w-0 gap-1 flex-grow mr-1">
+          {/* Main Content Area - Allow shrinking */}
+          <div className="truncate flex items-center min-w-0 gap-1 flex-grow mr-1">
             {isProject && hasChildren && (
               <span
                 className="flex-shrink-0 w-3 cursor-pointer p-0.5 -ml-0.5"
@@ -224,24 +225,26 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                 disabled={isSavingEdit}
               />
             ) : (
-              <span className="truncate pr-1">{displayName}</span>
+              // Ensure the span itself truncates
+              <span className="truncate flex-shrink min-w-0">
+                {displayName}
+              </span>
             )}
             {syncIndicator}
           </div>
 
-          {/* Action Buttons Area (Absolute Positioning) */}
+          {/* Action Buttons Area - No absolute positioning */}
           <div
             className={cn(
-              "absolute right-1 top-1/2 -translate-y-1/2 flex items-center flex-shrink-0",
+              "flex items-center flex-shrink-0 ml-1", // Use margin-left instead of absolute
               "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
-              "bg-card/80 backdrop-blur-sm p-0.5 rounded",
+              // "bg-card/80 backdrop-blur-sm p-0.5 rounded", // Optional background on hover
               isEditingThis ? "opacity-100" : "",
             )}
-            onClick={(e) => e.stopPropagation()} // Prevent click through to li
+            onClick={(e) => e.stopPropagation()}
           >
             {isEditingThis ? (
               <>
-                {/* Save Button */}
                 <ActionTooltipButton
                   tooltipText="Save (Enter)"
                   onClick={(e) => {
@@ -254,7 +257,6 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                   iconClassName={saveIconClassName}
                   className="h-5 w-5 text-green-500 hover:text-green-600"
                 />
-                {/* Cancel Button */}
                 <ActionTooltipButton
                   tooltipText="Cancel (Esc)"
                   onClick={(e) => {
@@ -269,7 +271,6 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
               </>
             ) : (
               <>
-                {/* Project Settings Button */}
                 {isProject && (
                   <ActionTooltipButton
                     tooltipText="Project Settings"
@@ -279,7 +280,6 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                     className="h-5 w-5 text-muted-foreground hover:text-foreground"
                   />
                 )}
-                {/* Edit Button */}
                 <ActionTooltipButton
                   tooltipText="Edit"
                   onClick={handleEditClick}
@@ -287,7 +287,6 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                   icon={<Edit2Icon />}
                   className="h-5 w-5 text-muted-foreground hover:text-foreground"
                 />
-                {/* Export Buttons */}
                 {isProject ? (
                   <ActionTooltipButton
                     tooltipText="Export Project (JSON)"
@@ -330,7 +329,6 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                     </div>
                   </div>
                 )}
-                {/* Delete Button */}
                 <ActionTooltipButton
                   tooltipText="Delete"
                   onClick={handleDeleteClick}

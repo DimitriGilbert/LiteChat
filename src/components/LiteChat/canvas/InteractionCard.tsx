@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/InteractionCard.tsx
-
+// FULL FILE
 import React, { useMemo, useState, useCallback } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { UserPromptDisplay } from "@/components/LiteChat/canvas/UserPromptDisplay";
@@ -91,17 +91,14 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
           className,
         )}
       >
-        {/* User Prompt */}
         {interaction.prompt && (
           <UserPromptDisplay
             turnData={interaction.prompt}
             timestamp={interaction.startedAt}
-            // Pass completion status to UserPromptDisplay
             isAssistantComplete={isComplete}
           />
         )}
 
-        {/* Assistant Section */}
         <div className="mt-3 pt-3 border-t border-border/50 relative group/assistant">
           <CardHeader
             displayModelName={displayModelName}
@@ -114,7 +111,6 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
             isFolded={isResponseFolded}
             toggleFold={toggleResponseFold}
             canFold={canFoldResponse}
-            // Pass metadata
             promptTokens={interaction.metadata?.promptTokens}
             completionTokens={interaction.metadata?.completionTokens}
             timeToFirstToken={interaction.metadata?.timeToFirstToken}
@@ -132,10 +128,9 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
           />
         </div>
 
-        {/* Action Buttons */}
         {showActions && (
           <CardActions
-            interactionId={interaction.id}
+            interaction={interaction} // Pass the full interaction object
             onEdit={onEdit}
             onRegenerate={onRegenerate}
             onDelete={onDelete}

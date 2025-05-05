@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsProviderRowView.tsx
-
+// FULL FILE
 import React, { useMemo, useCallback, useState } from "react";
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,6 @@ interface ProviderRowViewModeProps {
   onUpdate: (id: string, changes: Partial<DbProviderConfig>) => Promise<void>;
   fetchStatus: FetchStatus;
   isDeleting: boolean;
-  // Add callback prop
   onSelectModelForDetails: (combinedModelId: string | null) => void;
 }
 
@@ -110,8 +109,6 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   const handleModelClick = (modelId: string) => {
     const combinedId = combineModelId(provider.id, modelId);
     onSelectModelForDetails(combinedId);
-    // Optionally switch to the details tab (needs communication back up)
-    // This might be better handled in the parent component (SettingsProviders)
   };
 
   return (
@@ -275,10 +272,7 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
           // Pass the model click handler to the list
           <ModelEnablementList
             providerId={provider.id}
-            allAvailableModels={allAvailableModels.map((m) => ({
-              id: m.id,
-              name: m.name,
-            }))} // Pass basic info
+            allAvailableModels={allAvailableModels} // Pass full model data
             enabledModelIds={enabledModelsSet}
             onToggleModel={handleModelToggle}
             isLoading={fetchStatus === "fetching"}

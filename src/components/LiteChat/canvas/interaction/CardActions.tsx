@@ -1,19 +1,21 @@
 // src/components/LiteChat/canvas/interaction/CardActions.tsx
-
+// FULL FILE
 import React from "react";
 import { RefreshCwIcon, Trash2Icon, EditIcon } from "lucide-react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { cn } from "@/lib/utils";
+import { InteractionRating } from "./InteractionRating"; // Import the new component
+import type { Interaction } from "@/types/litechat/interaction"; // Import Interaction type
 
 interface CardActionsProps {
-  interactionId: string;
+  interaction: Interaction; // Pass the full interaction object
   onRegenerate?: (interactionId: string) => void;
   onDelete?: (interactionId: string) => void;
   onEdit?: (interactionId: string) => void;
 }
 
 export const CardActions: React.FC<CardActionsProps> = ({
-  interactionId,
+  interaction, // Destructure interaction
   onRegenerate,
   onDelete,
   onEdit,
@@ -23,19 +25,19 @@ export const CardActions: React.FC<CardActionsProps> = ({
       onDelete &&
       window.confirm("Are you sure you want to delete this interaction?")
     ) {
-      onDelete(interactionId);
+      onDelete(interaction.id);
     }
   };
 
   const handleRegenerate = () => {
     if (onRegenerate) {
-      onRegenerate(interactionId);
+      onRegenerate(interaction.id);
     }
   };
 
   const handleEdit = () => {
     if (onEdit) {
-      onEdit(interactionId);
+      onEdit(interaction.id);
     }
   };
 
@@ -46,13 +48,20 @@ export const CardActions: React.FC<CardActionsProps> = ({
         "bg-card/80 backdrop-blur-sm p-0.5 md:p-1 rounded-md shadow-md z-20",
       )}
     >
+      {/* Add the Rating Component */}
+      <InteractionRating
+        interactionId={interaction.id}
+        currentRating={interaction.rating}
+      />
+
+      {/* Existing Action Buttons */}
       {onEdit && (
         <ActionTooltipButton
           tooltipText="Edit"
           onClick={handleEdit}
           aria-label="Edit User Prompt"
           icon={<EditIcon />}
-          className="h-5 w-5 md:h-6 md:w-6" // Adjust size
+          className="h-5 w-5 md:h-6 md:w-6"
         />
       )}
       {onRegenerate && (
@@ -61,7 +70,7 @@ export const CardActions: React.FC<CardActionsProps> = ({
           onClick={handleRegenerate}
           aria-label="Regenerate Response"
           icon={<RefreshCwIcon />}
-          className="h-5 w-5 md:h-6 md:w-6" // Adjust size
+          className="h-5 w-5 md:h-6 md:w-6"
         />
       )}
       {onDelete && (
@@ -70,7 +79,7 @@ export const CardActions: React.FC<CardActionsProps> = ({
           onClick={handleDelete}
           aria-label="Delete Interaction"
           icon={<Trash2Icon />}
-          className="h-5 w-5 md:h-6 md:w-6 text-destructive hover:text-destructive/80" // Adjust size
+          className="h-5 w-5 md:h-6 md:w-6 text-destructive hover:text-destructive/80"
         />
       )}
     </div>

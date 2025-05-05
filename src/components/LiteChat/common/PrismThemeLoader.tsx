@@ -1,24 +1,34 @@
 // src/components/LiteChat/common/PrismThemeLoader.tsx
-
+// FULL FILE
 import { useEffect, useMemo } from "react";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
 
-// IDs for theme link elements
 const PRISM_THEME_LINK_ID = "prism-theme-link";
 const DEFAULT_LIGHT_THEME_LINK_ID = "prism-default-light-theme-link";
 const DEFAULT_DARK_THEME_LINK_ID = "prism-default-dark-theme-link";
 
-// Default theme URLs (using direct CDN links)
 const DEFAULT_LIGHT_THEME_URL =
   "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-material-light.min.css";
 const DEFAULT_DARK_THEME_URL =
   "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-coldark-dark.min.css";
 
-/**
- * Manages the dynamic loading and switching of PrismJS theme CSS files
- * in the document head based on application settings.
- */
+// Helper to ensure link exists and set attributes
+const ensureLinkElement = (id: string, url: string): HTMLLinkElement => {
+  let link = document.getElementById(id) as HTMLLinkElement | null;
+  if (!link) {
+    link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    // Append early to establish order
+    document.head.appendChild(link);
+  }
+  if (link.href !== url) {
+    link.href = url;
+  }
+  return link;
+};
+
 export const PrismThemeLoader: React.FC = () => {
   const { prismThemeUrl, theme: appTheme } = useSettingsStore(
     useShallow((state) => ({
@@ -28,7 +38,6 @@ export const PrismThemeLoader: React.FC = () => {
   );
 
   const systemTheme = useMemo(() => {
-    // Ensure this runs only client-side
     if (typeof window !== "undefined") {
       return window.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
@@ -37,58 +46,50 @@ export const PrismThemeLoader: React.FC = () => {
     return "light";
   }, []);
 
-  // Determine the effective theme mode (light/dark)
   const currentThemeMode = useMemo(() => {
-    if (appTheme === "system") {
-      return systemTheme;
-    }
-    if (appTheme === "TijuDark" || appTheme === "dark") {
+    const effectiveTheme = appTheme === "system" ? systemTheme : appTheme;
+    if (effectiveTheme === "dark" || effectiveTheme === "TijuDark") {
       return "dark";
     }
-    // Default to light for 'light', 'TijuLight', 'custom', or unknown
     return "light";
   }, [appTheme, systemTheme]);
 
   useEffect(() => {
-    const loadTheme = (url: string, id: string): void => {
-      let link = document.getElementById(id) as HTMLLinkElement | null;
-      if (!link) {
-        link = document.createElement("link");
-        link.id = id;
-        link.rel = "stylesheet";
-        document.head.appendChild(link);
-      }
-      if (link.href !== url) {
-        link.href = url;
-      }
-      link.disabled = false;
-    };
-
-    const disableTheme = (id: string): void => {
-      const link = document.getElementById(id) as HTMLLinkElement | null;
-      if (link) {
-        link.disabled = true;
-      }
-    };
+    // Ensure default links exist first to control load order
+    const lightLink = ensureLinkElement(
+      DEFAULT_LIGHT_THEME_LINK_ID,
+      DEFAULT_LIGHT_THEME_URL,
+    );
+    const darkLink = ensureLinkElement(
+      DEFAULT_DARK_THEME_LINK_ID,
+      DEFAULT_DARK_THEME_URL,
+    );
+    let customLink = document.getElementById(
+      PRISM_THEME_LINK_ID,
+    ) as HTMLLinkElement | null;
 
     if (prismThemeUrl) {
-      // User provided a custom theme URL
-      loadTheme(prismThemeUrl, PRISM_THEME_LINK_ID);
-      disableTheme(DEFAULT_LIGHT_THEME_LINK_ID);
-      disableTheme(DEFAULT_DARK_THEME_LINK_ID);
+      // Load or update custom theme
+      customLink = ensureLinkElement(PRISM_THEME_LINK_ID, prismThemeUrl);
+      customLink.disabled = false;
+      // Disable defaults
+      lightLink.disabled = true;
+      darkLink.disabled = true;
     } else {
-      // Use default themes based on the effective light/dark mode
-      disableTheme(PRISM_THEME_LINK_ID);
+      // Disable custom theme if it exists
+      if (customLink) {
+        customLink.disabled = true;
+      }
+      // Enable the correct default theme
       if (currentThemeMode === "dark") {
-        loadTheme(DEFAULT_DARK_THEME_URL, DEFAULT_DARK_THEME_LINK_ID);
-        disableTheme(DEFAULT_LIGHT_THEME_LINK_ID);
+        darkLink.disabled = false;
+        lightLink.disabled = true;
       } else {
-        loadTheme(DEFAULT_LIGHT_THEME_URL, DEFAULT_LIGHT_THEME_LINK_ID);
-        disableTheme(DEFAULT_DARK_THEME_LINK_ID);
+        lightLink.disabled = false;
+        darkLink.disabled = true;
       }
     }
   }, [prismThemeUrl, currentThemeMode]);
 
-  // This component doesn't render anything itself
   return null;
 };

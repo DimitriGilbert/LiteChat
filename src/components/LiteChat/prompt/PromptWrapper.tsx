@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/PromptWrapper.tsx
-
+// FULL FILE
 import React, { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { SendHorizonalIcon, Loader2 } from "lucide-react";
@@ -26,7 +26,6 @@ interface PromptWrapperProps {
   onSubmit: (turnData: PromptTurnObject) => Promise<void>;
   className?: string;
   placeholder?: string;
-  // Add prop to receive the ref from LiteChat
   inputAreaRef: React.RefObject<InputAreaRef | null>;
 }
 
@@ -37,11 +36,9 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   placeholder = "Send a message...",
   inputAreaRef,
 }) => {
-  // inputAreaRef is now passed from parent
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasInputValue, setHasInputValue] = useState(false);
 
-  // --- Store Hooks ---
   const registeredPromptControls = useControlRegistryStore(
     useShallow((state) => state.promptControls),
   );
@@ -57,7 +54,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       })),
     );
 
-  // --- Memoized Controls ---
   const promptControls = useMemo(() => {
     return Object.values(registeredPromptControls).filter((c) =>
       c.show ? c.show() : true,
@@ -73,7 +69,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     [promptControls],
   );
 
-  // --- Submission Logic ---
   const handleSubmit = useCallback(async () => {
     const valueFromRef = inputAreaRef?.current?.getValue() ?? "";
     const trimmedValue = valueFromRef.trim();
@@ -131,14 +126,16 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
 
       await onSubmit(finalTurnData);
 
+      // --- Clear state AFTER successful submission initiation ---
       clearAttachedFiles();
       promptControls.forEach((control) => {
         if (control.clearOnSubmit) {
           control.clearOnSubmit();
         }
       });
-      // Focus is now handled by the caller (LiteChat)
-      setHasInputValue(false);
+      // Explicitly clear the InputArea value via its ref
+      inputAreaRef.current?.clearValue();
+      setHasInputValue(false); // Reset local tracking state
     } catch (error) {
       console.error("Error during prompt submission:", error);
       toast.error(
@@ -158,7 +155,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
 
   const handleInputValueChange = useCallback((value: string) => {
     setHasInputValue(value.trim().length > 0);
-    emitter.emit(ModEvent.PROMPT_INPUT_CHANGE, { value });
+    // Emit event only if the InputArea itself doesn't emit it
+    // emitter.emit(ModEvent.PROMPT_INPUT_CHANGE, { value });
   }, []);
 
   return (
@@ -167,18 +165,17 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         <PromptControlWrapper
           controls={panelControls}
           area="panel"
-          className="flex flex-wrap gap-1 md:gap-2 items-start mb-1 md:mb-2" // Adjusted gap/margin
+          className="flex flex-wrap gap-1 md:gap-2 items-start mb-1 md:mb-2"
         />
       )}
 
-      {/* Attached Files Preview Area */}
       {attachedFilesMetadata.length > 0 && (
         <div className="max-h-40 overflow-y-auto space-y-1 border rounded-md p-2 bg-muted/20 mb-2">
           {attachedFilesMetadata.map((fileMeta) => (
             <FilePreviewRenderer
               key={fileMeta.id}
               fileMeta={fileMeta}
-              onRemove={removeAttachedFile} // Pass remove function
+              onRemove={removeAttachedFile}
               isReadOnly={false}
             />
           ))}
@@ -187,13 +184,12 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
 
       <div className="flex items-end gap-2">
         <InputAreaRenderer
-          // Pass the ref down to the actual InputArea component
           ref={inputAreaRef}
           onSubmit={handleSubmit}
           disabled={isStreaming || isSubmitting}
           placeholder={placeholder}
           onValueChange={handleInputValueChange}
-          className="flex-grow" // Allow textarea to grow
+          className="flex-grow"
         />
         <Button
           type="button"
@@ -204,7 +200,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
             isSubmitting ||
             (!hasInputValue && attachedFilesMetadata.length === 0)
           }
-          className="h-9 w-9 flex-shrink-0" // Consistent size
+          className="h-9 w-9 flex-shrink-0"
           aria-label="Send message"
         >
           {isSubmitting ? (
@@ -218,7 +214,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       <PromptControlWrapper
         controls={triggerControls}
         area="trigger"
-        className="flex items-center gap-1 flex-wrap flex-shrink-0 mt-1 md:mt-2" // Allow wrapping, adjusted margin
+        className="flex items-center gap-1 flex-wrap flex-shrink-0 mt-1 md:mt-2"
       />
     </div>
   );

@@ -1,8 +1,8 @@
 // src/components/LiteChat/common/ErrorBoundary.tsx
-// NEW FILE
-import { Component, ErrorInfo, ReactNode } from "react";
+// FULL FILE
+import React, { Component, ErrorInfo, ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { AlertTriangleIcon, CopyIcon, CodeIcon } from "lucide-react";
+import { AlertTriangleIcon, CopyIcon, CodeIcon, CheckIcon } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props {
@@ -16,8 +16,39 @@ interface State {
   errorInfo: ErrorInfo | null;
 }
 
-// Define package version (replace with actual dynamic injection if possible)
 const LITECHAT_VERSION = "0.1.0-dev";
+const GITHUB_REPO_URL = "https://github.com/DimitriGilbert/LiteChat";
+
+const CopyButton: React.FC<{
+  textToCopy: string;
+  label: string;
+  className?: string;
+}> = ({ textToCopy, label, className }) => {
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setIsCopied(true);
+      toast.success(`${label} copied to clipboard!`);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      toast.error(`Failed to copy ${label.toLowerCase()}.`);
+      console.error(`Clipboard copy failed for ${label}:`, err);
+    }
+  };
+
+  return (
+    <Button variant="outline" onClick={handleCopy} className={className}>
+      {isCopied ? (
+        <CheckIcon className="mr-2 h-4 w-4 text-green-500" />
+      ) : (
+        <CopyIcon className="mr-2 h-4 w-4" />
+      )}
+      {isCopied ? "Copied!" : `Copy ${label}`}
+    </Button>
+  );
+};
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
@@ -27,7 +58,6 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    // Update state so the next render will show the fallback UI.
     return { hasError: true, error: error, errorInfo: null };
   }
 
@@ -36,21 +66,19 @@ export class ErrorBoundary extends Component<Props, State> {
     this.setState({ errorInfo });
   }
 
+  // Modified to only include title in URL parameters
   private getGitHubIssueUrl(): string {
-    const repoUrl = "https://github.com/YOUR_GITHUB_USERNAME/litechat/issues";
+    const repoUrl = `${GITHUB_REPO_URL}/issues`;
     const title = encodeURIComponent(
       `Crash Report: ${this.state.error?.message.substring(0, 50) ?? "Unknown Error"}`,
     );
-    const body = encodeURIComponent(this.generateErrorReport(true));
-    return `${repoUrl}/new?title=${title}&body=${body}`;
+    // Remove the body parameter from the URL
+    return `${repoUrl}/new?title=${title}`;
   }
 
   private generateErrorReport(forGithub: boolean = false): string {
     const { error, errorInfo } = this.state;
-    const nl = forGithub
-      ? "\n"
-      : `
-`;
+    const nl = forGithub ? "\n" : `\n`;
     const codeBlock = forGithub ? "```" : "";
 
     let report = `## LiteChat Error Report${nl}${nl}`;
@@ -103,16 +131,6 @@ Based on this information, what are the likely causes and potential solutions? F
     return prompt;
   }
 
-  private copyToClipboard = async (text: string, type: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success(`${type} copied to clipboard!`);
-    } catch (err) {
-      toast.error(`Failed to copy ${type.toLowerCase()}.`);
-      console.error(`Clipboard copy failed for ${type}:`, err);
-    }
-  };
-
   public render() {
     if (this.state.hasError) {
       return this.props.fallback ? (
@@ -130,6 +148,7 @@ Based on this information, what are the likely causes and potential solutions? F
             <p className="text-destructive/90 mb-4">
               LiteChat encountered an unexpected error. Please try refreshing
               the page. If the problem persists, consider reporting the issue.
+              Copy the details and paste them into the GitHub issue.
             </p>
             <pre className="text-left text-xs bg-destructive/10 border border-destructive/30 rounded p-3 max-h-32 overflow-auto mb-4 font-mono text-destructive/80">
               {this.state.error?.message ?? "Unknown Error"}
@@ -141,27 +160,17 @@ Based on this information, what are the likely causes and potential solutions? F
               >
                 Refresh Page
               </Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  this.copyToClipboard(
-                    this.generateErrorReport(),
-                    "Error Details",
-                  )
-                }
-              >
-                <CopyIcon className="mr-2 h-4 w-4" /> Copy Details
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  this.copyToClipboard(this.generateAIPrompt(), "AI Prompt")
-                }
-              >
-                <CopyIcon className="mr-2 h-4 w-4" /> Copy AI Debug Prompt
-              </Button>
+              <CopyButton
+                textToCopy={this.generateErrorReport()}
+                label="Details"
+              />
+              <CopyButton
+                textToCopy={this.generateAIPrompt()}
+                label="AI Debug Prompt"
+              />
               <Button variant="outline" asChild>
                 <a
+                  // URL now only contains the title
                   href={this.getGitHubIssueUrl()}
                   target="_blank"
                   rel="noopener noreferrer"

@@ -34,9 +34,8 @@ interface AddProviderFormProps {
     config: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
   ) => Promise<string>;
   onCancel: () => void;
-  // Add optional initial props
   initialType?: DbProviderType;
-  initialName?: string;
+  initialName?: string; // Accept initialName
   initialApiKeyId?: string | null;
 }
 
@@ -45,7 +44,7 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
   onAddProvider,
   onCancel,
   initialType = "openai",
-  initialName = "",
+  initialName = "", // Use initialName prop
   initialApiKeyId = null,
 }) => {
   const [isSavingNew, setIsSavingNew] = useState(false);
@@ -56,22 +55,22 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
       autoFetchModels: boolean;
     }
   >({
-    name: initialName,
+    name: initialName, // Initialize with prop
     type: initialType,
     isEnabled: true,
     apiKeyId: initialApiKeyId,
     baseURL: null,
     enabledModels: null,
-    autoFetchModels: false,
+    autoFetchModels: supportsModelFetching(initialType), // Set based on initial type
     fetchedModels: null,
     modelsLastFetchedAt: null,
   });
 
-  // Effect to sync with initial props if they change (e.g., in EmptyStateSetup)
+  // Effect to sync with initial props if they change
   useEffect(() => {
     setNewProviderData((prev) => ({
       ...prev,
-      name: initialName || prev.name || "",
+      name: initialName || prev.name || "", // Prioritize prop
       type: initialType || prev.type || null,
       apiKeyId: initialApiKeyId || prev.apiKeyId || null,
       autoFetchModels: initialType
@@ -89,7 +88,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
         const updated = { ...prev, [field]: value };
         const currentName = prev.name || "";
 
-        // Prefill logic when type changes
         if (field === "type") {
           const newType = value as DbProviderType | null;
           const oldProviderLabel = PROVIDER_TYPES.find(
@@ -103,7 +101,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
             : false;
           updated.enabledModels = null;
 
-          // Prefill name if empty or matches old provider label
           const providerLabel = PROVIDER_TYPES.find(
             (p) => p.value === newType,
           )?.label;
@@ -114,7 +111,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
             updated.name = providerLabel;
           }
 
-          // Auto-select first relevant API key if available
           if (newType && requiresApiKey(newType)) {
             const relevantKeys = (apiKeys || []).filter(
               (k) => k.providerId === newType,
@@ -164,7 +160,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
       onCancel();
     } catch (error) {
       console.error("Failed to add provider (from form component):", error);
-      // Toast handled by store action or caller
     } finally {
       setIsSavingNew(false);
     }
@@ -174,7 +169,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
   const needsURL = requiresBaseURL(newProviderData.type ?? null);
   const canFetch = supportsModelFetching(newProviderData.type ?? null);
 
-  // Filter API keys based on the selected provider type
   const relevantApiKeys = (apiKeys || []).filter(
     (key) => !newProviderData.type || key.providerId === newProviderData.type,
   );
@@ -183,13 +177,11 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
     <div className="border border-primary rounded-md p-4 space-y-3 bg-card shadow-lg flex-shrink-0">
       <h4 className="font-semibold text-card-foreground">Add New Provider</h4>
 
-      {/* Grid layout for better responsiveness */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Provider Type (Moved First) */}
         <div className="space-y-1.5">
           <Label htmlFor="new-provider-type">Provider Type</Label>
           <Select
-            value={newProviderData.type ?? ""} // Handle null type
+            value={newProviderData.type ?? ""}
             onValueChange={(value) =>
               handleNewChange("type", value as DbProviderType)
             }
@@ -208,7 +200,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
           </Select>
         </div>
 
-        {/* Provider Name */}
         <div className="space-y-1.5">
           <Label htmlFor="new-provider-name">Provider Name</Label>
           <Input
@@ -221,24 +212,21 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
           />
         </div>
 
-        {/* API Key (Conditional) */}
         {needsKey && (
           <div className="space-y-1.5 md:col-span-2">
             <Label>API Key</Label>
             <ApiKeySelector
-              label="API Key" // Simplified label
+              label="API Key"
               selectedKeyId={newProviderData.apiKeyId ?? null}
               onKeySelected={(keyId: string | null) =>
                 handleNewChange("apiKeyId", keyId)
               }
-              // Pass filtered keys
               apiKeys={relevantApiKeys}
-              disabled={isSavingNew || !newProviderData.type} // Disable if type not selected
+              disabled={isSavingNew || !newProviderData.type}
             />
           </div>
         )}
 
-        {/* Base URL (Conditional) */}
         {needsURL && (
           <div className="space-y-1.5 md:col-span-2">
             <Label htmlFor="new-provider-baseurl">Base URL</Label>
@@ -254,7 +242,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
         )}
       </div>
 
-      {/* Toggles */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
         <div className="flex items-center space-x-2">
           <Switch
@@ -291,7 +278,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
         Models fetched will appear in the global organizer above after fetching.
       </p>
 
-      {/* Action Buttons */}
       <div className="flex justify-end space-x-2 pt-2">
         <Button
           variant="ghost"

@@ -6,6 +6,7 @@ import type { Interaction } from "@/types/litechat/interaction";
 import { PersistenceService } from "@/services/persistence.service";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { ModEvent } from "@/types/litechat/modding";
+import { toast } from "sonner";
 
 export interface InteractionState {
   interactions: Interaction[];
@@ -25,9 +26,11 @@ interface InteractionActions {
   ) => void;
   appendInteractionResponseChunk: (id: string, chunk: string) => void;
   _removeInteractionFromState: (id: string) => void;
-  // --- Persistence Actions (Called by InteractionService) ---
-  // Removed updateInteractionAndPersist - Persistence handled by service
-  // Removed deleteInteraction - Persistence handled by service
+  // --- Persistence Actions (Called by InteractionService or UI) ---
+  rateInteraction: (
+    interactionId: string,
+    rating: number | null,
+  ) => Promise<void>;
   // --- Other Actions ---
   setCurrentConversationId: (id: string | null) => Promise<void>;
   clearInteractions: () => void;
@@ -110,11 +113,9 @@ export const useInteractionStore = create(
         const index = state.interactions.findIndex((i) => i.id === id);
         if (index !== -1) {
           const existingInteraction = state.interactions[index];
-          // Create a new metadata object by merging
           let newMetadata = { ...(existingInteraction.metadata || {}) };
           if (updates.metadata) {
             newMetadata = { ...newMetadata, ...updates.metadata };
-            // Ensure toolCalls and toolResults are copied if present in updates
             if (
               updates.metadata.toolCalls !== undefined &&
               Array.isArray(updates.metadata.toolCalls)
@@ -129,19 +130,20 @@ export const useInteractionStore = create(
             }
           }
 
-          // Create the updated interaction object
           const updatedInteraction = {
             ...existingInteraction,
             ...updates,
             metadata: newMetadata,
           };
 
-          // Explicitly handle the 'response' field if it's in the updates
           if ("response" in updates) {
             updatedInteraction.response = updates.response;
           }
+          // Explicitly handle rating update
+          if ("rating" in updates) {
+            updatedInteraction.rating = updates.rating;
+          }
 
-          // Update the interaction in the state array
           state.interactions[index] = updatedInteraction;
         } else {
           console.warn(
@@ -166,9 +168,34 @@ export const useInteractionStore = create(
       });
     },
 
-    // --- Persistence Actions Removed ---
-    // updateInteractionAndPersist removed
-    // deleteInteraction removed
+    // --- Persistence Actions ---
+    rateInteraction: async (interactionId, rating) => {
+      const interaction = get().interactions.find(
+        (i) => i.id === interactionId,
+      );
+      if (!interaction) {
+        console.error(
+          `InteractionStore: Interaction ${interactionId} not found for rating.`,
+        );
+        return;
+      }
+      // Optimistic UI update
+      get()._updateInteractionInState(interactionId, { rating });
+      try {
+        // Persist the change
+        await PersistenceService.saveInteraction({ ...interaction, rating });
+      } catch (error) {
+        console.error(
+          `InteractionStore: Failed to persist rating for ${interactionId}`,
+          error,
+        );
+        // Revert UI update on error
+        get()._updateInteractionInState(interactionId, {
+          rating: interaction.rating,
+        });
+        toast.error("Failed to save rating.");
+      }
+    },
 
     // --- Other Actions ---
     setCurrentConversationId: async (id) => {
@@ -181,7 +208,6 @@ export const useInteractionStore = create(
         } else {
           get().clearInteractions();
         }
-        // Note: CONTEXT_CHANGED event is emitted by ConversationStore.selectItem
       } else {
         console.log(
           `InteractionStore: Conversation ID ${id} is already current.`,

@@ -187,7 +187,7 @@ ${userContent}`;
           autoTitleEnabledForTurn,
           ...restMeta
         }) => restMeta)(turnData.metadata ?? {}),
-        modelId: promptState.modelId,
+        modelId: promptState.modelId ?? undefined,
         // Store only basic file info (no content) in the final prompt metadata sent to AI Service
         attachedFiles: turnData.metadata.attachedFiles?.map(
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -491,7 +491,7 @@ ${userContent}`;
           autoTitleEnabledForTurn,
           ...restMeta
         }) => restMeta)(originalTurnData.metadata ?? {}),
-        modelId: promptState.modelId,
+        modelId: promptState.modelId ?? undefined,
         regeneratedFromId: interactionId,
         // Store only basic file info (no content)
         attachedFiles: originalAttachedFiles.map(

@@ -22,6 +22,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ModelEnablementList } from "@/components/LiteChat/settings/ModelEnablementList";
 import { Lnk } from "@/components/ui/lnk";
+import {
+  requiresApiKey,
+  PROVIDER_TYPES,
+} from "@/lib/litechat/provider-helpers";
 
 export const EmptyStateSetup: React.FC = () => {
   const {
@@ -61,12 +65,9 @@ export const EmptyStateSetup: React.FC = () => {
 
   const [isSavingKey, setIsSavingKey] = useState(false);
   // @ts-expect-error @AI DO NOT REMOVE, DOES NOT BUILD IF REMOVED
-  const [isSavingProvider, setIsSavingProvider] = useState(false);
+  const [isSavingProvider, setIsSavingProvider] = useState(false); // DO NOT FUCKING REMOVE THE FUCKING TS-EXPECT-ERROR !
   const [isStartingChat, setIsStartingChat] = useState(false);
-  // setFocusInputFlag removed
   const [isUpdatingModels, setIsUpdatingModels] = useState(false);
-  const [lastAddedKeyProviderType, setLastAddedKeyProviderType] =
-    useState<DbProviderType | null>(null);
 
   // --- Step Completion Logic ---
   const isApiKeyStepComplete = useMemo(
@@ -88,15 +89,15 @@ export const EmptyStateSetup: React.FC = () => {
 
   // --- Get data for the first provider (if it exists) ---
   const firstProvider = useMemo(() => {
-    return providers.length > 0 ? providers[0] : null;
+    const sortedProviders = [...providers].sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    );
+    return sortedProviders.length > 0 ? sortedProviders[0] : null;
   }, [providers]);
 
   const firstProviderModels = useMemo(() => {
     if (!firstProvider) return [];
-    return getAllAvailableModelDefsForProvider(firstProvider.id).map((m) => ({
-      id: m.id,
-      name: m.name,
-    }));
+    return getAllAvailableModelDefsForProvider(firstProvider.id);
   }, [firstProvider, getAllAvailableModelDefsForProvider]);
 
   const firstProviderEnabledModels = useMemo(() => {
@@ -104,12 +105,40 @@ export const EmptyStateSetup: React.FC = () => {
   }, [firstProvider]);
   // --- End first provider data ---
 
+  // Determine initial type AND name for AddProviderForm based on API keys
+  const { initialProviderTypeForForm, initialProviderNameForForm } =
+    useMemo(() => {
+      if (isProviderStepComplete) return { type: undefined, name: undefined };
+      if (apiKeys.length > 0) {
+        const sortedKeys = [...apiKeys].sort(
+          (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+        );
+        const relevantKey = sortedKeys.find((k) =>
+          requiresApiKey(k.providerId as DbProviderType),
+        );
+        if (relevantKey) {
+          const type = relevantKey.providerId as DbProviderType;
+          // Correctly derive the name from PROVIDER_TYPES
+          const name =
+            PROVIDER_TYPES.find((p) => p.value === type)?.label || type;
+          return {
+            initialProviderTypeForForm: type,
+            initialProviderNameForForm: name,
+          };
+        }
+      }
+      // Default if no relevant API key found
+      return {
+        initialProviderTypeForForm: undefined,
+        initialProviderNameForForm: undefined,
+      };
+    }, [apiKeys, isProviderStepComplete]);
+
   const handleSaveKey = useCallback(
     async (name: string, providerId: string, value: string) => {
       setIsSavingKey(true);
       try {
         await addApiKey(name, providerId, value);
-        setLastAddedKeyProviderType(providerId as DbProviderType);
       } finally {
         setIsSavingKey(false);
       }
@@ -124,7 +153,6 @@ export const EmptyStateSetup: React.FC = () => {
       setIsSavingProvider(true);
       try {
         const newId = await addProviderConfig(config);
-        setLastAddedKeyProviderType(null);
         return newId;
       } finally {
         setIsSavingProvider(false);
@@ -162,14 +190,12 @@ export const EmptyStateSetup: React.FC = () => {
     setIsStartingChat(true);
     try {
       const newId = await addConversation({ title: "New Chat" });
-      // Selection will trigger focus via LiteChat's context change effect
       await selectItem(newId, "conversation");
     } catch (error) {
       toast.error("Failed to start your first chat.");
       console.error("Failed to start first chat:", error);
       setIsStartingChat(false);
     }
-    // Don't set loading false on success, component will unmount
   }, [addConversation, selectItem]);
 
   const openSettings = (tab: string, subTab?: string) => {
@@ -177,13 +203,12 @@ export const EmptyStateSetup: React.FC = () => {
     toggleChatControlPanel("settingsModal", true);
   };
 
-  // Define steps
   const steps = [
     ...(enableApiKeyManagement
       ? [
           {
             id: "api-key",
-            title: "Add API Key",
+            title: "Add API Key (Optional)",
             description: (
               <div>
                 <p>
@@ -236,7 +261,8 @@ export const EmptyStateSetup: React.FC = () => {
             ) => Promise<string>
           }
           onCancel={() => {}}
-          initialType={lastAddedKeyProviderType ?? undefined}
+          initialType={initialProviderTypeForForm} // Pass derived type
+          initialName={initialProviderNameForForm} // Pass derived name
         />
       ),
     },
@@ -246,9 +272,9 @@ export const EmptyStateSetup: React.FC = () => {
       description: (
         <>
           Enable models for the provider you just added (
-          {firstProvider?.name || ""}). Enabling specific models improves the UI
-          by reducing clutter and choice paralysis. You can enable more later in
-          Settings.
+          <strong>{firstProvider?.name || "..."}</strong>). Enabling specific
+          models improves the UI by reducing clutter and choice paralysis. You
+          can enable more later in Settings.
         </>
       ),
       isComplete: isEnableModelsStepComplete,
@@ -275,7 +301,7 @@ export const EmptyStateSetup: React.FC = () => {
       content: (
         <Button
           onClick={handleStartFirstChat}
-          disabled={isStartingChat}
+          disabled={isStartingChat || !isEnableModelsStepComplete}
           size="sm"
         >
           <MessageSquarePlusIcon className="mr-2 h-4 w-4" />
@@ -322,6 +348,7 @@ export const EmptyStateSetup: React.FC = () => {
                 description={step.description}
                 isComplete={step.id !== "start-chat" && step.isComplete}
                 isActive={isActive}
+                openOnComplete={step.id === "enable-models"}
                 contentClassName={
                   step.id === "add-provider" || step.id === "api-key"
                     ? "p-0 border-none shadow-none bg-transparent"
@@ -337,7 +364,6 @@ export const EmptyStateSetup: React.FC = () => {
         </div>
 
         {!isProviderLoading &&
-          !enableApiKeyManagement &&
           !isProviderStepComplete &&
           activeStepIndex === -1 && (
             <div className="text-center text-muted-foreground mt-6">

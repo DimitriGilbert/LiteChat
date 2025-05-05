@@ -7,7 +7,6 @@ import type { DbMod } from "@/types/litechat/modding";
 import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import type { SyncRepo } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project";
-// Import new types
 import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
 
 export interface DbAppState {
@@ -24,31 +23,45 @@ export class LiteChatDatabase extends Dexie {
   apiKeys!: Table<DbApiKey, string>;
   syncRepos!: Table<SyncRepo, string>;
   projects!: Table<Project, string>;
-  // Add new tables
   rules!: Table<DbRule, string>;
   tags!: Table<DbTag, string>;
   tagRuleLinks!: Table<DbTagRuleLink, string>;
 
   constructor() {
     super("LiteChatDatabase_Rewrite_v1");
-    this.version(7) // Bump version for rules and tags
-      .stores({
-        conversations:
-          "++id, title, createdAt, updatedAt, syncRepoId, lastSyncedAt, projectId",
-        interactions:
-          "++id, conversationId, index, type, status, startedAt, parentId",
-        mods: "++id, &name, enabled, loadOrder",
-        appState: "&key",
-        providerConfigs: "++id, &name, type, isEnabled, apiKeyId",
-        apiKeys: "++id, &name",
-        syncRepos: "++id, &name, remoteUrl, username",
-        projects: "++id, &path, parentId, createdAt, updatedAt, name",
-        // Define new tables and indices
-        rules: "++id, &name, type, createdAt, updatedAt",
-        tags: "++id, &name, createdAt, updatedAt",
-        tagRuleLinks: "++id, tagId, ruleId, &[tagId+ruleId]",
-      });
+    // Bump version for rating field
+    this.version(8).stores({
+      conversations:
+        "++id, title, createdAt, updatedAt, syncRepoId, lastSyncedAt, projectId",
+      // Add rating index to interactions
+      interactions:
+        "++id, conversationId, index, type, status, startedAt, parentId, rating",
+      mods: "++id, &name, enabled, loadOrder",
+      appState: "&key",
+      providerConfigs: "++id, &name, type, isEnabled, apiKeyId",
+      apiKeys: "++id, &name",
+      syncRepos: "++id, &name, remoteUrl, username",
+      projects: "++id, &path, parentId, createdAt, updatedAt, name",
+      rules: "++id, &name, type, createdAt, updatedAt",
+      tags: "++id, &name, createdAt, updatedAt",
+      tagRuleLinks: "++id, tagId, ruleId, &[tagId+ruleId]",
+    });
     // Define previous versions explicitly for Dexie's upgrade path
+    this.version(7).stores({
+      conversations:
+        "++id, title, createdAt, updatedAt, syncRepoId, lastSyncedAt, projectId",
+      interactions:
+        "++id, conversationId, index, type, status, startedAt, parentId", // No rating index here
+      mods: "++id, &name, enabled, loadOrder",
+      appState: "&key",
+      providerConfigs: "++id, &name, type, isEnabled, apiKeyId",
+      apiKeys: "++id, &name",
+      syncRepos: "++id, &name, remoteUrl, username",
+      projects: "++id, &path, parentId, createdAt, updatedAt, name",
+      rules: "++id, &name, type, createdAt, updatedAt",
+      tags: "++id, &name, createdAt, updatedAt",
+      tagRuleLinks: "++id, tagId, ruleId, &[tagId+ruleId]",
+    });
     this.version(6).stores({
       conversations:
         "++id, title, createdAt, updatedAt, syncRepoId, lastSyncedAt, projectId",

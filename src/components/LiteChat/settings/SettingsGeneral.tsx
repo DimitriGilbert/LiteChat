@@ -3,13 +3,6 @@
 import React, { useCallback, useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,8 +13,6 @@ import { Separator } from "@/components/ui/separator";
 
 const SettingsGeneralComponent: React.FC = () => {
   const {
-    theme,
-    setTheme,
     enableStreamingMarkdown,
     setEnableStreamingMarkdown,
     enableStreamingCodeBlockParsing,
@@ -32,8 +23,6 @@ const SettingsGeneralComponent: React.FC = () => {
     setFoldUserMessagesOnCompletion,
     streamingRenderFPS,
     setStreamingRenderFPS,
-    prismThemeUrl,
-    setPrismThemeUrl,
     resetGeneralSettings,
   } = useSettingsStore(
     useShallow((state) => ({
@@ -97,50 +86,6 @@ const SettingsGeneralComponent: React.FC = () => {
 
   return (
     <div className="space-y-6 p-1">
-      <div className="space-y-2">
-        <h3 className="text-lg font-medium">Appearance</h3>
-        {/* Theme */}
-        <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-          <Label htmlFor="theme-select" className="font-medium">
-            Theme
-          </Label>
-          <Select
-            value={theme ?? "system"}
-            onValueChange={(value) => setTheme(value as typeof theme)}
-          >
-            <SelectTrigger id="theme-select" className="w-[180px]">
-              <SelectValue placeholder="Select theme" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="light">Light</SelectItem>
-              <SelectItem value="dark">Dark</SelectItem>
-              <SelectItem value="system">System</SelectItem>
-              <SelectItem value="TijuLight">Tiju Light</SelectItem>
-              <SelectItem value="TijuDark">Tiju Dark</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {/* PrismJS Theme URL */}
-        <div className="rounded-lg border p-3 shadow-sm space-y-1.5">
-          <Label htmlFor="prism-theme-url" className="font-medium">
-            Code Block Theme URL (Optional)
-          </Label>
-          <p className="text-xs text-muted-foreground">
-            Enter the URL of a PrismJS CSS theme file (e.g., from cdnjs). Leave
-            blank to use the default themes.
-          </p>
-          <Input
-            id="prism-theme-url"
-            type="url"
-            placeholder="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css"
-            value={prismThemeUrl ?? ""}
-            onChange={(e) => setPrismThemeUrl(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <Separator />
-
       {/* Streaming Settings */}
       <div className="space-y-2">
         <h3 className="text-lg font-medium">Streaming & Display</h3>

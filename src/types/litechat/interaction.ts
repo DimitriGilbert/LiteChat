@@ -7,7 +7,7 @@ export type InteractionType =
   | "message.user_assistant"
   | "message.assistant_regen"
   | "message.user_edit"
-  | "conversation.title_generation" // Added new type
+  | "conversation.title_generation"
   | "tool.execution"
   | "system.info"
   | "system.error";
@@ -32,8 +32,9 @@ export interface Interaction {
   status: InteractionStatus;
   startedAt: Date | null;
   endedAt: Date | null;
+  // Add rating field
+  rating?: number | null;
   metadata: Metadata & {
-    // Add specific metadata fields
     promptTokens?: number;
     completionTokens?: number;
     totalTokens?: number;
@@ -41,10 +42,8 @@ export interface Interaction {
     providerId?: string;
     error?: string;
     regeneratedFromId?: string;
-    // Store tool calls/results as JSON strings
     toolCalls?: string[];
     toolResults?: string[];
-    // Basic file info (no content) for display/reference
     attachedFiles?: {
       id: string;
       source: "direct" | "vfs";
@@ -53,14 +52,10 @@ export interface Interaction {
       size: number;
       path?: string;
     }[];
-    // Add reasoning field
     reasoning?: string;
-    // Store raw provider metadata if needed
     providerMetadata?: Record<string, any>;
-    // Add timing metadata
     timeToFirstToken?: number;
     generationTime?: number;
-    // Flag for title generation interaction
     isTitleGeneration?: boolean;
   };
 }
