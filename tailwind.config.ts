@@ -1,5 +1,4 @@
 // tailwind.config.ts
-// FULL FILE - Verified color definitions use hsl(var()) and removed maxWidth
 import { type Config } from "tailwindcss";
 import { fontFamily } from "tailwindcss/defaultTheme";
 
@@ -9,20 +8,14 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        // Use CSS variable for custom font, fallback to Geist Sans
-        sans: [
-          "var(--custom-font-family, var(--font-geist-sans))",
-          ...fontFamily.sans,
-        ],
+        sans: ["var(--font-geist-sans)", ...fontFamily.sans],
       },
       borderRadius: {
-        // Use CSS variable for radius
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
       colors: {
-        // Ensure all colors use the CSS variables defined in index.css
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
@@ -99,14 +92,6 @@ export default {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.5" },
         },
-        "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
-        },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
-        },
       },
       animation: {
         fadeIn: "fadeIn 0.3s ease-in-out",
@@ -115,10 +100,7 @@ export default {
         slideInFromTop: "slideInFromTop 0.3s ease-in-out",
         slideInFromBottom: "slideInFromBottom 0.3s ease-in-out",
         pulse: "pulse 1.5s infinite",
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
       },
-      // REMOVED redundant maxWidth definitions
     },
   },
   plugins: [require("tailwindcss-animate")],
