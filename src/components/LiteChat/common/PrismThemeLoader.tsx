@@ -1,5 +1,3 @@
-// src/components/LiteChat/common/PrismThemeLoader.tsx
-// FULL FILE
 import { useEffect, useMemo } from "react";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
@@ -11,20 +9,16 @@ const DEFAULT_DARK_THEME_LINK_ID = "prism-default-dark-theme-link";
 const DEFAULT_LIGHT_THEME_URL =
   "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-material-light.min.css";
 const DEFAULT_DARK_THEME_URL =
-  "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-coldark-dark.min.css";
+  "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-vsc-dark-plus.min.css";
 
 // Helper to ensure link exists and set attributes
-const ensureLinkElement = (id: string, url: string): HTMLLinkElement => {
+const ensureLinkElement = (id: string): HTMLLinkElement => {
   let link = document.getElementById(id) as HTMLLinkElement | null;
   if (!link) {
     link = document.createElement("link");
     link.id = id;
     link.rel = "stylesheet";
-    // Append early to establish order
     document.head.appendChild(link);
-  }
-  if (link.href !== url) {
-    link.href = url;
   }
   return link;
 };
@@ -38,57 +32,57 @@ export const PrismThemeLoader: React.FC = () => {
   );
 
   const systemTheme = useMemo(() => {
-    if (typeof window !== "undefined") {
-      return window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light";
-    }
-    return "light";
+    if (typeof window === "undefined") return "light";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
   }, []);
 
+  // Determine the current theme mode (dark or light)
   const currentThemeMode = useMemo(() => {
     const effectiveTheme = appTheme === "system" ? systemTheme : appTheme;
-    if (effectiveTheme === "dark" || effectiveTheme === "TijuDark") {
-      return "dark";
-    }
-    return "light";
+    return effectiveTheme === "dark" || effectiveTheme === "TijuDark"
+      ? "dark"
+      : "light";
   }, [appTheme, systemTheme]);
 
   useEffect(() => {
-    // Ensure default links exist first to control load order
-    const lightLink = ensureLinkElement(
-      DEFAULT_LIGHT_THEME_LINK_ID,
-      DEFAULT_LIGHT_THEME_URL,
-    );
-    const darkLink = ensureLinkElement(
-      DEFAULT_DARK_THEME_LINK_ID,
-      DEFAULT_DARK_THEME_URL,
-    );
-    let customLink = document.getElementById(
-      PRISM_THEME_LINK_ID,
-    ) as HTMLLinkElement | null;
+    // Only run in browser environment
+    if (typeof window === "undefined") return;
 
+    // Create all three link elements
+    const lightLink = ensureLinkElement(DEFAULT_LIGHT_THEME_LINK_ID);
+    const darkLink = ensureLinkElement(DEFAULT_DARK_THEME_LINK_ID);
+    const customLink = ensureLinkElement(PRISM_THEME_LINK_ID);
+
+    // Disable all links first
+    lightLink.disabled = true;
+    darkLink.disabled = true;
+    customLink.disabled = true;
+
+    // Set appropriate URLs
+    lightLink.href = DEFAULT_LIGHT_THEME_URL;
+    darkLink.href = DEFAULT_DARK_THEME_URL;
+
+    // Determine which link should be enabled
     if (prismThemeUrl) {
-      // Load or update custom theme
-      customLink = ensureLinkElement(PRISM_THEME_LINK_ID, prismThemeUrl);
+      // Custom theme takes precedence
+      customLink.href = prismThemeUrl;
       customLink.disabled = false;
-      // Disable defaults
-      lightLink.disabled = true;
-      darkLink.disabled = true;
     } else {
-      // Disable custom theme if it exists
-      if (customLink) {
-        customLink.disabled = true;
-      }
-      // Enable the correct default theme
+      // Use default theme based on current mode
+      console.log(currentThemeMode);
       if (currentThemeMode === "dark") {
         darkLink.disabled = false;
-        lightLink.disabled = true;
       } else {
         lightLink.disabled = false;
-        darkLink.disabled = true;
       }
     }
+
+    // Clean up function
+    return () => {
+      // No cleanup needed for link elements as they persist
+    };
   }, [prismThemeUrl, currentThemeMode]);
 
   return null;

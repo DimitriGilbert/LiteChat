@@ -105,34 +105,41 @@ export const EmptyStateSetup: React.FC = () => {
   }, [firstProvider]);
   // --- End first provider data ---
 
-  // Determine initial type AND name for AddProviderForm based on API keys
-  const { initialProviderTypeForForm, initialProviderNameForForm } =
-    useMemo(() => {
-      if (isProviderStepComplete) return { type: undefined, name: undefined };
-      if (apiKeys.length > 0) {
-        const sortedKeys = [...apiKeys].sort(
-          (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
-        );
-        const relevantKey = sortedKeys.find((k) =>
-          requiresApiKey(k.providerId as DbProviderType),
-        );
-        if (relevantKey) {
-          const type = relevantKey.providerId as DbProviderType;
-          // Correctly derive the name from PROVIDER_TYPES
-          const name =
-            PROVIDER_TYPES.find((p) => p.value === type)?.label || type;
-          return {
-            initialProviderTypeForForm: type,
-            initialProviderNameForForm: name,
-          };
-        }
+  // Determine initial type, name, AND key ID for forms based on API keys
+  const {
+    initialProviderTypeForForm,
+    initialProviderNameForForm,
+    initialApiKeyIdForForm,
+  } = useMemo(() => {
+    if (isProviderStepComplete)
+      return { type: undefined, name: undefined, keyId: undefined };
+    if (apiKeys.length > 0) {
+      const sortedKeys = [...apiKeys].sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      );
+      // Find the *first* key that requires one for the provider form
+      const relevantKeyForProvider = sortedKeys.find((k) =>
+        requiresApiKey(k.providerId as DbProviderType),
+      );
+      if (relevantKeyForProvider) {
+        const type = relevantKeyForProvider.providerId as DbProviderType;
+        const name =
+          PROVIDER_TYPES.find((p) => p.value === type)?.label || type;
+        // Use this key's ID for both forms initially
+        return {
+          initialProviderTypeForForm: type,
+          initialProviderNameForForm: name,
+          initialApiKeyIdForForm: relevantKeyForProvider.id,
+        };
       }
-      // Default if no relevant API key found
-      return {
-        initialProviderTypeForForm: undefined,
-        initialProviderNameForForm: undefined,
-      };
-    }, [apiKeys, isProviderStepComplete]);
+    }
+    // Default if no relevant API key found
+    return {
+      initialProviderTypeForForm: undefined,
+      initialProviderNameForForm: undefined,
+      initialApiKeyIdForForm: undefined,
+    };
+  }, [apiKeys, isProviderStepComplete]);
 
   const handleSaveKey = useCallback(
     async (name: string, providerId: string, value: string) => {
@@ -152,13 +159,20 @@ export const EmptyStateSetup: React.FC = () => {
     ): Promise<string> => {
       setIsSavingProvider(true);
       try {
-        const newId = await addProviderConfig(config);
+        // Ensure the initial API key ID is passed if available and relevant
+        const configWithKey = {
+          ...config,
+          apiKeyId:
+            config.apiKeyId ??
+            (requiresApiKey(config.type) ? initialApiKeyIdForForm : null),
+        };
+        const newId = await addProviderConfig(configWithKey);
         return newId;
       } finally {
         setIsSavingProvider(false);
       }
     },
-    [addProviderConfig],
+    [addProviderConfig, initialApiKeyIdForForm], // Add dependency
   );
 
   const handleModelToggle = useCallback(
@@ -241,6 +255,8 @@ export const EmptyStateSetup: React.FC = () => {
                 onCancel={() => {}}
                 isSaving={isSavingKey}
                 className="border-none shadow-none p-0"
+                // Pass initial type if available for pre-selection
+                initialProviderType={initialProviderTypeForForm}
               />
             ),
           },
@@ -263,6 +279,7 @@ export const EmptyStateSetup: React.FC = () => {
           onCancel={() => {}}
           initialType={initialProviderTypeForForm} // Pass derived type
           initialName={initialProviderNameForForm} // Pass derived name
+          initialApiKeyId={initialApiKeyIdForForm} // Pass derived key ID
         />
       ),
     },

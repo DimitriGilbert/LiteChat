@@ -21,6 +21,7 @@ interface ApiKeyFormProps {
   initialProviderType?: DbProviderType | null;
   initialName?: string;
   initialValue?: string;
+  initialApiKeyId?: string | null; // Added prop
   onSave: (
     name: string,
     providerId: string,
@@ -35,6 +36,7 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
   initialProviderType = null,
   initialName = "",
   initialValue = "",
+  initialApiKeyId = null, // Destructure new prop
   onSave,
   onCancel,
   isSaving,
@@ -47,11 +49,14 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
   );
   const keyInputRef = useRef<HTMLInputElement>(null);
 
+  // Effect to sync state with initial props
   useEffect(() => {
     setKeyName(initialName);
     setKeyValue(initialValue);
     setProviderType(initialProviderType);
-  }, [initialName, initialValue, initialProviderType]);
+    // Note: initialApiKeyId is not directly used in the form's state,
+    // but it's passed to AddProviderForm which uses it.
+  }, [initialName, initialValue, initialProviderType, initialApiKeyId]);
 
   const handleProviderTypeChange = useCallback(
     (value: string) => {

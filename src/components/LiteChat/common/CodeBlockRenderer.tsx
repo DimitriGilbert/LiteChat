@@ -38,35 +38,13 @@ interface CodeBlockRendererProps {
   isStreaming?: boolean;
 }
 
-// IDs for theme link elements
-const PRISM_THEME_LINK_ID = "prism-theme-link";
-const DEFAULT_LIGHT_THEME_LINK_ID = "prism-default-light-theme-link";
-const DEFAULT_DARK_THEME_LINK_ID = "prism-default-dark-theme-link";
-
-// Default theme URLs as specified
-const DEFAULT_LIGHT_THEME_URL =
-  "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-material-light.min.css";
-const DEFAULT_DARK_THEME_URL =
-  "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-coldark-dark.min.css";
-
-// Helper function to get raw content URL from GitHub
-const getRawGitHubUrl = (url: string): string => {
-  return url
-    .replace("github.com", "raw.githubusercontent.com")
-    .replace("/blob/", "/");
-};
-
 // Wrap the component logic in a named function before memo
 const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
   lang,
   code,
   isStreaming = false,
 }) => {
-  const {
-    prismThemeUrl,
-    theme: appTheme,
-    foldStreamingCodeBlocks,
-  } = useSettingsStore(
+  const { foldStreamingCodeBlocks } = useSettingsStore(
     useShallow((state) => ({
       prismThemeUrl: state.prismThemeUrl,
       theme: state.theme,
@@ -79,56 +57,6 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
     isStreaming ? foldStreamingCodeBlocks : false,
   );
   const codeRef = useRef<HTMLElement>(null);
-
-  const systemTheme = useMemo(() => {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
-  }, []);
-
-  const currentTheme = appTheme === "system" ? systemTheme : appTheme;
-
-  useEffect(() => {
-    const loadTheme = (url: string, id: string): void => {
-      const existingLink = document.getElementById(
-        id,
-      ) as HTMLLinkElement | null;
-      if (existingLink) {
-        if (existingLink.href !== url) existingLink.href = url;
-      } else {
-        const link = document.createElement("link");
-        link.id = id;
-        link.rel = "stylesheet";
-        link.href = url;
-        document.head.appendChild(link);
-      }
-    };
-    const removeTheme = (id: string): void => {
-      const existingLink = document.getElementById(id);
-      if (existingLink) existingLink.remove();
-    };
-
-    if (prismThemeUrl) {
-      loadTheme(prismThemeUrl, PRISM_THEME_LINK_ID);
-      removeTheme(DEFAULT_LIGHT_THEME_LINK_ID);
-      removeTheme(DEFAULT_DARK_THEME_LINK_ID);
-    } else {
-      removeTheme(PRISM_THEME_LINK_ID);
-      if (currentTheme === "dark") {
-        loadTheme(
-          getRawGitHubUrl(DEFAULT_DARK_THEME_URL),
-          DEFAULT_DARK_THEME_LINK_ID,
-        );
-        removeTheme(DEFAULT_LIGHT_THEME_LINK_ID);
-      } else {
-        loadTheme(
-          getRawGitHubUrl(DEFAULT_LIGHT_THEME_URL),
-          DEFAULT_LIGHT_THEME_LINK_ID,
-        );
-        removeTheme(DEFAULT_DARK_THEME_LINK_ID);
-      }
-    }
-  }, [prismThemeUrl, currentTheme]);
 
   const highlightCode = useCallback(() => {
     if (codeRef.current && code) {

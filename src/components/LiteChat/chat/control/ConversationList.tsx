@@ -501,7 +501,7 @@ export const ConversationListControlComponent: React.FC = () => {
       </div>
 
       {/* List Area */}
-      <ScrollArea className="flex-grow">
+      <div className="flex-grow">
         {isLoading ? (
           <div className="space-y-1 p-1">
             <Skeleton className="h-8 w-full" />
@@ -547,7 +547,7 @@ export const ConversationListControlComponent: React.FC = () => {
             ))}
           </ul>
         )}
-      </ScrollArea>
+      </div>
     </div>
   );
 };

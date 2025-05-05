@@ -183,14 +183,14 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
               : "",
             isEditingThis && "bg-muted ring-1 ring-primary",
             !isEditingThis && "cursor-pointer",
-            "overflow-hidden", // Keep overflow hidden on the li
+            // Remove overflow-hidden from li
           )}
           style={{ paddingLeft: `${0.375 + level * 0.75}rem` }}
           onClick={handleItemClick}
           title={!isEditingThis ? displayName : ""}
         >
-          {/* Main Content Area - Allow shrinking */}
-          <div className="truncate flex items-center min-w-0 gap-1 flex-grow mr-1">
+          {/* Main Content Area - Allow shrinking, ensure truncation works */}
+          <div className="flex items-center min-w-0 gap-1 flex-grow mr-1">
             {isProject && hasChildren && (
               <span
                 className="flex-shrink-0 w-3 cursor-pointer p-0.5 -ml-0.5"
@@ -233,12 +233,11 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
             {syncIndicator}
           </div>
 
-          {/* Action Buttons Area - No absolute positioning */}
+          {/* Action Buttons Area - No absolute positioning, flex-shrink-0 */}
           <div
             className={cn(
-              "flex items-center flex-shrink-0 ml-1", // Use margin-left instead of absolute
+              "flex items-center flex-shrink-0 ml-1", // Use margin-left
               "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
-              // "bg-card/80 backdrop-blur-sm p-0.5 rounded", // Optional background on hover
               isEditingThis ? "opacity-100" : "",
             )}
             onClick={(e) => e.stopPropagation()}

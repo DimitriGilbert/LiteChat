@@ -12,28 +12,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { RotateCcwIcon, Check, ChevronsUpDown } from "lucide-react";
+import { RotateCcwIcon } from "lucide-react";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
 import { Separator } from "@/components/ui/separator";
 import { SettingsSection } from "../common/SettingsSection";
 import type { CustomThemeColors, SettingsState } from "@/store/settings.store";
-import { cn } from "@/lib/utils";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 
-// Helper component for color input
 const ColorInput: React.FC<{
   label: string;
   colorKey: keyof CustomThemeColors;
@@ -82,16 +67,16 @@ const ColorInput: React.FC<{
   );
 };
 
-// List of Prism themes
+// List of Prism themes (remains the same)
 const PRISM_THEMES = [
   {
     name: "Default Light",
     url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-material-light.min.css",
   },
-  {
-    name: "Default Dark",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-coldark-dark.min.css",
-  },
+  // {
+  //   name: "Default Dark",
+  //   url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-vsc-dark-plus.min.css",
+  // },
   {
     name: "A11y Dark",
     url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-a11y-dark.min.css",
@@ -111,6 +96,10 @@ const PRISM_THEMES = [
   {
     name: "Coldark Cold",
     url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-coldark-cold.min.css",
+  },
+  {
+    name: "Coldark Dark",
+    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-coldark-dark.min.css",
   },
   {
     name: "Coy (No Shadow)",
@@ -264,7 +253,7 @@ const SettingsThemeComponent: React.FC = () => {
   );
 
   const [localFontSize, setLocalFontSize] = useState(customFontSize ?? 16);
-  const [prismPopoverOpen, setPrismPopoverOpen] = useState(false);
+  // Popover state removed
   const [customUrl, setCustomUrl] = useState(
     PRISM_THEMES.some((t) => t.url === prismThemeUrl)
       ? ""
@@ -301,16 +290,23 @@ const SettingsThemeComponent: React.FC = () => {
     }
   };
 
-  const handlePrismThemeSelect = (url: string | null) => {
-    setPrismThemeUrl(url);
-    setCustomUrl(url ?? ""); // Update custom URL input as well
-    setPrismPopoverOpen(false);
+  // Updated handler for Select component
+  const handlePrismThemeSelect = (value: string) => {
+    const selectedUrl = value === "default" ? null : value;
+    setPrismThemeUrl(selectedUrl);
+    // Update customUrl input only if a custom URL was effectively selected (or cleared)
+    if (value === "default" || !PRISM_THEMES.some((t) => t.url === value)) {
+      setCustomUrl(value === "default" ? "" : value);
+    } else {
+      setCustomUrl(""); // Clear custom URL if a preset is chosen
+    }
   };
 
   const handleCustomUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCustomUrl(e.target.value);
+    const url = e.target.value.trim();
+    setCustomUrl(url);
     // Apply immediately if user types a custom URL
-    setPrismThemeUrl(e.target.value.trim() || null);
+    setPrismThemeUrl(url || null);
   };
 
   const maxWidthOptions: { value: string; label: string }[] = [
@@ -357,9 +353,8 @@ const SettingsThemeComponent: React.FC = () => {
     { key: "chart5", label: "Chart 5" },
   ];
 
-  const selectedThemeName =
-    PRISM_THEMES.find((t) => t.url === prismThemeUrl)?.name ??
-    (prismThemeUrl ? "Custom URL" : "Default (Matches Theme)");
+  // Determine the value for the Select component
+  const selectValue = prismThemeUrl === null ? "default" : prismThemeUrl;
 
   return (
     <div className="space-y-6 p-1">
@@ -460,60 +455,20 @@ const SettingsThemeComponent: React.FC = () => {
         contentClassName="rounded-lg border p-4 shadow-sm bg-card space-y-3"
       >
         <Label htmlFor="prism-theme-select">Select Theme or Enter URL</Label>
-        <Popover open={prismPopoverOpen} onOpenChange={setPrismPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              id="prism-theme-select"
-              variant="outline"
-              role="combobox"
-              aria-expanded={prismPopoverOpen}
-              className="w-full justify-between"
-            >
-              <span className="truncate">{selectedThemeName}</span>
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-            <Command>
-              <CommandInput placeholder="Search theme or enter URL..." />
-              <CommandList>
-                <CommandEmpty>No theme found.</CommandEmpty>
-                <CommandGroup>
-                  <CommandItem
-                    key="default"
-                    value="Default (Matches Theme)"
-                    onSelect={() => handlePrismThemeSelect(null)}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        prismThemeUrl === null ? "opacity-100" : "opacity-0",
-                      )}
-                    />
-                    Default (Matches Theme)
-                  </CommandItem>
-                  {PRISM_THEMES.map((themeOption) => (
-                    <CommandItem
-                      key={themeOption.url}
-                      value={themeOption.name}
-                      onSelect={() => handlePrismThemeSelect(themeOption.url)}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          prismThemeUrl === themeOption.url
-                            ? "opacity-100"
-                            : "opacity-0",
-                        )}
-                      />
-                      {themeOption.name}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+        {/* Replace Popover+Command with Select */}
+        <Select value={selectValue} onValueChange={handlePrismThemeSelect}>
+          <SelectTrigger id="prism-theme-select" className="w-full">
+            <SelectValue placeholder="Select code theme..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="default">Default (Matches Theme)</SelectItem>
+            {PRISM_THEMES.map((themeOption) => (
+              <SelectItem key={themeOption.url} value={themeOption.url}>
+                {themeOption.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Input
           id="prism-theme-url-custom"
           type="url"
