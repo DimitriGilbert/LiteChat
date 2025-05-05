@@ -1,15 +1,9 @@
 // src/components/LiteChat/canvas/interaction/InteractionRating.tsx
-// FULL FILE
 import React from "react";
 import { cn } from "@/lib/utils";
 import { useInteractionStore } from "@/store/interaction.store";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
-import {
-  ThumbsUpIcon,
-  ThumbsDownIcon,
-  MinusIcon,
-  PlusIcon,
-} from "lucide-react"; // Import icons
+import { Star } from "lucide-react"; // Import star icon
 
 interface InteractionRatingProps {
   interactionId: string;
@@ -28,56 +22,83 @@ export const InteractionRating: React.FC<InteractionRatingProps> = ({
     rateInteraction(interactionId, ratingToSet);
   };
 
-  // Define the rating scale buttons
-  const ratingButtons = [-2, -1, 0, 1, 2].map((ratingValue) => {
-    let Icon = ratingValue > 0 ? ThumbsUpIcon : ThumbsDownIcon;
-    let tooltip = ratingValue > 0 ? "Good" : "Bad";
-    let colorClass = "text-muted-foreground";
-    let hoverColorClass = "hover:text-foreground";
-    let activeBgClass = "";
+  // Create array of ratings from -5 to 5
+  const ratings = Array.from({ length: 11 }, (_, i) => i - 5);
 
-    if (ratingValue === 0) {
-      Icon = MinusIcon; // Or maybe a neutral face?
-      tooltip = "Neutral";
-      hoverColorClass = "hover:text-foreground";
-    } else if (ratingValue === 1) {
-      tooltip = "Good";
-      hoverColorClass = "hover:text-green-500";
-    } else if (ratingValue === 2) {
-      tooltip = "Very Good";
-      hoverColorClass = "hover:text-green-600";
-    } else if (ratingValue === -1) {
-      tooltip = "Bad";
-      hoverColorClass = "hover:text-red-500";
-    } else if (ratingValue === -2) {
-      tooltip = "Very Bad";
-      hoverColorClass = "hover:text-red-600";
-    }
+  return (
+    <div className="flex items-center gap-1">
+      {ratings.map((ratingValue) => {
+        // Determine tooltip text based on rating value
+        let tooltip = "";
+        if (ratingValue === -5) tooltip = "Terrible";
+        else if (ratingValue === -4) tooltip = "Very Bad";
+        else if (ratingValue === -3) tooltip = "Bad";
+        else if (ratingValue === -2) tooltip = "Poor";
+        else if (ratingValue === -1) tooltip = "Below Average";
+        else if (ratingValue === 0) tooltip = "Neutral";
+        else if (ratingValue === 1) tooltip = "Above Average";
+        else if (ratingValue === 2) tooltip = "Good";
+        else if (ratingValue === 3) tooltip = "Very Good";
+        else if (ratingValue === 4) tooltip = "Excellent";
+        else if (ratingValue === 5) tooltip = "Perfect";
 
-    if (currentRating === ratingValue) {
-      if (ratingValue > 0) colorClass = "text-green-500";
-      else if (ratingValue < 0) colorClass = "text-red-500";
-      else colorClass = "text-primary"; // Neutral selected
-      activeBgClass = "bg-muted"; // Highlight background if selected
-    }
+        // Determine star color based on rating value
+        let colorClass = "text-muted-foreground";
+        let hoverColorClass = "hover:text-foreground";
+        let fillClass = "";
 
-    return (
-      <ActionTooltipButton
-        key={ratingValue}
-        tooltipText={tooltip}
-        onClick={() => handleRate(ratingValue)}
-        aria-label={`Rate response as ${tooltip}`}
-        icon={<Icon />}
-        variant="ghost"
-        className={cn(
-          "h-5 w-5 md:h-6 md:w-6 p-0.5", // Adjust padding
-          colorClass,
-          hoverColorClass,
-          activeBgClass,
-        )}
-      />
-    );
-  });
+        // Negative ratings (red)
+        if (ratingValue < 0) {
+          hoverColorClass = "hover:text-red-500";
+          if (currentRating === ratingValue) {
+            colorClass = "text-red-500";
+            fillClass = "fill-red-500";
+          }
+        }
+        // Zero rating (gray)
+        else if (ratingValue === 0) {
+          hoverColorClass = "hover:text-gray-500";
+          if (currentRating === ratingValue) {
+            colorClass = "text-gray-500";
+            fillClass = "fill-gray-500";
+          }
+        }
+        // Positive ratings (green)
+        else {
+          hoverColorClass = "hover:text-green-500";
+          if (currentRating === ratingValue) {
+            colorClass = "text-green-500";
+            fillClass = "fill-green-500";
+          }
+        }
 
-  return <div className="flex items-center gap-0">{ratingButtons}</div>;
+        // Highlight if this is the current rating
+        const activeBgClass = currentRating === ratingValue ? "bg-muted" : "";
+
+        return (
+          <ActionTooltipButton
+            key={ratingValue}
+            tooltipText={tooltip}
+            onClick={() => handleRate(ratingValue)}
+            aria-label={`Rate response as ${tooltip}`}
+            icon={
+              <Star
+                className={cn(
+                  fillClass,
+                  currentRating === ratingValue ? "fill-current" : "fill-none",
+                )}
+              />
+            }
+            variant="ghost"
+            className={cn(
+              "h-4 w-4 md:h-5 md:w-5 p-0",
+              colorClass,
+              hoverColorClass,
+              activeBgClass,
+            )}
+          />
+        );
+      })}
+    </div>
+  );
 };
