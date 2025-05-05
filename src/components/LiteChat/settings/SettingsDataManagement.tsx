@@ -25,6 +25,7 @@ import { PersistenceService } from "@/services/persistence.service";
 import {
   ImportExportService,
   type FullImportOptions, // Import options type
+  type FullExportOptions, // Import export options type
 } from "@/services/import-export.service"; // Import service
 import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
 import { Label } from "@/components/ui/label"; // Import Label
@@ -41,15 +42,26 @@ const SettingsDataManagementComponent: React.FC = () => {
 
   // Local UI state
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const fullImportInputRef = useRef<HTMLInputElement>(null); // Ref for full import
+  const fullImportInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
-  const [isFullExporting, setIsFullExporting] = useState(false); // State for full export
-  const [isFullImporting, setIsFullImporting] = useState(false); // State for full import
+  const [isFullExporting, setIsFullExporting] = useState(false);
+  const [isFullImporting, setIsFullImporting] = useState(false);
   // State for import options checkboxes
   const [importOptions, setImportOptions] = useState<FullImportOptions>({
     importSettings: true,
+    importApiKeys: true,
+    importProviderConfigs: true,
+    importProjects: true,
+    importConversations: true,
+    importRulesAndTags: true,
+    importMods: true,
+    importSyncRepos: true,
+  });
+  // State for export options checkboxes
+  const [exportOptions, setExportOptions] = useState<FullExportOptions>({
+    importSettings: true, // Keep names consistent for mapping
     importApiKeys: true,
     importProviderConfigs: true,
     importProjects: true,
@@ -138,15 +150,15 @@ const SettingsDataManagementComponent: React.FC = () => {
   const handleFullExportClick = useCallback(async () => {
     setIsFullExporting(true);
     try {
-      // Call service action
-      await ImportExportService.exportFullConfiguration();
+      // Call service action with selected export options
+      await ImportExportService.exportFullConfiguration(exportOptions);
     } catch (error) {
       console.error("Full export failed (from component):", error);
       // Error toast handled by service
     } finally {
       setIsFullExporting(false);
     }
-  }, []);
+  }, [exportOptions]); // Depend on selected export options
 
   const handleClearAllDataClick = useCallback(async () => {
     if (
@@ -187,26 +199,41 @@ Really delete everything? Consider exporting first.`,
     setImportOptions((prev) => ({ ...prev, [option]: checked }));
   };
 
-  const renderImportOption = (
-    id: keyof FullImportOptions,
+  const handleExportOptionChange = (
+    option: keyof FullExportOptions,
+    checked: boolean,
+  ) => {
+    setExportOptions((prev) => ({ ...prev, [option]: checked }));
+  };
+
+  const renderOptionCheckbox = (
+    type: "import" | "export",
+    id: keyof FullImportOptions, // Use one type, they are the same structure
     label: string,
     Icon: React.ElementType,
-  ) => (
-    <div key={id} className="flex items-center space-x-2">
-      <Checkbox
-        id={`import-${id}`}
-        checked={importOptions[id]}
-        onCheckedChange={(checked) => handleImportOptionChange(id, !!checked)}
-        disabled={isFullImporting}
-      />
-      <Label
-        htmlFor={`import-${id}`}
-        className="text-sm font-normal flex items-center gap-1.5"
-      >
-        <Icon className="h-4 w-4 text-muted-foreground" /> {label}
-      </Label>
-    </div>
-  );
+  ) => {
+    const state = type === "import" ? importOptions : exportOptions;
+    const handler =
+      type === "import" ? handleImportOptionChange : handleExportOptionChange;
+    const isDisabled = type === "import" ? isFullImporting : isFullExporting;
+
+    return (
+      <div key={`${type}-${id}`} className="flex items-center space-x-2">
+        <Checkbox
+          id={`${type}-${id}`}
+          checked={state[id]}
+          onCheckedChange={(checked) => handler(id, !!checked)}
+          disabled={isDisabled}
+        />
+        <Label
+          htmlFor={`${type}-${id}`}
+          className="text-sm font-normal flex items-center gap-1.5"
+        >
+          <Icon className="h-4 w-4 text-muted-foreground" /> {label}
+        </Label>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 p-1">
@@ -284,26 +311,45 @@ Really delete everything? Consider exporting first.`,
             </p>
             {/* Checkboxes for import options */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2">
-              {renderImportOption("importSettings", "Settings", SettingsIcon)}
-              {renderImportOption("importApiKeys", "API Keys", KeyIcon)}
-              {renderImportOption(
+              {renderOptionCheckbox(
+                "import",
+                "importSettings",
+                "Settings",
+                SettingsIcon,
+              )}
+              {renderOptionCheckbox(
+                "import",
+                "importApiKeys",
+                "API Keys",
+                KeyIcon,
+              )}
+              {renderOptionCheckbox(
+                "import",
                 "importProviderConfigs",
                 "Providers",
                 ServerIcon,
               )}
-              {renderImportOption("importProjects", "Projects", FolderTreeIcon)}
-              {renderImportOption(
+              {renderOptionCheckbox(
+                "import",
+                "importProjects",
+                "Projects",
+                FolderTreeIcon,
+              )}
+              {renderOptionCheckbox(
+                "import",
                 "importConversations",
                 "Conversations",
                 MessageSquareIcon,
               )}
-              {renderImportOption(
+              {renderOptionCheckbox(
+                "import",
                 "importRulesAndTags",
                 "Rules & Tags",
                 TagsIcon,
               )}
-              {renderImportOption("importMods", "Mods", PuzzleIcon)}
-              {renderImportOption(
+              {renderOptionCheckbox("import", "importMods", "Mods", PuzzleIcon)}
+              {renderOptionCheckbox(
+                "import",
                 "importSyncRepos",
                 "Sync Repos",
                 GitBranchIcon,
@@ -334,17 +380,65 @@ Really delete everything? Consider exporting first.`,
             </Button>
           </div>
           {/* Export */}
-          <div className="border p-4 rounded-md space-y-2">
+          <div className="border p-4 rounded-md space-y-3">
             <Label className="font-semibold">Export Full Configuration</Label>
             <p className="text-xs text-muted-foreground">
               Export all settings, providers, keys, projects, conversations,
-              rules, tags, mods, etc., into a single backup file.
+              rules, tags, mods, etc., into a single backup file. Select which
+              data types to include.
             </p>
+            {/* Checkboxes for export options */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2">
+              {renderOptionCheckbox(
+                "export",
+                "importSettings",
+                "Settings",
+                SettingsIcon,
+              )}
+              {renderOptionCheckbox(
+                "export",
+                "importApiKeys",
+                "API Keys",
+                KeyIcon,
+              )}
+              {renderOptionCheckbox(
+                "export",
+                "importProviderConfigs",
+                "Providers",
+                ServerIcon,
+              )}
+              {renderOptionCheckbox(
+                "export",
+                "importProjects",
+                "Projects",
+                FolderTreeIcon,
+              )}
+              {renderOptionCheckbox(
+                "export",
+                "importConversations",
+                "Conversations",
+                MessageSquareIcon,
+              )}
+              {renderOptionCheckbox(
+                "export",
+                "importRulesAndTags",
+                "Rules & Tags",
+                TagsIcon,
+              )}
+              {renderOptionCheckbox("export", "importMods", "Mods", PuzzleIcon)}
+              {renderOptionCheckbox(
+                "export",
+                "importSyncRepos",
+                "Sync Repos",
+                GitBranchIcon,
+              )}
+            </div>
             <Button
               onClick={handleFullExportClick}
               variant="outline"
               size="sm"
               disabled={isFullExporting}
+              className="mt-2"
             >
               {isFullExporting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

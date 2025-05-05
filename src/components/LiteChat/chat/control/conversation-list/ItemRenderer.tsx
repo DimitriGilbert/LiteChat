@@ -1,5 +1,5 @@
 // src/components/LiteChat/chat/control/conversation-list/ItemRenderer.tsx
-// Add more detailed logging before rendering the problematic part
+// FULL FILE
 import React, { memo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -170,16 +170,12 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
     const SaveIconComponent = isSavingEdit ? Loader2 : CheckIcon;
     const saveIconClassName = isSavingEdit ? "h-3 w-3 animate-spin" : "h-3 w-3";
 
-    // *** ADDING LOG ***
-    // console.log(`Rendering ItemRenderer for ${item.id} (${displayName}), isEditingThis: ${isEditingThis}`);
-    // *** END LOG ***
-
     return (
       <>
         <li
           key={item.id}
           className={cn(
-            "flex justify-between items-center group p-1.5 text-xs rounded",
+            "relative flex justify-between items-center group p-1.5 text-xs rounded", // Added relative
             "border border-transparent",
             !isEditingThis && "hover:bg-muted/50 hover:text-primary/80",
             isSelected && !isEditingThis
@@ -190,7 +186,9 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
           )}
           style={{ paddingLeft: `${0.375 + level * 0.75}rem` }}
           onClick={handleItemClick}
+          title={!isEditingThis ? displayName : ""} // Add title attribute for hover
         >
+          {/* Main Content Area */}
           <div className="flex items-center min-w-0 gap-1 flex-grow mr-1">
             {isProject && hasChildren && (
               <span
@@ -231,7 +229,16 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
             {syncIndicator}
           </div>
 
-          <div className="flex items-center flex-shrink-0">
+          {/* Action Buttons Area (Absolute Positioning) */}
+          <div
+            className={cn(
+              "absolute right-1 top-1/2 -translate-y-1/2 flex items-center flex-shrink-0",
+              "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
+              "bg-card/80 backdrop-blur-sm p-0.5 rounded", // Add background for visibility
+              isEditingThis ? "opacity-100" : "", // Keep visible when editing
+            )}
+            onClick={(e) => e.stopPropagation()} // Prevent click through to li
+          >
             {isEditingThis ? (
               <>
                 {/* Save Button */}
@@ -261,7 +268,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                 />
               </>
             ) : (
-              <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <>
                 {/* Project Settings Button */}
                 {isProject && (
                   <ActionTooltipButton
@@ -272,12 +279,12 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                     className="h-5 w-5 text-muted-foreground hover:text-foreground"
                   />
                 )}
-                {/* Edit Button - Check the icon prop carefully */}
+                {/* Edit Button */}
                 <ActionTooltipButton
                   tooltipText="Edit"
                   onClick={handleEditClick}
                   aria-label={`Edit ${displayName}`}
-                  icon={<Edit2Icon />} // Ensure Edit2Icon is valid her/>e
+                  icon={<Edit2Icon />}
                   className="h-5 w-5 text-muted-foreground hover:text-foreground"
                 />
                 {/* Export Buttons */}
@@ -331,7 +338,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                   icon={<Trash2Icon />}
                   className="h-5 w-5 text-destructive hover:text-destructive/80"
                 />
-              </div>
+              </>
             )}
           </div>
         </li>

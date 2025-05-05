@@ -129,7 +129,7 @@ const formatInteractionsToMarkdown = (
   return mdString;
 };
 
-// Options for full import
+// Options for full import/export
 export interface FullImportOptions {
   importSettings: boolean;
   importApiKeys: boolean;
@@ -140,6 +140,7 @@ export interface FullImportOptions {
   importMods: boolean;
   importSyncRepos: boolean;
 }
+export type FullExportOptions = FullImportOptions; // Alias for clarity
 
 export class ImportExportService {
   static async importConversation(
@@ -345,9 +346,12 @@ export class ImportExportService {
   }
 
   // --- Full Config Export/Import ---
-  static async exportFullConfiguration(): Promise<void> {
+  static async exportFullConfiguration(
+    options: FullExportOptions, // Accept export options
+  ): Promise<void> {
     try {
-      const exportData = await PersistenceService.getAllDataForExport();
+      // Pass options to persistence service
+      const exportData = await PersistenceService.getAllDataForExport(options);
       const jsonString = JSON.stringify(exportData, null, 2);
       const blob = new Blob([jsonString], { type: "application/json" });
       const filename = `litechat_full_export_${new Date().toISOString().split("T")[0]}.json`;

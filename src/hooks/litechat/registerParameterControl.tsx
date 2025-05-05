@@ -1,6 +1,6 @@
 // src/hooks/litechat/registerParameterControl.tsx
 // FULL FILE
-import React, { useState, useEffect } from "react"; // useCallback removed
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { SlidersHorizontalIcon } from "lucide-react";
 import {
@@ -23,10 +23,9 @@ import {
 } from "@/components/ui/tooltip";
 import { usePromptStateStore } from "@/store/prompt.store";
 import { useShallow } from "zustand/react/shallow";
-import { useProviderStore } from "@/store/provider.store"; // Import provider store
+import { useProviderStore } from "@/store/provider.store";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { ModEvent } from "@/types/litechat/modding"; // ModEventPayloadMap removed
-// provider-helpers import removed
+import { ModEvent } from "@/types/litechat/modding";
 import type { PromptState } from "@/store/prompt.store";
 
 // --- Popover Content Component ---
@@ -102,7 +101,7 @@ const ParameterPopoverContent: React.FC = () => {
 // --- Trigger Button Component ---
 const ParameterControlTrigger: React.FC = () => {
   // Local state for button appearance and interaction status
-  const [hasNonDefaultParams, setHasNonDefaultParams] = useState(false);
+  // const [hasNonDefaultParams, setHasNonDefaultParams] = useState(false);
   const [isStreaming, setIsStreaming] = useState(
     () => useInteractionStore.getState().status === "streaming",
   );
@@ -111,20 +110,20 @@ const ParameterControlTrigger: React.FC = () => {
   // Subscribe to relevant events
   useEffect(() => {
     // Update button variant based on param changes
-    const handleParamsChanged = (payload: { params: Partial<PromptState> }) => {
-      const currentState = {
-        ...usePromptStateStore.getState(),
-        ...payload.params,
-      };
-      const nonDefault =
-        currentState.temperature !== null ||
-        currentState.topP !== null ||
-        currentState.maxTokens !== null ||
-        currentState.topK !== null ||
-        currentState.presencePenalty !== null ||
-        currentState.frequencyPenalty !== null;
-      setHasNonDefaultParams(nonDefault);
-    };
+    // const handleParamsChanged = (payload: { params: Partial<PromptState> }) => {
+    //   // Get the full current state directly from the store
+    //   // No need to merge with payload here, as the store is the source of truth
+    //   // const currentState = usePromptStateStore.getState();
+    //   // Check if any parameter *in the store* is explicitly set (not null)
+    //   // const nonDefault =
+    //   //   currentState.temperature !== null ||
+    //   //   currentState.topP !== null ||
+    //   //   currentState.maxTokens !== null ||
+    //   //   currentState.topK !== null ||
+    //   //   currentState.presencePenalty !== null ||
+    //   //   currentState.frequencyPenalty !== null;
+    //   // setHasNonDefaultParams(nonDefault);
+    // };
 
     // Update streaming status
     const handleStatusChange = (payload: {
@@ -166,22 +165,20 @@ const ParameterControlTrigger: React.FC = () => {
     };
 
     // Initial check
-    handleParamsChanged({ params: {} }); // Check initial state
+    // handleParamsChanged({ params: {} }); // Check initial state
     handleModelChange({ modelId: useProviderStore.getState().selectedModelId }); // Check initial model
 
     // Subscriptions
-    emitter.on(ModEvent.PROMPT_PARAMS_CHANGED, handleParamsChanged);
+    // emitter.on(ModEvent.PROMPT_PARAMS_CHANGED, handleParamsChanged);
     emitter.on(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
     emitter.on(ModEvent.MODEL_SELECTION_CHANGED, handleModelChange);
-    // Correctly subscribe to SETTINGS_CHANGED
     emitter.on(ModEvent.SETTINGS_CHANGED, handleSettingsChange);
 
     // Cleanup
     return () => {
-      emitter.off(ModEvent.PROMPT_PARAMS_CHANGED, handleParamsChanged);
+      // emitter.off(ModEvent.PROMPT_PARAMS_CHANGED, handleParamsChanged);
       emitter.off(ModEvent.INTERACTION_STATUS_CHANGED, handleStatusChange);
       emitter.off(ModEvent.MODEL_SELECTION_CHANGED, handleModelChange);
-      // Correctly unsubscribe from SETTINGS_CHANGED
       emitter.off(ModEvent.SETTINGS_CHANGED, handleSettingsChange);
     };
   }, []);
@@ -197,7 +194,7 @@ const ParameterControlTrigger: React.FC = () => {
           <TooltipTrigger asChild>
             <PopoverTrigger asChild>
               <Button
-                variant={hasNonDefaultParams ? "secondary" : "ghost"}
+                variant={"ghost"}
                 size="icon"
                 className="h-8 w-8"
                 disabled={isStreaming}
@@ -224,7 +221,6 @@ export function registerParameterControl() {
 
   registerPromptControl({
     id: "core-parameters",
-    // order removed
     status: () => "ready",
     triggerRenderer: () => React.createElement(ParameterControlTrigger),
     // getParameters still reads directly from the store at submission time
@@ -254,8 +250,6 @@ export function registerParameterControl() {
 
       return Object.keys(params).length > 0 ? params : undefined;
     },
-    // Show function removed - component handles visibility
-    // show: () => { ... }
   });
 
   console.log("[Function] Registered Core Parameter Control");

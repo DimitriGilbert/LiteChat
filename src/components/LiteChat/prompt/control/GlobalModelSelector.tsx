@@ -1,7 +1,14 @@
 // src/components/LiteChat/prompt/control/GlobalModelSelector.tsx
-
+// FULL FILE
 import React, { useMemo, useState, useCallback } from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  BrainCircuitIcon,
+  SearchIcon as SearchIconLucide, // Rename Lucide's SearchIcon
+  WrenchIcon,
+  ImageIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +28,7 @@ import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import { Skeleton } from "@/components/ui/skeleton";
 import { combineModelId } from "@/lib/litechat/provider-helpers";
+import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton"; // Import ActionTooltipButton
 
 interface GlobalModelSelectorProps {
   /** The effective model ID for the current context */
@@ -33,10 +41,21 @@ interface GlobalModelSelectorProps {
   className?: string;
 }
 
+type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
+
 export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
   React.memo(({ value, onChange, disabled = false, className }) => {
     const [open, setOpen] = useState(false);
     const [filterText, setFilterText] = useState("");
+    // State for capability filters
+    const [capabilityFilters, setCapabilityFilters] = useState<
+      Record<CapabilityFilter, boolean>
+    >({
+      reasoning: false,
+      webSearch: false,
+      tools: false,
+      multimodal: false,
+    });
 
     const { dbProviderConfigs, globalModelSortOrder, isLoading } =
       useProviderStore(
@@ -50,20 +69,20 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
     const orderedModels = useMemo(() => {
       const enabledModelsMap = new Map<
         string,
-        { name: string; providerName: string }
+        {
+          name: string;
+          providerName: string;
+          metadata: import("@/types/litechat/provider").OpenRouterModel | null; // Include metadata
+        }
       >();
       const enabledIds = new Set<string>();
 
       dbProviderConfigs.forEach((config) => {
         if (!config.isEnabled || !config.enabledModels) return;
-        // Use fetchedModels or default models associated with the provider type
         const allProviderModels =
-          config.fetchedModels ??
-          (config.type
-            ? useProviderStore
-                .getState()
-                .getAllAvailableModelDefsForProvider(config.id)
-            : []);
+          useProviderStore
+            .getState()
+            .getAllAvailableModelDefsForProvider(config.id) ?? [];
         const providerModelsMap = new Map(
           allProviderModels.map((m) => [m.id, m]),
         );
@@ -75,12 +94,18 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
             enabledModelsMap.set(combinedId, {
               name: modelDef.name || modelId,
               providerName: config.name,
+              metadata: modelDef, // Store full metadata
             });
           }
         });
       });
 
-      const sorted: { id: string; name: string; providerName: string }[] = [];
+      const sorted: {
+        id: string;
+        name: string;
+        providerName: string;
+        metadata: import("@/types/litechat/provider").OpenRouterModel | null;
+      }[] = [];
       const added = new Set<string>();
 
       globalModelSortOrder.forEach((id) => {
@@ -106,17 +131,55 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
     }, [dbProviderConfigs, globalModelSortOrder]);
 
     const filteredModels = useMemo(() => {
-      if (!filterText.trim()) {
-        return orderedModels;
+      // 1. Filter by text
+      let textFiltered = orderedModels;
+      if (filterText.trim()) {
+        const lowerFilter = filterText.toLowerCase();
+        textFiltered = orderedModels.filter(
+          (model) =>
+            model.name.toLowerCase().includes(lowerFilter) ||
+            model.providerName.toLowerCase().includes(lowerFilter) ||
+            model.id.toLowerCase().includes(lowerFilter),
+        );
       }
-      const lowerFilter = filterText.toLowerCase();
-      return orderedModels.filter(
-        (model) =>
-          model.name.toLowerCase().includes(lowerFilter) ||
-          model.providerName.toLowerCase().includes(lowerFilter) ||
-          model.id.toLowerCase().includes(lowerFilter),
-      );
-    }, [orderedModels, filterText]);
+
+      // 2. Filter by active capabilities
+      const activeFilters = Object.entries(capabilityFilters)
+        .filter(([, isActive]) => isActive)
+        .map(([key]) => key as CapabilityFilter);
+
+      if (activeFilters.length === 0) {
+        return textFiltered; // No capability filters active
+      }
+
+      return textFiltered.filter((model) => {
+        const supportedParams = new Set(
+          model.metadata?.supported_parameters ?? [],
+        );
+        const inputModalities = new Set(
+          model.metadata?.architecture?.input_modalities ?? [],
+        );
+
+        return activeFilters.every((filter) => {
+          switch (filter) {
+            case "reasoning":
+              return supportedParams.has("reasoning");
+            case "webSearch":
+              return (
+                supportedParams.has("web_search") ||
+                supportedParams.has("web_search_options")
+              );
+            case "tools":
+              return supportedParams.has("tools");
+            case "multimodal":
+              // Check if any input modality is NOT 'text'
+              return Array.from(inputModalities).some((mod) => mod !== "text");
+            default:
+              return true;
+          }
+        });
+      });
+    }, [orderedModels, filterText, capabilityFilters]);
 
     const selectedModelDetails = useMemo(() => {
       return orderedModels.find((m) => m.id === value);
@@ -128,13 +191,25 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
         onChange(newValue);
         setOpen(false);
         setFilterText("");
+        // Optionally reset capability filters on select? Decided against for now.
+        // setCapabilityFilters({ reasoning: false, webSearch: false, tools: false, multimodal: false });
       },
       [onChange, value],
     );
 
+    const toggleCapabilityFilter = (filter: CapabilityFilter) => {
+      setCapabilityFilters((prev) => ({
+        ...prev,
+        [filter]: !prev[filter],
+      }));
+    };
+
     if (isLoading) {
       return <Skeleton className={cn("h-9 w-[250px]", className)} />;
     }
+
+    const activeFilterCount =
+      Object.values(capabilityFilters).filter(Boolean).length;
 
     return (
       <Popover open={open} onOpenChange={setOpen}>
@@ -159,15 +234,68 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
         </PopoverTrigger>
         <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0">
           <Command shouldFilter={false}>
-            {" "}
-            {/* Disable internal filtering */}
-            <CommandInput
-              placeholder="Search model..."
-              value={filterText}
-              onValueChange={setFilterText} // Update local filter state
-            />
+            <div className="flex items-center border-b px-3">
+              <SearchIconLucide className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+              <CommandInput
+                placeholder="Search model..."
+                value={filterText}
+                onValueChange={setFilterText}
+                className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+              />
+              {/* Capability Filter Buttons */}
+              <div className="flex items-center gap-0.5 ml-auto pl-2">
+                <ActionTooltipButton
+                  tooltipText="Filter: Reasoning"
+                  icon={<BrainCircuitIcon />}
+                  onClick={() => toggleCapabilityFilter("reasoning")}
+                  variant={capabilityFilters.reasoning ? "secondary" : "ghost"}
+                  className={cn(
+                    "h-7 w-7",
+                    capabilityFilters.reasoning && "text-primary",
+                  )}
+                  aria-label="Filter by reasoning capability"
+                />
+                <ActionTooltipButton
+                  tooltipText="Filter: Web Search"
+                  icon={<SearchIconLucide />}
+                  onClick={() => toggleCapabilityFilter("webSearch")}
+                  variant={capabilityFilters.webSearch ? "secondary" : "ghost"}
+                  className={cn(
+                    "h-7 w-7",
+                    capabilityFilters.webSearch && "text-primary",
+                  )}
+                  aria-label="Filter by web search capability"
+                />
+                <ActionTooltipButton
+                  tooltipText="Filter: Tools"
+                  icon={<WrenchIcon />}
+                  onClick={() => toggleCapabilityFilter("tools")}
+                  variant={capabilityFilters.tools ? "secondary" : "ghost"}
+                  className={cn(
+                    "h-7 w-7",
+                    capabilityFilters.tools && "text-primary",
+                  )}
+                  aria-label="Filter by tool usage capability"
+                />
+                <ActionTooltipButton
+                  tooltipText="Filter: Multimodal"
+                  icon={<ImageIcon />}
+                  onClick={() => toggleCapabilityFilter("multimodal")}
+                  variant={capabilityFilters.multimodal ? "secondary" : "ghost"}
+                  className={cn(
+                    "h-7 w-7",
+                    capabilityFilters.multimodal && "text-primary",
+                  )}
+                  aria-label="Filter by multimodal capability"
+                />
+              </div>
+            </div>
             <CommandList>
-              <CommandEmpty>No model found.</CommandEmpty>
+              <CommandEmpty>
+                {activeFilterCount > 0
+                  ? "No models match all active filters."
+                  : "No model found."}
+              </CommandEmpty>
               <CommandGroup>
                 {filteredModels.map((model) => (
                   <CommandItem

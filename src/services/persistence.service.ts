@@ -9,6 +9,7 @@ import type { SyncRepo } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project";
 import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
 import type { DbAppState } from "@/lib/litechat/db"; // Import DbAppState
+import type { FullExportOptions } from "./import-export.service"; // Import options type
 
 // Helper function to ensure date fields are Date objects
 const ensureDateFields = <
@@ -488,55 +489,50 @@ export class PersistenceService {
   }
 
   // --- Full Export/Import ---
-  static async getAllDataForExport(): Promise<FullExportData> {
-    const [
-      appState,
-      apiKeys,
-      providerConfigs,
-      projects,
-      conversations,
-      interactions,
-      rules,
-      tags,
-      tagRuleLinks,
-      mods,
-      syncRepos,
-    ] = await Promise.all([
-      db.appState.toArray(),
-      db.apiKeys.toArray(),
-      db.providerConfigs.toArray(),
-      db.projects.toArray(),
-      db.conversations.toArray(),
-      db.interactions.toArray(),
-      db.rules.toArray(),
-      db.tags.toArray(),
-      db.tagRuleLinks.toArray(),
-      db.mods.toArray(),
-      db.syncRepos.toArray(),
-    ]);
-
-    const settings: Record<string, any> = {};
-    appState.forEach((item) => {
-      if (item.key.startsWith("settings:")) {
-        settings[item.key.substring(9)] = item.value;
-      }
-    });
-
-    return {
+  static async getAllDataForExport(
+    options: FullExportOptions, // Accept options
+  ): Promise<FullExportData> {
+    const exportData: FullExportData = {
       version: 1,
       exportedAt: new Date().toISOString(),
-      settings,
-      apiKeys,
-      providerConfigs,
-      projects,
-      conversations,
-      interactions,
-      rules,
-      tags,
-      tagRuleLinks,
-      mods,
-      syncRepos,
     };
+
+    // Conditionally fetch data based on options
+    if (options.importSettings) {
+      const appState = await db.appState.toArray();
+      exportData.settings = {};
+      appState.forEach((item) => {
+        if (item.key.startsWith("settings:")) {
+          exportData.settings![item.key.substring(9)] = item.value;
+        }
+      });
+    }
+    if (options.importApiKeys) {
+      exportData.apiKeys = await db.apiKeys.toArray();
+    }
+    if (options.importProviderConfigs) {
+      exportData.providerConfigs = await db.providerConfigs.toArray();
+    }
+    if (options.importProjects) {
+      exportData.projects = await db.projects.toArray();
+    }
+    if (options.importConversations) {
+      exportData.conversations = await db.conversations.toArray();
+      exportData.interactions = await db.interactions.toArray();
+    }
+    if (options.importRulesAndTags) {
+      exportData.rules = await db.rules.toArray();
+      exportData.tags = await db.tags.toArray();
+      exportData.tagRuleLinks = await db.tagRuleLinks.toArray();
+    }
+    if (options.importMods) {
+      exportData.mods = await db.mods.toArray();
+    }
+    if (options.importSyncRepos) {
+      exportData.syncRepos = await db.syncRepos.toArray();
+    }
+
+    return exportData;
   }
 
   static async importAllData(
@@ -597,13 +593,11 @@ export class PersistenceService {
           await db.appState.bulkPut(settingsToPut);
         }
         if (options.importApiKeys && data.apiKeys) {
-          // Wrap ensureDateFields in anonymous function
           await db.apiKeys.bulkPut(
             data.apiKeys.map((k) => ensureDateFields(k)),
           );
         }
         if (options.importProviderConfigs && data.providerConfigs) {
-          // Wrap ensureDateFields in anonymous function
           await db.providerConfigs.bulkPut(
             data.providerConfigs.map((c) =>
               ensureDateFields(c, ["modelsLastFetchedAt"]),
@@ -611,20 +605,17 @@ export class PersistenceService {
           );
         }
         if (options.importProjects && data.projects) {
-          // Wrap ensureDateFields in anonymous function
           await db.projects.bulkPut(
             data.projects.map((p) => ensureDateFields(p)),
           );
         }
         if (options.importConversations && data.conversations) {
-          // Wrap ensureDateFields in anonymous function
           await db.conversations.bulkPut(
             data.conversations.map((c) =>
               ensureDateFields(c, ["lastSyncedAt"]),
             ),
           );
           if (data.interactions) {
-            // Wrap ensureDateFields in anonymous function
             await db.interactions.bulkPut(
               data.interactions.map((i) =>
                 ensureDateFields(i, ["startedAt", "endedAt"]),
@@ -634,24 +625,19 @@ export class PersistenceService {
         }
         if (options.importRulesAndTags) {
           if (data.rules) {
-            // Wrap ensureDateFields in anonymous function
             await db.rules.bulkPut(data.rules.map((r) => ensureDateFields(r)));
           }
           if (data.tags) {
-            // Wrap ensureDateFields in anonymous function
             await db.tags.bulkPut(data.tags.map((t) => ensureDateFields(t)));
           }
           if (data.tagRuleLinks) {
-            // No date fields in DbTagRuleLink
             await db.tagRuleLinks.bulkPut(data.tagRuleLinks);
           }
         }
         if (options.importMods && data.mods) {
-          // Wrap ensureDateFields in anonymous function
           await db.mods.bulkPut(data.mods.map((m) => ensureDateFields(m)));
         }
         if (options.importSyncRepos && data.syncRepos) {
-          // Wrap ensureDateFields in anonymous function
           await db.syncRepos.bulkPut(
             data.syncRepos.map((r) =>
               ensureDateFields(r, ["lastPulledAt", "lastPushedAt"]),

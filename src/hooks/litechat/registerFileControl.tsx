@@ -1,12 +1,6 @@
 // src/hooks/litechat/registerFileControl.tsx
 // FULL FILE
-import React, {
-  useRef,
-  useCallback,
-  // useMemo removed
-  useState,
-  useEffect,
-} from "react";
+import React, { useRef, useCallback, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { PaperclipIcon } from "lucide-react";
 import { useControlRegistryStore } from "@/store/control.store";
@@ -22,8 +16,6 @@ import {
 } from "@/components/ui/tooltip";
 import { FilePreviewRenderer } from "@/components/LiteChat/common/FilePreviewRenderer";
 import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
-// useShallow removed
-// provider-helpers import removed
 import { emitter } from "@/lib/litechat/event-emitter";
 import { ModEvent } from "@/types/litechat/modding";
 import type { AttachedFileMetadata } from "@/store/input.store";
@@ -40,7 +32,8 @@ const FileControlTrigger: React.FC = () => {
   const [isStreaming, setIsStreaming] = useState(
     () => useInteractionStore.getState().status === "streaming",
   );
-  const [allowFileInput, setAllowFileInput] = useState(true); // Assume allowed initially
+  // State to track if the current model supports non-text input
+  const [modelSupportsNonText, setModelSupportsNonText] = useState(true);
 
   // Subscribe to events
   useEffect(() => {
@@ -52,14 +45,15 @@ const FileControlTrigger: React.FC = () => {
 
     const handleModelChange = (payload: { modelId: string | null }) => {
       if (!payload.modelId) {
-        setAllowFileInput(true); // Default to allowed if no model
+        setModelSupportsNonText(false); // Default to false if no model
         return;
       }
       const { getSelectedModel } = useProviderStore.getState();
       const selectedModel = getSelectedModel();
       const inputModalities =
         selectedModel?.metadata?.architecture?.input_modalities;
-      setAllowFileInput(
+      // Check if *any* modality other than 'text' is present
+      setModelSupportsNonText(
         !inputModalities || inputModalities.some((mod) => mod !== "text"),
       );
     };
@@ -83,6 +77,9 @@ const FileControlTrigger: React.FC = () => {
       const files = event.target.files;
       if (!files) return;
 
+      // Get current model support status inside the handler
+      const currentModelSupportsNonText = modelSupportsNonText;
+
       for (const file of Array.from(files)) {
         if (file.size > MAX_FILE_SIZE_BYTES) {
           toast.error(
@@ -91,18 +88,27 @@ const FileControlTrigger: React.FC = () => {
           continue;
         }
 
+        const isText = isLikelyTextFile(file.name, file.type);
+        const isImage = file.type.startsWith("image/");
+
+        // Check if the file type is allowed
+        if (!isText && !currentModelSupportsNonText) {
+          toast.warning(
+            `File "${file.name}" (${file.type}) cannot be uploaded. The current model only supports text input.`,
+          );
+          continue; // Skip this file
+        }
+
         try {
           let fileData: {
             contentText?: string;
             contentBase64?: string;
           } = {};
 
-          const isText = isLikelyTextFile(file.name, file.type);
-          const isImage = file.type.startsWith("image/");
-
           if (isText) {
             fileData.contentText = await file.text();
           } else if (isImage) {
+            // Only process image if non-text is supported
             const reader = new FileReader();
             const promise = new Promise<string>((resolve, reject) => {
               reader.onload = () => resolve(reader.result as string);
@@ -118,9 +124,14 @@ const FileControlTrigger: React.FC = () => {
               );
             }
           } else {
-            console.log(
-              `File type ${file.type} (Name: ${file.name}) not directly processed for content storage in InputStore.`,
-            );
+            // Handle other non-text types if supported (e.g., audio, video in future)
+            // For now, just log if it's not text/image but non-text is allowed
+            if (currentModelSupportsNonText) {
+              console.log(
+                `File type ${file.type} (Name: ${file.name}) not directly processed for content storage, but model supports non-text.`,
+              );
+              // Potentially read as base64 for generic handling if needed later
+            }
           }
 
           // This action will emit ATTACHED_FILES_CHANGED
@@ -143,16 +154,16 @@ const FileControlTrigger: React.FC = () => {
         event.target.value = "";
       }
     },
-    [addAttachedFile],
+    [addAttachedFile, modelSupportsNonText], // Depend on model support status
   );
 
   const handleButtonClick = () => {
     fileInputRef.current?.click();
   };
 
-  const tooltipText = allowFileInput
-    ? "Attach Files"
-    : "File input not supported by this model";
+  const tooltipText = modelSupportsNonText
+    ? "Attach Files (Text, Images, etc.)"
+    : "Attach Text Files";
 
   return (
     <>
@@ -162,7 +173,9 @@ const FileControlTrigger: React.FC = () => {
         onChange={handleFileChange}
         multiple
         className="hidden"
-        disabled={isStreaming || !allowFileInput}
+        // Accept all files initially, filter in handleFileChange
+        // accept={modelSupportsNonText ? undefined : "text/*,.md,.json,..."} // Example: restrict accept if needed
+        disabled={isStreaming} // Only disable based on streaming status
       />
       <TooltipProvider delayDuration={100}>
         <Tooltip>
@@ -172,7 +185,7 @@ const FileControlTrigger: React.FC = () => {
               variant="ghost"
               size="icon"
               onClick={handleButtonClick}
-              disabled={isStreaming || !allowFileInput}
+              disabled={isStreaming} // Only disable based on streaming status
               className="h-8 w-8"
               aria-label={tooltipText}
             >
@@ -246,11 +259,8 @@ export function registerFileControl() {
 
   registerPromptControl({
     id: "core-file-attachment",
-    // order removed
     triggerRenderer: () => React.createElement(FileControlTrigger),
     renderer: () => React.createElement(FileControlPanel),
-    // clearOnSubmit is handled by PromptWrapper calling InputStore.clearAttachedFiles
-    // show function removed - component handles visibility/disabled state
   });
 
   console.log("[Function] Registered Core File Attachment Control");
