@@ -6,7 +6,6 @@ import {
   type SidebarItem,
 } from "@/store/conversation.store";
 import { useProjectStore } from "@/store/project.store";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PlusIcon, FolderPlusIcon, SearchIcon } from "lucide-react";

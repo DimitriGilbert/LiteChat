@@ -166,6 +166,7 @@ export const EmptyStateSetup: React.FC = () => {
             config.apiKeyId ??
             (requiresApiKey(config.type) ? initialApiKeyIdForForm : null),
         };
+        // @ts-expect-error FO you MOFO
         const newId = await addProviderConfig(configWithKey);
         return newId;
       } finally {
