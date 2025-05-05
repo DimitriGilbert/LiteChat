@@ -1,5 +1,5 @@
 // src/components/LiteChat/LiteChat.tsx
-// FULL FILE
+// FULL FILE - Verified border and rounding on main container
 import React, {
   useEffect,
   useCallback,
@@ -450,15 +450,16 @@ export const LiteChat: React.FC<LiteChatProps> = ({
 
   return (
     <>
+      {/* Apply border and rounding to the main container */}
       <div
         className={cn(
-          "flex h-full w-full border border-[--border] rounded-lg overflow-hidden bg-background text-foreground",
+          "flex h-full w-full border border-border rounded-lg overflow-hidden bg-background text-foreground",
         )}
       >
         {/* Sidebar */}
         <div
           className={cn(
-            "hidden md:flex flex-col border-r border-[--border] bg-card",
+            "hidden md:flex flex-col border-r border-border bg-card",
             "transition-[width] duration-300 ease-in-out",
             "flex-shrink-0 overflow-hidden",
             isSidebarCollapsed ? "w-16" : "w-64",
@@ -484,7 +485,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
           </div>
           <div
             className={cn(
-              "flex-shrink-0 border-t border-[--border] p-2",
+              "flex-shrink-0 border-t border-border p-2",
               isSidebarCollapsed
                 ? "flex flex-col items-center gap-2"
                 : "flex items-center justify-center",
@@ -506,7 +507,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
 
         {/* Main Chat Area */}
         <div className="flex flex-col flex-grow min-w-0">
-          <div className="flex items-center justify-end p-2 border-b border-[--border] bg-card flex-shrink-0">
+          <div className="flex items-center justify-end p-2 border-b border-border bg-card flex-shrink-0">
             <ChatControlWrapper
               controls={headerControls}
               panelId="header"
@@ -520,7 +521,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
             onRegenerateInteraction={onRegenerateInteraction}
             onStopInteraction={onStopInteraction}
             status={interactionStatus}
-            className="flex-grow overflow-y-hidden p-4 space-y-4"
+            className="flex-grow overflow-y-hidden" // Removed p-4, space-y-4 from here
           />
 
           {globalError && (
@@ -532,7 +533,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({
           <PromptWrapper
             InputAreaRenderer={InputArea}
             onSubmit={handlePromptSubmit}
-            className="border-t border-[--border] bg-card flex-shrink-0"
+            className="border-t border-border bg-card flex-shrink-0"
             // Pass the ref down
             inputAreaRef={inputAreaRef}
           />

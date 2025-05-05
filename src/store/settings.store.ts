@@ -1,12 +1,35 @@
 // src/store/settings.store.ts
-// FULL FILE
+// FULL FILE - Refactored chatMaxWidth to use Tailwind class strings
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { PersistenceService } from "@/services/persistence.service";
 import { toast } from "sonner";
 
-interface SettingsState {
-  theme: "light" | "dark" | "system";
+export interface CustomThemeColors {
+  background?: string;
+  foreground?: string;
+  card?: string;
+  cardForeground?: string;
+  popover?: string;
+  popoverForeground?: string;
+  primary?: string;
+  primaryForeground?: string;
+  secondary?: string;
+  secondaryForeground?: string;
+  muted?: string;
+  mutedForeground?: string;
+  accent?: string;
+  accentForeground?: string;
+  destructive?: string;
+  destructiveForeground?: string;
+  border?: string;
+  input?: string;
+  ring?: string;
+}
+
+// Define the SettingsState interface here so it can be imported
+export interface SettingsState {
+  theme: "light" | "dark" | "system" | "TijuLight" | "TijuDark" | "custom";
   globalSystemPrompt: string | null;
   temperature: number;
   maxTokens: number | null;
@@ -24,12 +47,15 @@ interface SettingsState {
   gitUserEmail: string | null;
   toolMaxSteps: number;
   prismThemeUrl: string | null;
-  // New Auto-Title Settings
   autoTitleEnabled: boolean;
   autoTitleModelId: string | null;
   autoTitlePromptMaxLength: number;
   autoTitleIncludeFiles: boolean;
   autoTitleIncludeRules: boolean;
+  customFontFamily: string | null;
+  customFontSize: number | null;
+  chatMaxWidth: string | null; // Store the Tailwind class string (e.g., 'max-w-7xl', 'max-w-full')
+  customThemeColors: CustomThemeColors | null;
 }
 
 interface SettingsActions {
@@ -51,15 +77,23 @@ interface SettingsActions {
   setGitUserEmail: (email: string | null) => void;
   setToolMaxSteps: (steps: number) => void;
   setPrismThemeUrl: (url: string | null) => void;
-  // New Auto-Title Actions
   setAutoTitleEnabled: (enabled: boolean) => void;
   setAutoTitleModelId: (modelId: string | null) => void;
   setAutoTitlePromptMaxLength: (length: number) => void;
   setAutoTitleIncludeFiles: (include: boolean) => void;
   setAutoTitleIncludeRules: (include: boolean) => void;
+  setCustomFontFamily: (fontFamily: string | null) => void;
+  setCustomFontSize: (fontSize: number | null) => void;
+  setChatMaxWidth: (maxWidthClass: string | null) => void; // Accept Tailwind class string
+  setCustomThemeColors: (colors: CustomThemeColors | null) => void;
+  setCustomThemeColor: (
+    colorName: keyof CustomThemeColors,
+    value: string | null,
+  ) => void;
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>;
-  resetAssistantSettings: () => Promise<void>; // Add reset for assistant
+  resetAssistantSettings: () => Promise<void>;
+  resetThemeSettings: () => Promise<void>;
 }
 
 // Define default constants
@@ -81,15 +115,18 @@ const DEFAULT_GIT_USER_NAME = null;
 const DEFAULT_GIT_USER_EMAIL = null;
 const DEFAULT_TOOL_MAX_STEPS = 5;
 const DEFAULT_PRISM_THEME_URL = null;
-// New Auto-Title Defaults
 const DEFAULT_AUTO_TITLE_ENABLED = true;
-const DEFAULT_AUTO_TITLE_MODEL_ID = null; // User must select
+const DEFAULT_AUTO_TITLE_MODEL_ID = null;
 const DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH = 768;
 const DEFAULT_AUTO_TITLE_INCLUDE_FILES = false;
 const DEFAULT_AUTO_TITLE_INCLUDE_RULES = false;
+const DEFAULT_CUSTOM_FONT_FAMILY = null;
+const DEFAULT_CUSTOM_FONT_SIZE = 16;
+const DEFAULT_CHAT_MAX_WIDTH = "max-w-7xl"; // Store Tailwind class
+const DEFAULT_CUSTOM_THEME_COLORS = null;
 
 export const useSettingsStore = create(
-  immer<SettingsState & SettingsActions>((set) => ({
+  immer<SettingsState & SettingsActions>((set, get) => ({
     // Initial default values using constants
     theme: DEFAULT_THEME,
     globalSystemPrompt: DEFAULT_SYSTEM_PROMPT,
@@ -110,23 +147,25 @@ export const useSettingsStore = create(
     gitUserEmail: DEFAULT_GIT_USER_EMAIL,
     toolMaxSteps: DEFAULT_TOOL_MAX_STEPS,
     prismThemeUrl: DEFAULT_PRISM_THEME_URL,
-    // Initialize new settings
     autoTitleEnabled: DEFAULT_AUTO_TITLE_ENABLED,
     autoTitleModelId: DEFAULT_AUTO_TITLE_MODEL_ID,
     autoTitlePromptMaxLength: DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH,
     autoTitleIncludeFiles: DEFAULT_AUTO_TITLE_INCLUDE_FILES,
     autoTitleIncludeRules: DEFAULT_AUTO_TITLE_INCLUDE_RULES,
+    customFontFamily: DEFAULT_CUSTOM_FONT_FAMILY,
+    customFontSize: DEFAULT_CUSTOM_FONT_SIZE,
+    chatMaxWidth: DEFAULT_CHAT_MAX_WIDTH, // Use Tailwind class
+    customThemeColors: DEFAULT_CUSTOM_THEME_COLORS,
 
+    // --- Existing Setters ---
     setTheme: (theme) => {
       set({ theme: theme });
       PersistenceService.saveSetting("theme", theme);
     },
-
     setGlobalSystemPrompt: (prompt) => {
       set({ globalSystemPrompt: prompt });
       PersistenceService.saveSetting("globalSystemPrompt", prompt);
     },
-
     setTemperature: (temp) => {
       set({ temperature: temp });
       PersistenceService.saveSetting("temperature", temp);
@@ -151,17 +190,14 @@ export const useSettingsStore = create(
       set({ frequencyPenalty: penalty });
       PersistenceService.saveSetting("frequencyPenalty", penalty);
     },
-
     setEnableAdvancedSettings: (enabled) => {
       set({ enableAdvancedSettings: enabled });
       PersistenceService.saveSetting("enableAdvancedSettings", enabled);
     },
-
     setEnableStreamingMarkdown: (enabled) => {
       set({ enableStreamingMarkdown: enabled });
       PersistenceService.saveSetting("enableStreamingMarkdown", enabled);
     },
-
     setEnableStreamingCodeBlockParsing: (enabled) => {
       set({ enableStreamingCodeBlockParsing: enabled });
       PersistenceService.saveSetting(
@@ -169,23 +205,19 @@ export const useSettingsStore = create(
         enabled,
       );
     },
-
     setFoldStreamingCodeBlocks: (fold) => {
       set({ foldStreamingCodeBlocks: fold });
       PersistenceService.saveSetting("foldStreamingCodeBlocks", fold);
     },
-
     setFoldUserMessagesOnCompletion: (fold) => {
       set({ foldUserMessagesOnCompletion: fold });
       PersistenceService.saveSetting("foldUserMessagesOnCompletion", fold);
     },
-
     setStreamingRenderFPS: (fps) => {
       const clampedFps = Math.max(3, Math.min(60, fps));
       set({ streamingRenderFPS: clampedFps });
       PersistenceService.saveSetting("streamingRenderFPS", clampedFps);
     },
-
     setGitUserName: (name) => {
       const trimmedName = name?.trim() || null;
       set({ gitUserName: trimmedName });
@@ -196,20 +228,16 @@ export const useSettingsStore = create(
       set({ gitUserEmail: trimmedEmail });
       PersistenceService.saveSetting("gitUserEmail", trimmedEmail);
     },
-
     setToolMaxSteps: (steps) => {
       const clampedSteps = Math.max(1, Math.min(20, steps));
       set({ toolMaxSteps: clampedSteps });
       PersistenceService.saveSetting("toolMaxSteps", clampedSteps);
     },
-
     setPrismThemeUrl: (url) => {
       const trimmedUrl = url?.trim() || null;
       set({ prismThemeUrl: trimmedUrl });
       PersistenceService.saveSetting("prismThemeUrl", trimmedUrl);
     },
-
-    // --- Auto-Title Setters ---
     setAutoTitleEnabled: (enabled) => {
       set({ autoTitleEnabled: enabled });
       PersistenceService.saveSetting("autoTitleEnabled", enabled);
@@ -219,7 +247,7 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("autoTitleModelId", modelId);
     },
     setAutoTitlePromptMaxLength: (length) => {
-      const clampedLength = Math.max(100, Math.min(4000, length)); // Example clamp
+      const clampedLength = Math.max(100, Math.min(4000, length));
       set({ autoTitlePromptMaxLength: clampedLength });
       PersistenceService.saveSetting("autoTitlePromptMaxLength", clampedLength);
     },
@@ -231,8 +259,47 @@ export const useSettingsStore = create(
       set({ autoTitleIncludeRules: include });
       PersistenceService.saveSetting("autoTitleIncludeRules", include);
     },
-    // --- End Auto-Title Setters ---
 
+    // --- New Theme Setters ---
+    setCustomFontFamily: (fontFamily) => {
+      const trimmedFont = fontFamily?.trim() || null;
+      set({ customFontFamily: trimmedFont });
+      PersistenceService.saveSetting("customFontFamily", trimmedFont);
+    },
+    setCustomFontSize: (fontSize) => {
+      const clampedSize =
+        fontSize === null ? null : Math.max(10, Math.min(24, fontSize));
+      set({ customFontSize: clampedSize });
+      PersistenceService.saveSetting("customFontSize", clampedSize);
+    },
+    setChatMaxWidth: (maxWidthClass) => {
+      // Accept Tailwind class string
+      set({ chatMaxWidth: maxWidthClass });
+      PersistenceService.saveSetting("chatMaxWidth", maxWidthClass);
+    },
+    setCustomThemeColors: (colors) => {
+      set({ customThemeColors: colors });
+      PersistenceService.saveSetting("customThemeColors", colors);
+    },
+    setCustomThemeColor: (colorName, value) => {
+      set((state) => {
+        const currentColors = state.customThemeColors ?? {};
+        const newColors = { ...currentColors };
+        if (value === null || value.trim() === "") {
+          delete newColors[colorName];
+        } else {
+          newColors[colorName] = value.trim();
+        }
+        state.customThemeColors =
+          Object.keys(newColors).length > 0 ? newColors : null;
+      });
+      PersistenceService.saveSetting(
+        "customThemeColors",
+        get().customThemeColors,
+      );
+    },
+
+    // --- Load Settings ---
     loadSettings: async () => {
       try {
         const [
@@ -254,12 +321,15 @@ export const useSettingsStore = create(
           gitUserEmail,
           toolMaxSteps,
           prismThemeUrl,
-          // Load new settings
           autoTitleEnabled,
           autoTitleModelId,
           autoTitlePromptMaxLength,
           autoTitleIncludeFiles,
           autoTitleIncludeRules,
+          customFontFamily,
+          customFontSize,
+          chatMaxWidth,
+          customThemeColors,
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -327,7 +397,6 @@ export const useSettingsStore = create(
             "prismThemeUrl",
             DEFAULT_PRISM_THEME_URL,
           ),
-          // Load new settings with defaults
           PersistenceService.loadSetting<boolean>(
             "autoTitleEnabled",
             DEFAULT_AUTO_TITLE_ENABLED,
@@ -347,6 +416,22 @@ export const useSettingsStore = create(
           PersistenceService.loadSetting<boolean>(
             "autoTitleIncludeRules",
             DEFAULT_AUTO_TITLE_INCLUDE_RULES,
+          ),
+          PersistenceService.loadSetting<string | null>(
+            "customFontFamily",
+            DEFAULT_CUSTOM_FONT_FAMILY,
+          ),
+          PersistenceService.loadSetting<number | null>(
+            "customFontSize",
+            DEFAULT_CUSTOM_FONT_SIZE,
+          ),
+          PersistenceService.loadSetting<string | null>( // Load string
+            "chatMaxWidth",
+            DEFAULT_CHAT_MAX_WIDTH,
+          ),
+          PersistenceService.loadSetting<CustomThemeColors | null>(
+            "customThemeColors",
+            DEFAULT_CUSTOM_THEME_COLORS,
           ),
         ]);
 
@@ -369,22 +454,25 @@ export const useSettingsStore = create(
           gitUserEmail,
           toolMaxSteps,
           prismThemeUrl,
-          // Set loaded values for new settings
           autoTitleEnabled,
           autoTitleModelId,
           autoTitlePromptMaxLength,
           autoTitleIncludeFiles,
           autoTitleIncludeRules,
+          customFontFamily,
+          customFontSize,
+          chatMaxWidth, // Set loaded string
+          customThemeColors,
         });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);
       }
     },
 
+    // --- Reset Actions ---
     resetGeneralSettings: async () => {
       try {
         set({
-          theme: DEFAULT_THEME,
           enableStreamingMarkdown: DEFAULT_ENABLE_STREAMING_MARKDOWN,
           enableStreamingCodeBlockParsing:
             DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
@@ -392,10 +480,8 @@ export const useSettingsStore = create(
           foldUserMessagesOnCompletion:
             DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION,
           streamingRenderFPS: DEFAULT_STREAMING_FPS,
-          prismThemeUrl: DEFAULT_PRISM_THEME_URL,
         });
         await Promise.all([
-          PersistenceService.saveSetting("theme", DEFAULT_THEME),
           PersistenceService.saveSetting(
             "enableStreamingMarkdown",
             DEFAULT_ENABLE_STREAMING_MARKDOWN,
@@ -416,18 +502,13 @@ export const useSettingsStore = create(
             "streamingRenderFPS",
             DEFAULT_STREAMING_FPS,
           ),
-          PersistenceService.saveSetting(
-            "prismThemeUrl",
-            DEFAULT_PRISM_THEME_URL,
-          ),
         ]);
-        toast.success("General settings reset to defaults.");
+        toast.success("Streaming & Display settings reset to defaults.");
       } catch (error) {
         console.error("SettingsStore: Error resetting general settings", error);
         toast.error("Failed to reset general settings.");
       }
     },
-
     resetAssistantSettings: async () => {
       try {
         set({
@@ -439,7 +520,6 @@ export const useSettingsStore = create(
           presencePenalty: DEFAULT_PRESENCE_PENALTY,
           frequencyPenalty: DEFAULT_FREQUENCY_PENALTY,
           toolMaxSteps: DEFAULT_TOOL_MAX_STEPS,
-          // Reset auto-title settings
           autoTitleEnabled: DEFAULT_AUTO_TITLE_ENABLED,
           autoTitleModelId: DEFAULT_AUTO_TITLE_MODEL_ID,
           autoTitlePromptMaxLength: DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH,
@@ -467,7 +547,6 @@ export const useSettingsStore = create(
             "toolMaxSteps",
             DEFAULT_TOOL_MAX_STEPS,
           ),
-          // Persist reset for auto-title settings
           PersistenceService.saveSetting(
             "autoTitleEnabled",
             DEFAULT_AUTO_TITLE_ENABLED,
@@ -496,6 +575,45 @@ export const useSettingsStore = create(
           error,
         );
         toast.error("Failed to reset assistant settings.");
+      }
+    },
+    resetThemeSettings: async () => {
+      try {
+        set({
+          theme: DEFAULT_THEME,
+          prismThemeUrl: DEFAULT_PRISM_THEME_URL,
+          customFontFamily: DEFAULT_CUSTOM_FONT_FAMILY,
+          customFontSize: DEFAULT_CUSTOM_FONT_SIZE,
+          chatMaxWidth: DEFAULT_CHAT_MAX_WIDTH, // Reset to Tailwind class
+          customThemeColors: DEFAULT_CUSTOM_THEME_COLORS,
+        });
+        await Promise.all([
+          PersistenceService.saveSetting("theme", DEFAULT_THEME),
+          PersistenceService.saveSetting(
+            "prismThemeUrl",
+            DEFAULT_PRISM_THEME_URL,
+          ),
+          PersistenceService.saveSetting(
+            "customFontFamily",
+            DEFAULT_CUSTOM_FONT_FAMILY,
+          ),
+          PersistenceService.saveSetting(
+            "customFontSize",
+            DEFAULT_CUSTOM_FONT_SIZE,
+          ),
+          PersistenceService.saveSetting(
+            "chatMaxWidth",
+            DEFAULT_CHAT_MAX_WIDTH, // Save Tailwind class
+          ),
+          PersistenceService.saveSetting(
+            "customThemeColors",
+            DEFAULT_CUSTOM_THEME_COLORS,
+          ),
+        ]);
+        toast.success("Theme settings reset to defaults.");
+      } catch (error) {
+        console.error("SettingsStore: Error resetting theme settings", error);
+        toast.error("Failed to reset theme settings.");
       }
     },
   })),

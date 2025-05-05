@@ -16,8 +16,8 @@ import { SettingsDataManagement } from "./SettingsDataManagement";
 import { SettingsMods } from "./SettingsMods";
 import { SettingsProviders } from "./SettingsProviders";
 import { SettingsGit } from "./SettingsGit";
-// Import the new settings component
 import { SettingsRulesAndTags } from "./SettingsRulesAndTags";
+import { SettingsTheme } from "./SettingsTheme"; // Import the new component
 import type { CustomSettingTab } from "@/types/litechat/modding";
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
@@ -49,13 +49,11 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
       })),
     );
 
-    // Local state to manage the active tab, initialized from store
-    const [activeTab, setActiveTab] = useState(initialSettingsTab || "general");
+    const [activeTab, setActiveTab] = useState(initialSettingsTab || "theme"); // Default to theme
 
-    // Effect to update local state if the initial tab state changes while modal is open
     useEffect(() => {
       if (isOpen) {
-        setActiveTab(initialSettingsTab || "general");
+        setActiveTab(initialSettingsTab || "theme"); // Default to theme
       }
     }, [isOpen, initialSettingsTab]);
 
@@ -70,13 +68,17 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
       setActiveTab(value);
     };
 
-    // Define tabs for the layout
     const tabs = useMemo(() => {
       const coreTabs: TabDefinition[] = [
         {
           value: "general",
           label: "General",
           content: <SettingsGeneral />,
+        },
+        {
+          value: "theme",
+          label: "Theme",
+          content: <SettingsTheme />,
         },
         {
           value: "providers",
@@ -92,7 +94,6 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
               } as TabDefinition,
             ]
           : []),
-        // Add the new Rules & Tags tab
         {
           value: "rules-tags",
           label: "Rules & Tags",
@@ -141,14 +142,13 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
             </DialogDescription>
           </DialogHeader>
 
-          {/* Use TabbedLayout for the main settings sections */}
           <TabbedLayout
             tabs={tabs}
-            initialValue={activeTab} // Pass initial value
-            onValueChange={handleTabChange} // Handle value changes
-            className="flex-grow overflow-hidden px-6" // Adjust padding if needed
-            listClassName="-mx-6 px-6" // Adjust list padding
-            contentContainerClassName="flex-grow overflow-y-auto pb-6 pr-2 -mr-2" // Ensure content grows and scrolls
+            initialValue={activeTab}
+            onValueChange={handleTabChange}
+            className="flex-grow overflow-hidden px-6"
+            listClassName="-mx-6 px-6"
+            contentContainerClassName="flex-grow overflow-y-auto pb-6 pr-2 -mr-2"
             scrollable={true}
           />
 

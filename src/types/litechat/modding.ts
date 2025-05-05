@@ -69,7 +69,13 @@ export interface ReadonlyChatContextSnapshot {
   readonly activeSystemPrompt: string | null;
   readonly temperature: number;
   readonly maxTokens: number | null;
-  readonly theme: "light" | "dark" | "system";
+  readonly theme:
+    | "light"
+    | "dark"
+    | "system"
+    | "TijuLight"
+    | "TijuDark"
+    | "custom";
 }
 
 /** The API surface exposed to loaded mods */

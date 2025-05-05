@@ -1,5 +1,4 @@
 // src/components/LiteChat/canvas/ChatCanvas.tsx
-// FULL FILE
 import React, { useMemo, useRef, useEffect, useState } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { InteractionCard } from "./InteractionCard";
@@ -19,9 +18,11 @@ import {
 import { EmptyStateReady } from "./empty-states/EmptyStateReady";
 import { EmptyStateSetup } from "./empty-states/EmptyStateSetup";
 import { useProviderStore } from "@/store/provider.store";
-import { useConversationStore } from "@/store/conversation.store"; // Import ConversationStore
-import { useProjectStore } from "@/store/project.store"; // Import ProjectStore
+import { useConversationStore } from "@/store/conversation.store";
+import { useProjectStore } from "@/store/project.store";
 import { useShallow } from "zustand/react/shallow";
+// Import settings store to get max width
+import { useSettingsStore } from "@/store/settings.store";
 
 const ChatCanvasHiddenInteractions = ["conversation.title_generation"];
 
@@ -51,8 +52,9 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   const streamingInteractionIds = useInteractionStore(
     (state) => state.streamingInteractionIds,
   );
+  // Get chatMaxWidth from settings store
+  const chatMaxWidth = useSettingsStore((state) => state.chatMaxWidth);
 
-  // --- State for Setup Check ---
   const { isLoading: isProviderLoading } = useProviderStore(
     useShallow((state) => ({
       providers: state.dbProviderConfigs,
@@ -62,7 +64,6 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     })),
   );
 
-  // Get conversation and project counts
   const { conversationCount, isConversationLoading } = useConversationStore(
     useShallow((state) => ({
       conversationCount: state.conversations.length,
@@ -76,13 +77,10 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     })),
   );
 
-  // --- Determine if initial setup state should be shown ---
   const showSetupState = useMemo(() => {
-    // Don't show setup if core data is still loading
     if (isProviderLoading || isConversationLoading || isProjectLoading) {
       return false;
     }
-    // Show setup if there are no conversations AND no projects
     return conversationCount === 0 && projectCount === 0;
   }, [
     conversationCount,
@@ -91,7 +89,6 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     isConversationLoading,
     isProjectLoading,
   ]);
-  // --- End Setup Status ---
 
   const interactionGroups = useMemo(() => {
     const groups: Interaction[][] = [];
@@ -101,9 +98,12 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     );
     sortedInteractions.forEach((interaction) => {
       if (processedIds.has(interaction.id)) return;
-      const group = [interaction];
-      processedIds.add(interaction.id);
-      groups.push(group);
+      // Filter out hidden types before grouping or processing
+      if (!ChatCanvasHiddenInteractions.includes(interaction.type)) {
+        const group = [interaction];
+        processedIds.add(interaction.id);
+        groups.push(group);
+      }
     });
     return groups;
   }, [interactions]);
@@ -125,10 +125,14 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
         status === "streaming" && streamingInteractionIds.length > 0;
 
       if (isAtBottom || isStreamingJustStarted) {
-        scrollToBottom(isStreamingJustStarted ? "smooth" : "auto");
+        // Use requestAnimationFrame to ensure scroll happens after render updates
+        requestAnimationFrame(() => {
+          scrollToBottom(isStreamingJustStarted ? "smooth" : "auto");
+        });
       }
     }
-  }, [interactions, status, streamingInteractionIds]);
+    // Depend on interactionGroups length to scroll when new messages appear
+  }, [interactionGroups.length, status, streamingInteractionIds]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -142,23 +146,23 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     };
 
     viewport.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll();
+    handleScroll(); // Initial check
 
     return () => {
       viewport.removeEventListener("scroll", handleScroll);
     };
-  }, []);
+  }, []); // Run only once
 
   useEffect(() => {
+    // Find the viewport element once the ScrollArea is mounted
     if (scrollAreaRef.current) {
       viewportRef.current = scrollAreaRef.current.querySelector(
         "[data-radix-scroll-area-viewport]",
       );
     }
-  }, []);
+  }, []); // Run only once
 
   const renderContent = () => {
-    // Show loading if any core data is loading
     if (isProviderLoading || isConversationLoading || isProjectLoading) {
       return (
         <div className="space-y-4 p-4">
@@ -169,74 +173,72 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
       );
     }
 
-    // Show setup guide if no conversations or projects exist yet
     if (showSetupState) {
       return <EmptyStateSetup />;
     }
 
-    // If setup is done (or skipped), but no conversation is selected, show ready state
     if (!conversationId) {
       return <EmptyStateReady />;
     }
 
-    // Render conversation content if conversationId exists
-    if (conversationId) {
-      if (interactions.length === 0 && status !== "streaming") {
-        // Show ready state even if conversation selected but has no messages
-        return <EmptyStateReady />;
-      }
-
-      return (
-        <div className="space-y-4 p-4">
-          {interactionGroups.map((group) => {
-            const interaction = group[0];
-            const isStreaming = streamingInteractionIds.includes(
-              interaction.id,
-            );
-            if (!ChatCanvasHiddenInteractions.includes(interaction.type)) {
-              if (isStreaming) {
-                return (
-                  <StreamingInteractionCard
-                    key={`${interaction.id}-streaming`}
-                    interactionId={interaction.id}
-                    onStop={onStopInteraction}
-                  />
-                );
-              } else {
-                return (
-                  <InteractionCard
-                    key={interaction.id}
-                    interaction={interaction}
-                    onEdit={onEditInteraction}
-                    onRegenerate={onRegenerateInteraction}
-                    onDelete={undefined} // Delete is handled internally now
-                  />
-                );
-              }
-            }
-          })}
-          {status === "streaming" &&
-            streamingInteractionIds
-              .filter((id) => !interactions.some((i) => i.id === id))
-              .map((id) => (
-                <StreamingInteractionCard
-                  key={`${id}-streaming-new`}
-                  interactionId={id}
-                  onStop={onStopInteraction}
-                />
-              ))}
-        </div>
-      );
+    // Check interactionGroups length for empty state after filtering
+    if (interactionGroups.length === 0 && status !== "streaming") {
+      return <EmptyStateReady />;
     }
 
-    // Fallback (shouldn't be reached with the above logic)
-    return null;
+    // --- USING THE CORRECTED RENDER LOGIC ---
+    return (
+      <div className="space-y-4 p-4">
+        {interactionGroups.map((group) => {
+          const interaction = group[0];
+          const isStreaming = streamingInteractionIds.includes(interaction.id);
+          // The check for hidden interactions is already done in interactionGroups memo
+          if (isStreaming) {
+            return (
+              <StreamingInteractionCard
+                key={`${interaction.id}-streaming`}
+                interactionId={interaction.id} // Pass ID
+                onStop={onStopInteraction} // Pass correct prop name
+              />
+            );
+          } else {
+            return (
+              <InteractionCard
+                key={interaction.id}
+                interaction={interaction}
+                onEdit={onEditInteraction} // Pass correct prop name
+                onRegenerate={onRegenerateInteraction} // Pass correct prop name
+                onDelete={undefined} // Pass undefined as per working code
+              />
+            );
+          }
+        })}
+        {/* Render placeholder for new streaming interactions */}
+        {status === "streaming" &&
+          streamingInteractionIds
+            .filter((id) => !interactions.some((i) => i.id === id))
+            .map((id) => (
+              <StreamingInteractionCard
+                key={`${id}-streaming-new`}
+                interactionId={id} // Pass ID
+                onStop={onStopInteraction} // Pass correct prop name
+              />
+            ))}
+      </div>
+    );
+    // --- END CORRECTED RENDER LOGIC ---
   };
+
+  // Determine the max-width class, defaulting if null
+  const maxWidthClass = chatMaxWidth || "max-w-7xl";
 
   return (
     <div className={cn("flex-grow relative", className)}>
       <ScrollArea className="h-full w-full" ref={scrollAreaRef}>
-        {renderContent()}
+        {/* Apply max-width and centering to the content container */}
+        <div className={cn("chat-canvas-container mx-auto", maxWidthClass)}>
+          {renderContent()}
+        </div>
       </ScrollArea>
       {showJumpToBottom && (
         <TooltipProvider delayDuration={100}>

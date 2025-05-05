@@ -1,6 +1,9 @@
 // src/App.tsx
+// FULL FILE - Corrected ThemeManager Placement
 import { LiteChat, RegistrationFunction } from "@/components/LiteChat/LiteChat";
 import { PrismThemeLoader } from "@/components/LiteChat/common/PrismThemeLoader";
+import { ThemeManager } from "@/components/LiteChat/common/ThemeManager"; // Import ThemeManager
+import { ErrorBoundary } from "@/components/LiteChat/common/ErrorBoundary"; // Import ErrorBoundary
 
 // Import ALL registration functions needed by this specific App instance
 import { registerConversationListControl } from "@/hooks/litechat/registerConversationListControl";
@@ -53,8 +56,10 @@ const controlsToRegister: RegistrationFunction[] = [
 
 function App() {
   return (
-    <>
-      {/* Render the theme loader outside LiteChat */}
+    // ErrorBoundary wraps the core application
+    <ErrorBoundary>
+      {/* Theme managers need to be inside the main app structure */}
+      <ThemeManager />
       <PrismThemeLoader />
       <div className="h-screen bg-background text-foreground flex flex-col">
         <main className="flex-grow overflow-hidden">
@@ -62,7 +67,7 @@ function App() {
           <LiteChat controls={controlsToRegister} />
         </main>
       </div>
-    </>
+    </ErrorBoundary>
   );
 }
 export default App;
