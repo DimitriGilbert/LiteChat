@@ -1,295 +1,399 @@
-# LiteChat ⚡️
+========
+README.md
+========
+# LiteChat
 
-**Chat Smarter, Your Way.**
-
-LiteChat isn't just another AI chat interface; it's your private, high-performance command center for interacting with the world of artificial intelligence. Built from the ground up with **privacy, speed, and customization** at its core, LiteChat runs entirely within your web browser, ensuring your conversations and valuable API keys never leave your device.
-
-**Why LiteChat?**
-
-*   **True Privacy:** Unlike many cloud-based solutions, LiteChat is **100% client-side**. Your data stays with you. Period. Interact directly with AI providers like OpenAI, Google Gemini, OpenRouter, or your self-hosted Ollama/LM Studio instances without intermediaries.
-*   **Blazing Fast:** Experience a fluid, responsive interface thanks to a lightweight design and efficient state management. No server lag, just smooth conversation flow.
-*   **Organize Your Thoughts (Projects):** Structure your chats with **Projects**. Create nested folders, group related conversations, set project-specific instructions or models (which inherit from parents or global defaults), and keep your workspace tidy. Each project gets its own dedicated Virtual File System.
-*   **Integrated File Management (VFS):** Go beyond simple text prompts. LiteChat features a built-in **Virtual File System** linked to your projects (or a shared space for non-project chats). Upload files, create folders, and manage assets directly within the interface. Provide files as context to your AI, keeping relevant documents alongside your conversations.
-*   **Git Powered:** The VFS isn't just for storage; it's **Git-enabled**. Initialize repositories within VFS folders, clone remote repos (like codebases or notes), commit your changes, pull updates, and push – all from within LiteChat. Perfect for AI-assisted coding, documentation, or version-controlled notes.
-*   **Sync Conversations with Git:** Keep your conversations backed up and synchronized across devices by linking them to specific Git repositories configured in settings. Your chat history becomes part of your version-controlled workflow.
-*   **AI Tool Calling:** Extend the AI's capabilities by registering custom tools (via Mods). Enable specific tools per conversation, allowing the AI to interact with external APIs, perform calculations, access VFS files, or execute custom logic. Tool calls and results are clearly displayed within the chat history.
-*   **Endlessly Extendable (Mods):** LiteChat is built on a **modular, event-driven architecture**. This means you (or the community) can easily create **Mods** to:
-    *   Add new UI elements and controls (`PromptControl`, `ChatControl`).
-    *   Integrate custom tools for the AI to use (`registerTool`).
-    *   Modify AI behavior with middleware (`addMiddleware`).
-    *   Listen to application events and trigger custom workflows (`on`).
-    *   Add new settings tabs (`registerSettingsTab`).
-    *   ...and much more!
-
-LiteChat is for anyone who values privacy, wants fine-grained control over their AI interactions, and loves to tinker and customize their tools. It's your personal AI workbench.
+**LiteChat** is a modular, extensible, and privacy-focused AI chat application for power users, developers, and teams. It supports multiple AI providers (OpenAI, Google Gemini, OpenRouter, Ollama, OpenAI-compatible APIs, and more), advanced prompt engineering, project-based organization, virtual file systems (VFS), Git sync, rules/tags, modding, and a highly customizable UI.
 
 ---
-## Docker Support
 
+## Table of Contents
 
-### Docker Setup
+- [Features](#features)
+- [Install](#install)
+- [Docker & CORS](#docker--cors)
+- [Project Structure](#project-structure)
+- [Core Concepts](#core-concepts)
+- [Getting Started](#getting-started)
+- [Providers & Models](#providers--models)
+- [Projects & Conversations](#projects--conversations)
+- [Prompt Controls & Chat Controls](#prompt-controls--chat-controls)
+- [Virtual File System (VFS)](#virtual-file-system-vfs)
+- [Git Sync](#git-sync)
+- [Rules & Tags](#rules--tags)
+- [Modding System](#modding-system)
+- [Import/Export & Data Management](#importexport--data-management)
+- [Theming & Customization](#theming--customization)
+- [Keyboard Shortcuts](#keyboard-shortcuts)
+- [Development & Contributing](#development--contributing)
+- [License](#license)
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/DimitriGilbert/LiteChat.git
-   cd LiteChat
-   ```
+---
 
-2. Build the Docker image:
-   ```bash
-   docker build -t litechat .
-   ```
+## Features
 
-3. Run the container:
-   ```bash
-   docker run -p 8080:80 litechat
-   ```
+- **Multi-provider support:** OpenAI, Google Gemini, OpenRouter, Ollama, OpenAI-compatible APIs, and more.
+- **Project-based organization:** Organize conversations into projects, with hierarchical project trees.
+- **Advanced prompt controls:** Per-turn system prompt, rules/tags, tool selection, structured output, web search, reasoning, and more.
+- **Virtual File System (VFS):** Per-project files, attach files to prompts, manage files in a browser-based filesystem, attach VFS files to prompts, and preview files.
+- **Git integration:** Link projects/conversations to Git repositories, sync conversations as JSON, and perform Git operations (clone, pull, push, commit, status) directly in the UI.
+- **Rules & Tags:** Define reusable prompt snippets and organize them with tags, apply them per-project, per-conversation, or per-turn.
+- **Modding system:** Register custom controls, tools, middleware, and settings tabs via user scripts or remote mods.
+- **Import/Export:** Export/import conversations, projects, or full configuration (including settings, providers, rules, mods, etc.).
+- **Custom theming:** Light, dark, Tiju, and fully custom themes with user-defined colors, fonts, and code block themes.
+- **Streaming markdown/code rendering:** Real-time markdown and code block rendering during AI response streaming.
+- **Token/context usage display:** Visual indicator of context window usage for the selected model.
+- **Auto-title generation:** Generate conversation titles using a dedicated model and prompt.
+- **Interaction rating:** Rate assistant responses from -5 to +5 for feedback or future training.
+- **Error boundaries:** Robust error handling with user-friendly error reports and GitHub issue integration.
+- **Extensive keyboard navigation and accessibility.**
 
-4. Access LiteChat at `http://localhost:8080`
+---
 
-### Docker Compose
+## Install
 
-For a more complete setup with CORS proxy configuration:
+### Download the Latest Release
 
-```yaml
-version: '3'
+You can download the latest release directly with `curl`:
 
-services:
-  litechat:
-    image: litechat/litechat:latest
-    # or build from local Dockerfile:
-    # build: .
-    ports:
-      - "8080:80"
-    volumes:
-      # Optional: custom NGINX configuration with API proxies
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+```bash
+curl -L -o litechat.zip https://github.com/DimitriGilbert/LiteChat/releases/latest/download/litechat-nightly.zip
+unzip litechat.zip -d litechat
+cd litechat
 ```
 
-### CORS Proxy Configuration
+Or download and extract in one line:
 
-Since LiteChat makes direct API calls from the browser, you may need to configure the NGINX server in Docker to act as a reverse proxy for AI providers with restrictive CORS policies.
+```bash
+curl -L https://github.com/DimitriGilbert/LiteChat/releases/latest/download/litechat-nightly.zip | bsdtar -xf- -C ./litechat
+cd litechat
+```
 
-Edit the included `nginx.conf` and uncomment the proxy section, modifying it for your specific provider endpoints. The Docker setup makes it easy to handle CORS issues without changing your local network configuration.
+### Start a Local HTTP Server
 
-### Persisting Data
+You can serve the static files with any simple HTTP server. Here are one-liners for various languages:
 
-LiteChat stores all data in your browser's IndexedDB. If you want to persist conversations and settings across Docker rebuilds, make sure to use the built-in Git sync functionality to back up your data to a repository.
+#### Python
 
-## Technical Overview (For Integrators & Power Users)
+```bash
+# Python 3.x
+python3 -m http.server 8080
+# Python 2.x
+python -m SimpleHTTPServer 8080
+```
 
-LiteChat is a static React web application designed for local execution and extensibility.
+#### Node.js
 
-**Core Concepts:**
+```bash
+npx serve -l 8080 .
+# or
+npx http-server -p 8080 .
+```
 
-*   **Client-Side Architecture:** All application logic, data storage (IndexedDB via Dexie), and AI API interactions occur directly within the user's browser. No backend is required for core functionality.
-*   **Component-Based UI (React):** Leverages reusable components (e.g., `<ChatCanvas>`, `<PromptWrapper>`, `<FileManager>`) built with shadcn/ui and Tailwind CSS.
-*   **State Management (Zustand):** Uses modular Zustand stores for efficient state management (`ConversationStore`, `InteractionStore`, `ProviderStore`, `VfsStore`, `InputStore`, `PromptStateStore`, etc.). `useShallow` is recommended for selecting state.
-*   **Controls (`PromptControl`, `ChatControl`):** Encapsulate discrete UI functionalities (e.g., model selection, file attachment, conversation list, settings panels). They manage their UI rendering and state interactions. Registered via `ControlRegistryStore`.
-*   **Event-Driven (`mitt`):** A central event emitter (`emitter`) enables decoupled communication between components, stores, and mods using `ModEvent` types.
-*   **Middleware Hooks:** Allow interception and modification of data at critical points (prompt finalization, AI request start, response chunk processing) using `ModMiddlewareHook` types. Registered via `ControlRegistryStore`.
-*   **Projects:** Hierarchical structure (`Project` type) for organizing conversations. Projects have unique paths, can inherit settings (system prompt, model, parameters, sync repo) from parents or global defaults, and each has a dedicated VFS instance. Managed by `ConversationStore`.
-*   **Virtual File System (VFS):** Implemented using ZenFS with an IndexedDB backend. Provides file storage and management capabilities within the browser environment, scoped per-project (or a shared 'orphan' space). Managed by `VfsStore` and `vfs-operations.ts`.
-*   **Git Integration (`isomorphic-git`):** Enables Git operations (clone, commit, pull, push, status) directly on folders within the VFS via `vfs-git-operations.ts`, interacting with remote repositories via an optional CORS proxy or correctly configured servers.
-*   **Conversation Sync:** Leverages the VFS/Git integration to store and sync conversation data (`.json` files containing conversation metadata and interactions) within designated Git repositories (`SyncRepo` config). Logic handled by `conversation-sync-logic.ts`.
-*   **Tool Calling:** Mods register tools (`Tool` definition + optional `ToolImplementation`) via `ControlRegistryStore`. Users enable tools per-conversation. `AIService` uses the `ai` SDK's `streamText` function with the `tools` and `toolChoice` options to manage execution. Tool calls and results are stored as JSON strings in `Interaction.metadata`.
+#### Ruby
 
-**Deployment & CORS:**
+```bash
+ruby -run -e httpd . -p 8080
+```
 
-LiteChat is designed to be deployed as a static web application (a single HTML, CSS, and JS bundle). You can host it on any standard web server or static hosting platform.
+#### Go
 
-However, because LiteChat makes direct calls from the browser to AI provider APIs (like OpenAI, Ollama, etc.), you might encounter **Cross-Origin Resource Sharing (CORS)** restrictions imposed by those APIs.
+```bash
+go run -e "http.ListenAndServe(`:8080`, http.FileServer(http.Dir(`.`)))"
+```
 
-**Mitigation Strategies:**
+#### PHP
 
-*   **Use APIs Designed for Browser Use:** Some APIs (like OpenRouter) are often configured with permissive CORS headers suitable for direct browser access.
-*   **Self-Hosted AI (Ollama, LM Studio):** When running models locally (e.g., via Ollama), ensure the local server is configured to allow requests from the origin where LiteChat is hosted.
-    *   **Ollama:** Set the `OLLAMA_ORIGINS` environment variable (e.g., `OLLAMA_ORIGINS=http://your-litechat-domain.com,http://localhost:5173`).
-*   **Configure Your Web Server as a Reverse Proxy:** This is the most robust solution for APIs without permissive CORS headers. Your web server forwards the request from LiteChat to the AI provider, effectively bypassing the browser's CORS limitations.
-    *   **Nginx:**
-        ```nginx
-        location /api/openai/ { # Or a path for your specific provider
-            # IMPORTANT: Add authentication handling here if needed!
-            # Example: proxy_set_header Authorization "Bearer YOUR_SERVER_SIDE_API_KEY";
+```bash
+php -S 0.0.0.0:8080
+```
 
-            proxy_pass https://api.openai.com/; # Forward to the actual API
-            proxy_set_header Host api.openai.com;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
+#### Perl
 
-            # Handle CORS preflight requests
-            if ($request_method = 'OPTIONS') {
-                add_header 'Access-Control-Allow-Origin' 'http://your-litechat-domain.com'; # Your LiteChat domain
-                add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
-                add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type'; # Add other headers if needed
-                add_header 'Access-Control-Allow-Credentials' 'true'; # If needed
-                add_header 'Access-Control-Max-Age' 1728000;
-                add_header 'Content-Type' 'text/plain charset=UTF-8';
-                add_header 'Content-Length' 0;
-                return 204;
-            }
+```bash
+perl -MHTTP::Server::Simple -e 'HTTP::Server::Simple->new(8080)->run'
+```
 
-            # Add CORS headers for actual requests
-            add_header 'Access-Control-Allow-Origin' 'http://your-litechat-domain.com';
-            add_header 'Access-Control-Allow-Credentials' 'true'; # If needed
-        }
-        ```
-        *In LiteChat Provider settings, set the Base URL to `http://your-litechat-domain.com/api/openai/`.*
-    *   **Apache (using `.htaccess` or `httpd.conf`):** Requires `mod_proxy`, `mod_headers`, `mod_rewrite`.
-        ```apache
-        # Enable proxying
-        ProxyRequests Off
-        ProxyPreserveHost On
-
-        <Location /api/openai/>
-            # IMPORTANT: Authentication handling might be needed here
-            # RequestHeader set Authorization "Bearer YOUR_SERVER_SIDE_API_KEY"
-
-            ProxyPass https://api.openai.com/
-            ProxyPassReverse https://api.openai.com/
-
-            # Handle CORS
-            Header always set Access-Control-Allow-Origin "http://your-litechat-domain.com"
-            Header always set Access-Control-Allow-Methods "POST, GET, OPTIONS"
-            Header always set Access-Control-Allow-Headers "Authorization, Content-Type" # Add others if needed
-            Header always set Access-Control-Allow-Credentials "true" # If needed
-
-            # Handle OPTIONS preflight
-            RewriteEngine On
-            RewriteCond %{REQUEST_METHOD} OPTIONS
-            RewriteRule ^(.*)$ $1 [R=204,L]
-        </Location>
-        ```
-        *In LiteChat Provider settings, set the Base URL to `http://your-litechat-domain.com/api/openai/`.*
-    *   **Caddy:**
-        ```caddyfile
-        # Your LiteChat domain
-        your-litechat-domain.com {
-            # Serve your static LiteChat files
-            root * /path/to/your/litechat/dist
-            file_server
-
-            # Reverse proxy for OpenAI API
-            reverse_proxy /api/openai/* https://api.openai.com {
-                # IMPORTANT: Add authentication if needed
-                # header_up Authorization "Bearer YOUR_SERVER_SIDE_API_KEY"
-                header_up Host {upstream_hostport}
-                header_up X-Forwarded-Host {host}
-            }
-
-            # Handle CORS globally or within the reverse_proxy block
-            @corsMethods {
-                method OPTIONS POST GET # Add other methods if needed
-            }
-            header {
-                Access-Control-Allow-Origin "http://your-litechat-domain.com"
-                Access-Control-Allow-Methods "GET, POST, OPTIONS"
-                Access-Control-Allow-Headers * # Or list specific headers
-                Access-Control-Allow-Credentials true # If needed
-                Access-Control-Max-Age 86400
-            }
-            # Respond to OPTIONS preflight requests
-            respond @corsMethods 204
-        }
-        ```
-        *In LiteChat Provider settings, set the Base URL to `http://your-litechat-domain.com/api/openai/`.*
+Now open [http://localhost:8080](http://localhost:8080) in your browser.
 
 ---
 
-## Developer & Modder Documentation
+## Docker & CORS
 
-This section details the architecture and APIs for developers extending or modifying LiteChat.
+### Docker
 
-### Architecture
+A sample `docker/nginx.conf` is provided for serving LiteChat with Nginx. You can use the following `Dockerfile` to build a static server image:
 
-*   **Core Components:**
-    *   `<LiteChat>`: Main orchestrator, initializes stores, loads data/mods, renders layout. Connects major sub-systems.
-    *   `<PromptWrapper>`: Manages user input area. Renders `InputArea`, `PromptControl` triggers/panels via `<PromptControlWrapper>`. Collects data from controls (`getParameters`, `getMetadata`), handles file attachment display, runs `PROMPT_TURN_FINALIZE` middleware, outputs `PromptTurnObject` on submit.
-    *   `<ChatCanvas>`: Displays conversation history (`Interaction` objects). Uses `UserPromptDisplay`, `InteractionCard` (for completed/revisions), and `StreamingInteractionCard` (for live responses).
-    *   `<ChatControlWrapper>`: Renders registered `ChatControl` components into designated panels (e.g., 'sidebar', 'header', 'sidebar-footer', 'drawer_right') based on `panelId` and `renderMode`.
-    *   `<FileManager>`: Provides the UI for the Virtual File System, including toolbar, file/folder table (`FileManagerTable`, `FileManagerRow`), context menus, and dialogs (`CloneDialog`, `CommitDialog`).
-    *   `<SettingsModal>`: Tabbed dialog for application configuration.
-    *   `<ProjectSettingsModal>`: Tabbed dialog for project-specific configuration.
-*   **Controls:**
-    *   `PromptControl`: Self-contained units adding functionality to the prompt area (e.g., model selection, file attachment, parameter sliders, VFS access, tool selection, Git sync). They contribute parameters/metadata and can run middleware on the `PromptTurnObject`. Defined in `src/types/litechat/prompt.ts`.
-    *   `ChatControl`: Self-contained units adding functionality to the overall chat UI (e.g., conversation list sidebar, settings button, status indicators, VFS drawer). They render UI into specific panels and can interact with stores/events. Defined in `src/types/litechat/chat.ts`.
-*   **State Management (Zustand):** Modular stores (`src/store/`) manage specific data domains:
-    *   `InteractionStore`: Manages `Interaction[]` for the selected conversation, including streaming state (`streamingInteractionIds`, `activeStreamBuffers`).
-    *   `ConversationStore`: Manages `Conversation[]` and `Project[]` lists, the tree structure, selection state (`selectedItemId`, `selectedItemType`), project settings inheritance, and Git sync status/operations.
-    *   `ControlRegistryStore`: Stores registered `PromptControl`, `ChatControl`, middleware functions, and tool definitions/implementations.
-    *   `ProviderStore`: Manages provider configurations (`DbProviderConfig`), API keys (`DbApiKey`), runtime model selection (`selectedModelId`), global model sort order, and related persistence/fetching logic.
-    *   `SettingsStore`: Global application settings (theme, default parameters, Git user config, tool defaults).
-    *   `ModStore`: Manages mod definitions (`DbMod`) from DB and loaded runtime instances (`ModInstance`), including custom settings tabs.
-    *   `UIStateStore`: Transient UI state (modal visibility, panel states, sidebar collapse state, focus flags).
-    *   `VfsStore`: Manages the Virtual File System state (nodes, childrenMap, current path, selected files) and interacts with `VfsOps`. Switches context based on `vfsKey`.
-    *   `InputStore`: Manages files attached to the *next* prompt submission, including their content (for direct uploads). Cleared after successful submission.
-    *   `PromptStateStore`: Manages transient state for the *next* prompt (effective model, parameters). Initialized based on current project/global settings.
-*   **Services (`src/services/`):**
-    *   `AIService`: Handles communication with AI SDKs (`@ai-sdk`). Takes the final `PromptObject`, runs `INTERACTION_BEFORE_START` middleware, manages streaming via `streamText`, processes file content into messages, handles tool calls/results, runs `INTERACTION_PROCESS_CHUNK` middleware, updates `InteractionStore`.
-    *   `PersistenceService`: Centralizes Dexie database operations (CRUD for all persistent data types). Handles DB schema versioning and upgrades.
-    *   `ModLoader` (`src/modding/loader.ts`): Loads and executes mod scripts (from URL or direct content), providing them with the `LiteChatModApi`.
-    *   `model-fetcher.ts`: Fetches available model lists from provider APIs (OpenAI, OpenRouter, Ollama, etc.) with caching.
-    *   `vfs-operations.ts` & `vfs-git-operations.ts`: Implements file system and Git operations using ZenFS and isomorphic-git. Handles user feedback via `toast`.
-*   **Data Models (`src/types/litechat/`):** Defines core data structures:
-    *   `PromptTurnObject`: Represents user's input turn data, including file content. Snapshot stored in `Interaction.prompt`.
-    *   `PromptObject`: Final payload sent to `AIService`, file content processed into `messages`.
-    *   `Interaction`: Logical unit/turn in conversation (user input + AI response/tool call). Includes tool call/result JSON strings in metadata.
-    *   `Conversation`: Metadata for a chat thread, linked to `Project`.
-    *   `Project`: Folder-like structure for organizing conversations, stores path, can override settings.
-    *   `DbProviderConfig`, `DbApiKey`, `SyncRepo`, `DbMod`: Database representations.
-    *   `VfsNode` (`VfsFile`, `VfsDirectory`): Nodes within the Virtual File System.
-    *   `AttachedFileMetadata`: Structure for files attached to the prompt input (in `InputStore`).
-*   **Events & Modding (`src/lib/litechat/event-emitter.ts`, `src/types/litechat/modding.ts`):**
-    *   `emitter`: Central `mitt` instance for pub/sub.
-    *   `ModEvent`: Standardized event names (e.g., `CONVERSATION_SELECTED`, `INTERACTION_STARTED`, `VFS_FILE_WRITTEN`).
-    *   `ModMiddlewareHook`: Standardized middleware hooks (e.g., `PROMPT_TURN_FINALIZE`, `INTERACTION_BEFORE_START`).
-    *   `LiteChatModApi`: The API surface exposed to mods (see below).
+```dockerfile
+FROM nginx:alpine
+COPY ./public /usr/share/nginx/html
+COPY ./docker/nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+```
 
-### Modding API (`LiteChatModApi`)
+Build and run:
 
-Mods receive an API object (`LiteChatModApi`) upon loading, enabling interaction with LiteChat:
+```bash
+docker build -t litechat .
+docker run -d -p 8080:80 litechat
+```
 
-*   **Control Registration:**
-    *   `registerPromptControl(control: PromptControl): () => void`
-    *   `registerChatControl(control: ChatControl): () => void`
-*   **Settings:**
-    *   `registerSettingsTab(tab: CustomSettingTab): () => void`
-*   **AI Tools:**
-    *   `registerTool<P>(toolName: string, definition: Tool<P>, implementation?: ToolImplementation<P>): () => void` (Registers a tool definition and its execution logic)
-*   **Event Handling:**
-    *   `on<E extends ModEventName>(eventName: E, callback: (payload: ModEventPayloadMap[E]) => void): () => void`
-*   **Middleware:**
-    *   `addMiddleware<H extends ModMiddlewareHookName>(hookName: H, callback: MiddlewareCallback<H>): () => void`
-*   **Context Access:**
-    *   `getContextSnapshot(): ReadonlyChatContextSnapshot` (Provides a safe, read-only view of key application states)
-*   **Utilities:**
-    *   `showToast(type: 'success' | 'error' | 'info' | 'warning', message: string): void`
-    *   `log(level: 'log' | 'warn' | 'error', ...args: any[]): void`
-*   **Identification:**
-    *   `readonly modId: string`
-    *   `readonly modName: string`
+### CORS
 
-*(Refer to `src/types/litechat/modding.ts` for detailed type definitions of payloads, controls, etc.)*
+If you are using local models (Ollama, LMStudio, etc.) or custom API endpoints, you may need to enable CORS on your backend. For example, for Ollama:
 
-### Getting Started (Development)
+- Start Ollama with CORS enabled:
+  ```bash
+  OLLAMA_ORIGIN='*' ollama serve
+  ```
+- For OpenAI-compatible APIs, check your server's documentation for CORS headers.
 
-1.  **Prerequisites:** Node.js, npm/pnpm/yarn.
-2.  **Clone:** `git clone <repository-url>`
-3.  **Install:** `cd litechat && npm install` (or equivalent)
-4.  **Run Dev Server:** `npm run dev`
-5.  **Access:** Open the URL provided by Vite (usually `http://localhost:5173`).
+If you use the built-in file manager and VFS, **no server-side CORS is needed** for local file operations.
 
-### Contribution Guidelines
+---
 
-*   Follow the coding style enforced by Prettier (`npm run format`).
-*   Adhere strictly to the modification rules provided in prompts when working with AI assistance (No ellipses, separate blocks, context is key, etc.).
-*   Write clear commit messages.
-*   Ensure new features or significant changes include relevant updates to types and potentially tests (if applicable).
+## Project Structure
+
+```
+.
+├── src/
+│   ├── components/
+│   │   ├── LiteChat/
+│   │   │   ├── canvas/           # Chat canvas, interaction cards, streaming, empty states
+│   │   │   ├── chat/             # Sidebar, conversation/project list, controls
+│   │   │   ├── common/           # Shared UI components, icons, error boundary, etc.
+│   │   │   ├── file-manager/     # VFS file manager, dialogs, toolbar, etc.
+│   │   │   ├── project-settings/ # Project settings modal and tabs
+│   │   │   ├── prompt/           # Prompt input, controls, wrappers
+│   │   │   ├── settings/         # Settings modal, tabs, provider management, etc.
+│   │   │   └── ui/               # UI primitives (button, input, dialog, etc.)
+│   ├── hooks/                    # Registration hooks for controls/tools
+│   ├── lib/                      # Utility functions, VFS, provider helpers, etc.
+│   ├── modding/                  # Mod API factory, loader
+│   ├── services/                 # AI, conversation, interaction, persistence, sync, etc.
+│   ├── store/                    # Zustand stores for all app state
+│   ├── types/                    # TypeScript types for all core concepts
+│   └── index.css                 # Tailwind and custom styles
+├── public/                       # Static assets, icons, manifest, etc.
+├── README.md                     # This file
+└── ...
+```
+
+---
+
+## Core Concepts
+
+### Providers & Models
+
+- **Providers**: Each provider (OpenAI, Google, OpenRouter, Ollama, etc.) is configured with its own API key, base URL, and enabled models.
+- **Models**: Models are fetched from the provider's API or defined statically. You can enable/disable models per provider and globally order them for selection.
+- **API Keys**: API keys are stored per provider and can be managed in the settings.
+
+### Projects & Conversations
+
+- **Projects**: Organize conversations into projects. Projects can be nested (tree structure), and each project can have its own default settings, rules, tags, and VFS.
+- **Conversations**: Each conversation belongs to a project (or is "orphaned" if not assigned). Conversations store their own metadata, sync status, and history.
+
+### Prompt Controls & Chat Controls
+
+- **Prompt Controls**: UI controls that appear in the prompt input area (e.g., system prompt, rules/tags, tool selector, file attachment, web search, reasoning, structured output, etc.). Controls can be registered by core or mods.
+- **Chat Controls**: Controls that appear in the sidebar, header, or other layout areas (e.g., settings, project settings, VFS modal, sidebar toggle, etc.).
+- **Registration**: Controls and tools are registered via hooks in `src/hooks/litechat/` and can be extended by mods.
+
+### Virtual File System (VFS)
+
+- **Per-project VFS**: Each project has its own virtual filesystem, stored in IndexedDB via ZenFS. Files can be uploaded, organized, renamed, deleted, and attached to prompts.
+- **File Manager**: Full-featured file manager UI with upload, folder creation, drag-and-drop, download, and ZIP extraction/export.
+- **VFS Modal**: Attach files from the VFS to prompts via a modal or inline controls.
+
+### Git Sync
+
+- **Sync Repositories**: Configure remote Git repositories (with optional credentials) to sync conversations as JSON files.
+- **Linking**: Link conversations to a sync repo; sync status is tracked and displayed.
+- **Git Operations**: Clone, pull, push, commit, and check status directly from the UI (per project or conversation).
+
+### Rules & Tags
+
+- **Rules**: Define reusable prompt snippets (system, before, after) that can be applied globally, per-project, per-conversation, or per-turn.
+- **Tags**: Organize rules into tags; tags can be activated per-turn or set as project defaults.
+- **Rules/Tags Controls**: UI for activating rules/tags for the next turn, and for managing them in settings.
+
+### Modding System
+
+- **Mods**: User scripts or remote mods can register prompt/chat controls, tools, middleware, and settings tabs.
+- **API**: Mods have access to a safe API for interacting with the app, registering controls, tools, and listening to events.
+- **Settings Tabs**: Mods can add custom settings tabs to the main settings modal.
+
+### Import/Export & Data Management
+
+- **Single Conversation**: Import/export individual conversations as JSON or Markdown.
+- **Project Export**: Export entire projects (including sub-projects and conversations).
+- **Full Configuration**: Import/export the entire app state (settings, providers, projects, conversations, rules, tags, mods, sync repos, etc.) with fine-grained options.
+- **Danger Zone**: Clear all local data from the browser.
+
+### Theming & Customization
+
+- **Themes**: Light, dark, Tiju, and fully custom themes.
+- **Custom Colors**: User-defined CSS variables for all theme colors.
+- **Fonts & Layout**: Custom font family, font size, and chat max width.
+- **Code Block Themes**: Select from preset PrismJS themes or provide a custom URL.
+
+---
+
+## Getting Started
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   # or
+   pnpm install
+   ```
+
+2. **Run the development server:**
+   ```bash
+   npm run dev
+   # or
+   pnpm dev
+   ```
+
+3. **Open LiteChat in your browser:**
+   ```
+   http://localhost:3000
+   ```
+
+4. **First-time setup:**
+   - Add an API key (if required by your provider).
+   - Add a provider configuration (OpenAI, Google, OpenRouter, Ollama, etc.).
+   - Enable at least one model for the provider.
+   - Start your first chat!
+
+---
+
+## Providers & Models
+
+- **Add API Keys**: Go to Settings → Providers & Models → API Keys.
+- **Add Provider**: Settings → Providers & Models → Configuration.
+- **Enable Models**: In the provider's edit section, enable models for global use.
+- **Model Order**: Drag and drop models in "Model Order" tab to set their display order.
+- **Model Details**: Click a model name to view its full metadata.
+
+---
+
+## Projects & Conversations
+
+- **Create Projects**: Use the sidebar to create projects and sub-projects.
+- **Move Conversations**: Assign conversations to projects for organization.
+- **Project Settings**: Each project can override system prompt, model, parameters, rules, tags, and sync repo.
+- **Project VFS**: Each project has its own virtual filesystem.
+
+---
+
+## Prompt Controls & Chat Controls
+
+- **Prompt Controls**: Appear below the input area. Includes:
+  - System Prompt (per-turn override)
+  - Rules & Tags (activate for next turn)
+  - Tool Selector (enable/disable tools, set max steps)
+  - File Attachment (upload or attach VFS files)
+  - VFS Trigger (open VFS modal)
+  - Web Search (enable for next turn)
+  - Reasoning (enable for next turn)
+  - Structured Output (set JSON schema for output)
+  - Usage Display (context/token usage indicator)
+  - Auto-Title (enable for first message)
+  - Git Sync (link conversation to sync repo)
+- **Chat Controls**: Appear in sidebar, header, or modals. Includes:
+  - Conversation List
+  - Settings
+  - Project Settings
+  - Sidebar Toggle
+  - VFS Modal
+
+---
+
+## Virtual File System (VFS)
+
+- **Per-project VFS**: Each project (and orphaned conversations) has a dedicated filesystem.
+- **File Manager**: Upload, download, rename, delete, create folders, extract ZIPs, export as ZIP.
+- **Attach Files**: Select files in the VFS and attach them to the next prompt.
+- **Preview**: Preview text, image, audio, and video files before sending.
+
+---
+
+## Git Sync
+
+- **Configure Repos**: Settings → Git → Sync Repositories.
+- **Link Conversations**: Use the Git Sync control in the prompt area to link a conversation to a repo.
+- **Sync Status**: See sync status in the sidebar and prompt controls.
+- **Git Operations**: Clone, pull, push, commit, and check status from the file manager or settings.
+
+---
+
+## Rules & Tags
+
+- **Manage Rules/Tags**: Settings → Rules & Tags.
+- **Apply Rules/Tags**: Use the Rules/Tags control in the prompt area to activate for the next turn.
+- **Project Defaults**: Set default rules/tags for a project in Project Settings.
+
+---
+
+## Modding System
+
+- **Enable Mods**: Settings → Mods.
+- **Add Mod**: Provide a script URL or paste code directly.
+- **Register Controls/Tools**: Mods can add prompt/chat controls, tools, middleware, and settings tabs.
+- **API**: Mods have access to a safe API for interacting with the app and state.
+
+---
+
+## Import/Export & Data Management
+
+- **Single Conversation**: Import/export as JSON or Markdown.
+- **Project Export**: Export a project and all its conversations.
+- **Full Export/Import**: Export/import the entire app state with fine-grained options.
+- **Clear All Data**: Danger zone in Settings → Data.
+
+---
+
+## Theming & Customization
+
+- **Themes**: Light, dark, Tiju, or custom.
+- **Custom Colors**: Define your own CSS variables for all theme colors.
+- **Fonts**: Set custom font family and size.
+- **Chat Max Width**: Control the width of the chat area.
+- **Code Block Themes**: Choose from preset PrismJS themes or provide a custom URL.
+
+---
+
+## Keyboard Shortcuts
+
+- **Enter**: Send message
+- **Shift+Enter**: New line in input
+- **Ctrl/Cmd+K**: Focus search/filter in sidebar
+- **Ctrl/Cmd+S**: Save in dialogs/forms
+- **Esc**: Close modals, cancel editing
+- **Tab**: Navigate controls
+
+---
+
+## Development & Contributing
+
+- **Tech Stack**: React, Zustand, TypeScript, Tailwind CSS, Dexie (IndexedDB), ZenFS, ai-sdk, isomorphic-git, etc.
+- **Modular Architecture**: All controls, tools, and features are registered via hooks and can be extended by mods.
+- **Strict Linting**: See `.eslintrc` and code style rules.
+- **Testing**: (TBD) Playwright and Vitest planned.
+- **Contributions**: PRs and issues welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) (coming soon).
 
 ---
 
 ## License
 
-MIT
-```
+MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+**LiteChat** is an open-source project. Feedback, bug reports, and contributions are welcome!
+
+---
+
+**Note:** This README is up to date as of May 2025 and reflects the current state of the codebase, including all major features, architectural changes, and UI/UX improvements. If you find any discrepancies, please open an issue or PR.
