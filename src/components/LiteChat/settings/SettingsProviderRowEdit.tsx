@@ -1,7 +1,7 @@
 // src/components/LiteChat/settings/SettingsProviderRowEdit.tsx
 // FULL FILE
 import React, { useCallback, useMemo } from "react";
-import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
+import type { DbApiKey } from "@/types/litechat/provider";
 import { Button } from "@/components/ui/button";
 import { SaveIcon, XIcon, Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";

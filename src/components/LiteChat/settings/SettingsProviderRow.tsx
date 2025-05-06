@@ -172,7 +172,6 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
           onCancel={handleCancel}
           onSave={handleSave}
           onChange={handleChange}
-          onUpdate={onUpdate}
         />
       ) : (
         <ProviderRowViewMode

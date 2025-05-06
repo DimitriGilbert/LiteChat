@@ -37,8 +37,6 @@ import {
   ProviderMetadata,
   LanguageModelV1,
   CoreMessage,
-  extractReasoningMiddleware, // Import the middleware
-  wrapLanguageModel, // Import the wrapper
 } from "ai";
 import type { fs as FsType } from "@zenfs/core";
 

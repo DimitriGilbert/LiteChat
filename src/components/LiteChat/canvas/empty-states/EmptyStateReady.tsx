@@ -2,7 +2,6 @@
 // FULL FILE
 import React from "react";
 import LCAddIcon from "@/components/LiteChat/common/icons/LCAdd";
-import { Button } from "@/components/ui/button";
 import {
   PaletteIcon,
   TagsIcon,
@@ -13,13 +12,7 @@ import {
 } from "lucide-react";
 import { useUIStateStore } from "@/store/ui.store";
 import { useShallow } from "zustand/react/shallow";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Interface for the action card props
 interface ActionCardProps {
