@@ -309,7 +309,7 @@ export const InteractionService = {
 
     // Instantiate reasoning middleware
     const reasoningMiddleware = extractReasoningMiddleware({
-      tagName: "reasoning",
+      tagName: "think",
     });
 
     // Wrap the model instance with the middleware

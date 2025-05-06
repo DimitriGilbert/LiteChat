@@ -2,8 +2,9 @@
 // FULL FILE
 import React, { Component, ErrorInfo, ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { AlertTriangleIcon, CopyIcon, CodeIcon, CheckIcon } from "lucide-react";
+import { CopyIcon, CodeIcon, CheckIcon } from "lucide-react";
 import { toast } from "sonner";
+import LCErrorIcon from "./icons/LCError";
 
 interface Props {
   children: ReactNode;
@@ -141,7 +142,7 @@ Based on this information, what are the likely causes and potential solutions? F
           className="flex flex-col items-center justify-center h-screen w-screen p-4 bg-background text-foreground"
         >
           <div className="max-w-2xl w-full border border-destructive bg-destructive/10 rounded-lg p-6 text-center shadow-lg">
-            <AlertTriangleIcon className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <LCErrorIcon className="h-24 w-24 text-destructive mx-auto mb-4" />
             <h1 className="text-2xl font-semibold text-destructive mb-2">
               Oops! Something went wrong.
             </h1>
