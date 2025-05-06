@@ -91,13 +91,15 @@ const SetupStep: React.FC<{
             )}
           </div>
           <div className="flex-1">
-            <div className="flex items-center justify-between">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setIsOpen(!isOpen)}
+            >
               <CardTitle className="text-base">
                 <span className="opacity-60 mr-2">{stepNumber}.</span>
                 {title}
               </CardTitle>
               <button
-                onClick={() => setIsOpen(!isOpen)}
                 className={`p-1 rounded-full transition-all ${isOpen ? "rotate-90" : ""} hover:bg-muted/60`}
               >
                 <ChevronRightIcon className="h-4 w-4" />
@@ -420,7 +422,8 @@ export const EmptyStateSetup: React.FC = () => {
                     LMStudio
                   </Lnk>{" "}
                   (or any other local LLM solution with an OpenAI compatible
-                  API). These typically don't require API keys.
+                  API). These typically don't require API keys so see you in
+                  step 2.
                 </p>
               </div>
             ),
@@ -548,7 +551,7 @@ export const EmptyStateSetup: React.FC = () => {
 
   if (isProviderLoading) {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-4 space-y-4 max-w-2xl mx-auto w-full">
+      <div className="flex h-full flex-col items-center justify-center p-4 space-y-4 max-w-4xl mx-auto w-full">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

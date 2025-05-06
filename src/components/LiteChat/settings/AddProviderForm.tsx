@@ -258,7 +258,7 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
         <div className="flex items-center space-x-2">
           <Switch
             id="new-autofetch"
-            checked={newProviderData.autoFetchModels ?? false}
+            checked={false}
             onCheckedChange={(checked) =>
               handleNewChange("autoFetchModels", checked)
             }

@@ -28,17 +28,32 @@ export const OnBoardingRant: React.FC = () => {
   };
 
   const wordHighlights = [
-    { word: "LiteChat", color: "text-primary" },
+    {
+      word: "LiteChat",
+      color:
+        "bg-gradient-to-tr from-lime-500 via-amber-400 to-red-600 bg-clip-text text-transparent",
+    },
     { word: "library", color: "text-emerald-500" },
     { word: "browser", color: "text-violet-500" },
     { word: "local", color: "text-amber-500" },
-    { word: "remote providers", color: "text-sky-500" },
-    { word: "AI", color: "text-rose-800" },
+    { word: "remote", color: "text-sky-500" },
+    { word: "providers", color: "text-purple-500" },
+    {
+      word: " AI ",
+      color:
+        "bg-gradient-to-b from-amber-300 to-rose-700 bg-clip-text text-transparent",
+    },
+    {
+      word: "Open Source",
+      color:
+        "bg-gradient-to-r from-lime-500 to-yellow-500 bg-clip-text text-transparent",
+    },
   ];
 
   const highlightText = (text: string | React.ReactNode) => {
     let parts: React.ReactNode[] = [text];
 
+    // Highlight keywords
     wordHighlights.forEach(({ word, color }) => {
       parts = parts.reduce<React.ReactNode[]>((acc, part) => {
         if (typeof part !== "string") {
@@ -63,6 +78,34 @@ export const OnBoardingRant: React.FC = () => {
       }, []);
     });
 
+    // De-emphasize parenthetical text
+    parts = parts.reduce<React.ReactNode[]>((acc, part, partIndex) => {
+      if (typeof part !== "string") {
+        acc.push(part);
+        return acc;
+      }
+
+      const regex = /(\([^)]*\))/g;
+      const split = part.split(regex);
+
+      split.forEach((sub, i) => {
+        if (regex.test(sub)) {
+          acc.push(
+            <span
+              key={`paren-${partIndex}-${i}`}
+              className="text-sm text-muted"
+            >
+              {sub}
+            </span>,
+          );
+        } else {
+          acc.push(sub);
+        }
+      });
+
+      return acc;
+    }, []);
+
     return parts;
   };
 
@@ -70,16 +113,21 @@ export const OnBoardingRant: React.FC = () => {
     "Oh, hey?! Hi there!! How are you doing!?",
     "Nice of you to pop by to checkout LiteChat!",
     "What'd you mean you don't know what LiteChat is? Oh Boy hey, you in for a treat!",
-    "To start with, it's an(other) AI chat app (yes...)!",
-    "But, it is also a library, so you can go on and create your own, AI chat app! (are AI chat apps the new JS frameworks?)",
+    "To start with, it's an(other) AI chat app (yes...shocker, right ?) and it's Open Source ! ",
+    "But, it is also an extensible library, so you can go on and create your own, AI chat app! With your own functionnalities !",
+    "(are AI chat apps the new JS frameworks?)",
     "And cause I might be a wee bit on the reluctant side when it comes to parting with my coins, it doesn't require no servers! It all stays in your browser.",
     "(that means I couldn't snoop on what you do here, even if I wanted to!)",
-    "While able to run LLM both local (did I tell you I ain't liking throwing coins out?) and from remote providers (but sometimes you have to :(..)",
+    "While able to run LLM both local (did I tell you I ain't liking throwing coins out?) and from remote providers",
+    "(but sometimes you have to :(..)",
+    "To cap things off, there is no fancy/crazy tech involved, I just glued bricks together with AI",
+    "(kids call it vibing apparently ^^)",
+    "Enough of this interminable babble! Go setup your future chat to prompt your brains out!",
   ];
 
   return (
     <motion.div
-      className="text-center max-w-2xl mx-auto space-y-3 my-6"
+      className="text-center max-w-4xl mx-auto space-y-3 my-6"
       initial="hidden"
       animate={isVisible ? "show" : "hidden"}
       variants={container}
