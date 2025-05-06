@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useMemo } from "react";
 import {
   AlertCircleIcon,
-  SettingsIcon,
+  // SettingsIcon,
   MessageSquarePlusIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,9 @@ import {
   requiresApiKey,
   PROVIDER_TYPES,
 } from "@/lib/litechat/provider-helpers";
+// import LiteChatIcon from "@/components/LiteChat/common/icons/LiteChatIcon";
+import LCSettingsIcon from "@/components/LiteChat/common/icons/LCSettings";
+import { OnBoardingRant } from "@/components/OnBoardingRant";
 
 export const EmptyStateSetup: React.FC = () => {
   const {
@@ -266,8 +269,15 @@ export const EmptyStateSetup: React.FC = () => {
     {
       id: "add-provider",
       title: "Add AI Provider",
-      description:
-        "Connect to an AI provider like OpenAI, Ollama, or others to start chatting.",
+      description: (
+        <div>
+          <p>Connect to an the AI provider you configured the key for...</p>
+          <p>
+            This might look redundant, but, that'll allow you to have multiple
+            keys for the same provider (personal, professional, ...)
+          </p>
+        </div>
+      ),
       isComplete: isProviderStepComplete,
       content: (
         <AddProviderForm
@@ -289,10 +299,18 @@ export const EmptyStateSetup: React.FC = () => {
       title: "Enable Models",
       description: (
         <>
-          Enable models for the provider you just added (
-          <strong>{firstProvider?.name || "..."}</strong>). Enabling specific
-          models improves the UI by reducing clutter and choice paralysis. You
-          can enable more later in Settings.
+          <p>
+            Enable models for the provider you just added (
+            <strong>{firstProvider?.name || "..."}</strong>).
+          </p>
+          <p>
+            Enabling specific models improves the UI by reducing clutter and
+            choice paralysis. You can enable more later in Settings.
+          </p>
+          <p>
+            And just like before, you can choose to activate a model for a
+            certain combination of key/provider !
+          </p>
         </>
       ),
       isComplete: isEnableModelsStepComplete,
@@ -347,10 +365,12 @@ export const EmptyStateSetup: React.FC = () => {
     <div className="flex h-full flex-col items-center justify-center p-4">
       <div className="w-full max-w-4xl space-y-6">
         <div className="text-center mb-6">
-          <SettingsIcon className="h-12 w-12 text-primary mx-auto mb-3" />
-          <h2 className="text-2xl font-semibold mb-1">LiteChat Setup</h2>
+          {/* <LiteChatIcon className="h-12 w-12 text-primary mx-auto mb-3" /> */}
+          <LCSettingsIcon className="h-12 w-12 text-primary mx-auto mb-3" />
+          <OnBoardingRant />
+          <h2 className="text-2xl font-semibold mb-1">Setup</h2>
           <p className="text-muted-foreground">
-            Follow these steps to configure LiteChat.
+            Follow these steps to configure Everything.
           </p>
         </div>
 
