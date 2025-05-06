@@ -60,6 +60,8 @@
     /* Custom Font */
     --custom-font-family: var(--font-sans); /* Default fallback */
     --custom-font-size: 16px; /* Default fallback */
+    /* Sticky Header Heights */
+    --card-header-height: 3.5rem; /* Approximate height of CardHeader */
 }
 
 :root {
@@ -337,6 +339,10 @@
     .code-block-header {
         @apply flex items-center justify-between px-3 py-2
       border-b border-border bg-muted/50;
+        position: sticky;
+        /* Adjust top based on the height of the CardHeader */
+        top: var(--card-header-height, 3.5rem);
+        z-index: 5; /* Lower than CardHeader's z-index */
     }
 
     /* Code block content - minimal styling to not override external themes */
@@ -355,6 +361,12 @@
     .folded-content-preview::after {
         content: "";
         @apply absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-card to-transparent;
+    }
+
+    /* Utility for word wrapping in specific contexts */
+    .overflow-wrap-anywhere {
+        overflow-wrap: anywhere;
+        word-break: break-word;
     }
 } /* End @layer utilities */
 

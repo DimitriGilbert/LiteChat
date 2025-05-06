@@ -1,5 +1,5 @@
 // src/components/LiteChat/project-settings/ProjectSettingsModal.tsx
-
+// FULL FILE
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Dialog,
@@ -22,6 +22,8 @@ import { ProjectSettingsPrompt } from "./ProjectSettingsPrompt";
 import { ProjectSettingsParams } from "./ProjectSettingsParams";
 import { ProjectSettingsSync } from "./ProjectSettingsSync";
 import { ProjectSettingsVfs } from "./ProjectSettingsVfs";
+import { ProjectSettingsRules } from "./ProjectSettingsRules";
+import { ProjectSettingsTags } from "./ProjectSettingsTags";
 import { useConversationStore } from "@/store/conversation.store";
 import { TabbedLayout, TabDefinition } from "../common/TabbedLayout";
 import { cn } from "@/lib/utils";
@@ -37,14 +39,12 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   onClose,
   projectId,
 }) => {
-  // Select primitive/stable values or stable functions
   const { getProjectById, updateProject } = useProjectStore(
     useShallow((state) => ({
       getProjectById: state.getProjectById,
       updateProject: state.updateProject,
     })),
   );
-  // Use getState for selector function outside hook dependencies
   const getEffectiveProjectSettings = useProjectStore(
     (state) => state.getEffectiveProjectSettings,
   );
@@ -72,6 +72,8 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   const [presencePenalty, setPresencePenalty] = useState<number | null>(null);
   const [frequencyPenalty, setFrequencyPenalty] = useState<number | null>(null);
   const [syncRepoId, setSyncRepoId] = useState<string | null>(null);
+  const [defaultTagIds, setDefaultTagIds] = useState<string[] | null>(null);
+  const [defaultRuleIds, setDefaultRuleIds] = useState<string[] | null>(null);
 
   const [localTemp, setLocalTemp] = useState(0.7);
   const [localTopP, setLocalTopP] = useState(1.0);
@@ -81,7 +83,6 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("prompt");
 
-  // Compute project and effective settings inside useMemo
   const { project, effectiveSettings } = useMemo(() => {
     const proj = projectId ? getProjectById(projectId) : null;
     const effSettings = projectId
@@ -118,6 +119,8 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
       setPresencePenalty(project.presencePenalty ?? null);
       setFrequencyPenalty(project.frequencyPenalty ?? null);
       setSyncRepoId(project.metadata?.syncRepoId ?? null);
+      setDefaultTagIds(project.defaultTagIds ?? null);
+      setDefaultRuleIds(project.defaultRuleIds ?? null);
       setLocalTemp(effectiveSettings.temperature ?? globalDefaults.temperature);
       setLocalTopP(effectiveSettings.topP ?? globalDefaults.topP ?? 1.0);
       setLocalPresence(
@@ -142,8 +145,9 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
       setPresencePenalty(null);
       setFrequencyPenalty(null);
       setSyncRepoId(null);
+      setDefaultTagIds(null);
+      setDefaultRuleIds(null);
     }
-    // Depend on computed project/settings
   }, [
     isOpen,
     projectId,
@@ -194,7 +198,6 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
     if (!projectId || !project) return;
     setIsSaving(true);
     try {
-      // Use computed project for parentId
       const parentSettings = project.parentId
         ? getEffectiveProjectSettings(project.parentId)
         : {
@@ -206,6 +209,8 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
             topK: globalDefaults.topK,
             presencePenalty: globalDefaults.presencePenalty,
             frequencyPenalty: globalDefaults.frequencyPenalty,
+            defaultTagIds: null,
+            defaultRuleIds: null,
           };
       const parentSyncRepoId = project.parentId
         ? getEffectiveSyncRepoId(project.parentId)
@@ -219,26 +224,49 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
       if (systemPrompt !== parentSettings.systemPrompt)
         updates.systemPrompt = systemPrompt;
       else updates.systemPrompt = undefined;
+
       if (modelId !== parentSettings.modelId) updates.modelId = modelId;
       else updates.modelId = undefined;
+
       if (temperature !== parentSettings.temperature)
         updates.temperature = temperature;
       else updates.temperature = undefined;
+
       if (maxTokens !== parentSettings.maxTokens) updates.maxTokens = maxTokens;
       else updates.maxTokens = undefined;
+
       if (topP !== parentSettings.topP) updates.topP = topP;
       else updates.topP = undefined;
+
       if (topK !== parentSettings.topK) updates.topK = topK;
       else updates.topK = undefined;
+
       if (presencePenalty !== parentSettings.presencePenalty)
         updates.presencePenalty = presencePenalty;
       else updates.presencePenalty = undefined;
+
       if (frequencyPenalty !== parentSettings.frequencyPenalty)
         updates.frequencyPenalty = frequencyPenalty;
       else updates.frequencyPenalty = undefined;
+
       if (syncRepoId !== parentSyncRepoId)
         metadataUpdates.syncRepoId = syncRepoId;
       else delete metadataUpdates.syncRepoId;
+
+      if (
+        JSON.stringify(defaultTagIds) !==
+        JSON.stringify(parentSettings.defaultTagIds)
+      )
+        updates.defaultTagIds = defaultTagIds;
+      else updates.defaultTagIds = undefined;
+
+      if (
+        JSON.stringify(defaultRuleIds) !==
+        JSON.stringify(parentSettings.defaultRuleIds)
+      )
+        updates.defaultRuleIds = defaultRuleIds;
+      else updates.defaultRuleIds = undefined;
+
       updates.metadata = metadataUpdates;
 
       await updateProject(projectId, updates);
@@ -252,7 +280,6 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
     }
   };
 
-  // Define tabs for the layout
   const tabs: TabDefinition[] = useMemo(
     () => [
       {
@@ -319,6 +346,24 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
         ),
       },
       {
+        value: "rules-tags",
+        label: "Rules & Tags",
+        content: (
+          <div className="space-y-6">
+            <ProjectSettingsRules
+              defaultRuleIds={defaultRuleIds}
+              setDefaultRuleIds={setDefaultRuleIds}
+              isSaving={isSaving}
+            />
+            <ProjectSettingsTags
+              defaultTagIds={defaultTagIds}
+              setDefaultTagIds={setDefaultTagIds}
+              isSaving={isSaving}
+            />
+          </div>
+        ),
+      },
+      {
         value: "sync",
         label: "Sync",
         content: (
@@ -337,7 +382,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
         content: (
           <ProjectSettingsVfs
             projectId={projectId}
-            projectName={project?.name ?? null} // Use computed project
+            projectName={project?.name ?? null}
             isSaving={isSaving}
           />
         ),
@@ -353,6 +398,8 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
       presencePenalty,
       frequencyPenalty,
       syncRepoId,
+      defaultTagIds,
+      defaultRuleIds,
       effectiveSettings,
       globalDefaults,
       globalModelId,
@@ -372,9 +419,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
         className={cn(
-          // Base styles
           "w-[95vw] h-[85vh] flex flex-col p-0",
-          // Responsive overrides
           "sm:w-[90vw] sm:max-w-[800px]",
           "md:h-[75vh]",
           "min-h-[500px] max-h-[90vh]",
@@ -388,15 +433,12 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Use TabbedLayout */}
         <TabbedLayout
           tabs={tabs}
           initialValue={activeTab}
           onValueChange={setActiveTab}
           className="flex-grow overflow-hidden px-4 md:px-6"
-          // Adjust list padding for mobile
           listClassName="-mx-4 md:-mx-6 px-2 md:px-6 py-1 md:py-0"
-          // Adjust content padding for mobile
           contentContainerClassName="pb-4 md:pb-6 pr-1 md:pr-2 -mr-1 md:-mr-2"
           scrollable={true}
         />

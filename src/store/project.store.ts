@@ -1,16 +1,17 @@
 // src/store/project.store.ts
-
+// FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { Project } from "@/types/litechat/project";
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
-import { dirname, buildPath } from "@/lib/litechat/file-manager-utils";
+import { normalizePath } from "@/lib/litechat/file-manager-utils";
 import { useSettingsStore } from "./settings.store";
-import { useConversationStore } from "./conversation.store";
-import { useVfsStore } from "./vfs.store";
 import { useProviderStore } from "./provider.store";
+import { useConversationStore } from "./conversation.store";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { ModEvent } from "@/types/litechat/modding";
 
 interface ProjectState {
   projects: Project[];
@@ -32,9 +33,7 @@ interface ProjectActions {
   ) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   getProjectById: (id: string | null) => Project | undefined;
-  getProjectHierarchy: (
-    projectId: string | null,
-  ) => { id: string; name: string }[];
+  getTopLevelProjectId: (id: string | null) => string | null;
   getEffectiveProjectSettings: (projectId: string | null) => {
     systemPrompt: string | null;
     modelId: string | null;
@@ -44,6 +43,8 @@ interface ProjectActions {
     topK: number | null;
     presencePenalty: number | null;
     frequencyPenalty: number | null;
+    defaultTagIds: string[] | null;
+    defaultRuleIds: string[] | null;
   };
 }
 
@@ -67,18 +68,20 @@ export const useProjectStore = create(
     addProject: async (projectData) => {
       const newId = nanoid();
       const now = new Date();
-      const parentId = projectData.parentId ?? null;
-      const parentProject = parentId ? get().getProjectById(parentId) : null;
-      const parentPath = parentProject ? parentProject.path : "/";
-      const newPath = buildPath(parentPath, projectData.name);
+      const parentPath = projectData.parentId
+        ? (get().getProjectById(projectData.parentId)?.path ?? "/")
+        : "/";
+      const newPath = normalizePath(
+        `${parentPath}/${projectData.name.replace(/\s+/g, "-").toLowerCase()}-${newId.substring(0, 4)}`,
+      );
 
       const newProject: Project = {
         id: newId,
+        path: newPath,
         createdAt: now,
         updatedAt: now,
         name: projectData.name,
-        parentId: parentId,
-        path: newPath,
+        parentId: projectData.parentId ?? null,
         systemPrompt: projectData.systemPrompt ?? null,
         modelId: projectData.modelId ?? null,
         temperature: projectData.temperature ?? null,
@@ -87,32 +90,24 @@ export const useProjectStore = create(
         topK: projectData.topK ?? null,
         presencePenalty: projectData.presencePenalty ?? null,
         frequencyPenalty: projectData.frequencyPenalty ?? null,
+        defaultTagIds: projectData.defaultTagIds ?? null,
+        defaultRuleIds: projectData.defaultRuleIds ?? null,
         metadata: projectData.metadata ?? {},
       };
 
-      set((state) => {
-        state.projects.push(newProject);
-        state.projects.sort(
-          (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-        );
-      });
-
       try {
-        const projectToSave = get().getProjectById(newId);
-        if (projectToSave) {
-          await PersistenceService.saveProject(projectToSave);
-          // Initialize VFS for the new project immediately
-          await useVfsStore.getState().initializeVFS(newId);
-        } else {
-          throw new Error("Failed to retrieve newly added project state");
-        }
+        await PersistenceService.saveProject(newProject);
+        set((state) => {
+          state.projects.unshift(newProject);
+          state.projects.sort(
+            (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+          );
+        });
+        emitter.emit(ModEvent.PROJECT_ADDED, { project: newProject });
         return newId;
       } catch (e) {
         console.error("ProjectStore: Error adding project", e);
-        set((state) => ({
-          error: "Failed to save new project",
-          projects: state.projects.filter((p) => p.id !== newId),
-        }));
+        set({ error: "Failed to save new project" });
         throw e;
       }
     },
@@ -124,82 +119,73 @@ export const useProjectStore = create(
         return;
       }
 
-      let newPath = originalProject.path;
-      if (updates.name && updates.name !== originalProject.name) {
-        const parentPath = dirname(originalProject.path);
-        newPath = buildPath(parentPath, updates.name);
-      }
-
       const updatedProjectData: Project = {
         ...originalProject,
         ...updates,
-        path: newPath,
         updatedAt: new Date(),
       };
 
-      set((state) => {
-        const index = state.projects.findIndex((p) => p.id === id);
-        if (index !== -1) {
-          state.projects[index] = updatedProjectData;
-          state.projects.sort(
-            (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-          );
-        }
-      });
+      if (updates.name && updates.name !== originalProject.name) {
+        const parentPath = originalProject.parentId
+          ? (get().getProjectById(originalProject.parentId)?.path ?? "/")
+          : "/";
+        updatedProjectData.path = normalizePath(
+          `${parentPath}/${updates.name.replace(/\s+/g, "-").toLowerCase()}-${id.substring(0, 4)}`,
+        );
+      }
 
       try {
         await PersistenceService.saveProject(updatedProjectData);
-      } catch (e) {
-        console.error("ProjectStore: Error updating project", e);
         set((state) => {
           const index = state.projects.findIndex((p) => p.id === id);
           if (index !== -1) {
-            state.projects[index] = originalProject;
+            state.projects[index] = updatedProjectData;
             state.projects.sort(
               (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
             );
           }
-          state.error = "Failed to save project update";
         });
+        emitter.emit(ModEvent.PROJECT_UPDATED, {
+          projectId: id,
+          updates: updatedProjectData,
+        });
+      } catch (e) {
+        console.error("ProjectStore: Error updating project", e);
+        set({ error: "Failed to save project update" });
         throw e;
       }
     },
 
     deleteProject: async (id) => {
-      const projectToDelete = get().getProjectById(id);
+      const projectToDelete = get().projects.find((p) => p.id === id);
       if (!projectToDelete) return;
 
-      const childProjectIds = get()
-        .projects.filter((p) => p.parentId === id)
-        .map((p) => p.id);
-      const allIdsToDelete = [id, ...childProjectIds];
-
-      set((state) => ({
-        projects: state.projects.filter((p) => !allIdsToDelete.includes(p.id)),
-      }));
-
-      // Unlink conversations associated with the deleted projects
-      useConversationStore
-        .getState()
-        ._unlinkConversationsFromProjects(allIdsToDelete);
+      const projectsToDeleteIds = new Set<string>();
+      const findDescendants = (currentId: string) => {
+        projectsToDeleteIds.add(currentId);
+        get()
+          .projects.filter((p) => p.parentId === currentId)
+          .forEach((child) => findDescendants(child.id));
+      };
+      findDescendants(id);
 
       try {
         await PersistenceService.deleteProject(id);
-        // VFS deletion should be handled separately if needed, maybe via settings
-        toast.success(`Project "${projectToDelete.name}" deleted.`);
+        set((state) => ({
+          projects: state.projects.filter(
+            (p) => !projectsToDeleteIds.has(p.id),
+          ),
+        }));
+        useConversationStore
+          .getState()
+          ._unlinkConversationsFromProjects(Array.from(projectsToDeleteIds));
+        emitter.emit(ModEvent.PROJECT_DELETED, { projectId: id });
+        toast.success(
+          `Project "${projectToDelete.name}" and its contents deleted.`,
+        );
       } catch (e) {
         console.error("ProjectStore: Error deleting project", e);
-        set((state) => {
-          // Re-add the deleted projects if deletion failed
-          const projectsToAddBack = get()
-            .projects.filter((p) => allIdsToDelete.includes(p.id))
-            .concat(projectToDelete);
-          state.projects.push(...projectsToAddBack);
-          state.projects.sort(
-            (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-          );
-          state.error = "Failed to delete project";
-        });
+        set({ error: "Failed to delete project" });
         throw e;
       }
     },
@@ -209,114 +195,93 @@ export const useProjectStore = create(
       return get().projects.find((p) => p.id === id);
     },
 
-    getProjectHierarchy: (projectId) => {
-      const hierarchy: { id: string; name: string }[] = [];
-      let currentId = projectId;
-      while (currentId) {
-        const project = get().getProjectById(currentId);
-        if (project) {
-          hierarchy.unshift({ id: project.id, name: project.name });
-          currentId = project.parentId;
-        } else {
-          break;
-        }
+    getTopLevelProjectId: (id) => {
+      if (!id) return null;
+      let current = get().getProjectById(id);
+      if (!current) return null;
+      while (current.parentId) {
+        const parent = get().getProjectById(current.parentId);
+        if (!parent) break;
+        current = parent;
       }
-      return hierarchy;
+      return current.id;
     },
 
     getEffectiveProjectSettings: (projectId) => {
       const globalSettings = useSettingsStore.getState();
-      // Get the globally selected model ID from ProviderStore
       const globalModelId = useProviderStore.getState().selectedModelId;
 
-      let currentId = projectId;
-      let settings = {
-        systemPrompt: null as string | null,
-        modelId: null as string | null,
-        temperature: null as number | null,
-        maxTokens: null as number | null,
-        topP: null as number | null,
-        topK: null as number | null,
-        presencePenalty: null as number | null,
-        frequencyPenalty: null as number | null,
+      const defaults = {
+        systemPrompt: globalSettings.globalSystemPrompt,
+        modelId: globalModelId,
+        temperature: globalSettings.temperature,
+        maxTokens: globalSettings.maxTokens,
+        topP: globalSettings.topP,
+        topK: globalSettings.topK,
+        presencePenalty: globalSettings.presencePenalty,
+        frequencyPenalty: globalSettings.frequencyPenalty,
+        defaultTagIds: null,
+        defaultRuleIds: null,
       };
 
-      // Traverse up the hierarchy
-      while (currentId) {
-        const project = get().getProjectById(currentId);
-        if (project) {
-          if (
-            settings.systemPrompt === null &&
-            project.systemPrompt !== null &&
-            project.systemPrompt !== undefined
-          )
-            settings.systemPrompt = project.systemPrompt;
-          if (
-            settings.modelId === null &&
-            project.modelId !== null &&
-            project.modelId !== undefined
-          )
-            settings.modelId = project.modelId;
-          if (
-            settings.temperature === null &&
-            project.temperature !== null &&
-            project.temperature !== undefined
-          )
-            settings.temperature = project.temperature;
-          if (
-            settings.maxTokens === null &&
-            project.maxTokens !== null &&
-            project.maxTokens !== undefined
-          )
-            settings.maxTokens = project.maxTokens;
-          if (
-            settings.topP === null &&
-            project.topP !== null &&
-            project.topP !== undefined
-          )
-            settings.topP = project.topP;
-          if (
-            settings.topK === null &&
-            project.topK !== null &&
-            project.topK !== undefined
-          )
-            settings.topK = project.topK;
-          if (
-            settings.presencePenalty === null &&
-            project.presencePenalty !== null &&
-            project.presencePenalty !== undefined
-          )
-            settings.presencePenalty = project.presencePenalty;
-          if (
-            settings.frequencyPenalty === null &&
-            project.frequencyPenalty !== null &&
-            project.frequencyPenalty !== undefined
-          )
-            settings.frequencyPenalty = project.frequencyPenalty;
-
-          currentId = project.parentId;
-        } else {
-          break;
-        }
+      if (!projectId) {
+        return defaults;
       }
 
-      // Apply global defaults if still null
-      if (settings.systemPrompt === null)
-        settings.systemPrompt = globalSettings.globalSystemPrompt;
-      // Use globalModelId from ProviderStore as the final fallback
-      if (settings.modelId === null) settings.modelId = globalModelId;
-      if (settings.temperature === null)
-        settings.temperature = globalSettings.temperature;
-      if (settings.maxTokens === null)
-        settings.maxTokens = globalSettings.maxTokens;
-      if (settings.topP === null) settings.topP = globalSettings.topP;
-      if (settings.topK === null) settings.topK = globalSettings.topK;
-      if (settings.presencePenalty === null)
-        settings.presencePenalty = globalSettings.presencePenalty;
-      if (settings.frequencyPenalty === null)
-        settings.frequencyPenalty = globalSettings.frequencyPenalty;
+      const project = get().getProjectById(projectId);
+      if (!project) {
+        return defaults;
+      }
 
-      return settings;
+      const parentSettings = project.parentId
+        ? get().getEffectiveProjectSettings(project.parentId)
+        : defaults;
+
+      return {
+        systemPrompt:
+          project.systemPrompt !== null && project.systemPrompt !== undefined
+            ? project.systemPrompt
+            : parentSettings.systemPrompt,
+        modelId:
+          project.modelId !== null && project.modelId !== undefined
+            ? project.modelId
+            : parentSettings.modelId,
+        temperature:
+          project.temperature !== null && project.temperature !== undefined
+            ? project.temperature
+            : parentSettings.temperature,
+        maxTokens:
+          project.maxTokens !== null && project.maxTokens !== undefined
+            ? project.maxTokens
+            : parentSettings.maxTokens,
+        topP:
+          project.topP !== null && project.topP !== undefined
+            ? project.topP
+            : parentSettings.topP,
+        topK:
+          project.topK !== null && project.topK !== undefined
+            ? project.topK
+            : parentSettings.topK,
+        presencePenalty:
+          project.presencePenalty !== null &&
+          project.presencePenalty !== undefined
+            ? project.presencePenalty
+            : parentSettings.presencePenalty,
+        frequencyPenalty:
+          project.frequencyPenalty !== null &&
+          project.frequencyPenalty !== undefined
+            ? project.frequencyPenalty
+            : parentSettings.frequencyPenalty,
+        defaultTagIds:
+          project.defaultTagIds !== null && project.defaultTagIds !== undefined
+            ? project.defaultTagIds
+            : parentSettings.defaultTagIds,
+        defaultRuleIds:
+          project.defaultRuleIds !== null &&
+          project.defaultRuleIds !== undefined
+            ? project.defaultRuleIds
+            : parentSettings.defaultRuleIds,
+      };
     },
   })),
 );

@@ -174,7 +174,6 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
         <li
           key={item.id}
           className={cn(
-            // Use flex, justify-between, items-center for the main layout
             "relative flex justify-between items-center group p-1.5 text-xs rounded",
             "border border-transparent",
             !isEditingThis && "hover:bg-muted/50 hover:text-primary/80",
@@ -183,13 +182,11 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
               : "",
             isEditingThis && "bg-muted ring-1 ring-primary",
             !isEditingThis && "cursor-pointer",
-            // Remove overflow-hidden from li
           )}
           style={{ paddingLeft: `${0.375 + level * 0.75}rem` }}
           onClick={handleItemClick}
           title={!isEditingThis ? displayName : ""}
         >
-          {/* Main Content Area - Allow shrinking, ensure truncation works */}
           <div className="flex items-center min-w-0 gap-1 flex-grow mr-1">
             {isProject && hasChildren && (
               <span
@@ -225,20 +222,17 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                 disabled={isSavingEdit}
               />
             ) : (
-              // Ensure the span itself truncates
-              <span className="truncate flex-shrink min-w-0">
-                {displayName}
-              </span>
+              <span className="truncate min-w-0 flex-1">{displayName}</span>
             )}
             {syncIndicator}
           </div>
 
-          {/* Action Buttons Area - No absolute positioning, flex-shrink-0 */}
           <div
             className={cn(
-              "flex items-center flex-shrink-0 ml-1", // Use margin-left
-              "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
-              isEditingThis ? "opacity-100" : "",
+              "items-center flex-shrink-0 ml-1",
+              isEditingThis
+                ? "flex"
+                : "hidden group-hover:flex transition-all duration-150",
             )}
             onClick={(e) => e.stopPropagation()}
           >

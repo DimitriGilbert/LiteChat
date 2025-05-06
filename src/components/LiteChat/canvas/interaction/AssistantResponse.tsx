@@ -1,7 +1,13 @@
 // src/components/LiteChat/canvas/interaction/AssistantResponse.tsx
 // FULL FILE
 import React, { useState, useCallback } from "react";
-import { ChevronDownIcon, ChevronUpIcon, BrainCircuitIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  BrainCircuitIcon,
+  ClipboardIcon,
+  CheckIcon,
+} from "lucide-react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import {
   useMarkdownParser,
@@ -11,8 +17,8 @@ import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRendere
 import { ToolCallPart, ToolResultPart } from "ai";
 import { ToolCallDisplay } from "@/components/LiteChat/canvas/tool/CallDisplay";
 import { ToolResultDisplay } from "@/components/LiteChat/canvas/tool/ResultDisplay";
+import { toast } from "sonner";
 
-// Component to render static markdown content (moved from InteractionCard)
 const StaticContentView: React.FC<{ markdownContent: string | null }> = ({
   markdownContent,
 }) => {
@@ -23,7 +29,6 @@ const StaticContentView: React.FC<{ markdownContent: string | null }> = ({
   }
 
   return (
-    // Add overflow-wrap here for the main text content
     <div className="overflow-wrap-anywhere">
       {parsedContent.map((item, index) => {
         if (typeof item === "string") {
@@ -54,7 +59,7 @@ interface AssistantResponseProps {
   response: any | null;
   toolCalls: string[] | undefined;
   toolResults: string[] | undefined;
-  reasoning: string | undefined; // Add reasoning prop
+  reasoning: string | undefined;
   isError: boolean;
   errorMessage: string | undefined;
   isFolded: boolean;
@@ -65,19 +70,34 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
   response,
   toolCalls,
   toolResults,
-  reasoning, // Destructure reasoning
+  reasoning,
   isError,
   errorMessage,
   isFolded,
   toggleFold,
 }) => {
   const [isReasoningFolded, setIsReasoningFolded] = useState(true);
+  const [isReasoningCopied, setIsReasoningCopied] = useState(false);
+
   const toggleReasoningFold = useCallback(
     () => setIsReasoningFolded((prev) => !prev),
     [],
   );
 
-  const hasReasoning = !!reasoning; // Check if reasoning exists
+  const handleCopyReasoning = useCallback(async () => {
+    if (!reasoning) return;
+    try {
+      await navigator.clipboard.writeText(reasoning);
+      setIsReasoningCopied(true);
+      toast.success("Reasoning copied!");
+      setTimeout(() => setIsReasoningCopied(false), 1500);
+    } catch (err) {
+      toast.error("Failed to copy reasoning.");
+      console.error("Clipboard copy failed for reasoning:", err);
+    }
+  }, [reasoning]);
+
+  const hasReasoning = !!reasoning;
   const hasResponseContent =
     response && (typeof response !== "string" || response.trim().length > 0);
   const hasToolCalls = toolCalls && toolCalls.length > 0;
@@ -108,35 +128,58 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
           <p>{errorMessage}</p>
         </div>
       )}
-      {/* Reasoning Display */}
       {hasReasoning && (
         <div className="my-2 p-2 border border-blue-500/30 bg-blue-500/10 rounded-md text-xs">
-          <div className="flex items-center justify-between mb-1">
+          <div
+            className="flex items-center justify-between mb-1 cursor-pointer group/reasoning"
+            onClick={toggleReasoningFold}
+          >
             <span className="font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1">
               <BrainCircuitIcon className="h-3.5 w-3.5" /> Reasoning
             </span>
-            <ActionTooltipButton
-              tooltipText={
-                isReasoningFolded ? "Show Reasoning" : "Hide Reasoning"
-              }
-              onClick={toggleReasoningFold}
-              aria-label={
-                isReasoningFolded ? "Show reasoning" : "Hide reasoning"
-              }
-              icon={isReasoningFolded ? <ChevronDownIcon /> : <ChevronUpIcon />}
-              iconClassName="h-3 w-3"
-              className="h-5 w-5 text-muted-foreground"
-            />
+            <div className="flex items-center opacity-0 group-hover/reasoning:opacity-100 focus-within:opacity-100 transition-opacity">
+              <ActionTooltipButton
+                tooltipText="Copy Reasoning"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopyReasoning();
+                }}
+                aria-label="Copy reasoning"
+                icon={
+                  isReasoningCopied ? (
+                    <CheckIcon className="text-green-500" />
+                  ) : (
+                    <ClipboardIcon />
+                  )
+                }
+                className="h-5 w-5 text-muted-foreground"
+              />
+              <ActionTooltipButton
+                tooltipText={
+                  isReasoningFolded ? "Show Reasoning" : "Hide Reasoning"
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleReasoningFold();
+                }}
+                aria-label={
+                  isReasoningFolded ? "Show reasoning" : "Hide reasoning"
+                }
+                icon={
+                  isReasoningFolded ? <ChevronDownIcon /> : <ChevronUpIcon />
+                }
+                iconClassName="h-3 w-3"
+                className="h-5 w-5 text-muted-foreground"
+              />
+            </div>
           </div>
           {!isReasoningFolded && (
-            // Add overflow-wrap to pre tag for reasoning
             <pre className="whitespace-pre-wrap text-xs font-mono p-2 bg-background/30 rounded mt-1 overflow-wrap-anywhere">
               {reasoning!}
             </pre>
           )}
         </div>
       )}
-      {/* Render Tool Calls */}
       {toolCalls?.map((callStr, idx) => {
         try {
           const parsedCall = JSON.parse(callStr) as ToolCallPart;
@@ -150,7 +193,6 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
           );
         }
       })}
-      {/* Render Tool Results */}
       {toolResults?.map((resStr, idx) => {
         try {
           const parsedResult = JSON.parse(resStr) as ToolResultPart;
@@ -166,9 +208,7 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
           );
         }
       })}
-      {/* Render Text Response */}
       <StaticContentView markdownContent={response} />
-      {/* Show placeholder if no text and no tools */}
       {!hasResponseContent &&
         !hasToolCalls &&
         !hasToolResults &&

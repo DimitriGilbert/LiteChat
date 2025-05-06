@@ -24,7 +24,6 @@ import { nanoid } from "nanoid";
 export const ConversationService = {
   async submitPrompt(turnData: PromptTurnObject): Promise<void> {
     console.log("[ConversationService] submitPrompt called", turnData);
-    // Read necessary state using getState()
     const interactionStoreState = useInteractionStore.getState();
     const projectStoreState = useProjectStore.getState();
     const promptState = usePromptStateStore.getState();
@@ -44,8 +43,9 @@ export const ConversationService = {
     const currentConversation =
       conversationStoreState.getConversationById(conversationId);
     const currentProjectId = currentConversation?.projectId ?? null;
+    const effectiveSettings =
+      projectStoreState.getEffectiveProjectSettings(currentProjectId);
 
-    // --- Check if this is the first interaction ---
     const isFirstInteraction =
       interactionStoreState.interactions.filter(
         (i) => i.conversationId === conversationId,
@@ -55,9 +55,7 @@ export const ConversationService = {
       settingsStoreState.autoTitleEnabled &&
       turnData.metadata?.autoTitleEnabledForTurn === true &&
       settingsStoreState.autoTitleModelId;
-    // --- End Check ---
 
-    // 1. Build History
     const currentHistory = interactionStoreState.interactions;
     const completedHistory = currentHistory.filter(
       (i) => i.status === "COMPLETED" && i.type === "message.user_assistant",
@@ -65,22 +63,30 @@ export const ConversationService = {
     const historyMessages: CoreMessage[] =
       buildHistoryMessages(completedHistory);
 
-    // 2. Prepare User Message (Text + Files + Rules)
     let userContent = turnData.content;
     const userMessageContentParts: (TextPart | ImagePart)[] = [];
 
-    // --- Apply Rules ---
-    const activeTagIds = turnData.metadata?.activeTagIds ?? [];
-    const activeRuleIds = turnData.metadata?.activeRuleIds ?? [];
-    const allActiveRuleIds = new Set<string>(activeRuleIds);
-    activeTagIds.forEach((tagId: string) => {
+    const projectDefaultTagIds = effectiveSettings.defaultTagIds ?? [];
+    const projectDefaultRuleIds = effectiveSettings.defaultRuleIds ?? [];
+    const turnActiveTagIds = turnData.metadata?.activeTagIds ?? [];
+    const turnActiveRuleIds = turnData.metadata?.activeRuleIds ?? [];
+
+    const combinedActiveTagIds = Array.from(
+      new Set([...projectDefaultTagIds, ...turnActiveTagIds]),
+    );
+    const combinedActiveRuleIds = Array.from(
+      new Set([...projectDefaultRuleIds, ...turnActiveRuleIds]),
+    );
+
+    const allEffectiveRuleIds = new Set<string>(combinedActiveRuleIds);
+    combinedActiveTagIds.forEach((tagId: string) => {
       rulesStoreState
         .getRulesForTag(tagId)
-        .forEach((rule) => allActiveRuleIds.add(rule.id));
+        .forEach((rule) => allEffectiveRuleIds.add(rule.id));
     });
 
     const activeRules: DbRule[] =
-      rulesStoreState.getRulesByIds(Array.from(allActiveRuleIds)) || [];
+      rulesStoreState.getRulesByIds(Array.from(allEffectiveRuleIds)) || [];
 
     const systemRules = activeRules
       .filter((r) => r.type === "system")
@@ -92,37 +98,32 @@ export const ConversationService = {
       .filter((r) => r.type === "after")
       .map((r) => r.content);
 
-    // Apply 'before' rules
     if (beforeRules.length > 0) {
-      userContent = `${beforeRules.join(`\n`)}
+      userContent = `${beforeRules.join(`
+`)}
 
 ${userContent}`;
     }
-    // Apply 'after' rules
     if (afterRules.length > 0) {
       userContent = `${userContent}
 
-    ${afterRules.join(`\n`)}`;
+    ${afterRules.join(`
+`)}`;
     }
-    // --- End Apply Rules ---
 
-    // Add processed user text content
     if (userContent) {
       userMessageContentParts.push({ type: "text", text: userContent });
     }
 
-    // Process and add file content
     const attachedFilesMeta = turnData.metadata?.attachedFiles ?? [];
     if (attachedFilesMeta.length > 0) {
       const fileContentParts = await this._processFilesForPrompt(
         attachedFilesMeta,
         conversationId,
       );
-      // Prepend file parts to user message content
       userMessageContentParts.unshift(...fileContentParts);
     }
 
-    // Add the user message to history (only if it has content or files)
     if (userMessageContentParts.length > 0) {
       historyMessages.push({ role: "user", content: userMessageContentParts });
     } else {
@@ -131,17 +132,12 @@ ${userContent}`;
       );
     }
 
-    // 3. Get Effective Settings (System Prompt + Rules)
     const turnSystemPrompt = turnData.metadata?.turnSystemPrompt as
       | string
       | undefined;
-    const effectiveSettings =
-      projectStoreState.getEffectiveProjectSettings(currentProjectId);
-    // Prioritize turn prompt, then project, then global
     let baseSystemPrompt =
       turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
 
-    // Apply 'system' rules
     if (systemRules.length > 0) {
       baseSystemPrompt = `${
         baseSystemPrompt
@@ -149,10 +145,10 @@ ${userContent}`;
 
         `
           : ""
-      }${systemRules.join(`\n`)}`;
+      }${systemRules.join(`
+`)}`;
     }
 
-    // 4. Merge Parameters (PromptState + TurnData)
     const finalParameters = {
       temperature: promptState.temperature,
       max_tokens: promptState.maxTokens,
@@ -162,7 +158,6 @@ ${userContent}`;
       frequency_penalty: promptState.frequencyPenalty,
       ...(turnData.parameters ?? {}),
     };
-    // Clean null/undefined parameters
     Object.keys(finalParameters).forEach((key) => {
       if (
         finalParameters[key as keyof typeof finalParameters] === null ||
@@ -172,13 +167,11 @@ ${userContent}`;
       }
     });
 
-    // 5. Construct PromptObject for main interaction
     const promptObject: PromptObject = {
       system: baseSystemPrompt,
       messages: historyMessages,
       parameters: finalParameters,
       metadata: {
-        // Remove rule/tag/auto-title activation metadata before sending to AI service
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         ...(({
           turnSystemPrompt,
@@ -186,32 +179,30 @@ ${userContent}`;
           activeRuleIds,
           autoTitleEnabledForTurn,
           ...restMeta
-        }) => restMeta)(turnData.metadata ?? {}),
+        }) => ({
+          ...restMeta,
+          effectivelyAppliedTagIds: combinedActiveTagIds,
+          effectivelyAppliedRuleIds: Array.from(allEffectiveRuleIds),
+        }))(turnData.metadata ?? {}),
         modelId: promptState.modelId ?? undefined,
-        // Store only basic file info (no content) in the final prompt metadata sent to AI Service
         attachedFiles: turnData.metadata.attachedFiles?.map(
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           ({ contentBase64, contentText, ...rest }) => rest,
         ),
       },
-      // toolChoice and tools will be added by InteractionService based on metadata
     };
 
-    // 6. Delegate main interaction to InteractionService
     try {
-      // Don't await this if title generation needs to run in parallel
       const mainInteractionPromise = InteractionService.startInteraction(
         promptObject,
         conversationId,
         turnData,
       );
 
-      // --- Trigger Title Generation Asynchronously ---
       if (shouldGenerateTitle) {
         console.log(
           "[ConversationService] Triggering asynchronous title generation.",
         );
-        // Don't await this promise, let it run in the background
         this.generateConversationTitle(
           conversationId,
           turnData,
@@ -221,24 +212,18 @@ ${userContent}`;
             "[ConversationService] Background title generation failed:",
             titleError,
           );
-          // Optionally toast a silent error or log it
         });
       }
-      // --- End Title Generation Trigger ---
-
-      // Await the main interaction promise *after* potentially starting title gen
       await mainInteractionPromise;
     } catch (error) {
       console.error("[ConversationService] Error starting interaction:", error);
       toast.error(
         `Failed to start interaction: ${error instanceof Error ? error.message : String(error)}`,
       );
-      // Re-throw or handle as needed if LiteChat needs to know about the failure
       throw error;
     }
   },
 
-  // --- New function for Title Generation ---
   async generateConversationTitle(
     conversationId: string,
     originalTurnData: PromptTurnObject,
@@ -253,17 +238,14 @@ ${userContent}`;
       return;
     }
 
-    // 1. Prepare simplified prompt content
     let titlePromptContent = originalTurnData.content;
 
-    // Truncate based on settings
     if (titlePromptContent.length > settings.autoTitlePromptMaxLength) {
       titlePromptContent =
         titlePromptContent.substring(0, settings.autoTitlePromptMaxLength) +
         "...";
     }
 
-    // Optionally add file info
     if (
       settings.autoTitleIncludeFiles &&
       originalTurnData.metadata?.attachedFiles?.length
@@ -276,7 +258,6 @@ ${userContent}`;
 [Attached files: ${fileNames}]`;
     }
 
-    // Optionally add rules info
     if (settings.autoTitleIncludeRules && activeRulesForTurn.length > 0) {
       const ruleNames = activeRulesForTurn.map((r) => r.name).join(", ");
       titlePromptContent += `
@@ -284,9 +265,7 @@ ${userContent}`;
 [Active rules: ${ruleNames}]`;
     }
 
-    // 2. Construct Title Generation Prompt Object
     const titlePromptObject: PromptObject = {
-      // Use a specific system prompt for title generation
       system:
         "Generate a concise, descriptive title (max 8-10 words) for the following user prompt. Output ONLY the title text, nothing else.",
       messages: [{ role: "user", content: titlePromptContent }],
@@ -298,13 +277,10 @@ ${userContent}`;
         modelId: settings.autoTitleModelId,
         isTitleGeneration: true,
       },
-      // No tools needed for title generation
       tools: undefined,
       toolChoice: "none",
     };
 
-    // 3. Create a dummy PromptTurnObject for the title generation interaction record
-    // This won't be displayed but helps track the request
     const titleTurnData: PromptTurnObject = {
       id: nanoid(),
       content: `[Generate title based on: ${originalTurnData.content.substring(0, 50)}...]`,
@@ -315,7 +291,6 @@ ${userContent}`;
       },
     };
 
-    // 4. Call InteractionService with specific type
     try {
       await InteractionService.startInteraction(
         titlePromptObject,
@@ -328,17 +303,14 @@ ${userContent}`;
         "[ConversationService] Error starting title generation interaction:",
         error,
       );
-      // Don't toast here, as it's a background task
     }
   },
-  // --- End Title Generation Function ---
 
   async regenerateInteraction(interactionId: string): Promise<void> {
     console.log(
       "[ConversationService] regenerateInteraction called",
       interactionId,
     );
-    // Read necessary state using getState()
     const interactionStoreState = useInteractionStore.getState();
     const projectStoreState = useProjectStore.getState();
     const promptState = usePromptStateStore.getState();
@@ -359,8 +331,9 @@ ${userContent}`;
     const currentConversation =
       conversationStoreState.getConversationById(conversationId);
     const currentProjectId = currentConversation?.projectId ?? null;
+    const effectiveSettings =
+      projectStoreState.getEffectiveProjectSettings(currentProjectId);
 
-    // 1. Build History up to the point of regeneration
     const historyUpToIndex = targetInteraction.index;
     const historyInteractions = interactionStoreState.interactions
       .filter(
@@ -374,22 +347,29 @@ ${userContent}`;
     const historyMessages: CoreMessage[] =
       buildHistoryMessages(historyInteractions);
 
-    // 2. Prepare User Message from original turn data (Apply rules again)
     let userContent = originalTurnData.content;
     const userMessageContentParts: (TextPart | ImagePart)[] = [];
 
-    // --- Apply Rules (from original turn data) ---
-    const activeTagIds = originalTurnData.metadata?.activeTagIds ?? [];
-    const activeRuleIds = originalTurnData.metadata?.activeRuleIds ?? [];
-    const allActiveRuleIds = new Set<string>(activeRuleIds);
-    activeTagIds.forEach((tagId: string) => {
+    const originalEffectivelyAppliedTagIds =
+      targetInteraction.metadata?.effectivelyAppliedTagIds ??
+      originalTurnData.metadata?.activeTagIds ??
+      [];
+    const originalEffectivelyAppliedRuleIds =
+      targetInteraction.metadata?.effectivelyAppliedRuleIds ??
+      originalTurnData.metadata?.activeRuleIds ??
+      [];
+
+    const allEffectiveRuleIds = new Set<string>(
+      originalEffectivelyAppliedRuleIds,
+    );
+    originalEffectivelyAppliedTagIds.forEach((tagId: string) => {
       rulesStoreState
         .getRulesForTag(tagId)
-        .forEach((rule) => allActiveRuleIds.add(rule.id));
+        .forEach((rule) => allEffectiveRuleIds.add(rule.id));
     });
 
     const activeRules: DbRule[] =
-      rulesStoreState.getRulesByIds(Array.from(allActiveRuleIds)) || [];
+      rulesStoreState.getRulesByIds(Array.from(allEffectiveRuleIds)) || [];
 
     const beforeRules = activeRules
       .filter((r) => r.type === "before")
@@ -398,19 +378,18 @@ ${userContent}`;
       .filter((r) => r.type === "after")
       .map((r) => r.content);
 
-    // Apply 'before' rules
     if (beforeRules.length > 0) {
-      userContent = `${beforeRules.join(`\n`)}
+      userContent = `${beforeRules.join(`
+`)}
 
 ${userContent}`;
     }
-    // Apply 'after' rules
     if (afterRules.length > 0) {
       userContent = `${userContent}
 
-    ${afterRules.join(`\n`)}`;
+    ${afterRules.join(`
+`)}`;
     }
-    // --- End Apply Rules ---
 
     if (userContent) {
       userMessageContentParts.push({ type: "text", text: userContent });
@@ -433,17 +412,12 @@ ${userContent}`;
       );
     }
 
-    // 3. Get Effective Settings (System Prompt + Rules)
     const turnSystemPrompt = originalTurnData.metadata?.turnSystemPrompt as
       | string
       | undefined;
-    const effectiveSettings =
-      projectStoreState.getEffectiveProjectSettings(currentProjectId);
-    // Prioritize turn prompt, then project, then global
     let baseSystemPrompt =
       turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
 
-    // Apply 'system' rules (from original turn)
     const systemRules = activeRules
       .filter((r) => r.type === "system")
       .map((r) => r.content);
@@ -454,10 +428,10 @@ ${userContent}`;
 
         `
           : ""
-      }${systemRules.join(`\n`)}`;
+      }${systemRules.join(`
+`)}`;
     }
 
-    // 4. Merge Parameters (Current PromptState + Original TurnData Params)
     const finalParameters = {
       temperature: promptState.temperature,
       max_tokens: promptState.maxTokens,
@@ -476,35 +450,35 @@ ${userContent}`;
       }
     });
 
-    // 5. Construct PromptObject
     const promptObject: PromptObject = {
       system: baseSystemPrompt,
       messages: historyMessages,
       parameters: finalParameters,
       metadata: {
-        // Remove rule/tag/auto-title activation metadata
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         ...(({
           turnSystemPrompt,
           activeTagIds,
           activeRuleIds,
           autoTitleEnabledForTurn,
+          effectivelyAppliedTagIds,
+          effectivelyAppliedRuleIds,
           ...restMeta
-        }) => restMeta)(originalTurnData.metadata ?? {}),
+        }) => ({
+          ...restMeta,
+          effectivelyAppliedTagIds: originalEffectivelyAppliedTagIds,
+          effectivelyAppliedRuleIds: Array.from(allEffectiveRuleIds),
+        }))(originalTurnData.metadata ?? {}),
         modelId: promptState.modelId ?? undefined,
         regeneratedFromId: interactionId,
-        // Store only basic file info (no content)
         attachedFiles: originalAttachedFiles.map(
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           ({ contentBase64, contentText, ...rest }) => rest,
         ),
       },
-      // toolChoice and tools will be added by InteractionService based on metadata
     };
 
-    // 6. Delegate to InteractionService
     try {
-      // Specify the type as regeneration
       await InteractionService.startInteraction(
         promptObject,
         conversationId,
@@ -519,12 +493,10 @@ ${userContent}`;
       toast.error(
         `Failed to start regeneration: ${error instanceof Error ? error.message : String(error)}`,
       );
-      // Re-throw or handle as needed
       throw error;
     }
   },
 
-  // --- Helper to process files (used by submit and regenerate) ---
   async _processFilesForPrompt(
     filesMeta: AttachedFileMetadata[],
     conversationId: string,
@@ -544,14 +516,12 @@ ${userContent}`;
         toast.error(
           `Filesystem unavailable for key ${targetVfsKey}. VFS files cannot be processed.`,
         );
-        // Add placeholders for VFS files if FS failed
         vfsFiles.forEach((fileMeta) => {
           fileContentParts.push({
             type: "text",
             text: `[Skipped VFS file: ${fileMeta.name} - Filesystem unavailable]`,
           });
         });
-        // Set vfsInstance to undefined to skip processing below
         vfsInstance = undefined;
       }
     }
@@ -565,7 +535,6 @@ ${userContent}`;
           console.log(
             `[ConversationService] Fetching VFS file: ${fileMeta.path}`,
           );
-          // Pass the specific fsInstance to readFileOp
           const contentBytes = await VfsOps.readFileOp(fileMeta.path, {
             fsInstance: vfsInstance,
           });
@@ -574,7 +543,6 @@ ${userContent}`;
             contentBytes: contentBytes,
           });
         } else if (fileMeta.source === "vfs" && !vfsInstance) {
-          // Skip VFS files if instance is null (error handled above)
           continue;
         }
 
@@ -595,7 +563,6 @@ ${userContent}`;
     return fileContentParts;
   },
 
-  // --- Helper for VFS Readiness (updated) ---
   async _ensureVfsReady(
     targetVfsKey: string,
   ): Promise<typeof FsType | undefined> {
@@ -603,8 +570,6 @@ ${userContent}`;
       `[ConversationService] Ensuring VFS ready for key "${targetVfsKey}"...`,
     );
     try {
-      // Use forced initialization to get an instance without affecting UI state
-      // Wrap in try...catch as initializeVFS now throws on error
       const fsInstance = await useVfsStore
         .getState()
         .initializeVFS(targetVfsKey, { force: true });
@@ -615,7 +580,6 @@ ${userContent}`;
         `[ConversationService] Failed to ensure VFS ready for key ${targetVfsKey}:`,
         vfsError,
       );
-      // Re-throw the error to be caught by the caller (_processFilesForPrompt)
       throw vfsError;
     }
   },

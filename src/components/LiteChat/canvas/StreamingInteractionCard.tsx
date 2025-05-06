@@ -16,8 +16,16 @@ import { cn } from "@/lib/utils";
 import { useProviderStore } from "@/store/provider.store";
 import { splitModelId } from "@/lib/litechat/provider-helpers";
 import { useSettingsStore } from "@/store/settings.store";
-import { BrainCircuitIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import {
+  BrainCircuitIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  BotIcon,
+  ClipboardIcon,
+  CheckIcon,
+} from "lucide-react";
 import { ActionTooltipButton } from "../common/ActionTooltipButton";
+import { toast } from "sonner";
 
 interface StreamingInteractionCardProps {
   interactionId: string;
@@ -27,7 +35,6 @@ interface StreamingInteractionCardProps {
 
 export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
   React.memo(({ interactionId, onStop, className }) => {
-    // Get interaction data and buffered content
     const { interaction, interactionStatus } = useInteractionStore(
       useShallow((state) => {
         const interaction = state.interactions.find(
@@ -40,21 +47,20 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       }),
     );
 
-    // Get FPS setting
     const streamingRenderFPS = useSettingsStore(
       (state) => state.streamingRenderFPS,
     );
 
-    // Local state for the *displayed* content, updated throttled
     const [displayedContent, setDisplayedContent] = useState("");
-    // Add state for the reasoning buffer content
     const [reasoningContent, setReasoningContent] = useState("");
-    const [isReasoningFolded, setIsReasoningFolded] = useState(true); // State for folding reasoning
+    const [isReasoningFolded, setIsReasoningFolded] = useState(true);
+    const [isResponseFolded, setIsResponseFolded] = useState(false);
+    const [isReasoningCopied, setIsReasoningCopied] = useState(false);
+    const [isResponseCopied, setIsResponseCopied] = useState(false);
 
     const animationFrameRef = useRef<number | null>(null);
     const lastUpdateTimeRef = useRef<number>(0);
 
-    // Effect to handle throttled updates for BOTH buffers
     useEffect(() => {
       const interval = 1000 / streamingRenderFPS;
       let isMounted = true;
@@ -62,14 +68,12 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       const updateDisplay = (timestamp: number) => {
         if (!isMounted) return;
 
-        // Check if the interaction is still streaming
         const isStillStreaming = useInteractionStore
           .getState()
           .streamingInteractionIds.includes(interactionId);
 
         if (isStillStreaming) {
           if (timestamp - lastUpdateTimeRef.current >= interval) {
-            // Get the latest buffer content directly from the store state
             const latestBuffer =
               useInteractionStore.getState().activeStreamBuffers[
                 interactionId
@@ -79,13 +83,11 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
                 interactionId
               ] ?? "";
             setDisplayedContent(latestBuffer);
-            setReasoningContent(latestReasoningBuffer); // Update reasoning content state
+            setReasoningContent(latestReasoningBuffer);
             lastUpdateTimeRef.current = timestamp;
           }
-          // Continue requesting frames
           animationFrameRef.current = requestAnimationFrame(updateDisplay);
         } else {
-          // Ensure the final content is displayed when streaming stops
           const finalBuffer =
             useInteractionStore.getState().activeStreamBuffers[interactionId] ??
             "";
@@ -94,15 +96,13 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
               interactionId
             ] ?? "";
           setDisplayedContent(finalBuffer);
-          setReasoningContent(finalReasoningBuffer); // Update reasoning content state
+          setReasoningContent(finalReasoningBuffer);
           animationFrameRef.current = null;
         }
       };
 
-      // Start the animation loop
       animationFrameRef.current = requestAnimationFrame(updateDisplay);
 
-      // Cleanup function
       return () => {
         isMounted = false;
         if (animationFrameRef.current) {
@@ -110,10 +110,8 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
           animationFrameRef.current = null;
         }
       };
-      // Re-run effect if interactionId or FPS changes
     }, [interactionId, streamingRenderFPS]);
 
-    // Effect to ensure final content is displayed when interaction status changes from STREAMING
     useEffect(() => {
       if (interactionStatus && interactionStatus !== "STREAMING") {
         const finalBuffer =
@@ -124,8 +122,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
             interactionId
           ] ?? "";
         setDisplayedContent(finalBuffer);
-        setReasoningContent(finalReasoningBuffer); // Update reasoning content state
-        // Ensure the animation loop is stopped if it hasn't already
+        setReasoningContent(finalReasoningBuffer);
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
           animationFrameRef.current = null;
@@ -133,7 +130,6 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       }
     }, [interactionStatus, interactionId]);
 
-    // Get provider data using useShallow
     const { dbProviderConfigs, getAllAvailableModelDefsForProvider } =
       useProviderStore(
         useShallow((state) => ({
@@ -143,40 +139,57 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
         })),
       );
 
-    // --- Memoize Model Name Calculation ---
     const displayModelName = useMemo(() => {
       const modelIdFromMeta = interaction?.metadata?.modelId;
       if (!modelIdFromMeta) return "Loading Model...";
-
       const { providerId, modelId: specificModelId } =
         splitModelId(modelIdFromMeta);
-      if (!providerId || !specificModelId) {
-        return modelIdFromMeta;
-      }
-
+      if (!providerId || !specificModelId) return modelIdFromMeta;
       const provider = dbProviderConfigs.find((p) => p.id === providerId);
       const providerName = provider?.name ?? providerId;
-
       const allModels = getAllAvailableModelDefsForProvider(providerId);
       const modelDef = allModels.find((m) => m.id === specificModelId);
-
       return `${modelDef?.name ?? specificModelId} (${providerName})`;
     }, [
       interaction?.metadata?.modelId,
       dbProviderConfigs,
       getAllAvailableModelDefsForProvider,
     ]);
-    // --- End Memoize Model Name Calculation ---
 
     const toggleReasoningFold = useCallback(
       () => setIsReasoningFolded((prev) => !prev),
       [],
     );
+    const toggleResponseFold = useCallback(
+      () => setIsResponseFolded((prev) => !prev),
+      [],
+    );
+
+    const handleCopyReasoning = useCallback(async () => {
+      if (!reasoningContent) return;
+      try {
+        await navigator.clipboard.writeText(reasoningContent);
+        setIsReasoningCopied(true);
+        toast.success("Reasoning copied!");
+        setTimeout(() => setIsReasoningCopied(false), 1500);
+      } catch (err) {
+        toast.error("Failed to copy reasoning.");
+      }
+    }, [reasoningContent]);
+
+    const handleCopyResponse = useCallback(async () => {
+      if (!displayedContent) return;
+      try {
+        await navigator.clipboard.writeText(displayedContent);
+        setIsResponseCopied(true);
+        toast.success("Response copied!");
+        setTimeout(() => setIsResponseCopied(false), 1500);
+      } catch (err) {
+        toast.error("Failed to copy response.");
+      }
+    }, [displayedContent]);
 
     if (!interaction) {
-      console.warn(
-        `StreamingInteractionCard: Interaction data for ${interactionId} not found yet.`,
-      );
       return (
         <div
           className={cn(
@@ -184,7 +197,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
             className,
           )}
         >
-          <div className="h-8 bg-muted rounded w-3/4 mb-4"></div>{" "}
+          <div className="h-8 bg-muted rounded w-3/4 mb-4"></div>
           <div className="mt-3 pt-3 border-t border-border/50">
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-medium text-muted-foreground">
@@ -194,7 +207,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
                 Streaming...
               </span>
             </div>
-            <div className="h-16 bg-muted rounded w-full"></div>{" "}
+            <div className="h-16 bg-muted rounded w-full"></div>
           </div>
         </div>
       );
@@ -205,6 +218,10 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
         onStop(interactionId);
       }
     };
+
+    const canFoldResponse =
+      (displayedContent && displayedContent.trim().length > 0) ||
+      (reasoningContent && reasoningContent.trim().length > 0);
 
     return (
       <div
@@ -217,54 +234,147 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
           <UserPromptDisplay
             turnData={interaction.prompt}
             timestamp={interaction.startedAt}
-            // Indicate assistant is not complete
             isAssistantComplete={false}
           />
         )}
         <div className="mt-3 pt-3 border-t border-border/50">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-medium text-muted-foreground">
-              Assistant ({displayModelName})
-            </span>
-            <span className="text-xs text-muted-foreground">Streaming...</span>
+          <div
+            className={cn(
+              "flex flex-col sm:flex-row justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-20 p-1 -m-1 rounded-t",
+            )}
+          >
+            <div className="flex items-start gap-1 min-w-0 mb-1 sm:mb-0">
+              <BotIcon className="h-4 w-4 text-secondary flex-shrink-0 mt-0.5" />
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-semibold text-secondary truncate mr-1">
+                    Assistant ({displayModelName})
+                  </span>
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity">
+                    {displayedContent && (
+                      <ActionTooltipButton
+                        tooltipText="Copy Response"
+                        onClick={handleCopyResponse}
+                        aria-label="Copy assistant response"
+                        icon={
+                          isResponseCopied ? (
+                            <CheckIcon className="text-green-500" />
+                          ) : (
+                            <ClipboardIcon />
+                          )
+                        }
+                        className="h-5 w-5"
+                      />
+                    )}
+                    {canFoldResponse && (
+                      <ActionTooltipButton
+                        tooltipText={isResponseFolded ? "Unfold" : "Fold"}
+                        onClick={toggleResponseFold}
+                        aria-label={
+                          isResponseFolded ? "Unfold response" : "Fold response"
+                        }
+                        icon={
+                          isResponseFolded ? (
+                            <ChevronDownIcon />
+                          ) : (
+                            <ChevronUpIcon />
+                          )
+                        }
+                        iconClassName="h-3.5 w-3.5"
+                        className="h-5 w-5"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-start flex-shrink-0 gap-1 self-end sm:self-start">
+              <span className="text-xs text-muted-foreground mt-0.5">
+                Streaming...
+              </span>
+            </div>
           </div>
 
-          {/* Display Streaming Reasoning */}
-          {reasoningContent && (
-            <div className="my-2 p-2 border border-blue-500/30 bg-blue-500/10 rounded-md text-xs">
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1">
-                  <BrainCircuitIcon className="h-3.5 w-3.5" /> Reasoning
-                  (Streaming)
-                </span>
-                <ActionTooltipButton
-                  tooltipText={
-                    isReasoningFolded ? "Show Reasoning" : "Hide Reasoning"
-                  }
-                  onClick={toggleReasoningFold}
-                  aria-label={
-                    isReasoningFolded ? "Show reasoning" : "Hide reasoning"
-                  }
-                  icon={
-                    isReasoningFolded ? <ChevronDownIcon /> : <ChevronUpIcon />
-                  }
-                  iconClassName="h-3 w-3"
-                  className="h-5 w-5 text-muted-foreground"
-                />
-              </div>
-              {!isReasoningFolded && (
-                <pre className="whitespace-pre-wrap text-xs font-mono p-2 bg-background/30 rounded mt-1 overflow-wrap-anywhere">
-                  {reasoningContent}
-                </pre>
+          {!isResponseFolded && (
+            <>
+              {reasoningContent && (
+                <div className="my-2 p-2 border border-blue-500/30 bg-blue-500/10 rounded-md text-xs">
+                  <div
+                    className="flex items-center justify-between mb-1 cursor-pointer group/reasoning"
+                    onClick={toggleReasoningFold}
+                  >
+                    <span className="font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                      <BrainCircuitIcon className="h-3.5 w-3.5" /> Reasoning
+                      (Streaming)
+                    </span>
+                    <div className="flex items-center opacity-0 group-hover/reasoning:opacity-100 focus-within:opacity-100 transition-opacity">
+                      <ActionTooltipButton
+                        tooltipText="Copy Reasoning"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyReasoning();
+                        }}
+                        aria-label="Copy reasoning"
+                        icon={
+                          isReasoningCopied ? (
+                            <CheckIcon className="text-green-500" />
+                          ) : (
+                            <ClipboardIcon />
+                          )
+                        }
+                        className="h-5 w-5 text-muted-foreground"
+                      />
+                      <ActionTooltipButton
+                        tooltipText={
+                          isReasoningFolded
+                            ? "Show Reasoning"
+                            : "Hide Reasoning"
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleReasoningFold();
+                        }}
+                        aria-label={
+                          isReasoningFolded
+                            ? "Show reasoning"
+                            : "Hide reasoning"
+                        }
+                        icon={
+                          isReasoningFolded ? (
+                            <ChevronDownIcon />
+                          ) : (
+                            <ChevronUpIcon />
+                          )
+                        }
+                        iconClassName="h-3 w-3"
+                        className="h-5 w-5 text-muted-foreground"
+                      />
+                    </div>
+                  </div>
+                  {!isReasoningFolded && (
+                    <pre className="whitespace-pre-wrap text-xs font-mono p-2 bg-background/30 rounded mt-1 overflow-wrap-anywhere">
+                      {reasoningContent}
+                    </pre>
+                  )}
+                </div>
               )}
+              <StreamingContentView
+                markdownContent={displayedContent}
+                isStreaming={true}
+              />
+            </>
+          )}
+          {isResponseFolded && (
+            <div
+              className="text-xs text-muted-foreground italic cursor-pointer hover:bg-muted/20 p-1 rounded"
+              onClick={toggleResponseFold}
+            >
+              {reasoningContent ? "[Reasoning] " : ""}
+              {displayedContent && typeof displayedContent === "string"
+                ? `"${displayedContent.substring(0, 80)}${displayedContent.length > 80 ? "..." : ""}"`
+                : "[Streaming...]"}
             </div>
           )}
-
-          {/* Render throttled main content */}
-          <StreamingContentView
-            markdownContent={displayedContent}
-            isStreaming={true}
-          />
         </div>
         {onStop && (
           <div className="absolute bottom-1 right-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200">

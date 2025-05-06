@@ -2,7 +2,7 @@
 // FULL FILE
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { TagsIcon } from "lucide-react";
+import { ShieldAlertIcon } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -127,7 +127,7 @@ const RulesControlTrigger: React.FC = () => {
                 disabled={isDisabled}
                 aria-label="Configure Rules & Tags for Next Turn"
               >
-                <TagsIcon className="h-4 w-4" />
+                <ShieldAlertIcon className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
@@ -189,7 +189,7 @@ export function registerRulesControl() {
     // Show only if rules or tags exist
     show: () => {
       const state = useRulesStore.getState();
-      return state.rules.length > 0 || state.tags.length > 0;
+      return state.rules.length > 0;
     },
   });
 
