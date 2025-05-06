@@ -46,6 +46,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
+import { ActionCards } from "./ActionCards";
 
 // Improved step component with animations
 const SetupStep: React.FC<{
@@ -540,6 +541,7 @@ export const EmptyStateSetup: React.FC = () => {
             <MessageSquarePlusIcon className="mr-2 h-4 w-4" />
             {isStartingChat ? "Launching..." : "Start First Chat"}
           </Button>
+          <ActionCards />
         </div>
       ),
       contentClassName: "p-4",
