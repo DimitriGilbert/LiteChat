@@ -67,19 +67,34 @@ export class ErrorBoundary extends Component<Props, State> {
     this.setState({ errorInfo });
   }
 
-  // Modified to only include title in URL parameters
-  private getGitHubIssueUrl(): string {
-    const repoUrl = `${GITHUB_REPO_URL}/issues`;
-    const title = encodeURIComponent(
-      `Crash Report: ${this.state.error?.message.substring(0, 50) ?? "Unknown Error"}`,
-    );
-    // Remove the body parameter from the URL
-    return `${repoUrl}/new?title=${title}`;
+  private getGitHubIssueTitle(): string {
+    const { error, errorInfo } = this.state;
+    let title = "Crash Report: ";
+
+    if (errorInfo?.componentStack) {
+      const firstComponent = errorInfo.componentStack
+        .trim()
+        .split(/\s+at\s+/)[1]
+        ?.split(" ")[0];
+      if (firstComponent) {
+        title += `Error in <${firstComponent}> - `;
+      }
+    }
+
+    title += error?.message.substring(0, 70) ?? "Unknown Error";
+    if (error && error.message.length > 70) {
+      title += "...";
+    }
+    return title;
   }
 
   private generateErrorReport(forGithub: boolean = false): string {
     const { error, errorInfo } = this.state;
-    const nl = forGithub ? "\n" : `\n`;
+    const nl = forGithub
+      ? `
+`
+      : `
+`; // Use markdown line breaks for GitHub
     const codeBlock = forGithub ? "```" : "";
 
     let report = `## LiteChat Error Report${nl}${nl}`;
@@ -132,6 +147,24 @@ Based on this information, what are the likely causes and potential solutions? F
     return prompt;
   }
 
+  private handleReportOnGitHub = async () => {
+    const reportBody = this.generateErrorReport(true);
+    try {
+      await navigator.clipboard.writeText(reportBody);
+      toast.success(
+        "Error report copied to clipboard. Paste it into the GitHub issue body.",
+      );
+      const issueUrl = `${GITHUB_REPO_URL}/issues/new?title=${encodeURIComponent(this.getGitHubIssueTitle())}`;
+      window.open(issueUrl, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      toast.error("Failed to copy error report. Please copy manually.");
+      console.error("Clipboard copy failed for GitHub report:", err);
+      // Still open the link even if copy fails
+      const issueUrl = `${GITHUB_REPO_URL}/issues/new?title=${encodeURIComponent(this.getGitHubIssueTitle())}`;
+      window.open(issueUrl, "_blank", "noopener,noreferrer");
+    }
+  };
+
   public render() {
     if (this.state.hasError) {
       return this.props.fallback ? (
@@ -169,15 +202,8 @@ Based on this information, what are the likely causes and potential solutions? F
                 textToCopy={this.generateAIPrompt()}
                 label="AI Debug Prompt"
               />
-              <Button variant="outline" asChild>
-                <a
-                  // URL now only contains the title
-                  href={this.getGitHubIssueUrl()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <CodeIcon className="mr-2 h-4 w-4" /> Report on GitHub
-                </a>
+              <Button variant="outline" onClick={this.handleReportOnGitHub}>
+                <CodeIcon className="mr-2 h-4 w-4" /> Report on GitHub
               </Button>
             </div>
           </div>
