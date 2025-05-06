@@ -13,6 +13,8 @@ export interface InteractionState {
   currentConversationId: string | null;
   streamingInteractionIds: string[];
   activeStreamBuffers: Record<string, string>;
+  // Add buffer for streaming reasoning content
+  activeReasoningBuffers: Record<string, string>;
   error: string | null;
   status: "idle" | "loading" | "streaming" | "error";
 }
@@ -25,6 +27,8 @@ interface InteractionActions {
     updates: Partial<Omit<Interaction, "id">>,
   ) => void;
   appendInteractionResponseChunk: (id: string, chunk: string) => void;
+  // Add action for reasoning chunk
+  appendReasoningChunk: (id: string, chunk: string) => void;
   _removeInteractionFromState: (id: string) => void;
   // --- Persistence Actions (Called by InteractionService or UI) ---
   rateInteraction: (
@@ -47,6 +51,7 @@ export const useInteractionStore = create(
     currentConversationId: null,
     streamingInteractionIds: [],
     activeStreamBuffers: {},
+    activeReasoningBuffers: {}, // Initialize reasoning buffer
     error: null,
     status: "idle",
 
@@ -63,6 +68,7 @@ export const useInteractionStore = create(
         interactions: [],
         streamingInteractionIds: [],
         activeStreamBuffers: {},
+        activeReasoningBuffers: {}, // Clear reasoning buffer on load
         currentConversationId: conversationId,
       });
       if (previousStatus !== "loading") {
@@ -128,6 +134,10 @@ export const useInteractionStore = create(
             ) {
               newMetadata.toolResults = [...updates.metadata.toolResults];
             }
+            // Ensure reasoning update is handled correctly
+            if (updates.metadata.reasoning !== undefined) {
+              newMetadata.reasoning = updates.metadata.reasoning;
+            }
           }
 
           const updatedInteraction = {
@@ -158,6 +168,16 @@ export const useInteractionStore = create(
         if (state.streamingInteractionIds.includes(id)) {
           state.activeStreamBuffers[id] =
             (state.activeStreamBuffers[id] || "") + chunk;
+        }
+      });
+    },
+
+    // Implement action for reasoning chunk
+    appendReasoningChunk: (id, chunk) => {
+      set((state) => {
+        if (state.streamingInteractionIds.includes(id)) {
+          state.activeReasoningBuffers[id] =
+            (state.activeReasoningBuffers[id] || "") + chunk;
         }
       });
     },
@@ -221,6 +241,7 @@ export const useInteractionStore = create(
         interactions: [],
         streamingInteractionIds: [],
         activeStreamBuffers: {},
+        activeReasoningBuffers: {}, // Clear reasoning buffer
         status: "idle",
         error: null,
         currentConversationId: null,
@@ -263,6 +284,7 @@ export const useInteractionStore = create(
         if (!state.streamingInteractionIds.includes(id)) {
           state.streamingInteractionIds.push(id);
           state.activeStreamBuffers[id] = "";
+          state.activeReasoningBuffers[id] = ""; // Initialize reasoning buffer
           if (state.streamingInteractionIds.length === 1) {
             state.status = "streaming";
             statusChanged = true;
@@ -283,7 +305,8 @@ export const useInteractionStore = create(
         if (index !== -1) {
           state.streamingInteractionIds.splice(index, 1);
           delete state.activeStreamBuffers[id];
-          console.log(`InteractionStore: Cleaned up buffer for ${id}.`);
+          delete state.activeReasoningBuffers[id]; // Clean up reasoning buffer
+          console.log(`InteractionStore: Cleaned up buffers for ${id}.`);
           if (
             state.streamingInteractionIds.length === 0 &&
             state.status === "streaming"

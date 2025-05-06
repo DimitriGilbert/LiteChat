@@ -1,5 +1,5 @@
 // src/hooks/litechat/registerReasoningControl.tsx
-
+// FULL FILE
 import React from "react";
 import { useControlRegistryStore } from "@/store/control.store";
 import { usePromptStateStore } from "@/store/prompt.store";
@@ -24,10 +24,11 @@ export function registerReasoningControl() {
         initialEnabled: promptStateActions.reasoningEnabled,
         onToggle: handleToggle,
       }),
-    // getParameters reads directly from store at submission time
-    getParameters: () => {
+    // getMetadata reads directly from store at submission time
+    getMetadata: () => {
       const { reasoningEnabled } = usePromptStateStore.getState();
-      return reasoningEnabled === true ? { reasoning: true } : undefined;
+      // Add metadata flag if reasoning is explicitly enabled for this turn
+      return reasoningEnabled === true ? { reasoningEnabled: true } : undefined;
     },
     // clearOnSubmit calls store action which emits event
     clearOnSubmit: () => {

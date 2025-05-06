@@ -1,11 +1,10 @@
 // src/lib/litechat/provider-helpers.ts
-// Line 7: Remove unused import
+// FULL FILE
 
 import type {
   DbProviderConfig,
   DbProviderType,
   AiModelConfig,
-  // OpenRouterModel,
 } from "@/types/litechat/provider";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -120,7 +119,11 @@ export function instantiateModelInstance(
       case "google":
         return createGoogleGenerativeAI({ apiKey })(modelId);
       case "openrouter":
-        return createOpenRouter({ apiKey })(modelId);
+        // Add extraBody here
+        return createOpenRouter({
+          apiKey,
+          extraBody: { include_reasoning: true },
+        })(modelId);
       case "ollama":
         return createOllama({ baseURL: config.baseURL ?? undefined })(modelId);
       case "openai-compatible":

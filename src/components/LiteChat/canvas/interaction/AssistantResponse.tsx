@@ -1,5 +1,5 @@
 // src/components/LiteChat/canvas/interaction/AssistantResponse.tsx
-
+// FULL FILE
 import React, { useState, useCallback } from "react";
 import { ChevronDownIcon, ChevronUpIcon, BrainCircuitIcon } from "lucide-react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
@@ -54,7 +54,7 @@ interface AssistantResponseProps {
   response: any | null;
   toolCalls: string[] | undefined;
   toolResults: string[] | undefined;
-  reasoning: string | undefined;
+  reasoning: string | undefined; // Add reasoning prop
   isError: boolean;
   errorMessage: string | undefined;
   isFolded: boolean;
@@ -65,7 +65,7 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
   response,
   toolCalls,
   toolResults,
-  reasoning,
+  reasoning, // Destructure reasoning
   isError,
   errorMessage,
   isFolded,
@@ -77,7 +77,7 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
     [],
   );
 
-  const hasReasoning = !!reasoning;
+  const hasReasoning = !!reasoning; // Check if reasoning exists
   const hasResponseContent =
     response && (typeof response !== "string" || response.trim().length > 0);
   const hasToolCalls = toolCalls && toolCalls.length > 0;

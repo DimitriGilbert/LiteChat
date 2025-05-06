@@ -1,6 +1,12 @@
 // src/components/LiteChat/canvas/StreamingInteractionCard.tsx
 // FULL FILE
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, {
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { UserPromptDisplay } from "./UserPromptDisplay";
 import { StreamingContentView } from "./StreamingContentView";
 import { StopButton } from "../common/StopButton";
@@ -10,6 +16,8 @@ import { cn } from "@/lib/utils";
 import { useProviderStore } from "@/store/provider.store";
 import { splitModelId } from "@/lib/litechat/provider-helpers";
 import { useSettingsStore } from "@/store/settings.store";
+import { BrainCircuitIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { ActionTooltipButton } from "../common/ActionTooltipButton";
 
 interface StreamingInteractionCardProps {
   interactionId: string;
@@ -39,10 +47,14 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
 
     // Local state for the *displayed* content, updated throttled
     const [displayedContent, setDisplayedContent] = useState("");
+    // Add state for the reasoning buffer content
+    const [reasoningContent, setReasoningContent] = useState("");
+    const [isReasoningFolded, setIsReasoningFolded] = useState(true); // State for folding reasoning
+
     const animationFrameRef = useRef<number | null>(null);
     const lastUpdateTimeRef = useRef<number>(0);
 
-    // Effect to handle throttled updates
+    // Effect to handle throttled updates for BOTH buffers
     useEffect(() => {
       const interval = 1000 / streamingRenderFPS;
       let isMounted = true;
@@ -62,7 +74,12 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
               useInteractionStore.getState().activeStreamBuffers[
                 interactionId
               ] ?? "";
+            const latestReasoningBuffer =
+              useInteractionStore.getState().activeReasoningBuffers[
+                interactionId
+              ] ?? "";
             setDisplayedContent(latestBuffer);
+            setReasoningContent(latestReasoningBuffer); // Update reasoning content state
             lastUpdateTimeRef.current = timestamp;
           }
           // Continue requesting frames
@@ -72,7 +89,12 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
           const finalBuffer =
             useInteractionStore.getState().activeStreamBuffers[interactionId] ??
             "";
+          const finalReasoningBuffer =
+            useInteractionStore.getState().activeReasoningBuffers[
+              interactionId
+            ] ?? "";
           setDisplayedContent(finalBuffer);
+          setReasoningContent(finalReasoningBuffer); // Update reasoning content state
           animationFrameRef.current = null;
         }
       };
@@ -87,21 +109,22 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
           cancelAnimationFrame(animationFrameRef.current);
           animationFrameRef.current = null;
         }
-        // Ensure final update on unmount if needed (optional, might cause flicker if state is already updated)
-        // const finalBuffer = useInteractionStore.getState().activeStreamBuffers[interactionId] ?? "";
-        // setDisplayedContent(finalBuffer);
       };
       // Re-run effect if interactionId or FPS changes
     }, [interactionId, streamingRenderFPS]);
 
     // Effect to ensure final content is displayed when interaction status changes from STREAMING
-    // This handles the case where the loop might stop slightly before the status update
     useEffect(() => {
       if (interactionStatus && interactionStatus !== "STREAMING") {
         const finalBuffer =
           useInteractionStore.getState().activeStreamBuffers[interactionId] ??
           "";
+        const finalReasoningBuffer =
+          useInteractionStore.getState().activeReasoningBuffers[
+            interactionId
+          ] ?? "";
         setDisplayedContent(finalBuffer);
+        setReasoningContent(finalReasoningBuffer); // Update reasoning content state
         // Ensure the animation loop is stopped if it hasn't already
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
@@ -144,6 +167,11 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       getAllAvailableModelDefsForProvider,
     ]);
     // --- End Memoize Model Name Calculation ---
+
+    const toggleReasoningFold = useCallback(
+      () => setIsReasoningFolded((prev) => !prev),
+      [],
+    );
 
     if (!interaction) {
       console.warn(
@@ -200,7 +228,39 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
             </span>
             <span className="text-xs text-muted-foreground">Streaming...</span>
           </div>
-          {/* Render throttled content */}
+
+          {/* Display Streaming Reasoning */}
+          {reasoningContent && (
+            <div className="my-2 p-2 border border-blue-500/30 bg-blue-500/10 rounded-md text-xs">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                  <BrainCircuitIcon className="h-3.5 w-3.5" /> Reasoning
+                  (Streaming)
+                </span>
+                <ActionTooltipButton
+                  tooltipText={
+                    isReasoningFolded ? "Show Reasoning" : "Hide Reasoning"
+                  }
+                  onClick={toggleReasoningFold}
+                  aria-label={
+                    isReasoningFolded ? "Show reasoning" : "Hide reasoning"
+                  }
+                  icon={
+                    isReasoningFolded ? <ChevronDownIcon /> : <ChevronUpIcon />
+                  }
+                  iconClassName="h-3 w-3"
+                  className="h-5 w-5 text-muted-foreground"
+                />
+              </div>
+              {!isReasoningFolded && (
+                <pre className="whitespace-pre-wrap text-xs font-mono p-2 bg-background/30 rounded mt-1 overflow-wrap-anywhere">
+                  {reasoningContent}
+                </pre>
+              )}
+            </div>
+          )}
+
+          {/* Render throttled main content */}
           <StreamingContentView
             markdownContent={displayedContent}
             isStreaming={true}

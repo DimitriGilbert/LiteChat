@@ -1,6 +1,6 @@
 // src/components/LiteChat/canvas/UserPromptDisplay.tsx
-
-import React, { useState, useCallback, useEffect } from "react";
+// FULL FILE
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
 import { FilePreviewRenderer } from "@/components/LiteChat/common/FilePreviewRenderer";
 import { formatDistanceToNow } from "date-fns";
@@ -15,35 +15,75 @@ import {
 import { toast } from "sonner";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { useSettingsStore } from "@/store/settings.store";
+// Import markdown parser and types
+import {
+  useMarkdownParser,
+  CodeBlockData,
+} from "@/lib/litechat/useMarkdownParser";
+import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
 
 interface UserPromptDisplayProps {
   turnData: Readonly<PromptTurnObject>;
   timestamp: Date | null;
   className?: string;
-  // Add prop to indicate if the corresponding assistant response is complete
   isAssistantComplete?: boolean;
 }
 
+// Component to render parsed user content
+const UserContentView: React.FC<{ markdownContent: string | null }> = ({
+  markdownContent,
+}) => {
+  const parsedContent = useMarkdownParser(markdownContent);
+
+  if (!markdownContent?.trim()) {
+    return null;
+  }
+
+  return (
+    // Add overflow-wrap here for the main text content
+    <div className="overflow-wrap-anywhere">
+      {parsedContent.map((item, index) => {
+        if (typeof item === "string") {
+          return (
+            <div
+              key={`html-${index}`}
+              // Apply markdown styles, but maybe slightly different for user prompts?
+              className="markdown-content"
+              dangerouslySetInnerHTML={{ __html: item }}
+            />
+          );
+        } else if (item.type === "code") {
+          const codeData = item as CodeBlockData;
+          // Use CodeBlockRenderer for consistency
+          return (
+            <CodeBlockRenderer
+              key={`code-${index}`}
+              lang={codeData.lang}
+              code={codeData.code}
+            />
+          );
+        }
+        return null;
+      })}
+    </div>
+  );
+};
+
 export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
   ({ turnData, timestamp, className, isAssistantComplete = true }) => {
-    // Get the setting from the store
     const foldUserMessagesOnCompletion = useSettingsStore(
       (state) => state.foldUserMessagesOnCompletion,
     );
 
-    // Initialize fold state based on setting and completion status
     const [isFolded, setIsFolded] = useState(
       isAssistantComplete && foldUserMessagesOnCompletion,
     );
     const [isCopied, setIsCopied] = useState(false);
 
-    // Effect to fold the message if the setting is enabled *after* the assistant completes
     useEffect(() => {
       if (isAssistantComplete && foldUserMessagesOnCompletion) {
         setIsFolded(true);
       }
-      // We only want this effect to run when the assistant completion status changes
-      // or the setting changes. We don't want it to re-run if the user manually unfolds.
     }, [isAssistantComplete, foldUserMessagesOnCompletion]);
 
     const timeAgo = timestamp
@@ -69,6 +109,21 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
         console.error("Clipboard copy failed:", err);
       }
     }, [turnData.content]);
+
+    // Memoize folded summary text
+    const foldedSummaryText = useMemo(() => {
+      let summary = "";
+      if (hasContent) {
+        summary += `"${turnData.content.substring(0, 50)}${turnData.content.length > 50 ? "..." : ""}"`;
+      }
+      if (hasContent && hasFiles) {
+        summary += " + ";
+      }
+      if (hasFiles) {
+        summary += `${turnData.metadata.attachedFiles?.length} file(s)`;
+      }
+      return summary || "[Empty Prompt]"; // Fallback if somehow both are false
+    }, [hasContent, hasFiles, turnData.content, turnData.metadata]);
 
     return (
       <div
@@ -136,11 +191,8 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
                 ))}
               </div>
             )}
-            {hasContent && (
-              <p className="whitespace-pre-wrap text-sm text-foreground">
-                {turnData.content}
-              </p>
-            )}
+            {/* Use the new UserContentView component */}
+            <UserContentView markdownContent={turnData.content} />
           </>
         )}
         {isFolded && (
@@ -148,13 +200,7 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
             className="text-xs text-muted-foreground italic cursor-pointer hover:bg-muted/20 p-1 rounded"
             onClick={toggleFold}
           >
-            {hasContent
-              ? `"${turnData.content.substring(0, 50)}${turnData.content.length > 50 ? "..." : ""}"`
-              : ""}
-            {hasContent && hasFiles ? " + " : ""}
-            {hasFiles
-              ? `${turnData.metadata.attachedFiles?.length} file(s)`
-              : ""}
+            {foldedSummaryText}
           </div>
         )}
       </div>

@@ -37,13 +37,12 @@ import {
   ProviderMetadata,
   LanguageModelV1,
   CoreMessage,
-  extractReasoningMiddleware,
-  wrapLanguageModel,
+  extractReasoningMiddleware, // Import the middleware
+  wrapLanguageModel, // Import the wrapper
 } from "ai";
 import type { fs as FsType } from "@zenfs/core";
 
 // Define the structure for options passed to executeInteraction
-// Remove experimental_middlewares
 interface AIServiceCallOptions {
   model: LanguageModelV1;
   messages: CoreMessage[];
@@ -62,6 +61,8 @@ interface AIServiceCallOptions {
   presencePenalty?: number;
   frequencyPenalty?: number;
   maxSteps?: number;
+  // Add providerOptions for specific provider features
+  providerOptions?: Record<string, any>;
 }
 
 export const InteractionService = {
@@ -144,7 +145,7 @@ export const InteractionService = {
         ...(finalPrompt.metadata || {}),
         toolCalls: [],
         toolResults: [],
-        reasoning: undefined,
+        reasoning: undefined, // Initialize reasoning
         timeToFirstToken: undefined,
         generationTime: undefined,
         // Add isTitleGeneration flag if type matches
@@ -307,19 +308,9 @@ export const InteractionService = {
       finalPrompt.parameters?.maxSteps ??
       useSettingsStore.getState().toolMaxSteps;
 
-    // Instantiate reasoning middleware
-    const reasoningMiddleware = extractReasoningMiddleware({
-      tagName: "think",
-    });
-
-    // Wrap the model instance with the middleware
-    const wrappedModel = wrapLanguageModel({
-      model: modelInstance,
-      middleware: reasoningMiddleware,
-    });
-
+    // No need for middleware wrapping here if AIService handles reasoning parts
     const callOptions: AIServiceCallOptions = {
-      model: wrappedModel,
+      model: modelInstance, // Use the original model instance
       messages: finalPrompt.messages,
       abortSignal: abortController.signal,
       system: finalPrompt.system,
@@ -344,6 +335,9 @@ export const InteractionService = {
     // 6. Define Callbacks
     const callbacks: AIServiceCallbacks = {
       onChunk: (chunk) => this._handleChunk(interactionId, chunk),
+      // Add handler for reasoning chunk
+      onReasoningChunk: (chunk) =>
+        this._handleReasoningChunk(interactionId, chunk),
       onToolCall: (toolCall) => this._handleToolCall(interactionId, toolCall),
       onToolResult: (toolResult) =>
         this._handleToolResult(interactionId, toolResult),
@@ -409,7 +403,7 @@ export const InteractionService = {
 
   // --- Callback Implementations ---
   async _handleChunk(interactionId: string, chunk: string): Promise<void> {
-    // Record timestamp of the very first chunk
+    // Record timestamp of the very first chunk (only for main content)
     if (!this._firstChunkTimestamps.has(interactionId)) {
       this._firstChunkTimestamps.set(interactionId, performance.now());
     }
@@ -434,6 +428,13 @@ export const InteractionService = {
         chunk: processedChunk,
       });
     }
+  },
+
+  // Add handler for reasoning chunk
+  _handleReasoningChunk(interactionId: string, chunk: string): void {
+    useInteractionStore.getState().appendReasoningChunk(interactionId, chunk);
+    // Optionally emit a different event for reasoning chunks if needed
+    // emitter.emit('reasoning:chunk', { interactionId, chunk });
   },
 
   _handleToolCall(interactionId: string, toolCall: ToolCallPart): void {
@@ -482,7 +483,7 @@ export const InteractionService = {
       finishReason: FinishReason;
       usage?: LanguageModelUsage;
       providerMetadata?: ProviderMetadata;
-      reasoning?: string;
+      reasoning?: string; // Add reasoning to details type
     },
     interactionType: InteractionType,
   ): void {
@@ -494,7 +495,7 @@ export const InteractionService = {
       "COMPLETED",
       undefined,
       interactionType,
-      details,
+      details, // Pass full details including reasoning
     );
   },
 
@@ -526,7 +527,7 @@ export const InteractionService = {
       finishReason: FinishReason;
       usage?: LanguageModelUsage;
       providerMetadata?: ProviderMetadata;
-      reasoning?: string;
+      reasoning?: string; // Add reasoning here too
     },
   ): void {
     const interactionStore = useInteractionStore.getState();
@@ -552,6 +553,9 @@ export const InteractionService = {
 
     const finalBufferedContent =
       interactionStore.activeStreamBuffers[interactionId] ?? "";
+    // Get final reasoning buffer content
+    const finalReasoningContent =
+      interactionStore.activeReasoningBuffers[interactionId] ?? "";
     const toolData = this._streamingToolData.get(interactionId) || {
       calls: [],
       results: [],
@@ -559,7 +563,7 @@ export const InteractionService = {
     const currentMetadata = currentInteraction?.metadata || {};
 
     console.log(
-      `[InteractionService] Finalizing ${interactionId}. Buffered Content Length: ${finalBufferedContent.length}`,
+      `[InteractionService] Finalizing ${interactionId}. Buffered Content Length: ${finalBufferedContent.length}, Reasoning Length: ${finalReasoningContent.length}`,
     );
 
     // Calculate timings
@@ -574,8 +578,9 @@ export const InteractionService = {
         ? Math.round(firstChunkTime - startTime)
         : undefined;
 
-    // Extract reasoning from finishDetails (added by middleware)
-    const reasoningData = finishDetails?.reasoning;
+    // Use final reasoning from finishDetails if available, otherwise use buffered content
+    const definitiveReasoning =
+      finishDetails?.reasoning ?? finalReasoningContent;
 
     const finalUpdates: Partial<Omit<Interaction, "id">> = {
       status: status,
@@ -593,7 +598,7 @@ export const InteractionService = {
         }),
         toolCalls: toolData.calls,
         toolResults: toolData.results,
-        reasoning: reasoningData,
+        reasoning: definitiveReasoning || undefined, // Save definitive reasoning data
         timeToFirstToken: timeToFirstToken,
         generationTime: generationTime,
         ...((status === "ERROR" ||
@@ -624,16 +629,13 @@ export const InteractionService = {
           .catch((e) =>
             console.error("Failed to update conversation title:", e),
           );
-        // Optionally remove the title generation interaction from state/DB after success?
-        // interactionStore._removeInteractionFromState(interactionId);
-        // PersistenceService.deleteInteraction(interactionId).catch(e => console.error("Failed to delete title gen interaction:", e));
       }
     }
     // --- End Title Generation Specifics ---
 
     // Update state (even for title gen, might be useful for debugging)
     interactionStore._updateInteractionInState(interactionId, finalUpdates);
-    interactionStore._removeStreamingId(interactionId);
+    interactionStore._removeStreamingId(interactionId); // This also cleans up buffers
 
     const finalInteractionState = useInteractionStore
       .getState()

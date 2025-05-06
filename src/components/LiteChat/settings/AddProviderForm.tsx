@@ -2,19 +2,8 @@
 // FULL FILE
 import React, { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { SaveIcon, XIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { ApiKeySelector } from "@/components/LiteChat/settings/ApiKeySelector";
 import type {
   DbProviderConfig,
   DbProviderType,
@@ -22,11 +11,10 @@ import type {
 } from "@/types/litechat/provider";
 import {
   supportsModelFetching,
-  requiresApiKey,
-  requiresBaseURL,
   PROVIDER_TYPES,
+  requiresApiKey,
 } from "@/lib/litechat/provider-helpers";
-import { cn } from "@/lib/utils";
+import { ProviderConfigForm, ProviderFormData } from "./ProviderConfigForm"; // Import the shared form
 
 interface AddProviderFormProps {
   apiKeys: DbApiKey[];
@@ -35,7 +23,7 @@ interface AddProviderFormProps {
   ) => Promise<string>;
   onCancel: () => void;
   initialType?: DbProviderType;
-  initialName?: string; // Accept initialName
+  initialName?: string;
   initialApiKeyId?: string | null;
 }
 
@@ -44,33 +32,25 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
   onAddProvider,
   onCancel,
   initialType = "openai",
-  initialName = "", // Use initialName prop
+  initialName = "",
   initialApiKeyId = null,
 }) => {
   const [isSavingNew, setIsSavingNew] = useState(false);
-  const [newProviderData, setNewProviderData] = useState<
-    Partial<DbProviderConfig> & {
-      type: DbProviderType | null;
-      isEnabled: boolean;
-      autoFetchModels: boolean;
-    }
-  >({
-    name: initialName, // Initialize with prop
+  // Use the shared form data type
+  const [newProviderData, setNewProviderData] = useState<ProviderFormData>({
+    name: initialName,
     type: initialType,
     isEnabled: true,
     apiKeyId: initialApiKeyId,
     baseURL: null,
-    enabledModels: null,
-    autoFetchModels: supportsModelFetching(initialType), // Set based on initial type
-    fetchedModels: null,
-    modelsLastFetchedAt: null,
+    autoFetchModels: supportsModelFetching(initialType),
   });
 
   // Effect to sync with initial props if they change
   useEffect(() => {
     setNewProviderData((prev) => ({
       ...prev,
-      name: initialName || prev.name || "", // Prioritize prop
+      name: initialName || prev.name || "",
       type: initialType || prev.type || null,
       apiKeyId: initialApiKeyId || prev.apiKeyId || null,
       autoFetchModels: initialType
@@ -81,13 +61,14 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
 
   const handleNewChange = useCallback(
     (
-      field: keyof DbProviderConfig,
+      field: keyof ProviderFormData,
       value: string | boolean | string[] | null,
     ) => {
       setNewProviderData((prev) => {
         const updated = { ...prev, [field]: value };
         const currentName = prev.name || "";
 
+        // Keep the logic for auto-filling name and resetting dependent fields
         if (field === "type") {
           const newType = value as DbProviderType | null;
           const oldProviderLabel = PROVIDER_TYPES.find(
@@ -99,7 +80,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
           updated.autoFetchModels = newType
             ? supportsModelFetching(newType)
             : false;
-          updated.enabledModels = null;
 
           const providerLabel = PROVIDER_TYPES.find(
             (p) => p.value === newType,
@@ -111,6 +91,7 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
             updated.name = providerLabel;
           }
 
+          // Auto-select first relevant API key if available
           if (newType && requiresApiKey(newType)) {
             const relevantKeys = (apiKeys || []).filter(
               (k) => k.providerId === newType,
@@ -119,10 +100,6 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
               updated.apiKeyId = relevantKeys[0].id;
             }
           }
-        }
-
-        if (field === "isEnabled" || field === "autoFetchModels") {
-          updated[field] = !!value;
         }
         return updated;
       });
@@ -150,133 +127,33 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
         isEnabled: newProviderData.isEnabled ?? true,
         apiKeyId: newProviderData.apiKeyId ?? null,
         baseURL: newProviderData.baseURL?.trim() || null,
-        enabledModels: null,
+        enabledModels: null, // Add form doesn't handle model enablement
         autoFetchModels: autoFetch,
         fetchedModels: null,
         modelsLastFetchedAt: null,
       };
 
       await onAddProvider(configToAdd);
-      onCancel();
+      onCancel(); // Close the form on success
     } catch (error) {
       console.error("Failed to add provider (from form component):", error);
+      // Error toast handled by the store action usually
     } finally {
       setIsSavingNew(false);
     }
   }, [newProviderData, onAddProvider, onCancel]);
 
-  const needsKey = requiresApiKey(newProviderData.type ?? null);
-  const needsURL = requiresBaseURL(newProviderData.type ?? null);
-  const canFetch = supportsModelFetching(newProviderData.type ?? null);
-
-  const relevantApiKeys = (apiKeys || []).filter(
-    (key) => !newProviderData.type || key.providerId === newProviderData.type,
-  );
-
   return (
     <div className="border border-primary rounded-md p-4 space-y-3 bg-card shadow-lg flex-shrink-0">
       <h4 className="font-semibold text-card-foreground">Add New Provider</h4>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="new-provider-type">Provider Type</Label>
-          <Select
-            value={newProviderData.type ?? ""}
-            onValueChange={(value) =>
-              handleNewChange("type", value as DbProviderType)
-            }
-            disabled={isSavingNew}
-          >
-            <SelectTrigger id="new-provider-type">
-              <SelectValue placeholder="Select Type" />
-            </SelectTrigger>
-            <SelectContent>
-              {PROVIDER_TYPES.map((pt) => (
-                <SelectItem key={pt.value} value={pt.value}>
-                  {pt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="new-provider-name">Provider Name</Label>
-          <Input
-            id="new-provider-name"
-            value={newProviderData.name || ""}
-            onChange={(e) => handleNewChange("name", e.target.value)}
-            placeholder="e.g., My Ollama"
-            disabled={isSavingNew}
-            aria-label="Provider Name"
-          />
-        </div>
-
-        {needsKey && (
-          <div className="space-y-1.5 md:col-span-2">
-            <Label>API Key</Label>
-            <ApiKeySelector
-              label="API Key"
-              selectedKeyId={newProviderData.apiKeyId ?? null}
-              onKeySelected={(keyId: string | null) =>
-                handleNewChange("apiKeyId", keyId)
-              }
-              apiKeys={relevantApiKeys}
-              disabled={isSavingNew || !newProviderData.type}
-            />
-          </div>
-        )}
-
-        {needsURL && (
-          <div className="space-y-1.5 md:col-span-2">
-            <Label htmlFor="new-provider-baseurl">Base URL</Label>
-            <Input
-              id="new-provider-baseurl"
-              value={newProviderData.baseURL || ""}
-              onChange={(e) => handleNewChange("baseURL", e.target.value)}
-              placeholder="Base URL (e.g., http://localhost:11434)"
-              disabled={isSavingNew}
-              aria-label="Base URL"
-            />
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="new-enabled"
-            checked={newProviderData.isEnabled ?? true}
-            onCheckedChange={(checked) => handleNewChange("isEnabled", checked)}
-            disabled={isSavingNew}
-            aria-labelledby="new-enabled-label"
-          />
-          <Label id="new-enabled-label" htmlFor="new-enabled">
-            Enabled
-          </Label>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="new-autofetch"
-            checked={false}
-            onCheckedChange={(checked) =>
-              handleNewChange("autoFetchModels", checked)
-            }
-            disabled={!canFetch || isSavingNew}
-            aria-labelledby="new-autofetch-label"
-          />
-          <Label
-            id="new-autofetch-label"
-            htmlFor="new-autofetch"
-            className={cn("text-sm", !canFetch ? "text-muted-foreground" : "")}
-          >
-            Auto-fetch models {canFetch ? "" : "(Not Supported)"}
-          </Label>
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Models fetched will appear in the global organizer above after fetching.
-      </p>
+      {/* Use the shared form component */}
+      <ProviderConfigForm
+        formData={newProviderData}
+        onChange={handleNewChange}
+        apiKeys={apiKeys}
+        disabled={isSavingNew}
+      />
 
       <div className="flex justify-end space-x-2 pt-2">
         <Button
