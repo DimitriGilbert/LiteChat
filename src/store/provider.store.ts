@@ -8,10 +8,10 @@ import type {
   AiProviderConfig,
   AiModelConfig,
   OpenRouterModel,
+  ModelListItem,
 } from "@/types/litechat/provider";
 import { PersistenceService } from "@/services/persistence.service";
 import {
-  createAiModelConfig,
   DEFAULT_MODELS,
   combineModelId,
   splitModelId,
@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { ModEvent } from "@/types/litechat/modding";
+import { instantiateModelInstance } from "@/lib/litechat/provider-helpers";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 const LAST_SELECTION_KEY = "provider:lastModelSelection";
@@ -36,7 +37,6 @@ export interface ProviderState {
   isLoading: boolean;
   error: string | null;
   enableApiKeyManagement: boolean;
-  // Temporary state for model details view
   _selectedModelForDetails: string | null;
 }
 
@@ -45,7 +45,7 @@ export interface ProviderActions {
   selectModel: (combinedId: string | null) => void;
   addApiKey: (
     name: string,
-    providerId: string,
+    providerId: string, // Should be DbProviderType
     value: string,
   ) => Promise<string>;
   deleteApiKey: (id: string) => Promise<void>;
@@ -62,19 +62,22 @@ export interface ProviderActions {
   getSelectedModel: () => AiModelConfig | undefined;
   getApiKeyForProvider: (providerId: string) => string | undefined;
   getActiveProviders: () => AiProviderConfig[];
-  // Update return type to use OpenRouterModel
   getAllAvailableModelDefsForProvider: (
     providerConfigId: string,
   ) => OpenRouterModel[];
+  getAvailableModelListItems: () => ModelListItem[];
   _setProviderFetchStatus: (providerId: string, status: FetchStatus) => void;
   setEnableApiKeyManagement: (enabled: boolean) => void;
-  // Action for temporary state
   setSelectedModelForDetails: (combinedId: string | null) => void;
+  createAiModelConfig: (
+    config: DbProviderConfig,
+    modelId: string,
+    apiKey?: string,
+  ) => AiModelConfig | undefined; // Expose createAiModelConfig
 }
 
 export const useProviderStore = create(
   immer<ProviderState & ProviderActions>((set, get) => ({
-    // Initial State
     dbProviderConfigs: [],
     dbApiKeys: [],
     selectedModelId: null,
@@ -84,6 +87,32 @@ export const useProviderStore = create(
     error: null,
     enableApiKeyManagement: true,
     _selectedModelForDetails: null,
+
+    createAiModelConfig: (config, modelId, apiKey) => {
+      const allAvailable = get().getAllAvailableModelDefsForProvider(config.id);
+      const modelInfo = allAvailable.find((m) => m.id === modelId);
+      if (!modelInfo) {
+        console.warn(
+          `Model definition not found for ${modelId} in provider ${config.name}`,
+        );
+        return undefined;
+      }
+      const instance = instantiateModelInstance(config, modelId, apiKey);
+      if (!instance) {
+        console.warn(
+          `Failed to instantiate AI SDK instance for ${modelId} from provider ${config.name}`,
+        );
+        return undefined;
+      }
+      return {
+        id: combineModelId(config.id, modelId),
+        name: modelInfo.name,
+        providerId: config.id,
+        providerName: config.name,
+        instance,
+        metadata: modelInfo,
+      };
+    },
 
     setEnableApiKeyManagement: (enabled) => {
       set({ enableApiKeyManagement: enabled });
@@ -121,7 +150,6 @@ export const useProviderStore = create(
           enableApiKeyManagement: enableApiMgmt,
         });
 
-        // --- Recalculate valid order and selection based on loaded configs ---
         const currentGloballyEnabledModels = configs.reduce(
           (acc: string[], provider) => {
             if (provider.isEnabled && provider.enabledModels) {
@@ -134,26 +162,16 @@ export const useProviderStore = create(
           [],
         );
         const enabledSet = new Set(currentGloballyEnabledModels);
-
-        // Filter saved order to only include currently enabled models
         const validSavedOrder = savedOrder.filter((id) => enabledSet.has(id));
-
         let modelToSelect = lastSelectedModelId;
         const isValidSelection = modelToSelect && enabledSet.has(modelToSelect);
 
-        // If saved selection is invalid or missing, find a new default
         if (!isValidSelection) {
-          // Prioritize the first model from the valid saved order
           modelToSelect = validSavedOrder[0] ?? null;
-          // If still no selection, take the first globally enabled model
           if (!modelToSelect) {
             modelToSelect = currentGloballyEnabledModels[0] ?? null;
           }
-          console.log(
-            `[ProviderStore] Saved selection invalid or missing, selecting default: ${modelToSelect}`,
-          );
         }
-        // --- End Recalculation ---
 
         set({
           globalModelSortOrder: validSavedOrder,
@@ -161,13 +179,7 @@ export const useProviderStore = create(
           isLoading: false,
         });
 
-        // Save the potentially updated selection
         await PersistenceService.saveSetting(LAST_SELECTION_KEY, modelToSelect);
-        // Emit initial selection event
-        console.log(
-          `[ProviderStore] Emitting initial ${ModEvent.MODEL_SELECTION_CHANGED} with payload:`,
-          { modelId: modelToSelect },
-        );
         emitter.emit(ModEvent.MODEL_SELECTION_CHANGED, {
           modelId: modelToSelect,
         });
@@ -183,24 +195,12 @@ export const useProviderStore = create(
 
     selectModel: (combinedId) => {
       const currentId = get().selectedModelId;
-      console.log(
-        `[ProviderStore] selectModel called. Current: ${currentId}, New: ${combinedId}`,
-      );
       if (currentId !== combinedId) {
         set({ selectedModelId: combinedId });
         PersistenceService.saveSetting(LAST_SELECTION_KEY, combinedId);
-        // Emit event when selection changes
-        console.log(
-          `[ProviderStore] Emitting ${ModEvent.MODEL_SELECTION_CHANGED} with payload:`,
-          { modelId: combinedId },
-        );
         emitter.emit(ModEvent.MODEL_SELECTION_CHANGED, {
           modelId: combinedId,
         });
-      } else {
-        console.log(
-          `[ProviderStore] selectModel skipped: ID ${combinedId} already selected.`,
-        );
       }
     },
 
@@ -210,8 +210,8 @@ export const useProviderStore = create(
       const newKey: DbApiKey = {
         id: newId,
         name,
-        value: value,
-        providerId: providerId,
+        value,
+        providerId, // This should be DbProviderType
         createdAt: now,
         updatedAt: now,
       };
@@ -242,7 +242,6 @@ export const useProviderStore = create(
         await PersistenceService.deleteApiKey(id);
         set((state) => {
           state.dbApiKeys = state.dbApiKeys.filter((k) => k.id !== id);
-          // Also update provider configs that might have been using this key
           state.dbProviderConfigs = state.dbProviderConfigs.map((p) =>
             p.apiKeyId === id ? { ...p, apiKeyId: null } : p,
           );
@@ -288,7 +287,6 @@ export const useProviderStore = create(
           providerId: newId,
           config: newConfig,
         });
-        // Trigger initial fetch after adding
         get()
           .fetchModels(newId)
           .catch((fetchError) => {
@@ -296,7 +294,6 @@ export const useProviderStore = create(
               `[ProviderStore] Initial model fetch failed for new provider ${newId}:`,
               fetchError,
             );
-            // Toast handled by fetchModels
           });
         return newId;
       } catch (e) {
@@ -310,36 +307,25 @@ export const useProviderStore = create(
 
     updateProviderConfig: async (id, changes) => {
       const originalConfig = get().dbProviderConfigs.find((p) => p.id === id);
-      if (!originalConfig) {
-        console.warn(`ProviderStore: Config ${id} not found for update.`);
-        return;
-      }
-
+      if (!originalConfig) return;
       const updatedConfigData: DbProviderConfig = {
         ...originalConfig,
         ...changes,
         updatedAt: new Date(),
       };
-
       try {
         await PersistenceService.saveProviderConfig(updatedConfigData);
         set((state) => {
           const index = state.dbProviderConfigs.findIndex((p) => p.id === id);
-          if (index !== -1) {
-            state.dbProviderConfigs[index] = updatedConfigData;
-          }
+          if (index !== -1) state.dbProviderConfigs[index] = updatedConfigData;
         });
         emitter.emit(ModEvent.PROVIDER_CONFIG_CHANGED, {
           providerId: id,
           config: updatedConfigData,
         });
-
-        // --- Recalculate valid order and selection after update ---
         const currentOrder = get().globalModelSortOrder;
         const configs = get().dbProviderConfigs;
-
         let newOrder = [...currentOrder];
-
         const currentGloballyEnabledModels = configs.reduce(
           (acc: string[], provider) => {
             if (provider.isEnabled && provider.enabledModels) {
@@ -352,18 +338,10 @@ export const useProviderStore = create(
           [],
         );
         const enabledSet = new Set(currentGloballyEnabledModels);
-
-        // Filter out models that are no longer enabled
         newOrder = currentOrder.filter((mId) => enabledSet.has(mId));
-
-        // Add any newly enabled models that aren't in the order yet
         enabledSet.forEach((mId) => {
-          if (!newOrder.includes(mId)) {
-            newOrder.push(mId);
-          }
+          if (!newOrder.includes(mId)) newOrder.push(mId);
         });
-
-        // Update order and potentially the selected model
         await get().setGlobalModelSortOrder(newOrder);
       } catch (e) {
         console.error("ProviderStore: Error updating provider config", e);
@@ -378,23 +356,18 @@ export const useProviderStore = create(
       const config = get().dbProviderConfigs.find((p) => p.id === id);
       if (!config) return;
       const configName = config.name;
-
       try {
         await PersistenceService.deleteProviderConfig(id);
-
         set((state) => {
           state.dbProviderConfigs = state.dbProviderConfigs.filter(
             (p) => p.id !== id,
           );
-          // Remove fetch status for the deleted provider
           delete state.providerFetchStatus[id];
         });
         emitter.emit(ModEvent.PROVIDER_CONFIG_CHANGED, {
           providerId: id,
           config: { ...config, isEnabled: false },
         });
-
-        // --- Recalculate valid order and selection after delete ---
         const configs = get().dbProviderConfigs;
         const currentGloballyEnabledModels = configs.reduce(
           (acc: string[], provider) => {
@@ -410,10 +383,7 @@ export const useProviderStore = create(
         const enabledSet = new Set(currentGloballyEnabledModels);
         const currentOrder = get().globalModelSortOrder;
         const newOrder = currentOrder.filter((mId) => enabledSet.has(mId));
-        // --- End Recalculation ---
-
         await get().setGlobalModelSortOrder(newOrder);
-
         toast.success(`Provider "${configName}" deleted.`);
       } catch (e) {
         console.error("ProviderStore: Error deleting provider config", e);
@@ -432,32 +402,21 @@ export const useProviderStore = create(
         toast.error("Provider configuration not found for fetching models.");
         return;
       }
-      if (get().providerFetchStatus[providerConfigId] === "fetching") {
-        console.log(
-          `[ProviderStore] Fetch already in progress for ${config.name}`,
-        );
-        return;
-      }
-
+      if (get().providerFetchStatus[providerConfigId] === "fetching") return;
       get()._setProviderFetchStatus(providerConfigId, "fetching");
-
       try {
         const apiKeyId = config.apiKeyId;
         const apiKey = get().dbApiKeys.find((k) => k.id === apiKeyId)?.value;
         const fetched = await fetchModelsForProvider(config, apiKey);
-
-        // Update the provider config with the fetched models
         await get().updateProviderConfig(providerConfigId, {
           fetchedModels: fetched,
           modelsLastFetchedAt: new Date(),
         });
-
         get()._setProviderFetchStatus(providerConfigId, "success");
         toast.success(`Models fetched successfully for ${config.name}`);
       } catch (error) {
         console.error(`Error fetching models for ${config.name}:`, error);
         get()._setProviderFetchStatus(providerConfigId, "error");
-        // Toast handled by fetcher
       }
     },
 
@@ -468,8 +427,6 @@ export const useProviderStore = create(
         GLOBAL_MODEL_SORT_ORDER_KEY,
         uniqueIds,
       );
-
-      // --- Validate Selection After Order Change ---
       const currentSelected = get().selectedModelId;
       const configs = get().dbProviderConfigs;
       const currentGloballyEnabledModels = configs.reduce(
@@ -484,25 +441,16 @@ export const useProviderStore = create(
         [],
       );
       const enabledIdsSet = new Set(currentGloballyEnabledModels);
-
-      // If current selection is no longer enabled, or no selection exists, pick a new default
       if (!currentSelected || !enabledIdsSet.has(currentSelected)) {
-        // Find the first valid model from the *new* order
         const firstValidInNewOrder = uniqueIds.find((id) =>
           enabledIdsSet.has(id),
         );
-        // Fallback to the first enabled model overall if the new order is empty or only contains invalid models
         const firstValidOverall = currentGloballyEnabledModels[0] ?? null;
         const newSelection = firstValidInNewOrder ?? firstValidOverall;
-
         if (newSelection !== currentSelected) {
-          console.log(
-            `[ProviderStore] Selection ${currentSelected} invalidated or missing. Selecting ${newSelection}`,
-          );
           get().selectModel(newSelection);
         }
       }
-      // --- End Selection Validation ---
     },
 
     _setProviderFetchStatus: (providerId, status) => {
@@ -511,25 +459,21 @@ export const useProviderStore = create(
       });
     },
 
-    // Action for temporary state
     setSelectedModelForDetails: (combinedId) => {
       set({ _selectedModelForDetails: combinedId });
     },
 
-    // --- Selectors ---
     getSelectedModel: () => {
-      const { selectedModelId, dbProviderConfigs, dbApiKeys } = get();
+      const { selectedModelId } = get();
       if (!selectedModelId) return undefined;
-
       const { providerId, modelId } = splitModelId(selectedModelId);
       if (!providerId || !modelId) return undefined;
-
-      const config = dbProviderConfigs.find((p) => p.id === providerId);
+      const config = get().dbProviderConfigs.find((p) => p.id === providerId);
       if (!config) return undefined;
-
-      const apiKeyRecord = dbApiKeys.find((k) => k.id === config.apiKeyId);
-      // Use the updated createAiModelConfig which handles the new metadata structure
-      return createAiModelConfig(config, modelId, apiKeyRecord?.value);
+      const apiKeyRecord = get().dbApiKeys.find(
+        (k) => k.id === config.apiKeyId,
+      );
+      return get().createAiModelConfig(config, modelId, apiKeyRecord?.value);
     },
 
     getApiKeyForProvider: (providerId) => {
@@ -539,9 +483,8 @@ export const useProviderStore = create(
 
     getActiveProviders: () => {
       return get()
-        .dbProviderConfigs.filter((p: DbProviderConfig) => p.isEnabled)
-        .map((c: DbProviderConfig): AiProviderConfig => {
-          // Use getAllAvailableModelDefsForProvider to get consistent model data
+        .dbProviderConfigs.filter((p) => p.isEnabled)
+        .map((c) => {
           const allAvailable = get().getAllAvailableModelDefsForProvider(c.id);
           return {
             id: c.id,
@@ -552,25 +495,19 @@ export const useProviderStore = create(
         });
     },
 
-    // Update return type to use OpenRouterModel
     getAllAvailableModelDefsForProvider: (providerConfigId) => {
       const config = get().dbProviderConfigs.find(
         (p) => p.id === providerConfigId,
       );
       if (!config) return [];
-      // Return fetchedModels if available, otherwise fallback to defaults (mapped)
       if (config.fetchedModels && config.fetchedModels.length > 0) {
         return [...config.fetchedModels];
       }
-      // Fallback to default models if fetchedModels is null or empty
       const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
       const defaultDefs = DEFAULT_MODELS[providerTypeKey] || [];
-      // Map default definitions to OpenRouterModel structure
       return defaultDefs.map((m) => ({
         id: m.id,
         name: m.name,
-        // metadata: m.metadata,
-        // Add other default fields based on mapToOpenRouterModel logic if needed
         context_length: 4096,
         architecture: {
           modality: "text->text",
@@ -581,6 +518,34 @@ export const useProviderStore = create(
         top_provider: { context_length: 4096 },
         supported_parameters: DEFAULT_SUPPORTED_PARAMS[config.type] ?? [],
       }));
+    },
+
+    getAvailableModelListItems: (): ModelListItem[] => {
+      const { dbProviderConfigs } = get();
+      const listItems: ModelListItem[] = [];
+      dbProviderConfigs.forEach((config) => {
+        const fullModelDefs = get().getAllAvailableModelDefsForProvider(
+          config.id,
+        );
+        fullModelDefs.forEach((modelDef) => {
+          listItems.push({
+            id: combineModelId(config.id, modelDef.id), // Combined ID
+            name: modelDef.name,
+            providerId: config.id,
+            providerName: config.name,
+            metadataSummary: {
+              context_length:
+                modelDef.top_provider?.context_length ??
+                modelDef.context_length,
+              supported_parameters: modelDef.supported_parameters,
+              input_modalities: modelDef.architecture?.input_modalities,
+              pricing: modelDef.pricing,
+              description: modelDef.description,
+            },
+          });
+        });
+      });
+      return listItems;
     },
   })),
 );

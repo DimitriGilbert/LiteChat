@@ -1,7 +1,12 @@
 // src/components/LiteChat/settings/SettingsProviderRow.tsx
-
+// FULL FILE
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
+// Import OpenRouterModel for allAvailableModels state
+import type {
+  DbProviderConfig,
+  DbApiKey,
+  OpenRouterModel,
+} from "@/types/litechat/provider";
 import { toast } from "sonner";
 import { ProviderRowViewMode } from "./SettingsProviderRowView";
 import { ProviderRowEditMode } from "./SettingsProviderRowEdit";
@@ -15,7 +20,6 @@ export interface ProviderRowProps {
   onDelete: (id: string) => Promise<void>;
   onFetchModels: (id: string) => Promise<void>;
   fetchStatus: FetchStatus;
-  // Add callback for selecting model details
   onSelectModelForDetails: (combinedModelId: string | null) => void;
 }
 
@@ -37,21 +41,28 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     (state) => state.getAllAvailableModelDefsForProvider,
   );
 
-  const [rawAvailableModels, setRawAvailableModels] = useState<
-    { id: string; name: string }[] // Keep basic type here for simplicity
+  // State to hold OpenRouterModel[] for the edit mode
+  const [allAvailableModelsForEdit, setAllAvailableModelsForEdit] = useState<
+    OpenRouterModel[]
   >([]);
 
-  const allAvailableModels = useMemo(() => {
-    return [...rawAvailableModels].sort((a, b) =>
+  // Memoize the sorted list for view mode (still uses OpenRouterModel from store)
+  const allAvailableModelsForView = useMemo(() => {
+    const models = getAllAvailableModelDefsForProvider(provider.id);
+    return [...models].sort((a, b) =>
       (a.name || a.id).localeCompare(b.name || b.id),
     );
-  }, [rawAvailableModels]);
+  }, [provider.id, getAllAvailableModelDefsForProvider]);
 
   useEffect(() => {
     if (isEditing) {
+      // Fetch and set OpenRouterModel[] when entering edit mode
       const models = getAllAvailableModelDefsForProvider(provider.id);
-      // Map full model data to basic {id, name} for the edit list
-      setRawAvailableModels(models.map((m) => ({ id: m.id, name: m.name })));
+      setAllAvailableModelsForEdit(
+        [...models].sort((a, b) =>
+          (a.name || a.id).localeCompare(b.name || b.id),
+        ),
+      );
       setEditData({
         name: provider.name,
         type: provider.type,
@@ -62,7 +73,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
         autoFetchModels: provider.autoFetchModels,
       });
     } else {
-      setRawAvailableModels([]);
+      setAllAvailableModelsForEdit([]); // Clear when not editing
     }
   }, [
     isEditing,
@@ -150,8 +161,13 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   const handleFetchModels = useCallback(async () => {
     await onFetchModels(provider.id);
     if (isEditing) {
+      // Re-fetch and update models for edit mode after fetching
       const models = getAllAvailableModelDefsForProvider(provider.id);
-      setRawAvailableModels(models.map((m) => ({ id: m.id, name: m.name })));
+      setAllAvailableModelsForEdit(
+        [...models].sort((a, b) =>
+          (a.name || a.id).localeCompare(b.name || b.id),
+        ),
+      );
     }
   }, [
     onFetchModels,
@@ -167,7 +183,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
           providerId={provider.id}
           editData={editData}
           apiKeys={apiKeys}
-          allAvailableModels={allAvailableModels} // Pass basic {id, name} list
+          allAvailableModels={allAvailableModelsForEdit} // Pass OpenRouterModel[]
           isSaving={isSaving}
           onCancel={handleCancel}
           onSave={handleSave}
@@ -180,11 +196,12 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
           onEdit={handleEdit}
           onDelete={handleDelete}
           onFetchModels={handleFetchModels}
-          onUpdate={onUpdate}
+          onUpdate={onUpdate} // Pass onUpdate for direct toggling in view mode
           fetchStatus={fetchStatus}
           isDeleting={isDeleting}
-          // Pass the callback down
           onSelectModelForDetails={onSelectModelForDetails}
+          // Pass the memoized list for view mode
+          allAvailableModelsForView={allAvailableModelsForView}
         />
       )}
     </div>

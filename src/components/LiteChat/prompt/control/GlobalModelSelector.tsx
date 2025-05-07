@@ -27,6 +27,8 @@ import {
 import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import { Skeleton } from "@/components/ui/skeleton";
+// Import ModelListItem
+import type { ModelListItem } from "@/types/litechat/provider";
 import { combineModelId } from "@/lib/litechat/provider-helpers";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 
@@ -57,78 +59,64 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
       multimodal: false,
     });
 
-    const { dbProviderConfigs, globalModelSortOrder, isLoading } =
-      useProviderStore(
-        useShallow((state) => ({
-          dbProviderConfigs: state.dbProviderConfigs,
-          globalModelSortOrder: state.globalModelSortOrder,
-          isLoading: state.isLoading,
-        })),
-      );
+    const {
+      dbProviderConfigs,
+      globalModelSortOrder,
+      isLoading,
+      // Use the new selector
+      getAvailableModelListItems,
+    } = useProviderStore(
+      useShallow((state) => ({
+        dbProviderConfigs: state.dbProviderConfigs,
+        globalModelSortOrder: state.globalModelSortOrder,
+        isLoading: state.isLoading,
+        // Use the new selector
+        getAvailableModelListItems: state.getAvailableModelListItems,
+      })),
+    );
 
-    const orderedModels = useMemo(() => {
-      const enabledModelsMap = new Map<
-        string,
-        {
-          name: string;
-          providerName: string;
-          metadata: import("@/types/litechat/provider").OpenRouterModel | null;
-        }
-      >();
-      const enabledIds = new Set<string>();
+    const orderedModels: ModelListItem[] = useMemo(() => {
+      // Get all list items (already filtered by provider enablement implicitly by how they are constructed)
+      const allModelListItems = getAvailableModelListItems();
+      const modelItemsMap = new Map(allModelListItems.map((m) => [m.id, m]));
 
+      // Filter these items based on whether they are in any provider's `enabledModels` list
+      const globallyEnabledCombinedIds = new Set<string>();
       dbProviderConfigs.forEach((config) => {
-        if (!config.isEnabled || !config.enabledModels) return;
-        const allProviderModels =
-          useProviderStore
-            .getState()
-            .getAllAvailableModelDefsForProvider(config.id) ?? [];
-        const providerModelsMap = new Map(
-          allProviderModels.map((m) => [m.id, m]),
-        );
-        config.enabledModels.forEach((modelId) => {
-          const combinedId = combineModelId(config.id, modelId);
-          const modelDef = providerModelsMap.get(modelId);
-          if (modelDef) {
-            enabledIds.add(combinedId);
-            enabledModelsMap.set(combinedId, {
-              name: modelDef.name || modelId,
-              providerName: config.name,
-              metadata: modelDef,
-            });
-          }
-        });
+        if (config.isEnabled && config.enabledModels) {
+          config.enabledModels.forEach((modelId) => {
+            globallyEnabledCombinedIds.add(combineModelId(config.id, modelId));
+          });
+        }
       });
 
-      const sorted: {
-        id: string;
-        name: string;
-        providerName: string;
-        metadata: import("@/types/litechat/provider").OpenRouterModel | null;
-      }[] = [];
+      const globallyEnabledModels = allModelListItems.filter((item) =>
+        globallyEnabledCombinedIds.has(item.id),
+      );
+
+      const sorted: ModelListItem[] = [];
       const added = new Set<string>();
 
+      // Use globalModelSortOrder (which contains combined IDs)
       globalModelSortOrder.forEach((id) => {
-        if (enabledIds.has(id)) {
-          const details = enabledModelsMap.get(id);
+        if (globallyEnabledCombinedIds.has(id)) {
+          const details = modelItemsMap.get(id);
           if (details && !added.has(id)) {
-            sorted.push({ id, ...details });
+            sorted.push(details);
             added.add(id);
           }
         }
       });
 
-      enabledIds.forEach((id) => {
-        if (!added.has(id)) {
-          const details = enabledModelsMap.get(id);
-          if (details) {
-            sorted.push({ id, ...details });
-          }
+      // Add any remaining enabled models not in the sort order yet
+      globallyEnabledModels.forEach((item) => {
+        if (!added.has(item.id)) {
+          sorted.push(item);
         }
       });
 
       return sorted;
-    }, [dbProviderConfigs, globalModelSortOrder]);
+    }, [dbProviderConfigs, globalModelSortOrder, getAvailableModelListItems]);
 
     const filteredModels = useMemo(() => {
       // 1. Filter by text
@@ -153,11 +141,12 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
       }
 
       return textFiltered.filter((model) => {
+        // Use metadataSummary for filtering
         const supportedParams = new Set(
-          model.metadata?.supported_parameters ?? [],
+          model.metadataSummary?.supported_parameters ?? [],
         );
         const inputModalities = new Set(
-          model.metadata?.architecture?.input_modalities ?? [],
+          model.metadataSummary?.input_modalities ?? [],
         );
 
         return activeFilters.every((filter) => {

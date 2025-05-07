@@ -1,7 +1,11 @@
 // src/components/LiteChat/settings/SettingsProviderRowView.tsx
 // FULL FILE
 import React, { useMemo, useCallback, useState } from "react";
-import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
+import type {
+  DbProviderConfig,
+  DbApiKey,
+  OpenRouterModel,
+} from "@/types/litechat/provider";
 import { Button } from "@/components/ui/button";
 import {
   Edit2Icon,
@@ -26,7 +30,6 @@ import {
   combineModelId,
 } from "@/lib/litechat/provider-helpers";
 import { cn } from "@/lib/utils";
-import { useProviderStore } from "@/store/provider.store";
 import { ModelEnablementList } from "./ModelEnablementList";
 import { toast } from "sonner";
 import { ActionTooltipButton } from "../common/ActionTooltipButton";
@@ -43,6 +46,7 @@ interface ProviderRowViewModeProps {
   fetchStatus: FetchStatus;
   isDeleting: boolean;
   onSelectModelForDetails: (combinedModelId: string | null) => void;
+  allAvailableModelsForView: OpenRouterModel[]; // Expects OpenRouterModel[]
 }
 
 const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
@@ -55,6 +59,7 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   fetchStatus,
   isDeleting,
   onSelectModelForDetails,
+  allAvailableModelsForView,
 }) => {
   const [isModelListFolded, setIsModelListFolded] = useState(true);
 
@@ -65,11 +70,6 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   const isEditButtonDisabled = isDeleting || fetchStatus === "fetching";
   const isDeleteButtonDisabled = isDeleting || fetchStatus === "fetching";
 
-  const getAllAvailableModelDefsForProvider = useProviderStore(
-    (state) => state.getAllAvailableModelDefsForProvider,
-  );
-  // Get full model defs here for display/linking
-  const allAvailableModels = getAllAvailableModelDefsForProvider(provider.id);
   const enabledModelsSet = useMemo(
     () => new Set(provider.enabledModels ?? []),
     [provider.enabledModels],
@@ -103,9 +103,8 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   const toggleFold = () => setIsModelListFolded((prev) => !prev);
 
   const enabledCount = provider.enabledModels?.length ?? 0;
-  const availableCount = allAvailableModels.length;
+  const availableCount = allAvailableModelsForView.length;
 
-  // Handler for clicking a model name
   const handleModelClick = (modelId: string) => {
     const combinedId = combineModelId(provider.id, modelId);
     onSelectModelForDetails(combinedId);
@@ -113,7 +112,6 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3 min-w-0">
           <TooltipProvider delayDuration={100}>
@@ -184,7 +182,6 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
         </div>
       </div>
 
-      {/* Details */}
       <div className="text-sm text-muted-foreground mt-1 space-y-1 pl-5">
         {needsKey && (
           <div>
@@ -252,7 +249,6 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
         )}
       </div>
 
-      {/* Model Enablement Section */}
       <div className="space-y-1 pt-2">
         <div className="flex items-center justify-between">
           <span className="font-medium text-card-foreground text-sm">
@@ -269,16 +265,14 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
           />
         </div>
         {!isModelListFolded && (
-          // Pass the model click handler to the list
           <ModelEnablementList
             providerId={provider.id}
-            allAvailableModels={allAvailableModels} // Pass full model data
+            allAvailableModels={allAvailableModelsForView} // Pass OpenRouterModel[]
             enabledModelIds={enabledModelsSet}
             onToggleModel={handleModelToggle}
             isLoading={fetchStatus === "fetching"}
             disabled={isDeleting}
             listHeightClass="h-64"
-            // Add the click handler prop
             onModelClick={handleModelClick}
           />
         )}

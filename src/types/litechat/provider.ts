@@ -1,9 +1,8 @@
 // src/types/litechat/provider.ts
-
+// FULL FILE
 import type { DbBase } from "./common";
 
 // --- OpenRouter Model Structure (Subset for Typing) ---
-// Define interfaces based on the OpenRouter model structure
 export interface OpenRouterModelArchitecture {
   modality?: string | null;
   input_modalities?: string[] | null;
@@ -28,7 +27,7 @@ export interface OpenRouterTopProvider {
 }
 
 export interface OpenRouterModel {
-  id: string;
+  id: string; // Simple model ID (e.g., "gpt-4o", "llama3")
   name: string;
   created?: number | null;
   description?: string | null;
@@ -38,9 +37,25 @@ export interface OpenRouterModel {
   top_provider?: OpenRouterTopProvider | null;
   per_request_limits?: Record<string, any> | null;
   supported_parameters?: string[] | null;
-  // Add any other fields you might want to store/use
 }
 // --- End OpenRouter Model Structure ---
+
+// --- Lighter Model Type for Global Lists ---
+export interface ModelListItem {
+  id: string; // Combined ID: providerId:modelId
+  name: string;
+  providerId: string;
+  providerName: string;
+  metadataSummary: {
+    // Contains only essential fields for list display and filtering
+    context_length?: number | null;
+    supported_parameters?: string[] | null;
+    input_modalities?: string[] | null;
+    pricing?: OpenRouterModelPricing | null;
+    description?: string | null;
+  };
+}
+// --- End Lighter Model Type ---
 
 export type DbProviderType =
   | "openai"
@@ -53,7 +68,7 @@ export type DbProviderType =
 export interface DbApiKey extends DbBase {
   name: string;
   value: string;
-  providerId: string;
+  providerId: string; // This should ideally be DbProviderType for clarity if keys are type-specific
 }
 
 // Stored in DB for Provider Configurations
@@ -63,33 +78,26 @@ export interface DbProviderConfig extends DbBase {
   isEnabled: boolean;
   apiKeyId: string | null;
   baseURL: string | null;
-  enabledModels: string[] | null;
+  enabledModels: string[] | null; // Stores simple model IDs, not combined
   autoFetchModels: boolean;
-  // Update fetchedModels to store the full OpenRouterModel structure
-  fetchedModels: OpenRouterModel[] | null;
+  fetchedModels: OpenRouterModel[] | null; // Stores full OpenRouterModel definitions
   modelsLastFetchedAt: Date | null;
 }
 
-// Runtime representation of a Model
+// Runtime representation of a Model (used when a model is actively selected/used)
 export interface AiModelConfig {
-  id: string;
+  id: string; // Combined ID
   name: string;
   providerId: string;
   providerName: string;
-  instance: any;
-  // Add the full metadata object
-  metadata: OpenRouterModel | null;
-  // Deprecate these individual fields in favor of metadata
-  // contextWindow?: number;
-  // supportsImageGeneration?: boolean;
-  // supportsToolCalling?: boolean;
+  instance: any; // The actual AI SDK model instance
+  metadata: OpenRouterModel | null; // Full metadata for the selected model
 }
 
-// Runtime representation of a Provider (Less critical for selection)
+// Runtime representation of a Provider (less critical for selection, more for info)
 export interface AiProviderConfig {
   id: string;
   name: string;
   type: DbProviderType;
-  // Update allAvailableModels to store the full OpenRouterModel structure
-  allAvailableModels: OpenRouterModel[];
+  allAvailableModels: OpenRouterModel[]; // Full definitions for a specific provider
 }

@@ -23,11 +23,11 @@ const SettingsGeneralComponent: React.FC = () => {
     setFoldUserMessagesOnCompletion,
     streamingRenderFPS,
     setStreamingRenderFPS,
+    autoScrollInterval,
+    setAutoScrollInterval,
     resetGeneralSettings,
   } = useSettingsStore(
     useShallow((state) => ({
-      theme: state.theme,
-      setTheme: state.setTheme,
       enableStreamingMarkdown: state.enableStreamingMarkdown,
       setEnableStreamingMarkdown: state.setEnableStreamingMarkdown,
       enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing,
@@ -39,23 +39,27 @@ const SettingsGeneralComponent: React.FC = () => {
       setFoldUserMessagesOnCompletion: state.setFoldUserMessagesOnCompletion,
       streamingRenderFPS: state.streamingRenderFPS,
       setStreamingRenderFPS: state.setStreamingRenderFPS,
-      prismThemeUrl: state.prismThemeUrl,
-      setPrismThemeUrl: state.setPrismThemeUrl,
+      autoScrollInterval: state.autoScrollInterval,
+      setAutoScrollInterval: state.setAutoScrollInterval,
       resetGeneralSettings: state.resetGeneralSettings,
     })),
   );
 
   const [localFps, setLocalFps] = useState(streamingRenderFPS);
+  const [localScrollInterval, setLocalScrollInterval] =
+    useState(autoScrollInterval);
 
   const handleFpsSliderVisualChange = useCallback((value: number[]) => {
     setLocalFps(value[0]);
   }, []);
+
   const handleFpsSliderCommit = useCallback(
     (value: number[]) => {
       setStreamingRenderFPS(value[0]);
     },
     [setStreamingRenderFPS],
   );
+
   const handleFpsInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
@@ -70,14 +74,46 @@ const SettingsGeneralComponent: React.FC = () => {
     [setStreamingRenderFPS],
   );
 
+  const handleScrollIntervalSliderVisualChange = useCallback(
+    (value: number[]) => {
+      setLocalScrollInterval(value[0]);
+    },
+    [],
+  );
+
+  const handleScrollIntervalSliderCommit = useCallback(
+    (value: number[]) => {
+      setAutoScrollInterval(value[0]);
+    },
+    [setAutoScrollInterval],
+  );
+
+  const handleScrollIntervalInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      const numValue =
+        value === "" ? 1000 : parseInt(value.replace(/[^0-9]/g, ""), 10);
+      if (!isNaN(numValue)) {
+        const clampedInterval = Math.max(50, numValue);
+        setAutoScrollInterval(clampedInterval);
+        setLocalScrollInterval(clampedInterval);
+      }
+    },
+    [setAutoScrollInterval],
+  );
+
   useEffect(() => {
     setLocalFps(streamingRenderFPS);
   }, [streamingRenderFPS]);
 
+  useEffect(() => {
+    setLocalScrollInterval(autoScrollInterval);
+  }, [autoScrollInterval]);
+
   const handleResetClick = () => {
     if (
       window.confirm(
-        "Are you sure you want to reset Appearance and Streaming settings to their defaults?",
+        "Are you sure you want to reset Streaming & Display settings to their defaults?",
       )
     ) {
       resetGeneralSettings();
@@ -86,10 +122,8 @@ const SettingsGeneralComponent: React.FC = () => {
 
   return (
     <div className="space-y-6 p-1">
-      {/* Streaming Settings */}
       <div className="space-y-2">
         <h3 className="text-lg font-medium">Streaming & Display</h3>
-        {/* Streaming Markdown Toggle */}
         <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
           <div>
             <Label htmlFor="streaming-markdown-switch" className="font-medium">
@@ -106,7 +140,6 @@ const SettingsGeneralComponent: React.FC = () => {
             onCheckedChange={setEnableStreamingMarkdown}
           />
         </div>
-        {/* Streaming Code Block Parsing Toggle */}
         <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
           <div>
             <Label htmlFor="streaming-codeblock-switch" className="font-medium">
@@ -124,7 +157,6 @@ const SettingsGeneralComponent: React.FC = () => {
             onCheckedChange={setEnableStreamingCodeBlockParsing}
           />
         </div>
-        {/* Fold Streaming Code Blocks Toggle */}
         <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
           <div>
             <Label htmlFor="fold-codeblock-switch" className="font-medium">
@@ -141,7 +173,6 @@ const SettingsGeneralComponent: React.FC = () => {
             onCheckedChange={setFoldStreamingCodeBlocks}
           />
         </div>
-        {/* Fold User Messages Toggle */}
         <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
           <div>
             <Label htmlFor="fold-user-message-switch" className="font-medium">
@@ -155,10 +186,9 @@ const SettingsGeneralComponent: React.FC = () => {
           <Switch
             id="fold-user-message-switch"
             checked={foldUserMessagesOnCompletion ?? false}
-            onCheckedChange={setFoldUserMessagesOnCompletion} // Use new action
+            onCheckedChange={setFoldUserMessagesOnCompletion}
           />
         </div>
-        {/* Combined Streaming FPS Setting */}
         <div className="rounded-lg border p-3 shadow-sm space-y-2">
           <div>
             <Label htmlFor="streaming-fps-slider" className="font-medium">
@@ -193,9 +223,44 @@ const SettingsGeneralComponent: React.FC = () => {
             <span className="text-xs text-muted-foreground">FPS</span>
           </div>
         </div>
+        <div className="rounded-lg border p-3 shadow-sm space-y-2">
+          <div>
+            <Label
+              htmlFor="auto-scroll-interval-slider"
+              className="font-medium"
+            >
+              Auto-Scroll Interval ({localScrollInterval} ms)
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              How often to scroll to the bottom during streaming (50-5000 ms).
+              (Default: 1000ms)
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <Slider
+              id="auto-scroll-interval-slider"
+              min={50}
+              max={5000}
+              step={50}
+              value={[localScrollInterval]}
+              onValueChange={handleScrollIntervalSliderVisualChange}
+              onValueCommit={handleScrollIntervalSliderCommit}
+              className="flex-grow"
+            />
+            <Input
+              type="number"
+              min={50}
+              max={5000}
+              step={50}
+              value={localScrollInterval}
+              onChange={handleScrollIntervalInputChange}
+              className="w-20 h-8 text-xs"
+            />
+            <span className="text-xs text-muted-foreground">ms</span>
+          </div>
+        </div>
       </div>
 
-      {/* Reset Button Section */}
       <Separator />
       <div className="flex justify-end pt-4">
         <Button variant="outline" size="sm" onClick={handleResetClick}>

@@ -1,5 +1,5 @@
 // src/store/settings.store.ts
-
+// FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { PersistenceService } from "@/services/persistence.service";
@@ -69,6 +69,7 @@ export interface SettingsState {
   customFontSize: number | null;
   chatMaxWidth: string | null;
   customThemeColors: CustomThemeColors | null;
+  autoScrollInterval: number;
 }
 
 interface SettingsActions {
@@ -103,6 +104,7 @@ interface SettingsActions {
     colorName: keyof CustomThemeColors,
     value: string | null,
   ) => void;
+  setAutoScrollInterval: (interval: number) => void;
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>;
   resetAssistantSettings: () => Promise<void>;
@@ -137,10 +139,10 @@ const DEFAULT_CUSTOM_FONT_FAMILY = null;
 const DEFAULT_CUSTOM_FONT_SIZE = 16;
 const DEFAULT_CHAT_MAX_WIDTH = "max-w-7xl";
 const DEFAULT_CUSTOM_THEME_COLORS = null;
+const DEFAULT_AUTO_SCROLL_INTERVAL = 1000; // 1 second
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set, get) => ({
-    // Initial default values using constants
     theme: DEFAULT_THEME,
     globalSystemPrompt: DEFAULT_SYSTEM_PROMPT,
     temperature: DEFAULT_TEMPERATURE,
@@ -169,8 +171,8 @@ export const useSettingsStore = create(
     customFontSize: DEFAULT_CUSTOM_FONT_SIZE,
     chatMaxWidth: DEFAULT_CHAT_MAX_WIDTH,
     customThemeColors: DEFAULT_CUSTOM_THEME_COLORS,
+    autoScrollInterval: DEFAULT_AUTO_SCROLL_INTERVAL,
 
-    // --- Existing Setters ---
     setTheme: (theme) => {
       set({ theme: theme });
       PersistenceService.saveSetting("theme", theme);
@@ -272,8 +274,6 @@ export const useSettingsStore = create(
       set({ autoTitleIncludeRules: include });
       PersistenceService.saveSetting("autoTitleIncludeRules", include);
     },
-
-    // --- New Theme Setters ---
     setCustomFontFamily: (fontFamily) => {
       const trimmedFont = fontFamily?.trim() || null;
       set({ customFontFamily: trimmedFont });
@@ -286,7 +286,6 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("customFontSize", clampedSize);
     },
     setChatMaxWidth: (maxWidthClass) => {
-      // Accept Tailwind class string
       set({ chatMaxWidth: maxWidthClass });
       PersistenceService.saveSetting("chatMaxWidth", maxWidthClass);
     },
@@ -311,8 +310,12 @@ export const useSettingsStore = create(
         get().customThemeColors,
       );
     },
+    setAutoScrollInterval: (interval) => {
+      const clampedInterval = Math.max(50, interval);
+      set({ autoScrollInterval: clampedInterval });
+      PersistenceService.saveSetting("autoScrollInterval", clampedInterval);
+    },
 
-    // --- Load Settings ---
     loadSettings: async () => {
       try {
         const [
@@ -343,6 +346,7 @@ export const useSettingsStore = create(
           customFontSize,
           chatMaxWidth,
           customThemeColors,
+          autoScrollInterval,
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -438,13 +442,17 @@ export const useSettingsStore = create(
             "customFontSize",
             DEFAULT_CUSTOM_FONT_SIZE,
           ),
-          PersistenceService.loadSetting<string | null>( // Load string
+          PersistenceService.loadSetting<string | null>(
             "chatMaxWidth",
             DEFAULT_CHAT_MAX_WIDTH,
           ),
           PersistenceService.loadSetting<CustomThemeColors | null>(
             "customThemeColors",
             DEFAULT_CUSTOM_THEME_COLORS,
+          ),
+          PersistenceService.loadSetting<number>(
+            "autoScrollInterval",
+            DEFAULT_AUTO_SCROLL_INTERVAL,
           ),
         ]);
 
@@ -476,13 +484,13 @@ export const useSettingsStore = create(
           customFontSize,
           chatMaxWidth,
           customThemeColors,
+          autoScrollInterval,
         });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);
       }
     },
 
-    // --- Reset Actions ---
     resetGeneralSettings: async () => {
       try {
         set({
@@ -493,6 +501,7 @@ export const useSettingsStore = create(
           foldUserMessagesOnCompletion:
             DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION,
           streamingRenderFPS: DEFAULT_STREAMING_FPS,
+          autoScrollInterval: DEFAULT_AUTO_SCROLL_INTERVAL,
         });
         await Promise.all([
           PersistenceService.saveSetting(
@@ -514,6 +523,10 @@ export const useSettingsStore = create(
           PersistenceService.saveSetting(
             "streamingRenderFPS",
             DEFAULT_STREAMING_FPS,
+          ),
+          PersistenceService.saveSetting(
+            "autoScrollInterval",
+            DEFAULT_AUTO_SCROLL_INTERVAL,
           ),
         ]);
         toast.success("Streaming & Display settings reset to defaults.");

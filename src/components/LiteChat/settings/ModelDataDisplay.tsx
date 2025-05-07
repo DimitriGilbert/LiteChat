@@ -1,333 +1,279 @@
 // src/components/LiteChat/settings/ModelDataDisplay.tsx
 // FULL FILE
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import {
-  splitModelId,
-  createAiModelConfig,
-} from "@/lib/litechat/provider-helpers";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+  TableCaption,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
-import {
-  AlertCircleIcon,
-  BrainCircuitIcon,
-  DollarSignIcon,
-  FileTextIcon,
-  ImageIcon,
-  InfoIcon,
-  LanguagesIcon,
-  MaximizeIcon,
-  PuzzleIcon,
-  SearchIcon,
-  Settings2Icon,
-  TagIcon,
-  UsersIcon,
-} from "lucide-react";
-import { CodeBlockRenderer } from "../common/CodeBlockRenderer";
+import { AlertCircleIcon, CheckCircle2Icon } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { splitModelId } from "@/lib/litechat/provider-helpers";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ModelDataDisplayProps {
-  modelId: string | null; // This is the combinedModelId
+  modelId: string | null; // Combined ID
 }
 
-const DetailRow: React.FC<{
-  label: string;
-  value: React.ReactNode;
-  icon?: React.ReactNode;
-  className?: string;
-}> = ({ label, value, icon, className }) => (
-  <TableRow className={className}>
-    <TableCell className="font-medium py-1.5 px-3 w-1/3">
-      <div className="flex items-center gap-2">
-        {icon}
-        {label}
-      </div>
-    </TableCell>
-    <TableCell className="py-1.5 px-3 text-muted-foreground">{value}</TableCell>
-  </TableRow>
-);
+const formatPrice = (priceStr: string | null | undefined): string => {
+  if (!priceStr) return "N/A";
+  const priceNum = parseFloat(priceStr);
+  if (isNaN(priceNum)) return "N/A";
+  return `$${(priceNum / 1000).toFixed(4)} / 1K tokens`;
+};
 
-const CapabilityBadge: React.FC<{
-  supported: boolean;
-  label: string;
-  icon: React.ReactNode;
-}> = ({ supported, label, icon }) => (
-  <Badge
-    variant={supported ? "default" : "outline"}
-    className={`text-xs ${supported ? "bg-green-500/20 text-green-700 dark:bg-green-500/10 dark:text-green-400 border-green-500/30" : "text-muted-foreground border-border/50"}`}
-  >
-    <div className="flex items-center gap-1">
-      {icon}
-      {label}
-    </div>
-  </Badge>
-);
+const renderDetailRow = (
+  label: string,
+  value: React.ReactNode | string | number | null | undefined,
+  isBadge: boolean = false,
+  badgeVariant:
+    | "default"
+    | "secondary"
+    | "destructive"
+    | "outline" = "secondary",
+) => {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return null;
+  }
+  return (
+    <TableRow>
+      <TableCell className="font-medium text-xs w-1/3 py-1.5 px-3">
+        {label}
+      </TableCell>
+      <TableCell className="text-xs py-1.5 px-3 break-all">
+        {isBadge ? (
+          <Badge variant={badgeVariant} className="text-xs">
+            {String(value)}
+          </Badge>
+        ) : Array.isArray(value) ? (
+          <div className="flex flex-wrap gap-1">
+            {value.map((item, index) => (
+              <Badge key={index} variant="outline" className="text-xs">
+                {String(item)}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          String(value)
+        )}
+      </TableCell>
+    </TableRow>
+  );
+};
 
 export const ModelDataDisplay: React.FC<ModelDataDisplayProps> = ({
   modelId: combinedModelId,
 }) => {
-  const { dbProviderConfigs, dbApiKeys, getAllAvailableModelDefsForProvider } =
-    useProviderStore(
-      useShallow((state) => ({
-        dbProviderConfigs: state.dbProviderConfigs,
-        dbApiKeys: state.dbApiKeys,
-        getAllAvailableModelDefsForProvider:
-          state.getAllAvailableModelDefsForProvider,
-      })),
-    );
-
-  const modelData = useMemo(() => {
-    if (!combinedModelId) return null;
-    const { providerId, modelId: specificModelId } =
-      splitModelId(combinedModelId);
-    if (!providerId || !specificModelId) return null;
-
-    const providerConfig = dbProviderConfigs.find((p) => p.id === providerId);
-    if (!providerConfig) return null;
-
-    // Get all models for this provider (these are OpenRouterModel type)
-    const allProviderModels = getAllAvailableModelDefsForProvider(providerId);
-    const modelDefinition = allProviderModels.find(
-      (m) => m.id === specificModelId,
-    );
-
-    if (!modelDefinition) return null;
-
-    // We can also create the AiModelConfig if needed for other properties,
-    // but modelDefinition (OpenRouterModel) holds most of what we need.
-    const apiKeyRecord = dbApiKeys.find(
-      (k) => k.id === providerConfig.apiKeyId,
-    );
-    const aiModelConfig = createAiModelConfig(
-      providerConfig,
-      specificModelId,
-      apiKeyRecord?.value,
-    );
-
-    return {
-      definition: modelDefinition, // This is the OpenRouterModel
-      config: aiModelConfig, // This is AiModelConfig (includes instance)
-      providerName: providerConfig.name,
-    };
-  }, [
-    combinedModelId,
+  const {
+    createAiModelConfig, // Use the action from the store
     dbProviderConfigs,
     dbApiKeys,
-    getAllAvailableModelDefsForProvider,
-  ]);
+    updateProviderConfig,
+    isLoading,
+  } = useProviderStore(
+    useShallow((state) => ({
+      createAiModelConfig: state.createAiModelConfig,
+      dbProviderConfigs: state.dbProviderConfigs,
+      dbApiKeys: state.dbApiKeys,
+      updateProviderConfig: state.updateProviderConfig,
+      isLoading: state.isLoading,
+    })),
+  );
+
+  const model = useMemo(() => {
+    if (!combinedModelId) return undefined;
+    const { providerId, modelId: simpleId } = splitModelId(combinedModelId);
+    if (!providerId || !simpleId) return undefined;
+    const config = dbProviderConfigs.find((p) => p.id === providerId);
+    if (!config) return undefined;
+    const apiKeyRecord = dbApiKeys.find((k) => k.id === config.apiKeyId);
+    return createAiModelConfig(config, simpleId, apiKeyRecord?.value);
+  }, [combinedModelId, dbProviderConfigs, dbApiKeys, createAiModelConfig]);
+
+  const metadata = model?.metadata;
+
+  const handleToggleModelEnabled = useCallback(async () => {
+    if (!model || !combinedModelId) return;
+
+    const { providerId, modelId: simpleModelId } =
+      splitModelId(combinedModelId);
+    if (!providerId || !simpleModelId) return;
+
+    const providerConfig = dbProviderConfigs.find((p) => p.id === providerId);
+    if (!providerConfig) {
+      toast.error("Provider configuration not found.");
+      return;
+    }
+
+    const currentEnabledSet = new Set(providerConfig.enabledModels ?? []);
+    const isCurrentlyEnabled = currentEnabledSet.has(simpleModelId);
+
+    if (isCurrentlyEnabled) {
+      currentEnabledSet.delete(simpleModelId);
+    } else {
+      currentEnabledSet.add(simpleModelId);
+    }
+    const newEnabledModels = Array.from(currentEnabledSet);
+
+    try {
+      await updateProviderConfig(providerConfig.id, {
+        enabledModels: newEnabledModels,
+      });
+      toast.success(
+        `Model "${model.name}" ${!isCurrentlyEnabled ? "enabled" : "disabled"}.`,
+      );
+    } catch (error) {
+      toast.error("Failed to update model status.");
+    }
+  }, [model, combinedModelId, dbProviderConfigs, updateProviderConfig]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 p-1 h-full flex flex-col">
+        <Skeleton className="h-8 w-3/4 flex-shrink-0" />
+        <Skeleton className="h-4 w-1/2 flex-shrink-0" />
+        <div className="flex-grow space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      </div>
+    );
+  }
 
   if (!combinedModelId) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground p-4">
-        <InfoIcon className="h-5 w-5 mr-2" />
-        Select a model from the list to view its details.
+      <div className="p-4 text-center text-muted-foreground h-full flex flex-col items-center justify-center">
+        <AlertCircleIcon className="mx-auto h-10 w-10 mb-2 text-amber-500" />
+        <p className="text-sm">
+          No model selected. Click a model in the "Configuration" or "Browse
+          Models" tab to view its details.
+        </p>
       </div>
     );
   }
 
-  if (!modelData) {
+  if (!model || !metadata) {
     return (
-      <Alert variant="destructive" className="m-4">
-        <AlertCircleIcon className="h-4 w-4" />
-        <AlertTitle>Error</AlertTitle>
-        <AlertDescription>
-          Could not load details for model ID: {combinedModelId}. It might have
-          been removed or the provider configuration is missing.
-        </AlertDescription>
-      </Alert>
+      <div className="p-4 text-center text-destructive h-full flex flex-col items-center justify-center">
+        <AlertCircleIcon className="mx-auto h-10 w-10 mb-2" />
+        <p className="text-sm">
+          Details not available for model: {combinedModelId}. It might be
+          misconfigured or no longer available.
+        </p>
+      </div>
     );
   }
 
-  const { definition: model, providerName } = modelData;
-  const arch = model.architecture;
-  const pricing = model.pricing;
-  const topProvider = model.top_provider;
-
-  const supportedParams = new Set(model.supported_parameters ?? []);
-  const inputModalities = new Set(arch?.input_modalities ?? []);
-
-  const capabilities = [
-    {
-      label: "Reasoning",
-      supported: supportedParams.has("reasoning"),
-      icon: <BrainCircuitIcon className="h-3 w-3" />,
-    },
-    {
-      label: "Web Search",
-      supported:
-        supportedParams.has("web_search") ||
-        supportedParams.has("web_search_options"),
-      icon: <SearchIcon className="h-3 w-3" />,
-    },
-    {
-      label: "Tools",
-      supported: supportedParams.has("tools"),
-      icon: <PuzzleIcon className="h-3 w-3" />,
-    },
-    {
-      label: "Multimodal Input",
-      supported: Array.from(inputModalities).some((mod) => mod !== "text"),
-      icon: <ImageIcon className="h-3 w-3" />,
-    },
-  ];
+  const { providerId, modelId: simpleModelId } = splitModelId(combinedModelId);
+  const providerConfig = dbProviderConfigs.find((p) => p.id === providerId);
+  const isModelEnabled =
+    simpleModelId != null &&
+    providerConfig?.isEnabled &&
+    providerConfig?.enabledModels?.includes(simpleModelId) === true;
 
   return (
-    <ScrollArea className="h-full p-1">
-      <div className="max-w-4xl mx-auto space-y-6 py-4 px-2">
-        <div className="pb-4 border-b">
-          <h2 className="text-2xl font-bold tracking-tight">{model.name}</h2>
-          <p className="text-sm text-muted-foreground">
-            Provider: {providerName} (ID: {model.id})
-          </p>
-          {model.description && (
-            <p className="text-sm mt-2">{model.description}</p>
-          )}
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Capabilities</h3>
-          <div className="flex flex-wrap gap-2">
-            {capabilities.map((cap) => (
-              <CapabilityBadge
-                key={cap.label}
-                supported={cap.supported}
-                label={cap.label}
-                icon={cap.icon}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Details</h3>
-            <Table>
-              <TableBody>
-                <DetailRow
-                  label="Context Length"
-                  value={
-                    model.context_length
-                      ? model.context_length.toLocaleString()
-                      : "N/A"
-                  }
-                  icon={<MaximizeIcon className="h-3.5 w-3.5" />}
-                />
-                {topProvider?.max_completion_tokens && (
-                  <DetailRow
-                    label="Max Completion Tokens"
-                    value={topProvider.max_completion_tokens.toLocaleString()}
-                    icon={<FileTextIcon className="h-3.5 w-3.5" />}
-                  />
-                )}
-                <DetailRow
-                  label="Tokenizer"
-                  value={arch?.tokenizer || "N/A"}
-                  icon={<TagIcon className="h-3.5 w-3.5" />}
-                />
-                <DetailRow
-                  label="Input Modalities"
-                  value={arch?.input_modalities?.join(", ") || "text (default)"}
-                  icon={<ImageIcon className="h-3.5 w-3.5" />}
-                />
-                <DetailRow
-                  label="Output Modalities"
-                  value={
-                    arch?.output_modalities?.join(", ") || "text (default)"
-                  }
-                  icon={<FileTextIcon className="h-3.5 w-3.5" />}
-                />
-                {arch?.instruct_type && (
-                  <DetailRow
-                    label="Instruct Type"
-                    value={arch.instruct_type}
-                    icon={<LanguagesIcon className="h-3.5 w-3.5" />}
-                  />
-                )}
-                {topProvider && (
-                  <DetailRow
-                    label="Moderated"
-                    value={topProvider.is_moderated ? "Yes" : "No"}
-                    icon={<UsersIcon className="h-3.5 w-3.5" />}
-                  />
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Pricing ($ / 1M tokens)</h3>
-            {pricing ? (
-              <Table>
-                <TableBody>
-                  <DetailRow
-                    label="Prompt"
-                    value={pricing.prompt || "N/A"}
-                    icon={<DollarSignIcon className="h-3.5 w-3.5" />}
-                  />
-                  <DetailRow
-                    label="Completion"
-                    value={pricing.completion || "N/A"}
-                    icon={<DollarSignIcon className="h-3.5 w-3.5" />}
-                  />
-                  {pricing.request && (
-                    <DetailRow
-                      label="Request (Fixed)"
-                      value={pricing.request}
-                      icon={<DollarSignIcon className="h-3.5 w-3.5" />}
-                    />
-                  )}
-                  {pricing.image && (
-                    <DetailRow
-                      label="Image (Per Image)"
-                      value={pricing.image}
-                      icon={<ImageIcon className="h-3.5 w-3.5" />}
-                    />
-                  )}
-                </TableBody>
-              </Table>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Pricing information not available.
-              </p>
-            )}
-          </div>
-        </div>
-
-        {model.supported_parameters &&
-          model.supported_parameters.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold">Supported Parameters</h3>
-              <div className="flex flex-wrap gap-2">
-                {model.supported_parameters.map((param) => (
-                  <Badge key={param} variant="secondary" className="text-xs">
-                    <Settings2Icon className="h-3 w-3 mr-1" />
-                    {param}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-        {model.per_request_limits && (
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold">Per-Request Limits</h3>
-            <CodeBlockRenderer
-              lang="json"
-              code={JSON.stringify(model.per_request_limits, null, 2)}
-            />
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold">Raw Definition</h3>
-          <CodeBlockRenderer
-            lang="json"
-            code={JSON.stringify(model, null, 2)}
+    <div className="space-y-4 p-1 h-full flex flex-col">
+      <div className="flex items-center justify-between flex-shrink-0">
+        <h4 className="text-lg font-semibold text-card-foreground truncate">
+          {model.name}
+          <span className="text-sm text-muted-foreground ml-2">
+            ({model.providerName})
+          </span>
+        </h4>
+        <div className="flex items-center space-x-2">
+          <Label
+            htmlFor={`enable-details-${simpleModelId}`}
+            className="text-xs"
+          >
+            {isModelEnabled ? "Enabled" : "Disabled"}
+          </Label>
+          <Switch
+            id={`enable-details-${simpleModelId}`}
+            checked={isModelEnabled}
+            onCheckedChange={handleToggleModelEnabled}
+            disabled={!providerConfig?.isEnabled}
+            aria-label={`Enable model ${model.name}`}
           />
         </div>
       </div>
-    </ScrollArea>
+      {metadata.description && (
+        <p className="text-xs text-muted-foreground flex-shrink-0">
+          {metadata.description}
+        </p>
+      )}
+      <ScrollArea className="flex-grow border rounded-md bg-background/30">
+        <Table>
+          <TableCaption className="py-2 text-xs">
+            Model ID: {metadata.id}
+          </TableCaption>
+          <TableBody>
+            {renderDetailRow(
+              "Context Length",
+              metadata.top_provider?.context_length ?? metadata.context_length,
+            )}
+            {renderDetailRow(
+              "Max Completion Tokens",
+              metadata.top_provider?.max_completion_tokens,
+            )}
+            {renderDetailRow(
+              "Input Modalities",
+              metadata.architecture?.input_modalities,
+            )}
+            {renderDetailRow(
+              "Output Modalities",
+              metadata.architecture?.output_modalities,
+            )}
+            {renderDetailRow(
+              "Tokenizer",
+              metadata.architecture?.tokenizer,
+              true,
+            )}
+            {renderDetailRow(
+              "Instruct Type",
+              metadata.architecture?.instruct_type,
+              true,
+            )}
+            {renderDetailRow(
+              "Pricing (Prompt)",
+              formatPrice(metadata.pricing?.prompt),
+            )}
+            {renderDetailRow(
+              "Pricing (Completion)",
+              formatPrice(metadata.pricing?.completion),
+            )}
+            {renderDetailRow(
+              "Pricing (Image)",
+              formatPrice(metadata.pricing?.image),
+            )}
+            {renderDetailRow(
+              "Pricing (Request)",
+              formatPrice(metadata.pricing?.request),
+            )}
+            {renderDetailRow(
+              "Supported Parameters",
+              metadata.supported_parameters,
+            )}
+            {renderDetailRow(
+              "Moderated",
+              metadata.top_provider?.is_moderated ? (
+                <CheckCircle2Icon className="h-4 w-4 text-green-500" />
+              ) : (
+                "No"
+              ),
+            )}
+          </TableBody>
+        </Table>
+      </ScrollArea>
+    </div>
   );
 };

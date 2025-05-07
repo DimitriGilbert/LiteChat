@@ -1,6 +1,5 @@
 // src/components/LiteChat/settings/GlobalModelOrganizer.tsx
-// Line 77: Access metadata correctly
-
+// FULL FILE
 import React, { useCallback, useMemo, useState } from "react";
 import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
@@ -26,7 +25,8 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { SortableModelItem } from "@/components/LiteChat/common/SortableModelItem";
-import type { AiModelConfig } from "@/types/litechat/provider";
+// Import ModelListItem
+import type { ModelListItem } from "@/types/litechat/provider";
 import { combineModelId } from "@/lib/litechat/provider-helpers";
 
 export const GlobalModelOrganizer: React.FC = () => {
@@ -35,58 +35,47 @@ export const GlobalModelOrganizer: React.FC = () => {
     dbProviderConfigs,
     globalModelSortOrder,
     isLoading,
-    getAllAvailableModelDefsForProvider,
+    // Use the new selector
+    getAvailableModelListItems,
   } = useProviderStore(
     useShallow((state) => ({
       setGlobalModelSortOrder: state.setGlobalModelSortOrder,
       dbProviderConfigs: state.dbProviderConfigs,
       globalModelSortOrder: state.globalModelSortOrder,
       isLoading: state.isLoading,
-      getAllAvailableModelDefsForProvider:
-        state.getAllAvailableModelDefsForProvider,
+      // Use the new selector
+      getAvailableModelListItems: state.getAvailableModelListItems,
     })),
   );
 
   const [filterText, setFilterText] = useState("");
 
   const enabledAndOrderedModels = useMemo(() => {
-    const globallyEnabledModelsMap = new Map<
-      string,
-      Omit<AiModelConfig, "instance">
-    >();
-    const enabledCombinedIds = new Set<string>();
+    // Get all list items (already filtered by provider enablement implicitly by how they are constructed)
+    const allModelListItems = getAvailableModelListItems();
+    const modelItemsMap = new Map(allModelListItems.map((m) => [m.id, m]));
 
+    // Filter these items based on whether they are in any provider's `enabledModels` list
+    const globallyEnabledCombinedIds = new Set<string>();
     dbProviderConfigs.forEach((config) => {
-      if (!config.isEnabled || !config.enabledModels) return;
-
-      // Use the selector to get full model definitions
-      const allProviderModels = getAllAvailableModelDefsForProvider(config.id);
-      const providerModelsMap = new Map(
-        allProviderModels.map((m) => [m.id, m]),
-      );
-
-      config.enabledModels.forEach((modelId) => {
-        const combinedId = combineModelId(config.id, modelId);
-        const modelDef = providerModelsMap.get(modelId);
-        if (modelDef) {
-          enabledCombinedIds.add(combinedId);
-          globallyEnabledModelsMap.set(combinedId, {
-            id: combinedId,
-            name: modelDef.name || modelId,
-            providerId: config.id,
-            providerName: config.name,
-            metadata: modelDef,
-          });
-        }
-      });
+      if (config.isEnabled && config.enabledModels) {
+        config.enabledModels.forEach((modelId) => {
+          globallyEnabledCombinedIds.add(combineModelId(config.id, modelId));
+        });
+      }
     });
 
-    const sortedModels: Omit<AiModelConfig, "instance">[] = [];
+    const globallyEnabledModels = allModelListItems.filter((item) =>
+      globallyEnabledCombinedIds.has(item.id),
+    );
+
+    const sortedModels: ModelListItem[] = [];
     const addedIds = new Set<string>();
 
+    // Use globalModelSortOrder (which contains combined IDs)
     globalModelSortOrder.forEach((combinedId) => {
-      if (enabledCombinedIds.has(combinedId)) {
-        const details = globallyEnabledModelsMap.get(combinedId);
+      if (globallyEnabledCombinedIds.has(combinedId)) {
+        const details = modelItemsMap.get(combinedId);
         if (details && !addedIds.has(combinedId)) {
           sortedModels.push(details);
           addedIds.add(combinedId);
@@ -94,19 +83,19 @@ export const GlobalModelOrganizer: React.FC = () => {
       }
     });
 
-    const remainingEnabled = Array.from(enabledCombinedIds)
-      .filter((combinedId) => !addedIds.has(combinedId))
-      .map((combinedId) => globallyEnabledModelsMap.get(combinedId))
-      .filter((details): details is Omit<AiModelConfig, "instance"> =>
-        Boolean(details),
-      )
-      .sort((a, b) => a.name.localeCompare(b.name));
+    // Add any remaining enabled models not in the sort order yet
+    globallyEnabledModels.forEach((item) => {
+      if (!addedIds.has(item.id)) {
+        sortedModels.push(item);
+        addedIds.add(item.id); // Should not be necessary here but good practice
+      }
+    });
 
-    return [...sortedModels, ...remainingEnabled];
+    return sortedModels;
   }, [
     dbProviderConfigs,
     globalModelSortOrder,
-    getAllAvailableModelDefsForProvider,
+    getAvailableModelListItems, // Depend on the new selector
   ]);
 
   const filteredAndOrderedModels = useMemo(() => {

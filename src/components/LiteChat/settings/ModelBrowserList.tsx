@@ -1,20 +1,22 @@
-// src/components/LiteChat/settings/ModelEnablementList.tsx
+// src/components/LiteChat/settings/ModelBrowserList.tsx
 // FULL FILE
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
+import { useProviderStore } from "@/store/provider.store";
+import { useShallow } from "zustand/react/shallow";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   SearchIcon,
+  InfoIcon,
+  CheckIcon,
+  BanIcon,
   BrainCircuitIcon,
   WrenchIcon,
   ImageIcon,
   FilterIcon,
-  CheckIcon,
-  BanIcon,
   DollarSignIcon,
 } from "lucide-react";
 import {
@@ -23,22 +25,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ActionTooltipButton } from "../common/ActionTooltipButton";
-// This component now expects OpenRouterModel[]
-import type { OpenRouterModel } from "@/types/litechat/provider";
+import type { ModelListItem } from "@/types/litechat/provider";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface ModelBrowserListProps {
+  onSelectModelForDetails: (combinedModelId: string | null) => void;
+}
 
 type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
-
-interface ModelEnablementListProps {
-  providerId: string;
-  allAvailableModels: OpenRouterModel[]; // Expects full model definitions
-  enabledModelIds: Set<string>; // Simple model IDs (e.g., "gpt-4o")
-  onToggleModel: (modelId: string, isEnabled: boolean) => void; // Expects simple model ID
-  isLoading?: boolean;
-  disabled?: boolean;
-  listHeightClass?: string;
-  onModelClick?: (modelId: string) => void; // Expects simple model ID
-}
 
 const parsePrice = (priceStr: string | null | undefined): number | null => {
   if (!priceStr) return null;
@@ -46,16 +42,23 @@ const parsePrice = (priceStr: string | null | undefined): number | null => {
   return isNaN(priceNum) ? null : priceNum / 1_000_000;
 };
 
-export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
-  providerId,
-  allAvailableModels,
-  enabledModelIds,
-  onToggleModel,
-  isLoading = false,
-  disabled = false,
-  listHeightClass = "h-48",
-  onModelClick,
+export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
+  onSelectModelForDetails,
 }) => {
+  const {
+    getAvailableModelListItems,
+    dbProviderConfigs,
+    updateProviderConfig,
+    isLoading,
+  } = useProviderStore(
+    useShallow((state) => ({
+      getAvailableModelListItems: state.getAvailableModelListItems,
+      dbProviderConfigs: state.dbProviderConfigs,
+      updateProviderConfig: state.updateProviderConfig,
+      isLoading: state.isLoading,
+    })),
+  );
+
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
   const [enabledFilter, setEnabledFilter] = useState<
@@ -74,13 +77,28 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   const [minOutputPrice, setMinOutputPrice] = useState<string>("");
   const [maxOutputPrice, setMaxOutputPrice] = useState<string>("");
 
-  const filteredModels = useMemo(() => {
-    let models = allAvailableModels;
+  const allModelItems = useMemo(
+    () => getAvailableModelListItems(),
+    [getAvailableModelListItems],
+  );
 
-    if (enabledFilter === "enabled") {
-      models = models.filter((model) => enabledModelIds.has(model.id));
-    } else if (enabledFilter === "disabled") {
-      models = models.filter((model) => !enabledModelIds.has(model.id));
+  const providerConfigsMap = useMemo(
+    () => new Map(dbProviderConfigs.map((p) => [p.id, p])),
+    [dbProviderConfigs],
+  );
+
+  const filteredModels = useMemo(() => {
+    let models = allModelItems;
+
+    if (enabledFilter !== "all") {
+      models = models.filter((model) => {
+        const providerConfig = providerConfigsMap.get(model.providerId);
+        const simpleModelId = model.id.split(":")[1];
+        const isEnabled =
+          providerConfig?.isEnabled &&
+          providerConfig?.enabledModels?.includes(simpleModelId) === true;
+        return enabledFilter === "enabled" ? isEnabled : !isEnabled;
+      });
     }
 
     if (searchQuery.trim()) {
@@ -88,6 +106,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
       models = models.filter(
         (model) =>
           model.name.toLowerCase().includes(query) ||
+          model.providerName.toLowerCase().includes(query) ||
           model.id.toLowerCase().includes(query),
       );
     }
@@ -98,11 +117,12 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
 
     if (activeCapabilityFilters.length > 0) {
       models = models.filter((model) => {
-        const supportedParams = new Set(model.supported_parameters ?? []);
-        const inputModalities = new Set(
-          model.architecture?.input_modalities ?? [],
+        const supportedParams = new Set(
+          model.metadataSummary?.supported_parameters ?? [],
         );
-
+        const inputModalities = new Set(
+          model.metadataSummary?.input_modalities ?? [],
+        );
         return activeCapabilityFilters.every((filter) => {
           switch (filter) {
             case "reasoning":
@@ -127,7 +147,6 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
     const maxIn = parseFloat(maxInputPrice);
     const minOut = parseFloat(minOutputPrice);
     const maxOut = parseFloat(maxOutputPrice);
-
     const hasMinIn = !isNaN(minIn);
     const hasMaxIn = !isNaN(maxIn);
     const hasMinOut = !isNaN(minOut);
@@ -135,14 +154,14 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
 
     if (hasMinIn || hasMaxIn || hasMinOut || hasMaxOut) {
       models = models.filter((model) => {
-        const promptPrice = parsePrice(model.pricing?.prompt);
-        const completionPrice = parsePrice(model.pricing?.completion);
-
+        const promptPrice = parsePrice(model.metadataSummary?.pricing?.prompt);
+        const completionPrice = parsePrice(
+          model.metadataSummary?.pricing?.completion,
+        );
         const minInPerToken = hasMinIn ? minIn / 1_000_000 : -Infinity;
         const maxInPerToken = hasMaxIn ? maxIn / 1_000_000 : Infinity;
         const minOutPerToken = hasMinOut ? minOut / 1_000_000 : -Infinity;
         const maxOutPerToken = hasMaxOut ? maxOut / 1_000_000 : Infinity;
-
         const inputPriceMatch =
           promptPrice !== null &&
           promptPrice >= minInPerToken &&
@@ -151,21 +170,23 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
           completionPrice !== null &&
           completionPrice >= minOutPerToken &&
           completionPrice <= maxOutPerToken;
-
         let match = true;
         if (hasMinIn || hasMaxIn) match &&= inputPriceMatch;
         if (hasMinOut || hasMaxOut) match &&= outputPriceMatch;
-
         return match;
       });
     }
 
-    return models;
+    return models.sort((a, b) => {
+      const nameComp = a.name.localeCompare(b.name);
+      if (nameComp !== 0) return nameComp;
+      return a.providerName.localeCompare(b.providerName);
+    });
   }, [
-    allAvailableModels,
+    allModelItems,
     searchQuery,
     enabledFilter,
-    enabledModelIds,
+    providerConfigsMap,
     capabilityFilters,
     minInputPrice,
     maxInputPrice,
@@ -173,11 +194,37 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
     maxOutputPrice,
   ]);
 
+  const handleToggleModel = useCallback(
+    async (modelItem: ModelListItem, checked: boolean) => {
+      const providerConfig = providerConfigsMap.get(modelItem.providerId);
+      if (!providerConfig) {
+        toast.error("Provider configuration not found.");
+        return;
+      }
+      const simpleModelId = modelItem.id.split(":")[1];
+      const currentEnabledSet = new Set(providerConfig.enabledModels ?? []);
+      if (checked) {
+        currentEnabledSet.add(simpleModelId);
+      } else {
+        currentEnabledSet.delete(simpleModelId);
+      }
+      const newEnabledModels = Array.from(currentEnabledSet);
+      try {
+        await updateProviderConfig(providerConfig.id, {
+          enabledModels: newEnabledModels,
+        });
+        toast.success(
+          `Model "${modelItem.name}" ${checked ? "enabled" : "disabled"}.`,
+        );
+      } catch (error) {
+        toast.error("Failed to update model status.");
+      }
+    },
+    [providerConfigsMap, updateProviderConfig],
+  );
+
   const toggleCapabilityFilter = (filter: CapabilityFilter) => {
-    setCapabilityFilters((prev) => ({
-      ...prev,
-      [filter]: !prev[filter],
-    }));
+    setCapabilityFilters((prev) => ({ ...prev, [filter]: !prev[filter] }));
   };
 
   const activeFilterCount =
@@ -189,44 +236,34 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
 
   if (isLoading) {
     return (
-      <div className={`space-y-2 ${listHeightClass}`}>
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-8 w-full" />
+      <div className="space-y-3 h-full flex flex-col">
+        <Skeleton className="h-9 w-full flex-shrink-0" />
+        <Skeleton className="h-9 w-1/4 flex-shrink-0" />
+        <div className="flex-grow space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
       </div>
     );
   }
 
-  if (allAvailableModels.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground italic pt-2">
-        No models available for this provider. Try fetching models.
-      </p>
-    );
-  }
-
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
+    <div className="space-y-3 h-full flex flex-col">
+      <div className="flex items-center gap-2 flex-shrink-0">
         <div className="relative flex-grow">
           <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter models by name..."
+            placeholder="Filter models by name or provider..."
             className="pl-8 h-9 w-full text-xs"
             type="text"
-            disabled={disabled}
           />
         </div>
         <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
           <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 px-3 relative"
-              disabled={disabled}
-            >
+            <Button variant="outline" size="sm" className="h-9 px-3 relative">
               <FilterIcon className="h-4 w-4 mr-1" />
               Filters
               {activeFilterCount > 0 && (
@@ -357,42 +394,58 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
           </PopoverContent>
         </Popover>
       </div>
-      <ScrollArea
-        className={`${listHeightClass} w-full rounded-md border border-border p-3 bg-background/50`}
-      >
-        <div className="space-y-2">
-          {filteredModels.map((model) => (
-            <div
-              key={model.id} // Use simple model ID as key
-              className="flex items-center justify-between space-x-2 p-1.5 rounded hover:bg-muted/50"
-            >
-              <Switch
-                id={`enable-model-${providerId}-${model.id}`}
-                checked={enabledModelIds.has(model.id)}
-                onCheckedChange={(checked) => onToggleModel(model.id, checked)}
-                disabled={disabled}
-                aria-label={`Enable model ${model.name || model.id}`}
-                className="flex-shrink-0"
-                onClick={(e) => e.stopPropagation()}
-              />
-              <Label
-                htmlFor={`enable-model-${providerId}-${model.id}`}
-                className="text-sm font-normal text-card-foreground flex-grow cursor-pointer truncate pl-2"
-                title={model.name || model.id}
-                onClick={
-                  onModelClick ? () => onModelClick(model.id) : undefined
-                }
-              >
-                {model.name || model.id}
-              </Label>
-            </div>
-          ))}
-          {filteredModels.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No models match the current filters.
-            </p>
-          )}
-        </div>
+      <ScrollArea className="flex-grow border rounded-md p-2 bg-background/50">
+        {filteredModels.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No models match your filters.
+          </p>
+        ) : (
+          <div className="space-y-1">
+            {filteredModels.map((model) => {
+              const providerConfig = providerConfigsMap.get(model.providerId);
+              const simpleModelId = model.id.split(":")[1];
+              const isEnabled =
+                providerConfig?.isEnabled &&
+                providerConfig?.enabledModels?.includes(simpleModelId) === true;
+              return (
+                <div
+                  key={model.id}
+                  className="flex items-center justify-between p-1.5 rounded hover:bg-muted"
+                >
+                  <div className="flex items-center space-x-2 flex-grow mr-2">
+                    <Switch
+                      id={`browse-enable-${model.id}`}
+                      checked={isEnabled}
+                      onCheckedChange={(checked) =>
+                        handleToggleModel(model, checked)
+                      }
+                      className="flex-shrink-0"
+                      disabled={!providerConfig?.isEnabled}
+                    />
+                    <Label
+                      htmlFor={`browse-enable-${model.id}`}
+                      className="text-sm font-normal cursor-pointer space-y-0.5"
+                    >
+                      <span className="block font-medium">{model.name}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Provider: {model.providerName}
+                      </span>
+                    </Label>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => onSelectModelForDetails(model.id)}
+                    title="View Model Details"
+                  >
+                    <InfoIcon className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </ScrollArea>
     </div>
   );

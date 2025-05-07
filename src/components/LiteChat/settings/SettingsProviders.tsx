@@ -1,5 +1,5 @@
 // src/components/LiteChat/settings/SettingsProviders.tsx
-
+// FULL FILE
 import React, { useState, useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
@@ -13,8 +13,8 @@ import { TabbedLayout, TabDefinition } from "../common/TabbedLayout";
 import { GlobalModelOrganizer } from "./GlobalModelOrganizer";
 import { ModelDataDisplay } from "./ModelDataDisplay";
 import { SettingsApiKeys } from "./ApiKeys";
+import { ModelBrowserList } from "./ModelBrowserList";
 
-// This component now focuses solely on the list and adding providers
 const ProviderConfigList: React.FC<{
   onSelectModelForDetails: (id: string | null) => void;
 }> = ({ onSelectModelForDetails }) => {
@@ -59,7 +59,6 @@ const ProviderConfigList: React.FC<{
 
   return (
     <div className="space-y-6 h-full flex flex-col">
-      {/* Provider Configuration Section */}
       <div>
         <h3 className="text-lg font-semibold text-card-foreground">
           Provider Configuration
@@ -70,8 +69,6 @@ const ProviderConfigList: React.FC<{
           details.
         </p>
       </div>
-
-      {/* Add Provider Button / Form */}
       <div className="flex-shrink-0">
         {!isAdding ? (
           <Button
@@ -90,18 +87,14 @@ const ProviderConfigList: React.FC<{
           />
         )}
       </div>
-
-      {/* Provider List */}
       <div className="flex-grow border-t border-border pt-4 mt-4 overflow-y-auto">
         <div className="space-y-2">
           {isLoading && !isAdding ? (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-              </div>
-            </>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {providersToDisplay.map((provider: DbProviderConfig) => (
@@ -113,7 +106,6 @@ const ProviderConfigList: React.FC<{
                   onDelete={deleteDbProviderConfig}
                   onFetchModels={handleFetchModels}
                   fetchStatus={providerFetchStatus[provider.id] || "idle"}
-                  // Pass the setter for model details view
                   onSelectModelForDetails={onSelectModelForDetails}
                 />
               ))}
@@ -131,7 +123,6 @@ const ProviderConfigList: React.FC<{
   );
 };
 
-// Main component using TabbedLayout
 const SettingsProvidersComponent: React.FC = () => {
   const { selectedModelForDetails, setSelectedModelForDetails } =
     useProviderStore(
@@ -141,18 +132,16 @@ const SettingsProvidersComponent: React.FC = () => {
       })),
     );
 
-  // State to manage the active tab
   const [activeTab, setActiveTab] = useState("providers-config");
 
-  // Callback to handle selecting a model and switching tabs
   const handleSelectModelAndSwitchTab = useCallback(
     (combinedId: string | null) => {
       setSelectedModelForDetails(combinedId);
       if (combinedId) {
-        setActiveTab("providers-details");
+        setActiveTab("providers-details-current");
       }
     },
-    [setSelectedModelForDetails],
+    [setSelectedModelForDetails, setActiveTab],
   );
 
   const tabs: TabDefinition[] = useMemo(
@@ -177,9 +166,18 @@ const SettingsProvidersComponent: React.FC = () => {
         content: <SettingsApiKeys />,
       },
       {
-        value: "providers-details",
-        label: "Model Details",
+        value: "providers-details-current",
+        label: "Selected Model",
         content: <ModelDataDisplay modelId={selectedModelForDetails} />,
+      },
+      {
+        value: "providers-browse-all",
+        label: "Browse Models",
+        content: (
+          <ModelBrowserList
+            onSelectModelForDetails={handleSelectModelAndSwitchTab}
+          />
+        ),
       },
     ],
     [selectedModelForDetails, handleSelectModelAndSwitchTab],
@@ -188,8 +186,8 @@ const SettingsProvidersComponent: React.FC = () => {
   return (
     <TabbedLayout
       tabs={tabs}
-      initialValue={activeTab} // Use state for initial/current value
-      onValueChange={setActiveTab} // Update state on change
+      initialValue={activeTab}
+      onValueChange={setActiveTab}
       className="h-full"
       listClassName="bg-muted/50 rounded-md"
       contentContainerClassName="mt-4"
