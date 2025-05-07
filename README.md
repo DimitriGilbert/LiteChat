@@ -1,6 +1,3 @@
-========
-README.md
-========
 # LiteChat
 
 **LiteChat** is a modular, extensible, and privacy-focused AI chat application for power users, developers, and teams. It supports multiple AI providers (OpenAI, Google Gemini, OpenRouter, Ollama, OpenAI-compatible APIs, and more), advanced prompt engineering, project-based organization, virtual file systems (VFS), Git sync, rules/tags, modding, and a highly customizable UI.
@@ -243,6 +240,7 @@ If you use the built-in file manager and VFS, **no server-side CORS is needed** 
 ## Getting Started
 
 1. **Install dependencies:**
+
    ```bash
    npm install
    # or
@@ -250,6 +248,7 @@ If you use the built-in file manager and VFS, **no server-side CORS is needed** 
    ```
 
 2. **Run the development server:**
+
    ```bash
    npm run dev
    # or
@@ -257,6 +256,7 @@ If you use the built-in file manager and VFS, **no server-side CORS is needed** 
    ```
 
 3. **Open LiteChat in your browser:**
+
    ```
    http://localhost:3000
    ```

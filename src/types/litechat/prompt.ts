@@ -90,6 +90,7 @@ export type PromptControlArea = "panel" | "trigger";
 
 export interface InputAreaRef {
   getValue: () => string;
+  setValue: (value: string) => void; // Add setValue method
   focus: () => void;
-  clearValue: () => void; // Add clearValue method
+  clearValue: () => void;
 }

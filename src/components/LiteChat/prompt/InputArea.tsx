@@ -37,7 +37,7 @@ export const InputArea = memo(
         onValueChange,
         ...rest
       },
-      ref,
+      ref
     ) => {
       const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
       const [internalValue, setInternalValue] = useState(initialValue);
@@ -45,20 +45,36 @@ export const InputArea = memo(
       // Expose methods via ref
       useImperativeHandle(ref, () => ({
         getValue: () => internalValue,
-        focus: () => internalTextareaRef.current?.focus(),
-        // Implement clearValue
-        clearValue: () => {
-          setInternalValue("");
+        setValue: (value: string) => {
+          setInternalValue(value);
           if (onValueChange) {
-            onValueChange(""); // Notify parent about the change
+            onValueChange(value);
           }
-          // Manually trigger resize after clearing
+          emitter.emit(ModEvent.PROMPT_INPUT_CHANGE, { value });
+          // Manually trigger resize after setting value
           requestAnimationFrame(() => {
             const textarea = internalTextareaRef.current;
             if (textarea) {
-              textarea.style.height = "auto"; // Reset height before calculating
+              textarea.style.height = "auto";
               textarea.style.height = `${textarea.scrollHeight}px`;
-              textarea.style.overflowY = "hidden"; // Reset overflow
+              textarea.style.overflowY =
+                textarea.scrollHeight > 250 ? "auto" : "hidden";
+            }
+          });
+        },
+        focus: () => internalTextareaRef.current?.focus(),
+        clearValue: () => {
+          setInternalValue("");
+          if (onValueChange) {
+            onValueChange("");
+          }
+          emitter.emit(ModEvent.PROMPT_INPUT_CHANGE, { value: "" });
+          requestAnimationFrame(() => {
+            const textarea = internalTextareaRef.current;
+            if (textarea) {
+              textarea.style.height = "auto";
+              textarea.style.height = `${textarea.scrollHeight}px`;
+              textarea.style.overflowY = "hidden";
             }
           });
         },
@@ -72,48 +88,44 @@ export const InputArea = memo(
           if (internalValue.trim().length > 0 || hasFiles) {
             onSubmit();
             // Clear value using the ref's method to ensure consistency
-            // @ts-expect-error yeah sure !
+            // @ts-expect-error - ref.current might be null initially
             ref?.current?.clearValue();
           }
         }
       };
 
       const handleTextareaChange = (
-        e: React.ChangeEvent<HTMLTextAreaElement>,
+        e: React.ChangeEvent<HTMLTextAreaElement>
       ) => {
         const newValue = e.target.value;
         setInternalValue(newValue);
         if (onValueChange) {
           onValueChange(newValue);
         }
-        // Emit event on every change
         emitter.emit(ModEvent.PROMPT_INPUT_CHANGE, { value: newValue });
       };
 
-      // Auto-resize logic
       useEffect(() => {
         const textarea = internalTextareaRef.current;
         if (textarea) {
-          textarea.style.height = "auto"; // Reset height
+          textarea.style.height = "auto";
           const scrollHeight = textarea.scrollHeight;
-          const maxHeight = 250; // Max height in pixels
+          const maxHeight = 250;
           textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
           textarea.style.overflowY =
             scrollHeight > maxHeight ? "auto" : "hidden";
         }
-      }, [internalValue]); // Re-run only when internalValue changes
+      }, [internalValue]);
 
-      // Sync with initialValue prop if it changes externally
       useEffect(() => {
         if (initialValue !== internalValue) {
           setInternalValue(initialValue);
           if (onValueChange) {
             onValueChange(initialValue);
           }
+          // Do not emit PROMPT_INPUT_CHANGE here as it might conflict with direct setValue calls
         }
-        // Only run when initialValue changes
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [initialValue]);
+      }, [initialValue, onValueChange]); // Removed internalValue from deps
 
       return (
         <Textarea
@@ -126,15 +138,15 @@ export const InputArea = memo(
           rows={1}
           className={cn(
             "w-full p-3 border rounded bg-input text-foreground resize-none focus:ring-2 focus:ring-primary outline-none disabled:opacity-50 overflow-y-auto",
-            "min-h-[40px] max-h-[250px]", // Use min/max height for control
-            className,
+            "min-h-[40px] max-h-[250px]",
+            className
           )}
           aria-label="Chat input"
           {...rest}
         />
       );
-    },
-  ),
+    }
+  )
 );
 
 InputArea.displayName = "InputArea";

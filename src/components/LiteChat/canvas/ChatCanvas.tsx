@@ -51,32 +51,34 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   const autoScrollIntervalTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const streamingInteractionIds = useInteractionStore(
-    (state) => state.streamingInteractionIds,
+    (state) => state.streamingInteractionIds
   );
-  const { chatMaxWidth, autoScrollInterval } = useSettingsStore(
-    useShallow((state) => ({
-      chatMaxWidth: state.chatMaxWidth,
-      autoScrollInterval: state.autoScrollInterval,
-    })),
-  );
+  const { chatMaxWidth, autoScrollInterval, enableAutoScrollOnStream } =
+    useSettingsStore(
+      useShallow((state) => ({
+        chatMaxWidth: state.chatMaxWidth,
+        autoScrollInterval: state.autoScrollInterval,
+        enableAutoScrollOnStream: state.enableAutoScrollOnStream,
+      }))
+    );
 
   const { isLoading: isProviderLoading } = useProviderStore(
     useShallow((state) => ({
       isLoading: state.isLoading,
-    })),
+    }))
   );
 
   const { conversationCount, isConversationLoading } = useConversationStore(
     useShallow((state) => ({
       conversationCount: state.conversations.length,
       isConversationLoading: state.isLoading,
-    })),
+    }))
   );
   const { projectCount, isProjectLoading } = useProjectStore(
     useShallow((state) => ({
       projectCount: state.projects.length,
       isProjectLoading: state.isLoading,
-    })),
+    }))
   );
 
   const showSetupState = useMemo(() => {
@@ -96,7 +98,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     const groups: Interaction[][] = [];
     const processedIds = new Set<string>();
     const sortedInteractions = [...interactions].sort(
-      (a, b) => a.index - b.index,
+      (a, b) => a.index - b.index
     );
     sortedInteractions.forEach((interaction) => {
       if (processedIds.has(interaction.id)) return;
@@ -132,7 +134,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   }, [interactionGroups.length, status]);
 
   useEffect(() => {
-    if (status === "streaming") {
+    if (status === "streaming" && enableAutoScrollOnStream) {
       if (autoScrollIntervalTimerRef.current) {
         clearInterval(autoScrollIntervalTimerRef.current);
       }
@@ -150,7 +152,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
         clearInterval(autoScrollIntervalTimerRef.current);
       }
     };
-  }, [status, autoScrollInterval]);
+  }, [status, autoScrollInterval, enableAutoScrollOnStream]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -171,7 +173,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   useEffect(() => {
     if (scrollAreaRef.current) {
       viewportRef.current = scrollAreaRef.current.querySelector(
-        "[data-radix-scroll-area-viewport]",
+        "[data-radix-scroll-area-viewport]"
       );
     }
   }, []);
@@ -204,7 +206,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
         {interactionGroups.map((group) => {
           const interaction = group[0];
           const isStreamingInteraction = streamingInteractionIds.includes(
-            interaction.id,
+            interaction.id
           );
           if (isStreamingInteraction) {
             return (

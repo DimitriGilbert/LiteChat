@@ -15,7 +15,10 @@ import { useProjectStore } from "@/store/project.store";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useUIStateStore } from "@/store/ui.store";
 import { useControlRegistryStore } from "@/store/control.store";
-import type { PromptTurnObject, InputAreaRef } from "@/types/litechat/prompt";
+import type {
+  PromptTurnObject,
+  InputAreaRef,
+} from "@/types/litechat/prompt";
 import { ConversationService } from "@/services/conversation.service";
 import { InteractionService } from "@/services/interaction.service";
 import { useModStore } from "@/store/mod.store";
@@ -31,6 +34,15 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Loader2, Menu, X } from "lucide-react";
 import { usePromptStateStore } from "@/store/prompt.store";
+import { parseAppUrlParameters } from "@/lib/litechat/url-helpers";
+import { useInputStore } from "@/store/input.store";
+import * as VfsOps from "@/lib/litechat/vfs-operations";
+import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
+import { nanoid } from "nanoid";
+import { runMiddleware } from "@/lib/litechat/ai-helpers";
+import { ModEvent, ModMiddlewareHook } from "@/types/litechat/modding";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { basename } from "@/lib/litechat/file-manager-utils";
 
 // Define the type for the registration functions prop
 export type RegistrationFunction = () => void;
@@ -47,26 +59,26 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
   // --- Store Hooks ---
   const selectedItemId = useConversationStore((state) => state.selectedItemId);
   const selectedItemType = useConversationStore(
-    (state) => state.selectedItemType,
+    (state) => state.selectedItemType
   );
   const loadSidebarItems = useConversationStore(
-    (state) => state.loadSidebarItems,
+    (state) => state.loadSidebarItems
   );
   const getConversationById = useConversationStore(
-    (state) => state.getConversationById,
+    (state) => state.getConversationById
   );
   const { getEffectiveProjectSettings } = useProjectStore(
     useShallow((state) => ({
       projects: state.projects,
       getProjectById: state.getProjectById,
       getEffectiveProjectSettings: state.getEffectiveProjectSettings,
-    })),
+    }))
   );
   const { interactions, status: interactionStatus } = useInteractionStore(
     useShallow((state) => ({
       interactions: state.interactions,
       status: state.status,
-    })),
+    }))
   );
   const {
     globalError,
@@ -81,41 +93,41 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       isChatControlPanelOpen: state.isChatControlPanelOpen,
       isProjectSettingsModalOpen: state.isProjectSettingsModalOpen,
       isVfsModalOpen: state.isVfsModalOpen,
-    })),
+    }))
   );
   const chatControls = useControlRegistryStore(
-    useShallow((state) => Object.values(state.chatControls)),
+    useShallow((state) => Object.values(state.chatControls))
   );
   const { loadDbMods, setLoadedMods } = useModStore(
     useShallow((state) => ({
       loadDbMods: state.loadDbMods,
       setLoadedMods: state.setLoadedMods,
-    })),
+    }))
   );
   const { loadInitialData: loadProviderData } = useProviderStore(
     useShallow((state) => ({
       loadInitialData: state.loadInitialData,
-    })),
+    }))
   );
   const { loadSettings } = useSettingsStore(
     useShallow((state) => ({
       loadSettings: state.loadSettings,
-    })),
+    }))
   );
   const { setVfsKey } = useVfsStore(
     useShallow((state) => ({
       setVfsKey: state.setVfsKey,
-    })),
+    }))
   );
   const { initializePromptState } = usePromptStateStore(
     useShallow((state) => ({
       initializePromptState: state.initializePromptState,
-    })),
+    }))
   );
   const { loadRulesAndTags } = useRulesStore(
     useShallow((state) => ({
       loadRulesAndTags: state.loadRulesAndTags,
-    })),
+    }))
   );
 
   // --- Mobile Sidebar Toggle Handler ---
@@ -137,6 +149,198 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     requestAnimationFrame(() => {
       inputAreaRef.current?.focus();
     });
+  }, []);
+
+  // --- Process URL Parameters ---
+  const processUrlParameters = useCallback(async () => {
+    const urlParams = parseAppUrlParameters();
+    if (!urlParams.query && !urlParams.modelId && !urlParams.vfsFiles?.length) {
+      return; // No relevant parameters
+    }
+
+    toast.info("Processing parameters from URL...");
+
+    const {
+      addConversation,
+      selectItem,
+      getConversationById: getConvoById,
+    } = useConversationStore.getState();
+    const { setModelId: setPromptModelId } = usePromptStateStore.getState();
+    const { addAttachedFile } = useInputStore.getState();
+    const { getAvailableModelListItems } = useProviderStore.getState();
+    const { initializeVFS: initVfs, findNodeByPath: findVfsNodeByPath } =
+      useVfsStore.getState();
+
+    try {
+      // 1. Create and select a new conversation
+      const newConversationId = await addConversation({
+        title: urlParams.query
+          ? `From URL: ${urlParams.query.substring(0, 30)}...`
+          : "From URL Parameters",
+      });
+      await selectItem(newConversationId, "conversation");
+      // This selection will trigger context changes and prompt state initialization.
+
+      // 2. Set Model if specified
+      if (urlParams.modelId) {
+        const availableModels = getAvailableModelListItems();
+        const modelExists = availableModels.some(
+          (m) => m.id === urlParams.modelId
+        );
+        if (modelExists) {
+          setPromptModelId(urlParams.modelId);
+          toast.success(`Model set to: ${urlParams.modelId}`);
+        } else {
+          toast.warning(
+            `Model ID "${urlParams.modelId}" from URL not found or not enabled. Using default.`
+          );
+        }
+      }
+
+      // 3. Attach VFS Files if specified
+      if (urlParams.vfsFiles && urlParams.vfsFiles.length > 0) {
+        // The new conversation has no project, so its VFS key is 'orphan'
+        const vfsKeyForUrl = "orphan"; // Or derive if a default project logic exists
+        let fsInstance;
+        try {
+          fsInstance = await initVfs(vfsKeyForUrl, { force: true });
+        } catch (vfsError) {
+          toast.error(
+            `Failed to initialize VFS for URL files: ${
+              vfsError instanceof Error ? vfsError.message : String(vfsError)
+            }`
+          );
+          // Continue without VFS files if VFS init fails
+        }
+
+        if (fsInstance) {
+          for (const filePath of urlParams.vfsFiles) {
+            try {
+              // Attempt to read the file directly
+              const contentBytes = await VfsOps.readFileOp(filePath, {
+                fsInstance,
+              });
+              const nodeStat = await fsInstance.promises.stat(filePath); // Get basic stats
+              const fileName = basename(filePath);
+              const mimeType = "application/octet-stream"; // Basic mime, refine if possible
+
+              const isText = isLikelyTextFile(fileName, mimeType);
+              let fileData: {
+                contentText?: string;
+                contentBase64?: string;
+              } = {};
+
+              if (isText) {
+                fileData.contentText = new TextDecoder().decode(contentBytes);
+              } else {
+                // For non-text, convert to base64
+                let binary = "";
+                const len = contentBytes.byteLength;
+                for (let i = 0; i < len; i++) {
+                  binary += String.fromCharCode(contentBytes[i]);
+                }
+                fileData.contentBase64 = window.btoa(binary);
+              }
+
+              addAttachedFile({
+                source: "vfs",
+                name: fileName,
+                type: mimeType,
+                size: nodeStat.size,
+                path: filePath,
+                ...fileData,
+              });
+              toast.success(`Attached VFS file: ${fileName}`);
+            } catch (fileError: any) {
+              if (fileError.code === "ENOENT") {
+                toast.warning(`VFS file not found: ${filePath}`);
+              } else {
+                toast.warning(
+                  `Failed to attach VFS file "${filePath}": ${fileError.message}`
+                );
+              }
+              console.error(
+                `Error processing VFS file ${filePath}:`,
+                fileError
+              );
+            }
+          }
+        }
+      }
+
+      // 4. Submit Prompt or Set Input Area
+      if (urlParams.query) {
+        // Gather parameters and metadata for the prompt turn
+        let parameters: Record<string, any> = {};
+        let metadata: Record<string, any> = {};
+        const currentPromptControls = Object.values(
+          useControlRegistryStore.getState().promptControls
+        ).filter((c) => (c.show ? c.show() : true));
+
+        for (const control of currentPromptControls) {
+          if (control.getParameters) {
+            const params = await control.getParameters();
+            if (params) parameters = { ...parameters, ...params };
+          }
+          if (control.getMetadata) {
+            const meta = await control.getMetadata();
+            if (meta) metadata = { ...metadata, ...meta };
+          }
+        }
+        const currentAttachedFiles =
+          useInputStore.getState().attachedFilesMetadata;
+        if (currentAttachedFiles.length > 0) {
+          metadata.attachedFiles = [...currentAttachedFiles];
+        }
+
+        let turnData: PromptTurnObject = {
+          id: nanoid(),
+          content: urlParams.query,
+          parameters,
+          metadata,
+        };
+
+        emitter.emit(ModEvent.PROMPT_SUBMITTED, { turnData });
+        const middlewareResult = await runMiddleware(
+          ModMiddlewareHook.PROMPT_TURN_FINALIZE,
+          { turnData }
+        );
+        if (middlewareResult === false) {
+          toast.warning("Prompt submission from URL cancelled by middleware.");
+          return;
+        }
+        const finalTurnData =
+          middlewareResult && typeof middlewareResult === "object"
+            ? (middlewareResult as { turnData: PromptTurnObject }).turnData
+            : turnData;
+
+        await ConversationService.submitPrompt(finalTurnData);
+        // Clear URL params after successful submission
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname
+        );
+      } else if (urlParams.modelId || urlParams.vfsFiles?.length) {
+        // If only model/VFS files, but no query, we don't auto-submit.
+        // The files are attached, model is set. User can type and send.
+        toast.info(
+          "Model and/or VFS files from URL applied. Type your message."
+        );
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname
+        );
+      }
+    } catch (error) {
+      toast.error(
+        `Failed to process URL parameters: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      console.error("Error processing URL parameters:", error);
+    }
   }, []);
 
   // --- Initialization Effect ---
@@ -162,20 +366,16 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         console.log("LiteChat: Sidebar items loaded.");
 
         console.log("LiteChat: Registering core controls and tools...");
-        // --- Call Registration Functions from Props ---
         controls.forEach((registerFn) => {
-          // Use the 'controls' prop
           try {
             registerFn();
           } catch (regError) {
             console.error(
               `LiteChat: Error running registration function:`,
-              regError,
+              regError
             );
           }
         });
-        // --- End Registration Call ---
-
         console.log("LiteChat: Core controls and tools registered.");
         if (!isMounted) return;
 
@@ -190,23 +390,31 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         setLoadedMods(loadedModInstances);
         console.log(`LiteChat: ${loadedModInstances.length} mods processed.`);
 
+        const initialSelItemId = useConversationStore.getState().selectedItemId;
+        const initialSelItemType =
+          useConversationStore.getState().selectedItemType;
         const initialProjectId =
-          selectedItemType === "project"
-            ? selectedItemId
-            : selectedItemType === "conversation"
-              ? (getConversationById(selectedItemId)?.projectId ?? null)
-              : null;
+          initialSelItemType === "project"
+            ? initialSelItemId
+            : initialSelItemType === "conversation"
+            ? getConversationById(initialSelItemId)?.projectId ?? null
+            : null;
         const initialEffectiveSettings =
           getEffectiveProjectSettings(initialProjectId);
         initializePromptState(initialEffectiveSettings);
         console.log(
           "LiteChat: Initial prompt state initialized.",
-          initialEffectiveSettings,
+          initialEffectiveSettings
         );
+
+        // Process URL parameters after core initialization
+        await processUrlParameters();
       } catch (error) {
         console.error("LiteChat: Initialization failed:", error);
         toast.error(
-          `Initialization failed: ${error instanceof Error ? error.message : String(error)}`,
+          `Initialization failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`
         );
         useUIStateStore.getState().setGlobalError("Initialization failed.");
       } finally {
@@ -223,8 +431,19 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       isMounted = false;
       console.log("LiteChat: Unmounting, initialization cancelled if pending.");
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [controls]);
+  }, [
+    controls,
+    loadSettings,
+    loadProviderData,
+    loadRulesAndTags,
+    loadSidebarItems,
+    loadDbMods,
+    setLoadedMods,
+    getConversationById,
+    getEffectiveProjectSettings,
+    initializePromptState,
+    processUrlParameters,
+  ]); // Added processUrlParameters to dependency array
 
   // --- Effect to update Prompt State on Context Change ---
   const prevContextRef = useRef<{
@@ -248,22 +467,21 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         selectedItemType === "project"
           ? selectedItemId
           : selectedItemType === "conversation"
-            ? (getConversationById(selectedItemId)?.projectId ?? null)
-            : null;
+          ? getConversationById(selectedItemId)?.projectId ?? null
+          : null;
 
       console.log(
-        `[LiteChat Effect] Context changed (Item: ${selectedItemId}, Type: ${selectedItemType}). Calculating effective settings for Project ID: ${currentProjectId}`,
+        `[LiteChat Effect] Context changed (Item: ${selectedItemId}, Type: ${selectedItemType}). Calculating effective settings for Project ID: ${currentProjectId}`
       );
       const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
       initializePromptState(effectiveSettings);
       console.log(
         "[LiteChat Effect] Prompt state updated based on context change.",
-        effectiveSettings,
+        effectiveSettings
       );
 
       prevContextRef.current = currentContext;
 
-      // Focus input if the new context is a conversation
       if (currentContext.itemType === "conversation") {
         focusInput();
       }
@@ -293,12 +511,12 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         targetVfsKey = "orphan";
       }
       console.log(
-        `[LiteChat Effect] VFS Context Required. Setting target key: ${targetVfsKey}`,
+        `[LiteChat Effect] VFS Context Required. Setting target key: ${targetVfsKey}`
       );
     } else {
       targetVfsKey = null;
       console.log(
-        "[LiteChat Effect] VFS Context Not Required. Setting target key: null",
+        "[LiteChat Effect] VFS Context Not Required. Setting target key: null"
       );
     }
     if (useVfsStore.getState().vfsKey !== targetVfsKey) {
@@ -318,10 +536,10 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         conversationState.selectedItemType === "project"
           ? conversationState.selectedItemId
           : conversationState.selectedItemType === "conversation"
-            ? (conversationState.getConversationById(
-                conversationState.selectedItemId,
-              )?.projectId ?? null)
-            : null;
+          ? conversationState.getConversationById(
+              conversationState.selectedItemId
+            )?.projectId ?? null
+          : null;
 
       if (!currentConvId) {
         console.log("LiteChat: No conversation selected, creating new one...");
@@ -334,13 +552,12 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
           currentConvId = useConversationStore.getState().selectedItemId;
           if (currentConvId !== newId) {
             console.error(
-              "LiteChat: Mismatch between created ID and selected ID after selection!",
+              "LiteChat: Mismatch between created ID and selected ID after selection!"
             );
           }
           console.log(
-            `LiteChat: New conversation created (${currentConvId}), selected.`,
+            `LiteChat: New conversation created (${currentConvId}), selected.`
           );
-          // Focus is handled by the context change effect
         } catch (error) {
           console.error("LiteChat: Failed to create new conversation", error);
           toast.error("Failed to start new chat.");
@@ -367,7 +584,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         focusInput();
       }
     },
-    [focusInput],
+    [focusInput]
   );
 
   // --- Regeneration Handler ---
@@ -377,7 +594,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       try {
         await ConversationService.regenerateInteraction(interactionId);
         console.log(
-          `LiteChat: ConversationService regeneration initiated for ${interactionId}.`,
+          `LiteChat: ConversationService regeneration initiated for ${interactionId}.`
         );
         focusInput();
       } catch (error) {
@@ -385,7 +602,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         focusInput();
       }
     },
-    [focusInput],
+    [focusInput]
   );
 
   // --- Stop Interaction Handler ---
@@ -395,7 +612,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       InteractionService.abortInteraction(interactionId);
       focusInput();
     },
-    [focusInput],
+    [focusInput]
   );
 
   // --- Memoized Controls ---
@@ -403,27 +620,26 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     () =>
       chatControls
         .filter(
-          (c) =>
-            (c.panel ?? "main") === "sidebar" && (c.show ? c.show() : true),
+          (c) => (c.panel ?? "main") === "sidebar" && (c.show ? c.show() : true)
         )
         .map((c) => c),
-    [chatControls],
+    [chatControls]
   );
   const sidebarFooterControls = useMemo(
     () =>
       chatControls
         .filter(
-          (c) => c.panel === "sidebar-footer" && (c.show ? c.show() : true),
+          (c) => c.panel === "sidebar-footer" && (c.show ? c.show() : true)
         )
         .map((c) => c),
-    [chatControls],
+    [chatControls]
   );
   const headerControls = useMemo(
     () =>
       chatControls
         .filter((c) => c.panel === "header" && (c.show ? c.show() : true))
         .map((c) => c),
-    [chatControls],
+    [chatControls]
   );
 
   // --- Memoized Modal Renderers ---
@@ -431,17 +647,17 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     () =>
       chatControls.find((c) => c.id === "core-settings-trigger")
         ?.settingsRenderer,
-    [chatControls],
+    [chatControls]
   );
   const projectSettingsModalRenderer = useMemo(
     () =>
       chatControls.find((c) => c.id === "core-project-settings-trigger")
         ?.settingsRenderer,
-    [chatControls],
+    [chatControls]
   );
   const vfsModalRenderer = useMemo(
     () => chatControls.find((c) => c.id === "core-vfs-modal-panel")?.renderer,
-    [chatControls],
+    [chatControls]
   );
 
   const currentConversationIdForCanvas =
@@ -463,15 +679,13 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
 
   return (
     <>
-      {/* Main container */}
       <div className="flex h-full w-full border border-border rounded-lg overflow-hidden bg-background text-foreground">
-        {/* Desktop Sidebar */}
         <div
           className={cn(
             "hidden md:flex flex-col border-r border-border bg-card",
             "transition-[width] duration-300 ease-in-out",
             "flex-shrink-0 overflow-hidden",
-            isSidebarCollapsed ? "w-16" : "w-64",
+            isSidebarCollapsed ? "w-16" : "w-64"
           )}
         >
           <div className="flex-grow overflow-y-auto overflow-x-hidden">
@@ -497,7 +711,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
               "flex-shrink-0 border-t border-border p-2",
               isSidebarCollapsed
                 ? "flex flex-col items-center gap-2"
-                : "flex items-center justify-center",
+                : "flex items-center justify-center"
             )}
           >
             <ChatControlWrapper
@@ -508,24 +722,19 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
                 "flex",
                 isSidebarCollapsed
                   ? "flex-col gap-2 items-center"
-                  : "items-center gap-1 justify-center",
+                  : "items-center gap-1 justify-center"
               )}
             />
           </div>
         </div>
 
-        {/* Mobile Sidebar (Overlay) */}
         {isMobileSidebarOpen && (
           <div className="md:hidden fixed inset-0 z-50 flex">
-            {/* Backdrop/overlay */}
             <div
               className="fixed inset-0 bg-background/80 backdrop-blur-sm animate-fadeIn"
               onClick={toggleMobileSidebar}
             ></div>
-
-            {/* Mobile sidebar content */}
             <div className="relative w-4/5 max-w-xs bg-card border-r border-border h-full flex flex-col animate-slideInFromLeft">
-              {/* Close button */}
               <div className="flex justify-between items-center p-4 border-b border-border">
                 <h2 className="font-semibold">LiteChat Menu</h2>
                 <button
@@ -536,8 +745,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-
-              {/* Sidebar content */}
               <div className="flex-grow overflow-y-auto overflow-x-hidden">
                 <ChatControlWrapper
                   controls={sidebarControls}
@@ -546,8 +753,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
                   className="h-full"
                 />
               </div>
-
-              {/* Footer controls */}
               <div className="flex-shrink-0 border-t border-border p-4">
                 <ChatControlWrapper
                   controls={sidebarFooterControls}
@@ -560,10 +765,8 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
           </div>
         )}
 
-        {/* Main Chat Area */}
         <div className="flex flex-col flex-grow min-w-0">
           <div className="flex items-center justify-between p-2 border-b border-border bg-card flex-shrink-0">
-            {/* Mobile menu button */}
             <button
               className="md:hidden p-2 rounded-md hover:bg-muted"
               onClick={toggleMobileSidebar}
@@ -571,12 +774,10 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
             >
               <Menu className="h-5 w-5" />
             </button>
-
-            {/* Header controls (right-aligned) */}
             <ChatControlWrapper
               controls={headerControls}
               panelId="header"
-              className="flex items-center justify-end gap-1 flex-grow" // Ensure it takes space
+              className="flex items-center justify-end gap-1 flex-grow"
             />
           </div>
 
@@ -604,7 +805,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         </div>
       </div>
 
-      {/* Render Modals Explicitly */}
       {isChatControlPanelOpen["settingsModal"] &&
         settingsModalRenderer &&
         settingsModalRenderer()}

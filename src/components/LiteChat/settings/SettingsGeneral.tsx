@@ -25,6 +25,8 @@ const SettingsGeneralComponent: React.FC = () => {
     setStreamingRenderFPS,
     autoScrollInterval,
     setAutoScrollInterval,
+    enableAutoScrollOnStream, // New setting
+    setEnableAutoScrollOnStream, // New action
     resetGeneralSettings,
   } = useSettingsStore(
     useShallow((state) => ({
@@ -41,8 +43,10 @@ const SettingsGeneralComponent: React.FC = () => {
       setStreamingRenderFPS: state.setStreamingRenderFPS,
       autoScrollInterval: state.autoScrollInterval,
       setAutoScrollInterval: state.setAutoScrollInterval,
+      enableAutoScrollOnStream: state.enableAutoScrollOnStream, // New setting
+      setEnableAutoScrollOnStream: state.setEnableAutoScrollOnStream, // New action
       resetGeneralSettings: state.resetGeneralSettings,
-    })),
+    }))
   );
 
   const [localFps, setLocalFps] = useState(streamingRenderFPS);
@@ -57,7 +61,7 @@ const SettingsGeneralComponent: React.FC = () => {
     (value: number[]) => {
       setStreamingRenderFPS(value[0]);
     },
-    [setStreamingRenderFPS],
+    [setStreamingRenderFPS]
   );
 
   const handleFpsInputChange = useCallback(
@@ -71,21 +75,21 @@ const SettingsGeneralComponent: React.FC = () => {
         setLocalFps(clampedFps);
       }
     },
-    [setStreamingRenderFPS],
+    [setStreamingRenderFPS]
   );
 
   const handleScrollIntervalSliderVisualChange = useCallback(
     (value: number[]) => {
       setLocalScrollInterval(value[0]);
     },
-    [],
+    []
   );
 
   const handleScrollIntervalSliderCommit = useCallback(
     (value: number[]) => {
       setAutoScrollInterval(value[0]);
     },
-    [setAutoScrollInterval],
+    [setAutoScrollInterval]
   );
 
   const handleScrollIntervalInputChange = useCallback(
@@ -99,7 +103,7 @@ const SettingsGeneralComponent: React.FC = () => {
         setLocalScrollInterval(clampedInterval);
       }
     },
-    [setAutoScrollInterval],
+    [setAutoScrollInterval]
   );
 
   useEffect(() => {
@@ -113,7 +117,7 @@ const SettingsGeneralComponent: React.FC = () => {
   const handleResetClick = () => {
     if (
       window.confirm(
-        "Are you sure you want to reset Streaming & Display settings to their defaults?",
+        "Are you sure you want to reset Streaming & Display settings to their defaults?"
       )
     ) {
       resetGeneralSettings();
@@ -189,6 +193,23 @@ const SettingsGeneralComponent: React.FC = () => {
             onCheckedChange={setFoldUserMessagesOnCompletion}
           />
         </div>
+        {/* New Auto-Scroll Toggle */}
+        <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+          <div>
+            <Label htmlFor="enable-auto-scroll-switch" className="font-medium">
+              Auto-Scroll While Streaming
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Automatically scroll to the bottom as new content arrives.
+            </p>
+          </div>
+          <Switch
+            id="enable-auto-scroll-switch"
+            checked={enableAutoScrollOnStream ?? true}
+            onCheckedChange={setEnableAutoScrollOnStream}
+          />
+        </div>
+        {/* End New Auto-Scroll Toggle */}
         <div className="rounded-lg border p-3 shadow-sm space-y-2">
           <div>
             <Label htmlFor="streaming-fps-slider" className="font-medium">
@@ -233,7 +254,8 @@ const SettingsGeneralComponent: React.FC = () => {
             </Label>
             <p className="text-xs text-muted-foreground">
               How often to scroll to the bottom during streaming (50-5000 ms).
-              (Default: 1000ms)
+              Only active if "Auto-Scroll While Streaming" is enabled. (Default:
+              1000ms)
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -246,6 +268,7 @@ const SettingsGeneralComponent: React.FC = () => {
               onValueChange={handleScrollIntervalSliderVisualChange}
               onValueCommit={handleScrollIntervalSliderCommit}
               className="flex-grow"
+              disabled={!enableAutoScrollOnStream}
             />
             <Input
               type="number"
@@ -255,6 +278,7 @@ const SettingsGeneralComponent: React.FC = () => {
               value={localScrollInterval}
               onChange={handleScrollIntervalInputChange}
               className="w-20 h-8 text-xs"
+              disabled={!enableAutoScrollOnStream}
             />
             <span className="text-xs text-muted-foreground">ms</span>
           </div>
