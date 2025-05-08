@@ -1,0 +1,273 @@
+name: LiteChat
+version: 0.0.1
+description: This document provides comprehensive development context for LiteChat, a modular, event-driven, client-side AI chat component library built with React, TypeScript, Zustand, Dexie, and Vite. The architecture prioritizes component independence, centralized state with decoupled logic, event-driven communication (mitt), control-based functionality encapsulation, middleware pipelines, and robust client-side persistence via IndexedDB. Key features include multi-provider AI support, project-based conversation organization, an integrated Virtual File System (VFS) with isomorphic-git support, conversation synchronization via Git, and a powerful modding API.
+authoritative_source_url: https://github.com/DimitriGilbert/LiteChat
+
+
+## Core Concepts & Patterns
+
+client_side_architecture: All application logic, data storage, and AI API interactions occur directly within the user's browser. No backend server is required for core functionality. Data persistence relies on IndexedDB.
+modularity: Functionality is broken down into independent units:
+  - UI Components (`src/components/LiteChat/`): Responsible for rendering.
+  - Zustand Stores (`src/store/`): Manage specific slices of application state.
+  - Services (`src/services/`): Encapsulate business logic (AI calls, persistence, mod loading, VFS ops).
+  - Controls (`PromptControl`, `ChatControl`): Self-contained UI/logic units registered via `ControlRegistryStore`.
+event_driven: `mitt` emitter (`src/lib/litechat/event-emitter.ts`) facilitates decoupled communication between components, stores, and mods using standardized events (`src/types/litechat/modding.ts` -> `ModEvent`).
+middleware_pipeline: Allows mods/controls to intercept and modify data at key points (e.g., prompt submission, AI response chunk processing) via hooks registered in `ControlRegistryStore` (`src/types/litechat/modding.ts` -> `ModMiddlewareHook`). Middleware functions run in a defined order.
+state_management: Zustand (`src/store/`) with Immer middleware for immutable updates. Stores are modular (e.g., `ConversationStore`, `InteractionStore`, `ProviderStore`, `VfsStore`). State updates often trigger persistence calls via `PersistenceService`.
+persistence: Dexie.js (`src/lib/litechat/db.ts`) provides a robust wrapper around IndexedDB. `PersistenceService` (`src/services/persistence.service.ts`) centralizes all DB interactions (CRUD operations for conversations, interactions, projects, mods, settings, providers, keys, sync repos). Handles DB schema versioning and upgrades.
+virtual_file_system_vfs: Uses ZenFS (`@zenfs/core`, `@zenfs/dom`) with an IndexedDB backend (`src/lib/litechat/vfs-operations.ts`, `src/store/vfs.store.ts`). Provides a file system abstraction within the browser. UI is handled by `FileManager` (`src/components/LiteChat/file-manager/`).
+git_integration: Uses `isomorphic-git` (`src/lib/litechat/vfs-operations.ts`) to perform Git operations (init, clone, commit, pull, push, status) directly on folders within the VFS. Requires user configuration (`gitUserName`, `gitUserEmail` in `SettingsStore`).
+conversation_sync: Leverages VFS/Git. Linked conversations are saved as JSON (`{conversation, interactions}`) within a configured Git repository (`SyncRepo` managed by `ConversationStore`). Manual sync triggers pull/commit/push operations via `VfsOps`.
+
+
+## Project Structure & Key Files
+
+src/
+├── App.tsx                 # Root application component
+├── main.tsx                # Application entry point, renders App
+├── index.css               # Global styles, Tailwind directives, theme variables
+├── components/
+│   ├── LiteChat/           # Core LiteChat components
+│   │   ├── LiteChat.tsx    # Main orchestrator component
+│   │   ├── canvas/         # Components for displaying conversation history
+│   │   │   ├── ChatCanvas.tsx
+│   │   │   ├── InteractionCard.tsx
+│   │   │   ├── StreamingInteractionCard.tsx
+│   │   │   ├── StreamingContentView.tsx
+│   │   │   └── UserPromptDisplay.tsx
+│   │   ├── chat/           # Components related to the overall chat UI layout/controls
+│   │   │   ├── ChatControlWrapper.tsx
+│   │   │   └── control/    # Specific ChatControl implementations
+│   │   │       ├── ConversationList.tsx # Sidebar list
+│   │   │       ├── conversation-list/ # Sub-components for ConversationList
+│   │   │       ├── Settings.tsx         # Settings button/modal trigger registration
+│   │   │       └── SidebarToggleControl.tsx # Sidebar collapse control registration
+│   │   ├── common/         # Shared UI components used across LiteChat
+│   │   │   ├── CodeBlockRenderer.tsx
+│   │   │   ├── FilePreviewRenderer.tsx
+│   │   │   └── StopButton.tsx
+│   │   ├── file-manager/   # Virtual File System UI components
+│   │   │   ├── FileManager.tsx
+│   │   │   ├── FileManagerToolbar.tsx
+│   │   │   ├── FileManagerTable.tsx
+│   │   │   ├── FileManagerRow.tsx
+│   │   │   ├── CloneDialog.tsx
+│   │   │   └── CommitDialog.tsx
+│   │   ├── prompt/         # Components related to the user input area
+│   │   │   ├── PromptWrapper.tsx
+│   │   │   ├── InputArea.tsx
+│   │   │   ├── PromptControlWrapper.tsx
+│   │   │   └── control/    # Specific PromptControl implementations
+│   │   │       ├── FileControlRegistration.tsx
+│   │   │       ├── VfsControlRegistration.tsx
+│   │   │       ├── GlobalModelSelectorRegistration.tsx
+│   │   │       ├── ParameterControlRegistration.tsx
+│   │   │       └── GitSyncControlRegistration.tsx
+│   │   └── settings/       # Components for the Settings modal
+│   │       ├── SettingsModal.tsx
+│   │       ├── SettingsGeneral.tsx
+│   │       ├── SettingsProviders.tsx
+│   │       ├── SettingsApiKeys.tsx
+│   │       ├── SettingsGit.tsx # Container for Git sub-tabs
+│   │       ├── SettingsGitConfig.tsx
+│   │       ├── SettingsGitSyncRepos.tsx
+│   │       ├── SettingsDataManagement.tsx
+│   │       └── SettingsMods.tsx
+│   └── ui/                 # Base shadcn/ui components (button, input, etc.)
+├── hooks/litechat/         # Custom hooks specific to LiteChat features
+│   ├── useConversationListControl.tsx # Registers the core conversation list
+│   └── useItemEditing.tsx             # Hook for inline editing in lists
+├── lib/litechat/           # Core library code, utilities, non-React logic
+│   ├── db.ts               # Dexie database definition and setup
+│   ├── event-emitter.ts    # mitt event emitter instance
+│   ├── file-manager-utils.ts # Path manipulation, formatting utilities
+│   ├── provider-helpers.ts # AI Provider related constants and helpers
+│   ├── useMarkdownParser.ts# Hook for parsing markdown (used in canvas)
+│   └── vfs-operations.ts   # VFS & Git operations implementation (ZenFS, isomorphic-git)
+├── modding/                # Mod loading and API factory
+│   ├── api-factory.ts      # Creates the LiteChatModApi instance for mods
+│   └── loader.ts           # Loads and executes mod scripts
+├── services/               # Business logic, external interactions
+│   ├── ai.service.ts       # Handles AI SDK interactions, streaming, tool calls
+│   ├── model-fetcher.ts    # Fetches model lists from provider APIs
+│   └── persistence.service.ts # Centralizes all Dexie/IndexedDB operations
+├── store/                  # Zustand state management stores
+│   ├── control.store.ts    # Registry for Prompt/Chat controls, middleware, tools
+│   ├── conversation.store.ts # Manages conversations, projects, selection, sync
+│   ├── input.store.ts      # Manages files attached to the *next* prompt
+│   ├── interaction.store.ts# Manages interactions for the selected conversation, streaming
+│   ├── mod.store.ts        # Manages mod definitions, loaded instances, settings tabs
+│   ├── provider.store.ts   # Manages provider configs, API keys, model selection/order
+│   ├── settings.store.ts   # Manages global application settings
+│   ├── ui.store.ts         # Manages transient UI state (modals, loading, errors, focus)
+│   └── vfs.store.ts        # Manages VFS state (nodes, current path, selection)
+└── types/litechat/         # TypeScript type definitions for the application
+    ├── chat.ts
+    ├── common.ts
+    ├── control.ts          # (Duplicate of store file? Verify/remove if needed)
+    ├── interaction.ts
+    ├── modding.ts
+    ├── project.ts
+    ├── prompt.ts
+    ├── provider.ts
+    ├── sync.ts
+    └── vfs.ts
+
+
+## Data Flow Examples
+
+prompt_submission_flow:
+  1. User Input: Types in `InputArea` (`PromptWrapper` state updates). Attaches files via `FileControl`/`VfsControl` -> `InputStore` updated with `AttachedFileMetadata` (including content).
+  2. Submit Action: User clicks Send -> `PromptWrapper.handleSubmit`.
+  3. Data Collection: `PromptWrapper` reads `inputValue`, calls `getParameters`/`getMetadata` on active `PromptControls` (registered in `ControlRegistryStore`), reads basic file info from `InputStore`.
+  4. Turn Object Creation: `PromptTurnObject` created (text, params, metadata + file content from `InputStore`).
+  5. Prompt Middleware: `runMiddleware('middleware:prompt:turnFinalize', { turnData })` executes relevant middleware from `ControlRegistryStore`.
+  6. Orchestration: `LiteChat.handlePromptSubmit` receives final `PromptTurnObject`.
+     - Checks/creates conversation (`ConversationStore.addConversation`).
+     - Sets current conversation in `InteractionStore`.
+     - Builds history `CoreMessage[]` from `InteractionStore.interactions`.
+     - Gets system prompt (`ConversationStore` (project) or `SettingsStore` (global)).
+     - Constructs `PromptObject` (history, system prompt, tools, final params/metadata *without* file content).
+  7. AI Service Call: `AIService.startInteraction(promptObject, promptTurnObject)` called.
+     - Runs `middleware:interaction:beforeStart` on `PromptObject`.
+     - Processes `promptTurnObject.metadata.attachedFiles` into `CoreMessage[]` content (text/image parts).
+     - Creates `Interaction` record (status: STREAMING, prompt: snapshot of `promptTurnObject`), adds to `InteractionStore` state (`_addInteractionToState`), persists initial record (`PersistenceService.saveInteraction`). Emits `interaction:started`.
+     - Calls AI SDK (`streamText`) with final payload, tools (from `ControlRegistryStore`), parameters.
+  8. Streaming Response:
+     - Chunks received -> `runMiddleware('middleware:interaction:processChunk')` -> `InteractionStore.appendInteractionResponseChunk` (updates buffer) -> `interaction:stream_chunk` event emitted.
+     - Tool calls received -> Stored temporarily in `AIService`.
+     - Tool results received -> Stored temporarily in `AIService`.
+  9. Completion:
+     - Stream finishes -> `AIService` updates `Interaction` record (status: COMPLETED/ERROR/CANCELLED, response: final buffer content, metadata: tokens, tool calls/results), updates `InteractionStore` state (`_updateInteractionInState`, `_removeStreamingId`), persists final record (`PersistenceService.saveInteraction`). Emits `interaction:completed`.
+  10. Cleanup: `PromptWrapper` calls `clearInputs` -> `InputStore.clearAttachedFiles`.
+
+vfs_file_upload_flow:
+  1. User Action: Drags file onto `VfsControl` or clicks upload button in `FileManagerToolbar`.
+  2. Event Handling: `FileManager.handleFileChange` or `VfsControl.handleFileDrop`.
+  3. Store Action: Calls `VfsStore.uploadFiles(parentId, files)`.
+  4. VFS Operation: `VfsStore` action calls `VfsOps.uploadFilesOp(files, parentPath)`.
+  5. File Writing: `VfsOps.uploadFilesOp` iterates files, reads `ArrayBuffer`, calls `VfsOps.writeFileOp(filePath, buffer)`.
+  6. Persistence: `VfsOps.writeFileOp` uses `fs.promises.writeFile` (ZenFS) to write to IndexedDB. Emits `VFS_FILE_WRITTEN`.
+  7. State Update: `VfsStore.uploadFiles` calls `VfsStore.fetchNodes(parentId)` on completion.
+  8. Fetch Nodes: `VfsStore.fetchNodes` calls `VfsOps.listFilesOp`, compares results with current state, calls `_addNodes` / `_removeNodes` to update `VfsStore.nodes` and `VfsStore.childrenMap`.
+  9. UI Update: `FileManagerTable` re-renders with updated nodes.
+
+
+## Store Interactions & Purpose
+
+ConversationStore (`src/store/conversation.store.ts`):
+  - State: `conversations`, `projects`, `selectedItemId`, `selectedItemType`, `syncRepos`, `conversationSyncStatus`, `isLoading`, `error`.
+  - Purpose: Manages the list and hierarchy of conversations and projects, user selection, Git sync repository configurations, and conversation sync status.
+  - Key Actions: `loadSidebarItems`, `addConversation`, `updateConversation`, `deleteConversation`, `addProject`, `updateProject`, `deleteProject`, `selectItem`, `importConversation`, `exportConversation`, `addSyncRepo`, `updateSyncRepo`, `deleteSyncRepo`, `linkConversationToRepo`, `syncConversation`.
+  - Interactions: Reads/writes `Conversation`, `Project`, `SyncRepo` via `PersistenceService`. Triggers `InteractionStore.setCurrentConversationId` on selection change. `syncConversation` uses `VfsOps` for Git operations.
+
+InteractionStore (`src/store/interaction.store.ts`):
+  - State: `interactions` (for current convo), `currentConversationId`, `streamingInteractionIds`, `activeStreamBuffers`, `status`, `error`.
+  - Purpose: Holds the messages/interactions for the currently selected conversation. Manages the state of active AI response streams.
+  - Key Actions: `loadInteractions`, `setCurrentConversationId`, `_addInteractionToState`, `_updateInteractionInState`, `appendInteractionResponseChunk`, `_addStreamingId`, `_removeStreamingId`, `addInteractionAndPersist`, `updateInteractionAndPersist`, `deleteInteraction`.
+  - Interactions: Reads/writes `Interaction` via `PersistenceService`. Updated by `AIService` during streaming/completion. Triggered by `ConversationStore.selectItem`.
+
+ProviderStore (`src/store/provider.store.ts`):
+  - State: `dbProviderConfigs`, `dbApiKeys`, `selectedModelId` (combined), `globalModelSortOrder` (combined IDs), `providerFetchStatus`, `isLoading`, `error`, `enableApiKeyManagement`.
+  - Purpose: Manages AI provider configurations, API keys, the currently selected model for new chats, and the global display order of enabled models.
+  - Key Actions: `loadInitialData`, `selectModel`, `addApiKey`, `deleteApiKey`, `addProviderConfig`, `updateProviderConfig`, `deleteProviderConfig`, `fetchModels`, `setGlobalModelSortOrder`.
+  - Interactions: Reads/writes `DbProviderConfig`, `DbApiKey` via `PersistenceService`. Reads/writes settings (`LAST_SELECTION_KEY`, `GLOBAL_MODEL_SORT_ORDER_KEY`) via `PersistenceService`. Uses `model-fetcher.ts` via `fetchModels` action. Provides selectors like `getSelectedModel` (instantiates model via `provider-helpers.ts`).
+
+SettingsStore (`src/store/settings.store.ts`):
+  - State: `theme`, `globalSystemPrompt`, AI parameters (`temperature`, `maxTokens`, etc.), `enableAdvancedSettings`, streaming settings (`enableStreamingMarkdown`, `streamingRenderFPS`, `streamingCodeRenderFPS`), Git user config (`gitUserName`, `gitUserEmail`).
+  - Purpose: Holds global application settings affecting appearance and default AI behavior.
+  - Key Actions: Setters for each state property (`setTheme`, `setTemperature`, etc.), `loadSettings`.
+  - Interactions: Reads/writes settings via `PersistenceService.loadSetting`/`saveSetting`.
+
+ControlRegistryStore (`src/store/control.store.ts`):
+  - State: `promptControls`, `chatControls`, `middlewareRegistry`, `tools`.
+  - Purpose: Central registry for dynamically added UI controls, middleware functions, and AI tools.
+  - Key Actions: `register*`, `unregister*`, `getMiddlewareForHook`, `getRegisteredTools`.
+  - Interactions: Populated by core registration hooks (e.g., `useConversationListControlRegistration`) and mods via `LiteChatModApi`. Read by `PromptWrapper`, `ChatControlWrapper`, `AIService`, `runMiddleware`.
+
+ModStore (`src/store/mod.store.ts`):
+  - State: `dbMods`, `loadedMods`, `modSettingsTabs`, `isLoading`, `error`.
+  - Purpose: Manages mod definitions stored in the DB and the runtime instances loaded by `ModLoader`. Stores custom settings tabs registered by mods.
+  - Key Actions: `loadDbMods`, `addDbMod`, `updateDbMod`, `deleteDbMod`, `setLoadedMods`, `_addSettingsTab`, `_removeSettingsTab`.
+  - Interactions: Reads/writes `DbMod` via `PersistenceService`. `setLoadedMods` called by `ModLoader`. `_addSettingsTab`/`_removeSettingsTab` called by mods via `LiteChatModApi`.
+
+UIStateStore (`src/store/ui.store.ts`):
+  - State: `isChatControlPanelOpen`, `isPromptControlPanelOpen`, `isSidebarCollapsed`, `globalLoading`, `globalError`, `focusInputOnNextRender`.
+  - Purpose: Manages transient UI state like modal visibility, loading indicators, errors, sidebar state, and input focus control.
+  - Key Actions: `toggle*`, `setGlobalLoading`, `setGlobalError`, `setFocusInputFlag`.
+  - Interactions: Used by various components (`SettingsControl`, `SidebarToggleControl`, `LiteChat`, `InputArea`) to control UI visibility and behavior.
+
+VfsStore (`src/store/vfs.store.ts`):
+  - State: `nodes`, `childrenMap`, `rootId`, `currentParentId`, `selectedFileIds`, `loading`, `operationLoading`, `error`, `fs` (ZenFS instance), `enableVfs`, `isVfsEnabledForItem`, `vfsKey`, `configuredVfsKey`.
+  - Purpose: Manages the state of the Virtual File System, including the file/folder tree, current directory, selected files for attachment, and loading/error states related to VFS operations.
+  - Key Actions: `initializeVFS`, `fetchNodes`, `setCurrentPath`, `createDirectory`, `uploadFiles`, `deleteNodes`, `renameNode`, `selectFile`, `deselectFile`, `clearSelection`.
+  - Interactions: Uses `VfsOps` for all file system and Git operations. `initializeVFS` sets up the ZenFS backend. Actions update the tree structure (`nodes`, `childrenMap`). `selectedFileIds` is read by `FileManagerTable` and `VfsControl`.
+
+InputStore (`src/store/input.store.ts`):
+  - State: `attachedFilesMetadata` (includes content).
+  - Purpose: Temporarily stores metadata *and content* for files attached to the *next* prompt submission. This ensures file content is available for processing by `AIService` even if the VFS/original source changes before submission.
+  - Key Actions: `addAttachedFile`, `removeAttachedFile`, `clearAttachedFiles`.
+  - Interactions: Populated by `FileControlRegistration` (direct uploads) and `VfsControlRegistration` (VFS selections). Read by `PromptWrapper` during `handleSubmit`. Cleared by `PromptWrapper` after successful submission.
+
+
+## Common Development Tasks & Examples
+
+adding_setting:
+  1. Define State: Add property to `SettingsState` interface (`src/store/settings.store.ts`).
+  2. Add Default: Set initial value in `useSettingsStore` create function.
+  3. Add Action: Create setter action (e.g., `setMySetting: (value: T) => void`).
+  4. Implement Action: Use `set({ mySetting: value });` and `PersistenceService.saveSetting('mySetting', value);`.
+  5. Update Load: Add `PersistenceService.loadSetting('mySetting', defaultValue)` call in `loadSettings` action and update the `set` call there.
+  6. Add UI: Modify relevant component in `src/components/LiteChat/settings/` to display and control the new setting, calling the setter action.
+
+adding_prompt_control:
+  1. Create Component: Build the React component for the control's UI (`src/components/LiteChat/prompt/control/MyControl.tsx`).
+  2. Create Registration Hook: Create `useMyControlRegistration.tsx`.
+     - Import `useControlRegistryStore`.
+     - Use `useEffect` to call `registerPromptControl` on mount.
+     - Define the `PromptControl` object (id, order, show?, renderer?, triggerRenderer?, getParameters?, getMetadata?, clearOnSubmit?).
+     - Return the unregister function from `useEffect`.
+  3. Integrate: Render the registration hook component (e.g., `<UseMyControlRegistration />`) within `LiteChat.tsx`.
+
+adding_chat_control:
+  1. Create Component: Build the React component (`src/components/LiteChat/chat/control/MyChatControl.tsx`).
+  2. Create Registration Hook: Create `useMyChatControlRegistration.tsx`.
+     - Import `useControlRegistryStore`.
+     - Use `useEffect` to call `registerChatControl`.
+     - Define the `ChatControl` object (id, order, panel, renderer?, iconRenderer?, show?).
+     - Return the unregister function.
+  3. Integrate: Render the registration hook component within `LiteChat.tsx`.
+
+adding_middleware (via Mod):
+  1. Mod Script: Inside the mod's main function (`modApi`):
+     ```javascript
+     modApi.addMiddleware(
+       'middleware:prompt:turnFinalize',
+       async (payload) => { // Payload type from ModMiddlewarePayloadMap
+         console.log('Processing turn:', payload.turnData.id);
+         // Modify payload.turnData directly (Immer handled by store if needed, but often direct mutation is fine here)
+         payload.turnData.metadata.myModData = 'processed';
+         // Return modified payload (or original if no changes)
+         // Return false to cancel the action
+         return payload;
+       }
+     );
+     ```
+
+adding_vfs_feature:
+  1. UI Component: Modify components in `src/components/LiteChat/file-manager/` (e.g., add button to `FileManagerToolbar`, add action to `FileManagerRow` context menu).
+  2. VFS Operation: Implement the core logic in `src/lib/litechat/vfs-operations.ts` using `fs` (ZenFS) or `git` (isomorphic-git). Include `toast` feedback.
+  3. Store Action: Add an action in `src/store/vfs.store.ts` that calls the new `VfsOps` function. This action should handle `_setOperationLoading` and `_setError`.
+  4. Connect UI: Call the new `VfsStore` action from the UI component's event handler.
+  5. State Update: Ensure the `VfsStore` action updates relevant state (`nodes`, `childrenMap`) after the operation, often by calling `fetchNodes`.
+
+
+## Troubleshooting Tips
+
+dexie_errors: Check DB schema versions in `src/lib/litechat/db.ts`. Ensure `@zenfs/dom` IndexedDB backend is configured correctly (`vfs-operations.ts`). Use browser devtools (Application -> IndexedDB) to inspect `LiteChatDatabase_Rewrite_v1` and VFS stores (`litechat_vfs_*`). Clear DBs if corruption is suspected.
+zustand_errors: Use Redux DevTools extension. Ensure Immer mutations are valid (don't return from `set` callback unless replacing whole state). Check selector dependencies (`useShallow` or create granular selectors).
+vfs_git_errors: Check CORS proxy setup if using remotes. Ensure `gitUserName`/`gitUserEmail` are set in Settings -> Git. Check browser console for detailed errors from `isomorphic-git` or `ZenFS`. Check network tab for failed HTTP requests during clone/pull/push.
+ai_errors: Verify API Keys/Base URLs in Settings -> Providers. Check Network tab for API request details (headers, body, response). Check AI provider status pages. Log the exact `PromptObject` payload in `AIService` before the `streamText` call.
+mod_errors: Check console for errors during `ModLoader` execution. Use `modApi.log` within mods. Ensure mod script syntax is correct. Check network tab if loading from URL.
+ui_rendering_issues: Check component props and state. Use React DevTools. Ensure `cn` utility is used for conditional classes. Check for Tailwind CSS conflicts or incorrect class names. Verify list keys are unique and stable.
