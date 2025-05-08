@@ -19,7 +19,6 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 import { ModEvent, ModMiddlewareHook } from "@/types/litechat/modding";
-import { FilePreviewRenderer } from "../common/FilePreviewRenderer";
 
 interface PromptWrapperProps {
   InputAreaRenderer: InputAreaRenderer;
@@ -40,33 +39,32 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   const [hasInputValue, setHasInputValue] = useState(false);
 
   const registeredPromptControls = useControlRegistryStore(
-    useShallow((state) => state.promptControls),
+    useShallow((state) => state.promptControls)
   );
   const isStreaming = useInteractionStore(
-    useShallow((state) => state.status === "streaming"),
+    useShallow((state) => state.status === "streaming")
   );
-  const { attachedFilesMetadata, clearAttachedFiles, removeAttachedFile } =
-    useInputStore(
-      useShallow((state) => ({
-        attachedFilesMetadata: state.attachedFilesMetadata,
-        clearAttachedFiles: state.clearAttachedFiles,
-        removeAttachedFile: state.removeAttachedFile,
-      })),
-    );
+  const { attachedFilesMetadata, clearAttachedFiles } = useInputStore(
+    useShallow((state) => ({
+      attachedFilesMetadata: state.attachedFilesMetadata,
+      clearAttachedFiles: state.clearAttachedFiles,
+      removeAttachedFile: state.removeAttachedFile,
+    }))
+  );
 
   const promptControls = useMemo(() => {
     return Object.values(registeredPromptControls).filter((c) =>
-      c.show ? c.show() : true,
+      c.show ? c.show() : true
     );
   }, [registeredPromptControls]);
 
   const panelControls = useMemo(
     () => promptControls.filter((c) => c.renderer),
-    [promptControls],
+    [promptControls]
   );
   const triggerControls = useMemo(
     () => promptControls.filter((c) => c.triggerRenderer),
-    [promptControls],
+    [promptControls]
   );
 
   const handleSubmit = useCallback(async () => {
@@ -110,7 +108,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
 
       const middlewareResult = await runMiddleware(
         ModMiddlewareHook.PROMPT_TURN_FINALIZE,
-        { turnData },
+        { turnData }
       );
 
       if (middlewareResult === false) {
@@ -139,7 +137,9 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     } catch (error) {
       console.error("Error during prompt submission:", error);
       toast.error(
-        `Failed to send message: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to send message: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
     } finally {
       setIsSubmitting(false);
@@ -167,19 +167,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
           area="panel"
           className="flex flex-wrap gap-1 md:gap-2 items-start mb-1 md:mb-2"
         />
-      )}
-
-      {attachedFilesMetadata.length > 0 && (
-        <div className="max-h-40 overflow-y-auto space-y-1 border rounded-md p-2 bg-muted/20 mb-2">
-          {attachedFilesMetadata.map((fileMeta) => (
-            <FilePreviewRenderer
-              key={fileMeta.id}
-              fileMeta={fileMeta}
-              onRemove={removeAttachedFile}
-              isReadOnly={false}
-            />
-          ))}
-        </div>
       )}
 
       <div className="flex items-end gap-2">
