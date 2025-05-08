@@ -1,6 +1,6 @@
 // src/components/LiteChat/prompt/control/GlobalModelSelector.tsx
 // FULL FILE
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import {
   Check,
   ChevronsUpDown,
@@ -8,6 +8,7 @@ import {
   SearchIcon as SearchIconLucide,
   WrenchIcon,
   ImageIcon,
+  FilterIcon, // Use FilterIcon for provider filter trigger
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -27,19 +28,17 @@ import {
 import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import { Skeleton } from "@/components/ui/skeleton";
-// Import ModelListItem
 import type { ModelListItem } from "@/types/litechat/provider";
 import { combineModelId } from "@/lib/litechat/provider-helpers";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface GlobalModelSelectorProps {
-  /** The effective model ID for the current context */
   value: string | null;
-  /** Callback to update the GLOBAL default model selection */
   onChange: (value: string | null) => void;
-  /** Optional flag to disable the selector */
   disabled?: boolean;
-  /** Optional className for the trigger */
   className?: string;
 }
 
@@ -48,8 +47,8 @@ type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
 export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
   React.memo(({ value, onChange, disabled = false, className }) => {
     const [open, setOpen] = useState(false);
+    const [providerFilterOpen, setProviderFilterOpen] = useState(false); // State for provider filter popover
     const [filterText, setFilterText] = useState("");
-    // State for capability filters
     const [capabilityFilters, setCapabilityFilters] = useState<
       Record<CapabilityFilter, boolean>
     >({
@@ -63,24 +62,27 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
       dbProviderConfigs,
       globalModelSortOrder,
       isLoading,
-      // Use the new selector
       getAvailableModelListItems,
     } = useProviderStore(
       useShallow((state) => ({
         dbProviderConfigs: state.dbProviderConfigs,
         globalModelSortOrder: state.globalModelSortOrder,
         isLoading: state.isLoading,
-        // Use the new selector
         getAvailableModelListItems: state.getAvailableModelListItems,
-      })),
+      }))
     );
 
+    const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
+      () => new Set(dbProviderConfigs.map((p) => p.id))
+    );
+
+    useEffect(() => {
+      setSelectedProviders(new Set(dbProviderConfigs.map((p) => p.id)));
+    }, [dbProviderConfigs]);
+
     const orderedModels: ModelListItem[] = useMemo(() => {
-      // Get all list items (already filtered by provider enablement implicitly by how they are constructed)
       const allModelListItems = getAvailableModelListItems();
       const modelItemsMap = new Map(allModelListItems.map((m) => [m.id, m]));
-
-      // Filter these items based on whether they are in any provider's `enabledModels` list
       const globallyEnabledCombinedIds = new Set<string>();
       dbProviderConfigs.forEach((config) => {
         if (config.isEnabled && config.enabledModels) {
@@ -89,15 +91,11 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
           });
         }
       });
-
       const globallyEnabledModels = allModelListItems.filter((item) =>
-        globallyEnabledCombinedIds.has(item.id),
+        globallyEnabledCombinedIds.has(item.id)
       );
-
       const sorted: ModelListItem[] = [];
       const added = new Set<string>();
-
-      // Use globalModelSortOrder (which contains combined IDs)
       globalModelSortOrder.forEach((id) => {
         if (globallyEnabledCombinedIds.has(id)) {
           const details = modelItemsMap.get(id);
@@ -107,48 +105,44 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
           }
         }
       });
-
-      // Add any remaining enabled models not in the sort order yet
       globallyEnabledModels.forEach((item) => {
         if (!added.has(item.id)) {
           sorted.push(item);
         }
       });
-
       return sorted;
     }, [dbProviderConfigs, globalModelSortOrder, getAvailableModelListItems]);
 
     const filteredModels = useMemo(() => {
-      // 1. Filter by text
-      let textFiltered = orderedModels;
+      let providerFiltered = orderedModels;
+      if (selectedProviders.size !== dbProviderConfigs.length) {
+        providerFiltered = orderedModels.filter((model) =>
+          selectedProviders.has(model.providerId)
+        );
+      }
+      let textFiltered = providerFiltered;
       if (filterText.trim()) {
         const lowerFilter = filterText.toLowerCase();
-        textFiltered = orderedModels.filter(
+        textFiltered = providerFiltered.filter(
           (model) =>
             model.name.toLowerCase().includes(lowerFilter) ||
             model.providerName.toLowerCase().includes(lowerFilter) ||
-            model.id.toLowerCase().includes(lowerFilter),
+            model.id.toLowerCase().includes(lowerFilter)
         );
       }
-
-      // 2. Filter by active capabilities
       const activeFilters = Object.entries(capabilityFilters)
         .filter(([, isActive]) => isActive)
         .map(([key]) => key as CapabilityFilter);
-
       if (activeFilters.length === 0) {
         return textFiltered;
       }
-
       return textFiltered.filter((model) => {
-        // Use metadataSummary for filtering
         const supportedParams = new Set(
-          model.metadataSummary?.supported_parameters ?? [],
+          model.metadataSummary?.supported_parameters ?? []
         );
         const inputModalities = new Set(
-          model.metadataSummary?.input_modalities ?? [],
+          model.metadataSummary?.input_modalities ?? []
         );
-
         return activeFilters.every((filter) => {
           switch (filter) {
             case "reasoning":
@@ -161,14 +155,19 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
             case "tools":
               return supportedParams.has("tools");
             case "multimodal":
-              // Check if any input modality is NOT 'text'
               return Array.from(inputModalities).some((mod) => mod !== "text");
             default:
               return true;
           }
         });
       });
-    }, [orderedModels, filterText, capabilityFilters]);
+    }, [
+      orderedModels,
+      filterText,
+      capabilityFilters,
+      selectedProviders,
+      dbProviderConfigs.length,
+    ]);
 
     const selectedModelDetails = useMemo(() => {
       return orderedModels.find((m) => m.id === value);
@@ -180,10 +179,8 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
         onChange(newValue);
         setOpen(false);
         setFilterText("");
-        // Optionally reset capability filters on select? Decided against for now.
-        // setCapabilityFilters({ reasoning: false, webSearch: false, tools: false, multimodal: false });
       },
-      [onChange, value],
+      [onChange, value]
     );
 
     const toggleCapabilityFilter = (filter: CapabilityFilter) => {
@@ -193,24 +190,45 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
       }));
     };
 
+    const handleProviderFilterChange = useCallback(
+      (providerId: string, checked: boolean) => {
+        setSelectedProviders((prev) => {
+          const next = new Set(prev);
+          if (checked) {
+            next.add(providerId);
+          } else {
+            next.delete(providerId);
+          }
+          return next;
+        });
+      },
+      []
+    );
+
     if (isLoading) {
+      // Reverted Skeleton to match original button size
       return <Skeleton className={cn("h-9 w-[250px]", className)} />;
     }
 
-    const activeFilterCount =
+    const activeCapabilityFilterCount =
       Object.values(capabilityFilters).filter(Boolean).length;
+    const activeProviderFilterCount =
+      selectedProviders.size !== dbProviderConfigs.length ? 1 : 0;
+    const totalActiveFilters =
+      activeCapabilityFilterCount + activeProviderFilterCount;
 
     return (
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
+          {/* Reverted Trigger Button to original style */}
           <Button
             variant="outline"
             role="combobox"
             aria-expanded={open}
             disabled={disabled || orderedModels.length === 0}
             className={cn(
-              "w-auto justify-between h-9 text-sm font-normal",
-              className,
+              "w-auto justify-between h-9 text-sm font-normal relative", // Added relative positioning for badge
+              className
             )}
           >
             <span className="truncate max-w-[200px] sm:max-w-[300px]">
@@ -219,10 +237,17 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
                 : "Select Model..."}
             </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            {/* Filter count badge */}
+            {totalActiveFilters > 0 && (
+              <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-primary rounded-full">
+                {totalActiveFilters}
+              </span>
+            )}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0">
           <Command shouldFilter={false}>
+            {/* Search and Filters Section */}
             <div className="flex items-center border-b px-3">
               <SearchIconLucide className="mr-2 h-4 w-4 shrink-0 opacity-50" />
               <CommandInput
@@ -231,8 +256,67 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
                 onValueChange={setFilterText}
                 className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
               />
-              {/* Capability Filter Buttons */}
+              {/* Capability and Provider Filter Buttons */}
               <div className="flex items-center gap-0.5 ml-auto pl-2">
+                {/* Provider Filter Popover */}
+                <Popover
+                  open={providerFilterOpen}
+                  onOpenChange={setProviderFilterOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <ActionTooltipButton
+                      tooltipText="Filter by Provider"
+                      icon={<FilterIcon />}
+                      variant={
+                        activeProviderFilterCount > 0 ? "secondary" : "ghost"
+                      }
+                      className={cn(
+                        "h-7 w-7 relative", // Added relative for badge
+                        activeProviderFilterCount > 0 && "text-primary"
+                      )}
+                      aria-label="Filter by provider"
+                    >
+                      {activeProviderFilterCount > 0 && (
+                        <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1 text-[10px] font-semibold leading-none text-white bg-primary rounded-full">
+                          {selectedProviders.size}
+                        </span>
+                      )}
+                    </ActionTooltipButton>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-60 p-0">
+                    <div className="p-2 space-y-1">
+                      <Label className="text-xs px-2 font-semibold">
+                        Filter by Provider
+                      </Label>
+                      <ScrollArea className="h-48">
+                        {dbProviderConfigs.map((provider) => (
+                          <div
+                            key={provider.id}
+                            className="flex items-center space-x-2 p-1.5 rounded hover:bg-muted"
+                          >
+                            <Checkbox
+                              id={`popover-provider-filter-${provider.id}`}
+                              checked={selectedProviders.has(provider.id)}
+                              onCheckedChange={(checked) =>
+                                handleProviderFilterChange(
+                                  provider.id,
+                                  !!checked
+                                )
+                              }
+                            />
+                            <Label
+                              htmlFor={`popover-provider-filter-${provider.id}`}
+                              className="text-sm font-normal cursor-pointer"
+                            >
+                              {provider.name} ({provider.type})
+                            </Label>
+                          </div>
+                        ))}
+                      </ScrollArea>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                {/* Capability Filters */}
                 <ActionTooltipButton
                   tooltipText="Filter: Reasoning"
                   icon={<BrainCircuitIcon />}
@@ -240,7 +324,7 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
                   variant={capabilityFilters.reasoning ? "secondary" : "ghost"}
                   className={cn(
                     "h-7 w-7",
-                    capabilityFilters.reasoning && "text-primary",
+                    capabilityFilters.reasoning && "text-primary"
                   )}
                   aria-label="Filter by reasoning capability"
                 />
@@ -251,7 +335,7 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
                   variant={capabilityFilters.webSearch ? "secondary" : "ghost"}
                   className={cn(
                     "h-7 w-7",
-                    capabilityFilters.webSearch && "text-primary",
+                    capabilityFilters.webSearch && "text-primary"
                   )}
                   aria-label="Filter by web search capability"
                 />
@@ -262,7 +346,7 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
                   variant={capabilityFilters.tools ? "secondary" : "ghost"}
                   className={cn(
                     "h-7 w-7",
-                    capabilityFilters.tools && "text-primary",
+                    capabilityFilters.tools && "text-primary"
                   )}
                   aria-label="Filter by tool usage capability"
                 />
@@ -273,7 +357,7 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
                   variant={capabilityFilters.multimodal ? "secondary" : "ghost"}
                   className={cn(
                     "h-7 w-7",
-                    capabilityFilters.multimodal && "text-primary",
+                    capabilityFilters.multimodal && "text-primary"
                   )}
                   aria-label="Filter by multimodal capability"
                 />
@@ -281,7 +365,7 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
             </div>
             <CommandList>
               <CommandEmpty>
-                {activeFilterCount > 0
+                {totalActiveFilters > 0
                   ? "No models match all active filters."
                   : "No model found."}
               </CommandEmpty>
@@ -289,13 +373,13 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
                 {filteredModels.map((model) => (
                   <CommandItem
                     key={model.id}
-                    value={model.id} // Use combined ID as value
+                    value={model.id}
                     onSelect={handleSelect}
                   >
                     <Check
                       className={cn(
                         "mr-2 h-4 w-4",
-                        value === model.id ? "opacity-100" : "opacity-0",
+                        value === model.id ? "opacity-100" : "opacity-0"
                       )}
                     />
                     <span className="truncate">

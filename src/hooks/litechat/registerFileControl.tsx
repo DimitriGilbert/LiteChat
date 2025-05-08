@@ -19,6 +19,7 @@ import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { ModEvent } from "@/types/litechat/modding";
 import type { AttachedFileMetadata } from "@/store/input.store";
+import { cn } from "@/lib/utils"; // Import cn
 
 const MAX_FILE_SIZE_MB = 20;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -30,7 +31,7 @@ const FileControlTrigger: React.FC = () => {
 
   // Local state managed by events
   const [isStreaming, setIsStreaming] = useState(
-    () => useInteractionStore.getState().status === "streaming",
+    () => useInteractionStore.getState().status === "streaming"
   );
   // State to track if the current model supports non-text input
   const [modelSupportsNonText, setModelSupportsNonText] = useState(true);
@@ -54,7 +55,7 @@ const FileControlTrigger: React.FC = () => {
         selectedModel?.metadata?.architecture?.input_modalities;
       // Check if *any* modality other than 'text' is present
       setModelSupportsNonText(
-        !inputModalities || inputModalities.some((mod) => mod !== "text"),
+        !inputModalities || inputModalities.some((mod) => mod !== "text")
       );
     };
 
@@ -83,7 +84,7 @@ const FileControlTrigger: React.FC = () => {
       for (const file of Array.from(files)) {
         if (file.size > MAX_FILE_SIZE_BYTES) {
           toast.error(
-            `File "${file.name}" exceeds the ${MAX_FILE_SIZE_MB}MB limit.`,
+            `File "${file.name}" exceeds the ${MAX_FILE_SIZE_MB}MB limit.`
           );
           continue;
         }
@@ -94,7 +95,7 @@ const FileControlTrigger: React.FC = () => {
         // Check if the file type is allowed
         if (!isText && !currentModelSupportsNonText) {
           toast.warning(
-            `File "${file.name}" (${file.type}) cannot be uploaded. The current model only supports text input.`,
+            `File "${file.name}" (${file.type}) cannot be uploaded. The current model only supports text input.`
           );
           continue;
         }
@@ -120,7 +121,7 @@ const FileControlTrigger: React.FC = () => {
               fileData.contentBase64 = dataUrl.split(",")[1];
             } else {
               console.warn(
-                `Could not extract base64 from data URL for ${file.name}`,
+                `Could not extract base64 from data URL for ${file.name}`
               );
             }
           } else {
@@ -128,7 +129,7 @@ const FileControlTrigger: React.FC = () => {
             // For now, just log if it's not text/image but non-text is allowed
             if (currentModelSupportsNonText) {
               console.log(
-                `File type ${file.type} (Name: ${file.name}) not directly processed for content storage, but model supports non-text.`,
+                `File type ${file.type} (Name: ${file.name}) not directly processed for content storage, but model supports non-text.`
               );
               // Potentially read as base64 for generic handling if needed later
             }
@@ -145,7 +146,9 @@ const FileControlTrigger: React.FC = () => {
         } catch (error) {
           console.error(`Error processing file ${file.name}:`, error);
           toast.error(
-            `Failed to process file "${file.name}": ${error instanceof Error ? error.message : String(error)}`,
+            `Failed to process file "${file.name}": ${
+              error instanceof Error ? error.message : String(error)
+            }`
           );
         }
       }
@@ -154,7 +157,7 @@ const FileControlTrigger: React.FC = () => {
         event.target.value = "";
       }
     },
-    [addAttachedFile, modelSupportsNonText],
+    [addAttachedFile, modelSupportsNonText]
   );
 
   const handleButtonClick = () => {
@@ -209,7 +212,7 @@ const FileControlPanel: React.FC = () => {
     AttachedFileMetadata[]
   >(() => useInputStore.getState().attachedFilesMetadata);
   const [isStreaming, setIsStreaming] = useState(
-    () => useInteractionStore.getState().status === "streaming",
+    () => useInteractionStore.getState().status === "streaming"
   );
 
   // Subscribe to events
@@ -239,8 +242,15 @@ const FileControlPanel: React.FC = () => {
   }
 
   return (
-    <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+    // Changed layout from space-y-1 to flex flex-wrap gap-1
+    <div
+      className={cn(
+        "max-h-40 overflow-y-auto pr-1",
+        "flex flex-wrap gap-1" // Apply flexbox wrapping
+      )}
+    >
       {attachedFilesMetadata.map((fileMeta) => (
+        // Each FilePreviewRenderer will now be a flex item
         <FilePreviewRenderer
           key={fileMeta.id}
           fileMeta={fileMeta}
