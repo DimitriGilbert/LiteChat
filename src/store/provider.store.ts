@@ -21,7 +21,8 @@ import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { ModEvent } from "@/types/litechat/modding";
+// Import new event constants
+import { ProviderEvent, SettingsEvent } from "@/types/litechat/modding";
 import { instantiateModelInstance } from "@/lib/litechat/provider-helpers";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
@@ -45,16 +46,16 @@ export interface ProviderActions {
   selectModel: (combinedId: string | null) => void;
   addApiKey: (
     name: string,
-    providerId: string, // Should be DbProviderType
-    value: string,
+    providerId: string,
+    value: string
   ) => Promise<string>;
   deleteApiKey: (id: string) => Promise<void>;
   addProviderConfig: (
-    configData: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
+    configData: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">
   ) => Promise<string>;
   updateProviderConfig: (
     id: string,
-    changes: Partial<DbProviderConfig>,
+    changes: Partial<DbProviderConfig>
   ) => Promise<void>;
   deleteProviderConfig: (id: string) => Promise<void>;
   fetchModels: (providerConfigId: string) => Promise<void>;
@@ -63,7 +64,7 @@ export interface ProviderActions {
   getApiKeyForProvider: (providerId: string) => string | undefined;
   getActiveProviders: () => AiProviderConfig[];
   getAllAvailableModelDefsForProvider: (
-    providerConfigId: string,
+    providerConfigId: string
   ) => OpenRouterModel[];
   getAvailableModelListItems: () => ModelListItem[];
   _setProviderFetchStatus: (providerId: string, status: FetchStatus) => void;
@@ -72,8 +73,8 @@ export interface ProviderActions {
   createAiModelConfig: (
     config: DbProviderConfig,
     modelId: string,
-    apiKey?: string,
-  ) => AiModelConfig | undefined; // Expose createAiModelConfig
+    apiKey?: string
+  ) => AiModelConfig | undefined;
 }
 
 export const useProviderStore = create(
@@ -93,14 +94,14 @@ export const useProviderStore = create(
       const modelInfo = allAvailable.find((m) => m.id === modelId);
       if (!modelInfo) {
         console.warn(
-          `Model definition not found for ${modelId} in provider ${config.name}`,
+          `Model definition not found for ${modelId} in provider ${config.name}`
         );
         return undefined;
       }
       const instance = instantiateModelInstance(config, modelId, apiKey);
       if (!instance) {
         console.warn(
-          `Failed to instantiate AI SDK instance for ${modelId} from provider ${config.name}`,
+          `Failed to instantiate AI SDK instance for ${modelId} from provider ${config.name}`
         );
         return undefined;
       }
@@ -117,9 +118,9 @@ export const useProviderStore = create(
     setEnableApiKeyManagement: (enabled) => {
       set({ enableApiKeyManagement: enabled });
       PersistenceService.saveSetting("enableApiKeyManagement", enabled);
-      emitter.emit(ModEvent.SETTINGS_CHANGED, {
-        key: "enableApiKeyManagement",
-        value: enabled,
+      // Use new event constant
+      emitter.emit(SettingsEvent.ENABLE_API_KEY_MANAGEMENT_CHANGED, {
+        enabled,
       });
     },
 
@@ -128,7 +129,7 @@ export const useProviderStore = create(
       try {
         const enableApiMgmt = await PersistenceService.loadSetting<boolean>(
           "enableApiKeyManagement",
-          true,
+          true
         );
         const [configs, keys, savedOrder, lastSelectedModelId] =
           await Promise.all([
@@ -136,11 +137,11 @@ export const useProviderStore = create(
             PersistenceService.loadApiKeys(),
             PersistenceService.loadSetting<string[]>(
               GLOBAL_MODEL_SORT_ORDER_KEY,
-              [],
+              []
             ),
             PersistenceService.loadSetting<string | null>(
               LAST_SELECTION_KEY,
-              null,
+              null
             ),
           ]);
 
@@ -159,7 +160,7 @@ export const useProviderStore = create(
             }
             return acc;
           },
-          [],
+          []
         );
         const enabledSet = new Set(currentGloballyEnabledModels);
         const validSavedOrder = savedOrder.filter((id) => enabledSet.has(id));
@@ -180,7 +181,8 @@ export const useProviderStore = create(
         });
 
         await PersistenceService.saveSetting(LAST_SELECTION_KEY, modelToSelect);
-        emitter.emit(ModEvent.MODEL_SELECTION_CHANGED, {
+        // Use new event constant
+        emitter.emit(ProviderEvent.MODEL_SELECTION_CHANGED, {
           modelId: modelToSelect,
         });
       } catch (e) {
@@ -198,7 +200,8 @@ export const useProviderStore = create(
       if (currentId !== combinedId) {
         set({ selectedModelId: combinedId });
         PersistenceService.saveSetting(LAST_SELECTION_KEY, combinedId);
-        emitter.emit(ModEvent.MODEL_SELECTION_CHANGED, {
+        // Use new event constant
+        emitter.emit(ProviderEvent.MODEL_SELECTION_CHANGED, {
           modelId: combinedId,
         });
       }
@@ -211,7 +214,7 @@ export const useProviderStore = create(
         id: newId,
         name,
         value,
-        providerId, // This should be DbProviderType
+        providerId,
         createdAt: now,
         updatedAt: now,
       };
@@ -221,7 +224,8 @@ export const useProviderStore = create(
           state.dbApiKeys.push(newKey);
         });
         toast.success(`API Key "${name}" added.`);
-        emitter.emit(ModEvent.API_KEY_CHANGED, {
+        // Use new event constant
+        emitter.emit(ProviderEvent.API_KEY_CHANGED, {
           keyId: newId,
           action: "added",
         });
@@ -229,7 +233,7 @@ export const useProviderStore = create(
       } catch (e) {
         console.error("ProviderStore: Error adding API key", e);
         toast.error(
-          `Failed to add API Key: ${e instanceof Error ? e.message : String(e)}`,
+          `Failed to add API Key: ${e instanceof Error ? e.message : String(e)}`
         );
         throw e;
       }
@@ -243,18 +247,21 @@ export const useProviderStore = create(
         set((state) => {
           state.dbApiKeys = state.dbApiKeys.filter((k) => k.id !== id);
           state.dbProviderConfigs = state.dbProviderConfigs.map((p) =>
-            p.apiKeyId === id ? { ...p, apiKeyId: null } : p,
+            p.apiKeyId === id ? { ...p, apiKeyId: null } : p
           );
         });
         toast.success(`API Key "${keyName}" deleted.`);
-        emitter.emit(ModEvent.API_KEY_CHANGED, {
+        // Use new event constant
+        emitter.emit(ProviderEvent.API_KEY_CHANGED, {
           keyId: id,
           action: "deleted",
         });
       } catch (e) {
         console.error("ProviderStore: Error deleting API key", e);
         toast.error(
-          `Failed to delete API Key: ${e instanceof Error ? e.message : String(e)}`,
+          `Failed to delete API Key: ${
+            e instanceof Error ? e.message : String(e)
+          }`
         );
         throw e;
       }
@@ -283,7 +290,8 @@ export const useProviderStore = create(
           state.dbProviderConfigs.push(newConfig);
         });
         toast.success(`Provider "${configData.name}" added.`);
-        emitter.emit(ModEvent.PROVIDER_CONFIG_CHANGED, {
+        // Use new event constant
+        emitter.emit(ProviderEvent.CONFIG_CHANGED, {
           providerId: newId,
           config: newConfig,
         });
@@ -292,14 +300,16 @@ export const useProviderStore = create(
           .catch((fetchError) => {
             console.warn(
               `[ProviderStore] Initial model fetch failed for new provider ${newId}:`,
-              fetchError,
+              fetchError
             );
           });
         return newId;
       } catch (e) {
         console.error("ProviderStore: Error adding provider config", e);
         toast.error(
-          `Failed to add Provider: ${e instanceof Error ? e.message : String(e)}`,
+          `Failed to add Provider: ${
+            e instanceof Error ? e.message : String(e)
+          }`
         );
         throw e;
       }
@@ -319,7 +329,8 @@ export const useProviderStore = create(
           const index = state.dbProviderConfigs.findIndex((p) => p.id === id);
           if (index !== -1) state.dbProviderConfigs[index] = updatedConfigData;
         });
-        emitter.emit(ModEvent.PROVIDER_CONFIG_CHANGED, {
+        // Use new event constant
+        emitter.emit(ProviderEvent.CONFIG_CHANGED, {
           providerId: id,
           config: updatedConfigData,
         });
@@ -335,7 +346,7 @@ export const useProviderStore = create(
             }
             return acc;
           },
-          [],
+          []
         );
         const enabledSet = new Set(currentGloballyEnabledModels);
         newOrder = currentOrder.filter((mId) => enabledSet.has(mId));
@@ -346,7 +357,9 @@ export const useProviderStore = create(
       } catch (e) {
         console.error("ProviderStore: Error updating provider config", e);
         toast.error(
-          `Failed to update Provider: ${e instanceof Error ? e.message : String(e)}`,
+          `Failed to update Provider: ${
+            e instanceof Error ? e.message : String(e)
+          }`
         );
         throw e;
       }
@@ -360,13 +373,14 @@ export const useProviderStore = create(
         await PersistenceService.deleteProviderConfig(id);
         set((state) => {
           state.dbProviderConfigs = state.dbProviderConfigs.filter(
-            (p) => p.id !== id,
+            (p) => p.id !== id
           );
           delete state.providerFetchStatus[id];
         });
-        emitter.emit(ModEvent.PROVIDER_CONFIG_CHANGED, {
+        // Use new event constant
+        emitter.emit(ProviderEvent.CONFIG_CHANGED, {
           providerId: id,
-          config: { ...config, isEnabled: false },
+          config: { ...config, isEnabled: false }, // Indicate deletion via event
         });
         const configs = get().dbProviderConfigs;
         const currentGloballyEnabledModels = configs.reduce(
@@ -378,7 +392,7 @@ export const useProviderStore = create(
             }
             return acc;
           },
-          [],
+          []
         );
         const enabledSet = new Set(currentGloballyEnabledModels);
         const currentOrder = get().globalModelSortOrder;
@@ -388,7 +402,9 @@ export const useProviderStore = create(
       } catch (e) {
         console.error("ProviderStore: Error deleting provider config", e);
         toast.error(
-          `Failed to delete Provider: ${e instanceof Error ? e.message : String(e)}`,
+          `Failed to delete Provider: ${
+            e instanceof Error ? e.message : String(e)
+          }`
         );
         throw e;
       }
@@ -396,7 +412,7 @@ export const useProviderStore = create(
 
     fetchModels: async (providerConfigId) => {
       const config = get().dbProviderConfigs.find(
-        (p) => p.id === providerConfigId,
+        (p) => p.id === providerConfigId
       );
       if (!config) {
         toast.error("Provider configuration not found for fetching models.");
@@ -425,7 +441,7 @@ export const useProviderStore = create(
       set({ globalModelSortOrder: uniqueIds });
       await PersistenceService.saveSetting(
         GLOBAL_MODEL_SORT_ORDER_KEY,
-        uniqueIds,
+        uniqueIds
       );
       const currentSelected = get().selectedModelId;
       const configs = get().dbProviderConfigs;
@@ -438,12 +454,12 @@ export const useProviderStore = create(
           }
           return acc;
         },
-        [],
+        []
       );
       const enabledIdsSet = new Set(currentGloballyEnabledModels);
       if (!currentSelected || !enabledIdsSet.has(currentSelected)) {
         const firstValidInNewOrder = uniqueIds.find((id) =>
-          enabledIdsSet.has(id),
+          enabledIdsSet.has(id)
         );
         const firstValidOverall = currentGloballyEnabledModels[0] ?? null;
         const newSelection = firstValidInNewOrder ?? firstValidOverall;
@@ -471,7 +487,7 @@ export const useProviderStore = create(
       const config = get().dbProviderConfigs.find((p) => p.id === providerId);
       if (!config) return undefined;
       const apiKeyRecord = get().dbApiKeys.find(
-        (k) => k.id === config.apiKeyId,
+        (k) => k.id === config.apiKeyId
       );
       return get().createAiModelConfig(config, modelId, apiKeyRecord?.value);
     },
@@ -497,7 +513,7 @@ export const useProviderStore = create(
 
     getAllAvailableModelDefsForProvider: (providerConfigId) => {
       const config = get().dbProviderConfigs.find(
-        (p) => p.id === providerConfigId,
+        (p) => p.id === providerConfigId
       );
       if (!config) return [];
       if (config.fetchedModels && config.fetchedModels.length > 0) {
@@ -525,11 +541,11 @@ export const useProviderStore = create(
       const listItems: ModelListItem[] = [];
       dbProviderConfigs.forEach((config) => {
         const fullModelDefs = get().getAllAvailableModelDefsForProvider(
-          config.id,
+          config.id
         );
         fullModelDefs.forEach((modelDef) => {
           listItems.push({
-            id: combineModelId(config.id, modelDef.id), // Combined ID
+            id: combineModelId(config.id, modelDef.id),
             name: modelDef.name,
             providerId: config.id,
             providerName: config.name,
@@ -547,5 +563,5 @@ export const useProviderStore = create(
       });
       return listItems;
     },
-  })),
+  }))
 );

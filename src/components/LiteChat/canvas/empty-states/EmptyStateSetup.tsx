@@ -17,14 +17,14 @@ import { useUIStateStore } from "@/store/ui.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { useShallow } from "zustand/react/shallow";
 import { ApiKeyForm } from "@/components/LiteChat/common/ApiKeysForm";
-import { AddProviderForm } from "@/components/LiteChat/settings/AddProviderForm";
+import { AddProviderForm } from "@/controls/components/settings/AddProviderForm"; //components/LiteChat/settings/AddProviderForm";
 import type {
   DbProviderConfig,
   DbProviderType,
 } from "@/types/litechat/provider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { ModelEnablementList } from "@/components/LiteChat/settings/ModelEnablementList";
+import { ModelEnablementList } from "@/controls/components/settings/ModelEnablementList";
 import { Lnk } from "@/components/ui/lnk";
 import {
   requiresApiKey,
@@ -78,12 +78,24 @@ const SetupStep: React.FC<{
 
   return (
     <Card
-      className={`border border-border/40 bg-card/50 backdrop-blur-sm shadow-lg ${isComplete ? "border-l-4 border-l-green-500/70" : isActive ? "border-l-4 border-l-primary/70" : ""}`}
+      className={`border border-border/40 bg-card/50 backdrop-blur-sm shadow-lg ${
+        isComplete
+          ? "border-l-4 border-l-green-500/70"
+          : isActive
+          ? "border-l-4 border-l-primary/70"
+          : ""
+      }`}
     >
       <CardHeader className="pb-2">
         <div className="flex items-center space-x-3">
           <div
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isComplete ? "bg-green-500/20 text-green-500" : isActive ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+              isComplete
+                ? "bg-green-500/20 text-green-500"
+                : isActive
+                ? "bg-primary/20 text-primary"
+                : "bg-muted text-muted-foreground"
+            }`}
           >
             {isComplete ? (
               <CheckCircle2Icon className="h-5 w-5" />
@@ -101,7 +113,9 @@ const SetupStep: React.FC<{
                 {title}
               </CardTitle>
               <button
-                className={`p-1 rounded-full transition-all ${isOpen ? "rotate-90" : ""} hover:bg-muted/60`}
+                className={`p-1 rounded-full transition-all ${
+                  isOpen ? "rotate-90" : ""
+                } hover:bg-muted/60`}
               >
                 <ChevronRightIcon className="h-4 w-4" />
               </button>
@@ -166,21 +180,21 @@ export const EmptyStateSetup: React.FC = () => {
         state.getAllAvailableModelDefsForProvider,
       isLoading: state.isLoading,
       enableApiKeyManagement: state.enableApiKeyManagement,
-    })),
+    }))
   );
 
   const { toggleChatControlPanel, setInitialSettingsTabs } = useUIStateStore(
     useShallow((state) => ({
       toggleChatControlPanel: state.toggleChatControlPanel,
       setInitialSettingsTabs: state.setInitialSettingsTabs,
-    })),
+    }))
   );
 
   const { addConversation, selectItem } = useConversationStore(
     useShallow((state) => ({
       addConversation: state.addConversation,
       selectItem: state.selectItem,
-    })),
+    }))
   );
 
   const [isSavingKey, setIsSavingKey] = useState(false);
@@ -193,17 +207,17 @@ export const EmptyStateSetup: React.FC = () => {
   // --- Step Completion Logic ---
   const isApiKeyStepComplete = useMemo(
     () => !enableApiKeyManagement || apiKeys.length > 0,
-    [enableApiKeyManagement, apiKeys],
+    [enableApiKeyManagement, apiKeys]
   );
 
   const isProviderStepComplete = useMemo(
     () => providers.length > 0,
-    [providers],
+    [providers]
   );
 
   const isEnableModelsStepComplete = useMemo(() => {
     return providers.some(
-      (p) => p.isEnabled && p.enabledModels && p.enabledModels.length > 0,
+      (p) => p.isEnabled && p.enabledModels && p.enabledModels.length > 0
     );
   }, [providers]);
   // --- End Step Completion Logic ---
@@ -211,7 +225,7 @@ export const EmptyStateSetup: React.FC = () => {
   // --- Get data for the first provider (if it exists) ---
   const firstProvider = useMemo(() => {
     const sortedProviders = [...providers].sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
     );
     return sortedProviders.length > 0 ? sortedProviders[0] : null;
   }, [providers]);
@@ -236,11 +250,11 @@ export const EmptyStateSetup: React.FC = () => {
       return { type: undefined, name: undefined, keyId: undefined };
     if (apiKeys.length > 0) {
       const sortedKeys = [...apiKeys].sort(
-        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
       );
       // Find the *first* key that requires one for the provider form
       const relevantKeyForProvider = sortedKeys.find((k) =>
-        requiresApiKey(k.providerId as DbProviderType),
+        requiresApiKey(k.providerId as DbProviderType)
       );
       if (relevantKeyForProvider) {
         const type = relevantKeyForProvider.providerId as DbProviderType;
@@ -272,12 +286,12 @@ export const EmptyStateSetup: React.FC = () => {
         setIsSavingKey(false);
       }
     },
-    [addApiKey],
+    [addApiKey]
   );
 
   const handleSaveProvider = useCallback(
     async (
-      config: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
+      config: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">
     ): Promise<string> => {
       setIsSavingProvider(true);
       try {
@@ -296,7 +310,7 @@ export const EmptyStateSetup: React.FC = () => {
         setIsSavingProvider(false);
       }
     },
-    [addProviderConfig, initialApiKeyIdForForm], // Add dependency
+    [addProviderConfig, initialApiKeyIdForForm] // Add dependency
   );
 
   const handleModelToggle = useCallback(
@@ -317,7 +331,7 @@ export const EmptyStateSetup: React.FC = () => {
         toast.success(
           checked
             ? "Model enabled successfully!"
-            : "Model disabled successfully!",
+            : "Model disabled successfully!"
         );
       } catch (error) {
         toast.error("Failed to update model status.");
@@ -326,7 +340,7 @@ export const EmptyStateSetup: React.FC = () => {
         setIsUpdatingModels(false);
       }
     },
-    [firstProvider, updateProviderConfig],
+    [firstProvider, updateProviderConfig]
   );
 
   const handleStartFirstChat = useCallback(async () => {
@@ -460,7 +474,7 @@ export const EmptyStateSetup: React.FC = () => {
           apiKeys={apiKeys}
           onAddProvider={
             handleSaveProvider as (
-              config: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
+              config: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">
             ) => Promise<string>
           }
           onCancel={() => {}}

@@ -5,7 +5,7 @@ import {
   useMarkdownParser,
   CodeBlockData,
 } from "@/lib/litechat/useMarkdownParser";
-import { CodeBlockRenderer } from "../common/CodeBlockRenderer";
+import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
 import { useSettingsStore } from "@/store/settings.store";
 import { cn } from "@/lib/utils";
 import { useShallow } from "zustand/react/shallow";
@@ -21,7 +21,7 @@ const renderBlock = (
   item: string | CodeBlockData,
   index: number,
   useFullCodeBlock: boolean,
-  isStreamingBlock: boolean,
+  isStreamingBlock: boolean
 ): React.ReactNode | null => {
   // Use ReactNode type
   if (typeof item === "string") {
@@ -65,7 +65,7 @@ const renderBlock = (
           <code
             className={cn(
               languageClass,
-              "block p-4 font-mono text-sm leading-relaxed",
+              "block p-4 font-mono text-sm leading-relaxed"
             )}
           >
             {codeData.code}
@@ -87,17 +87,17 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
       useShallow((state) => ({
         enableStreamingMarkdown: state.enableStreamingMarkdown,
         enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing,
-      })),
+      }))
     );
 
   // Call useMarkdownParser at the top level
   const parsedContent = useMarkdownParser(
-    enableStreamingMarkdown ? markdownContent : null,
+    enableStreamingMarkdown ? markdownContent : null
   );
 
   // State to store the rendered elements of finalized blocks
   const [finalizedElements, setFinalizedElements] = useState<React.ReactNode[]>(
-    [],
+    []
   );
   // State to store the *data* of the currently streaming block
   const [streamingBlockData, setStreamingBlockData] = useState<
@@ -122,7 +122,7 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
     // Identify new blocks that have been finalized (all except the last one)
     const newlyFinalizedBlocks = parsedContent.slice(
       currentFinalizedCount,
-      parsedContent.length - 1,
+      parsedContent.length - 1
     );
 
     if (newlyFinalizedBlocks.length > 0) {
@@ -132,8 +132,8 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
             block,
             currentFinalizedCount + index,
             enableStreamingCodeBlockParsing,
-            false,
-          ),
+            false
+          )
         )
         .filter((el): el is React.ReactNode => el !== null);
 
@@ -173,7 +173,7 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
       streamingBlockData,
       finalizedBlockCountRef.current,
       enableStreamingCodeBlockParsing,
-      true,
+      true
     );
   }, [
     streamingBlockData,

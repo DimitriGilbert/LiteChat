@@ -4,6 +4,9 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { PersistenceService } from "@/services/persistence.service";
 import { toast } from "sonner";
+import { emitter } from "@/lib/litechat/event-emitter";
+// Import new event constants
+import { SettingsEvent } from "@/types/litechat/modding";
 
 export interface CustomThemeColors {
   background?: string;
@@ -40,7 +43,6 @@ export interface CustomThemeColors {
   chart5?: string;
 }
 
-// Define the SettingsState interface here so it can be imported
 export interface SettingsState {
   theme: "light" | "dark" | "system" | "TijuLight" | "TijuDark" | "custom";
   globalSystemPrompt: string | null;
@@ -70,7 +72,7 @@ export interface SettingsState {
   chatMaxWidth: string | null;
   customThemeColors: CustomThemeColors | null;
   autoScrollInterval: number;
-  enableAutoScrollOnStream: boolean; // New setting
+  enableAutoScrollOnStream: boolean;
 }
 
 interface SettingsActions {
@@ -106,7 +108,7 @@ interface SettingsActions {
     value: string | null
   ) => void;
   setAutoScrollInterval: (interval: number) => void;
-  setEnableAutoScrollOnStream: (enabled: boolean) => void; // New action
+  setEnableAutoScrollOnStream: (enabled: boolean) => void;
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>;
   resetAssistantSettings: () => Promise<void>;
@@ -141,8 +143,8 @@ const DEFAULT_CUSTOM_FONT_FAMILY = null;
 const DEFAULT_CUSTOM_FONT_SIZE = 16;
 const DEFAULT_CHAT_MAX_WIDTH = "max-w-7xl";
 const DEFAULT_CUSTOM_THEME_COLORS = null;
-const DEFAULT_AUTO_SCROLL_INTERVAL = 1000; // 1 second
-const DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM = true; // New default
+const DEFAULT_AUTO_SCROLL_INTERVAL = 1000;
+const DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM = true;
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set, get) => ({
@@ -175,47 +177,61 @@ export const useSettingsStore = create(
     chatMaxWidth: DEFAULT_CHAT_MAX_WIDTH,
     customThemeColors: DEFAULT_CUSTOM_THEME_COLORS,
     autoScrollInterval: DEFAULT_AUTO_SCROLL_INTERVAL,
-    enableAutoScrollOnStream: DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM, // New setting
+    enableAutoScrollOnStream: DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM,
 
     setTheme: (theme) => {
       set({ theme: theme });
       PersistenceService.saveSetting("theme", theme);
+      emitter.emit(SettingsEvent.THEME_CHANGED, { theme });
     },
     setGlobalSystemPrompt: (prompt) => {
       set({ globalSystemPrompt: prompt });
       PersistenceService.saveSetting("globalSystemPrompt", prompt);
+      emitter.emit(SettingsEvent.GLOBAL_SYSTEM_PROMPT_CHANGED, { prompt });
     },
     setTemperature: (temp) => {
       set({ temperature: temp });
       PersistenceService.saveSetting("temperature", temp);
+      emitter.emit(SettingsEvent.TEMPERATURE_CHANGED, { value: temp });
     },
     setMaxTokens: (tokens) => {
       set({ maxTokens: tokens });
       PersistenceService.saveSetting("maxTokens", tokens);
+      emitter.emit(SettingsEvent.MAX_TOKENS_CHANGED, { value: tokens });
     },
     setTopP: (topP) => {
       set({ topP: topP });
       PersistenceService.saveSetting("topP", topP);
+      emitter.emit(SettingsEvent.TOP_P_CHANGED, { value: topP });
     },
     setTopK: (topK) => {
       set({ topK: topK });
       PersistenceService.saveSetting("topK", topK);
+      emitter.emit(SettingsEvent.TOP_K_CHANGED, { value: topK });
     },
     setPresencePenalty: (penalty) => {
       set({ presencePenalty: penalty });
       PersistenceService.saveSetting("presencePenalty", penalty);
+      emitter.emit(SettingsEvent.PRESENCE_PENALTY_CHANGED, { value: penalty });
     },
     setFrequencyPenalty: (penalty) => {
       set({ frequencyPenalty: penalty });
       PersistenceService.saveSetting("frequencyPenalty", penalty);
+      emitter.emit(SettingsEvent.FREQUENCY_PENALTY_CHANGED, { value: penalty });
     },
     setEnableAdvancedSettings: (enabled) => {
       set({ enableAdvancedSettings: enabled });
       PersistenceService.saveSetting("enableAdvancedSettings", enabled);
+      emitter.emit(SettingsEvent.ENABLE_ADVANCED_SETTINGS_CHANGED, {
+        enabled,
+      });
     },
     setEnableStreamingMarkdown: (enabled) => {
       set({ enableStreamingMarkdown: enabled });
       PersistenceService.saveSetting("enableStreamingMarkdown", enabled);
+      emitter.emit(SettingsEvent.ENABLE_STREAMING_MARKDOWN_CHANGED, {
+        enabled,
+      });
     },
     setEnableStreamingCodeBlockParsing: (enabled) => {
       set({ enableStreamingCodeBlockParsing: enabled });
@@ -223,79 +239,118 @@ export const useSettingsStore = create(
         "enableStreamingCodeBlockParsing",
         enabled
       );
+      emitter.emit(SettingsEvent.ENABLE_STREAMING_CODE_BLOCK_PARSING_CHANGED, {
+        enabled,
+      });
     },
     setFoldStreamingCodeBlocks: (fold) => {
       set({ foldStreamingCodeBlocks: fold });
       PersistenceService.saveSetting("foldStreamingCodeBlocks", fold);
+      emitter.emit(SettingsEvent.FOLD_STREAMING_CODE_BLOCKS_CHANGED, { fold });
     },
     setFoldUserMessagesOnCompletion: (fold) => {
       set({ foldUserMessagesOnCompletion: fold });
       PersistenceService.saveSetting("foldUserMessagesOnCompletion", fold);
+      emitter.emit(SettingsEvent.FOLD_USER_MESSAGES_ON_COMPLETION_CHANGED, {
+        fold,
+      });
     },
     setStreamingRenderFPS: (fps) => {
       const clampedFps = Math.max(3, Math.min(60, fps));
       set({ streamingRenderFPS: clampedFps });
       PersistenceService.saveSetting("streamingRenderFPS", clampedFps);
+      emitter.emit(SettingsEvent.STREAMING_RENDER_FPS_CHANGED, {
+        fps: clampedFps,
+      });
     },
     setGitUserName: (name) => {
       const trimmedName = name?.trim() || null;
       set({ gitUserName: trimmedName });
       PersistenceService.saveSetting("gitUserName", trimmedName);
+      emitter.emit(SettingsEvent.GIT_USER_NAME_CHANGED, { name: trimmedName });
     },
     setGitUserEmail: (email) => {
       const trimmedEmail = email?.trim() || null;
       set({ gitUserEmail: trimmedEmail });
       PersistenceService.saveSetting("gitUserEmail", trimmedEmail);
+      emitter.emit(SettingsEvent.GIT_USER_EMAIL_CHANGED, {
+        email: trimmedEmail,
+      });
     },
     setToolMaxSteps: (steps) => {
       const clampedSteps = Math.max(1, Math.min(20, steps));
       set({ toolMaxSteps: clampedSteps });
       PersistenceService.saveSetting("toolMaxSteps", clampedSteps);
+      emitter.emit(SettingsEvent.TOOL_MAX_STEPS_CHANGED, {
+        steps: clampedSteps,
+      });
     },
     setPrismThemeUrl: (url) => {
       const trimmedUrl = url?.trim() || null;
       set({ prismThemeUrl: trimmedUrl });
       PersistenceService.saveSetting("prismThemeUrl", trimmedUrl);
+      emitter.emit(SettingsEvent.PRISM_THEME_URL_CHANGED, { url: trimmedUrl });
     },
     setAutoTitleEnabled: (enabled) => {
       set({ autoTitleEnabled: enabled });
       PersistenceService.saveSetting("autoTitleEnabled", enabled);
+      emitter.emit(SettingsEvent.AUTO_TITLE_ENABLED_CHANGED, { enabled });
     },
     setAutoTitleModelId: (modelId) => {
       set({ autoTitleModelId: modelId });
       PersistenceService.saveSetting("autoTitleModelId", modelId);
+      emitter.emit(SettingsEvent.AUTO_TITLE_MODEL_ID_CHANGED, { modelId });
     },
     setAutoTitlePromptMaxLength: (length) => {
       const clampedLength = Math.max(100, Math.min(4000, length));
       set({ autoTitlePromptMaxLength: clampedLength });
       PersistenceService.saveSetting("autoTitlePromptMaxLength", clampedLength);
+      emitter.emit(SettingsEvent.AUTO_TITLE_PROMPT_MAX_LENGTH_CHANGED, {
+        length: clampedLength,
+      });
     },
     setAutoTitleIncludeFiles: (include) => {
       set({ autoTitleIncludeFiles: include });
       PersistenceService.saveSetting("autoTitleIncludeFiles", include);
+      emitter.emit(SettingsEvent.AUTO_TITLE_INCLUDE_FILES_CHANGED, {
+        include,
+      });
     },
     setAutoTitleIncludeRules: (include) => {
       set({ autoTitleIncludeRules: include });
       PersistenceService.saveSetting("autoTitleIncludeRules", include);
+      emitter.emit(SettingsEvent.AUTO_TITLE_INCLUDE_RULES_CHANGED, {
+        include,
+      });
     },
     setCustomFontFamily: (fontFamily) => {
       const trimmedFont = fontFamily?.trim() || null;
       set({ customFontFamily: trimmedFont });
       PersistenceService.saveSetting("customFontFamily", trimmedFont);
+      emitter.emit(SettingsEvent.CUSTOM_FONT_FAMILY_CHANGED, {
+        fontFamily: trimmedFont,
+      });
     },
     setCustomFontSize: (fontSize) => {
       const clampedSize =
         fontSize === null ? null : Math.max(10, Math.min(24, fontSize));
       set({ customFontSize: clampedSize });
       PersistenceService.saveSetting("customFontSize", clampedSize);
+      emitter.emit(SettingsEvent.CUSTOM_FONT_SIZE_CHANGED, {
+        fontSize: clampedSize,
+      });
     },
     setChatMaxWidth: (maxWidthClass) => {
       set({ chatMaxWidth: maxWidthClass });
       PersistenceService.saveSetting("chatMaxWidth", maxWidthClass);
+      emitter.emit(SettingsEvent.CHAT_MAX_WIDTH_CHANGED, {
+        maxWidth: maxWidthClass,
+      });
     },
     setCustomThemeColors: (colors) => {
       set({ customThemeColors: colors });
       PersistenceService.saveSetting("customThemeColors", colors);
+      emitter.emit(SettingsEvent.CUSTOM_THEME_COLORS_CHANGED, { colors });
     },
     setCustomThemeColor: (colorName, value) => {
       set((state) => {
@@ -309,19 +364,26 @@ export const useSettingsStore = create(
         state.customThemeColors =
           Object.keys(newColors).length > 0 ? newColors : null;
       });
-      PersistenceService.saveSetting(
-        "customThemeColors",
-        get().customThemeColors
-      );
+      const newColors = get().customThemeColors;
+      PersistenceService.saveSetting("customThemeColors", newColors);
+      emitter.emit(SettingsEvent.CUSTOM_THEME_COLORS_CHANGED, {
+        colors: newColors,
+      });
     },
     setAutoScrollInterval: (interval) => {
       const clampedInterval = Math.max(50, interval);
       set({ autoScrollInterval: clampedInterval });
       PersistenceService.saveSetting("autoScrollInterval", clampedInterval);
+      emitter.emit(SettingsEvent.AUTO_SCROLL_INTERVAL_CHANGED, {
+        interval: clampedInterval,
+      });
     },
     setEnableAutoScrollOnStream: (enabled) => {
       set({ enableAutoScrollOnStream: enabled });
       PersistenceService.saveSetting("enableAutoScrollOnStream", enabled);
+      emitter.emit(SettingsEvent.ENABLE_AUTO_SCROLL_ON_STREAM_CHANGED, {
+        enabled,
+      });
     },
 
     loadSettings: async () => {
@@ -355,7 +417,7 @@ export const useSettingsStore = create(
           chatMaxWidth,
           customThemeColors,
           autoScrollInterval,
-          enableAutoScrollOnStream, // Load new setting
+          enableAutoScrollOnStream,
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -463,7 +525,7 @@ export const useSettingsStore = create(
             "autoScrollInterval",
             DEFAULT_AUTO_SCROLL_INTERVAL
           ),
-          PersistenceService.loadSetting<boolean>( // Load new setting
+          PersistenceService.loadSetting<boolean>(
             "enableAutoScrollOnStream",
             DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM
           ),
@@ -498,7 +560,7 @@ export const useSettingsStore = create(
           chatMaxWidth,
           customThemeColors,
           autoScrollInterval,
-          enableAutoScrollOnStream, // Set new setting
+          enableAutoScrollOnStream,
         });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);
@@ -507,48 +569,17 @@ export const useSettingsStore = create(
 
     resetGeneralSettings: async () => {
       try {
-        set({
-          enableStreamingMarkdown: DEFAULT_ENABLE_STREAMING_MARKDOWN,
-          enableStreamingCodeBlockParsing:
-            DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING,
-          foldStreamingCodeBlocks: DEFAULT_FOLD_STREAMING_CODE_BLOCKS,
-          foldUserMessagesOnCompletion:
-            DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION,
-          streamingRenderFPS: DEFAULT_STREAMING_FPS,
-          autoScrollInterval: DEFAULT_AUTO_SCROLL_INTERVAL,
-          enableAutoScrollOnStream: DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM, // Reset new setting
-        });
-        await Promise.all([
-          PersistenceService.saveSetting(
-            "enableStreamingMarkdown",
-            DEFAULT_ENABLE_STREAMING_MARKDOWN
-          ),
-          PersistenceService.saveSetting(
-            "enableStreamingCodeBlockParsing",
-            DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING
-          ),
-          PersistenceService.saveSetting(
-            "foldStreamingCodeBlocks",
-            DEFAULT_FOLD_STREAMING_CODE_BLOCKS
-          ),
-          PersistenceService.saveSetting(
-            "foldUserMessagesOnCompletion",
-            DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION
-          ),
-          PersistenceService.saveSetting(
-            "streamingRenderFPS",
-            DEFAULT_STREAMING_FPS
-          ),
-          PersistenceService.saveSetting(
-            "autoScrollInterval",
-            DEFAULT_AUTO_SCROLL_INTERVAL
-          ),
-          PersistenceService.saveSetting(
-            // Save reset for new setting
-            "enableAutoScrollOnStream",
-            DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM
-          ),
-        ]);
+        get().setEnableStreamingMarkdown(DEFAULT_ENABLE_STREAMING_MARKDOWN);
+        get().setEnableStreamingCodeBlockParsing(
+          DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING
+        );
+        get().setFoldStreamingCodeBlocks(DEFAULT_FOLD_STREAMING_CODE_BLOCKS);
+        get().setFoldUserMessagesOnCompletion(
+          DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION
+        );
+        get().setStreamingRenderFPS(DEFAULT_STREAMING_FPS);
+        get().setAutoScrollInterval(DEFAULT_AUTO_SCROLL_INTERVAL);
+        get().setEnableAutoScrollOnStream(DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM);
         toast.success("Streaming & Display settings reset to defaults.");
       } catch (error) {
         console.error("SettingsStore: Error resetting general settings", error);
@@ -557,63 +588,19 @@ export const useSettingsStore = create(
     },
     resetAssistantSettings: async () => {
       try {
-        set({
-          globalSystemPrompt: DEFAULT_SYSTEM_PROMPT,
-          temperature: DEFAULT_TEMPERATURE,
-          maxTokens: DEFAULT_MAX_TOKENS,
-          topP: DEFAULT_TOP_P,
-          topK: DEFAULT_TOP_K,
-          presencePenalty: DEFAULT_PRESENCE_PENALTY,
-          frequencyPenalty: DEFAULT_FREQUENCY_PENALTY,
-          toolMaxSteps: DEFAULT_TOOL_MAX_STEPS,
-          autoTitleEnabled: DEFAULT_AUTO_TITLE_ENABLED,
-          autoTitleModelId: DEFAULT_AUTO_TITLE_MODEL_ID,
-          autoTitlePromptMaxLength: DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH,
-          autoTitleIncludeFiles: DEFAULT_AUTO_TITLE_INCLUDE_FILES,
-          autoTitleIncludeRules: DEFAULT_AUTO_TITLE_INCLUDE_RULES,
-        });
-        await Promise.all([
-          PersistenceService.saveSetting(
-            "globalSystemPrompt",
-            DEFAULT_SYSTEM_PROMPT
-          ),
-          PersistenceService.saveSetting("temperature", DEFAULT_TEMPERATURE),
-          PersistenceService.saveSetting("maxTokens", DEFAULT_MAX_TOKENS),
-          PersistenceService.saveSetting("topP", DEFAULT_TOP_P),
-          PersistenceService.saveSetting("topK", DEFAULT_TOP_K),
-          PersistenceService.saveSetting(
-            "presencePenalty",
-            DEFAULT_PRESENCE_PENALTY
-          ),
-          PersistenceService.saveSetting(
-            "frequencyPenalty",
-            DEFAULT_FREQUENCY_PENALTY
-          ),
-          PersistenceService.saveSetting(
-            "toolMaxSteps",
-            DEFAULT_TOOL_MAX_STEPS
-          ),
-          PersistenceService.saveSetting(
-            "autoTitleEnabled",
-            DEFAULT_AUTO_TITLE_ENABLED
-          ),
-          PersistenceService.saveSetting(
-            "autoTitleModelId",
-            DEFAULT_AUTO_TITLE_MODEL_ID
-          ),
-          PersistenceService.saveSetting(
-            "autoTitlePromptMaxLength",
-            DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH
-          ),
-          PersistenceService.saveSetting(
-            "autoTitleIncludeFiles",
-            DEFAULT_AUTO_TITLE_INCLUDE_FILES
-          ),
-          PersistenceService.saveSetting(
-            "autoTitleIncludeRules",
-            DEFAULT_AUTO_TITLE_INCLUDE_RULES
-          ),
-        ]);
+        get().setGlobalSystemPrompt(DEFAULT_SYSTEM_PROMPT);
+        get().setTemperature(DEFAULT_TEMPERATURE);
+        get().setMaxTokens(DEFAULT_MAX_TOKENS);
+        get().setTopP(DEFAULT_TOP_P);
+        get().setTopK(DEFAULT_TOP_K);
+        get().setPresencePenalty(DEFAULT_PRESENCE_PENALTY);
+        get().setFrequencyPenalty(DEFAULT_FREQUENCY_PENALTY);
+        get().setToolMaxSteps(DEFAULT_TOOL_MAX_STEPS);
+        get().setAutoTitleEnabled(DEFAULT_AUTO_TITLE_ENABLED);
+        get().setAutoTitleModelId(DEFAULT_AUTO_TITLE_MODEL_ID);
+        get().setAutoTitlePromptMaxLength(DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH);
+        get().setAutoTitleIncludeFiles(DEFAULT_AUTO_TITLE_INCLUDE_FILES);
+        get().setAutoTitleIncludeRules(DEFAULT_AUTO_TITLE_INCLUDE_RULES);
         toast.success("Assistant settings reset to defaults.");
       } catch (error) {
         console.error(
@@ -625,37 +612,12 @@ export const useSettingsStore = create(
     },
     resetThemeSettings: async () => {
       try {
-        set({
-          theme: DEFAULT_THEME,
-          prismThemeUrl: DEFAULT_PRISM_THEME_URL,
-          customFontFamily: DEFAULT_CUSTOM_FONT_FAMILY,
-          customFontSize: DEFAULT_CUSTOM_FONT_SIZE,
-          chatMaxWidth: DEFAULT_CHAT_MAX_WIDTH,
-          customThemeColors: DEFAULT_CUSTOM_THEME_COLORS,
-        });
-        await Promise.all([
-          PersistenceService.saveSetting("theme", DEFAULT_THEME),
-          PersistenceService.saveSetting(
-            "prismThemeUrl",
-            DEFAULT_PRISM_THEME_URL
-          ),
-          PersistenceService.saveSetting(
-            "customFontFamily",
-            DEFAULT_CUSTOM_FONT_FAMILY
-          ),
-          PersistenceService.saveSetting(
-            "customFontSize",
-            DEFAULT_CUSTOM_FONT_SIZE
-          ),
-          PersistenceService.saveSetting(
-            "chatMaxWidth",
-            DEFAULT_CHAT_MAX_WIDTH
-          ),
-          PersistenceService.saveSetting(
-            "customThemeColors",
-            DEFAULT_CUSTOM_THEME_COLORS
-          ),
-        ]);
+        get().setTheme(DEFAULT_THEME);
+        get().setPrismThemeUrl(DEFAULT_PRISM_THEME_URL);
+        get().setCustomFontFamily(DEFAULT_CUSTOM_FONT_FAMILY);
+        get().setCustomFontSize(DEFAULT_CUSTOM_FONT_SIZE);
+        get().setChatMaxWidth(DEFAULT_CHAT_MAX_WIDTH);
+        get().setCustomThemeColors(DEFAULT_CUSTOM_THEME_COLORS);
         toast.success("Theme settings reset to defaults.");
       } catch (error) {
         console.error("SettingsStore: Error resetting theme settings", error);

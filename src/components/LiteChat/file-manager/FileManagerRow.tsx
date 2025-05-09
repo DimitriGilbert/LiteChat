@@ -30,7 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/litechat/file-manager-utils";
 import type { VfsNode } from "@/types/litechat/vfs";
-import { ActionTooltipButton } from "../common/ActionTooltipButton";
+import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 
 interface FileManagerRowProps {
   entry: VfsNode;
@@ -85,7 +85,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
     // Prevent navigation/selection if clicking on interactive elements
     if (
       (e.target as HTMLElement).closest(
-        'input[type="checkbox"], button, input[type="text"], [data-radix-context-menu-trigger]',
+        'input[type="checkbox"], button, input[type="text"], [data-radix-context-menu-trigger]'
       )
     ) {
       return;
@@ -127,7 +127,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
         "group hover:bg-muted/50",
         isEditingThis && "bg-muted ring-1 ring-primary",
         isOperationLoading && "opacity-70 cursor-not-allowed",
-        !isDirectory && "cursor-pointer",
+        !isDirectory && "cursor-pointer"
       )}
       onClick={handleRowClick}
       onDoubleClick={() =>
@@ -164,7 +164,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
           <span
             className={cn(
               "truncate",
-              isDirectory && "cursor-pointer hover:underline",
+              isDirectory && "cursor-pointer hover:underline"
             )}
             title={entry.name}
             // Keep folder navigation on name click
@@ -192,7 +192,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
           className={cn(
             "flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity",
             isEditingThis && "opacity-100",
-            isOperationLoading && "opacity-30",
+            isOperationLoading && "opacity-30"
           )}
         >
           {isEditingThis ? (

@@ -3,7 +3,7 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ActionDialog } from "../common/ActionDialog";
+import { ActionDialog } from "@/components/LiteChat/common/ActionDialog";
 
 interface CommitDialogProps {
   isOpen: boolean;

@@ -4,7 +4,8 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { ModEvent } from "@/types/litechat/modding";
+// Corrected: Import InputEvent specifically
+import { InputEvent } from "@/types/litechat/modding";
 
 // Define a unified structure for attached file metadata
 export interface AttachedFileMetadata {
@@ -49,8 +50,8 @@ export const useInputStore = create(
           f.source === "direct" && fileData.source === "direct"
             ? f.name === fileData.name && f.size === fileData.size
             : f.source === "vfs" && fileData.source === "vfs"
-              ? f.path === fileData.path
-              : false,
+            ? f.path === fileData.path
+            : false
         );
 
         if (!isDuplicate) {
@@ -62,12 +63,13 @@ export const useInputStore = create(
           added = true;
         } else {
           console.warn(
-            `InputStore: File "${fileData.name}" (source: ${fileData.source}) already attached. Skipping.`,
+            `InputStore: File "${fileData.name}" (source: ${fileData.source}) already attached. Skipping.`
           );
         }
       });
       if (added) {
-        emitter.emit(ModEvent.ATTACHED_FILES_CHANGED, {
+        // Corrected: Use InputEvent
+        emitter.emit(InputEvent.ATTACHED_FILES_CHANGED, {
           files: get().attachedFilesMetadata,
         });
       }
@@ -77,12 +79,13 @@ export const useInputStore = create(
       set((state) => {
         const initialLength = state.attachedFilesMetadata.length;
         state.attachedFilesMetadata = state.attachedFilesMetadata.filter(
-          (f) => f.id !== attachmentId,
+          (f) => f.id !== attachmentId
         );
         removed = state.attachedFilesMetadata.length < initialLength;
       });
       if (removed) {
-        emitter.emit(ModEvent.ATTACHED_FILES_CHANGED, {
+        // Corrected: Use InputEvent
+        emitter.emit(InputEvent.ATTACHED_FILES_CHANGED, {
           files: get().attachedFilesMetadata,
         });
       }
@@ -92,8 +95,9 @@ export const useInputStore = create(
       // Clear only attached files
       set({ attachedFilesMetadata: [] });
       if (hadFiles) {
-        emitter.emit(ModEvent.ATTACHED_FILES_CHANGED, { files: [] });
+        // Corrected: Use InputEvent
+        emitter.emit(InputEvent.ATTACHED_FILES_CHANGED, { files: [] });
       }
     },
-  })),
+  }))
 );

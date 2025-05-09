@@ -1,0 +1,163 @@
+// src/hooks/litechat/modules/ToolSelectorControlModule.ts
+// NEW FILE
+import React from "react";
+import {
+  ControlModule,
+  LiteChatModApi,
+  InteractionEvent,
+  ProviderEvent,
+  UiEvent,
+} from "@/types/litechat/modding";
+import { ToolSelectorTrigger } from "@/components/LiteChat/prompt/control/tool-selector/ToolSelectorTrigger"; // Assume moved
+import { useInteractionStore } from "@/store/interaction.store";
+import { useProviderStore } from "@/store/provider.store";
+import { useConversationStore } from "@/store/conversation.store";
+import { useControlRegistryStore } from "@/store/control.store";
+import type { SidebarItemType } from "@/types/litechat/chat";
+
+export class ToolSelectorControlModule implements ControlModule {
+  readonly id = "core-tool-selector";
+  private modApi: LiteChatModApi | null = null;
+  private unregisterCallbacks: (() => void)[] = [];
+  private eventUnsubscribers: (() => void)[] = [];
+
+  // Transient state managed by the module instance
+  private transientEnabledTools = new Set<string>();
+  private transientMaxStepsOverride: number | null = null;
+
+  // State derived from global stores/events, needed by the component
+  private isStreaming = false;
+  private isVisible = true;
+  private selectedItemType: SidebarItemType | null = null;
+  private selectedItemId: string | null = null;
+  private allToolsCount = 0;
+
+  // Callback to trigger re-render in the component instance
+  private notifyComponentUpdate: (() => void) | null = null;
+
+  async initialize(modApi: LiteChatModApi): Promise<void> {
+    this.modApi = modApi;
+    this.transientEnabledTools = new Set<string>();
+    this.transientMaxStepsOverride = null;
+
+    // Initialize state from global stores
+    this.isStreaming = useInteractionStore.getState().status === "streaming";
+    this.selectedItemId = useConversationStore.getState().selectedItemId;
+    this.selectedItemType = useConversationStore.getState().selectedItemType;
+    this.allToolsCount = Object.keys(
+      useControlRegistryStore.getState().tools
+    ).length;
+    this.updateVisibility(); // Initial visibility check
+
+    // Subscribe to events
+    const unsubStatus = modApi.on(
+      InteractionEvent.STATUS_CHANGED,
+      (payload) => {
+        this.isStreaming = payload.status === "streaming";
+        this.notifyComponentUpdate?.();
+      }
+    );
+    const unsubModel = modApi.on(ProviderEvent.MODEL_SELECTION_CHANGED, () => {
+      this.updateVisibility();
+      this.notifyComponentUpdate?.();
+    });
+    const unsubContext = modApi.on(UiEvent.CONTEXT_CHANGED, (payload) => {
+      this.selectedItemId = payload.selectedItemId;
+      this.selectedItemType = payload.selectedItemType;
+      this.notifyComponentUpdate?.();
+    });
+    // Need to listen for tool registration/unregistration if possible,
+    // or re-calculate count periodically. For now, count is static after init.
+
+    this.eventUnsubscribers.push(unsubStatus, unsubModel, unsubContext);
+    console.log(`[${this.id}] Initialized.`);
+  }
+
+  private updateVisibility() {
+    const { getSelectedModel } = useProviderStore.getState();
+    const selectedModel = getSelectedModel();
+    const hasRegisteredTools =
+      Object.keys(useControlRegistryStore.getState().tools).length > 0;
+    this.isVisible =
+      hasRegisteredTools &&
+      (selectedModel?.metadata?.supported_parameters?.includes("tools") ??
+        false);
+  }
+
+  // Methods for the component to interact with module state
+  private setEnabledTools = (updater: (prev: Set<string>) => Set<string>) => {
+    this.transientEnabledTools = updater(this.transientEnabledTools);
+    this.notifyComponentUpdate?.(); // Notify component of state change
+  };
+
+  private setMaxStepsOverride = (steps: number | null) => {
+    this.transientMaxStepsOverride = steps;
+    this.notifyComponentUpdate?.(); // Notify component of state change
+  };
+
+  register(modApi: LiteChatModApi): void {
+    if (this.unregisterCallbacks.length > 0) {
+      console.warn(`[${this.id}] Already registered. Skipping.`);
+      return;
+    }
+
+    const unregisterPrompt = modApi.registerPromptControl({
+      id: this.id,
+      triggerRenderer: () =>
+        React.createElement(ToolSelectorTrigger, {
+          // Pass module state and methods as props
+          enabledTools: this.transientEnabledTools,
+          setEnabledTools: this.setEnabledTools,
+          maxStepsOverride: this.transientMaxStepsOverride,
+          setMaxStepsOverride: this.setMaxStepsOverride,
+          isStreaming: this.isStreaming,
+          isVisible: this.isVisible,
+          selectedItemType: this.selectedItemType,
+          selectedItemId: this.selectedItemId,
+          allToolsCount: this.allToolsCount,
+          setNotifyCallback: (cb) => {
+            this.notifyComponentUpdate = cb;
+          },
+        }),
+      getMetadata: () => {
+        if (
+          this.transientEnabledTools.size > 0 ||
+          this.transientMaxStepsOverride !== null
+        ) {
+          return {
+            enabledTools: Array.from(this.transientEnabledTools),
+            ...(this.transientMaxStepsOverride !== null && {
+              maxSteps: this.transientMaxStepsOverride,
+            }),
+          };
+        }
+        return undefined;
+      },
+      clearOnSubmit: () => {
+        this.transientEnabledTools = new Set<string>();
+        this.transientMaxStepsOverride = null;
+        this.notifyComponentUpdate?.(); // Notify component to reset its view
+      },
+      show: () => this.isVisible, // Control visibility from module state
+    });
+
+    this.unregisterCallbacks.push(unregisterPrompt);
+    console.log(`[${this.id}] Registered.`);
+  }
+
+  destroy(): void {
+    this.eventUnsubscribers.forEach((unsub) => unsub());
+    this.eventUnsubscribers = [];
+    this.unregisterCallbacks.forEach((unsub) => unsub());
+    this.unregisterCallbacks = [];
+    this.notifyComponentUpdate = null;
+    this.modApi = null;
+    console.log(`[${this.id}] Destroyed.`);
+  }
+}
+
+// NOTE: ToolSelectorTrigger component needs significant refactoring:
+// - Accept all necessary state (enabledTools, maxStepsOverride, isStreaming, etc.) as props.
+// - Accept callbacks (setEnabledTools, setMaxStepsOverride) as props.
+// - Accept setNotifyCallback prop to register its forceUpdate function.
+// - Remove internal event listeners and direct store access.

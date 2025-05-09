@@ -5,7 +5,8 @@ import { IndexedDB } from "@zenfs/dom";
 import { toast } from "sonner";
 import type { FileSystemEntry } from "@/types/litechat/vfs";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { ModEvent } from "@/types/litechat/modding";
+// Corrected: Import VfsEvent specifically
+import { VfsEvent } from "@/types/litechat/modding";
 import JSZip from "jszip";
 import {
   normalizePath,
@@ -31,7 +32,7 @@ import {
 // --- Helper Functions (Non-Git) ---
 const createDirectoryRecursive = async (
   path: string,
-  options?: { fsInstance?: typeof fs },
+  options?: { fsInstance?: typeof fs }
 ): Promise<void> => {
   const fsToUse = options?.fsInstance ?? fs;
   const normalized = normalizePath(path);
@@ -42,14 +43,16 @@ const createDirectoryRecursive = async (
     // Ignore EEXIST error, as directory might be created concurrently
     if (err instanceof Error && (err as any).code === "EEXIST") {
       console.warn(
-        `[VFS Op] Directory already exists or created concurrently: ${normalized}`,
+        `[VFS Op] Directory already exists or created concurrently: ${normalized}`
       );
       return;
     }
     // Log and re-throw other errors
     console.error(`[VFS Op] Failed to create directory ${normalized}:`, err);
     toast.error(
-      `Error creating directory "${basename(normalized)}": ${err instanceof Error ? err.message : String(err)}`,
+      `Error creating directory "${basename(normalized)}": ${
+        err instanceof Error ? err.message : String(err)
+      }`
     );
     throw err;
   }
@@ -63,7 +66,7 @@ const createDirectoryRecursive = async (
  * @returns The configured fs instance or null on failure.
  */
 export const initializeFsOp = async (
-  vfsKey: string,
+  vfsKey: string
 ): Promise<typeof fs | null> => {
   try {
     const vfsConf = {
@@ -76,10 +79,12 @@ export const initializeFsOp = async (
   } catch (error) {
     console.error(
       `[VFS Op] Failed to initialize VFS for key "${vfsKey}":`,
-      error,
+      error
     );
     toast.error(
-      `Failed to initialize filesystem "${vfsKey}": ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to initialize filesystem "${vfsKey}": ${
+        error instanceof Error ? error.message : String(error)
+      }`
     );
     return null;
   }
@@ -94,7 +99,7 @@ export const initializeFsOp = async (
  */
 export const listFilesOp = async (
   path: string,
-  options?: { fsInstance?: typeof fs },
+  options?: { fsInstance?: typeof fs }
 ): Promise<FileSystemEntry[]> => {
   const fsToUse = options?.fsInstance ?? fs;
   const normalized = normalizePath(path);
@@ -106,7 +111,7 @@ export const listFilesOp = async (
       if (statErr.code === "ENOENT") {
         // If directory doesn't exist, create it and return empty list
         console.warn(
-          `[VFS Op] Directory not found for listing, attempting creation: ${normalized}`,
+          `[VFS Op] Directory not found for listing, attempting creation: ${normalized}`
         );
         await createDirectoryRecursive(normalized, { fsInstance: fsToUse });
         return [];
@@ -133,7 +138,7 @@ export const listFilesOp = async (
           console.error(`[VFS Op] Failed to stat ${fullPath}:`, statErr);
           return null;
         }
-      },
+      }
     );
     const stats = await Promise.all(statsPromises);
     // Filter out null results where stat failed
@@ -142,7 +147,7 @@ export const listFilesOp = async (
   } catch (err: unknown) {
     console.error(`[VFS Op] Failed to list directory ${normalized}:`, err);
     toast.error(
-      `Error listing files: ${err instanceof Error ? err.message : String(err)}`,
+      `Error listing files: ${err instanceof Error ? err.message : String(err)}`
     );
     throw err;
   }
@@ -157,18 +162,21 @@ export const listFilesOp = async (
  */
 export const readFileOp = async (
   path: string,
-  options?: { fsInstance?: typeof fs },
+  options?: { fsInstance?: typeof fs }
 ): Promise<Uint8Array> => {
   const fsToUse = options?.fsInstance ?? fs;
   const normalizedPath = normalizePath(path);
   try {
     const data = await fsToUse.promises.readFile(normalizedPath);
-    emitter.emit(ModEvent.VFS_FILE_READ, { path: normalizedPath });
+    // Corrected: Use VfsEvent
+    emitter.emit(VfsEvent.FILE_READ, { path: normalizedPath });
     return data;
   } catch (err: unknown) {
     console.error(`[VFS Op] Failed to read file ${normalizedPath}:`, err);
     toast.error(
-      `Error reading file "${basename(normalizedPath)}": ${err instanceof Error ? err.message : String(err)}`,
+      `Error reading file "${basename(normalizedPath)}": ${
+        err instanceof Error ? err.message : String(err)
+      }`
     );
     throw err;
   }
@@ -184,7 +192,7 @@ export const readFileOp = async (
 export const writeFileOp = async (
   path: string,
   data: Uint8Array | string,
-  options?: { fsInstance?: typeof fs },
+  options?: { fsInstance?: typeof fs }
 ): Promise<void> => {
   const fsToUse = options?.fsInstance ?? fs;
   const normalized = normalizePath(path);
@@ -196,7 +204,8 @@ export const writeFileOp = async (
     }
     // Write the file
     await fsToUse.promises.writeFile(normalized, data);
-    emitter.emit(ModEvent.VFS_FILE_WRITTEN, { path: normalized });
+    // Corrected: Use VfsEvent
+    emitter.emit(VfsEvent.FILE_WRITTEN, { path: normalized });
   } catch (err: unknown) {
     // Avoid double-toasting if error came from createDirectoryRecursive
     if (
@@ -206,7 +215,9 @@ export const writeFileOp = async (
     ) {
       console.error(`[VFS Op] Failed to write file ${normalized}:`, err);
       toast.error(
-        `Error writing file "${basename(normalized)}": ${err instanceof Error ? err.message : String(err)}`,
+        `Error writing file "${basename(normalized)}": ${
+          err instanceof Error ? err.message : String(err)
+        }`
       );
     }
     throw err;
@@ -223,7 +234,7 @@ export const writeFileOp = async (
 export const deleteItemOp = async (
   path: string,
   recursive: boolean = false,
-  options?: { fsInstance?: typeof fs },
+  options?: { fsInstance?: typeof fs }
 ): Promise<void> => {
   const fsToUse = options?.fsInstance ?? fs;
   const normalized = normalizePath(path);
@@ -236,11 +247,13 @@ export const deleteItemOp = async (
     if (fileStat.isDirectory()) {
       // Use rm for directories
       await fsToUse.promises.rm(normalized, { recursive });
-      emitter.emit(ModEvent.VFS_FILE_DELETED, { path: normalized });
+      // Corrected: Use VfsEvent
+      emitter.emit(VfsEvent.FILE_DELETED, { path: normalized });
     } else {
       // Use unlink for files
       await fsToUse.promises.unlink(normalized);
-      emitter.emit(ModEvent.VFS_FILE_DELETED, { path: normalized });
+      // Corrected: Use VfsEvent
+      emitter.emit(VfsEvent.FILE_DELETED, { path: normalized });
     }
     toast.success(`"${basename(normalized)}" deleted.`);
   } catch (err: unknown) {
@@ -252,7 +265,9 @@ export const deleteItemOp = async (
     // Handle other errors
     console.error(`[VFS Op] Failed to delete ${normalized}:`, err);
     toast.error(
-      `Error deleting "${basename(normalized)}": ${err instanceof Error ? err.message : String(err)}`,
+      `Error deleting "${basename(normalized)}": ${
+        err instanceof Error ? err.message : String(err)
+      }`
     );
     throw err;
   }
@@ -266,7 +281,7 @@ export const deleteItemOp = async (
  */
 export const createDirectoryOp = async (
   path: string,
-  options?: { fsInstance?: typeof fs },
+  options?: { fsInstance?: typeof fs }
 ): Promise<void> => {
   await createDirectoryRecursive(path, options);
 };
@@ -280,7 +295,7 @@ export const createDirectoryOp = async (
 export const downloadFileOp = async (
   path: string,
   filename?: string,
-  options?: { fsInstance?: typeof fs },
+  options?: { fsInstance?: typeof fs }
 ): Promise<void> => {
   try {
     const data = await readFileOp(path, options);
@@ -301,7 +316,7 @@ export const downloadFileOp = async (
     // Avoid double toast if readFileOp already showed one
     if (!(err instanceof Error && err.message.includes("Error reading file"))) {
       toast.error(
-        `Download failed: ${err instanceof Error ? err.message : String(err)}`,
+        `Download failed: ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }
@@ -316,7 +331,7 @@ export const downloadFileOp = async (
 export const uploadFilesOp = async (
   files: FileList | File[],
   targetPath: string,
-  options?: { fsInstance?: typeof fs },
+  options?: { fsInstance?: typeof fs }
 ): Promise<void> => {
   const fsToUse = options?.fsInstance ?? fs;
   const normalizedTargetPath = normalizePath(targetPath);
@@ -351,18 +366,20 @@ export const uploadFilesOp = async (
     errorCount = fileArray.length;
     console.error(
       `[VFS Op] Failed to prepare target directory ${normalizedTargetPath} for upload:`,
-      err,
+      err
     );
     // Toast handled by createDirectoryRecursive
   } finally {
     // Provide summary toast based on counts
     if (errorCount > 0 && successCount > 0) {
       toast.warning(
-        `Upload complete with issues. ${successCount} succeeded, ${errorCount} failed.`,
+        `Upload complete with issues. ${successCount} succeeded, ${errorCount} failed.`
       );
     } else if (errorCount === 0 && successCount > 0) {
       toast.success(
-        `Successfully uploaded ${successCount} file(s) to ${normalizedTargetPath === "/" ? "root" : basename(normalizedTargetPath)}.`,
+        `Successfully uploaded ${successCount} file(s) to ${
+          normalizedTargetPath === "/" ? "root" : basename(normalizedTargetPath)
+        }.`
       );
     } else if (errorCount > 0 && successCount === 0) {
       // Error toast was likely already shown by createDirectoryRecursive or writeFileOp
@@ -380,7 +397,7 @@ export const uploadFilesOp = async (
 export const uploadAndExtractZipOp = async (
   file: File,
   targetPath: string,
-  options?: { fsInstance?: typeof fs },
+  options?: { fsInstance?: typeof fs }
 ): Promise<void> => {
   const fsToUse = options?.fsInstance ?? fs;
   if (!file.name.toLowerCase().endsWith(".zip")) {
@@ -416,7 +433,7 @@ export const uploadAndExtractZipOp = async (
           await writeFileOp(fullTargetPath, content, { fsInstance: fsToUse });
         }
         return { name: zipEntry.name, isDir: zipEntry.dir };
-      }),
+      })
     );
 
     // Tally results for summary toast
@@ -439,11 +456,17 @@ export const uploadAndExtractZipOp = async (
     // Show summary toast
     if (failedCount > 0) {
       toast.warning(
-        `Finished extracting "${file.name}". ${successFileCount + successDirCount} items succeeded, ${failedCount} failed.`,
+        `Finished extracting "${file.name}". ${
+          successFileCount + successDirCount
+        } items succeeded, ${failedCount} failed.`
       );
     } else {
       toast.success(
-        `Successfully extracted ${successFileCount} files and ${successDirCount} folders from "${file.name}" to ${normalizedTargetPath === "/" ? "root" : basename(normalizedTargetPath)}.`,
+        `Successfully extracted ${successFileCount} files and ${successDirCount} folders from "${
+          file.name
+        }" to ${
+          normalizedTargetPath === "/" ? "root" : basename(normalizedTargetPath)
+        }.`
       );
     }
   } catch (err: unknown) {
@@ -456,7 +479,9 @@ export const uploadAndExtractZipOp = async (
     ) {
       console.error(`[VFS Op] Failed to extract zip ${file.name}:`, err);
       toast.error(
-        `ZIP extraction failed: ${err instanceof Error ? err.message : String(err)}`,
+        `ZIP extraction failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`
       );
     }
     // Do not re-throw here, allow operation to finish
@@ -472,7 +497,7 @@ export const uploadAndExtractZipOp = async (
 export const downloadAllAsZipOp = async (
   filename?: string,
   rootPath: string = "/",
-  options?: { fsInstance?: typeof fs },
+  options?: { fsInstance?: typeof fs }
 ): Promise<void> => {
   const fsToUse = options?.fsInstance ?? fs;
   const zip = new JSZip();
@@ -494,7 +519,9 @@ export const downloadAllAsZipOp = async (
       } else {
         // Handle other stat errors
         toast.error(
-          `Cannot export: Error accessing path "${rootDirName}". ${statErr instanceof Error ? statErr.message : String(statErr)}`,
+          `Cannot export: Error accessing path "${rootDirName}". ${
+            statErr instanceof Error ? statErr.message : String(statErr)
+          }`
         );
       }
       return;
@@ -558,7 +585,7 @@ export const downloadAllAsZipOp = async (
       )
     ) {
       toast.error(
-        `ZIP export failed: ${err instanceof Error ? err.message : String(err)}`,
+        `ZIP export failed: ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }
@@ -574,7 +601,7 @@ export const downloadAllAsZipOp = async (
 export const renameOp = async (
   oldPath: string,
   newPath: string,
-  options?: { fsInstance?: typeof fs },
+  options?: { fsInstance?: typeof fs }
 ): Promise<void> => {
   const fsToUse = options?.fsInstance ?? fs;
   const normalizedOld = normalizePath(oldPath);
@@ -599,7 +626,7 @@ export const renameOp = async (
     // Attempt the rename operation
     await fsToUse.promises.rename(normalizedOld, normalizedNew);
     toast.success(
-      `Renamed "${basename(normalizedOld)}" to "${basename(normalizedNew)}"`,
+      `Renamed "${basename(normalizedOld)}" to "${basename(normalizedNew)}"`
     );
   } catch (err: unknown) {
     // Handle specific errors for better feedback
@@ -610,13 +637,15 @@ export const renameOp = async (
       } else {
         // Original item not found
         toast.error(
-          `Rename failed: Original item "${basename(normalizedOld)}" not found.`,
+          `Rename failed: Original item "${basename(normalizedOld)}" not found.`
         );
       }
     } else if (err instanceof Error && (err as any).code === "EEXIST") {
       // Target name already exists
       toast.error(
-        `Rename failed: An item named "${basename(normalizedNew)}" already exists.`,
+        `Rename failed: An item named "${basename(
+          normalizedNew
+        )}" already exists.`
       );
     } else if (
       // Avoid double-toasting if error came from createDirectoryRecursive
@@ -626,13 +655,13 @@ export const renameOp = async (
     ) {
       // Handle other generic errors
       toast.error(
-        `Rename failed: ${err instanceof Error ? err.message : String(err)}`,
+        `Rename failed: ${err instanceof Error ? err.message : String(err)}`
       );
     }
     // Log the error regardless
     console.error(
       `[VFS Op] Failed to rename ${normalizedOld} to ${normalizedNew}:`,
-      err,
+      err
     );
     throw err;
   }

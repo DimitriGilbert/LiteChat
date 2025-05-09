@@ -1,0 +1,46 @@
+// src/hooks/litechat/modules/FileControlModule.ts
+// REVISED FILE
+import React from "react";
+import { ControlModule, LiteChatModApi } from "@/types/litechat/modding";
+// Assume components are moved to a dedicated directory
+import { FileControlTrigger } from "@/components/LiteChat/prompt/control/file/FileControlTrigger";
+import { FileControlPanel } from "@/components/LiteChat/prompt/control/file/FileControlPanel";
+
+export class FileControlModule implements ControlModule {
+  readonly id = "core-file-attachment";
+  private unregisterCallbacks: (() => void)[] = [];
+
+  async initialize(modApi: LiteChatModApi): Promise<void> {
+    // No specific initialization needed here for now.
+    // Components will handle their own event subscriptions.
+    console.log(`[${this.id}] Initialized.`);
+  }
+
+  register(modApi: LiteChatModApi): void {
+    if (this.unregisterCallbacks.length > 0) {
+      console.warn(`[${this.id}] Already registered. Skipping.`);
+      return;
+    }
+
+    const unregisterPrompt = modApi.registerPromptControl({
+      id: this.id,
+      triggerRenderer: () => React.createElement(FileControlTrigger),
+      renderer: () => React.createElement(FileControlPanel),
+      // No getParameters/getMetadata needed here, handled by InputStore read
+    });
+
+    this.unregisterCallbacks.push(unregisterPrompt);
+    console.log(`[${this.id}] Registered.`);
+  }
+
+  destroy(): void {
+    this.unregisterCallbacks.forEach((unsub) => unsub());
+    this.unregisterCallbacks = [];
+    console.log(`[${this.id}] Destroyed.`);
+  }
+}
+
+// NOTE: The FileControlTrigger and FileControlPanel components will need to be
+// updated to use the new event constants (e.g., InteractionEvent.STATUS_CHANGED)
+// but their internal logic for subscribing and managing state remains largely the same.
+// They will also need to be moved to the assumed new directory structure.

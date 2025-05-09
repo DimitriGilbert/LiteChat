@@ -11,9 +11,8 @@ import type { SyncStatus } from "./sync";
 import type { AttachedFileMetadata } from "@/store/input.store";
 import type { PromptState } from "@/store/prompt.store";
 import type { InteractionState } from "@/store/interaction.store";
-import type { PromptControl as ModPromptControl } from "./prompt";
-import type { ChatControl as ModChatControl } from "./chat";
-
+import type { SettingsState } from "@/store/settings.store"; // Added for settings events
+import type { DbRule, DbTag } from "@/types/litechat/rules"; // Added for rules/tags events
 // --- Mod Definition & Instance ---
 
 /** Mod definition stored in the database */
@@ -48,7 +47,7 @@ export interface ModState {
 export interface ModActions {
   loadDbMods: () => Promise<void>;
   addDbMod: (
-    modData: Omit<DbMod, "id" | "createdAt">,
+    modData: Omit<DbMod, "id" | "createdAt">
   ) => Promise<string | undefined>;
   updateDbMod: (id: string, changes: Partial<DbMod>) => Promise<void>;
   deleteDbMod: (id: string) => Promise<void>;
@@ -84,28 +83,28 @@ export interface LiteChatModApi {
   readonly modName: string;
 
   // Control Registration
-  registerPromptControl: (control: ModPromptControl) => () => void;
-  registerChatControl: (control: ModChatControl) => () => void;
+  registerPromptControl: (control: PromptControl) => () => void;
+  registerChatControl: (control: ChatControl) => () => void;
 
   // Tool Registration
   registerTool: <P extends z.ZodSchema<any>>(
     toolName: string,
     definition: Tool<P>,
-    implementation?: ToolImplementation<P>,
+    implementation?: ToolImplementation<P>
   ) => () => void;
 
   // Event Bus
-  on: <K extends ModEventName>(
+  on: <K extends keyof ModEventPayloadMap>(
     eventName: K,
-    callback: (payload: ModEventPayloadMap[K]) => void,
+    callback: (payload: ModEventPayloadMap[K]) => void
   ) => () => void;
 
   // Middleware
   addMiddleware: <H extends ModMiddlewareHookName>(
     hookName: H,
     callback: (
-      payload: ModMiddlewarePayloadMap[H],
-    ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>,
+      payload: ModMiddlewarePayloadMap[H]
+    ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>
   ) => () => void;
 
   // Settings
@@ -115,7 +114,7 @@ export interface LiteChatModApi {
   getContextSnapshot: () => ReadonlyChatContextSnapshot;
   showToast: (
     type: "success" | "info" | "warning" | "error",
-    message: string,
+    message: string
   ) => void;
   log: (
     level: "log" | "warn" | "error" | "info" | "debug",
@@ -128,7 +127,7 @@ export interface LiteChatModApi {
 /** Function signature for tool execution logic */
 export type ToolImplementation<P extends z.ZodSchema<any>> = (
   params: z.infer<P>,
-  context: ReadonlyChatContextSnapshot,
+  context: ReadonlyChatContextSnapshot & { fsInstance?: any } // Allow fsInstance for VFS tools
 ) => Promise<any>;
 
 // --- Custom Settings Tab ---
@@ -142,130 +141,293 @@ export interface CustomSettingTab {
 
 // --- Event Emitter ---
 
-/** Defines the names of events mods can subscribe to */
-export enum ModEvent {
-  // App Lifecycle
-  APP_LOADED = "app:loaded",
-  MOD_LOADED = "mod:loaded",
-  MOD_ERROR = "mod:error",
+// Replace Enum with string constants using dot-notation
+export const AppEvent = {
+  LOADED: "app.loaded",
+} as const;
 
-  // Conversation Lifecycle
-  CONVERSATION_SELECTED = "conversation:selected",
-  CONVERSATION_ADDED = "conversation:added",
-  CONVERSATION_UPDATED = "conversation:updated",
-  CONVERSATION_DELETED = "conversation:deleted",
+export const ModEvent = {
+  LOADED: "mod.loaded",
+  ERROR: "mod.error",
+} as const;
 
-  // Project Lifecycle
-  PROJECT_SELECTED = "project:selected",
-  PROJECT_ADDED = "project:added",
-  PROJECT_UPDATED = "project:updated",
-  PROJECT_DELETED = "project:deleted",
+export const ConversationEvent = {
+  SELECTED: "conversation.selected",
+  ADDED: "conversation.added",
+  UPDATED: "conversation.updated",
+  DELETED: "conversation.deleted",
+  SYNC_STATUS_CHANGED: "conversation.syncStatusChanged",
+} as const;
 
-  // Interaction Lifecycle
-  INTERACTION_STARTED = "interaction:started",
-  INTERACTION_STREAM_CHUNK = "interaction:stream_chunk",
-  INTERACTION_COMPLETED = "interaction:completed",
+export const ProjectEvent = {
+  SELECTED: "project.selected",
+  ADDED: "project.added",
+  UPDATED: "project.updated",
+  DELETED: "project.deleted",
+} as const;
 
-  // Prompt Lifecycle
-  PROMPT_SUBMITTED = "prompt:submitted",
-  PROMPT_INPUT_CHANGE = "prompt:input_change",
+export const InteractionEvent = {
+  STARTED: "interaction.started",
+  STREAM_CHUNK: "interaction.streamChunk",
+  COMPLETED: "interaction.completed",
+  STATUS_CHANGED: "interaction.statusChanged",
+} as const;
 
-  // Settings Changes
-  SETTINGS_CHANGED = "settings:changed",
+export const PromptEvent = {
+  SUBMITTED: "prompt.submitted",
+  INPUT_CHANGED: "prompt.inputChanged",
+  PARAMS_CHANGED: "prompt.paramsChanged",
+} as const;
 
-  // Provider/Model Changes
-  PROVIDER_CONFIG_CHANGED = "provider:config_changed",
-  API_KEY_CHANGED = "provider:api_key_changed",
-  MODEL_SELECTION_CHANGED = "provider:model_selection_changed",
+export const SettingsEvent = {
+  // Specific settings changes
+  THEME_CHANGED: "settings.themeChanged",
+  GLOBAL_SYSTEM_PROMPT_CHANGED: "settings.globalSystemPromptChanged",
+  TEMPERATURE_CHANGED: "settings.temperatureChanged",
+  MAX_TOKENS_CHANGED: "settings.maxTokensChanged",
+  TOP_P_CHANGED: "settings.topPChanged",
+  TOP_K_CHANGED: "settings.topKChanged",
+  PRESENCE_PENALTY_CHANGED: "settings.presencePenaltyChanged",
+  FREQUENCY_PENALTY_CHANGED: "settings.frequencyPenaltyChanged",
+  ENABLE_ADVANCED_SETTINGS_CHANGED: "settings.enableAdvancedSettingsChanged",
+  ENABLE_STREAMING_MARKDOWN_CHANGED: "settings.enableStreamingMarkdownChanged",
+  ENABLE_STREAMING_CODE_BLOCK_PARSING_CHANGED:
+    "settings.enableStreamingCodeBlockParsingChanged",
+  FOLD_STREAMING_CODE_BLOCKS_CHANGED: "settings.foldStreamingCodeBlocksChanged",
+  FOLD_USER_MESSAGES_ON_COMPLETION_CHANGED:
+    "settings.foldUserMessagesOnCompletionChanged",
+  STREAMING_RENDER_FPS_CHANGED: "settings.streamingRenderFpsChanged",
+  GIT_USER_NAME_CHANGED: "settings.gitUserNameChanged",
+  GIT_USER_EMAIL_CHANGED: "settings.gitUserEmailChanged",
+  TOOL_MAX_STEPS_CHANGED: "settings.toolMaxStepsChanged",
+  PRISM_THEME_URL_CHANGED: "settings.prismThemeUrlChanged",
+  AUTO_TITLE_ENABLED_CHANGED: "settings.autoTitleEnabledChanged",
+  AUTO_TITLE_MODEL_ID_CHANGED: "settings.autoTitleModelIdChanged",
+  AUTO_TITLE_PROMPT_MAX_LENGTH_CHANGED:
+    "settings.autoTitlePromptMaxLengthChanged",
+  AUTO_TITLE_INCLUDE_FILES_CHANGED: "settings.autoTitleIncludeFilesChanged",
+  AUTO_TITLE_INCLUDE_RULES_CHANGED: "settings.autoTitleIncludeRulesChanged",
+  CUSTOM_FONT_FAMILY_CHANGED: "settings.customFontFamilyChanged",
+  CUSTOM_FONT_SIZE_CHANGED: "settings.customFontSizeChanged",
+  CHAT_MAX_WIDTH_CHANGED: "settings.chatMaxWidthChanged",
+  CUSTOM_THEME_COLORS_CHANGED: "settings.customThemeColorsChanged",
+  AUTO_SCROLL_INTERVAL_CHANGED: "settings.autoScrollIntervalChanged",
+  ENABLE_AUTO_SCROLL_ON_STREAM_CHANGED:
+    "settings.enableAutoScrollOnStreamChanged",
+  ENABLE_API_KEY_MANAGEMENT_CHANGED: "settings.enableApiKeyManagementChanged",
+} as const;
 
-  // VFS Events
-  VFS_FILE_WRITTEN = "vfs:file_written",
-  VFS_FILE_READ = "vfs:file_read",
-  VFS_FILE_DELETED = "vfs:file_deleted",
-  VFS_CONTEXT_CHANGED = "vfs:context_changed",
+export const ProviderEvent = {
+  CONFIG_CHANGED: "provider.configChanged",
+  API_KEY_CHANGED: "provider.apiKeyChanged",
+  MODEL_SELECTION_CHANGED: "provider.modelSelectionChanged",
+} as const;
 
-  // Sync Events
-  SYNC_REPO_CHANGED = "sync:repo_changed",
-  CONVERSATION_SYNC_STATUS_CHANGED = "sync:conversation_status_changed",
-  REPO_INIT_STATUS_CHANGED = "sync:repo_init_status_changed",
+export const VfsEvent = {
+  FILE_WRITTEN: "vfs.fileWritten",
+  FILE_READ: "vfs.fileRead",
+  FILE_DELETED: "vfs.fileDeleted",
+  CONTEXT_CHANGED: "vfs.contextChanged",
+} as const;
 
-  // Input State Changes
-  ATTACHED_FILES_CHANGED = "input:attached_files_changed",
-  PROMPT_PARAMS_CHANGED = "input:prompt_params_changed",
+export const SyncEvent = {
+  REPO_CHANGED: "sync.repoChanged",
+  REPO_INIT_STATUS_CHANGED: "sync.repoInitStatusChanged",
+} as const;
 
-  // Interaction State Changes
-  INTERACTION_STATUS_CHANGED = "interaction:status_changed",
+export const InputEvent = {
+  ATTACHED_FILES_CHANGED: "input.attachedFilesChanged",
+} as const;
 
-  // UI State Changes
-  CONTEXT_CHANGED = "ui:context_changed",
-}
+export const UiEvent = {
+  CONTEXT_CHANGED: "ui.contextChanged",
+} as const;
 
-/** Maps event names to their expected payload types */
-export interface ModEventPayloadMap {
-  [ModEvent.APP_LOADED]: undefined;
-  [ModEvent.MOD_LOADED]: { id: string; name: string };
-  [ModEvent.MOD_ERROR]: { id: string; name: string; error: Error | string };
-  [ModEvent.CONVERSATION_SELECTED]: { conversationId: string | null };
-  [ModEvent.CONVERSATION_ADDED]: { conversation: Conversation };
-  [ModEvent.CONVERSATION_UPDATED]: {
+export const RulesEvent = {
+  RULES_LOADED: "rules.rulesLoaded",
+  TAGS_LOADED: "rules.tagsLoaded",
+  LINKS_LOADED: "rules.linksLoaded",
+  RULE_SAVED: "rules.ruleSaved",
+  RULE_DELETED: "rules.ruleDeleted",
+  TAG_SAVED: "rules.tagSaved",
+  TAG_DELETED: "rules.tagDeleted",
+  LINK_SAVED: "rules.linkSaved",
+  LINK_DELETED: "rules.linkDeleted",
+} as const;
+
+// Combine all event types into a single map
+export type ModEventPayloadMap = {
+  // App
+  [AppEvent.LOADED]: undefined;
+  // Mod
+  [ModEvent.LOADED]: { id: string; name: string };
+  [ModEvent.ERROR]: { id: string; name: string; error: Error | string };
+  // Conversation
+  [ConversationEvent.SELECTED]: { conversationId: string | null };
+  [ConversationEvent.ADDED]: { conversation: Conversation };
+  [ConversationEvent.UPDATED]: {
     conversationId: string;
     updates: Partial<Conversation>;
   };
-  [ModEvent.CONVERSATION_DELETED]: { conversationId: string };
-  [ModEvent.PROJECT_SELECTED]: { projectId: string | null };
-  [ModEvent.PROJECT_ADDED]: { project: Project };
-  [ModEvent.PROJECT_UPDATED]: { projectId: string; updates: Partial<Project> };
-  [ModEvent.PROJECT_DELETED]: { projectId: string };
-  [ModEvent.INTERACTION_STARTED]: {
+  [ConversationEvent.DELETED]: { conversationId: string };
+  [ConversationEvent.SYNC_STATUS_CHANGED]: {
+    conversationId: string;
+    status: SyncStatus;
+  };
+  // Project
+  [ProjectEvent.SELECTED]: { projectId: string | null };
+  [ProjectEvent.ADDED]: { project: Project };
+  [ProjectEvent.UPDATED]: { projectId: string; updates: Partial<Project> };
+  [ProjectEvent.DELETED]: { projectId: string };
+  // Interaction
+  [InteractionEvent.STARTED]: {
     interactionId: string;
     conversationId: string;
     type: string;
   };
-  [ModEvent.INTERACTION_STREAM_CHUNK]: {
-    interactionId: string;
-    chunk: string;
-  };
-  [ModEvent.INTERACTION_COMPLETED]: {
+  [InteractionEvent.STREAM_CHUNK]: { interactionId: string; chunk: string };
+  [InteractionEvent.COMPLETED]: {
     interactionId: string;
     status: Interaction["status"];
     error?: string;
     toolCalls?: ToolCallPart[];
     toolResults?: ToolResultPart[];
   };
-  [ModEvent.PROMPT_SUBMITTED]: { turnData: PromptTurnObject };
-  [ModEvent.PROMPT_INPUT_CHANGE]: { value: string };
-  [ModEvent.SETTINGS_CHANGED]: { key: string; value: any };
-  [ModEvent.PROVIDER_CONFIG_CHANGED]: {
+  [InteractionEvent.STATUS_CHANGED]: { status: InteractionState["status"] };
+  // Prompt
+  [PromptEvent.SUBMITTED]: { turnData: PromptTurnObject };
+  [PromptEvent.INPUT_CHANGED]: { value: string };
+  [PromptEvent.PARAMS_CHANGED]: { params: Partial<PromptState> };
+  // Settings (Specific)
+  [SettingsEvent.THEME_CHANGED]: {
+    theme: SettingsState["theme"];
+  };
+  [SettingsEvent.GLOBAL_SYSTEM_PROMPT_CHANGED]: {
+    prompt: SettingsState["globalSystemPrompt"];
+  };
+  [SettingsEvent.TEMPERATURE_CHANGED]: {
+    value: SettingsState["temperature"];
+  };
+  [SettingsEvent.MAX_TOKENS_CHANGED]: {
+    value: SettingsState["maxTokens"];
+  };
+  [SettingsEvent.TOP_P_CHANGED]: {
+    value: SettingsState["topP"];
+  };
+  [SettingsEvent.TOP_K_CHANGED]: {
+    value: SettingsState["topK"];
+  };
+  [SettingsEvent.PRESENCE_PENALTY_CHANGED]: {
+    value: SettingsState["presencePenalty"];
+  };
+  [SettingsEvent.FREQUENCY_PENALTY_CHANGED]: {
+    value: SettingsState["frequencyPenalty"];
+  };
+  [SettingsEvent.ENABLE_ADVANCED_SETTINGS_CHANGED]: {
+    enabled: SettingsState["enableAdvancedSettings"];
+  };
+  [SettingsEvent.ENABLE_STREAMING_MARKDOWN_CHANGED]: {
+    enabled: SettingsState["enableStreamingMarkdown"];
+  };
+  [SettingsEvent.ENABLE_STREAMING_CODE_BLOCK_PARSING_CHANGED]: {
+    enabled: SettingsState["enableStreamingCodeBlockParsing"];
+  };
+  [SettingsEvent.FOLD_STREAMING_CODE_BLOCKS_CHANGED]: {
+    fold: SettingsState["foldStreamingCodeBlocks"];
+  };
+  [SettingsEvent.FOLD_USER_MESSAGES_ON_COMPLETION_CHANGED]: {
+    fold: SettingsState["foldUserMessagesOnCompletion"];
+  };
+  [SettingsEvent.STREAMING_RENDER_FPS_CHANGED]: {
+    fps: SettingsState["streamingRenderFPS"];
+  };
+  [SettingsEvent.GIT_USER_NAME_CHANGED]: {
+    name: SettingsState["gitUserName"];
+  };
+  [SettingsEvent.GIT_USER_EMAIL_CHANGED]: {
+    email: SettingsState["gitUserEmail"];
+  };
+  [SettingsEvent.TOOL_MAX_STEPS_CHANGED]: {
+    steps: SettingsState["toolMaxSteps"];
+  };
+  [SettingsEvent.PRISM_THEME_URL_CHANGED]: {
+    url: SettingsState["prismThemeUrl"];
+  };
+  [SettingsEvent.AUTO_TITLE_ENABLED_CHANGED]: {
+    enabled: SettingsState["autoTitleEnabled"];
+  };
+  [SettingsEvent.AUTO_TITLE_MODEL_ID_CHANGED]: {
+    modelId: SettingsState["autoTitleModelId"];
+  };
+  [SettingsEvent.AUTO_TITLE_PROMPT_MAX_LENGTH_CHANGED]: {
+    length: SettingsState["autoTitlePromptMaxLength"];
+  };
+  [SettingsEvent.AUTO_TITLE_INCLUDE_FILES_CHANGED]: {
+    include: SettingsState["autoTitleIncludeFiles"];
+  };
+  [SettingsEvent.AUTO_TITLE_INCLUDE_RULES_CHANGED]: {
+    include: SettingsState["autoTitleIncludeRules"];
+  };
+  [SettingsEvent.CUSTOM_FONT_FAMILY_CHANGED]: {
+    fontFamily: SettingsState["customFontFamily"];
+  };
+  [SettingsEvent.CUSTOM_FONT_SIZE_CHANGED]: {
+    fontSize: SettingsState["customFontSize"];
+  };
+  [SettingsEvent.CHAT_MAX_WIDTH_CHANGED]: {
+    maxWidth: SettingsState["chatMaxWidth"];
+  };
+  [SettingsEvent.CUSTOM_THEME_COLORS_CHANGED]: {
+    colors: SettingsState["customThemeColors"];
+  };
+  [SettingsEvent.AUTO_SCROLL_INTERVAL_CHANGED]: {
+    interval: SettingsState["autoScrollInterval"];
+  };
+  [SettingsEvent.ENABLE_AUTO_SCROLL_ON_STREAM_CHANGED]: {
+    enabled: SettingsState["enableAutoScrollOnStream"];
+  };
+  [SettingsEvent.ENABLE_API_KEY_MANAGEMENT_CHANGED]: {
+    enabled: boolean;
+  };
+  // Provider
+  [ProviderEvent.CONFIG_CHANGED]: {
     providerId: string;
     config: DbProviderConfig;
   };
-  [ModEvent.API_KEY_CHANGED]: { keyId: string; action: "added" | "deleted" };
-  [ModEvent.MODEL_SELECTION_CHANGED]: { modelId: string | null };
-  [ModEvent.VFS_FILE_WRITTEN]: { path: string };
-  [ModEvent.VFS_FILE_READ]: { path: string };
-  [ModEvent.VFS_FILE_DELETED]: { path: string };
-  [ModEvent.VFS_CONTEXT_CHANGED]: { vfsKey: string | null };
-  [ModEvent.SYNC_REPO_CHANGED]: {
+  [ProviderEvent.API_KEY_CHANGED]: {
+    keyId: string;
+    action: "added" | "deleted";
+  };
+  [ProviderEvent.MODEL_SELECTION_CHANGED]: { modelId: string | null };
+  // VFS
+  [VfsEvent.FILE_WRITTEN]: { path: string };
+  [VfsEvent.FILE_READ]: { path: string };
+  [VfsEvent.FILE_DELETED]: { path: string };
+  [VfsEvent.CONTEXT_CHANGED]: { vfsKey: string | null };
+  // Sync
+  [SyncEvent.REPO_CHANGED]: {
     repoId: string;
     action: "added" | "updated" | "deleted";
   };
-  [ModEvent.CONVERSATION_SYNC_STATUS_CHANGED]: {
-    conversationId: string;
-    status: SyncStatus;
-  };
-  [ModEvent.REPO_INIT_STATUS_CHANGED]: { repoId: string; status: SyncStatus };
-  [ModEvent.ATTACHED_FILES_CHANGED]: { files: AttachedFileMetadata[] };
-  [ModEvent.PROMPT_PARAMS_CHANGED]: { params: Partial<PromptState> };
-  [ModEvent.INTERACTION_STATUS_CHANGED]: {
-    status: InteractionState["status"];
-  };
-  [ModEvent.CONTEXT_CHANGED]: {
+  [SyncEvent.REPO_INIT_STATUS_CHANGED]: { repoId: string; status: SyncStatus };
+  // Input
+  [InputEvent.ATTACHED_FILES_CHANGED]: { files: AttachedFileMetadata[] };
+  // UI
+  [UiEvent.CONTEXT_CHANGED]: {
     selectedItemId: string | null;
     selectedItemType: SidebarItemType | null;
   };
-}
-
-export type ModEventName = ModEvent;
+  // Rules & Tags
+  [RulesEvent.RULES_LOADED]: { rules: DbRule[] };
+  [RulesEvent.TAGS_LOADED]: { tags: DbTag[] };
+  [RulesEvent.LINKS_LOADED]: { links: any[] }; // Replace any with DbTagRuleLink if available
+  [RulesEvent.RULE_SAVED]: { rule: DbRule };
+  [RulesEvent.RULE_DELETED]: { ruleId: string };
+  [RulesEvent.TAG_SAVED]: { tag: DbTag };
+  [RulesEvent.TAG_DELETED]: { tagId: string };
+  [RulesEvent.LINK_SAVED]: { link: any }; // Replace any with DbTagRuleLink
+  [RulesEvent.LINK_DELETED]: { linkId: string };
+};
 
 // --- Middleware ---
 
@@ -310,7 +472,6 @@ export type ModMiddlewareHookName = ModMiddlewareHook;
 /** Base definition for UI controls registered by mods or core */
 interface BaseControl {
   id: string;
-  // order removed
   status?: () => "ready" | "loading" | "error";
   show?: () => boolean;
 }
@@ -333,7 +494,8 @@ export interface PromptControl extends BaseControl {
 /** Definition for controls appearing in other chat layout areas */
 export interface ChatControl extends BaseControl {
   panel?: "sidebar" | "sidebar-footer" | "header" | "drawer_right" | "main";
-  renderer?: () => React.ReactNode;
-  iconRenderer?: () => React.ReactNode;
-  settingsRenderer?: () => React.ReactNode;
+  // Corrected: Renderer types to match CoreChatControl
+  renderer?: () => React.ReactElement | null;
+  iconRenderer?: () => React.ReactElement | null;
+  settingsRenderer?: () => React.ReactElement | null;
 }

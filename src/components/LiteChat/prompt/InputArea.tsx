@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils";
 import { useInputStore } from "@/store/input.store";
 import type { InputAreaRef } from "@/types/litechat/prompt";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { ModEvent } from "@/types/litechat/modding";
+// Import new event constant
+import { PromptEvent } from "@/types/litechat/modding";
 
 interface InputAreaProps {
   initialValue?: string;
@@ -42,7 +43,6 @@ export const InputArea = memo(
       const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
       const [internalValue, setInternalValue] = useState(initialValue);
 
-      // Expose methods via ref
       useImperativeHandle(ref, () => ({
         getValue: () => internalValue,
         setValue: (value: string) => {
@@ -50,8 +50,8 @@ export const InputArea = memo(
           if (onValueChange) {
             onValueChange(value);
           }
-          emitter.emit(ModEvent.PROMPT_INPUT_CHANGE, { value });
-          // Manually trigger resize after setting value
+          // Use new event constant
+          emitter.emit(PromptEvent.INPUT_CHANGED, { value });
           requestAnimationFrame(() => {
             const textarea = internalTextareaRef.current;
             if (textarea) {
@@ -68,7 +68,8 @@ export const InputArea = memo(
           if (onValueChange) {
             onValueChange("");
           }
-          emitter.emit(ModEvent.PROMPT_INPUT_CHANGE, { value: "" });
+          // Use new event constant
+          emitter.emit(PromptEvent.INPUT_CHANGED, { value: "" });
           requestAnimationFrame(() => {
             const textarea = internalTextareaRef.current;
             if (textarea) {
@@ -87,7 +88,6 @@ export const InputArea = memo(
             useInputStore.getState().attachedFilesMetadata.length > 0;
           if (internalValue.trim().length > 0 || hasFiles) {
             onSubmit();
-            // Clear value using the ref's method to ensure consistency
             // @ts-expect-error - ref.current might be null initially
             ref?.current?.clearValue();
           }
@@ -102,7 +102,8 @@ export const InputArea = memo(
         if (onValueChange) {
           onValueChange(newValue);
         }
-        emitter.emit(ModEvent.PROMPT_INPUT_CHANGE, { value: newValue });
+        // Use new event constant
+        emitter.emit(PromptEvent.INPUT_CHANGED, { value: newValue });
       };
 
       useEffect(() => {
@@ -123,9 +124,8 @@ export const InputArea = memo(
           if (onValueChange) {
             onValueChange(initialValue);
           }
-          // Do not emit PROMPT_INPUT_CHANGE here as it might conflict with direct setValue calls
         }
-      }, [initialValue, onValueChange]); // Removed internalValue from deps
+      }, [initialValue, onValueChange]);
 
       return (
         <Textarea

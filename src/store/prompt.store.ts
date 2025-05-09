@@ -3,7 +3,8 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { ModEvent } from "@/types/litechat/modding";
+// Import new event constant
+import { PromptEvent } from "@/types/litechat/modding";
 
 // State for the *next* prompt submission
 export interface PromptState {
@@ -14,14 +15,12 @@ export interface PromptState {
   topK: number | null;
   presencePenalty: number | null;
   frequencyPenalty: number | null;
-  // New transient states
   reasoningEnabled: boolean | null;
   webSearchEnabled: boolean | null;
   structuredOutputJson: string | null;
 }
 
 interface PromptActions {
-  // Setters for individual parameters
   setModelId: (id: string | null) => void;
   setTemperature: (value: number | null) => void;
   setMaxTokens: (value: number | null) => void;
@@ -29,11 +28,9 @@ interface PromptActions {
   setTopK: (value: number | null) => void;
   setPresencePenalty: (value: number | null) => void;
   setFrequencyPenalty: (value: number | null) => void;
-  // Setters for new parameters
   setReasoningEnabled: (enabled: boolean | null) => void;
   setWebSearchEnabled: (enabled: boolean | null) => void;
   setStructuredOutputJson: (json: string | null) => void;
-  // Action to set all state based on effective settings
   initializePromptState: (effectiveSettings: {
     modelId: string | null;
     temperature: number | null;
@@ -43,21 +40,21 @@ interface PromptActions {
     presencePenalty: number | null;
     frequencyPenalty: number | null;
   }) => void;
-  // Action to reset only transient parameters, keeping modelId
   resetTransientParameters: () => void;
 }
 
 // Helper to emit parameter changes
 const emitParamChange = (
   key: keyof PromptState,
-  value: PromptState[keyof PromptState],
+  value: PromptState[keyof PromptState]
 ) => {
-  emitter.emit(ModEvent.PROMPT_PARAMS_CHANGED, { params: { [key]: value } });
+  // Use new event constant
+  emitter.emit(PromptEvent.PARAMS_CHANGED, { params: { [key]: value } });
 };
 
 export const usePromptStateStore = create(
   immer<PromptState & PromptActions>((set, get) => ({
-    // Initial State (all null, will be initialized by LiteChat)
+    // Initial State
     modelId: null,
     temperature: null,
     maxTokens: null,
@@ -74,8 +71,6 @@ export const usePromptStateStore = create(
       if (get().modelId !== id) {
         set({ modelId: id });
         emitParamChange("modelId", id);
-        // Note: Model selection change is primarily handled by ProviderStore emitting MODEL_SELECTION_CHANGED
-        // This ensures the prompt state reflects it, but the main event comes from the source.
       }
     },
     setTemperature: (value) => {
@@ -114,7 +109,6 @@ export const usePromptStateStore = create(
         emitParamChange("frequencyPenalty", value);
       }
     },
-    // Actions for new parameters
     setReasoningEnabled: (enabled) => {
       if (get().reasoningEnabled !== enabled) {
         set({ reasoningEnabled: enabled });
@@ -140,7 +134,6 @@ export const usePromptStateStore = create(
       const changes: Partial<PromptState> = {};
       let changed = false;
 
-      // Compare and set only if changed
       if (currentState.modelId !== settings.modelId) {
         changes.modelId = settings.modelId;
         changed = true;
@@ -172,8 +165,8 @@ export const usePromptStateStore = create(
 
       if (changed) {
         set(changes);
-        // Emit a single event for initialization changes
-        emitter.emit(ModEvent.PROMPT_PARAMS_CHANGED, { params: changes });
+        // Use new event constant
+        emitter.emit(PromptEvent.PARAMS_CHANGED, { params: changes });
       }
     },
 
@@ -183,7 +176,6 @@ export const usePromptStateStore = create(
       const changes: Partial<PromptState> = {};
       let changed = false;
 
-      // Compare and set only if changed
       if (currentState.temperature !== null) {
         changes.temperature = null;
         changed = true;
@@ -223,9 +215,9 @@ export const usePromptStateStore = create(
 
       if (changed) {
         set(changes);
-        // Emit a single event for reset changes
-        emitter.emit(ModEvent.PROMPT_PARAMS_CHANGED, { params: changes });
+        // Use new event constant
+        emitter.emit(PromptEvent.PARAMS_CHANGED, { params: changes });
       }
     },
-  })),
+  }))
 );

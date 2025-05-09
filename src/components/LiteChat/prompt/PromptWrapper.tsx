@@ -18,7 +18,8 @@ import { runMiddleware } from "@/lib/litechat/ai-helpers";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
-import { ModEvent, ModMiddlewareHook } from "@/types/litechat/modding";
+// Import new event constants
+import { PromptEvent, ModMiddlewareHook } from "@/types/litechat/modding";
 
 interface PromptWrapperProps {
   InputAreaRenderer: InputAreaRenderer;
@@ -48,7 +49,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     useShallow((state) => ({
       attachedFilesMetadata: state.attachedFilesMetadata,
       clearAttachedFiles: state.clearAttachedFiles,
-      removeAttachedFile: state.removeAttachedFile,
     }))
   );
 
@@ -104,7 +104,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         metadata,
       };
 
-      emitter.emit(ModEvent.PROMPT_SUBMITTED, { turnData });
+      // Use new event constant
+      emitter.emit(PromptEvent.SUBMITTED, { turnData });
 
       const middlewareResult = await runMiddleware(
         ModMiddlewareHook.PROMPT_TURN_FINALIZE,
@@ -124,16 +125,14 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
 
       await onSubmit(finalTurnData);
 
-      // --- Clear state AFTER successful submission initiation ---
       clearAttachedFiles();
       promptControls.forEach((control) => {
         if (control.clearOnSubmit) {
           control.clearOnSubmit();
         }
       });
-      // Explicitly clear the InputArea value via its ref
       inputAreaRef.current?.clearValue();
-      setHasInputValue(false); // Reset local tracking state
+      setHasInputValue(false);
     } catch (error) {
       console.error("Error during prompt submission:", error);
       toast.error(
@@ -155,8 +154,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
 
   const handleInputValueChange = useCallback((value: string) => {
     setHasInputValue(value.trim().length > 0);
-    // Emit event only if the InputArea itself doesn't emit it
-    // emitter.emit(ModEvent.PROMPT_INPUT_CHANGE, { value });
   }, []);
 
   return (

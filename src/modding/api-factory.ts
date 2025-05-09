@@ -7,9 +7,16 @@ import type {
   CustomSettingTab,
   ToolImplementation,
   ModMiddlewareHookName,
+  ModEventPayloadMap,
+  // Explicitly import PromptControl and ChatControl from modding types
+  PromptControl as ModPromptControl,
+  ChatControl as ModChatControl,
 } from "@/types/litechat/modding";
-import type { PromptControl } from "@/types/litechat/prompt";
-import type { ChatControl } from "@/types/litechat/chat";
+// Import the stricter ChatControl type for the store
+import type { ChatControl as CoreChatControl } from "@/types/litechat/chat";
+// Import the stricter PromptControl type for the store
+import type { PromptControl as CorePromptControl } from "@/types/litechat/prompt";
+
 import { Tool } from "ai";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -32,18 +39,19 @@ export function createModApi(mod: DbMod): LiteChatModApi {
   const api: LiteChatModApi = {
     modId,
     modName,
-    registerPromptControl: (c: PromptControl) => {
-      // Ensure the control being registered matches the expected type
-      const u = controlStoreActions.registerPromptControl(c);
+    registerPromptControl: (control: ModPromptControl) => {
+      // ModPromptControl and CorePromptControl have compatible renderer/triggerRenderer (React.ReactNode)
+      const u = controlStoreActions.registerPromptControl(
+        control as CorePromptControl
+      );
       unsubscribers.push(u);
       return u;
     },
-    registerChatControl: (c: ChatControl) => {
-      // Ensure the control being registered matches the expected type
-      // Provide a default status function if the mod doesn't, to satisfy the stricter type
-      const controlWithDefaults: ChatControl = {
-        ...c,
-        status: c.status ?? (() => "ready"),
+    registerChatControl: (control: ModChatControl) => {
+      // ModChatControl's renderers now return React.ReactElement | null, matching CoreChatControl
+      const controlWithDefaults: CoreChatControl = {
+        ...control,
+        status: control.status ?? (() => "ready"),
       };
       const u = controlStoreActions.registerChatControl(controlWithDefaults);
       unsubscribers.push(u);
@@ -52,31 +60,34 @@ export function createModApi(mod: DbMod): LiteChatModApi {
     registerTool: <P extends z.ZodSchema<any>>(
       toolName: string,
       definition: Tool<P>,
-      implementation?: ToolImplementation<P>,
+      implementation?: ToolImplementation<P>
     ) => {
       console.log(`[${modName}] Registering tool: ${toolName}`);
       const u = controlStoreActions.registerTool(
-        modId,
+        modId, // modId is passed here as the first argument to the store's registerTool
         toolName,
         definition,
-        implementation,
+        implementation
       );
       unsubscribers.push(u);
       return u;
     },
-    on: (eN, cb) => {
-      emitter.on(eN, cb as any);
-      const u = () => emitter.off(eN, cb as any);
+    on: <K extends keyof ModEventPayloadMap>(
+      eventName: K,
+      callback: (payload: ModEventPayloadMap[K]) => void
+    ) => {
+      emitter.on(eventName, callback);
+      const u = () => emitter.off(eventName, callback);
       unsubscribers.push(u);
       return u;
     },
     addMiddleware: <H extends ModMiddlewareHookName>(
       hN: H,
       cb: (
-        payload: any,
+        payload: any
       ) =>
         | import("@/types/litechat/modding").ModMiddlewareReturnMap[H]
-        | Promise<import("@/types/litechat/modding").ModMiddlewareReturnMap[H]>,
+        | Promise<import("@/types/litechat/modding").ModMiddlewareReturnMap[H]>
     ) => {
       const u = controlStoreActions.registerMiddleware(hN, modId, cb);
       unsubscribers.push(u);
@@ -103,7 +114,7 @@ export function createModApi(mod: DbMod): LiteChatModApi {
         interactions: Object.freeze(
           iS.currentConversationId === selectedConversationId
             ? iS.interactions.map((i) => Object.freeze({ ...i }))
-            : [],
+            : []
         ),
         isStreaming: iS.status === "streaming",
         selectedProviderId: providerId,

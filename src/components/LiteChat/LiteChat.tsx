@@ -1,5 +1,5 @@
 // src/components/LiteChat/LiteChat.tsx
-
+// FULL FILE
 import React, {
   useEffect,
   useCallback,
@@ -18,7 +18,6 @@ import { useControlRegistryStore } from "@/store/control.store";
 import type { PromptTurnObject, InputAreaRef } from "@/types/litechat/prompt";
 import { ConversationService } from "@/services/conversation.service";
 import { InteractionService } from "@/services/interaction.service";
-// ModStore, ProviderStore, SettingsStore, RulesStore, PromptStateStore, VfsStore imports are used by initialization helpers
 import { Toaster } from "@/components/ui/sonner";
 import { InputArea } from "@/components/LiteChat/prompt/InputArea";
 import { useShallow } from "zustand/react/shallow";
@@ -31,19 +30,17 @@ import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
 import { nanoid } from "nanoid";
 import { runMiddleware } from "@/lib/litechat/ai-helpers";
-import { ModEvent, ModMiddlewareHook } from "@/types/litechat/modding";
+import { PromptEvent, ModMiddlewareHook } from "@/types/litechat/modding";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { basename } from "@/lib/litechat/file-manager-utils";
-import { performFullInitialization } from "@/lib/litechat/initialization"; // Import new helper
+import { performFullInitialization } from "@/lib/litechat/initialization";
 import { useProviderStore } from "@/store/provider.store";
 import { usePromptStateStore } from "@/store/prompt.store";
 import { useVfsStore } from "@/store/vfs.store";
-
-// Define the type for the registration functions prop
-export type RegistrationFunction = () => void;
+import type { ControlModuleConstructor } from "@/types/litechat/control";
 
 interface LiteChatProps {
-  controls?: RegistrationFunction[];
+  controls?: ControlModuleConstructor[];
 }
 
 export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
@@ -51,7 +48,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const inputAreaRef = useRef<InputAreaRef>(null);
 
-  // --- Store Hooks (for component rendering and direct interactions) ---
   const selectedItemId = useConversationStore((state) => state.selectedItemId);
   const selectedItemType = useConversationStore(
     (state) => state.selectedItemType
@@ -99,7 +95,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     }))
   );
 
-  // --- Mobile Sidebar Toggle Handler ---
   const toggleMobileSidebar = useCallback(() => {
     setIsMobileSidebarOpen((prev) => !prev);
   }, []);
@@ -110,22 +105,18 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     }
   }, [selectedItemId, selectedItemType, isMobileSidebarOpen]);
 
-  // --- Focus Input Helper ---
   const focusInput = useCallback(() => {
     requestAnimationFrame(() => {
       inputAreaRef.current?.focus();
     });
   }, []);
 
-  // --- Process URL Parameters ---
   const processUrlParameters = useCallback(async () => {
     const urlParams = parseAppUrlParameters();
     if (!urlParams.query && !urlParams.modelId && !urlParams.vfsFiles?.length) {
       return;
     }
-
     toast.info("Processing parameters from URL...");
-
     const { addConversation, selectItem } = useConversationStore.getState();
     const { setModelId: setPromptModelId } = usePromptStateStore.getState();
     const { addAttachedFile } = useInputStore.getState();
@@ -140,59 +131,36 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       });
       await selectItem(newConversationId, "conversation");
 
-      // --- Improved Model Selection Logic ---
       if (urlParams.modelId) {
         const availableModels = getAvailableModelListItems();
         let foundModelId: string | null = null;
         const modelParamLower = urlParams.modelId.toLowerCase();
-
-        // 1. Try exact combined ID match
         if (urlParams.modelId.includes(":")) {
           const directMatch = availableModels.find(
             (m) => m.id === urlParams.modelId
           );
-          if (directMatch) {
-            foundModelId = directMatch.id;
-          }
+          if (directMatch) foundModelId = directMatch.id;
         }
-
-        // 2. Try exact name match (case-insensitive)
         if (!foundModelId) {
           const nameMatch = availableModels.find(
             (m) => m.name.toLowerCase() === modelParamLower
           );
-          if (nameMatch) {
-            foundModelId = nameMatch.id;
-          }
+          if (nameMatch) foundModelId = nameMatch.id;
         }
-
-        // 3. Try starts-with name match (case-insensitive)
         if (!foundModelId) {
           const startsWithNameMatch = availableModels.find((m) =>
             m.name.toLowerCase().startsWith(modelParamLower)
           );
-          if (startsWithNameMatch) {
-            foundModelId = startsWithNameMatch.id;
-          }
+          if (startsWithNameMatch) foundModelId = startsWithNameMatch.id;
         }
-
-        // 4. remove before /, Try starts-with provider name match (case-insensitive)
         if (!foundModelId) {
-          const startsWithProviderMatch = availableModels.find((m) =>
-            {
-              const mtc = m.id.toLowerCase().split('/')
-              console.log(mtc)
-              if (mtc.length > 1) {
-                return mtc[1].startsWith(modelParamLower)
-              }
-            }
-          );
-          if (startsWithProviderMatch) {
+          const startsWithProviderMatch = availableModels.find((m) => {
+            const mtc = m.id.toLowerCase().split("/");
+            return mtc.length > 1 && mtc[1].startsWith(modelParamLower);
+          });
+          if (startsWithProviderMatch)
             foundModelId = startsWithProviderMatch.id;
-          }
         }
-
-        // Apply if found
         if (foundModelId) {
           setPromptModelId(foundModelId);
           const foundModelDetails = availableModels.find(
@@ -207,7 +175,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
           );
         }
       }
-      // --- End Improved Model Selection Logic ---
 
       if (urlParams.vfsFiles && urlParams.vfsFiles.length > 0) {
         const vfsKeyForUrl = "orphan";
@@ -221,7 +188,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
             }`
           );
         }
-
         if (fsInstance) {
           for (const filePath of urlParams.vfsFiles) {
             try {
@@ -274,7 +240,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
 
       if (urlParams.query) {
         if (urlParams.submit === "0") {
-          // Set value in input area and focus
           inputAreaRef.current?.setValue(urlParams.query);
           focusInput();
           toast.info("Query from URL loaded into input area.");
@@ -284,13 +249,11 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
             window.location.pathname
           );
         } else {
-          // Submit the prompt (existing logic)
           let parameters: Record<string, any> = {};
           let metadata: Record<string, any> = {};
           const currentPromptControls = Object.values(
             useControlRegistryStore.getState().promptControls
           ).filter((c) => (c.show ? c.show() : true));
-
           for (const control of currentPromptControls) {
             if (control.getParameters) {
               const params = await control.getParameters();
@@ -306,28 +269,27 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
           if (currentAttachedFiles.length > 0) {
             metadata.attachedFiles = [...currentAttachedFiles];
           }
-
           let turnData: PromptTurnObject = {
             id: nanoid(),
             content: urlParams.query,
             parameters,
             metadata,
           };
-
-          emitter.emit(ModEvent.PROMPT_SUBMITTED, { turnData });
+          emitter.emit(PromptEvent.SUBMITTED, { turnData });
           const middlewareResult = await runMiddleware(
             ModMiddlewareHook.PROMPT_TURN_FINALIZE,
             { turnData }
           );
           if (middlewareResult === false) {
-            toast.warning("Prompt submission from URL cancelled by middleware.");
+            toast.warning(
+              "Prompt submission from URL cancelled by middleware."
+            );
             return;
           }
           const finalTurnData =
             middlewareResult && typeof middlewareResult === "object"
               ? (middlewareResult as { turnData: PromptTurnObject }).turnData
               : turnData;
-
           await ConversationService.submitPrompt(finalTurnData);
           window.history.replaceState(
             {},
@@ -355,20 +317,15 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     }
   }, [focusInput]);
 
-  // --- Initialization Effect ---
   useEffect(() => {
     let isMounted = true;
     const initializeApp = async () => {
       console.log("LiteChat: Starting initialization...");
       setIsInitializing(true);
       try {
-        // Use the modularized initialization function
         await performFullInitialization(controls);
-        // Process URL parameters after core initialization is complete
         await processUrlParameters();
       } catch (error) {
-        // Error handling is done within performFullInitialization or processUrlParameters
-        // and will set globalError via UIStateStore if necessary.
         console.error("LiteChat: Top-level initialization error:", error);
       } finally {
         if (isMounted) {
@@ -377,17 +334,14 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         }
       }
     };
-
     initializeApp();
-
     return () => {
       isMounted = false;
       console.log("LiteChat: Unmounting, initialization cancelled if pending.");
+      // TODO: Call destroy on all initialized control modules
     };
-    // processUrlParameters is now included in the dependency array
   }, [controls, processUrlParameters]);
 
-  // --- Effect to update Prompt State on Context Change ---
   const prevContextRef = useRef<{
     itemId: string | null;
     itemType: string | null;
@@ -395,12 +349,10 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
 
   useEffect(() => {
     if (isInitializing) return;
-
     const currentContext = {
       itemId: selectedItemId,
       itemType: selectedItemType,
     };
-
     if (
       currentContext.itemId !== prevContextRef.current.itemId ||
       currentContext.itemType !== prevContextRef.current.itemType
@@ -411,7 +363,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
           : selectedItemType === "conversation"
           ? getConversationById(selectedItemId)?.projectId ?? null
           : null;
-
       const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
       initializePromptState(effectiveSettings);
       prevContextRef.current = currentContext;
@@ -429,7 +380,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     focusInput,
   ]);
 
-  // --- VFS Context Management Effect ---
   useEffect(() => {
     let targetVfsKey: string | null = null;
     if (isVfsModalOpen || selectedItemType === "project") {
@@ -449,7 +399,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     }
   }, [isVfsModalOpen, selectedItemId, selectedItemType, setVfsKey]);
 
-  // --- Prompt Submission Handler ---
   const handlePromptSubmit = useCallback(
     async (turnData: PromptTurnObject) => {
       const conversationState = useConversationStore.getState();
@@ -465,7 +414,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
               conversationState.selectedItemId
             )?.projectId ?? null
           : null;
-
       if (!currentConvId) {
         try {
           const newId = await conversationState.addConversation({
@@ -480,7 +428,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
           return;
         }
       }
-
       try {
         const currentPromptState = usePromptStateStore.getState();
         const finalTurnData = {

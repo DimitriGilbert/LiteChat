@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { UserPromptDisplay } from "./UserPromptDisplay";
 import { StreamingContentView } from "./StreamingContentView";
-import { StopButton } from "../common/StopButton";
+import { StopButton } from "@/components/LiteChat/common/StopButton";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,7 @@ import {
   ClipboardIcon,
   CheckIcon,
 } from "lucide-react";
-import { ActionTooltipButton } from "../common/ActionTooltipButton";
+import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { toast } from "sonner";
 
 interface StreamingInteractionCardProps {
@@ -38,17 +38,17 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
     const { interaction, interactionStatus } = useInteractionStore(
       useShallow((state) => {
         const interaction = state.interactions.find(
-          (i) => i.id === interactionId,
+          (i) => i.id === interactionId
         );
         return {
           interaction,
           interactionStatus: interaction?.status,
         };
-      }),
+      })
     );
 
     const streamingRenderFPS = useSettingsStore(
-      (state) => state.streamingRenderFPS,
+      (state) => state.streamingRenderFPS
     );
 
     const [displayedContent, setDisplayedContent] = useState("");
@@ -136,7 +136,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
           dbProviderConfigs: state.dbProviderConfigs,
           getAllAvailableModelDefsForProvider:
             state.getAllAvailableModelDefsForProvider,
-        })),
+        }))
       );
 
     const displayModelName = useMemo(() => {
@@ -158,11 +158,11 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
 
     const toggleReasoningFold = useCallback(
       () => setIsReasoningFolded((prev) => !prev),
-      [],
+      []
     );
     const toggleResponseFold = useCallback(
       () => setIsResponseFolded((prev) => !prev),
-      [],
+      []
     );
 
     const handleCopyReasoning = useCallback(async () => {
@@ -194,7 +194,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
         <div
           className={cn(
             "group/card relative rounded-lg border border-primary/30 bg-card p-4 shadow-sm animate-pulse",
-            className,
+            className
           )}
         >
           <div className="h-8 bg-muted rounded w-3/4 mb-4"></div>
@@ -227,7 +227,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       <div
         className={cn(
           "group/card relative rounded-lg border border-primary/30 bg-card p-4 shadow-sm animate-fadeIn",
-          className,
+          className
         )}
       >
         {interaction.prompt && (
@@ -240,7 +240,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
         <div className="mt-3 pt-3 border-t border-border/50">
           <div
             className={cn(
-              "flex flex-col sm:flex-row justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-20 p-1 -m-1 rounded-t",
+              "flex flex-col sm:flex-row justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-20 p-1 -m-1 rounded-t"
             )}
           >
             <div className="flex items-start gap-1 min-w-0 mb-1 sm:mb-0">
@@ -371,7 +371,9 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
             >
               {reasoningContent ? "[Reasoning] " : ""}
               {displayedContent && typeof displayedContent === "string"
-                ? `"${displayedContent.substring(0, 80)}${displayedContent.length > 80 ? "..." : ""}"`
+                ? `"${displayedContent.substring(0, 80)}${
+                    displayedContent.length > 80 ? "..." : ""
+                  }"`
                 : "[Streaming...]"}
             </div>
           )}

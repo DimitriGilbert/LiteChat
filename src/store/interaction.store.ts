@@ -5,7 +5,8 @@ import { immer } from "zustand/middleware/immer";
 import type { Interaction } from "@/types/litechat/interaction";
 import { PersistenceService } from "@/services/persistence.service";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { ModEvent } from "@/types/litechat/modding";
+// Import new event constant
+import { InteractionEvent } from "@/types/litechat/modding";
 import { toast } from "sonner";
 
 export interface InteractionState {
@@ -13,29 +14,24 @@ export interface InteractionState {
   currentConversationId: string | null;
   streamingInteractionIds: string[];
   activeStreamBuffers: Record<string, string>;
-  // Add buffer for streaming reasoning content
   activeReasoningBuffers: Record<string, string>;
   error: string | null;
   status: "idle" | "loading" | "streaming" | "error";
 }
 interface InteractionActions {
   loadInteractions: (conversationId: string) => Promise<void>;
-  // --- Synchronous State Updates ONLY ---
   _addInteractionToState: (interaction: Interaction) => void;
   _updateInteractionInState: (
     id: string,
-    updates: Partial<Omit<Interaction, "id">>,
+    updates: Partial<Omit<Interaction, "id">>
   ) => void;
   appendInteractionResponseChunk: (id: string, chunk: string) => void;
-  // Add action for reasoning chunk
   appendReasoningChunk: (id: string, chunk: string) => void;
   _removeInteractionFromState: (id: string) => void;
-  // --- Persistence Actions (Called by InteractionService or UI) ---
   rateInteraction: (
     interactionId: string,
-    rating: number | null,
+    rating: number | null
   ) => Promise<void>;
-  // --- Other Actions ---
   setCurrentConversationId: (id: string | null) => Promise<void>;
   clearInteractions: () => void;
   setError: (error: string | null) => void;
@@ -51,7 +47,7 @@ export const useInteractionStore = create(
     currentConversationId: null,
     streamingInteractionIds: [],
     activeStreamBuffers: {},
-    activeReasoningBuffers: {}, // Initialize reasoning buffer
+    activeReasoningBuffers: {},
     error: null,
     status: "idle",
 
@@ -68,26 +64,27 @@ export const useInteractionStore = create(
         interactions: [],
         streamingInteractionIds: [],
         activeStreamBuffers: {},
-        activeReasoningBuffers: {}, // Clear reasoning buffer on load
+        activeReasoningBuffers: {},
         currentConversationId: conversationId,
       });
       if (previousStatus !== "loading") {
-        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, {
-          status: "loading",
-        });
+        // Use new event constant
+        emitter.emit(InteractionEvent.STATUS_CHANGED, { status: "loading" });
       }
       try {
         const dbInteractions =
           await PersistenceService.loadInteractionsForConversation(
-            conversationId,
+            conversationId
           );
         dbInteractions.sort((a, b) => a.index - b.index);
         set({ interactions: dbInteractions, status: "idle" });
-        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, { status: "idle" });
+        // Use new event constant
+        emitter.emit(InteractionEvent.STATUS_CHANGED, { status: "idle" });
       } catch (e) {
         console.error("InteractionStore: Error loading interactions", e);
         set({ error: "Failed load interactions", status: "error" });
-        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, { status: "error" });
+        // Use new event constant
+        emitter.emit(InteractionEvent.STATUS_CHANGED, { status: "error" });
       }
     },
 
@@ -99,10 +96,10 @@ export const useInteractionStore = create(
           state.interactions.sort((a, b) => a.index - b.index);
         } else {
           console.warn(
-            `InteractionStore: Interaction ${interaction.id} already exists. Updating instead.`,
+            `InteractionStore: Interaction ${interaction.id} already exists. Updating instead.`
           );
           const index = state.interactions.findIndex(
-            (i) => i.id === interaction.id,
+            (i) => i.id === interaction.id
           );
           if (index !== -1) {
             state.interactions[index] = {
@@ -134,7 +131,6 @@ export const useInteractionStore = create(
             ) {
               newMetadata.toolResults = [...updates.metadata.toolResults];
             }
-            // Ensure reasoning update is handled correctly
             if (updates.metadata.reasoning !== undefined) {
               newMetadata.reasoning = updates.metadata.reasoning;
             }
@@ -149,7 +145,6 @@ export const useInteractionStore = create(
           if ("response" in updates) {
             updatedInteraction.response = updates.response;
           }
-          // Explicitly handle rating update
           if ("rating" in updates) {
             updatedInteraction.rating = updates.rating;
           }
@@ -157,7 +152,7 @@ export const useInteractionStore = create(
           state.interactions[index] = updatedInteraction;
         } else {
           console.warn(
-            `InteractionStore: Interaction ${id} not found for sync state update.`,
+            `InteractionStore: Interaction ${id} not found for sync state update.`
           );
         }
       });
@@ -172,7 +167,6 @@ export const useInteractionStore = create(
       });
     },
 
-    // Implement action for reasoning chunk
     appendReasoningChunk: (id, chunk) => {
       set((state) => {
         if (state.streamingInteractionIds.includes(id)) {
@@ -191,25 +185,22 @@ export const useInteractionStore = create(
     // --- Persistence Actions ---
     rateInteraction: async (interactionId, rating) => {
       const interaction = get().interactions.find(
-        (i) => i.id === interactionId,
+        (i) => i.id === interactionId
       );
       if (!interaction) {
         console.error(
-          `InteractionStore: Interaction ${interactionId} not found for rating.`,
+          `InteractionStore: Interaction ${interactionId} not found for rating.`
         );
         return;
       }
-      // Optimistic UI update
       get()._updateInteractionInState(interactionId, { rating });
       try {
-        // Persist the change
         await PersistenceService.saveInteraction({ ...interaction, rating });
       } catch (error) {
         console.error(
           `InteractionStore: Failed to persist rating for ${interactionId}`,
-          error,
+          error
         );
-        // Revert UI update on error
         get()._updateInteractionInState(interactionId, {
           rating: interaction.rating,
         });
@@ -221,7 +212,7 @@ export const useInteractionStore = create(
     setCurrentConversationId: async (id) => {
       if (get().currentConversationId !== id) {
         console.log(
-          `InteractionStore: Setting current conversation ID to ${id}`,
+          `InteractionStore: Setting current conversation ID to ${id}`
         );
         if (id) {
           await get().loadInteractions(id);
@@ -230,7 +221,7 @@ export const useInteractionStore = create(
         }
       } else {
         console.log(
-          `InteractionStore: Conversation ID ${id} is already current.`,
+          `InteractionStore: Conversation ID ${id} is already current.`
         );
       }
     },
@@ -241,13 +232,14 @@ export const useInteractionStore = create(
         interactions: [],
         streamingInteractionIds: [],
         activeStreamBuffers: {},
-        activeReasoningBuffers: {}, // Clear reasoning buffer
+        activeReasoningBuffers: {},
         status: "idle",
         error: null,
         currentConversationId: null,
       });
       if (previousStatus !== "idle") {
-        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, { status: "idle" });
+        // Use new event constant
+        emitter.emit(InteractionEvent.STATUS_CHANGED, { status: "idle" });
       }
     },
     setError: (error) => {
@@ -267,15 +259,15 @@ export const useInteractionStore = create(
         }
       });
       if (previousStatus !== newStatus) {
-        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, {
-          status: newStatus,
-        });
+        // Use new event constant
+        emitter.emit(InteractionEvent.STATUS_CHANGED, { status: newStatus });
       }
     },
     setStatus: (status) => {
       if (get().status !== status) {
         set({ status });
-        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, { status });
+        // Use new event constant
+        emitter.emit(InteractionEvent.STATUS_CHANGED, { status });
       }
     },
     _addStreamingId: (id) => {
@@ -284,7 +276,7 @@ export const useInteractionStore = create(
         if (!state.streamingInteractionIds.includes(id)) {
           state.streamingInteractionIds.push(id);
           state.activeStreamBuffers[id] = "";
-          state.activeReasoningBuffers[id] = ""; // Initialize reasoning buffer
+          state.activeReasoningBuffers[id] = "";
           if (state.streamingInteractionIds.length === 1) {
             state.status = "streaming";
             statusChanged = true;
@@ -293,9 +285,8 @@ export const useInteractionStore = create(
         }
       });
       if (statusChanged) {
-        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, {
-          status: "streaming",
-        });
+        // Use new event constant
+        emitter.emit(InteractionEvent.STATUS_CHANGED, { status: "streaming" });
       }
     },
     _removeStreamingId: (id) => {
@@ -305,7 +296,7 @@ export const useInteractionStore = create(
         if (index !== -1) {
           state.streamingInteractionIds.splice(index, 1);
           delete state.activeStreamBuffers[id];
-          delete state.activeReasoningBuffers[id]; // Clean up reasoning buffer
+          delete state.activeReasoningBuffers[id];
           console.log(`InteractionStore: Cleaned up buffers for ${id}.`);
           if (
             state.streamingInteractionIds.length === 0 &&
@@ -317,10 +308,9 @@ export const useInteractionStore = create(
         }
       });
       if (statusChanged) {
-        emitter.emit(ModEvent.INTERACTION_STATUS_CHANGED, {
-          status: get().status,
-        });
+        // Use new event constant
+        emitter.emit(InteractionEvent.STATUS_CHANGED, { status: get().status });
       }
     },
-  })),
+  }))
 );

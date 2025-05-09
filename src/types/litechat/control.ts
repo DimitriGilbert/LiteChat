@@ -1,4 +1,5 @@
-// src/store/control.store.ts
+// src/types/litechat/control.ts
+// FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { PromptControl } from "@/types/litechat/prompt";
@@ -8,19 +9,21 @@ import type {
   ModMiddlewarePayloadMap,
   ModMiddlewareReturnMap,
   ToolImplementation,
+  LiteChatModApi, // Added for initialize method
 } from "@/types/litechat/modding";
-import type { z } from "zod";
 import { Tool } from "ai";
+import type { z } from "zod";
+
+// --- Existing Types ---
 
 interface RegisteredMiddleware<H extends ModMiddlewareHookName> {
   modId: string;
   callback: (
-    payload: ModMiddlewarePayloadMap[H],
+    payload: ModMiddlewarePayloadMap[H]
   ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>;
   order?: number;
 }
 
-// Type for the registry, mapping hook names to arrays of registered middleware
 type MiddlewareRegistry = {
   [H in ModMiddlewareHookName]?: RegisteredMiddleware<H>[];
 };
@@ -29,7 +32,6 @@ interface ControlState {
   promptControls: Record<string, PromptControl>;
   chatControls: Record<string, ChatControl>;
   middlewareRegistry: MiddlewareRegistry;
-  // Add state for tools
   tools: Record<
     string,
     {
@@ -49,26 +51,71 @@ interface ControlActions {
     hookName: H,
     modId: string,
     callback: RegisteredMiddleware<H>["callback"],
-    order?: number,
+    order?: number
   ) => () => void;
   unregisterMiddleware: <H extends ModMiddlewareHookName>(
     hookName: H,
     modId: string,
-    callback: RegisteredMiddleware<H>["callback"],
+    callback: RegisteredMiddleware<H>["callback"]
   ) => void;
   getMiddlewareForHook: <H extends ModMiddlewareHookName>(
-    hookName: H,
+    hookName: H
   ) => ReadonlyArray<RegisteredMiddleware<H>>;
-  // Add actions for tools
   registerTool: <P extends z.ZodSchema<any>>(
     modId: string,
     toolName: string,
     definition: Tool<P>,
-    implementation?: ToolImplementation<P>,
+    implementation?: ToolImplementation<P>
   ) => () => void;
   unregisterTool: (toolName: string) => void;
   getRegisteredTools: () => Readonly<ControlState["tools"]>;
 }
+
+// --- New Control Module Interface ---
+
+/**
+ * Defines the standard interface for a self-contained control module.
+ */
+export interface ControlModule {
+  /** Unique identifier for this control module. */
+  readonly id: string;
+  /** List of control module IDs that this module depends on. */
+  readonly dependencies?: string[];
+
+  /**
+   * Initializes the control module. Called once during application startup
+   * in the correct dependency order. Use this to load data, subscribe to
+   * events, and prepare the module.
+   * @param modApi - The LiteChat Modding API instance for interaction.
+   * @returns A promise that resolves when initialization is complete.
+   */
+  initialize(modApi: LiteChatModApi): Promise<void>;
+
+  /**
+   * Registers the control's UI components, tools, middleware, etc., using
+   * the provided Modding API. Called after `initialize`.
+   * @param modApi - The LiteChat Modding API instance for interaction.
+   */
+  register(modApi: LiteChatModApi): void;
+
+  /**
+   * Cleans up resources used by the control module. Called during shutdown
+   * or when the module is unloaded. Use this to unsubscribe from events,
+   * unregister components, etc.
+   * @param modApi - The LiteChat Modding API instance for interaction.
+   */
+  destroy(modApi: LiteChatModApi): void;
+}
+
+/**
+ * Type alias for a constructor that creates a ControlModule instance.
+ */
+export type ControlModuleConstructor = new () => ControlModule;
+
+// --- Existing Store Definition (No changes needed here for this step) ---
+// import { create } from "zustand";
+// import { immer } from "zustand/middleware/immer";
+// export const useControlRegistryStore = create(...)
 
 export const useControlRegistryStore = create(
   immer<ControlState & ControlActions>((set, get) => ({
@@ -83,7 +130,7 @@ export const useControlRegistryStore = create(
       set((state) => {
         if (state.promptControls[control.id]) {
           console.warn(
-            `ControlRegistryStore: PromptControl with ID "${control.id}" already registered. Overwriting.`,
+            `ControlRegistryStore: PromptControl with ID "${control.id}" already registered. Overwriting.`
           );
         }
         state.promptControls[control.id] = control;
@@ -98,7 +145,7 @@ export const useControlRegistryStore = create(
           delete state.promptControls[id];
         } else {
           console.warn(
-            `ControlRegistryStore: PromptControl with ID "${id}" not found for unregistration.`,
+            `ControlRegistryStore: PromptControl with ID "${id}" not found for unregistration.`
           );
         }
       });
@@ -108,7 +155,7 @@ export const useControlRegistryStore = create(
       set((state) => {
         if (state.chatControls[control.id]) {
           console.warn(
-            `ControlRegistryStore: ChatControl with ID "${control.id}" already registered. Overwriting.`,
+            `ControlRegistryStore: ChatControl with ID "${control.id}" already registered. Overwriting.`
           );
         }
         state.chatControls[control.id] = control;
@@ -123,7 +170,7 @@ export const useControlRegistryStore = create(
           delete state.chatControls[id];
         } else {
           console.warn(
-            `ControlRegistryStore: ChatControl with ID "${id}" not found for unregistration.`,
+            `ControlRegistryStore: ChatControl with ID "${id}" not found for unregistration.`
           );
         }
       });
@@ -159,7 +206,7 @@ export const useControlRegistryStore = create(
           state.middlewareRegistry[hookName] = (
             state.middlewareRegistry[hookName] as RegisteredMiddleware<any>[]
           ).filter(
-            (reg) => !(reg.modId === modId && reg.callback === callback),
+            (reg) => !(reg.modId === modId && reg.callback === callback)
           );
           // Clean up the array if it becomes empty
           if (state.middlewareRegistry[hookName]?.length === 0) {
@@ -167,7 +214,7 @@ export const useControlRegistryStore = create(
           }
         } else {
           console.warn(
-            `ControlRegistryStore: Middleware hook "${hookName}" not found for unregistration.`,
+            `ControlRegistryStore: Middleware hook "${hookName}" not found for unregistration.`
           );
         }
       });
@@ -179,8 +226,8 @@ export const useControlRegistryStore = create(
       // Ensure sorting just in case (though registerMiddleware should maintain it)
       return Object.freeze(
         [...(middleware as RegisteredMiddleware<any>[])].sort(
-          (a, b) => (a.order ?? 0) - (b.order ?? 0),
-        ),
+          (a, b) => (a.order ?? 0) - (b.order ?? 0)
+        )
       );
     },
 
@@ -189,7 +236,7 @@ export const useControlRegistryStore = create(
       set((state) => {
         if (state.tools[toolName]) {
           console.warn(
-            `ControlRegistryStore: Tool "${toolName}" already registered by mod "${state.tools[toolName].modId}". Overwriting with registration from mod "${modId}".`,
+            `ControlRegistryStore: Tool "${toolName}" already registered by mod "${state.tools[toolName].modId}". Overwriting with registration from mod "${modId}".`
           );
         }
         state.tools[toolName] = { definition, implementation, modId };
@@ -203,7 +250,7 @@ export const useControlRegistryStore = create(
           delete state.tools[toolName];
         } else {
           console.warn(
-            `ControlRegistryStore: Tool "${toolName}" not found for unregistration.`,
+            `ControlRegistryStore: Tool "${toolName}" not found for unregistration.`
           );
         }
       });
@@ -213,5 +260,5 @@ export const useControlRegistryStore = create(
       // Return a readonly shallow copy of the tools object
       return Object.freeze({ ...get().tools });
     },
-  })),
+  }))
 );

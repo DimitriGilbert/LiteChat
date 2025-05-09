@@ -4,7 +4,9 @@ import {
   type DbMod,
   type ModInstance,
   type LiteChatModApi,
-  ModEvent,
+  // Import new event constants
+  ModEvent as ModEventStrings, // Alias to avoid conflict if ModEvent enum was used locally
+  AppEvent,
 } from "@/types/litechat/modding";
 import { createModApi } from "./api-factory";
 import { toast } from "sonner";
@@ -21,30 +23,29 @@ export async function loadMods(dbMods: DbMod[]): Promise<ModInstance[]> {
         modApi = createModApi(mod);
         if (mod.sourceUrl) {
           console.log(
-            `[ModLoader] Fetching script for ${mod.name} from ${mod.sourceUrl}`,
+            `[ModLoader] Fetching script for ${mod.name} from ${mod.sourceUrl}`
           );
           try {
             const response = await fetch(mod.sourceUrl);
             if (!response.ok) {
               throw new Error(
-                `Failed to fetch mod script: ${response.status} ${response.statusText}`,
+                `Failed to fetch mod script: ${response.status} ${response.statusText}`
               );
             }
             scriptContent = await response.text();
             console.log(
-              `[ModLoader] Successfully fetched script for ${mod.name}`,
+              `[ModLoader] Successfully fetched script for ${mod.name}`
             );
           } catch (fetchError) {
             console.error(
               `[ModLoader] Error fetching script from ${mod.sourceUrl}:`,
-              fetchError,
+              fetchError
             );
             throw fetchError;
           }
         }
         if (!scriptContent) throw new Error("Mod script content is empty.");
 
-        // Execute the script
         const modFunction = new Function("modApi", scriptContent);
         modFunction(modApi);
         console.log(`[ModLoader] Successfully executed script for ${mod.name}`);
@@ -52,11 +53,14 @@ export async function loadMods(dbMods: DbMod[]): Promise<ModInstance[]> {
         instanceError = e instanceof Error ? e : String(e);
         console.error(`[ModLoader] Error loading mod "${mod.name}":`, e);
         toast.error(
-          `Error loading mod "${mod.name}": ${instanceError instanceof Error ? instanceError.message : instanceError}`,
+          `Error loading mod "${mod.name}": ${
+            instanceError instanceof Error
+              ? instanceError.message
+              : instanceError
+          }`
         );
       }
 
-      // Ensure API exists even if loading failed, for potential cleanup/status reporting
       if (!modApi) modApi = createModApi(mod);
 
       const instance: ModInstance = {
@@ -66,19 +70,22 @@ export async function loadMods(dbMods: DbMod[]): Promise<ModInstance[]> {
         error: instanceError ?? undefined,
       };
 
-      // Emit events after instance creation using enum members
-      emitter.emit(instance.error ? ModEvent.MOD_ERROR : ModEvent.MOD_LOADED, {
-        id: mod.id,
-        name: mod.name,
-        error: instance.error,
-      });
+      // Use new event constants
+      emitter.emit(
+        instance.error ? ModEventStrings.ERROR : ModEventStrings.LOADED,
+        {
+          id: mod.id,
+          name: mod.name,
+          error: instance.error,
+        }
+      );
 
       return instance;
-    }),
+    })
   );
 
-  // Emit app loaded event after all mods have been processed using enum member
-  emitter.emit(ModEvent.APP_LOADED, undefined);
+  // Use new event constant
+  emitter.emit(AppEvent.LOADED, undefined);
   console.log(`[ModLoader] Finished processing ${instances.length} mods.`);
   return instances;
 }

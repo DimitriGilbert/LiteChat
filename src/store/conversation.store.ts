@@ -25,7 +25,13 @@ import * as VfsOps from "@/lib/litechat/vfs-operations";
 // Import ProjectStore for interaction
 import { useProjectStore } from "./project.store";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { ModEvent } from "@/types/litechat/modding";
+// Import new event constants
+import {
+  ConversationEvent,
+  ProjectEvent,
+  SyncEvent,
+  UiEvent,
+} from "@/types/litechat/modding";
 
 // Define a union type for items in the sidebar (now includes Project from ProjectStore)
 export type SidebarItem =
@@ -34,7 +40,6 @@ export type SidebarItem =
 
 interface ConversationState {
   conversations: Conversation[];
-  // projects removed - managed by ProjectStore
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
   syncRepos: SyncRepo[];
@@ -49,56 +54,51 @@ interface ConversationActions {
     conversationData: Partial<Omit<Conversation, "id" | "createdAt">> & {
       title: string;
       projectId?: string | null;
-    },
+    }
   ) => Promise<string>;
   updateConversation: (
     id: string,
-    updates: Partial<Omit<Conversation, "id" | "createdAt">>,
+    updates: Partial<Omit<Conversation, "id" | "createdAt">>
   ) => Promise<void>;
   deleteConversation: (id: string) => Promise<void>;
-  // Project actions removed
   selectItem: (
     id: string | null,
-    type: SidebarItemType | null,
+    type: SidebarItemType | null
   ) => Promise<void>;
   importConversation: (file: File) => Promise<void>;
   exportConversation: (
     conversationId: string,
-    format: "json" | "md",
+    format: "json" | "md"
   ) => Promise<void>;
   exportProject: (projectId: string) => Promise<void>;
   exportAllConversations: () => Promise<void>;
   loadSyncRepos: () => Promise<void>;
   addSyncRepo: (
-    repoData: Omit<SyncRepo, "id" | "createdAt" | "updatedAt">,
+    repoData: Omit<SyncRepo, "id" | "createdAt" | "updatedAt">
   ) => Promise<string>;
   updateSyncRepo: (
     id: string,
-    updates: Partial<Omit<SyncRepo, "id" | "createdAt">>,
+    updates: Partial<Omit<SyncRepo, "id" | "createdAt">>
   ) => Promise<void>;
   deleteSyncRepo: (id: string) => Promise<void>;
   linkConversationToRepo: (
     conversationId: string,
-    repoId: string | null,
+    repoId: string | null
   ) => Promise<void>;
   syncConversation: (conversationId: string) => Promise<void>;
   initializeOrSyncRepo: (repoId: string) => Promise<void>;
   _setConversationSyncStatus: (
     conversationId: string,
     status: SyncStatus,
-    error?: string | null,
+    error?: string | null
   ) => void;
   _setRepoInitializationStatus: (repoId: string, status: SyncStatus) => void;
-  // getProjectById removed - use ProjectStore
   getConversationById: (id: string | null) => Conversation | undefined;
-  // getTopLevelProjectId removed - use ProjectStore
   updateCurrentConversationToolSettings: (settings: {
     enabledTools?: string[];
     toolMaxStepsOverride?: number | null;
   }) => Promise<void>;
   _ensureSyncVfsReady: () => Promise<typeof FsType>;
-  // getEffectiveProjectSettings removed - use ProjectStore
-  // Internal action for project deletion side effects
   _unlinkConversationsFromProjects: (projectIds: string[]) => void;
 }
 
@@ -107,7 +107,6 @@ const SYNC_REPO_BASE_DIR = "/synced_repos";
 export const useConversationStore = create(
   immer<ConversationState & ConversationActions>((set, get) => ({
     conversations: [],
-    // projects removed
     selectedItemId: null,
     selectedItemType: null,
     syncRepos: [],
@@ -119,20 +118,19 @@ export const useConversationStore = create(
     _ensureSyncVfsReady: async () => {
       console.log("[ConversationStore] Ensuring Sync VFS is ready...");
       try {
-        // Use forced initialization to get an instance without affecting UI state
-        // Wrap in try...catch as initializeVFS now throws on error
         const fsInstance = await useVfsStore
           .getState()
           .initializeVFS(SYNC_VFS_KEY, { force: true });
-
         console.log(
-          `[ConversationStore] Sync VFS ready for key ${SYNC_VFS_KEY}.`,
+          `[ConversationStore] Sync VFS ready for key ${SYNC_VFS_KEY}.`
         );
         return fsInstance;
       } catch (error) {
         console.error("[ConversationStore] Failed to ensure Sync VFS:", error);
         toast.error(
-          `Filesystem error for sync: ${error instanceof Error ? error.message : String(error)}`,
+          `Filesystem error for sync: ${
+            error instanceof Error ? error.message : String(error)
+          }`
         );
         throw error;
       }
@@ -141,9 +139,7 @@ export const useConversationStore = create(
     loadSidebarItems: async () => {
       set({ isLoading: true, error: null });
       try {
-        // Load projects using ProjectStore action
         await useProjectStore.getState().loadProjects();
-        // Load conversations and sync repos locally
         const [dbConvos, dbSyncRepos] = await Promise.all([
           PersistenceService.loadConversations(),
           PersistenceService.loadSyncRepos(),
@@ -171,7 +167,6 @@ export const useConversationStore = create(
 
         set({
           conversations: dbConvos,
-          // projects removed from this store's state
           syncRepos: dbSyncRepos,
           conversationSyncStatus: initialStatus,
           repoInitializationStatus: {},
@@ -212,7 +207,8 @@ export const useConversationStore = create(
         const conversationToSave = get().getConversationById(newId);
         if (conversationToSave) {
           await PersistenceService.saveConversation(conversationToSave);
-          emitter.emit(ModEvent.CONVERSATION_ADDED, {
+          // Use new event constant
+          emitter.emit(ConversationEvent.ADDED, {
             conversation: conversationToSave,
           });
         } else {
@@ -226,8 +222,8 @@ export const useConversationStore = create(
           conversations: state.conversations.filter((c) => c.id !== newId),
           conversationSyncStatus: Object.fromEntries(
             Object.entries(state.conversationSyncStatus).filter(
-              ([id]) => id !== newId,
-            ),
+              ([id]) => id !== newId
+            )
           ),
         }));
         throw e;
@@ -238,7 +234,7 @@ export const useConversationStore = create(
       const originalConversation = get().getConversationById(id);
       if (!originalConversation) {
         console.warn(
-          `ConversationStore: Conversation ${id} not found for update.`,
+          `ConversationStore: Conversation ${id} not found for update.`
         );
         return;
       }
@@ -257,7 +253,7 @@ export const useConversationStore = create(
           });
 
           const relevantFieldsChanged = ["title", "metadata", "projectId"].some(
-            (field) => field in updates,
+            (field) => field in updates
           );
 
           const lastSyncTime =
@@ -288,7 +284,8 @@ export const useConversationStore = create(
         try {
           const plainData = JSON.parse(JSON.stringify(updatedConversationData));
           await PersistenceService.saveConversation(plainData);
-          emitter.emit(ModEvent.CONVERSATION_UPDATED, {
+          // Use new event constant
+          emitter.emit(ConversationEvent.UPDATED, {
             conversationId: id,
             updates: updates,
           });
@@ -310,8 +307,8 @@ export const useConversationStore = create(
                 originalUpdatedTime <= originalLastSyncTime
                   ? "idle"
                   : originalConversation.syncRepoId
-                    ? "needs-sync"
-                    : "idle";
+                  ? "needs-sync"
+                  : "idle";
             }
             state.error = "Failed to save conversation update";
           });
@@ -319,7 +316,7 @@ export const useConversationStore = create(
         }
       } else {
         console.error(
-          "ConversationStore: Failed to retrieve updated conversation state after update.",
+          "ConversationStore: Failed to retrieve updated conversation state after update."
         );
         set((state) => {
           const index = state.conversations.findIndex((c) => c.id === id);
@@ -337,8 +334,8 @@ export const useConversationStore = create(
               originalUpdatedTime <= originalLastSyncTime
                 ? "idle"
                 : originalConversation.syncRepoId
-                  ? "needs-sync"
-                  : "idle";
+                ? "needs-sync"
+                : "idle";
           }
           state.error = "Failed to save conversation update (state error)";
         });
@@ -363,23 +360,24 @@ export const useConversationStore = create(
             : currentSelectedType,
         conversationSyncStatus: Object.fromEntries(
           Object.entries(state.conversationSyncStatus).filter(
-            ([convoId]) => convoId !== id,
-          ),
+            ([convoId]) => convoId !== id
+          )
         ),
       }));
 
       try {
         await PersistenceService.deleteConversation(id);
         await PersistenceService.deleteInteractionsForConversation(id);
-        emitter.emit(ModEvent.CONVERSATION_DELETED, { conversationId: id });
+        // Use new event constant
+        emitter.emit(ConversationEvent.DELETED, { conversationId: id });
 
         if (
           currentSelectedId === id &&
           currentSelectedType === "conversation"
         ) {
           await useInteractionStore.getState().setCurrentConversationId(null);
-          // Emit context change if selection was cleared
-          emitter.emit(ModEvent.CONTEXT_CHANGED, {
+          // Use new event constant
+          emitter.emit(UiEvent.CONTEXT_CHANGED, {
             selectedItemId: null,
             selectedItemType: null,
           });
@@ -401,8 +399,8 @@ export const useConversationStore = create(
               originalUpdatedTime <= originalLastSyncTime
                 ? "idle"
                 : conversationToDelete.syncRepoId
-                  ? "needs-sync"
-                  : "idle";
+                ? "needs-sync"
+                : "idle";
           }
           if (
             currentSelectedId === id &&
@@ -417,40 +415,38 @@ export const useConversationStore = create(
       }
     },
 
-    // Project actions removed
-
     selectItem: async (id, type) => {
       if (get().selectedItemId !== id || get().selectedItemType !== type) {
         set({ selectedItemId: id, selectedItemType: type });
         await useInteractionStore
           .getState()
           .setCurrentConversationId(type === "conversation" ? id : null);
-        // Emit context change event
-        emitter.emit(ModEvent.CONTEXT_CHANGED, {
+        // Use new event constant
+        emitter.emit(UiEvent.CONTEXT_CHANGED, {
           selectedItemId: id,
           selectedItemType: type,
         });
         if (type === "conversation") {
-          emitter.emit(ModEvent.CONVERSATION_SELECTED, { conversationId: id });
+          // Use new event constant
+          emitter.emit(ConversationEvent.SELECTED, { conversationId: id });
         } else if (type === "project") {
-          emitter.emit(ModEvent.PROJECT_SELECTED, { projectId: id });
+          // Use new event constant
+          emitter.emit(ProjectEvent.SELECTED, { projectId: id });
         } else {
-          emitter.emit(ModEvent.CONVERSATION_SELECTED, {
-            conversationId: null,
-          });
-          emitter.emit(ModEvent.PROJECT_SELECTED, { projectId: null });
+          // Use new event constants
+          emitter.emit(ConversationEvent.SELECTED, { conversationId: null });
+          emitter.emit(ProjectEvent.SELECTED, { projectId: null });
         }
       } else {
         console.log(`Item ${id} (${type}) already selected.`);
       }
     },
 
-    // --- Import/Export Actions (Delegate to Service) ---
     importConversation: async (file) => {
       await ImportExportService.importConversation(
         file,
         get().addConversation,
-        get().selectItem,
+        get().selectItem
       );
     },
     exportConversation: async (conversationId, format) => {
@@ -462,7 +458,6 @@ export const useConversationStore = create(
     exportAllConversations: async () => {
       await ImportExportService.exportAllConversations();
     },
-    // --- End Import/Export Actions ---
 
     loadSyncRepos: async () => {
       if (get().isLoading) return;
@@ -497,7 +492,8 @@ export const useConversationStore = create(
         if (repoToSave) {
           const plainData = JSON.parse(JSON.stringify(repoToSave));
           await PersistenceService.saveSyncRepo(plainData);
-          emitter.emit(ModEvent.SYNC_REPO_CHANGED, {
+          // Use new event constant
+          emitter.emit(SyncEvent.REPO_CHANGED, {
             repoId: newId,
             action: "added",
           });
@@ -540,7 +536,8 @@ export const useConversationStore = create(
         try {
           const plainData = JSON.parse(JSON.stringify(repoToSave));
           await PersistenceService.saveSyncRepo(plainData);
-          emitter.emit(ModEvent.SYNC_REPO_CHANGED, {
+          // Use new event constant
+          emitter.emit(SyncEvent.REPO_CHANGED, {
             repoId: id,
             action: "updated",
           });
@@ -558,7 +555,7 @@ export const useConversationStore = create(
         }
       } else {
         console.error(
-          "ConversationStore: Failed to retrieve updated sync repo state after update.",
+          "ConversationStore: Failed to retrieve updated sync repo state after update."
         );
         set((state) => {
           const index = state.syncRepos.findIndex((r) => r.id === id);
@@ -580,7 +577,6 @@ export const useConversationStore = create(
       try {
         fsInstance = await get()._ensureSyncVfsReady();
       } catch (fsError) {
-        // Error already toasted by _ensureSyncVfsReady
         return;
       }
 
@@ -588,14 +584,15 @@ export const useConversationStore = create(
         syncRepos: state.syncRepos.filter((r) => r.id !== id),
         repoInitializationStatus: Object.fromEntries(
           Object.entries(state.repoInitializationStatus).filter(
-            ([repoId]) => repoId !== id,
-          ),
+            ([repoId]) => repoId !== id
+          )
         ),
       }));
 
       try {
         await PersistenceService.deleteSyncRepo(id);
-        emitter.emit(ModEvent.SYNC_REPO_CHANGED, {
+        // Use new event constant
+        emitter.emit(SyncEvent.REPO_CHANGED, {
           repoId: id,
           action: "deleted",
         });
@@ -603,17 +600,16 @@ export const useConversationStore = create(
 
         try {
           console.log(`[ConversationStore] Deleting VFS directory: ${repoDir}`);
-          // Pass the specific fsInstance
           await VfsOps.deleteItemOp(repoDir, true, { fsInstance });
           toast.info(`Removed local sync folder for "${repoToDelete.name}".`);
         } catch (vfsError: any) {
           console.error(
             `[ConversationStore] Failed to delete VFS directory ${repoDir}:`,
-            vfsError,
+            vfsError
           );
           if (vfsError.code !== "ENOENT") {
             toast.warning(
-              `Failed to remove local sync folder: ${vfsError.message}`,
+              `Failed to remove local sync folder: ${vfsError.message}`
             );
           }
         }
@@ -636,10 +632,12 @@ export const useConversationStore = create(
       });
       get()._setConversationSyncStatus(
         conversationId,
-        repoId ? "needs-sync" : "idle",
+        repoId ? "needs-sync" : "idle"
       );
       toast.info(
-        `Conversation ${repoId ? "linked to" : "unlinked from"} sync repository.`,
+        `Conversation ${
+          repoId ? "linked to" : "unlinked from"
+        } sync repository.`
       );
     },
 
@@ -650,7 +648,8 @@ export const useConversationStore = create(
           console.error(`Sync error for ${conversationId}: ${error}`);
         }
       });
-      emitter.emit(ModEvent.CONVERSATION_SYNC_STATUS_CHANGED, {
+      // Use new event constant
+      emitter.emit(ConversationEvent.SYNC_STATUS_CHANGED, {
         conversationId,
         status,
       });
@@ -660,7 +659,8 @@ export const useConversationStore = create(
       set((state) => {
         state.repoInitializationStatus[repoId] = status;
       });
-      emitter.emit(ModEvent.REPO_INIT_STATUS_CHANGED, { repoId, status });
+      // Use new event constant
+      emitter.emit(SyncEvent.REPO_INIT_STATUS_CHANGED, { repoId, status });
     },
 
     initializeOrSyncRepo: async (repoId) => {
@@ -676,11 +676,10 @@ export const useConversationStore = create(
         get()._setRepoInitializationStatus(repoId, "error");
         return;
       }
-      // Pass the specific fsInstance
       await initializeOrSyncRepoLogic(
         fsInstance,
         repo,
-        get()._setRepoInitializationStatus,
+        get()._setRepoInitializationStatus
       );
     },
 
@@ -695,14 +694,14 @@ export const useConversationStore = create(
         return;
       }
       const repo = get().syncRepos.find(
-        (r) => r.id === conversation.syncRepoId,
+        (r) => r.id === conversation.syncRepoId
       );
       if (!repo) {
         toast.error("Sync repository configuration not found.");
         get()._setConversationSyncStatus(
           conversationId,
           "error",
-          "Repo not found",
+          "Repo not found"
         );
         return;
       }
@@ -714,12 +713,11 @@ export const useConversationStore = create(
         get()._setConversationSyncStatus(
           conversationId,
           "error",
-          "Filesystem not ready",
+          "Filesystem not ready"
         );
         return;
       }
 
-      // Pass the specific fsInstance
       await syncConversationLogic(
         fsInstance,
         conversation,
@@ -727,14 +725,14 @@ export const useConversationStore = create(
         get()._setConversationSyncStatus,
         get().updateConversation,
         () => get().selectedItemId,
-        () => get().selectedItemType,
+        () => get().selectedItemType
       );
 
       const potentiallyUpdatedConvo = get().getConversationById(conversationId);
       if (potentiallyUpdatedConvo) {
         set((state) => {
           const index = state.conversations.findIndex(
-            (c) => c.id === conversationId,
+            (c) => c.id === conversationId
           );
           if (index !== -1) {
             state.conversations[index] = potentiallyUpdatedConvo;
@@ -743,12 +741,10 @@ export const useConversationStore = create(
       }
     },
 
-    // getProjectById removed
     getConversationById: (id) => {
       if (!id) return undefined;
       return get().conversations.find((c) => c.id === id);
     },
-    // getTopLevelProjectId removed
 
     updateCurrentConversationToolSettings: async (settings) => {
       const { selectedItemId, selectedItemType, updateConversation } = get();
@@ -761,7 +757,7 @@ export const useConversationStore = create(
       const currentConversation = get().getConversationById(selectedItemId);
       if (!currentConversation) {
         console.warn(
-          "Cannot update tool settings: Selected conversation not found.",
+          "Cannot update tool settings: Selected conversation not found."
         );
         return;
       }
@@ -784,19 +780,15 @@ export const useConversationStore = create(
       }
     },
 
-    // getEffectiveProjectSettings removed
-
-    // Internal action called by ProjectStore.deleteProject
     _unlinkConversationsFromProjects: (projectIds) => {
       const idsToUnlink = new Set(projectIds);
       set((state) => {
         state.conversations = state.conversations.map((c) =>
           c.projectId && idsToUnlink.has(c.projectId)
             ? { ...c, projectId: null }
-            : c,
+            : c
         );
       });
-      // Note: This only updates the state. PersistenceService.deleteProject handles DB updates.
     },
-  })),
+  }))
 );

@@ -11,7 +11,8 @@ import { useSettingsStore } from "./settings.store";
 import { useProviderStore } from "./provider.store";
 import { useConversationStore } from "./conversation.store";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { ModEvent } from "@/types/litechat/modding";
+// Corrected: Import ProjectEvent specifically
+import { ProjectEvent } from "@/types/litechat/modding";
 
 interface ProjectState {
   projects: Project[];
@@ -25,11 +26,11 @@ interface ProjectActions {
     projectData: Partial<Omit<Project, "id" | "createdAt" | "path">> & {
       name: string;
       parentId?: string | null;
-    },
+    }
   ) => Promise<string>;
   updateProject: (
     id: string,
-    updates: Partial<Omit<Project, "id" | "createdAt" | "path">>,
+    updates: Partial<Omit<Project, "id" | "createdAt" | "path">>
   ) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   getProjectById: (id: string | null) => Project | undefined;
@@ -69,10 +70,12 @@ export const useProjectStore = create(
       const newId = nanoid();
       const now = new Date();
       const parentPath = projectData.parentId
-        ? (get().getProjectById(projectData.parentId)?.path ?? "/")
+        ? get().getProjectById(projectData.parentId)?.path ?? "/"
         : "/";
       const newPath = normalizePath(
-        `${parentPath}/${projectData.name.replace(/\s+/g, "-").toLowerCase()}-${newId.substring(0, 4)}`,
+        `${parentPath}/${projectData.name
+          .replace(/\s+/g, "-")
+          .toLowerCase()}-${newId.substring(0, 4)}`
       );
 
       const newProject: Project = {
@@ -100,10 +103,11 @@ export const useProjectStore = create(
         set((state) => {
           state.projects.unshift(newProject);
           state.projects.sort(
-            (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+            (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
           );
         });
-        emitter.emit(ModEvent.PROJECT_ADDED, { project: newProject });
+        // Corrected: Use ProjectEvent
+        emitter.emit(ProjectEvent.ADDED, { project: newProject });
         return newId;
       } catch (e) {
         console.error("ProjectStore: Error adding project", e);
@@ -127,10 +131,12 @@ export const useProjectStore = create(
 
       if (updates.name && updates.name !== originalProject.name) {
         const parentPath = originalProject.parentId
-          ? (get().getProjectById(originalProject.parentId)?.path ?? "/")
+          ? get().getProjectById(originalProject.parentId)?.path ?? "/"
           : "/";
         updatedProjectData.path = normalizePath(
-          `${parentPath}/${updates.name.replace(/\s+/g, "-").toLowerCase()}-${id.substring(0, 4)}`,
+          `${parentPath}/${updates.name
+            .replace(/\s+/g, "-")
+            .toLowerCase()}-${id.substring(0, 4)}`
         );
       }
 
@@ -141,13 +147,14 @@ export const useProjectStore = create(
           if (index !== -1) {
             state.projects[index] = updatedProjectData;
             state.projects.sort(
-              (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+              (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
             );
           }
         });
-        emitter.emit(ModEvent.PROJECT_UPDATED, {
+        // Corrected: Use ProjectEvent
+        emitter.emit(ProjectEvent.UPDATED, {
           projectId: id,
-          updates: updatedProjectData,
+          updates: updatedProjectData, // Pass the full updated project data
         });
       } catch (e) {
         console.error("ProjectStore: Error updating project", e);
@@ -173,15 +180,16 @@ export const useProjectStore = create(
         await PersistenceService.deleteProject(id);
         set((state) => ({
           projects: state.projects.filter(
-            (p) => !projectsToDeleteIds.has(p.id),
+            (p) => !projectsToDeleteIds.has(p.id)
           ),
         }));
         useConversationStore
           .getState()
           ._unlinkConversationsFromProjects(Array.from(projectsToDeleteIds));
-        emitter.emit(ModEvent.PROJECT_DELETED, { projectId: id });
+        // Corrected: Use ProjectEvent
+        emitter.emit(ProjectEvent.DELETED, { projectId: id });
         toast.success(
-          `Project "${projectToDelete.name}" and its contents deleted.`,
+          `Project "${projectToDelete.name}" and its contents deleted.`
         );
       } catch (e) {
         console.error("ProjectStore: Error deleting project", e);
@@ -283,5 +291,5 @@ export const useProjectStore = create(
             : parentSettings.defaultRuleIds,
       };
     },
-  })),
+  }))
 );

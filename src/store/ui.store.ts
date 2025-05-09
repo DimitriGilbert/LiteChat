@@ -14,7 +14,6 @@ interface UIState {
   initialSettingsSubTab: string | null;
   isProjectSettingsModalOpen: boolean;
   projectSettingsModalTargetId: string | null;
-  // Add state for VFS modal
   isVfsModalOpen: boolean;
 }
 
@@ -29,7 +28,6 @@ interface UIActions {
   clearInitialSettingsTabs: () => void;
   openProjectSettingsModal: (projectId: string) => void;
   closeProjectSettingsModal: () => void;
-  // Add actions for VFS modal
   toggleVfsModal: (isOpen?: boolean) => void;
 }
 
@@ -46,7 +44,6 @@ export const useUIStateStore = create(
     initialSettingsSubTab: null,
     isProjectSettingsModalOpen: false,
     projectSettingsModalTargetId: null,
-    // Initialize VFS modal state
     isVfsModalOpen: false,
 
     // Actions
@@ -111,11 +108,10 @@ export const useUIStateStore = create(
       });
     },
 
-    // Actions for VFS modal
     toggleVfsModal: (isOpen) => {
       set((state) => {
         state.isVfsModalOpen = isOpen ?? !state.isVfsModalOpen;
       });
     },
-  })),
+  }))
 );
