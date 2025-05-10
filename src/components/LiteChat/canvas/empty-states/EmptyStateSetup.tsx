@@ -1,4 +1,5 @@
 // src/components/LiteChat/canvas/empty-states/EmptyStateSetup.tsx
+// FULL FILE
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   AlertCircleIcon,
@@ -17,10 +18,11 @@ import { useUIStateStore } from "@/store/ui.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { useShallow } from "zustand/react/shallow";
 import { ApiKeyForm } from "@/components/LiteChat/common/ApiKeysForm";
-import { AddProviderForm } from "@/controls/components/settings/AddProviderForm"; //components/LiteChat/settings/AddProviderForm";
+import { AddProviderForm } from "@/controls/components/settings/AddProviderForm";
 import type {
   DbProviderConfig,
   DbProviderType,
+  OpenRouterModel,
 } from "@/types/litechat/provider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -48,7 +50,6 @@ import {
 } from "@/components/ui/tooltip";
 import { ActionCards } from "./ActionCards";
 
-// Improved step component with animations
 const SetupStep: React.FC<{
   stepNumber: number;
   title: string;
@@ -173,7 +174,7 @@ export const EmptyStateSetup: React.FC = () => {
     useShallow((state) => ({
       apiKeys: state.dbApiKeys,
       addApiKey: state.addApiKey,
-      providers: state.dbProviderConfigs,
+      providers: state.dbProviderConfigs, // This will trigger re-memo when its reference changes
       addProviderConfig: state.addProviderConfig,
       updateProviderConfig: state.updateProviderConfig,
       getAllAvailableModelDefsForProvider:
@@ -198,13 +199,11 @@ export const EmptyStateSetup: React.FC = () => {
   );
 
   const [isSavingKey, setIsSavingKey] = useState(false);
-  // @ts-expect-error @AI DO NOT REMOVE, DOES NOT BUILD IF REMOVED
-  const [isSavingProvider, setIsSavingProvider] = useState(false); // DO NOT FUCKING REMOVE THE FUCKING TS-EXPECT-ERROR !
+  const [isSavingProvider, setIsSavingProvider] = useState(false);
   const [isStartingChat, setIsStartingChat] = useState(false);
   const [isUpdatingModels, setIsUpdatingModels] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
 
-  // --- Step Completion Logic ---
   const isApiKeyStepComplete = useMemo(
     () => !enableApiKeyManagement || apiKeys.length > 0,
     [enableApiKeyManagement, apiKeys]
@@ -220,27 +219,26 @@ export const EmptyStateSetup: React.FC = () => {
       (p) => p.isEnabled && p.enabledModels && p.enabledModels.length > 0
     );
   }, [providers]);
-  // --- End Step Completion Logic ---
 
-  // --- Get data for the first provider (if it exists) ---
   const firstProvider = useMemo(() => {
     const sortedProviders = [...providers].sort(
       (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
     );
     return sortedProviders.length > 0 ? sortedProviders[0] : null;
-  }, [providers]);
+  }, [providers]); // Depends directly on the `providers` array from the store
 
-  const firstProviderModels = useMemo(() => {
+  // This will re-calculate if `firstProvider` changes (due to `providers` changing)
+  // or if `getAllAvailableModelDefsForProvider` function reference changes (which it shouldn't often).
+  const currentFirstProviderModels = useMemo(() => {
     if (!firstProvider) return [];
     return getAllAvailableModelDefsForProvider(firstProvider.id);
   }, [firstProvider, getAllAvailableModelDefsForProvider]);
 
   const firstProviderEnabledModels = useMemo(() => {
+    // This correctly uses the `firstProvider` from the store, which reflects the latest `enabledModels`.
     return new Set(firstProvider?.enabledModels ?? []);
-  }, [firstProvider]);
-  // --- End first provider data ---
+  }, [firstProvider]); // Depends on `firstProvider`
 
-  // Determine initial type, name, AND key ID for forms based on API keys
   const {
     initialProviderTypeForForm,
     initialProviderNameForForm,
@@ -252,7 +250,6 @@ export const EmptyStateSetup: React.FC = () => {
       const sortedKeys = [...apiKeys].sort(
         (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
       );
-      // Find the *first* key that requires one for the provider form
       const relevantKeyForProvider = sortedKeys.find((k) =>
         requiresApiKey(k.providerId as DbProviderType)
       );
@@ -260,7 +257,6 @@ export const EmptyStateSetup: React.FC = () => {
         const type = relevantKeyForProvider.providerId as DbProviderType;
         const name =
           PROVIDER_TYPES.find((p) => p.value === type)?.label || type;
-        // Use this key's ID for both forms initially
         return {
           initialProviderTypeForForm: type,
           initialProviderNameForForm: name,
@@ -268,7 +264,6 @@ export const EmptyStateSetup: React.FC = () => {
         };
       }
     }
-    // Default if no relevant API key found
     return {
       initialProviderTypeForForm: undefined,
       initialProviderNameForForm: undefined,
@@ -295,14 +290,14 @@ export const EmptyStateSetup: React.FC = () => {
     ): Promise<string> => {
       setIsSavingProvider(true);
       try {
-        // Ensure the initial API key ID is passed if available and relevant
         const configWithKey = {
           ...config,
           apiKeyId:
             config.apiKeyId ??
-            (requiresApiKey(config.type) ? initialApiKeyIdForForm : null),
+            (requiresApiKey(config.type)
+              ? initialApiKeyIdForForm ?? null
+              : null),
         };
-        // @ts-expect-error FO you MOFO
         const newId = await addProviderConfig(configWithKey);
         toast.success("Provider added successfully!");
         return newId;
@@ -310,7 +305,7 @@ export const EmptyStateSetup: React.FC = () => {
         setIsSavingProvider(false);
       }
     },
-    [addProviderConfig, initialApiKeyIdForForm] // Add dependency
+    [addProviderConfig, initialApiKeyIdForForm]
   );
 
   const handleModelToggle = useCallback(
@@ -325,6 +320,9 @@ export const EmptyStateSetup: React.FC = () => {
       }
       const newEnabledModels = Array.from(currentEnabledSet);
       try {
+        // When updateProviderConfig is called, the `providers` array in the store will update.
+        // This will cause `firstProvider` to re-memoize.
+        // Then `currentFirstProviderModels` will re-memoize using the new `firstProvider`.
         await updateProviderConfig(firstProvider.id, {
           enabledModels: newEnabledModels,
         });
@@ -345,17 +343,11 @@ export const EmptyStateSetup: React.FC = () => {
 
   const handleStartFirstChat = useCallback(async () => {
     setIsStartingChat(true);
-
-    // Show progress animation
     setShowProgress(true);
-
     try {
-      // Simulate some loading time if desired for better UX
       await new Promise((resolve) => setTimeout(resolve, 800));
-
       const newId = await addConversation({ title: "New Chat" });
       await selectItem(newId, "conversation");
-
       toast.success("Welcome to your first chat!");
     } catch (error) {
       toast.error("Failed to start your first chat.");
@@ -370,7 +362,6 @@ export const EmptyStateSetup: React.FC = () => {
     toggleChatControlPanel("settingsModal", true);
   };
 
-  // Calculate setup progress
   const completedSteps = [
     isApiKeyStepComplete,
     isProviderStepComplete,
@@ -512,11 +503,11 @@ export const EmptyStateSetup: React.FC = () => {
         <div className="bg-card/40 rounded-lg p-3 border border-border/30 shadow-inner">
           <ModelEnablementList
             providerId={firstProvider.id}
-            allAvailableModels={firstProviderModels}
+            allAvailableModels={currentFirstProviderModels}
             enabledModelIds={firstProviderEnabledModels}
             onToggleModel={handleModelToggle}
             isLoading={isProviderLoading || isUpdatingModels}
-            listHeightClass="h-48"
+            listHeightClass="h-[26rem]"
           />
         </div>
       ) : (

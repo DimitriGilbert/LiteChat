@@ -29,7 +29,6 @@ import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ModelListItem } from "@/types/litechat/provider";
-import { combineModelId } from "@/lib/litechat/provider-helpers";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -37,11 +36,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import type { GlobalModelSelectorModule } from "@/controls/modules/GlobalModelSelectorModule";
 
 interface GlobalModelSelectorProps {
-  module?: GlobalModelSelectorModule; // Module is now optional
-  value?: string | null; // Direct value prop
-  onChange?: (newModelId: string | null) => void; // Direct onChange prop
+  module?: GlobalModelSelectorModule;
+  value?: string | null;
+  onChange?: (newModelId: string | null) => void;
   className?: string;
-  disabled?: boolean; // Allow direct disabling
+  disabled?: boolean;
 }
 
 type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
@@ -57,7 +56,6 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
     }) => {
       const [, forceUpdate] = useState({});
 
-      // State and handlers for module-driven mode
       useEffect(() => {
         if (module) {
           module.setNotifyCallback(() => forceUpdate({}));
@@ -65,7 +63,6 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
         }
       }, [module]);
 
-      // Determine if operating in module-driven or direct prop mode
       const isModuleDriven = !!module;
 
       const currentValue = isModuleDriven
@@ -90,13 +87,14 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
 
       const {
         dbProviderConfigs,
-        globalModelSortOrder,
-        getAvailableModelListItems,
+        // Directly select the state that changes
+        globallyEnabledModelDefinitionsFromStore,
       } = useProviderStore(
         useShallow((state) => ({
           dbProviderConfigs: state.dbProviderConfigs,
-          globalModelSortOrder: state.globalModelSortOrder,
-          getAvailableModelListItems: state.getAvailableModelListItems,
+          // Select the actual data array
+          globallyEnabledModelDefinitionsFromStore:
+            state.globallyEnabledModelDefinitions,
         }))
       );
 
@@ -108,40 +106,10 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
         setSelectedProviders(new Set(dbProviderConfigs.map((p) => p.id)));
       }, [dbProviderConfigs]);
 
+      // Use the directly selected state in useMemo's dependency array
       const orderedModels: ModelListItem[] = useMemo(() => {
-        const allModelListItems = getAvailableModelListItems();
-        const modelItemsMap = new Map(allModelListItems.map((m) => [m.id, m]));
-        const globallyEnabledCombinedIds = new Set<string>();
-        dbProviderConfigs.forEach((config) => {
-          if (config.isEnabled && config.enabledModels) {
-            config.enabledModels.forEach((modelId) => {
-              globallyEnabledCombinedIds.add(
-                combineModelId(config.id, modelId)
-              );
-            });
-          }
-        });
-        const globallyEnabledModels = allModelListItems.filter((item) =>
-          globallyEnabledCombinedIds.has(item.id)
-        );
-        const sorted: ModelListItem[] = [];
-        const added = new Set<string>();
-        globalModelSortOrder.forEach((id) => {
-          if (globallyEnabledCombinedIds.has(id)) {
-            const details = modelItemsMap.get(id);
-            if (details && !added.has(id)) {
-              sorted.push(details);
-              added.add(id);
-            }
-          }
-        });
-        globallyEnabledModels.forEach((item) => {
-          if (!added.has(item.id)) {
-            sorted.push(item);
-          }
-        });
-        return sorted;
-      }, [dbProviderConfigs, globalModelSortOrder, getAvailableModelListItems]);
+        return globallyEnabledModelDefinitionsFromStore;
+      }, [globallyEnabledModelDefinitionsFromStore]);
 
       const filteredModels = useMemo(() => {
         let providerFiltered = orderedModels;
@@ -245,7 +213,6 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
       );
 
       if (isLoadingProviders && isModuleDriven) {
-        // Only show skeleton if module-driven and loading
         return <Skeleton className={cn("h-9 w-[250px]", className)} />;
       }
 

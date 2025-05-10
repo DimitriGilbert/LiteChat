@@ -10,13 +10,11 @@ import { usePromptStateStore } from "@/store/prompt.store";
 import { useProjectStore } from "@/store/project.store";
 import { useUIStateStore } from "@/store/ui.store";
 import { loadMods } from "@/modding/loader";
-// Import new ControlModule types
 import type {
   ControlModule,
   ControlModuleConstructor,
 } from "@/types/litechat/control";
-import { createModApi } from "@/modding/api-factory"; // Needed for modApi instance
-import type { LiteChatModApi } from "@/types/litechat/modding"; // Needed for modApi type
+import type { LiteChatModApi } from "@/types/litechat/modding"; // No longer need createModApi here
 
 interface CoreStores {
   loadSettings: () => Promise<void>;
@@ -32,7 +30,6 @@ interface CoreStores {
   selectedItemType: string | null;
 }
 
-// --- Dependency Resolution (Topological Sort) ---
 function resolveDependencyOrder(
   modules: ControlModule[]
 ): ControlModule[] | null {
@@ -47,32 +44,29 @@ function resolveDependencyOrder(
     if (visited.has(module.id)) return true;
     if (visiting.has(module.id)) {
       console.error(
-        `[Initialization] Circular dependency detected involving module: ${module.id}`
+        `[Init] Circular dependency detected involving module: ${module.id}`
       );
       toast.error(`Initialization Error: Circular dependency in controls.`);
-      return false; // Cycle detected
+      return false;
     }
-
     visiting.add(module.id);
-
     for (const depId of module.dependencies ?? []) {
       const dependency = moduleMap.get(depId);
       if (!dependency) {
         console.error(
-          `[Initialization] Missing dependency "${depId}" for module "${module.id}"`
+          `[Init] Missing dependency "${depId}" for module "${module.id}"`
         );
         toast.error(
           `Initialization Error: Missing dependency "${depId}" for "${module.id}".`
         );
         visiting.delete(module.id);
-        return false; // Missing dependency
+        return false;
       }
       if (!visit(dependency)) {
         visiting.delete(module.id);
-        return false; // Cycle detected in dependency
+        return false;
       }
     }
-
     visiting.delete(module.id);
     visited.add(module.id);
     sorted.push(module);
@@ -82,83 +76,79 @@ function resolveDependencyOrder(
   for (const module of modules) {
     if (!visited.has(module.id)) {
       if (!visit(module)) {
-        return null; // Error occurred
+        return null;
       }
     }
   }
-
   return sorted;
 }
-// --- End Dependency Resolution ---
 
 export async function loadCoreData(stores: CoreStores): Promise<void> {
-  console.log("LiteChat Init: Loading core data...");
+  console.log("[Init] Core Data: Loading...");
   await stores.loadSettings();
-  console.log("LiteChat Init: Settings loaded.");
   await stores.loadProviderData();
-  console.log("LiteChat Init: Provider data loaded.");
   await stores.loadRulesAndTags();
-  console.log("LiteChat Init: Rules and Tags loaded.");
   await stores.loadSidebarItems();
-  console.log("LiteChat Init: Sidebar items loaded.");
+  console.log("[Init] Core Data: Loaded.");
 }
 
-// Renamed function, now handles instantiation, sorting, and initialization
 export async function initializeControlModules(
   moduleConstructors: ControlModuleConstructor[],
-  modApi: LiteChatModApi // Pass modApi instance
+  modApi: LiteChatModApi
 ): Promise<ControlModule[]> {
-  console.log("LiteChat Init: Instantiating control modules...");
+  console.log(
+    "[Init] Control Modules: Instantiation & Dependency Resolution START"
+  );
   const moduleInstances = moduleConstructors.map((Ctor) => new Ctor());
-  console.log(`LiteChat Init: ${moduleInstances.length} modules instantiated.`);
-
-  console.log("LiteChat Init: Resolving control module dependencies...");
   const sortedModules = resolveDependencyOrder(moduleInstances);
 
   if (!sortedModules) {
+    console.error("[Init] Control Modules: Dependency resolution FAILED.");
     throw new Error("Failed to resolve control module dependency order.");
   }
   console.log(
-    "LiteChat Init: Dependency order resolved:",
+    `[Init] Control Modules: Dependency order resolved (${sortedModules.length} modules):`,
     sortedModules.map((m) => m.id)
   );
+  console.log(
+    "[Init] Control Modules: Instantiation & Dependency Resolution COMPLETE"
+  );
 
-  console.log("LiteChat Init: Initializing control modules...");
+  console.log("[Init] Control Modules: Initialization START");
   for (const module of sortedModules) {
     try {
-      console.log(`LiteChat Init: Initializing module "${module.id}"...`);
+      // console.log(`[Init] Initializing module "${module.id}"...`);
       await module.initialize(modApi);
+      // console.log(`[Init] Module "${module.id}" initialized.`);
     } catch (initError) {
       console.error(
-        `LiteChat Init: Error initializing module "${module.id}":`,
+        `[Init] Error initializing module "${module.id}":`,
         initError
       );
       toast.error(
-        `Module Initialization Error (${module.id}): ${
+        `Module Init Error (${module.id}): ${
           initError instanceof Error ? initError.message : String(initError)
         }`
       );
-      // Decide whether to continue or halt initialization
-      // For now, let's continue but log the error
     }
   }
-  console.log("LiteChat Init: Control modules initialized.");
-  return sortedModules; // Return sorted instances
+  console.log("[Init] Control Modules: Initialization COMPLETE.");
+  return sortedModules;
 }
 
-// Renamed function, now just handles registration
 export function registerControlModules(
-  modules: ControlModule[], // Accept initialized & sorted modules
+  modules: ControlModule[],
   modApi: LiteChatModApi
 ): void {
-  console.log("LiteChat Init: Registering control modules...");
+  console.log("[Init] Control Modules: Registration START");
   for (const module of modules) {
     try {
-      console.log(`LiteChat Init: Registering module "${module.id}"...`);
-      module.register(modApi);
+      // console.log(`[Init] Registering module "${module.id}"...`);
+      module.register(modApi); // This now checks for double registration internally
+      // console.log(`[Init] Module "${module.id}" registered.`);
     } catch (regError) {
       console.error(
-        `LiteChat Init: Error registering module "${module.id}":`,
+        `[Init] Error registering module "${module.id}":`,
         regError
       );
       toast.error(
@@ -168,22 +158,25 @@ export function registerControlModules(
       );
     }
   }
-  console.log("LiteChat Init: Control modules registered.");
+  console.log("[Init] Control Modules: Registration COMPLETE.");
 }
 
 export async function loadAndProcessMods(stores: CoreStores): Promise<void> {
-  console.log("LiteChat Init: Loading mods...");
+  console.log("[Init] External Mods: Loading DB records...");
   await stores.loadDbMods();
-  console.log("LiteChat Init: DB Mods loaded.");
   const currentDbMods = useModStore.getState().dbMods;
-  console.log(`LiteChat Init: Processing ${currentDbMods.length} mods...`);
+  console.log(
+    `[Init] External Mods: Processing ${currentDbMods.length} mods...`
+  );
   const loadedModInstances = await loadMods(currentDbMods);
   stores.setLoadedMods(loadedModInstances);
-  console.log(`LiteChat Init: ${loadedModInstances.length} mods processed.`);
+  console.log(
+    `[Init] External Mods: ${loadedModInstances.length} mods processed.`
+  );
 }
 
 export function initializeCoreUiStates(stores: CoreStores): void {
-  console.log("LiteChat Init: Initializing core UI states...");
+  console.log("[Init] Core UI States: Initializing...");
   const initialSelItemId = stores.selectedItemId;
   const initialSelItemType = stores.selectedItemType;
 
@@ -198,14 +191,16 @@ export function initializeCoreUiStates(stores: CoreStores): void {
     stores.getEffectiveProjectSettings(initialProjectId);
   stores.initializePromptState(initialEffectiveSettings);
   console.log(
-    "LiteChat Init: Initial prompt state initialized.",
-    initialEffectiveSettings
+    "[Init] Core UI States: Initial prompt state synchronized with context."
   );
 }
 
+// Pass coreModApi instance to performFullInitialization
 export async function performFullInitialization(
-  moduleConstructors: ControlModuleConstructor[] // Expect constructors now
-): Promise<void> {
+  moduleConstructors: ControlModuleConstructor[],
+  coreModApi: LiteChatModApi
+): Promise<ControlModule[]> {
+  console.log("LiteChat: Full initialization sequence START.");
   const stores: CoreStores = {
     loadSettings: useSettingsStore.getState().loadSettings,
     loadProviderData: useProviderStore.getState().loadInitialData,
@@ -221,29 +216,19 @@ export async function performFullInitialization(
     selectedItemType: useConversationStore.getState().selectedItemType,
   };
 
-  // Create a minimal modApi instance for core controls
-  // This assumes a 'core' mod doesn't really exist, but we need the API structure.
-  const coreModApi = createModApi({
-    id: "core",
-    name: "LiteChat Core",
-    sourceUrl: null,
-    scriptContent: null,
-    enabled: true,
-    loadOrder: -1,
-    createdAt: new Date(),
-  });
-
+  let initializedModules: ControlModule[] = [];
   try {
     await loadCoreData(stores);
-    const initializedModules = await initializeControlModules(
+    initializedModules = await initializeControlModules(
       moduleConstructors,
       coreModApi
     );
-    registerControlModules(initializedModules, coreModApi); // Register after initialization
+    registerControlModules(initializedModules, coreModApi);
     await loadAndProcessMods(stores);
     initializeCoreUiStates(stores);
+    console.log("LiteChat: Full initialization sequence COMPLETE.");
   } catch (error) {
-    console.error("LiteChat: Full initialization sequence failed:", error);
+    console.error("LiteChat: Full initialization sequence FAILED:", error);
     toast.error(
       `Initialization sequence failed: ${
         error instanceof Error ? error.message : String(error)
@@ -252,6 +237,7 @@ export async function performFullInitialization(
     useUIStateStore
       .getState()
       .setGlobalError("Initialization sequence failed.");
-    throw error;
+    throw error; // Re-throw to allow LiteChat.tsx to catch if needed
   }
+  return initializedModules; // Return the modules for potential cleanup
 }

@@ -13,17 +13,50 @@ export class ConversationListControlModule implements ControlModule {
   private unregisterCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
 
-  public isLoading = false;
+  // isLoading now primarily reflects the *initial* load state.
+  // Add/delete operations should feel instant due to optimistic UI updates in stores.
+  public isLoading = true;
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(_modApi: LiteChatModApi): Promise<void> {
-    // modApi parameter is available here if needed for initialization logic
     this.isLoading =
       useConversationStore.getState().isLoading ||
       useProjectStore.getState().isLoading;
-    console.log(`[${this.id}] Initialized.`);
+    // Subscribe to store loading state changes if they exist and are granular
+    // For now, we assume initial load is handled by the main app sequence.
+    // This module's isLoading will primarily be true until the first data is available.
+    console.log(
+      `[${this.id}] Initialized. Initial loading state: ${this.isLoading}`
+    );
+
+    // If stores have a way to notify when their initial load is done, subscribe here.
+    // Example (conceptual - depends on store implementation):
+    // const unsubConvLoad = useConversationStore.subscribe(
+    //   (state) => state.isLoading,
+    //   (loading) => this.updateLoadingState()
+    // );
+    // const unsubProjLoad = useProjectStore.subscribe(
+    //   (state) => state.isLoading,
+    //   (loading) => this.updateLoadingState()
+    // );
+    // this.eventUnsubscribers.push(unsubConvLoad, unsubProjLoad);
+    // For now, we'll rely on the component to re-read this.isLoading if the module re-renders.
   }
 
+  // Call this if stores provide fine-grained loading state updates
+  public updateLoadingState() {
+    const newLoadingState =
+      useConversationStore.getState().isLoading ||
+      useProjectStore.getState().isLoading;
+    if (this.isLoading !== newLoadingState) {
+      this.isLoading = newLoadingState;
+      this.notifyComponentUpdate?.();
+    }
+  }
+
+  // This method is now primarily for actions *within the component* that might need
+  // to show a temporary loading state (e.g., if an action was complex and not optimistic).
+  // For simple add/delete, the stores handle optimistic updates.
   public setIsLoading = (loading: boolean) => {
     if (this.isLoading !== loading) {
       this.isLoading = loading;
@@ -37,7 +70,9 @@ export class ConversationListControlModule implements ControlModule {
 
   register(modApi: LiteChatModApi): void {
     if (this.unregisterCallback) {
-      console.warn(`[${this.id}] Already registered. Skipping.`);
+      console.warn(
+        `[${this.id}] Module "${this.id}" already registered. Skipping.`
+      );
       return;
     }
 
@@ -53,7 +88,7 @@ export class ConversationListControlModule implements ControlModule {
         React.createElement(ConversationListIconRenderer, { module: this }),
       show: () => true,
     });
-    console.log(`[${this.id}] Registered.`);
+    console.log(`[Init] Module "${this.id}" registered.`);
   }
 
   destroy(): void {

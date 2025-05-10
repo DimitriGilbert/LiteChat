@@ -24,20 +24,24 @@ import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Loader2, Menu, X } from "lucide-react";
-import { parseAppUrlParameters } from "@/lib/litechat/url-helpers";
-import { useInputStore } from "@/store/input.store";
-import * as VfsOps from "@/lib/litechat/vfs-operations";
-import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
-import { nanoid } from "nanoid";
-import { runMiddleware } from "@/lib/litechat/ai-helpers";
-import { PromptEvent, ModMiddlewareHook } from "@/types/litechat/modding";
-import { emitter } from "@/lib/litechat/event-emitter";
-import { basename } from "@/lib/litechat/file-manager-utils";
+// import { useInputStore } from "@/store/input.store"; // No longer directly used here
+// import { nanoid } from "nanoid"; // No longer directly used here
+// import { runMiddleware } from "@/lib/litechat/ai-helpers"; // No longer directly used here
+// import { PromptEvent, ModMiddlewareHook } from "@/types/litechat/modding"; // No longer directly used here
+// import { emitter } from "@/lib/litechat/event-emitter"; // No longer directly used here
 import { performFullInitialization } from "@/lib/litechat/initialization";
-import { useProviderStore } from "@/store/provider.store";
 import { usePromptStateStore } from "@/store/prompt.store";
-import { useVfsStore } from "@/store/vfs.store";
-import type { ControlModuleConstructor } from "@/types/litechat/control";
+import type {
+  ControlModule,
+  ControlModuleConstructor,
+} from "@/types/litechat/control";
+import { createModApi } from "@/modding/api-factory";
+import { useVfsStore } from "@/store/vfs.store"; // For VFS key logic
+
+let initializedControlModules: ControlModule[] = [];
+// Ensure appInitializationPromise and hasInitialized are module-scoped correctly
+let appInitializationPromise: Promise<ControlModule[]> | null = null;
+let hasInitializedSuccessfully = false;
 
 interface LiteChatProps {
   controls?: ControlModuleConstructor[];
@@ -105,242 +109,59 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     }
   }, [selectedItemId, selectedItemType, isMobileSidebarOpen]);
 
-  const focusInput = useCallback(() => {
-    requestAnimationFrame(() => {
-      inputAreaRef.current?.focus();
-    });
-  }, []);
-
-  const processUrlParameters = useCallback(async () => {
-    const urlParams = parseAppUrlParameters();
-    if (!urlParams.query && !urlParams.modelId && !urlParams.vfsFiles?.length) {
-      return;
-    }
-    toast.info("Processing parameters from URL...");
-    const { addConversation, selectItem } = useConversationStore.getState();
-    const { setModelId: setPromptModelId } = usePromptStateStore.getState();
-    const { addAttachedFile } = useInputStore.getState();
-    const { getAvailableModelListItems } = useProviderStore.getState();
-    const { initializeVFS: initVfs } = useVfsStore.getState();
-
-    try {
-      const newConversationId = await addConversation({
-        title: urlParams.query
-          ? `From URL: ${urlParams.query.substring(0, 30)}...`
-          : "From URL Parameters",
-      });
-      await selectItem(newConversationId, "conversation");
-
-      if (urlParams.modelId) {
-        const availableModels = getAvailableModelListItems();
-        let foundModelId: string | null = null;
-        const modelParamLower = urlParams.modelId.toLowerCase();
-        if (urlParams.modelId.includes(":")) {
-          const directMatch = availableModels.find(
-            (m) => m.id === urlParams.modelId
-          );
-          if (directMatch) foundModelId = directMatch.id;
-        }
-        if (!foundModelId) {
-          const nameMatch = availableModels.find(
-            (m) => m.name.toLowerCase() === modelParamLower
-          );
-          if (nameMatch) foundModelId = nameMatch.id;
-        }
-        if (!foundModelId) {
-          const startsWithNameMatch = availableModels.find((m) =>
-            m.name.toLowerCase().startsWith(modelParamLower)
-          );
-          if (startsWithNameMatch) foundModelId = startsWithNameMatch.id;
-        }
-        if (!foundModelId) {
-          const startsWithProviderMatch = availableModels.find((m) => {
-            const mtc = m.id.toLowerCase().split("/");
-            return mtc.length > 1 && mtc[1].startsWith(modelParamLower);
-          });
-          if (startsWithProviderMatch)
-            foundModelId = startsWithProviderMatch.id;
-        }
-        if (foundModelId) {
-          setPromptModelId(foundModelId);
-          const foundModelDetails = availableModels.find(
-            (m) => m.id === foundModelId
-          );
-          toast.success(
-            `Model set to: ${foundModelDetails?.name} (${foundModelDetails?.providerName})`
-          );
-        } else {
-          toast.warning(
-            `Model matching "${urlParams.modelId}" not found or not enabled. Using default.`
-          );
-        }
-      }
-
-      if (urlParams.vfsFiles && urlParams.vfsFiles.length > 0) {
-        const vfsKeyForUrl = "orphan";
-        let fsInstance;
-        try {
-          fsInstance = await initVfs(vfsKeyForUrl, { force: true });
-        } catch (vfsError) {
-          toast.error(
-            `Failed to initialize VFS for URL files: ${
-              vfsError instanceof Error ? vfsError.message : String(vfsError)
-            }`
-          );
-        }
-        if (fsInstance) {
-          for (const filePath of urlParams.vfsFiles) {
-            try {
-              const contentBytes = await VfsOps.readFileOp(filePath, {
-                fsInstance,
-              });
-              const nodeStat = await fsInstance.promises.stat(filePath);
-              const fileName = basename(filePath);
-              const mimeType = "application/octet-stream";
-              const isText = isLikelyTextFile(fileName, mimeType);
-              let fileData: {
-                contentText?: string;
-                contentBase64?: string;
-              } = {};
-              if (isText) {
-                fileData.contentText = new TextDecoder().decode(contentBytes);
-              } else {
-                let binary = "";
-                const len = contentBytes.byteLength;
-                for (let i = 0; i < len; i++) {
-                  binary += String.fromCharCode(contentBytes[i]);
-                }
-                fileData.contentBase64 = window.btoa(binary);
-              }
-              addAttachedFile({
-                source: "vfs",
-                name: fileName,
-                type: mimeType,
-                size: nodeStat.size,
-                path: filePath,
-                ...fileData,
-              });
-              toast.success(`Attached VFS file: ${fileName}`);
-            } catch (fileError: any) {
-              if (fileError.code === "ENOENT") {
-                toast.warning(`VFS file not found: ${filePath}`);
-              } else {
-                toast.warning(
-                  `Failed to attach VFS file "${filePath}": ${fileError.message}`
-                );
-              }
-              console.error(
-                `Error processing VFS file ${filePath}:`,
-                fileError
-              );
-            }
-          }
-        }
-      }
-
-      if (urlParams.query) {
-        if (urlParams.submit === "0") {
-          inputAreaRef.current?.setValue(urlParams.query);
-          focusInput();
-          toast.info("Query from URL loaded into input area.");
-          window.history.replaceState(
-            {},
-            document.title,
-            window.location.pathname
-          );
-        } else {
-          let parameters: Record<string, any> = {};
-          let metadata: Record<string, any> = {};
-          const currentPromptControls = Object.values(
-            useControlRegistryStore.getState().promptControls
-          ).filter((c) => (c.show ? c.show() : true));
-          for (const control of currentPromptControls) {
-            if (control.getParameters) {
-              const params = await control.getParameters();
-              if (params) parameters = { ...parameters, ...params };
-            }
-            if (control.getMetadata) {
-              const meta = await control.getMetadata();
-              if (meta) metadata = { ...metadata, ...meta };
-            }
-          }
-          const currentAttachedFiles =
-            useInputStore.getState().attachedFilesMetadata;
-          if (currentAttachedFiles.length > 0) {
-            metadata.attachedFiles = [...currentAttachedFiles];
-          }
-          let turnData: PromptTurnObject = {
-            id: nanoid(),
-            content: urlParams.query,
-            parameters,
-            metadata,
-          };
-          emitter.emit(PromptEvent.SUBMITTED, { turnData });
-          const middlewareResult = await runMiddleware(
-            ModMiddlewareHook.PROMPT_TURN_FINALIZE,
-            { turnData }
-          );
-          if (middlewareResult === false) {
-            toast.warning(
-              "Prompt submission from URL cancelled by middleware."
-            );
-            return;
-          }
-          const finalTurnData =
-            middlewareResult && typeof middlewareResult === "object"
-              ? (middlewareResult as { turnData: PromptTurnObject }).turnData
-              : turnData;
-          await ConversationService.submitPrompt(finalTurnData);
-          window.history.replaceState(
-            {},
-            document.title,
-            window.location.pathname
-          );
-        }
-      } else if (urlParams.modelId || urlParams.vfsFiles?.length) {
-        toast.info(
-          "Model and/or VFS files from URL applied. Type your message."
-        );
-        window.history.replaceState(
-          {},
-          document.title,
-          window.location.pathname
-        );
-      }
-    } catch (error) {
-      toast.error(
-        `Failed to process URL parameters: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-      console.error("Error processing URL parameters:", error);
-    }
-  }, [focusInput]);
-
   useEffect(() => {
-    let isMounted = true;
+    const coreModApi = createModApi({
+      id: "core-litechat-app",
+      name: "LiteChat App Core",
+      sourceUrl: null,
+      scriptContent: null,
+      enabled: true,
+      loadOrder: -1000,
+      createdAt: new Date(),
+    });
+
     const initializeApp = async () => {
-      console.log("LiteChat: Starting initialization...");
+      if (hasInitializedSuccessfully) {
+        console.log(
+          "[LiteChat] App: Skipping re-initialization (already run successfully)."
+        );
+        setIsInitializing(false);
+        return;
+      }
+
+      console.log("[LiteChat] App: Starting initialization...");
       setIsInitializing(true);
       try {
-        await performFullInitialization(controls);
-        await processUrlParameters();
+        initializedControlModules = await performFullInitialization(
+          controls,
+          coreModApi
+        );
+        hasInitializedSuccessfully = true; // Set flag on successful completion
       } catch (error) {
-        console.error("LiteChat: Top-level initialization error:", error);
+        console.error("[LiteChat] App: Top-level initialization error:", error);
+        hasInitializedSuccessfully = false; // Ensure it's false on error
       } finally {
-        if (isMounted) {
-          console.log("LiteChat: Initialization complete.");
-          setIsInitializing(false);
-        }
+        console.log("[LiteChat] App: Initialization attempt complete.");
+        setIsInitializing(false);
       }
     };
-    initializeApp();
+
+    if (!appInitializationPromise) {
+      appInitializationPromise = initializeApp().then(
+        () => initializedControlModules
+      );
+    }
+
     return () => {
-      isMounted = false;
-      console.log("LiteChat: Unmounting, initialization cancelled if pending.");
-      // TODO: Call destroy on all initialized control modules
+      console.log("[LiteChat] App: StrictMode unmount or component unmount.");
+      // Cleanup only if this is a "true" unmount, not just StrictMode.
+      // For StrictMode, we want modules to persist for the remount.
+      // If we had a way to detect true unmount vs. StrictMode unmount,
+      // we could be more precise. For now, the `hasInitializedSuccessfully` flag
+      // prevents re-running the full init.
+      // The `destroy` logic for modules should ideally be tied to application shutdown.
     };
-  }, [controls, processUrlParameters]);
+  }, [controls]);
 
   const prevContextRef = useRef<{
     itemId: string | null;
@@ -348,11 +169,13 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
   }>({ itemId: null, itemType: null });
 
   useEffect(() => {
-    if (isInitializing) return;
+    if (isInitializing || !hasInitializedSuccessfully) return;
+
     const currentContext = {
       itemId: selectedItemId,
       itemType: selectedItemType,
     };
+
     if (
       currentContext.itemId !== prevContextRef.current.itemId ||
       currentContext.itemType !== prevContextRef.current.itemType
@@ -363,12 +186,10 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
           : selectedItemType === "conversation"
           ? getConversationById(selectedItemId)?.projectId ?? null
           : null;
+
       const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
       initializePromptState(effectiveSettings);
       prevContextRef.current = currentContext;
-      if (currentContext.itemType === "conversation") {
-        focusInput();
-      }
     }
   }, [
     selectedItemId,
@@ -377,96 +198,98 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     getEffectiveProjectSettings,
     initializePromptState,
     isInitializing,
-    focusInput,
   ]);
 
+  // VFS Key Management Effect (from VfsControlModule logic)
   useEffect(() => {
+    if (isInitializing || !hasInitializedSuccessfully) return;
+
     let targetVfsKey: string | null = null;
     if (isVfsModalOpen || selectedItemType === "project") {
       if (selectedItemType === "project") {
         targetVfsKey = selectedItemId;
       } else if (selectedItemType === "conversation") {
-        const convo = useConversationStore
-          .getState()
-          .getConversationById(selectedItemId);
+        const convo = getConversationById(selectedItemId);
         targetVfsKey = convo?.projectId ?? "orphan";
       } else {
         targetVfsKey = "orphan";
       }
+    } else if (selectedItemType === "conversation") {
+      const convo = getConversationById(selectedItemId);
+      targetVfsKey = convo?.projectId ?? "orphan";
     }
+
     if (useVfsStore.getState().vfsKey !== targetVfsKey) {
       setVfsKey(targetVfsKey);
     }
-  }, [isVfsModalOpen, selectedItemId, selectedItemType, setVfsKey]);
+  }, [
+    isVfsModalOpen,
+    selectedItemId,
+    selectedItemType,
+    setVfsKey,
+    getConversationById,
+    isInitializing,
+  ]);
 
-  const handlePromptSubmit = useCallback(
-    async (turnData: PromptTurnObject) => {
-      const conversationState = useConversationStore.getState();
-      let currentConvId =
-        conversationState.selectedItemType === "conversation"
-          ? conversationState.selectedItemId
-          : null;
-      const currentProjectId =
-        conversationState.selectedItemType === "project"
-          ? conversationState.selectedItemId
-          : conversationState.selectedItemType === "conversation"
-          ? conversationState.getConversationById(
-              conversationState.selectedItemId
-            )?.projectId ?? null
-          : null;
-      if (!currentConvId) {
-        try {
-          const newId = await conversationState.addConversation({
-            title: "New Chat",
-            projectId: currentProjectId,
-          });
-          await conversationState.selectItem(newId, "conversation");
-          currentConvId = useConversationStore.getState().selectedItemId;
-        } catch (error) {
-          console.error("LiteChat: Failed to create new conversation", error);
-          toast.error("Failed to start new chat.");
-          return;
-        }
-      }
+  const handlePromptSubmit = useCallback(async (turnData: PromptTurnObject) => {
+    const conversationState = useConversationStore.getState();
+    let currentConvId =
+      conversationState.selectedItemType === "conversation"
+        ? conversationState.selectedItemId
+        : null;
+    const currentProjectId =
+      conversationState.selectedItemType === "project"
+        ? conversationState.selectedItemId
+        : conversationState.selectedItemType === "conversation"
+        ? conversationState.getConversationById(
+            conversationState.selectedItemId
+          )?.projectId ?? null
+        : null;
+
+    if (!currentConvId) {
       try {
-        const currentPromptState = usePromptStateStore.getState();
-        const finalTurnData = {
-          ...turnData,
-          metadata: {
-            ...turnData.metadata,
-            modelId: currentPromptState.modelId,
-          },
-        };
-        await ConversationService.submitPrompt(finalTurnData);
-        focusInput();
+        const newId = await conversationState.addConversation({
+          title: "New Chat",
+          projectId: currentProjectId,
+        });
+        await conversationState.selectItem(newId, "conversation");
+        currentConvId = useConversationStore.getState().selectedItemId;
       } catch (error) {
-        console.error("LiteChat: Error submitting prompt:", error);
-        focusInput();
+        console.error(
+          "[LiteChat] App: Failed to create new conversation",
+          error
+        );
+        toast.error("Failed to start new chat.");
+        return;
       }
-    },
-    [focusInput]
-  );
+    }
 
-  const onRegenerateInteraction = useCallback(
-    async (interactionId: string) => {
-      try {
-        await ConversationService.regenerateInteraction(interactionId);
-        focusInput();
-      } catch (error) {
-        console.error("LiteChat: Error regenerating interaction:", error);
-        focusInput();
-      }
-    },
-    [focusInput]
-  );
+    try {
+      const currentPromptState = usePromptStateStore.getState();
+      const finalTurnData = {
+        ...turnData,
+        metadata: {
+          ...turnData.metadata,
+          modelId: currentPromptState.modelId,
+        },
+      };
+      await ConversationService.submitPrompt(finalTurnData);
+    } catch (error) {
+      console.error("[LiteChat] App: Error submitting prompt:", error);
+    }
+  }, []);
 
-  const onStopInteraction = useCallback(
-    (interactionId: string) => {
-      InteractionService.abortInteraction(interactionId);
-      focusInput();
-    },
-    [focusInput]
-  );
+  const onRegenerateInteraction = useCallback(async (interactionId: string) => {
+    try {
+      await ConversationService.regenerateInteraction(interactionId);
+    } catch (error) {
+      console.error("[LiteChat] App: Error regenerating interaction:", error);
+    }
+  }, []);
+
+  const onStopInteraction = useCallback((interactionId: string) => {
+    InteractionService.abortInteraction(interactionId);
+  }, []);
 
   const sidebarControls = useMemo(
     () =>
@@ -647,6 +470,8 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
             onSubmit={handlePromptSubmit}
             className="border-t border-border bg-card flex-shrink-0"
             inputAreaRef={inputAreaRef}
+            selectedItemId={selectedItemId}
+            selectedItemType={selectedItemType}
           />
         </div>
       </div>

@@ -1,6 +1,6 @@
 // src/components/LiteChat/prompt/PromptWrapper.tsx
 // FULL FILE
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react"; // Added useEffect
 import { Button } from "@/components/ui/button";
 import { SendHorizonalIcon, Loader2 } from "lucide-react";
 import { PromptControlWrapper } from "./PromptControlWrapper";
@@ -18,8 +18,8 @@ import { runMiddleware } from "@/lib/litechat/ai-helpers";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
-// Import new event constants
 import { PromptEvent, ModMiddlewareHook } from "@/types/litechat/modding";
+import type { SidebarItemType } from "@/types/litechat/chat"; // For selectedItemType
 
 interface PromptWrapperProps {
   InputAreaRenderer: InputAreaRenderer;
@@ -27,6 +27,8 @@ interface PromptWrapperProps {
   className?: string;
   placeholder?: string;
   inputAreaRef: React.RefObject<InputAreaRef | null>;
+  selectedItemId: string | null; // New prop for focus logic
+  selectedItemType: SidebarItemType | null; // New prop for focus logic
 }
 
 export const PromptWrapper: React.FC<PromptWrapperProps> = ({
@@ -35,6 +37,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   className,
   placeholder = "Send a message...",
   inputAreaRef,
+  selectedItemId, // Destructure new prop
+  selectedItemType, // Destructure new prop
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasInputValue, setHasInputValue] = useState(false);
@@ -51,6 +55,16 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       clearAttachedFiles: state.clearAttachedFiles,
     }))
   );
+
+  // Effect for focusing input on conversation selection
+  useEffect(() => {
+    if (selectedItemType === "conversation" && selectedItemId) {
+      // Ensure a conversation is selected and it's not just any item
+      requestAnimationFrame(() => {
+        inputAreaRef.current?.focus();
+      });
+    }
+  }, [selectedItemId, selectedItemType, inputAreaRef]);
 
   const promptControls = useMemo(() => {
     return Object.values(registeredPromptControls).filter((c) =>
@@ -104,7 +118,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         metadata,
       };
 
-      // Use new event constant
       emitter.emit(PromptEvent.SUBMITTED, { turnData });
 
       const middlewareResult = await runMiddleware(
@@ -165,7 +178,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
           className="flex flex-wrap gap-1 md:gap-2 items-start mb-1 md:mb-2"
         />
       )}
-
       <div className="flex items-end gap-2">
         <InputAreaRenderer
           ref={inputAreaRef}
@@ -193,8 +205,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
             <SendHorizonalIcon className="h-4 w-4" />
           )}
         </Button>
-      </div>
-
+      </div>{" "}
       <PromptControlWrapper
         controls={triggerControls}
         area="trigger"

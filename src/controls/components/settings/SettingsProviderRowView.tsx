@@ -1,4 +1,4 @@
-// src/components/LiteChat/settings/SettingsProviderRowView.tsx
+// src/controls/components/settings/SettingsProviderRowView.tsx
 // FULL FILE
 import React, { useMemo, useCallback, useState } from "react";
 import type {
@@ -46,7 +46,7 @@ interface ProviderRowViewModeProps {
   fetchStatus: FetchStatus;
   isDeleting: boolean;
   onSelectModelForDetails: (combinedModelId: string | null) => void;
-  allAvailableModelsForView: OpenRouterModel[]; // Expects OpenRouterModel[]
+  allAvailableModelsForView: OpenRouterModel[];
 }
 
 const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
@@ -267,12 +267,12 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
         {!isModelListFolded && (
           <ModelEnablementList
             providerId={provider.id}
-            allAvailableModels={allAvailableModelsForView} // Pass OpenRouterModel[]
+            allAvailableModels={allAvailableModelsForView}
             enabledModelIds={enabledModelsSet}
             onToggleModel={handleModelToggle}
             isLoading={fetchStatus === "fetching"}
             disabled={isDeleting}
-            listHeightClass="h-64"
+            listHeightClass="h-[26rem]" // Updated height
             onModelClick={handleModelClick}
           />
         )}

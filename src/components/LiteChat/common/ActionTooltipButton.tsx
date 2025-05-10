@@ -20,7 +20,7 @@ export type ActionTooltipButtonProps = React.ComponentProps<"button"> &
     icon: LucideIcon | React.ReactNode;
     iconClassName?: string;
     tooltipSide?: "top" | "bottom" | "left" | "right";
-    "aria-label": string;
+    "aria-label"?: string;
   };
 
 export const ActionTooltipButton: React.FC<ActionTooltipButtonProps> = ({
@@ -49,7 +49,7 @@ export const ActionTooltipButton: React.FC<ActionTooltipButtonProps> = ({
             onClick={onClick}
             disabled={disabled}
             className={cn("h-6 w-6", className)} // Default size, can be overridden
-            aria-label={ariaLabel}
+            aria-label={ariaLabel ?? tooltipText}
             {...rest}
           >
             {/* Conditionally render the icon */}

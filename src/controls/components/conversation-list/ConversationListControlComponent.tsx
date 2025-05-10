@@ -1,6 +1,12 @@
 // src/controls/components/conversation-list/ConversationListControlComponent.tsx
 // FULL FILE
-import React, { useMemo, useState, useCallback, useEffect } from "react";
+import React, {
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import {
   useConversationStore,
   type SidebarItem,
@@ -11,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { PlusIcon, FolderPlusIcon, SearchIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { SidebarItemType } from "@/types/litechat/chat";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
@@ -23,9 +28,18 @@ import type { Project } from "@/types/litechat/project";
 import type { Conversation } from "@/types/litechat/chat";
 import { ConversationItemRenderer } from "./ItemRenderer";
 import { useItemEditing } from "@/hooks/litechat/useItemEditing";
-import type { ConversationListControlModule } from "@/controls/modules/ConversationListControlModule"; // Import module type
+import type { ConversationListControlModule } from "@/controls/modules/ConversationListControlModule";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
-// --- Recursive Filtering Helper (remains the same) ---
+interface VirtualListItem {
+  id: string;
+  originalId: string;
+  type: SidebarItemType;
+  level: number;
+  data: Project | Conversation;
+}
+
 const itemMatchesFilterOrHasMatchingDescendant = (
   itemId: string,
   itemType: SidebarItemType,
@@ -97,14 +111,55 @@ interface ConversationListControlComponentProps {
 export const ConversationListControlComponent: React.FC<
   ConversationListControlComponentProps
 > = ({ module }) => {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [viewportReady, setViewportReady] = useState(false);
   const [, forceUpdate] = useState({});
+
   useEffect(() => {
     module.setNotifyCallback(() => forceUpdate({}));
+    if (
+      module.isLoading &&
+      !useConversationStore.getState().isLoading &&
+      !useProjectStore.getState().isLoading
+    ) {
+      module.setIsLoading(false);
+    }
     return () => module.setNotifyCallback(null);
   }, [module]);
 
-  // Read necessary state from stores directly, as this component is complex
-  // and already uses useShallow for optimization.
+  useEffect(() => {
+    const currentScrollArea = listRef.current;
+    if (currentScrollArea) {
+      const viewportElement = currentScrollArea.querySelector<HTMLDivElement>(
+        "[data-radix-scroll-area-viewport]"
+      );
+      if (viewportElement && viewportRef.current !== viewportElement) {
+        viewportRef.current = viewportElement;
+        if (!viewportReady) setViewportReady(true);
+        forceUpdate({});
+      } else if (!viewportElement && viewportRef.current) {
+        viewportRef.current = null;
+        setViewportReady(false);
+      }
+      if (!viewportRef.current) {
+        const observer = new MutationObserver(() => {
+          const vp = currentScrollArea.querySelector<HTMLDivElement>(
+            "[data-radix-scroll-area-viewport]"
+          );
+          if (vp && viewportRef.current !== vp) {
+            viewportRef.current = vp;
+            setViewportReady(true);
+            forceUpdate({});
+            observer.disconnect();
+          }
+        });
+        observer.observe(currentScrollArea, { childList: true, subtree: true });
+        return () => observer.disconnect();
+      }
+    }
+  }, [listRef.current, viewportReady]);
+
   const {
     selectedItemId,
     selectedItemType,
@@ -146,7 +201,7 @@ export const ConversationListControlComponent: React.FC<
       }))
     );
 
-  const isLoading = module.isLoading; // Read loading state from module
+  const isLoading = module.isLoading;
 
   const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(
     new Set()
@@ -157,20 +212,16 @@ export const ConversationListControlComponent: React.FC<
     updateProject,
     updateConversation,
     deleteProject,
-    getProjectById,
-    getConversationById,
   });
+
   const {
     editingItemId,
     editingItemType,
-    originalName,
-    localEditingName,
-    setLocalEditingName,
     isSavingEdit,
-    editInputRef,
     handleStartEditing,
     handleSaveEdit,
     handleCancelEdit,
+    originalNameToCompare,
   } = editingState;
 
   const toggleProjectExpansion = useCallback((projectId: string) => {
@@ -197,7 +248,6 @@ export const ConversationListControlComponent: React.FC<
 
   const handleNewChat = useCallback(async () => {
     if (editingItemId) return;
-    module.setIsLoading(true);
     try {
       const parentProjectId = getParentProjectId();
       const newId = await addConversation({
@@ -208,14 +258,11 @@ export const ConversationListControlComponent: React.FC<
     } catch (error) {
       console.error("Failed to create new chat:", error);
       toast.error("Failed to create new chat.");
-    } finally {
-      module.setIsLoading(false);
     }
-  }, [editingItemId, getParentProjectId, addConversation, selectItem, module]);
+  }, [editingItemId, getParentProjectId, addConversation, selectItem]);
 
   const handleNewProject = useCallback(async () => {
     if (editingItemId) return;
-    module.setIsLoading(true);
     try {
       const parentProjectId = getParentProjectId();
       const newId = await addProject({
@@ -234,8 +281,6 @@ export const ConversationListControlComponent: React.FC<
       }, 50);
     } catch (error) {
       console.error("Failed to create new project:", error);
-    } finally {
-      module.setIsLoading(false);
     }
   }, [
     editingItemId,
@@ -244,21 +289,13 @@ export const ConversationListControlComponent: React.FC<
     selectItem,
     getProjectById,
     handleStartEditing,
-    module,
   ]);
 
   const handleSelectItem = useCallback(
     (id: string, type: SidebarItemType) => {
-      if (id === editingItemId) return;
-      if (editingItemId && id !== editingItemId) {
-        if (
-          localEditingName.trim() &&
-          localEditingName.trim() !== originalName
-        ) {
-          handleSaveEdit();
-        } else {
-          handleCancelEdit();
-        }
+      if (id === editingItemId && type === editingItemType) return;
+      if (editingItemId && (id !== editingItemId || type !== editingItemType)) {
+        handleCancelEdit();
       }
       if (id !== selectedItemId || type !== selectedItemType) {
         selectItem(id, type);
@@ -266,11 +303,9 @@ export const ConversationListControlComponent: React.FC<
     },
     [
       editingItemId,
-      localEditingName,
-      originalName,
+      editingItemType,
       selectedItemId,
       selectedItemType,
-      handleSaveEdit,
       handleCancelEdit,
       selectItem,
     ]
@@ -280,30 +315,24 @@ export const ConversationListControlComponent: React.FC<
     (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
       if (window.confirm("Delete this conversation? This cannot be undone.")) {
-        module.setIsLoading(true);
-        deleteConversation(id)
-          .catch((error) => {
-            console.error("Failed to delete conversation:", error);
-            toast.error("Failed to delete conversation.");
-          })
-          .finally(() => module.setIsLoading(false));
+        deleteConversation(id).catch((error) => {
+          console.error("Failed to delete conversation:", error);
+          toast.error("Failed to delete conversation.");
+        });
       }
     },
-    [deleteConversation, module]
+    [deleteConversation]
   );
 
   const handleDeleteProject = useCallback(
     (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
-      module.setIsLoading(true);
-      deleteProject(id)
-        .catch((error) => {
-          console.error("Failed to delete project:", error);
-          toast.error("Failed to delete project.");
-        })
-        .finally(() => module.setIsLoading(false));
+      deleteProject(id).catch((error) => {
+        console.error("Failed to delete project:", error);
+        toast.error("Failed to delete project.");
+      });
     },
-    [deleteProject, module]
+    [deleteProject]
   );
 
   const handleExportConversation = useCallback(
@@ -356,15 +385,14 @@ export const ConversationListControlComponent: React.FC<
       };
     }, [projects, conversations]);
 
-  const getChildren = useCallback(
-    (
-      parentId: string | null,
-      filter: string
-    ): { projects: Project[]; conversations: Conversation[] } => {
-      const lowerCaseFilter = filter.toLowerCase();
-      const memoCache: Record<string, boolean> = {};
-      const childProjects = (projectsByParentId.get(parentId) || []).filter(
-        (p) =>
+  const flattenedVisibleItems = useMemo((): VirtualListItem[] => {
+    const flatList: VirtualListItem[] = [];
+    const lowerCaseFilter = filterText.toLowerCase();
+    const memoCache: Record<string, boolean> = {};
+
+    function addChildren(parentId: string | null, level: number) {
+      const childProjects = (projectsByParentId.get(parentId) || [])
+        .filter((p) =>
           itemMatchesFilterOrHasMatchingDescendant(
             p.id,
             "project",
@@ -376,62 +404,54 @@ export const ConversationListControlComponent: React.FC<
             projectsByParentId,
             memoCache
           )
-      );
-      const childConversations = (
-        conversationsByProjectId.get(parentId) || []
-      ).filter((c) => c.title.toLowerCase().includes(lowerCaseFilter));
-      childProjects.sort(
-        (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
-      );
-      childConversations.sort(
-        (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
-      );
-      return { projects: childProjects, conversations: childConversations };
-    },
-    [
-      projects,
-      conversations,
-      projectsById,
-      conversationsByProjectId,
-      projectsByParentId,
-    ]
-  );
+        )
+        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
-  const rootItems = useMemo(() => {
-    const lowerCaseFilter = filterText.toLowerCase();
-    const memoCache: Record<string, boolean> = {};
-    const rootProjects = (projectsByParentId.get(null) || []).filter((p) =>
-      itemMatchesFilterOrHasMatchingDescendant(
-        p.id,
-        "project",
-        lowerCaseFilter,
-        projects,
-        conversations,
-        projectsById,
-        conversationsByProjectId,
-        projectsByParentId,
-        memoCache
-      )
-    );
-    const rootConversations = (conversationsByProjectId.get(null) || []).filter(
-      (c) => c.title.toLowerCase().includes(lowerCaseFilter)
-    );
-    const combined = [
-      ...rootProjects.map((p): SidebarItem => ({ ...p, itemType: "project" })),
-      ...rootConversations.map(
-        (c): SidebarItem => ({ ...c, itemType: "conversation" })
-      ),
-    ];
-    combined.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
-    return combined;
+      const childConversations = (conversationsByProjectId.get(parentId) || [])
+        .filter((c) => c.title.toLowerCase().includes(lowerCaseFilter))
+        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+
+      childProjects.forEach((p) => {
+        flatList.push({
+          id: `project-${p.id}`,
+          originalId: p.id,
+          type: "project",
+          level,
+          data: p,
+        });
+        if (expandedProjects.has(p.id)) {
+          addChildren(p.id, level + 1);
+        }
+      });
+      childConversations.forEach((c) => {
+        flatList.push({
+          id: `conversation-${c.id}`,
+          originalId: c.id,
+          type: "conversation",
+          level,
+          data: c,
+        });
+      });
+    }
+
+    addChildren(null, 0);
+    return flatList;
   }, [
     projects,
     conversations,
     filterText,
+    expandedProjects,
     projectsById,
     conversationsByProjectId,
     projectsByParentId,
   ]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: flattenedVisibleItems.length,
+    getScrollElement: () => viewportRef.current,
+    estimateSize: () => 30,
+    overscan: 10,
+  });
 
   return (
     <div className="p-2 border-r border-[--border] bg-card text-card-foreground h-full flex flex-col">
@@ -485,53 +505,77 @@ export const ConversationListControlComponent: React.FC<
           disabled={isLoading}
         />
       </div>
-      <div className="flex-grow overflow-y-auto">
-        {isLoading ? (
+      <ScrollArea className="flex-grow" ref={listRef}>
+        {isLoading && flattenedVisibleItems.length === 0 ? (
           <div className="space-y-1 p-1">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
+            <div className="h-8 w-full bg-muted rounded animate-pulse" />
+            <div className="h-8 w-full bg-muted rounded animate-pulse" />
+            <div className="h-8 w-full bg-muted rounded animate-pulse" />
           </div>
-        ) : rootItems.length === 0 ? (
+        ) : !isLoading && flattenedVisibleItems.length === 0 ? (
           <p className="text-xs text-muted-foreground p-2 text-center">
             {filterText.trim() !== ""
               ? "No items match your filter."
               : "Workspace is empty."}
           </p>
         ) : (
-          <ul className="space-y-0.5 p-1">
-            {rootItems.map((item) => (
-              <ConversationItemRenderer
-                key={item.id}
-                item={item}
-                level={0}
-                selectedItemId={selectedItemId}
-                conversationSyncStatus={conversationSyncStatus}
-                repoNameMap={repoNameMap}
-                onSelectItem={handleSelectItem}
-                onDeleteConversation={handleDeleteConversation}
-                onDeleteProject={handleDeleteProject}
-                onExportConversation={handleExportConversation}
-                onExportProject={handleExportProject}
-                expandedProjects={expandedProjects}
-                toggleProjectExpansion={toggleProjectExpansion}
-                getChildren={getChildren}
-                filterText={filterText}
-                editingItemId={editingItemId}
-                editingItemType={editingItemType}
-                originalName={originalName}
-                localEditingName={localEditingName}
-                setLocalEditingName={setLocalEditingName}
-                handleStartEditing={handleStartEditing}
-                handleSaveEdit={handleSaveEdit}
-                handleCancelEdit={handleCancelEdit}
-                isSavingEdit={isSavingEdit}
-                editInputRef={editInputRef}
-              />
-            ))}
-          </ul>
+          viewportReady && (
+            <div
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                width: "100%",
+                position: "relative",
+              }}
+            >
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const itemData = flattenedVisibleItems[virtualRow.index];
+                if (!itemData) return null;
+                return (
+                  <div
+                    key={itemData.id}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                    className="px-1"
+                  >
+                    <ConversationItemRenderer
+                      item={itemData.data as SidebarItem}
+                      level={itemData.level}
+                      selectedItemId={selectedItemId}
+                      conversationSyncStatus={conversationSyncStatus}
+                      repoNameMap={repoNameMap}
+                      onSelectItem={handleSelectItem}
+                      onDeleteConversation={handleDeleteConversation}
+                      onDeleteProject={handleDeleteProject}
+                      onExportConversation={handleExportConversation}
+                      onExportProject={handleExportProject}
+                      expandedProjects={expandedProjects}
+                      toggleProjectExpansion={toggleProjectExpansion}
+                      editingItemId={editingItemId}
+                      editingItemType={editingItemType}
+                      handleStartEditing={handleStartEditing}
+                      handleSaveEdit={handleSaveEdit}
+                      handleCancelEdit={handleCancelEdit}
+                      isSavingEdit={isSavingEdit}
+                      originalNameToCompare={originalNameToCompare}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )
         )}
-      </div>
+        {!viewportReady && !isLoading && (
+          <div className="flex items-center justify-center h-full text-muted-foreground">
+            Initializing list...
+          </div>
+        )}
+      </ScrollArea>
     </div>
   );
 };

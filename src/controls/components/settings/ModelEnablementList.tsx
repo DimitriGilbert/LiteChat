@@ -1,10 +1,15 @@
-// src/components/LiteChat/settings/ModelEnablementList.tsx
+// src/controls/components/settings/ModelEnablementList.tsx
 // FULL FILE
-import React, { useState, useMemo } from "react";
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,21 +28,21 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
-// This component now expects OpenRouterModel[]
 import type { OpenRouterModel } from "@/types/litechat/provider";
 import { cn } from "@/lib/utils";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
 
 interface ModelEnablementListProps {
   providerId: string;
-  allAvailableModels: OpenRouterModel[]; // Expects full model definitions
-  enabledModelIds: Set<string>; // Simple model IDs (e.g., "gpt-4o")
-  onToggleModel: (modelId: string, isEnabled: boolean) => void; // Expects simple model ID
+  allAvailableModels: OpenRouterModel[];
+  enabledModelIds: Set<string>;
+  onToggleModel: (modelId: string, isEnabled: boolean) => void;
   isLoading?: boolean;
   disabled?: boolean;
   listHeightClass?: string;
-  onModelClick?: (modelId: string) => void; // Expects simple model ID
+  onModelClick?: (modelId: string) => void;
 }
 
 const parsePrice = (priceStr: string | null | undefined): number | null => {
@@ -53,9 +58,44 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   onToggleModel,
   isLoading = false,
   disabled = false,
-  listHeightClass = "h-48",
+  listHeightClass = "h-[26rem]",
   onModelClick,
 }) => {
+  const [scrollAreaContainer, setScrollAreaContainer] =
+    useState<HTMLDivElement | null>(null);
+  const [viewportElement, setViewportElement] = useState<HTMLDivElement | null>(
+    null
+  );
+
+  const scrollAreaRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      setScrollAreaContainer(node);
+      const vp = node.querySelector<HTMLDivElement>(
+        "[data-radix-scroll-area-viewport]"
+      );
+      if (vp) {
+        setViewportElement(vp);
+      } else {
+        // Fallback if viewport not immediately available
+        const observer = new MutationObserver(() => {
+          const observedVp = node.querySelector<HTMLDivElement>(
+            "[data-radix-scroll-area-viewport]"
+          );
+          if (observedVp) {
+            setViewportElement(observedVp);
+            observer.disconnect();
+          }
+        });
+        observer.observe(node, { childList: true, subtree: true });
+        // Consider a timeout for the observer as well
+        return () => observer.disconnect();
+      }
+    } else {
+      setScrollAreaContainer(null);
+      setViewportElement(null);
+    }
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
   const [enabledFilter, setEnabledFilter] = useState<
@@ -75,7 +115,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   const [maxOutputPrice, setMaxOutputPrice] = useState<string>("");
 
   const filteredModels = useMemo(() => {
-    let models = allAvailableModels;
+    let models = [...allAvailableModels];
 
     if (enabledFilter === "enabled") {
       models = models.filter((model) => enabledModelIds.has(model.id));
@@ -91,18 +131,15 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
           model.id.toLowerCase().includes(query)
       );
     }
-
     const activeCapabilityFilters = Object.entries(capabilityFilters)
       .filter(([, isActive]) => isActive)
       .map(([key]) => key as CapabilityFilter);
-
     if (activeCapabilityFilters.length > 0) {
       models = models.filter((model) => {
         const supportedParams = new Set(model.supported_parameters ?? []);
         const inputModalities = new Set(
           model.architecture?.input_modalities ?? []
         );
-
         return activeCapabilityFilters.every((filter) => {
           switch (filter) {
             case "reasoning":
@@ -122,12 +159,10 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
         });
       });
     }
-
     const minIn = parseFloat(minInputPrice);
     const maxIn = parseFloat(maxInputPrice);
     const minOut = parseFloat(minOutputPrice);
     const maxOut = parseFloat(maxOutputPrice);
-
     const hasMinIn = !isNaN(minIn);
     const hasMaxIn = !isNaN(maxIn);
     const hasMinOut = !isNaN(minOut);
@@ -137,12 +172,10 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
       models = models.filter((model) => {
         const promptPrice = parsePrice(model.pricing?.prompt);
         const completionPrice = parsePrice(model.pricing?.completion);
-
         const minInPerToken = hasMinIn ? minIn / 1_000_000 : -Infinity;
         const maxInPerToken = hasMaxIn ? maxIn / 1_000_000 : Infinity;
         const minOutPerToken = hasMinOut ? minOut / 1_000_000 : -Infinity;
         const maxOutPerToken = hasMaxOut ? maxOut / 1_000_000 : Infinity;
-
         const inputPriceMatch =
           promptPrice !== null &&
           promptPrice >= minInPerToken &&
@@ -151,15 +184,12 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
           completionPrice !== null &&
           completionPrice >= minOutPerToken &&
           completionPrice <= maxOutPerToken;
-
         let match = true;
         if (hasMinIn || hasMaxIn) match &&= inputPriceMatch;
         if (hasMinOut || hasMaxOut) match &&= outputPriceMatch;
-
         return match;
       });
     }
-
     return models;
   }, [
     allAvailableModels,
@@ -173,11 +203,15 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
     maxOutputPrice,
   ]);
 
+  const rowVirtualizer = useVirtualizer({
+    count: filteredModels.length,
+    getScrollElement: () => viewportElement,
+    estimateSize: () => 40,
+    overscan: 10,
+  });
+
   const toggleCapabilityFilter = (filter: CapabilityFilter) => {
-    setCapabilityFilters((prev) => ({
-      ...prev,
-      [filter]: !prev[filter],
-    }));
+    setCapabilityFilters((prev) => ({ ...prev, [filter]: !prev[filter] }));
   };
 
   const activeFilterCount =
@@ -189,10 +223,10 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
 
   if (isLoading) {
     return (
-      <div className={`space-y-2 ${listHeightClass}`}>
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-8 w-full" />
+      <div className={cn("space-y-2", listHeightClass)}>
+        <div className="h-8 w-full bg-muted rounded animate-pulse" />
+        <div className="h-8 w-full bg-muted rounded animate-pulse" />
+        <div className="h-8 w-full bg-muted rounded animate-pulse" />
       </div>
     );
   }
@@ -206,8 +240,8 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
+    <div className="space-y-2 flex flex-col h-full">
+      <div className="flex items-center gap-2 flex-shrink-0">
         <div className="relative flex-grow">
           <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -358,41 +392,73 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
         </Popover>
       </div>
       <ScrollArea
-        className={`${listHeightClass} w-full rounded-md border border-border p-3 bg-background/50`}
+        className={cn(
+          "w-full rounded-md border border-border p-1 bg-background/50 flex-grow",
+          listHeightClass
+        )}
+        ref={scrollAreaRef}
       >
-        <div className="space-y-2">
-          {filteredModels.map((model) => (
-            <div
-              key={model.id} // Use simple model ID as key
-              className="flex items-center justify-between space-x-2 p-1.5 rounded hover:bg-muted/50"
-            >
-              <Switch
-                id={`enable-model-${providerId}-${model.id}`}
-                checked={enabledModelIds.has(model.id)}
-                onCheckedChange={(checked) => onToggleModel(model.id, checked)}
-                disabled={disabled}
-                aria-label={`Enable model ${model.name || model.id}`}
-                className="flex-shrink-0"
-                onClick={(e) => e.stopPropagation()}
-              />
-              <Label
-                htmlFor={`enable-model-${providerId}-${model.id}`}
-                className="text-sm font-normal text-card-foreground flex-grow cursor-pointer truncate pl-2"
-                title={model.name || model.id}
-                onClick={
-                  onModelClick ? () => onModelClick(model.id) : undefined
-                }
-              >
-                {model.name || model.id}
-              </Label>
-            </div>
-          ))}
-          {filteredModels.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No models match the current filters.
-            </p>
-          )}
-        </div>
+        {viewportElement && (
+          <div
+            style={{
+              height: `${rowVirtualizer.getTotalSize()}px`,
+              width: "100%",
+              position: "relative",
+            }}
+          >
+            {filteredModels.length === 0 && !isLoading ? (
+              <p className="text-sm text-muted-foreground text-center py-4 absolute inset-0 flex items-center justify-center">
+                No models match the current filters.
+              </p>
+            ) : (
+              rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const model = filteredModels[virtualRow.index];
+                if (!model) return null;
+                return (
+                  <div
+                    key={model.id}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                    className="flex items-center justify-between space-x-2 p-1.5 rounded hover:bg-muted/50"
+                  >
+                    <Switch
+                      id={`enable-model-${providerId}-${model.id}`}
+                      checked={enabledModelIds.has(model.id)}
+                      onCheckedChange={(checked) =>
+                        onToggleModel(model.id, checked)
+                      }
+                      disabled={disabled}
+                      aria-label={`Enable model ${model.name || model.id}`}
+                      className="flex-shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <Label
+                      htmlFor={`enable-model-${providerId}-${model.id}`}
+                      className="text-sm font-normal text-card-foreground flex-grow cursor-pointer truncate pl-2"
+                      title={model.name || model.id}
+                      onClick={
+                        onModelClick ? () => onModelClick(model.id) : undefined
+                      }
+                    >
+                      {model.name || model.id}
+                    </Label>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+        {!viewportElement && !isLoading && (
+          <div className="flex items-center justify-center h-full text-muted-foreground">
+            Initializing list...
+          </div>
+        )}
       </ScrollArea>
     </div>
   );

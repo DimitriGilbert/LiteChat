@@ -42,6 +42,7 @@
     "@radix-ui/react-tabs": "^1.1.9",
     "@radix-ui/react-tooltip": "^1.2.4",
     "@tailwindcss/vite": "^4.0.17",
+    "@tanstack/react-virtual": "^3.13.8",
     "@types/lodash-es": "^4.17.12",
     "@zenfs/core": "^2.0.0",
     "@zenfs/dom": "^1.1.6",
