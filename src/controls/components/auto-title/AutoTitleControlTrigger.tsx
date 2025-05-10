@@ -19,35 +19,20 @@ interface AutoTitleControlTriggerProps {
 export const AutoTitleControlTrigger: React.FC<
   AutoTitleControlTriggerProps
 > = ({ module }) => {
-  // Local state for UI responsiveness, synced with module state
-  const [localAutoTitleEnabled, setLocalAutoTitleEnabled] = useState(
-    module.getTurnEnabled()
-  );
-  const [, forceUpdate] = useState({}); // For re-rendering when module state changes
+  const [, forceUpdate] = useState({});
+  useEffect(() => {
+    module.setNotifyCallback(() => forceUpdate({}));
+    return () => module.setNotifyCallback(null);
+  }, [module]);
 
-  // Read derived state from module for rendering
+  const localAutoTitleEnabled = module.getTurnEnabled();
   const isStreaming = module.getIsStreaming();
   const isVisible =
     module.getGlobalAutoTitleEnabled() && module.getIsFirstInteraction();
 
-  // Effect to register a callback with the module for updates
-  useEffect(() => {
-    module.setNotifyCallback(() => forceUpdate({}));
-    return () => module.setNotifyCallback(null); // Cleanup
-  }, [module]);
-
-  // Effect to sync local state if module's state changes
-  useEffect(() => {
-    const moduleEnabled = module.getTurnEnabled();
-    if (localAutoTitleEnabled !== moduleEnabled) {
-      setLocalAutoTitleEnabled(moduleEnabled);
-    }
-  }, [module, localAutoTitleEnabled]); // Re-run if module instance or local state changes
-
   const handleToggle = useCallback(() => {
     const newState = !localAutoTitleEnabled;
-    setLocalAutoTitleEnabled(newState); // Update local state for immediate UI feedback
-    module.setTurnEnabled(newState); // Call module method to update module state
+    module.setTurnEnabled(newState);
   }, [localAutoTitleEnabled, module]);
 
   if (!isVisible) {

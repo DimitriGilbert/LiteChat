@@ -6,9 +6,8 @@ import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { ParameterControlModule } from "@/controls/modules/ParameterControlModule"; // Import module type
+import type { ParameterControlModule } from "@/controls/modules/ParameterControlModule";
 
-// Props now take the module instance
 interface ParameterControlComponentProps {
   module: ParameterControlModule;
   className?: string;
@@ -23,7 +22,6 @@ export const ParameterControlComponent: React.FC<
     return () => module.setNotifyCallback(null);
   }, [module]);
 
-  // Read current values and defaults from the module
   const temperature = module.temperature;
   const topP = module.topP;
   const maxTokens = module.maxTokens;
@@ -40,7 +38,6 @@ export const ParameterControlComponent: React.FC<
 
   const supportedParams = module.supportedParams;
 
-  // Local slider states, initialized from module's current effective values
   const [localTemp, setLocalTemp] = useState(
     temperature ?? defaultTemperature ?? 0.7
   );
@@ -52,7 +49,6 @@ export const ParameterControlComponent: React.FC<
     frequencyPenalty ?? defaultFrequencyPenalty ?? 0.0
   );
 
-  // Sync local slider states if module's state changes
   useEffect(() => {
     setLocalTemp(temperature ?? defaultTemperature ?? 0.7);
   }, [temperature, defaultTemperature]);
@@ -62,9 +58,10 @@ export const ParameterControlComponent: React.FC<
   useEffect(() => {
     setLocalPresence(presencePenalty ?? defaultPresencePenalty ?? 0.0);
   }, [presencePenalty, defaultPresencePenalty]);
-  useEffect(() => {
-    setLocalFrequency(frequencyPenalty ?? defaultFrequencyPenalty ?? 0.0);
-  }, [frequencyPenalty, defaultFrequencyPenalty]);
+  useEffect(
+    () => setLocalFrequency(frequencyPenalty ?? defaultFrequencyPenalty ?? 0.0),
+    [frequencyPenalty, defaultFrequencyPenalty]
+  );
 
   const handleNumberInputChange = useCallback(
     (
@@ -74,7 +71,7 @@ export const ParameterControlComponent: React.FC<
       const value = e.target.value;
       const numValue = value === "" ? null : parseInt(value, 10);
       if (value === "" || (!isNaN(numValue!) && numValue !== null)) {
-        setter(numValue); // This calls the module's setter
+        setter(numValue);
       }
     },
     []
@@ -82,14 +79,14 @@ export const ParameterControlComponent: React.FC<
 
   const handleSliderCommit = useCallback(
     (setter: (value: number | null) => void, value: number[]) => {
-      setter(value[0]); // This calls the module's setter
+      setter(value[0]);
     },
     []
   );
 
   const handleUseDefault = useCallback(
     (setter: (value: number | null) => void) => {
-      setter(null); // This calls the module's setter
+      setter(null);
     },
     []
   );

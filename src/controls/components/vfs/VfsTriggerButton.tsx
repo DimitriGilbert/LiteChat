@@ -12,8 +12,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { VfsControlModule } from "@/controls/modules/VfsControlModule";
-import { useInputStore } from "@/store/input.store"; // For addAttachedFile
-// Corrected: Import useVfsStore
+import { useInputStore } from "@/store/input.store";
 import { useVfsStore } from "@/store/vfs.store";
 
 interface VfsTriggerButtonProps {
@@ -31,6 +30,7 @@ export const VfsTriggerButton: React.FC<VfsTriggerButtonProps> = ({
 
   const isVfsModalOpen = module.getIsVfsModalOpen();
   const selectedFileIdsCount = module.getSelectedFileIdsCount();
+  const isVisible = module.getEnableVfs(); // Visibility based on module state
 
   const addAttachedFile = useInputStore.getState().addAttachedFile;
 
@@ -44,7 +44,6 @@ export const VfsTriggerButton: React.FC<VfsTriggerButtonProps> = ({
     let attachedCount = 0;
     const nodes = module.getVfsNodes();
     selectedIds.forEach((fileId: string) => {
-      // Added type for fileId
       const node = nodes[fileId];
       if (node && node.type === "file") {
         addAttachedFile({
@@ -68,6 +67,10 @@ export const VfsTriggerButton: React.FC<VfsTriggerButtonProps> = ({
       toast.warning("No valid files were selected to attach.");
     }
   };
+
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <div className="flex items-center gap-1">

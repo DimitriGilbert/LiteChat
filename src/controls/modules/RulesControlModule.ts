@@ -4,8 +4,8 @@ import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import {
   type LiteChatModApi,
-  InteractionEvent,
-  RulesEvent,
+  interactionEvent, // Updated import
+  rulesEvent, // Updated import
 } from "@/types/litechat/modding";
 import { RulesControlTrigger } from "@/controls/components/rules/RulesControlTrigger";
 import { useRulesStore } from "@/store/rules.store";
@@ -24,24 +24,20 @@ export class RulesControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
-    // modApi parameter is used here for subscriptions
     this.loadInitialState();
 
-    const unsubStatus = modApi.on(
-      InteractionEvent.STATUS_CHANGED,
-      (payload) => {
-        if (this.isStreaming !== (payload.status === "streaming")) {
-          this.isStreaming = payload.status === "streaming";
-          this.notifyComponentUpdate?.();
-        }
+    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
+      if (this.isStreaming !== (payload.status === "streaming")) {
+        this.isStreaming = payload.status === "streaming";
+        this.notifyComponentUpdate?.();
       }
-    );
-    const unsubRulesLoaded = modApi.on(RulesEvent.RULES_LOADED, () => {
+    });
+    const unsubRulesLoaded = modApi.on(rulesEvent.rulesLoaded, () => {
       this.updateHasRulesOrTags();
       this.isLoadingRules = false;
       this.notifyComponentUpdate?.();
     });
-    const unsubTagsLoaded = modApi.on(RulesEvent.TAGS_LOADED, () => {
+    const unsubTagsLoaded = modApi.on(rulesEvent.tagsLoaded, () => {
       this.updateHasRulesOrTags();
       this.isLoadingRules = false;
       this.notifyComponentUpdate?.();
@@ -121,7 +117,7 @@ export class RulesControlModule implements ControlModule {
         }
         if (changed) this.notifyComponentUpdate?.();
       },
-      show: () => this.hasRulesOrTags,
+      // show method removed, visibility handled by RulesControlTrigger
     });
     console.log(`[${this.id}] Registered.`);
   }

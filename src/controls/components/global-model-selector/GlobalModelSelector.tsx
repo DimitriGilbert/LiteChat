@@ -85,18 +85,14 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
         multimodal: false,
       });
 
-      const {
-        dbProviderConfigs,
-        // Directly select the state that changes
-        globallyEnabledModelDefinitionsFromStore,
-      } = useProviderStore(
-        useShallow((state) => ({
-          dbProviderConfigs: state.dbProviderConfigs,
-          // Select the actual data array
-          globallyEnabledModelDefinitionsFromStore:
-            state.globallyEnabledModelDefinitions,
-        }))
-      );
+      const { dbProviderConfigs, globallyEnabledModelDefinitionsFromStore } =
+        useProviderStore(
+          useShallow((state) => ({
+            dbProviderConfigs: state.dbProviderConfigs,
+            globallyEnabledModelDefinitionsFromStore:
+              state.globallyEnabledModelDefinitions,
+          }))
+        );
 
       const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
         () => new Set(dbProviderConfigs.map((p) => p.id))
@@ -106,7 +102,6 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
         setSelectedProviders(new Set(dbProviderConfigs.map((p) => p.id)));
       }, [dbProviderConfigs]);
 
-      // Use the directly selected state in useMemo's dependency array
       const orderedModels: ModelListItem[] = useMemo(() => {
         return globallyEnabledModelDefinitionsFromStore;
       }, [globallyEnabledModelDefinitionsFromStore]);

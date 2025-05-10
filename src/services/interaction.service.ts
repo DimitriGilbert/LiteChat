@@ -26,8 +26,7 @@ import { z } from "zod";
 import {
   type ToolImplementation,
   ModMiddlewareHook,
-  // Import new event constants
-  InteractionEvent,
+  interactionEvent, // Updated import
 } from "@/types/litechat/modding";
 import {
   type Tool,
@@ -164,8 +163,7 @@ export const InteractionService = {
       );
     });
 
-    // Use new event constant
-    emitter.emit(InteractionEvent.STARTED, {
+    emitter.emit(interactionEvent.started, {
       interactionId,
       conversationId,
       type: interactionData.type,
@@ -393,8 +391,7 @@ export const InteractionService = {
       useInteractionStore
         .getState()
         .appendInteractionResponseChunk(interactionId, processedChunk);
-      // Use new event constant
-      emitter.emit(InteractionEvent.STREAM_CHUNK, {
+      emitter.emit(interactionEvent.streamChunk, {
         interactionId,
         chunk: processedChunk,
       });
@@ -633,8 +630,7 @@ export const InteractionService = {
       );
     }
 
-    // Use new event constant
-    emitter.emit(InteractionEvent.COMPLETED, {
+    emitter.emit(interactionEvent.completed, {
       interactionId,
       status: status,
       error: error?.message,

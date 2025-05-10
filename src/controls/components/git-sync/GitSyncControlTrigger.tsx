@@ -22,9 +22,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getSyncIndicator } from "@/controls/components/conversation-list/SyncIndicator"; // Adjusted path
+import { getSyncIndicator } from "@/controls/components/conversation-list/SyncIndicator";
 import type { SyncStatus } from "@/types/litechat/sync";
-import type { GitSyncControlModule } from "@/controls/modules/GitSyncControlModule"; // Import module type
+import type { GitSyncControlModule } from "@/controls/modules/GitSyncControlModule";
 
 interface GitSyncControlTriggerProps {
   module: GitSyncControlModule;
@@ -39,14 +39,12 @@ export const GitSyncControlTrigger: React.FC<GitSyncControlTriggerProps> = ({
     return () => module.setNotifyCallback(null);
   }, [module]);
 
-  // Read state from module
   const selectedItemId = module.selectedItemId;
   const selectedItemType = module.selectedItemType;
   const syncRepos = module.syncRepos;
   const conversationSyncStatus = module.conversationSyncStatus;
   const isStreaming = module.isStreaming;
 
-  // Local UI state
   const [currentRepoId, setCurrentRepoId] = useState<string | null>(null);
   const [currentStatus, setCurrentStatus] = useState<SyncStatus>("idle");
   const [isLinking, setIsLinking] = useState(false);
@@ -61,12 +59,7 @@ export const GitSyncControlTrigger: React.FC<GitSyncControlTriggerProps> = ({
       setCurrentRepoId(null);
       setCurrentStatus("idle");
     }
-  }, [
-    selectedItemId,
-    selectedItemType,
-    conversationSyncStatus,
-    module, // module.getConversationById depends on module
-  ]);
+  }, [selectedItemId, selectedItemType, conversationSyncStatus, module]);
 
   const repoNameMap = React.useMemo(
     () => new Map(syncRepos.map((r) => [r.id, r.name])),
@@ -102,7 +95,11 @@ export const GitSyncControlTrigger: React.FC<GitSyncControlTriggerProps> = ({
     isStreaming ||
     currentStatus === "syncing";
 
-  // Visibility is handled by the module's `show` method.
+  const isVisible = selectedItemType === "conversation" && syncRepos.length > 0;
+
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <Popover>

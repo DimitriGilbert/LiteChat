@@ -25,10 +25,9 @@ export const ReasoningControlTrigger: React.FC<
     return () => module.setNotifyCallback(null);
   }, [module]);
 
-  // Read state from module
   const localReasoningEnabled = module.getReasoningEnabled();
   const isStreaming = module.getIsStreaming();
-  // Visibility is handled by module's `show` method
+  const isVisible = module.getIsVisible();
 
   const isExplicitlyEnabled = localReasoningEnabled === true;
 
@@ -36,6 +35,10 @@ export const ReasoningControlTrigger: React.FC<
     const newState = isExplicitlyEnabled ? null : true;
     module.setReasoningEnabled(newState);
   }, [isExplicitlyEnabled, module]);
+
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <TooltipProvider delayDuration={100}>

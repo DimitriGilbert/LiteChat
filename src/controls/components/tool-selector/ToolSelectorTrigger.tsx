@@ -1,6 +1,6 @@
 // src/controls/components/tool-selector/ToolSelectorTrigger.tsx
 // FULL FILE
-import React, { useState, useEffect } from "react"; // Removed useCallback
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { WrenchIcon } from "lucide-react";
 import {
@@ -39,8 +39,8 @@ export const ToolSelectorTrigger: React.FC<ToolSelectorTriggerProps> = ({
   const maxStepsOverride = module.getMaxStepsOverride();
   const isStreaming = module.getIsStreaming();
   const selectedItemType = module.getSelectedItemType();
-  // const selectedItemId = module.getSelectedItemId(); // Unused
   const allToolsCount = module.getAllToolsCount();
+  const isVisible = module.getIsVisible(); // Get visibility from module
 
   useEffect(() => {
     setPopoverMaxSteps(module.getMaxStepsOverride());
@@ -56,6 +56,10 @@ export const ToolSelectorTrigger: React.FC<ToolSelectorTriggerProps> = ({
   const hasActiveSettings = enabledTools.size > 0 || maxStepsOverride !== null;
   const isDisabled =
     isStreaming || allToolsCount === 0 || selectedItemType !== "conversation";
+
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <Popover open={popoverOpen} onOpenChange={handlePopoverOpenChange}>

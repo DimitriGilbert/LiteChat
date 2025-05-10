@@ -1,5 +1,5 @@
 // src/controls/components/parameter/ParameterControlTrigger.tsx
-// NEW FILE
+// FULL FILE
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { SlidersHorizontalIcon } from "lucide-react";
@@ -30,7 +30,6 @@ export const ParameterControlTrigger: React.FC<
     return () => module.setNotifyCallback(null);
   }, [module]);
 
-  // Read state from module
   const isStreaming = module.getIsStreaming();
   const isVisible = module.getIsVisible();
 
@@ -59,7 +58,6 @@ export const ParameterControlTrigger: React.FC<
         </Tooltip>
       </TooltipProvider>
       <PopoverContent className="w-auto p-0" align="start">
-        {/* Pass the module to the content component */}
         <ParameterControlComponent module={module} />
       </PopoverContent>
     </Popover>

@@ -1,5 +1,5 @@
 // src/controls/components/usage-display/UsageDisplayControl.tsx
-// NEW FILE
+// FULL FILE
 import React, { useMemo, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
@@ -24,12 +24,12 @@ export const UsageDisplayControl: React.FC<UsageDisplayControlProps> = ({
     return () => module.setNotifyCallback(null);
   }, [module]);
 
-  // Read values from module
   const contextLength = module.contextLength;
   const estimatedInputTokens = module.getEstimatedInputTokens();
   const totalEstimatedTokens = module.getTotalEstimatedTokens();
   const contextPercentage = module.getContextPercentage();
-  const historyTokens = module.historyTokens; // For tooltip
+  const historyTokens = module.historyTokens;
+  const selectedModelId = module.selectedModelId; // For visibility check
 
   const indicatorColor = useMemo(() => {
     if (contextPercentage > 85) return "text-red-600 dark:text-red-500";
@@ -38,7 +38,11 @@ export const UsageDisplayControl: React.FC<UsageDisplayControlProps> = ({
     return "text-green-600 dark:text-green-500";
   }, [contextPercentage]);
 
-  // Visibility is handled by module's `show` method.
+  const isVisible = selectedModelId !== null && contextLength > 0;
+
+  if (!isVisible) {
+    return null;
+  }
 
   const tooltipText = `Context: ~${totalEstimatedTokens.toLocaleString()} / ${contextLength.toLocaleString()} tokens (${contextPercentage}%) [History: ${historyTokens}, Input: ${estimatedInputTokens}]`;
 

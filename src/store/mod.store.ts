@@ -10,6 +10,8 @@ import type {
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
+// No direct event emissions from this store in this iteration,
+// but if added, they would use the new `modEvent` constants.
 
 export const useModStore = create(
   immer<ModStoreState & ModStoreActions>((set, get) => ({

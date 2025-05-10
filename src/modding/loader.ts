@@ -4,9 +4,8 @@ import {
   type DbMod,
   type ModInstance,
   type LiteChatModApi,
-  // Import new event constants
-  ModEvent as ModEventStrings, // Alias to avoid conflict if ModEvent enum was used locally
-  AppEvent,
+  modEvent, // Updated import
+  appEvent, // Updated import
 } from "@/types/litechat/modding";
 import { createModApi } from "./api-factory";
 import { toast } from "sonner";
@@ -70,22 +69,17 @@ export async function loadMods(dbMods: DbMod[]): Promise<ModInstance[]> {
         error: instanceError ?? undefined,
       };
 
-      // Use new event constants
-      emitter.emit(
-        instance.error ? ModEventStrings.ERROR : ModEventStrings.LOADED,
-        {
-          id: mod.id,
-          name: mod.name,
-          error: instance.error,
-        }
-      );
+      emitter.emit(instance.error ? modEvent.error : modEvent.loaded, {
+        id: mod.id,
+        name: mod.name,
+        error: instance.error,
+      });
 
       return instance;
     })
   );
 
-  // Use new event constant
-  emitter.emit(AppEvent.LOADED, undefined);
+  emitter.emit(appEvent.loaded, undefined);
   console.log(`[ModLoader] Finished processing ${instances.length} mods.`);
   return instances;
 }

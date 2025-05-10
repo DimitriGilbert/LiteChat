@@ -5,8 +5,7 @@ import { immer } from "zustand/middleware/immer";
 import type { Interaction } from "@/types/litechat/interaction";
 import { PersistenceService } from "@/services/persistence.service";
 import { emitter } from "@/lib/litechat/event-emitter";
-// Import new event constant
-import { InteractionEvent } from "@/types/litechat/modding";
+import { interactionEvent } from "@/types/litechat/modding"; // Updated import
 import { toast } from "sonner";
 
 export interface InteractionState {
@@ -68,8 +67,7 @@ export const useInteractionStore = create(
         currentConversationId: conversationId,
       });
       if (previousStatus !== "loading") {
-        // Use new event constant
-        emitter.emit(InteractionEvent.STATUS_CHANGED, { status: "loading" });
+        emitter.emit(interactionEvent.statusChanged, { status: "loading" });
       }
       try {
         const dbInteractions =
@@ -78,13 +76,11 @@ export const useInteractionStore = create(
           );
         dbInteractions.sort((a, b) => a.index - b.index);
         set({ interactions: dbInteractions, status: "idle" });
-        // Use new event constant
-        emitter.emit(InteractionEvent.STATUS_CHANGED, { status: "idle" });
+        emitter.emit(interactionEvent.statusChanged, { status: "idle" });
       } catch (e) {
         console.error("InteractionStore: Error loading interactions", e);
         set({ error: "Failed load interactions", status: "error" });
-        // Use new event constant
-        emitter.emit(InteractionEvent.STATUS_CHANGED, { status: "error" });
+        emitter.emit(interactionEvent.statusChanged, { status: "error" });
       }
     },
 
@@ -238,8 +234,7 @@ export const useInteractionStore = create(
         currentConversationId: null,
       });
       if (previousStatus !== "idle") {
-        // Use new event constant
-        emitter.emit(InteractionEvent.STATUS_CHANGED, { status: "idle" });
+        emitter.emit(interactionEvent.statusChanged, { status: "idle" });
       }
     },
     setError: (error) => {
@@ -259,15 +254,13 @@ export const useInteractionStore = create(
         }
       });
       if (previousStatus !== newStatus) {
-        // Use new event constant
-        emitter.emit(InteractionEvent.STATUS_CHANGED, { status: newStatus });
+        emitter.emit(interactionEvent.statusChanged, { status: newStatus });
       }
     },
     setStatus: (status) => {
       if (get().status !== status) {
         set({ status });
-        // Use new event constant
-        emitter.emit(InteractionEvent.STATUS_CHANGED, { status });
+        emitter.emit(interactionEvent.statusChanged, { status });
       }
     },
     _addStreamingId: (id) => {
@@ -285,8 +278,7 @@ export const useInteractionStore = create(
         }
       });
       if (statusChanged) {
-        // Use new event constant
-        emitter.emit(InteractionEvent.STATUS_CHANGED, { status: "streaming" });
+        emitter.emit(interactionEvent.statusChanged, { status: "streaming" });
       }
     },
     _removeStreamingId: (id) => {
@@ -308,8 +300,7 @@ export const useInteractionStore = create(
         }
       });
       if (statusChanged) {
-        // Use new event constant
-        emitter.emit(InteractionEvent.STATUS_CHANGED, { status: get().status });
+        emitter.emit(interactionEvent.statusChanged, { status: get().status });
       }
     },
   }))

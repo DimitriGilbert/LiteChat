@@ -5,8 +5,7 @@ import { immer } from "zustand/middleware/immer";
 import { PersistenceService } from "@/services/persistence.service";
 import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";
-// Import new event constants
-import { SettingsEvent } from "@/types/litechat/modding";
+import { settingsEvent } from "@/types/litechat/modding"; // Updated import
 
 export interface CustomThemeColors {
   background?: string;
@@ -182,54 +181,54 @@ export const useSettingsStore = create(
     setTheme: (theme) => {
       set({ theme: theme });
       PersistenceService.saveSetting("theme", theme);
-      emitter.emit(SettingsEvent.THEME_CHANGED, { theme });
+      emitter.emit(settingsEvent.themeChanged, { theme });
     },
     setGlobalSystemPrompt: (prompt) => {
       set({ globalSystemPrompt: prompt });
       PersistenceService.saveSetting("globalSystemPrompt", prompt);
-      emitter.emit(SettingsEvent.GLOBAL_SYSTEM_PROMPT_CHANGED, { prompt });
+      emitter.emit(settingsEvent.globalSystemPromptChanged, { prompt });
     },
     setTemperature: (temp) => {
       set({ temperature: temp });
       PersistenceService.saveSetting("temperature", temp);
-      emitter.emit(SettingsEvent.TEMPERATURE_CHANGED, { value: temp });
+      emitter.emit(settingsEvent.temperatureChanged, { value: temp });
     },
     setMaxTokens: (tokens) => {
       set({ maxTokens: tokens });
       PersistenceService.saveSetting("maxTokens", tokens);
-      emitter.emit(SettingsEvent.MAX_TOKENS_CHANGED, { value: tokens });
+      emitter.emit(settingsEvent.maxTokensChanged, { value: tokens });
     },
     setTopP: (topP) => {
       set({ topP: topP });
       PersistenceService.saveSetting("topP", topP);
-      emitter.emit(SettingsEvent.TOP_P_CHANGED, { value: topP });
+      emitter.emit(settingsEvent.topPChanged, { value: topP });
     },
     setTopK: (topK) => {
       set({ topK: topK });
       PersistenceService.saveSetting("topK", topK);
-      emitter.emit(SettingsEvent.TOP_K_CHANGED, { value: topK });
+      emitter.emit(settingsEvent.topKChanged, { value: topK });
     },
     setPresencePenalty: (penalty) => {
       set({ presencePenalty: penalty });
       PersistenceService.saveSetting("presencePenalty", penalty);
-      emitter.emit(SettingsEvent.PRESENCE_PENALTY_CHANGED, { value: penalty });
+      emitter.emit(settingsEvent.presencePenaltyChanged, { value: penalty });
     },
     setFrequencyPenalty: (penalty) => {
       set({ frequencyPenalty: penalty });
       PersistenceService.saveSetting("frequencyPenalty", penalty);
-      emitter.emit(SettingsEvent.FREQUENCY_PENALTY_CHANGED, { value: penalty });
+      emitter.emit(settingsEvent.frequencyPenaltyChanged, { value: penalty });
     },
     setEnableAdvancedSettings: (enabled) => {
       set({ enableAdvancedSettings: enabled });
       PersistenceService.saveSetting("enableAdvancedSettings", enabled);
-      emitter.emit(SettingsEvent.ENABLE_ADVANCED_SETTINGS_CHANGED, {
+      emitter.emit(settingsEvent.enableAdvancedSettingsChanged, {
         enabled,
       });
     },
     setEnableStreamingMarkdown: (enabled) => {
       set({ enableStreamingMarkdown: enabled });
       PersistenceService.saveSetting("enableStreamingMarkdown", enabled);
-      emitter.emit(SettingsEvent.ENABLE_STREAMING_MARKDOWN_CHANGED, {
+      emitter.emit(settingsEvent.enableStreamingMarkdownChanged, {
         enabled,
       });
     },
@@ -239,19 +238,19 @@ export const useSettingsStore = create(
         "enableStreamingCodeBlockParsing",
         enabled
       );
-      emitter.emit(SettingsEvent.ENABLE_STREAMING_CODE_BLOCK_PARSING_CHANGED, {
+      emitter.emit(settingsEvent.enableStreamingCodeBlockParsingChanged, {
         enabled,
       });
     },
     setFoldStreamingCodeBlocks: (fold) => {
       set({ foldStreamingCodeBlocks: fold });
       PersistenceService.saveSetting("foldStreamingCodeBlocks", fold);
-      emitter.emit(SettingsEvent.FOLD_STREAMING_CODE_BLOCKS_CHANGED, { fold });
+      emitter.emit(settingsEvent.foldStreamingCodeBlocksChanged, { fold });
     },
     setFoldUserMessagesOnCompletion: (fold) => {
       set({ foldUserMessagesOnCompletion: fold });
       PersistenceService.saveSetting("foldUserMessagesOnCompletion", fold);
-      emitter.emit(SettingsEvent.FOLD_USER_MESSAGES_ON_COMPLETION_CHANGED, {
+      emitter.emit(settingsEvent.foldUserMessagesOnCompletionChanged, {
         fold,
       });
     },
@@ -259,7 +258,7 @@ export const useSettingsStore = create(
       const clampedFps = Math.max(3, Math.min(60, fps));
       set({ streamingRenderFPS: clampedFps });
       PersistenceService.saveSetting("streamingRenderFPS", clampedFps);
-      emitter.emit(SettingsEvent.STREAMING_RENDER_FPS_CHANGED, {
+      emitter.emit(settingsEvent.streamingRenderFpsChanged, {
         fps: clampedFps,
       });
     },
@@ -267,13 +266,13 @@ export const useSettingsStore = create(
       const trimmedName = name?.trim() || null;
       set({ gitUserName: trimmedName });
       PersistenceService.saveSetting("gitUserName", trimmedName);
-      emitter.emit(SettingsEvent.GIT_USER_NAME_CHANGED, { name: trimmedName });
+      emitter.emit(settingsEvent.gitUserNameChanged, { name: trimmedName });
     },
     setGitUserEmail: (email) => {
       const trimmedEmail = email?.trim() || null;
       set({ gitUserEmail: trimmedEmail });
       PersistenceService.saveSetting("gitUserEmail", trimmedEmail);
-      emitter.emit(SettingsEvent.GIT_USER_EMAIL_CHANGED, {
+      emitter.emit(settingsEvent.gitUserEmailChanged, {
         email: trimmedEmail,
       });
     },
@@ -281,7 +280,7 @@ export const useSettingsStore = create(
       const clampedSteps = Math.max(1, Math.min(20, steps));
       set({ toolMaxSteps: clampedSteps });
       PersistenceService.saveSetting("toolMaxSteps", clampedSteps);
-      emitter.emit(SettingsEvent.TOOL_MAX_STEPS_CHANGED, {
+      emitter.emit(settingsEvent.toolMaxStepsChanged, {
         steps: clampedSteps,
       });
     },
@@ -289,37 +288,37 @@ export const useSettingsStore = create(
       const trimmedUrl = url?.trim() || null;
       set({ prismThemeUrl: trimmedUrl });
       PersistenceService.saveSetting("prismThemeUrl", trimmedUrl);
-      emitter.emit(SettingsEvent.PRISM_THEME_URL_CHANGED, { url: trimmedUrl });
+      emitter.emit(settingsEvent.prismThemeUrlChanged, { url: trimmedUrl });
     },
     setAutoTitleEnabled: (enabled) => {
       set({ autoTitleEnabled: enabled });
       PersistenceService.saveSetting("autoTitleEnabled", enabled);
-      emitter.emit(SettingsEvent.AUTO_TITLE_ENABLED_CHANGED, { enabled });
+      emitter.emit(settingsEvent.autoTitleEnabledChanged, { enabled });
     },
     setAutoTitleModelId: (modelId) => {
       set({ autoTitleModelId: modelId });
       PersistenceService.saveSetting("autoTitleModelId", modelId);
-      emitter.emit(SettingsEvent.AUTO_TITLE_MODEL_ID_CHANGED, { modelId });
+      emitter.emit(settingsEvent.autoTitleModelIdChanged, { modelId });
     },
     setAutoTitlePromptMaxLength: (length) => {
       const clampedLength = Math.max(100, Math.min(4000, length));
       set({ autoTitlePromptMaxLength: clampedLength });
       PersistenceService.saveSetting("autoTitlePromptMaxLength", clampedLength);
-      emitter.emit(SettingsEvent.AUTO_TITLE_PROMPT_MAX_LENGTH_CHANGED, {
+      emitter.emit(settingsEvent.autoTitlePromptMaxLengthChanged, {
         length: clampedLength,
       });
     },
     setAutoTitleIncludeFiles: (include) => {
       set({ autoTitleIncludeFiles: include });
       PersistenceService.saveSetting("autoTitleIncludeFiles", include);
-      emitter.emit(SettingsEvent.AUTO_TITLE_INCLUDE_FILES_CHANGED, {
+      emitter.emit(settingsEvent.autoTitleIncludeFilesChanged, {
         include,
       });
     },
     setAutoTitleIncludeRules: (include) => {
       set({ autoTitleIncludeRules: include });
       PersistenceService.saveSetting("autoTitleIncludeRules", include);
-      emitter.emit(SettingsEvent.AUTO_TITLE_INCLUDE_RULES_CHANGED, {
+      emitter.emit(settingsEvent.autoTitleIncludeRulesChanged, {
         include,
       });
     },
@@ -327,7 +326,7 @@ export const useSettingsStore = create(
       const trimmedFont = fontFamily?.trim() || null;
       set({ customFontFamily: trimmedFont });
       PersistenceService.saveSetting("customFontFamily", trimmedFont);
-      emitter.emit(SettingsEvent.CUSTOM_FONT_FAMILY_CHANGED, {
+      emitter.emit(settingsEvent.customFontFamilyChanged, {
         fontFamily: trimmedFont,
       });
     },
@@ -336,21 +335,21 @@ export const useSettingsStore = create(
         fontSize === null ? null : Math.max(10, Math.min(24, fontSize));
       set({ customFontSize: clampedSize });
       PersistenceService.saveSetting("customFontSize", clampedSize);
-      emitter.emit(SettingsEvent.CUSTOM_FONT_SIZE_CHANGED, {
+      emitter.emit(settingsEvent.customFontSizeChanged, {
         fontSize: clampedSize,
       });
     },
     setChatMaxWidth: (maxWidthClass) => {
       set({ chatMaxWidth: maxWidthClass });
       PersistenceService.saveSetting("chatMaxWidth", maxWidthClass);
-      emitter.emit(SettingsEvent.CHAT_MAX_WIDTH_CHANGED, {
+      emitter.emit(settingsEvent.chatMaxWidthChanged, {
         maxWidth: maxWidthClass,
       });
     },
     setCustomThemeColors: (colors) => {
       set({ customThemeColors: colors });
       PersistenceService.saveSetting("customThemeColors", colors);
-      emitter.emit(SettingsEvent.CUSTOM_THEME_COLORS_CHANGED, { colors });
+      emitter.emit(settingsEvent.customThemeColorsChanged, { colors });
     },
     setCustomThemeColor: (colorName, value) => {
       set((state) => {
@@ -366,7 +365,7 @@ export const useSettingsStore = create(
       });
       const newColors = get().customThemeColors;
       PersistenceService.saveSetting("customThemeColors", newColors);
-      emitter.emit(SettingsEvent.CUSTOM_THEME_COLORS_CHANGED, {
+      emitter.emit(settingsEvent.customThemeColorsChanged, {
         colors: newColors,
       });
     },
@@ -374,14 +373,14 @@ export const useSettingsStore = create(
       const clampedInterval = Math.max(50, interval);
       set({ autoScrollInterval: clampedInterval });
       PersistenceService.saveSetting("autoScrollInterval", clampedInterval);
-      emitter.emit(SettingsEvent.AUTO_SCROLL_INTERVAL_CHANGED, {
+      emitter.emit(settingsEvent.autoScrollIntervalChanged, {
         interval: clampedInterval,
       });
     },
     setEnableAutoScrollOnStream: (enabled) => {
       set({ enableAutoScrollOnStream: enabled });
       PersistenceService.saveSetting("enableAutoScrollOnStream", enabled);
-      emitter.emit(SettingsEvent.ENABLE_AUTO_SCROLL_ON_STREAM_CHANGED, {
+      emitter.emit(settingsEvent.enableAutoScrollOnStreamChanged, {
         enabled,
       });
     },

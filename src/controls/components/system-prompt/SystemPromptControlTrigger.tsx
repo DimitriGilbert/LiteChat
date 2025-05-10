@@ -32,24 +32,19 @@ export const SystemPromptControlTrigger: React.FC<
   }, [module]);
 
   const [popoverOpen, setPopoverOpen] = useState(false);
-  // Local state for textarea, synced with module on open/save
   const [localPrompt, setLocalPrompt] = useState(module.getTurnSystemPrompt());
 
-  // Read derived state from module
   const effectiveSystemPrompt = module.getEffectiveSystemPrompt();
   const isStreaming = module.getIsStreaming();
-  const turnSystemPromptValue = module.getTurnSystemPrompt(); // For hasTurnPrompt check
+  const turnSystemPromptValue = module.getTurnSystemPrompt();
 
-  // Sync localPrompt when popover opens or module's turn prompt changes
   useEffect(() => {
     if (popoverOpen) {
       setLocalPrompt(module.getTurnSystemPrompt());
     }
-  }, [popoverOpen, module]); // module as dep to catch external changes
+  }, [popoverOpen, module]);
 
   useEffect(() => {
-    // This effect syncs localPrompt if the module's turnSystemPromptValue changes
-    // while the popover might not be open (e.g., due to clearOnSubmit)
     const currentModulePrompt = module.getTurnSystemPrompt();
     if (localPrompt !== currentModulePrompt) {
       setLocalPrompt(currentModulePrompt);
@@ -62,19 +57,22 @@ export const SystemPromptControlTrigger: React.FC<
   }, [localPrompt, module]);
 
   const handleClear = useCallback(() => {
-    setLocalPrompt(""); // Clear local input
-    module.setTurnSystemPrompt(""); // Update module state
+    setLocalPrompt("");
+    module.setTurnSystemPrompt("");
     setPopoverOpen(false);
   }, [module]);
 
   const handleOpenChange = (open: boolean) => {
     if (open) {
-      setLocalPrompt(module.getTurnSystemPrompt()); // Sync on open
+      setLocalPrompt(module.getTurnSystemPrompt());
     }
     setPopoverOpen(open);
   };
 
   const hasTurnPrompt = turnSystemPromptValue.trim().length > 0;
+
+  // Visibility: This control is always visible if registered.
+  // The parent PromptControlWrapper handles the overall rendering.
 
   return (
     <Popover open={popoverOpen} onOpenChange={handleOpenChange}>

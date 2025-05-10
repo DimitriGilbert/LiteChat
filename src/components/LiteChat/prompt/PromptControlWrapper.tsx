@@ -1,5 +1,5 @@
 // src/components/LiteChat/prompt/PromptControlWrapper.tsx
-
+// FULL FILE
 import React from "react";
 import type { PromptControl } from "@/types/litechat/prompt";
 import { cn } from "@/lib/utils";
@@ -16,12 +16,11 @@ export const PromptControlWrapper: React.FC<PromptControlWrapperProps> = ({
   className,
 }) => {
   // Filter controls based on the area and whether the corresponding function exists
+  // Removed the c.show() filter here as per plan
   const controlsToRender = controls.filter((c) =>
-    // Use triggerRenderer instead of trigger
-    area === "trigger" ? !!c.triggerRenderer : !!c.renderer,
+    area === "trigger" ? !!c.triggerRenderer : !!c.renderer
   );
 
-  // Return null if no controls are relevant for this area
   if (controlsToRender.length === 0) {
     return null;
   }
@@ -29,11 +28,8 @@ export const PromptControlWrapper: React.FC<PromptControlWrapperProps> = ({
   return (
     <div className={cn(className)}>
       {controlsToRender.map((c) => {
-        // Call the appropriate render function (triggerRenderer or renderer)
         const elementToRender =
-          // Use triggerRenderer instead of trigger
           area === "trigger" ? c.triggerRenderer?.() : c.renderer?.();
-        // Render the element inside a Fragment with a key
         return elementToRender ? (
           <React.Fragment key={c.id}>{elementToRender}</React.Fragment>
         ) : null;

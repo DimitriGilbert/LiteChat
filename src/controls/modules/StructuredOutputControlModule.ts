@@ -4,8 +4,8 @@ import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import {
   type LiteChatModApi,
-  ProviderEvent,
-  PromptEvent,
+  providerEvent, // Updated import
+  promptEvent, // Updated import
 } from "@/types/litechat/modding";
 import { VisibleStructuredOutputControl } from "@/controls/components/structured-output/VisibleStructuredOutputControl";
 import { useProviderStore } from "@/store/provider.store";
@@ -21,17 +21,16 @@ export class StructuredOutputControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
-    // modApi parameter is available here if needed for initialization logic
     this.structuredOutputJson =
       usePromptStateStore.getState().structuredOutputJson;
     this.updateVisibility();
 
-    const unsubModel = modApi.on(ProviderEvent.MODEL_SELECTION_CHANGED, () => {
+    const unsubModel = modApi.on(providerEvent.modelSelectionChanged, () => {
       this.updateVisibility();
       this.notifyComponentUpdate?.();
     });
     const unsubPromptParams = modApi.on(
-      PromptEvent.PARAMS_CHANGED,
+      promptEvent.paramsChanged,
       (payload) => {
         if (
           "structuredOutputJson" in payload.params &&
@@ -100,7 +99,7 @@ export class StructuredOutputControlModule implements ControlModule {
       clearOnSubmit: () => {
         usePromptStateStore.getState().setStructuredOutputJson(null);
       },
-      show: () => this.isVisible,
+      // show method removed, visibility handled by VisibleStructuredOutputControl
     });
     console.log(`[${this.id}] Registered.`);
   }

@@ -11,8 +11,9 @@ import type { SyncStatus } from "./sync";
 import type { AttachedFileMetadata } from "@/store/input.store";
 import type { PromptState } from "@/store/prompt.store";
 import type { InteractionState } from "@/store/interaction.store";
-import type { SettingsState } from "@/store/settings.store"; // Added for settings events
-import type { DbRule, DbTag } from "@/types/litechat/rules"; // Added for rules/tags events
+import type { SettingsState } from "@/store/settings.store";
+import type { DbRule, DbTag } from "@/types/litechat/rules";
+
 // --- Mod Definition & Instance ---
 
 /** Mod definition stored in the database */
@@ -83,8 +84,8 @@ export interface LiteChatModApi {
   readonly modName: string;
 
   // Control Registration
-  registerPromptControl: (control: PromptControl) => () => void;
-  registerChatControl: (control: ChatControl) => () => void;
+  registerPromptControl: (control: ModPromptControl) => () => void;
+  registerChatControl: (control: ModChatControl) => () => void;
 
   // Tool Registration
   registerTool: <P extends z.ZodSchema<any>>(
@@ -127,7 +128,7 @@ export interface LiteChatModApi {
 /** Function signature for tool execution logic */
 export type ToolImplementation<P extends z.ZodSchema<any>> = (
   params: z.infer<P>,
-  context: ReadonlyChatContextSnapshot & { fsInstance?: any } // Allow fsInstance for VFS tools
+  context: ReadonlyChatContextSnapshot & { fsInstance?: any }
 ) => Promise<any>;
 
 // --- Custom Settings Tab ---
@@ -141,301 +142,300 @@ export interface CustomSettingTab {
 
 // --- Event Emitter ---
 
-// Replace Enum with string constants using dot-notation
-export const AppEvent = {
-  LOADED: "app.loaded",
+// Event names changed to dot.case
+export const appEvent = {
+  loaded: "app.loaded",
 } as const;
 
-export const ModEvent = {
-  LOADED: "mod.loaded",
-  ERROR: "mod.error",
+export const modEvent = {
+  loaded: "mod.loaded",
+  error: "mod.error",
 } as const;
 
-export const ConversationEvent = {
-  SELECTED: "conversation.selected",
-  ADDED: "conversation.added",
-  UPDATED: "conversation.updated",
-  DELETED: "conversation.deleted",
-  SYNC_STATUS_CHANGED: "conversation.syncStatusChanged",
+export const conversationEvent = {
+  selected: "conversation.selected",
+  added: "conversation.added",
+  updated: "conversation.updated",
+  deleted: "conversation.deleted",
+  syncStatusChanged: "conversation.syncStatusChanged",
 } as const;
 
-export const ProjectEvent = {
-  SELECTED: "project.selected",
-  ADDED: "project.added",
-  UPDATED: "project.updated",
-  DELETED: "project.deleted",
+export const projectEvent = {
+  selected: "project.selected",
+  added: "project.added",
+  updated: "project.updated",
+  deleted: "project.deleted",
 } as const;
 
-export const InteractionEvent = {
-  STARTED: "interaction.started",
-  STREAM_CHUNK: "interaction.streamChunk",
-  COMPLETED: "interaction.completed",
-  STATUS_CHANGED: "interaction.statusChanged",
+export const interactionEvent = {
+  started: "interaction.started",
+  streamChunk: "interaction.streamChunk",
+  completed: "interaction.completed",
+  statusChanged: "interaction.statusChanged",
 } as const;
 
-export const PromptEvent = {
-  SUBMITTED: "prompt.submitted",
-  INPUT_CHANGED: "prompt.inputChanged",
-  PARAMS_CHANGED: "prompt.paramsChanged",
+export const promptEvent = {
+  submitted: "prompt.submitted",
+  inputChanged: "prompt.inputChanged",
+  paramsChanged: "prompt.paramsChanged",
 } as const;
 
-export const SettingsEvent = {
-  // Specific settings changes
-  THEME_CHANGED: "settings.themeChanged",
-  GLOBAL_SYSTEM_PROMPT_CHANGED: "settings.globalSystemPromptChanged",
-  TEMPERATURE_CHANGED: "settings.temperatureChanged",
-  MAX_TOKENS_CHANGED: "settings.maxTokensChanged",
-  TOP_P_CHANGED: "settings.topPChanged",
-  TOP_K_CHANGED: "settings.topKChanged",
-  PRESENCE_PENALTY_CHANGED: "settings.presencePenaltyChanged",
-  FREQUENCY_PENALTY_CHANGED: "settings.frequencyPenaltyChanged",
-  ENABLE_ADVANCED_SETTINGS_CHANGED: "settings.enableAdvancedSettingsChanged",
-  ENABLE_STREAMING_MARKDOWN_CHANGED: "settings.enableStreamingMarkdownChanged",
-  ENABLE_STREAMING_CODE_BLOCK_PARSING_CHANGED:
+export const settingsEvent = {
+  themeChanged: "settings.themeChanged",
+  globalSystemPromptChanged: "settings.globalSystemPromptChanged",
+  temperatureChanged: "settings.temperatureChanged",
+  maxTokensChanged: "settings.maxTokensChanged",
+  topPChanged: "settings.topPChanged",
+  topKChanged: "settings.topKChanged",
+  presencePenaltyChanged: "settings.presencePenaltyChanged",
+  frequencyPenaltyChanged: "settings.frequencyPenaltyChanged",
+  enableAdvancedSettingsChanged: "settings.enableAdvancedSettingsChanged",
+  enableStreamingMarkdownChanged: "settings.enableStreamingMarkdownChanged",
+  enableStreamingCodeBlockParsingChanged:
     "settings.enableStreamingCodeBlockParsingChanged",
-  FOLD_STREAMING_CODE_BLOCKS_CHANGED: "settings.foldStreamingCodeBlocksChanged",
-  FOLD_USER_MESSAGES_ON_COMPLETION_CHANGED:
+  foldStreamingCodeBlocksChanged: "settings.foldStreamingCodeBlocksChanged",
+  foldUserMessagesOnCompletionChanged:
     "settings.foldUserMessagesOnCompletionChanged",
-  STREAMING_RENDER_FPS_CHANGED: "settings.streamingRenderFpsChanged",
-  GIT_USER_NAME_CHANGED: "settings.gitUserNameChanged",
-  GIT_USER_EMAIL_CHANGED: "settings.gitUserEmailChanged",
-  TOOL_MAX_STEPS_CHANGED: "settings.toolMaxStepsChanged",
-  PRISM_THEME_URL_CHANGED: "settings.prismThemeUrlChanged",
-  AUTO_TITLE_ENABLED_CHANGED: "settings.autoTitleEnabledChanged",
-  AUTO_TITLE_MODEL_ID_CHANGED: "settings.autoTitleModelIdChanged",
-  AUTO_TITLE_PROMPT_MAX_LENGTH_CHANGED:
-    "settings.autoTitlePromptMaxLengthChanged",
-  AUTO_TITLE_INCLUDE_FILES_CHANGED: "settings.autoTitleIncludeFilesChanged",
-  AUTO_TITLE_INCLUDE_RULES_CHANGED: "settings.autoTitleIncludeRulesChanged",
-  CUSTOM_FONT_FAMILY_CHANGED: "settings.customFontFamilyChanged",
-  CUSTOM_FONT_SIZE_CHANGED: "settings.customFontSizeChanged",
-  CHAT_MAX_WIDTH_CHANGED: "settings.chatMaxWidthChanged",
-  CUSTOM_THEME_COLORS_CHANGED: "settings.customThemeColorsChanged",
-  AUTO_SCROLL_INTERVAL_CHANGED: "settings.autoScrollIntervalChanged",
-  ENABLE_AUTO_SCROLL_ON_STREAM_CHANGED:
-    "settings.enableAutoScrollOnStreamChanged",
-  ENABLE_API_KEY_MANAGEMENT_CHANGED: "settings.enableApiKeyManagementChanged",
+  streamingRenderFpsChanged: "settings.streamingRenderFpsChanged",
+  gitUserNameChanged: "settings.gitUserNameChanged",
+  gitUserEmailChanged: "settings.gitUserEmailChanged",
+  toolMaxStepsChanged: "settings.toolMaxStepsChanged",
+  prismThemeUrlChanged: "settings.prismThemeUrlChanged",
+  autoTitleEnabledChanged: "settings.autoTitleEnabledChanged",
+  autoTitleModelIdChanged: "settings.autoTitleModelIdChanged",
+  autoTitlePromptMaxLengthChanged: "settings.autoTitlePromptMaxLengthChanged",
+  autoTitleIncludeFilesChanged: "settings.autoTitleIncludeFilesChanged",
+  autoTitleIncludeRulesChanged: "settings.autoTitleIncludeRulesChanged",
+  customFontFamilyChanged: "settings.customFontFamilyChanged",
+  customFontSizeChanged: "settings.customFontSizeChanged",
+  chatMaxWidthChanged: "settings.chatMaxWidthChanged",
+  customThemeColorsChanged: "settings.customThemeColorsChanged",
+  autoScrollIntervalChanged: "settings.autoScrollIntervalChanged",
+  enableAutoScrollOnStreamChanged: "settings.enableAutoScrollOnStreamChanged",
+  enableApiKeyManagementChanged: "settings.enableApiKeyManagementChanged",
 } as const;
 
-export const ProviderEvent = {
-  CONFIG_CHANGED: "provider.configChanged",
-  API_KEY_CHANGED: "provider.apiKeyChanged",
-  MODEL_SELECTION_CHANGED: "provider.modelSelectionChanged",
+export const providerEvent = {
+  configChanged: "provider.configChanged",
+  apiKeyChanged: "provider.apiKeyChanged",
+  modelSelectionChanged: "provider.modelSelectionChanged",
 } as const;
 
-export const VfsEvent = {
-  FILE_WRITTEN: "vfs.fileWritten",
-  FILE_READ: "vfs.fileRead",
-  FILE_DELETED: "vfs.fileDeleted",
-  CONTEXT_CHANGED: "vfs.contextChanged",
+export const vfsEvent = {
+  fileWritten: "vfs.fileWritten",
+  fileRead: "vfs.fileRead",
+  fileDeleted: "vfs.fileDeleted",
+  contextChanged: "vfs.contextChanged",
 } as const;
 
-export const SyncEvent = {
-  REPO_CHANGED: "sync.repoChanged",
-  REPO_INIT_STATUS_CHANGED: "sync.repoInitStatusChanged",
+export const syncEvent = {
+  repoChanged: "sync.repoChanged",
+  repoInitStatusChanged: "sync.repoInitStatusChanged",
 } as const;
 
-export const InputEvent = {
-  ATTACHED_FILES_CHANGED: "input.attachedFilesChanged",
+export const inputEvent = {
+  attachedFilesChanged: "input.attachedFilesChanged",
 } as const;
 
-export const UiEvent = {
-  CONTEXT_CHANGED: "ui.contextChanged",
+export const uiEvent = {
+  contextChanged: "ui.contextChanged",
 } as const;
 
-export const RulesEvent = {
-  RULES_LOADED: "rules.rulesLoaded",
-  TAGS_LOADED: "rules.tagsLoaded",
-  LINKS_LOADED: "rules.linksLoaded",
-  RULE_SAVED: "rules.ruleSaved",
-  RULE_DELETED: "rules.ruleDeleted",
-  TAG_SAVED: "rules.tagSaved",
-  TAG_DELETED: "rules.tagDeleted",
-  LINK_SAVED: "rules.linkSaved",
-  LINK_DELETED: "rules.linkDeleted",
+export const rulesEvent = {
+  rulesLoaded: "rules.rulesLoaded",
+  tagsLoaded: "rules.tagsLoaded",
+  linksLoaded: "rules.linksLoaded",
+  ruleSaved: "rules.ruleSaved",
+  ruleDeleted: "rules.ruleDeleted",
+  tagSaved: "rules.tagSaved",
+  tagDeleted: "rules.tagDeleted",
+  linkSaved: "rules.linkSaved",
+  linkDeleted: "rules.linkDeleted",
 } as const;
 
 // Combine all event types into a single map
+// Keys updated to dot.case
 export type ModEventPayloadMap = {
   // App
-  [AppEvent.LOADED]: undefined;
+  [appEvent.loaded]: undefined;
   // Mod
-  [ModEvent.LOADED]: { id: string; name: string };
-  [ModEvent.ERROR]: { id: string; name: string; error: Error | string };
+  [modEvent.loaded]: { id: string; name: string };
+  [modEvent.error]: { id: string; name: string; error: Error | string };
   // Conversation
-  [ConversationEvent.SELECTED]: { conversationId: string | null };
-  [ConversationEvent.ADDED]: { conversation: Conversation };
-  [ConversationEvent.UPDATED]: {
+  [conversationEvent.selected]: { conversationId: string | null };
+  [conversationEvent.added]: { conversation: Conversation };
+  [conversationEvent.updated]: {
     conversationId: string;
     updates: Partial<Conversation>;
   };
-  [ConversationEvent.DELETED]: { conversationId: string };
-  [ConversationEvent.SYNC_STATUS_CHANGED]: {
+  [conversationEvent.deleted]: { conversationId: string };
+  [conversationEvent.syncStatusChanged]: {
     conversationId: string;
     status: SyncStatus;
   };
   // Project
-  [ProjectEvent.SELECTED]: { projectId: string | null };
-  [ProjectEvent.ADDED]: { project: Project };
-  [ProjectEvent.UPDATED]: { projectId: string; updates: Partial<Project> };
-  [ProjectEvent.DELETED]: { projectId: string };
+  [projectEvent.selected]: { projectId: string | null };
+  [projectEvent.added]: { project: Project };
+  [projectEvent.updated]: { projectId: string; updates: Partial<Project> };
+  [projectEvent.deleted]: { projectId: string };
   // Interaction
-  [InteractionEvent.STARTED]: {
+  [interactionEvent.started]: {
     interactionId: string;
     conversationId: string;
     type: string;
   };
-  [InteractionEvent.STREAM_CHUNK]: { interactionId: string; chunk: string };
-  [InteractionEvent.COMPLETED]: {
+  [interactionEvent.streamChunk]: { interactionId: string; chunk: string };
+  [interactionEvent.completed]: {
     interactionId: string;
     status: Interaction["status"];
     error?: string;
     toolCalls?: ToolCallPart[];
     toolResults?: ToolResultPart[];
   };
-  [InteractionEvent.STATUS_CHANGED]: { status: InteractionState["status"] };
+  [interactionEvent.statusChanged]: { status: InteractionState["status"] };
   // Prompt
-  [PromptEvent.SUBMITTED]: { turnData: PromptTurnObject };
-  [PromptEvent.INPUT_CHANGED]: { value: string };
-  [PromptEvent.PARAMS_CHANGED]: { params: Partial<PromptState> };
+  [promptEvent.submitted]: { turnData: PromptTurnObject };
+  [promptEvent.inputChanged]: { value: string };
+  [promptEvent.paramsChanged]: { params: Partial<PromptState> };
   // Settings (Specific)
-  [SettingsEvent.THEME_CHANGED]: {
+  [settingsEvent.themeChanged]: {
     theme: SettingsState["theme"];
   };
-  [SettingsEvent.GLOBAL_SYSTEM_PROMPT_CHANGED]: {
+  [settingsEvent.globalSystemPromptChanged]: {
     prompt: SettingsState["globalSystemPrompt"];
   };
-  [SettingsEvent.TEMPERATURE_CHANGED]: {
+  [settingsEvent.temperatureChanged]: {
     value: SettingsState["temperature"];
   };
-  [SettingsEvent.MAX_TOKENS_CHANGED]: {
+  [settingsEvent.maxTokensChanged]: {
     value: SettingsState["maxTokens"];
   };
-  [SettingsEvent.TOP_P_CHANGED]: {
+  [settingsEvent.topPChanged]: {
     value: SettingsState["topP"];
   };
-  [SettingsEvent.TOP_K_CHANGED]: {
+  [settingsEvent.topKChanged]: {
     value: SettingsState["topK"];
   };
-  [SettingsEvent.PRESENCE_PENALTY_CHANGED]: {
+  [settingsEvent.presencePenaltyChanged]: {
     value: SettingsState["presencePenalty"];
   };
-  [SettingsEvent.FREQUENCY_PENALTY_CHANGED]: {
+  [settingsEvent.frequencyPenaltyChanged]: {
     value: SettingsState["frequencyPenalty"];
   };
-  [SettingsEvent.ENABLE_ADVANCED_SETTINGS_CHANGED]: {
+  [settingsEvent.enableAdvancedSettingsChanged]: {
     enabled: SettingsState["enableAdvancedSettings"];
   };
-  [SettingsEvent.ENABLE_STREAMING_MARKDOWN_CHANGED]: {
+  [settingsEvent.enableStreamingMarkdownChanged]: {
     enabled: SettingsState["enableStreamingMarkdown"];
   };
-  [SettingsEvent.ENABLE_STREAMING_CODE_BLOCK_PARSING_CHANGED]: {
+  [settingsEvent.enableStreamingCodeBlockParsingChanged]: {
     enabled: SettingsState["enableStreamingCodeBlockParsing"];
   };
-  [SettingsEvent.FOLD_STREAMING_CODE_BLOCKS_CHANGED]: {
+  [settingsEvent.foldStreamingCodeBlocksChanged]: {
     fold: SettingsState["foldStreamingCodeBlocks"];
   };
-  [SettingsEvent.FOLD_USER_MESSAGES_ON_COMPLETION_CHANGED]: {
+  [settingsEvent.foldUserMessagesOnCompletionChanged]: {
     fold: SettingsState["foldUserMessagesOnCompletion"];
   };
-  [SettingsEvent.STREAMING_RENDER_FPS_CHANGED]: {
+  [settingsEvent.streamingRenderFpsChanged]: {
     fps: SettingsState["streamingRenderFPS"];
   };
-  [SettingsEvent.GIT_USER_NAME_CHANGED]: {
+  [settingsEvent.gitUserNameChanged]: {
     name: SettingsState["gitUserName"];
   };
-  [SettingsEvent.GIT_USER_EMAIL_CHANGED]: {
+  [settingsEvent.gitUserEmailChanged]: {
     email: SettingsState["gitUserEmail"];
   };
-  [SettingsEvent.TOOL_MAX_STEPS_CHANGED]: {
+  [settingsEvent.toolMaxStepsChanged]: {
     steps: SettingsState["toolMaxSteps"];
   };
-  [SettingsEvent.PRISM_THEME_URL_CHANGED]: {
+  [settingsEvent.prismThemeUrlChanged]: {
     url: SettingsState["prismThemeUrl"];
   };
-  [SettingsEvent.AUTO_TITLE_ENABLED_CHANGED]: {
+  [settingsEvent.autoTitleEnabledChanged]: {
     enabled: SettingsState["autoTitleEnabled"];
   };
-  [SettingsEvent.AUTO_TITLE_MODEL_ID_CHANGED]: {
+  [settingsEvent.autoTitleModelIdChanged]: {
     modelId: SettingsState["autoTitleModelId"];
   };
-  [SettingsEvent.AUTO_TITLE_PROMPT_MAX_LENGTH_CHANGED]: {
+  [settingsEvent.autoTitlePromptMaxLengthChanged]: {
     length: SettingsState["autoTitlePromptMaxLength"];
   };
-  [SettingsEvent.AUTO_TITLE_INCLUDE_FILES_CHANGED]: {
+  [settingsEvent.autoTitleIncludeFilesChanged]: {
     include: SettingsState["autoTitleIncludeFiles"];
   };
-  [SettingsEvent.AUTO_TITLE_INCLUDE_RULES_CHANGED]: {
+  [settingsEvent.autoTitleIncludeRulesChanged]: {
     include: SettingsState["autoTitleIncludeRules"];
   };
-  [SettingsEvent.CUSTOM_FONT_FAMILY_CHANGED]: {
+  [settingsEvent.customFontFamilyChanged]: {
     fontFamily: SettingsState["customFontFamily"];
   };
-  [SettingsEvent.CUSTOM_FONT_SIZE_CHANGED]: {
+  [settingsEvent.customFontSizeChanged]: {
     fontSize: SettingsState["customFontSize"];
   };
-  [SettingsEvent.CHAT_MAX_WIDTH_CHANGED]: {
+  [settingsEvent.chatMaxWidthChanged]: {
     maxWidth: SettingsState["chatMaxWidth"];
   };
-  [SettingsEvent.CUSTOM_THEME_COLORS_CHANGED]: {
+  [settingsEvent.customThemeColorsChanged]: {
     colors: SettingsState["customThemeColors"];
   };
-  [SettingsEvent.AUTO_SCROLL_INTERVAL_CHANGED]: {
+  [settingsEvent.autoScrollIntervalChanged]: {
     interval: SettingsState["autoScrollInterval"];
   };
-  [SettingsEvent.ENABLE_AUTO_SCROLL_ON_STREAM_CHANGED]: {
+  [settingsEvent.enableAutoScrollOnStreamChanged]: {
     enabled: SettingsState["enableAutoScrollOnStream"];
   };
-  [SettingsEvent.ENABLE_API_KEY_MANAGEMENT_CHANGED]: {
+  [settingsEvent.enableApiKeyManagementChanged]: {
     enabled: boolean;
   };
   // Provider
-  [ProviderEvent.CONFIG_CHANGED]: {
+  [providerEvent.configChanged]: {
     providerId: string;
     config: DbProviderConfig;
   };
-  [ProviderEvent.API_KEY_CHANGED]: {
+  [providerEvent.apiKeyChanged]: {
     keyId: string;
     action: "added" | "deleted";
   };
-  [ProviderEvent.MODEL_SELECTION_CHANGED]: { modelId: string | null };
+  [providerEvent.modelSelectionChanged]: { modelId: string | null };
   // VFS
-  [VfsEvent.FILE_WRITTEN]: { path: string };
-  [VfsEvent.FILE_READ]: { path: string };
-  [VfsEvent.FILE_DELETED]: { path: string };
-  [VfsEvent.CONTEXT_CHANGED]: { vfsKey: string | null };
+  [vfsEvent.fileWritten]: { path: string };
+  [vfsEvent.fileRead]: { path: string };
+  [vfsEvent.fileDeleted]: { path: string };
+  [vfsEvent.contextChanged]: { vfsKey: string | null };
   // Sync
-  [SyncEvent.REPO_CHANGED]: {
+  [syncEvent.repoChanged]: {
     repoId: string;
     action: "added" | "updated" | "deleted";
   };
-  [SyncEvent.REPO_INIT_STATUS_CHANGED]: { repoId: string; status: SyncStatus };
+  [syncEvent.repoInitStatusChanged]: { repoId: string; status: SyncStatus };
   // Input
-  [InputEvent.ATTACHED_FILES_CHANGED]: { files: AttachedFileMetadata[] };
+  [inputEvent.attachedFilesChanged]: { files: AttachedFileMetadata[] };
   // UI
-  [UiEvent.CONTEXT_CHANGED]: {
+  [uiEvent.contextChanged]: {
     selectedItemId: string | null;
     selectedItemType: SidebarItemType | null;
   };
   // Rules & Tags
-  [RulesEvent.RULES_LOADED]: { rules: DbRule[] };
-  [RulesEvent.TAGS_LOADED]: { tags: DbTag[] };
-  [RulesEvent.LINKS_LOADED]: { links: any[] }; // Replace any with DbTagRuleLink if available
-  [RulesEvent.RULE_SAVED]: { rule: DbRule };
-  [RulesEvent.RULE_DELETED]: { ruleId: string };
-  [RulesEvent.TAG_SAVED]: { tag: DbTag };
-  [RulesEvent.TAG_DELETED]: { tagId: string };
-  [RulesEvent.LINK_SAVED]: { link: any }; // Replace any with DbTagRuleLink
-  [RulesEvent.LINK_DELETED]: { linkId: string };
+  [rulesEvent.rulesLoaded]: { rules: DbRule[] };
+  [rulesEvent.tagsLoaded]: { tags: DbTag[] };
+  [rulesEvent.linksLoaded]: { links: any[] };
+  [rulesEvent.ruleSaved]: { rule: DbRule };
+  [rulesEvent.ruleDeleted]: { ruleId: string };
+  [rulesEvent.tagSaved]: { tag: DbTag };
+  [rulesEvent.tagDeleted]: { tagId: string };
+  [rulesEvent.linkSaved]: { link: any };
+  [rulesEvent.linkDeleted]: { linkId: string };
 };
 
 // --- Middleware ---
 
 /** Defines the names of available middleware hooks */
+// Changed to dot.case
 export enum ModMiddlewareHook {
-  PROMPT_TURN_FINALIZE = "middleware:prompt:turnFinalize",
-  INTERACTION_BEFORE_START = "middleware:interaction:beforeStart",
-  INTERACTION_PROCESS_CHUNK = "middleware:interaction:processChunk",
+  PROMPT_TURN_FINALIZE = "middleware.prompt.turnFinalize",
+  INTERACTION_BEFORE_START = "middleware.interaction.beforeStart",
+  INTERACTION_PROCESS_CHUNK = "middleware.interaction.processChunk",
 }
 
 /** Maps middleware hook names to their expected payload types */
@@ -465,19 +465,13 @@ export interface ModMiddlewareReturnMap {
 export type ModMiddlewareHookName = ModMiddlewareHook;
 
 // --- Controls ---
-// Note: These are the types used by the Mod API. The core application might use
-// slightly stricter types (e.g., requiring status function). The API factory
-// handles the mapping/defaults.
-
-/** Base definition for UI controls registered by mods or core */
 interface BaseControl {
   id: string;
   status?: () => "ready" | "loading" | "error";
-  show?: () => boolean;
+  // show removed from ModPromptControl as per plan
 }
 
-/** Definition for controls appearing in the prompt input area */
-export interface PromptControl extends BaseControl {
+export interface ModPromptControl extends BaseControl {
   triggerRenderer?: () => React.ReactNode;
   renderer?: () => React.ReactNode;
   getParameters?: () =>
@@ -491,11 +485,10 @@ export interface PromptControl extends BaseControl {
   clearOnSubmit?: () => void;
 }
 
-/** Definition for controls appearing in other chat layout areas */
-export interface ChatControl extends BaseControl {
+export interface ModChatControl extends BaseControl {
   panel?: "sidebar" | "sidebar-footer" | "header" | "drawer_right" | "main";
-  // Corrected: Renderer types to match CoreChatControl
   renderer?: () => React.ReactElement | null;
   iconRenderer?: () => React.ReactElement | null;
   settingsRenderer?: () => React.ReactElement | null;
+  show?: () => boolean; // Kept for ChatControl
 }

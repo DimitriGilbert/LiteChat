@@ -21,7 +21,7 @@ import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { ProviderEvent, SettingsEvent } from "@/types/litechat/modding";
+import { providerEvent, settingsEvent } from "@/types/litechat/modding"; // Updated import
 import { instantiateModelInstance } from "@/lib/litechat/provider-helpers";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
@@ -164,7 +164,7 @@ export const useProviderStore = create(
     setEnableApiKeyManagement: (enabled) => {
       set({ enableApiKeyManagement: enabled });
       PersistenceService.saveSetting("enableApiKeyManagement", enabled);
-      emitter.emit(SettingsEvent.ENABLE_API_KEY_MANAGEMENT_CHANGED, {
+      emitter.emit(settingsEvent.enableApiKeyManagementChanged, {
         enabled,
       });
     },
@@ -219,7 +219,7 @@ export const useProviderStore = create(
         });
 
         await PersistenceService.saveSetting(LAST_SELECTION_KEY, modelToSelect);
-        emitter.emit(ProviderEvent.MODEL_SELECTION_CHANGED, {
+        emitter.emit(providerEvent.modelSelectionChanged, {
           modelId: modelToSelect,
         });
       } catch (e) {
@@ -237,7 +237,7 @@ export const useProviderStore = create(
       if (currentId !== combinedId) {
         set({ selectedModelId: combinedId });
         PersistenceService.saveSetting(LAST_SELECTION_KEY, combinedId);
-        emitter.emit(ProviderEvent.MODEL_SELECTION_CHANGED, {
+        emitter.emit(providerEvent.modelSelectionChanged, {
           modelId: combinedId,
         });
       }
@@ -260,7 +260,7 @@ export const useProviderStore = create(
           state.dbApiKeys.push(newKey);
         });
         toast.success(`API Key "${name}" added.`);
-        emitter.emit(ProviderEvent.API_KEY_CHANGED, {
+        emitter.emit(providerEvent.apiKeyChanged, {
           keyId: newId,
           action: "added",
         });
@@ -286,7 +286,7 @@ export const useProviderStore = create(
           );
         });
         toast.success(`API Key "${keyName}" deleted.`);
-        emitter.emit(ProviderEvent.API_KEY_CHANGED, {
+        emitter.emit(providerEvent.apiKeyChanged, {
           keyId: id,
           action: "deleted",
         });
@@ -325,7 +325,7 @@ export const useProviderStore = create(
         });
         get()._updateGloballyEnabledModelDefinitions();
         toast.success(`Provider "${configData.name}" added.`);
-        emitter.emit(ProviderEvent.CONFIG_CHANGED, {
+        emitter.emit(providerEvent.configChanged, {
           providerId: newId,
           config: newConfig,
         });
@@ -356,7 +356,6 @@ export const useProviderStore = create(
       const updatedConfigData: DbProviderConfig = {
         ...originalConfig,
         ...changes,
-        // Explicitly preserve these fields if not in 'changes'
         fetchedModels:
           changes.fetchedModels !== undefined
             ? changes.fetchedModels
@@ -375,7 +374,7 @@ export const useProviderStore = create(
           if (index !== -1) state.dbProviderConfigs[index] = updatedConfigData;
         });
         get()._updateGloballyEnabledModelDefinitions();
-        emitter.emit(ProviderEvent.CONFIG_CHANGED, {
+        emitter.emit(providerEvent.configChanged, {
           providerId: id,
           config: updatedConfigData,
         });
@@ -412,7 +411,7 @@ export const useProviderStore = create(
           delete state.providerFetchStatus[id];
         });
         get()._updateGloballyEnabledModelDefinitions();
-        emitter.emit(ProviderEvent.CONFIG_CHANGED, {
+        emitter.emit(providerEvent.configChanged, {
           providerId: id,
           config: { ...config, isEnabled: false },
         });

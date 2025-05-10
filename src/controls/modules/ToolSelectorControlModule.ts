@@ -1,15 +1,13 @@
 // src/controls/modules/ToolSelectorControlModule.ts
 // FULL FILE
 import React from "react";
-// Corrected: Import ControlModule from its definition file
 import { type ControlModule } from "@/types/litechat/control";
 import {
   type LiteChatModApi,
-  InteractionEvent,
-  ProviderEvent,
-  UiEvent,
-  // Corrected: Import SettingsEvent
-  SettingsEvent,
+  interactionEvent, // Updated import
+  providerEvent, // Updated import
+  uiEvent, // Updated import
+  settingsEvent, // Updated import
 } from "@/types/litechat/modding";
 import { ToolSelectorTrigger } from "@/controls/components/tool-selector/ToolSelectorTrigger";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -24,11 +22,9 @@ export class ToolSelectorControlModule implements ControlModule {
   private unregisterCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
 
-  // Transient state
   public transientEnabledTools = new Set<string>();
   public transientMaxStepsOverride: number | null = null;
 
-  // Derived state
   public isStreaming = false;
   public isVisible = true;
   public selectedItemType: SidebarItemType | null = null;
@@ -42,26 +38,23 @@ export class ToolSelectorControlModule implements ControlModule {
     this.loadInitialState();
     this.updateVisibility();
 
-    const unsubStatus = modApi.on(
-      InteractionEvent.STATUS_CHANGED,
-      (payload) => {
-        if (this.isStreaming !== (payload.status === "streaming")) {
-          this.isStreaming = payload.status === "streaming";
-          this.notifyComponentUpdate?.();
-        }
+    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
+      if (this.isStreaming !== (payload.status === "streaming")) {
+        this.isStreaming = payload.status === "streaming";
+        this.notifyComponentUpdate?.();
       }
-    );
-    const unsubModel = modApi.on(ProviderEvent.MODEL_SELECTION_CHANGED, () => {
+    });
+    const unsubModel = modApi.on(providerEvent.modelSelectionChanged, () => {
       this.updateVisibility();
       this.notifyComponentUpdate?.();
     });
-    const unsubContext = modApi.on(UiEvent.CONTEXT_CHANGED, (payload) => {
+    const unsubContext = modApi.on(uiEvent.contextChanged, (payload) => {
       this.selectedItemId = payload.selectedItemId;
       this.selectedItemType = payload.selectedItemType;
       this.notifyComponentUpdate?.();
     });
     const unsubSettings = modApi.on(
-      SettingsEvent.TOOL_MAX_STEPS_CHANGED,
+      settingsEvent.toolMaxStepsChanged,
       (payload) => {
         this.globalDefaultMaxSteps = payload.steps;
         this.notifyComponentUpdate?.();
@@ -160,7 +153,7 @@ export class ToolSelectorControlModule implements ControlModule {
         }
         if (changed) this.notifyComponentUpdate?.();
       },
-      show: () => this.isVisible,
+      // show method removed, visibility handled by ToolSelectorTrigger
     });
     console.log(`[${this.id}] Registered.`);
   }

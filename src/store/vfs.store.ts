@@ -14,8 +14,7 @@ import { fs } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
-// Import new event constant
-import { VfsEvent } from "@/types/litechat/modding";
+import { vfsEvent } from "@/types/litechat/modding"; // Updated import
 
 interface VfsState {
   nodes: Record<string, VfsNode>;
@@ -188,8 +187,7 @@ export const useVfsStore = create(
           operationLoading: false,
           initializingKey: null,
         });
-        // Use new event constant
-        emitter.emit(VfsEvent.CONTEXT_CHANGED, { vfsKey: null });
+        emitter.emit(vfsEvent.contextChanged, { vfsKey: null });
       } else if (!get().vfsKey && !get().configuredVfsKey) {
         console.log(
           "[VfsStore] VFS globally enabled, waiting for vfsKey to be set."
@@ -198,8 +196,7 @@ export const useVfsStore = create(
     },
     _setConfiguredVfsKey: (key) => {
       set({ configuredVfsKey: key });
-      // Use new event constant
-      emitter.emit(VfsEvent.CONTEXT_CHANGED, { vfsKey: key });
+      emitter.emit(vfsEvent.contextChanged, { vfsKey: key });
     },
 
     // --- VFS Context Switching ---
@@ -243,8 +240,7 @@ export const useVfsStore = create(
         selectedFileIds: new Set(),
         initializingKey: null,
       });
-      // Use new event constant
-      emitter.emit(VfsEvent.CONTEXT_CHANGED, { vfsKey: null });
+      emitter.emit(vfsEvent.contextChanged, { vfsKey: null });
 
       if (key !== null) {
         get()

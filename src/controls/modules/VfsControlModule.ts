@@ -4,13 +4,13 @@ import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import {
   type LiteChatModApi,
-  UiEvent, // Added UiEvent
+  uiEvent, // Updated import
 } from "@/types/litechat/modding";
 import { VfsTriggerButton } from "@/controls/components/vfs/VfsTriggerButton";
 import { VfsModalPanel } from "@/controls/components/vfs/VfsModalPanel";
 import { useVfsStore } from "@/store/vfs.store";
 import { useUIStateStore } from "@/store/ui.store";
-import { useConversationStore } from "@/store/conversation.store"; // To get context
+import { useConversationStore } from "@/store/conversation.store";
 
 export class VfsControlModule implements ControlModule {
   readonly id = "core-vfs";
@@ -21,21 +21,13 @@ export class VfsControlModule implements ControlModule {
   private notifyModalUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
-    this.updateVfsKeyBasedOnContext(); // Initial update
+    this.updateVfsKeyBasedOnContext();
 
-    // Listen to UI context changes (selected item, modal state)
-    const unsubUiContext = modApi.on(UiEvent.CONTEXT_CHANGED, () => {
+    const unsubUiContext = modApi.on(uiEvent.contextChanged, () => {
       this.updateVfsKeyBasedOnContext();
-      this.notifyTriggerUpdate?.(); // Notify trigger if its display depends on VFS state
-      this.notifyModalUpdate?.(); // Notify modal if its display depends on VFS state
+      this.notifyTriggerUpdate?.();
+      this.notifyModalUpdate?.();
     });
-
-    // Direct subscription to UIStateStore for modal changes might be cleaner if pattern allows
-    // For now, assuming UIStateStore emits an event or we poll/check it.
-    // A more robust way would be for UIStateStore to emit a specific event for modal changes.
-    // Let's assume for now that UiEvent.CONTEXT_CHANGED is sufficient or that
-    // the modal's `show` condition re-evaluates frequently enough.
-    // Alternatively, the VFS modal component itself can react to UIStateStore.
 
     this.eventUnsubscribers.push(unsubUiContext);
     console.log(`[${this.id}] Initialized.`);
@@ -58,14 +50,9 @@ export class VfsControlModule implements ControlModule {
           .getConversationById(selectedItemId);
         targetVfsKey = convo?.projectId ?? "orphan";
       } else {
-        // If modal is open but no specific project/convo context, default to orphan
-        // This case might need refinement based on desired UX when opening VFS from a global context
         targetVfsKey = "orphan";
       }
-    }
-    // If neither modal is open nor a project is selected, VFS key should be null (inactive)
-    // unless a conversation is selected, then it's its project or orphan.
-    else if (selectedItemType === "conversation") {
+    } else if (selectedItemType === "conversation") {
       const convo = useConversationStore
         .getState()
         .getConversationById(selectedItemId);
@@ -88,8 +75,7 @@ export class VfsControlModule implements ControlModule {
 
   public toggleVfsModal = (isOpen?: boolean) => {
     useUIStateStore.getState().toggleVfsModal(isOpen);
-    // VFS key update will be handled by the event listener or next context check
-    this.updateVfsKeyBasedOnContext(); // Explicitly update on toggle
+    this.updateVfsKeyBasedOnContext();
     this.notifyTriggerUpdate?.();
     this.notifyModalUpdate?.();
   };
@@ -112,7 +98,7 @@ export class VfsControlModule implements ControlModule {
 
     const unregisterTrigger = modApi.registerPromptControl({
       id: "core-vfs-prompt-trigger",
-      show: () => this.getEnableVfs(),
+      // show method removed, visibility handled by VfsTriggerButton
       triggerRenderer: () =>
         React.createElement(VfsTriggerButton, { module: this }),
     });
@@ -120,8 +106,8 @@ export class VfsControlModule implements ControlModule {
 
     const unregisterModal = modApi.registerChatControl({
       id: "core-vfs-modal-panel",
-      panel: undefined, // This means it's a modal, not in a fixed panel
-      show: () => this.getIsVfsModalOpen(), // Controlled by UIStateStore
+      panel: undefined,
+      show: () => this.getIsVfsModalOpen(),
       renderer: () => React.createElement(VfsModalPanel, { module: this }),
       status: () => "ready",
     });

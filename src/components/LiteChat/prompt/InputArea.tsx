@@ -13,8 +13,7 @@ import { cn } from "@/lib/utils";
 import { useInputStore } from "@/store/input.store";
 import type { InputAreaRef } from "@/types/litechat/prompt";
 import { emitter } from "@/lib/litechat/event-emitter";
-// Import new event constant
-import { PromptEvent } from "@/types/litechat/modding";
+import { promptEvent } from "@/types/litechat/modding"; // Updated import
 
 interface InputAreaProps {
   initialValue?: string;
@@ -50,8 +49,7 @@ export const InputArea = memo(
           if (onValueChange) {
             onValueChange(value);
           }
-          // Use new event constant
-          emitter.emit(PromptEvent.INPUT_CHANGED, { value });
+          emitter.emit(promptEvent.inputChanged, { value });
           requestAnimationFrame(() => {
             const textarea = internalTextareaRef.current;
             if (textarea) {
@@ -68,8 +66,7 @@ export const InputArea = memo(
           if (onValueChange) {
             onValueChange("");
           }
-          // Use new event constant
-          emitter.emit(PromptEvent.INPUT_CHANGED, { value: "" });
+          emitter.emit(promptEvent.inputChanged, { value: "" });
           requestAnimationFrame(() => {
             const textarea = internalTextareaRef.current;
             if (textarea) {
@@ -102,8 +99,7 @@ export const InputArea = memo(
         if (onValueChange) {
           onValueChange(newValue);
         }
-        // Use new event constant
-        emitter.emit(PromptEvent.INPUT_CHANGED, { value: newValue });
+        emitter.emit(promptEvent.inputChanged, { value: newValue });
       };
 
       useEffect(() => {

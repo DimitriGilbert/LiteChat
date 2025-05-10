@@ -1,7 +1,11 @@
 // src/controls/modules/UrlParameterControlModule.ts
-// NEW FILE
+// FULL FILE
 import { type ControlModule } from "@/types/litechat/control";
-import { type LiteChatModApi } from "@/types/litechat/modding";
+import {
+  type LiteChatModApi,
+  promptEvent, // Updated import
+  ModMiddlewareHook, // Updated import
+} from "@/types/litechat/modding";
 import { parseAppUrlParameters } from "@/lib/litechat/url-helpers";
 import { useConversationStore } from "@/store/conversation.store";
 import { useProviderStore } from "@/store/provider.store";
@@ -15,7 +19,6 @@ import { basename } from "@/lib/litechat/file-manager-utils";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { runMiddleware } from "@/lib/litechat/ai-helpers";
-import { PromptEvent, ModMiddlewareHook } from "@/types/litechat/modding";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
 import { ConversationService } from "@/services/conversation.service";
 
@@ -82,7 +85,7 @@ export class UrlParameterControlModule implements ControlModule {
         }
         if (!foundModelId) {
           const startsWithProviderMatch = availableModels.find((m) => {
-            const mtc = m.id.toLowerCase().split("/"); // Assuming model IDs might be like 'ollama/llama3'
+            const mtc = m.id.toLowerCase().split("/");
             return mtc.length > 1 && mtc[1].startsWith(modelParamLower);
           });
           if (startsWithProviderMatch)
@@ -105,7 +108,7 @@ export class UrlParameterControlModule implements ControlModule {
       }
 
       if (urlParams.vfsFiles && urlParams.vfsFiles.length > 0) {
-        const vfsKeyForUrl = "orphan"; // URL files are context-agnostic initially
+        const vfsKeyForUrl = "orphan";
         let fsInstance;
         try {
           fsInstance = await initVfs(vfsKeyForUrl, { force: true });
@@ -125,7 +128,7 @@ export class UrlParameterControlModule implements ControlModule {
               });
               const nodeStat = await fsInstance.promises.stat(filePath);
               const fileName = basename(filePath);
-              const mimeType = "application/octet-stream"; // Default, can be improved
+              const mimeType = "application/octet-stream";
               const isText = isLikelyTextFile(fileName, mimeType);
 
               let fileData: {
@@ -136,7 +139,6 @@ export class UrlParameterControlModule implements ControlModule {
               if (isText) {
                 fileData.contentText = new TextDecoder().decode(contentBytes);
               } else {
-                // For non-text, assume base64 for now if needed by model
                 let binary = "";
                 const len = contentBytes.byteLength;
                 for (let i = 0; i < len; i++) {
@@ -173,11 +175,7 @@ export class UrlParameterControlModule implements ControlModule {
 
       if (urlParams.query) {
         if (urlParams.submit === "0") {
-          // This part is tricky as the module doesn't directly own the input ref.
-          // We'll emit an event or rely on LiteChat.tsx to handle setting input value.
-          // For now, we'll log and the user might need to paste.
-          // A better solution would be an event that PromptWrapper listens to.
-          emitter.emit(PromptEvent.INPUT_CHANGED, { value: urlParams.query });
+          emitter.emit(promptEvent.inputChanged, { value: urlParams.query });
           toast.info("Query from URL loaded into input area.");
           window.history.replaceState(
             {},
@@ -185,14 +183,8 @@ export class UrlParameterControlModule implements ControlModule {
             window.location.pathname
           );
         } else {
-          // Auto-submit
           let parameters: Record<string, any> = {};
           let metadata: Record<string, any> = {};
-
-          // Note: Accessing other controls' getParameters/getMetadata directly from a module
-          // is not standard. This logic might be better placed in ConversationService
-          // or LiteChat.tsx if it needs to aggregate from all active controls.
-          // For simplicity here, we'll assume this module doesn't gather from others.
 
           const currentAttachedFiles =
             useInputStore.getState().attachedFilesMetadata;
@@ -207,7 +199,7 @@ export class UrlParameterControlModule implements ControlModule {
             metadata,
           };
 
-          emitter.emit(PromptEvent.SUBMITTED, { turnData });
+          emitter.emit(promptEvent.submitted, { turnData });
 
           const middlewareResult = await runMiddleware(
             ModMiddlewareHook.PROMPT_TURN_FINALIZE,

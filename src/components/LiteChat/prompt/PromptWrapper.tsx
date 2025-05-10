@@ -1,6 +1,6 @@
 // src/components/LiteChat/prompt/PromptWrapper.tsx
 // FULL FILE
-import React, { useState, useCallback, useMemo, useEffect } from "react"; // Added useEffect
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { SendHorizonalIcon, Loader2 } from "lucide-react";
 import { PromptControlWrapper } from "./PromptControlWrapper";
@@ -18,8 +18,9 @@ import { runMiddleware } from "@/lib/litechat/ai-helpers";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
-import { PromptEvent, ModMiddlewareHook } from "@/types/litechat/modding";
-import type { SidebarItemType } from "@/types/litechat/chat"; // For selectedItemType
+import { promptEvent, ModMiddlewareHook } from "@/types/litechat/modding"; // Updated import
+import type { SidebarItemType } from "@/types/litechat/chat";
+import { usePromptStateStore } from "@/store/prompt.store"; // Added for modelId
 
 interface PromptWrapperProps {
   InputAreaRenderer: InputAreaRenderer;
@@ -27,8 +28,8 @@ interface PromptWrapperProps {
   className?: string;
   placeholder?: string;
   inputAreaRef: React.RefObject<InputAreaRef | null>;
-  selectedItemId: string | null; // New prop for focus logic
-  selectedItemType: SidebarItemType | null; // New prop for focus logic
+  selectedItemId: string | null;
+  selectedItemType: SidebarItemType | null;
 }
 
 export const PromptWrapper: React.FC<PromptWrapperProps> = ({
@@ -37,8 +38,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   className,
   placeholder = "Send a message...",
   inputAreaRef,
-  selectedItemId, // Destructure new prop
-  selectedItemType, // Destructure new prop
+  selectedItemId,
+  selectedItemType,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasInputValue, setHasInputValue] = useState(false);
@@ -55,11 +56,12 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       clearAttachedFiles: state.clearAttachedFiles,
     }))
   );
+  const currentModelIdFromPromptStore = usePromptStateStore(
+    (state) => state.modelId
+  );
 
-  // Effect for focusing input on conversation selection
   useEffect(() => {
     if (selectedItemType === "conversation" && selectedItemId) {
-      // Ensure a conversation is selected and it's not just any item
       requestAnimationFrame(() => {
         inputAreaRef.current?.focus();
       });
@@ -67,9 +69,9 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   }, [selectedItemId, selectedItemType, inputAreaRef]);
 
   const promptControls = useMemo(() => {
-    return Object.values(registeredPromptControls).filter((c) =>
-      c.show ? c.show() : true
-    );
+    // The `show` method is no longer on the PromptControl interface.
+    // Visibility is handled by the control's own trigger/renderer component.
+    return Object.values(registeredPromptControls);
   }, [registeredPromptControls]);
 
   const panelControls = useMemo(
@@ -111,6 +113,11 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         metadata.attachedFiles = [...currentAttachedFiles];
       }
 
+      // Ensure modelId from prompt store is included if not already set by a control
+      if (!metadata.modelId && currentModelIdFromPromptStore) {
+        metadata.modelId = currentModelIdFromPromptStore;
+      }
+
       let turnData: PromptTurnObject = {
         id: nanoid(),
         content: trimmedValue,
@@ -118,7 +125,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         metadata,
       };
 
-      emitter.emit(PromptEvent.SUBMITTED, { turnData });
+      emitter.emit(promptEvent.submitted, { turnData });
 
       const middlewareResult = await runMiddleware(
         ModMiddlewareHook.PROMPT_TURN_FINALIZE,
@@ -163,6 +170,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     promptControls,
     onSubmit,
     clearAttachedFiles,
+    currentModelIdFromPromptStore, // Added dependency
   ]);
 
   const handleInputValueChange = useCallback((value: string) => {

@@ -1,13 +1,12 @@
 // src/controls/modules/FileControlModule.ts
 // FULL FILE
 import React from "react";
-// Corrected: Import ControlModule from its definition file
 import { type ControlModule } from "@/types/litechat/control";
 import {
   type LiteChatModApi,
-  InteractionEvent,
-  ProviderEvent,
-  InputEvent,
+  interactionEvent,
+  providerEvent,
+  inputEvent,
 } from "@/types/litechat/modding";
 import { FileControlTrigger } from "@/controls/components/file/FileControlTrigger";
 import { FileControlPanel } from "@/controls/components/file/FileControlPanel";
@@ -23,7 +22,6 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 export class FileControlModule implements ControlModule {
   readonly id = "core-file-attachment";
-  // @ts-expect-error - ts have not seeing it is used, keep it for now (Pattern 4)
   private modApi: LiteChatModApi | null = null;
   private unregisterCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
@@ -40,31 +38,24 @@ export class FileControlModule implements ControlModule {
     this.attachedFiles = useInputStore.getState().attachedFilesMetadata;
     this.updateModelSupport();
 
-    const unsubStatus = modApi.on(
-      InteractionEvent.STATUS_CHANGED,
-      (payload) => {
-        if (this.isStreaming !== (payload.status === "streaming")) {
-          this.isStreaming = payload.status === "streaming";
-          this.notifyComponentUpdate?.();
-        }
+    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
+      if (this.isStreaming !== (payload.status === "streaming")) {
+        this.isStreaming = payload.status === "streaming";
+        this.notifyComponentUpdate?.();
       }
-    );
-    const unsubModel = modApi.on(ProviderEvent.MODEL_SELECTION_CHANGED, () => {
+    });
+    const unsubModel = modApi.on(providerEvent.modelSelectionChanged, () => {
       this.updateModelSupport();
       this.notifyComponentUpdate?.();
     });
-    const unsubFiles = modApi.on(
-      InputEvent.ATTACHED_FILES_CHANGED,
-      (payload) => {
-        // Ensure we're comparing values correctly or just update
-        if (
-          JSON.stringify(this.attachedFiles) !== JSON.stringify(payload.files)
-        ) {
-          this.attachedFiles = payload.files;
-          this.notifyComponentUpdate?.();
-        }
+    const unsubFiles = modApi.on(inputEvent.attachedFilesChanged, (payload) => {
+      if (
+        JSON.stringify(this.attachedFiles) !== JSON.stringify(payload.files)
+      ) {
+        this.attachedFiles = payload.files;
+        this.notifyComponentUpdate?.();
       }
-    );
+    });
 
     this.eventUnsubscribers.push(unsubStatus, unsubModel, unsubFiles);
     console.log(`[${this.id}] Initialized.`);
@@ -82,14 +73,12 @@ export class FileControlModule implements ControlModule {
     }
   }
 
-  // Getters for components
   public getIsStreaming = (): boolean => this.isStreaming;
   public getModelSupportsNonText = (): boolean => this.modelSupportsNonText;
   public getAttachedFiles = (): AttachedFileMetadata[] => this.attachedFiles;
   public isLikelyTextFile = (name: string, type?: string): boolean =>
     isLikelyTextFile(name, type);
 
-  // Actions for components
   public onFileAdd = (fileData: Omit<AttachedFileMetadata, "id">) => {
     if (fileData.size > MAX_FILE_SIZE_BYTES) {
       toast.error(
@@ -105,12 +94,10 @@ export class FileControlModule implements ControlModule {
       return;
     }
     useInputStore.getState().addAttachedFile(fileData);
-    // Event emitter will trigger update of this.attachedFiles via InputEvent.ATTACHED_FILES_CHANGED
   };
 
   public onFileRemove = (attachmentId: string) => {
     useInputStore.getState().removeAttachedFile(attachmentId);
-    // Event emitter will trigger update of this.attachedFiles via InputEvent.ATTACHED_FILES_CHANGED
   };
 
   public setNotifyCallback = (cb: (() => void) | null) => {

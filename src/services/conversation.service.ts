@@ -35,7 +35,7 @@ export const ConversationService = {
     if (!conversationId) {
       toast.error("Cannot submit prompt: No active conversation.");
       console.error(
-        "[ConversationService] submitPrompt failed: No conversationId.",
+        "[ConversationService] submitPrompt failed: No conversationId."
       );
       return;
     }
@@ -48,7 +48,7 @@ export const ConversationService = {
 
     const isFirstInteraction =
       interactionStoreState.interactions.filter(
-        (i) => i.conversationId === conversationId,
+        (i) => i.conversationId === conversationId
       ).length === 0;
     const shouldGenerateTitle =
       isFirstInteraction &&
@@ -58,7 +58,7 @@ export const ConversationService = {
 
     const currentHistory = interactionStoreState.interactions;
     const completedHistory = currentHistory.filter(
-      (i) => i.status === "COMPLETED" && i.type === "message.user_assistant",
+      (i) => i.status === "COMPLETED" && i.type === "message.user_assistant"
     );
     const historyMessages: CoreMessage[] =
       buildHistoryMessages(completedHistory);
@@ -72,10 +72,10 @@ export const ConversationService = {
     const turnActiveRuleIds = turnData.metadata?.activeRuleIds ?? [];
 
     const combinedActiveTagIds = Array.from(
-      new Set([...projectDefaultTagIds, ...turnActiveTagIds]),
+      new Set([...projectDefaultTagIds, ...turnActiveTagIds])
     );
     const combinedActiveRuleIds = Array.from(
-      new Set([...projectDefaultRuleIds, ...turnActiveRuleIds]),
+      new Set([...projectDefaultRuleIds, ...turnActiveRuleIds])
     );
 
     const allEffectiveRuleIds = new Set<string>(combinedActiveRuleIds);
@@ -119,7 +119,7 @@ ${userContent}`;
     if (attachedFilesMeta.length > 0) {
       const fileContentParts = await this._processFilesForPrompt(
         attachedFilesMeta,
-        conversationId,
+        conversationId
       );
       userMessageContentParts.unshift(...fileContentParts);
     }
@@ -128,7 +128,7 @@ ${userContent}`;
       historyMessages.push({ role: "user", content: userMessageContentParts });
     } else {
       console.warn(
-        "[ConversationService] No user text or file content found in turnData. Submitting without user message.",
+        "[ConversationService] No user text or file content found in turnData. Submitting without user message."
       );
     }
 
@@ -172,7 +172,6 @@ ${userContent}`;
       messages: historyMessages,
       parameters: finalParameters,
       metadata: {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         ...(({
           turnSystemPrompt,
           activeTagIds,
@@ -186,8 +185,7 @@ ${userContent}`;
         }))(turnData.metadata ?? {}),
         modelId: promptState.modelId ?? undefined,
         attachedFiles: turnData.metadata.attachedFiles?.map(
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          ({ contentBase64, contentText, ...rest }) => rest,
+          ({ contentBase64, contentText, ...rest }) => rest
         ),
       },
     };
@@ -196,21 +194,21 @@ ${userContent}`;
       const mainInteractionPromise = InteractionService.startInteraction(
         promptObject,
         conversationId,
-        turnData,
+        turnData
       );
 
       if (shouldGenerateTitle) {
         console.log(
-          "[ConversationService] Triggering asynchronous title generation.",
+          "[ConversationService] Triggering asynchronous title generation."
         );
         this.generateConversationTitle(
           conversationId,
           turnData,
-          activeRules,
+          activeRules
         ).catch((titleError) => {
           console.error(
             "[ConversationService] Background title generation failed:",
-            titleError,
+            titleError
           );
         });
       }
@@ -218,7 +216,9 @@ ${userContent}`;
     } catch (error) {
       console.error("[ConversationService] Error starting interaction:", error);
       toast.error(
-        `Failed to start interaction: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to start interaction: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
       throw error;
     }
@@ -227,13 +227,13 @@ ${userContent}`;
   async generateConversationTitle(
     conversationId: string,
     originalTurnData: PromptTurnObject,
-    activeRulesForTurn: DbRule[],
+    activeRulesForTurn: DbRule[]
   ): Promise<void> {
     const settings = useSettingsStore.getState();
 
     if (!settings.autoTitleModelId) {
       console.warn(
-        "[ConversationService] Auto-title generation skipped: No model selected in settings.",
+        "[ConversationService] Auto-title generation skipped: No model selected in settings."
       );
       return;
     }
@@ -283,7 +283,10 @@ ${userContent}`;
 
     const titleTurnData: PromptTurnObject = {
       id: nanoid(),
-      content: `[Generate title based on: ${originalTurnData.content.substring(0, 50)}...]`,
+      content: `[Generate title based on: ${originalTurnData.content.substring(
+        0,
+        50
+      )}...]`,
       parameters: titlePromptObject.parameters,
       metadata: {
         ...titlePromptObject.metadata,
@@ -296,12 +299,12 @@ ${userContent}`;
         titlePromptObject,
         conversationId,
         titleTurnData,
-        "conversation.title_generation",
+        "conversation.title_generation"
       );
     } catch (error) {
       console.error(
         "[ConversationService] Error starting title generation interaction:",
-        error,
+        error
       );
     }
   },
@@ -309,7 +312,7 @@ ${userContent}`;
   async regenerateInteraction(interactionId: string): Promise<void> {
     console.log(
       "[ConversationService] regenerateInteraction called",
-      interactionId,
+      interactionId
     );
     const interactionStoreState = useInteractionStore.getState();
     const projectStoreState = useProjectStore.getState();
@@ -318,7 +321,7 @@ ${userContent}`;
     const rulesStoreState = useRulesStore.getState();
 
     const targetInteraction = interactionStoreState.interactions.find(
-      (i) => i.id === interactionId,
+      (i) => i.id === interactionId
     );
 
     if (!targetInteraction || !targetInteraction.prompt) {
@@ -341,7 +344,7 @@ ${userContent}`;
           i.conversationId === conversationId &&
           i.index < historyUpToIndex &&
           i.status === "COMPLETED" &&
-          i.type === "message.user_assistant",
+          i.type === "message.user_assistant"
       )
       .sort((a, b) => a.index - b.index);
     const historyMessages: CoreMessage[] =
@@ -360,7 +363,7 @@ ${userContent}`;
       [];
 
     const allEffectiveRuleIds = new Set<string>(
-      originalEffectivelyAppliedRuleIds,
+      originalEffectivelyAppliedRuleIds
     );
     originalEffectivelyAppliedTagIds.forEach((tagId: string) => {
       rulesStoreState
@@ -399,7 +402,7 @@ ${userContent}`;
     if (originalAttachedFiles.length > 0) {
       const fileContentParts = await this._processFilesForPrompt(
         originalAttachedFiles,
-        conversationId,
+        conversationId
       );
       userMessageContentParts.unshift(...fileContentParts);
     }
@@ -408,7 +411,7 @@ ${userContent}`;
       historyMessages.push({ role: "user", content: userMessageContentParts });
     } else {
       console.warn(
-        "[ConversationService] No user text or file content found in original turnData for regeneration.",
+        "[ConversationService] No user text or file content found in original turnData for regeneration."
       );
     }
 
@@ -455,7 +458,6 @@ ${userContent}`;
       messages: historyMessages,
       parameters: finalParameters,
       metadata: {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         ...(({
           turnSystemPrompt,
           activeTagIds,
@@ -472,8 +474,7 @@ ${userContent}`;
         modelId: promptState.modelId ?? undefined,
         regeneratedFromId: interactionId,
         attachedFiles: originalAttachedFiles.map(
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          ({ contentBase64, contentText, ...rest }) => rest,
+          ({ contentBase64, contentText, ...rest }) => rest
         ),
       },
     };
@@ -483,15 +484,17 @@ ${userContent}`;
         promptObject,
         conversationId,
         originalTurnData,
-        "message.assistant_regen",
+        "message.assistant_regen"
       );
     } catch (error) {
       console.error(
         "[ConversationService] Error starting regeneration interaction:",
-        error,
+        error
       );
       toast.error(
-        `Failed to start regeneration: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to start regeneration: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
       throw error;
     }
@@ -499,7 +502,7 @@ ${userContent}`;
 
   async _processFilesForPrompt(
     filesMeta: AttachedFileMetadata[],
-    conversationId: string,
+    conversationId: string
   ): Promise<(TextPart | ImagePart)[]> {
     const fileContentParts: (TextPart | ImagePart)[] = [];
     const vfsFiles = filesMeta.filter((f) => f.source === "vfs");
@@ -514,7 +517,7 @@ ${userContent}`;
         vfsInstance = await this._ensureVfsReady(targetVfsKey);
       } catch (fsError) {
         toast.error(
-          `Filesystem unavailable for key ${targetVfsKey}. VFS files cannot be processed.`,
+          `Filesystem unavailable for key ${targetVfsKey}. VFS files cannot be processed.`
         );
         vfsFiles.forEach((fileMeta) => {
           fileContentParts.push({
@@ -533,7 +536,7 @@ ${userContent}`;
           contentPart = processFileMetaToUserContent(fileMeta);
         } else if (fileMeta.source === "vfs" && vfsInstance && fileMeta.path) {
           console.log(
-            `[ConversationService] Fetching VFS file: ${fileMeta.path}`,
+            `[ConversationService] Fetching VFS file: ${fileMeta.path}`
           );
           const contentBytes = await VfsOps.readFileOp(fileMeta.path, {
             fsInstance: vfsInstance,
@@ -552,7 +555,7 @@ ${userContent}`;
       } catch (processingError) {
         console.error(
           `[ConversationService] Error processing file ${fileMeta.name}:`,
-          processingError,
+          processingError
         );
         fileContentParts.push({
           type: "text",
@@ -564,10 +567,10 @@ ${userContent}`;
   },
 
   async _ensureVfsReady(
-    targetVfsKey: string,
+    targetVfsKey: string
   ): Promise<typeof FsType | undefined> {
     console.log(
-      `[ConversationService] Ensuring VFS ready for key "${targetVfsKey}"...`,
+      `[ConversationService] Ensuring VFS ready for key "${targetVfsKey}"...`
     );
     try {
       const fsInstance = await useVfsStore
@@ -578,7 +581,7 @@ ${userContent}`;
     } catch (vfsError) {
       console.error(
         `[ConversationService] Failed to ensure VFS ready for key ${targetVfsKey}:`,
-        vfsError,
+        vfsError
       );
       throw vfsError;
     }

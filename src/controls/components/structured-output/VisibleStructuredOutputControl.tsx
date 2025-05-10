@@ -1,7 +1,7 @@
 // src/controls/components/structured-output/VisibleStructuredOutputControl.tsx
-// NEW FILE
+// FULL FILE
 import React, { useEffect, useState } from "react";
-import { StructuredOutputControl } from "./StructuredOutputControl"; // Assume this is the actual UI
+import { StructuredOutputControl } from "./StructuredOutputControl";
 import type { StructuredOutputControlModule } from "@/controls/modules/StructuredOutputControlModule";
 
 interface VisibleStructuredOutputControlProps {
@@ -22,6 +22,5 @@ export const VisibleStructuredOutputControl: React.FC<
   if (!isVisible) {
     return null;
   }
-  // Pass the module to the actual UI component
   return <StructuredOutputControl module={module} />;
 };

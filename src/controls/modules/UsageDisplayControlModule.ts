@@ -4,11 +4,11 @@ import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import {
   type LiteChatModApi,
-  PromptEvent,
-  InputEvent,
-  ProviderEvent,
-  InteractionEvent,
-  UiEvent,
+  promptEvent, // Updated import
+  inputEvent, // Updated import
+  providerEvent, // Updated import
+  interactionEvent, // Updated import
+  uiEvent, // Updated import
 } from "@/types/litechat/modding";
 import { UsageDisplayControl } from "@/controls/components/usage-display/UsageDisplayControl";
 import { useProviderStore } from "@/store/provider.store";
@@ -52,23 +52,19 @@ export class UsageDisplayControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
-    // modApi parameter is used here for subscriptions
     this.loadInitialState();
     this.updateContextLength();
 
-    const unsubInput = modApi.on(PromptEvent.INPUT_CHANGED, (payload) => {
+    const unsubInput = modApi.on(promptEvent.inputChanged, (payload) => {
       this.currentInputText = payload.value;
       this.notifyComponentUpdate?.();
     });
-    const unsubFiles = modApi.on(
-      InputEvent.ATTACHED_FILES_CHANGED,
-      (payload) => {
-        this.attachedFiles = payload.files;
-        this.notifyComponentUpdate?.();
-      }
-    );
+    const unsubFiles = modApi.on(inputEvent.attachedFilesChanged, (payload) => {
+      this.attachedFiles = payload.files;
+      this.notifyComponentUpdate?.();
+    });
     const unsubModel = modApi.on(
-      ProviderEvent.MODEL_SELECTION_CHANGED,
+      providerEvent.modelSelectionChanged,
       (payload) => {
         this.selectedModelId = payload.modelId;
         this.updateContextLength();
@@ -76,13 +72,13 @@ export class UsageDisplayControlModule implements ControlModule {
       }
     );
     const unsubInteractionComplete = modApi.on(
-      InteractionEvent.COMPLETED,
+      interactionEvent.completed,
       () => {
         this.updateHistoryTokens();
         this.notifyComponentUpdate?.();
       }
     );
-    const unsubContextChange = modApi.on(UiEvent.CONTEXT_CHANGED, () => {
+    const unsubContextChange = modApi.on(uiEvent.contextChanged, () => {
       this.updateHistoryTokens();
       this.notifyComponentUpdate?.();
     });
@@ -186,7 +182,7 @@ export class UsageDisplayControlModule implements ControlModule {
       status: () => "ready",
       triggerRenderer: () =>
         React.createElement(UsageDisplayControl, { module: this }),
-      show: () => this.selectedModelId !== null && this.contextLength > 0,
+      // show method removed, visibility handled by UsageDisplayControl
     });
     console.log(`[${this.id}] Registered.`);
   }

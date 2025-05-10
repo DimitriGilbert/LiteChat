@@ -14,7 +14,7 @@ import type {
   ControlModule,
   ControlModuleConstructor,
 } from "@/types/litechat/control";
-import type { LiteChatModApi } from "@/types/litechat/modding"; // No longer need createModApi here
+import type { LiteChatModApi } from "@/types/litechat/modding";
 
 interface CoreStores {
   loadSettings: () => Promise<void>;
@@ -117,9 +117,7 @@ export async function initializeControlModules(
   console.log("[Init] Control Modules: Initialization START");
   for (const module of sortedModules) {
     try {
-      // console.log(`[Init] Initializing module "${module.id}"...`);
       await module.initialize(modApi);
-      // console.log(`[Init] Module "${module.id}" initialized.`);
     } catch (initError) {
       console.error(
         `[Init] Error initializing module "${module.id}":`,
@@ -143,9 +141,7 @@ export function registerControlModules(
   console.log("[Init] Control Modules: Registration START");
   for (const module of modules) {
     try {
-      // console.log(`[Init] Registering module "${module.id}"...`);
-      module.register(modApi); // This now checks for double registration internally
-      // console.log(`[Init] Module "${module.id}" registered.`);
+      module.register(modApi);
     } catch (regError) {
       console.error(
         `[Init] Error registering module "${module.id}":`,
@@ -195,7 +191,6 @@ export function initializeCoreUiStates(stores: CoreStores): void {
   );
 }
 
-// Pass coreModApi instance to performFullInitialization
 export async function performFullInitialization(
   moduleConstructors: ControlModuleConstructor[],
   coreModApi: LiteChatModApi
@@ -237,7 +232,7 @@ export async function performFullInitialization(
     useUIStateStore
       .getState()
       .setGlobalError("Initialization sequence failed.");
-    throw error; // Re-throw to allow LiteChat.tsx to catch if needed
+    throw error;
   }
-  return initializedModules; // Return the modules for potential cleanup
+  return initializedModules;
 }

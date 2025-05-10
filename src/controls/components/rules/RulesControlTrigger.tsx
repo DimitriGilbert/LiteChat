@@ -1,5 +1,5 @@
 // src/controls/components/rules/RulesControlTrigger.tsx
-// NEW FILE
+// FULL FILE
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ShieldAlertIcon } from "lucide-react";
@@ -14,7 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { RulesControlDialogContent } from "./RulesControlDialogContent"; // Keep existing dialog content
+import { RulesControlDialogContent } from "./RulesControlDialogContent";
 import type { RulesControlModule } from "@/controls/modules/RulesControlModule";
 
 interface RulesControlTriggerProps {
@@ -32,11 +32,10 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
 
   const [popoverOpen, setPopoverOpen] = useState(false);
 
-  // Read state from module
   const activeTagIds = module.getActiveTagIds();
   const activeRuleIds = module.getActiveRuleIds();
   const isStreaming = module.getIsStreaming();
-  // Visibility is handled by module's `show` method
+  const isVisible = module.getHasRulesOrTags(); // Visibility based on module state
 
   const handleToggleTag = useCallback(
     (tagId: string, isActive: boolean) => {
@@ -63,7 +62,11 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
   );
 
   const hasActiveSettings = activeTagIds.size > 0 || activeRuleIds.size > 0;
-  const isDisabled = isStreaming; // Visibility already checks for rules/tags existence
+  const isDisabled = isStreaming;
+
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>

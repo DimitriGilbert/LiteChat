@@ -4,10 +4,10 @@ import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import {
   type LiteChatModApi,
-  InteractionEvent,
-  UiEvent,
-  ProjectEvent,
-  SettingsEvent,
+  interactionEvent, // Updated import
+  uiEvent, // Updated import
+  projectEvent, // Updated import
+  settingsEvent, // Updated import
 } from "@/types/litechat/modding";
 import { SystemPromptControlTrigger } from "@/controls/components/system-prompt/SystemPromptControlTrigger";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -26,29 +26,25 @@ export class SystemPromptControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
-    // modApi parameter is used here for subscriptions
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.updateEffectivePrompt();
 
-    const unsubStatus = modApi.on(
-      InteractionEvent.STATUS_CHANGED,
-      (payload) => {
-        if (this.isStreaming !== (payload.status === "streaming")) {
-          this.isStreaming = payload.status === "streaming";
-          this.notifyComponentUpdate?.();
-        }
+    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
+      if (this.isStreaming !== (payload.status === "streaming")) {
+        this.isStreaming = payload.status === "streaming";
+        this.notifyComponentUpdate?.();
       }
-    );
-    const unsubContext = modApi.on(UiEvent.CONTEXT_CHANGED, () => {
+    });
+    const unsubContext = modApi.on(uiEvent.contextChanged, () => {
       this.updateEffectivePrompt();
       this.notifyComponentUpdate?.();
     });
-    const unsubProject = modApi.on(ProjectEvent.UPDATED, () => {
+    const unsubProject = modApi.on(projectEvent.updated, () => {
       this.updateEffectivePrompt();
       this.notifyComponentUpdate?.();
     });
     const unsubSettings = modApi.on(
-      SettingsEvent.GLOBAL_SYSTEM_PROMPT_CHANGED,
+      settingsEvent.globalSystemPromptChanged,
       () => {
         this.updateEffectivePrompt();
         this.notifyComponentUpdate?.();
@@ -121,6 +117,7 @@ export class SystemPromptControlModule implements ControlModule {
           this.notifyComponentUpdate?.();
         }
       },
+      // show method removed, visibility handled by SystemPromptControlTrigger
     });
     console.log(`[${this.id}] Registered.`);
   }

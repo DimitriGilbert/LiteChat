@@ -11,8 +11,7 @@ import { useSettingsStore } from "./settings.store";
 import { useProviderStore } from "./provider.store";
 import { useConversationStore } from "./conversation.store";
 import { emitter } from "@/lib/litechat/event-emitter";
-// Corrected: Import ProjectEvent specifically
-import { ProjectEvent } from "@/types/litechat/modding";
+import { projectEvent } from "@/types/litechat/modding"; // Updated import
 
 interface ProjectState {
   projects: Project[];
@@ -106,8 +105,7 @@ export const useProjectStore = create(
             (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
           );
         });
-        // Corrected: Use ProjectEvent
-        emitter.emit(ProjectEvent.ADDED, { project: newProject });
+        emitter.emit(projectEvent.added, { project: newProject });
         return newId;
       } catch (e) {
         console.error("ProjectStore: Error adding project", e);
@@ -151,10 +149,9 @@ export const useProjectStore = create(
             );
           }
         });
-        // Corrected: Use ProjectEvent
-        emitter.emit(ProjectEvent.UPDATED, {
+        emitter.emit(projectEvent.updated, {
           projectId: id,
-          updates: updatedProjectData, // Pass the full updated project data
+          updates: updatedProjectData,
         });
       } catch (e) {
         console.error("ProjectStore: Error updating project", e);
@@ -186,8 +183,7 @@ export const useProjectStore = create(
         useConversationStore
           .getState()
           ._unlinkConversationsFromProjects(Array.from(projectsToDeleteIds));
-        // Corrected: Use ProjectEvent
-        emitter.emit(ProjectEvent.DELETED, { projectId: id });
+        emitter.emit(projectEvent.deleted, { projectId: id });
         toast.success(
           `Project "${projectToDelete.name}" and its contents deleted.`
         );

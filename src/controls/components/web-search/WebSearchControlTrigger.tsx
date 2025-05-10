@@ -27,7 +27,7 @@ export const WebSearchControlTrigger: React.FC<
 
   const localWebSearchEnabled = module.getWebSearchEnabled();
   const isStreaming = module.getIsStreaming();
-  // Visibility handled by module
+  const isVisible = module.getIsVisible(); // Get visibility from module
 
   const isExplicitlyEnabled = localWebSearchEnabled === true;
 
@@ -35,6 +35,10 @@ export const WebSearchControlTrigger: React.FC<
     const newState = isExplicitlyEnabled ? null : true;
     module.setWebSearchEnabled(newState);
   }, [isExplicitlyEnabled, module]);
+
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <TooltipProvider delayDuration={100}>

@@ -3,10 +3,11 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
-// Import PersistenceService instead of db
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
+// No direct event emissions from this store in this iteration,
+// but if added, they would use the new `rulesEvent` constants.
 
 interface RulesState {
   rules: DbRule[];
@@ -18,28 +19,24 @@ interface RulesState {
 
 interface RulesActions {
   loadRulesAndTags: () => Promise<void>;
-  // Rule Actions
   addRule: (
-    ruleData: Omit<DbRule, "id" | "createdAt" | "updatedAt">,
+    ruleData: Omit<DbRule, "id" | "createdAt" | "updatedAt">
   ) => Promise<string>;
   updateRule: (
     id: string,
-    updates: Partial<Omit<DbRule, "id" | "createdAt">>,
+    updates: Partial<Omit<DbRule, "id" | "createdAt">>
   ) => Promise<void>;
   deleteRule: (id: string) => Promise<void>;
-  // Tag Actions
   addTag: (
-    tagData: Omit<DbTag, "id" | "createdAt" | "updatedAt">,
+    tagData: Omit<DbTag, "id" | "createdAt" | "updatedAt">
   ) => Promise<string>;
   updateTag: (
     id: string,
-    updates: Partial<Omit<DbTag, "id" | "createdAt">>,
+    updates: Partial<Omit<DbTag, "id" | "createdAt">>
   ) => Promise<void>;
   deleteTag: (id: string) => Promise<void>;
-  // Link Actions
   linkTagToRule: (tagId: string, ruleId: string) => Promise<void>;
   unlinkTagFromRule: (tagId: string, ruleId: string) => Promise<void>;
-  // Selectors
   getRulesForTag: (tagId: string) => DbRule[];
   getTagsForRule: (ruleId: string) => DbTag[];
   getRuleById: (ruleId: string) => DbRule | undefined;
@@ -49,25 +46,21 @@ interface RulesActions {
 
 export const useRulesStore = create(
   immer<RulesState & RulesActions>((set, get) => ({
-    // Initial State
     rules: [],
     tags: [],
     tagRuleLinks: [],
     isLoading: false,
     error: null,
 
-    // Actions
     loadRulesAndTags: async () => {
       set({ isLoading: true, error: null });
       try {
-        // Use PersistenceService to load data
         const [dbRules, dbTags, dbLinks] = await Promise.all([
           PersistenceService.loadRules(),
           PersistenceService.loadTags(),
           PersistenceService.loadTagRuleLinks(),
         ]);
         set({
-          // ensureDateFields is handled by PersistenceService now
           rules: dbRules,
           tags: dbTags,
           tagRuleLinks: dbLinks,
@@ -80,7 +73,6 @@ export const useRulesStore = create(
       }
     },
 
-    // --- Rule Actions ---
     addRule: async (ruleData) => {
       const newId = nanoid();
       const now = new Date();
@@ -90,19 +82,16 @@ export const useRulesStore = create(
         updatedAt: now,
         ...ruleData,
       };
-      // Optimistic UI update
       set((state) => {
         state.rules.push(newRule);
         state.rules.sort((a, b) => a.name.localeCompare(b.name));
       });
       try {
-        // Use PersistenceService to save
         await PersistenceService.saveRule(newRule);
         toast.success(`Rule "${newRule.name}" added.`);
         return newId;
       } catch (e) {
         console.error("RulesStore: Error adding rule", e);
-        // Revert optimistic update
         set((state) => ({
           error: "Failed to save new rule",
           rules: state.rules.filter((r) => r.id !== newId),
@@ -122,7 +111,6 @@ export const useRulesStore = create(
         updatedAt: new Date(),
       };
 
-      // Optimistic UI update
       set((state) => {
         const index = state.rules.findIndex((r) => r.id === id);
         if (index !== -1) {
@@ -132,12 +120,10 @@ export const useRulesStore = create(
       });
 
       try {
-        // Use PersistenceService to save
         await PersistenceService.saveRule(updatedRuleData);
         toast.success(`Rule "${updatedRuleData.name}" updated.`);
       } catch (e) {
         console.error("RulesStore: Error updating rule", e);
-        // Revert optimistic update
         set((state) => {
           const index = state.rules.findIndex((r) => r.id === id);
           if (index !== -1) {
@@ -155,22 +141,19 @@ export const useRulesStore = create(
       const ruleToDelete = get().rules.find((r) => r.id === id);
       if (!ruleToDelete) return;
       const originalLinks = get().tagRuleLinks.filter(
-        (link) => link.ruleId === id,
+        (link) => link.ruleId === id
       );
 
-      // Optimistic UI update
       set((state) => ({
         rules: state.rules.filter((r) => r.id !== id),
         tagRuleLinks: state.tagRuleLinks.filter((link) => link.ruleId !== id),
       }));
 
       try {
-        // Use PersistenceService to delete (handles transaction)
         await PersistenceService.deleteRule(id);
         toast.success(`Rule "${ruleToDelete.name}" deleted.`);
       } catch (e) {
         console.error("RulesStore: Error deleting rule", e);
-        // Revert optimistic update
         set((state) => {
           state.rules.push(ruleToDelete);
           state.rules.sort((a, b) => a.name.localeCompare(b.name));
@@ -182,7 +165,6 @@ export const useRulesStore = create(
       }
     },
 
-    // --- Tag Actions ---
     addTag: async (tagData) => {
       const newId = nanoid();
       const now = new Date();
@@ -192,19 +174,16 @@ export const useRulesStore = create(
         updatedAt: now,
         ...tagData,
       };
-      // Optimistic UI update
       set((state) => {
         state.tags.push(newTag);
         state.tags.sort((a, b) => a.name.localeCompare(b.name));
       });
       try {
-        // Use PersistenceService to save
         await PersistenceService.saveTag(newTag);
         toast.success(`Tag "${newTag.name}" added.`);
         return newId;
       } catch (e) {
         console.error("RulesStore: Error adding tag", e);
-        // Revert optimistic update
         set((state) => ({
           error: "Failed to save new tag",
           tags: state.tags.filter((t) => t.id !== newId),
@@ -224,7 +203,6 @@ export const useRulesStore = create(
         updatedAt: new Date(),
       };
 
-      // Optimistic UI update
       set((state) => {
         const index = state.tags.findIndex((t) => t.id === id);
         if (index !== -1) {
@@ -234,12 +212,10 @@ export const useRulesStore = create(
       });
 
       try {
-        // Use PersistenceService to save
         await PersistenceService.saveTag(updatedTagData);
         toast.success(`Tag "${updatedTagData.name}" updated.`);
       } catch (e) {
         console.error("RulesStore: Error updating tag", e);
-        // Revert optimistic update
         set((state) => {
           const index = state.tags.findIndex((t) => t.id === id);
           if (index !== -1) {
@@ -257,22 +233,19 @@ export const useRulesStore = create(
       const tagToDelete = get().tags.find((t) => t.id === id);
       if (!tagToDelete) return;
       const originalLinks = get().tagRuleLinks.filter(
-        (link) => link.tagId === id,
+        (link) => link.tagId === id
       );
 
-      // Optimistic UI update
       set((state) => ({
         tags: state.tags.filter((t) => t.id !== id),
         tagRuleLinks: state.tagRuleLinks.filter((link) => link.tagId !== id),
       }));
 
       try {
-        // Use PersistenceService to delete (handles transaction)
         await PersistenceService.deleteTag(id);
         toast.success(`Tag "${tagToDelete.name}" deleted.`);
       } catch (e) {
         console.error("RulesStore: Error deleting tag", e);
-        // Revert optimistic update
         set((state) => {
           state.tags.push(tagToDelete);
           state.tags.sort((a, b) => a.name.localeCompare(b.name));
@@ -284,23 +257,19 @@ export const useRulesStore = create(
       }
     },
 
-    // --- Link Actions ---
     linkTagToRule: async (tagId, ruleId) => {
       const linkId = `${tagId}-${ruleId}`;
       const existingLink = get().tagRuleLinks.find((l) => l.id === linkId);
       if (existingLink) return;
 
       const newLink: DbTagRuleLink = { id: linkId, tagId, ruleId };
-      // Optimistic UI update
       set((state) => {
         state.tagRuleLinks.push(newLink);
       });
       try {
-        // Use PersistenceService to save
         await PersistenceService.saveTagRuleLink(newLink);
       } catch (e) {
         console.error("RulesStore: Error linking tag to rule", e);
-        // Revert optimistic update
         set((state) => ({
           error: "Failed to link tag and rule",
           tagRuleLinks: state.tagRuleLinks.filter((l) => l.id !== linkId),
@@ -315,16 +284,13 @@ export const useRulesStore = create(
       const linkToDelete = get().tagRuleLinks.find((l) => l.id === linkId);
       if (!linkToDelete) return;
 
-      // Optimistic UI update
       set((state) => ({
         tagRuleLinks: state.tagRuleLinks.filter((l) => l.id !== linkId),
       }));
       try {
-        // Use PersistenceService to delete
         await PersistenceService.deleteTagRuleLink(linkId);
       } catch (e) {
         console.error("RulesStore: Error unlinking tag from rule", e);
-        // Revert optimistic update
         set((state) => {
           state.tagRuleLinks.push(linkToDelete);
           state.error = "Failed to unlink tag and rule";
@@ -334,13 +300,12 @@ export const useRulesStore = create(
       }
     },
 
-    // --- Selectors (remain the same) ---
     getRulesForTag: (tagId) => {
       const state = get();
       const ruleIds = new Set(
         state.tagRuleLinks
           .filter((link) => link.tagId === tagId)
-          .map((link) => link.ruleId),
+          .map((link) => link.ruleId)
       );
       return state.rules.filter((rule) => ruleIds.has(rule.id));
     },
@@ -350,7 +315,7 @@ export const useRulesStore = create(
       const tagIds = new Set(
         state.tagRuleLinks
           .filter((link) => link.ruleId === ruleId)
-          .map((link) => link.tagId),
+          .map((link) => link.tagId)
       );
       return state.tags.filter((tag) => tagIds.has(tag.id));
     },
@@ -367,5 +332,5 @@ export const useRulesStore = create(
       const idSet = new Set(ruleIds);
       return get().rules.filter((r) => idSet.has(r.id));
     },
-  })),
+  }))
 );

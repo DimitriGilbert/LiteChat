@@ -3,8 +3,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { emitter } from "@/lib/litechat/event-emitter";
-// Import new event constant
-import { PromptEvent } from "@/types/litechat/modding";
+import { promptEvent } from "@/types/litechat/modding"; // Updated import
 
 // State for the *next* prompt submission
 export interface PromptState {
@@ -48,8 +47,7 @@ const emitParamChange = (
   key: keyof PromptState,
   value: PromptState[keyof PromptState]
 ) => {
-  // Use new event constant
-  emitter.emit(PromptEvent.PARAMS_CHANGED, { params: { [key]: value } });
+  emitter.emit(promptEvent.paramsChanged, { params: { [key]: value } });
 };
 
 export const usePromptStateStore = create(
@@ -165,8 +163,7 @@ export const usePromptStateStore = create(
 
       if (changed) {
         set(changes);
-        // Use new event constant
-        emitter.emit(PromptEvent.PARAMS_CHANGED, { params: changes });
+        emitter.emit(promptEvent.paramsChanged, { params: changes });
       }
     },
 
@@ -215,8 +212,7 @@ export const usePromptStateStore = create(
 
       if (changed) {
         set(changes);
-        // Use new event constant
-        emitter.emit(PromptEvent.PARAMS_CHANGED, { params: changes });
+        emitter.emit(promptEvent.paramsChanged, { params: changes });
       }
     },
   }))

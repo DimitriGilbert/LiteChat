@@ -4,8 +4,7 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
-// Corrected: Import InputEvent specifically
-import { InputEvent } from "@/types/litechat/modding";
+import { inputEvent } from "@/types/litechat/modding"; // Updated import
 
 // Define a unified structure for attached file metadata
 export interface AttachedFileMetadata {
@@ -68,8 +67,7 @@ export const useInputStore = create(
         }
       });
       if (added) {
-        // Corrected: Use InputEvent
-        emitter.emit(InputEvent.ATTACHED_FILES_CHANGED, {
+        emitter.emit(inputEvent.attachedFilesChanged, {
           files: get().attachedFilesMetadata,
         });
       }
@@ -84,8 +82,7 @@ export const useInputStore = create(
         removed = state.attachedFilesMetadata.length < initialLength;
       });
       if (removed) {
-        // Corrected: Use InputEvent
-        emitter.emit(InputEvent.ATTACHED_FILES_CHANGED, {
+        emitter.emit(inputEvent.attachedFilesChanged, {
           files: get().attachedFilesMetadata,
         });
       }
@@ -95,8 +92,7 @@ export const useInputStore = create(
       // Clear only attached files
       set({ attachedFilesMetadata: [] });
       if (hadFiles) {
-        // Corrected: Use InputEvent
-        emitter.emit(InputEvent.ATTACHED_FILES_CHANGED, { files: [] });
+        emitter.emit(inputEvent.attachedFilesChanged, { files: [] });
       }
     },
   }))

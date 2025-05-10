@@ -4,9 +4,9 @@ import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import {
   type LiteChatModApi,
-  InteractionEvent,
-  UiEvent,
-  SettingsEvent,
+  interactionEvent, // Updated import
+  uiEvent, // Updated import
+  settingsEvent, // Updated import
 } from "@/types/litechat/modding";
 import { AutoTitleControlTrigger } from "@/controls/components/auto-title/AutoTitleControlTrigger";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -29,23 +29,20 @@ export class AutoTitleControlModule implements ControlModule {
     this.globalAutoTitleEnabled = useSettingsStore.getState().autoTitleEnabled;
     this.checkFirstInteraction();
 
-    const unsubStatus = modApi.on(
-      InteractionEvent.STATUS_CHANGED,
-      (payload) => {
-        if (this.isStreaming !== (payload.status === "streaming")) {
-          this.isStreaming = payload.status === "streaming";
-          this.notifyComponentUpdate?.();
-        }
+    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
+      if (this.isStreaming !== (payload.status === "streaming")) {
+        this.isStreaming = payload.status === "streaming";
+        this.notifyComponentUpdate?.();
       }
-    );
-    const unsubContext = modApi.on(UiEvent.CONTEXT_CHANGED, () => {
+    });
+    const unsubContext = modApi.on(uiEvent.contextChanged, () => {
       const oldIsFirst = this.isFirstInteraction;
       this.checkFirstInteraction();
       if (oldIsFirst !== this.isFirstInteraction) {
         this.notifyComponentUpdate?.();
       }
     });
-    const unsubComplete = modApi.on(InteractionEvent.COMPLETED, () => {
+    const unsubComplete = modApi.on(interactionEvent.completed, () => {
       const oldIsFirst = this.isFirstInteraction;
       this.checkFirstInteraction();
       if (oldIsFirst !== this.isFirstInteraction) {
@@ -53,7 +50,7 @@ export class AutoTitleControlModule implements ControlModule {
       }
     });
     const unsubSettings = modApi.on(
-      SettingsEvent.AUTO_TITLE_ENABLED_CHANGED,
+      settingsEvent.autoTitleEnabledChanged,
       (payload) => {
         if (this.globalAutoTitleEnabled !== payload.enabled) {
           this.globalAutoTitleEnabled = payload.enabled;
@@ -128,7 +125,7 @@ export class AutoTitleControlModule implements ControlModule {
           this.notifyComponentUpdate?.();
         }
       },
-      show: () => this.globalAutoTitleEnabled && this.isFirstInteraction,
+      // show method removed, visibility handled by AutoTitleControlTrigger
     });
     console.log(`[${this.id}] Registered.`);
   }

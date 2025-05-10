@@ -10,30 +10,24 @@ import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { normalizePath } from "@/lib/litechat/file-manager-utils";
-// Import sync logic helpers from the service file
 import {
   initializeOrSyncRepoLogic,
   syncConversationLogic,
 } from "@/services/sync.service";
-// Import import/export service
 import { ImportExportService } from "@/services/import-export.service";
-// Import the key from the constants file
 import { SYNC_VFS_KEY } from "@/lib/litechat/constants";
 import { useVfsStore } from "./vfs.store";
 import type { fs as FsType } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
-// Import ProjectStore for interaction
 import { useProjectStore } from "./project.store";
 import { emitter } from "@/lib/litechat/event-emitter";
-// Import new event constants
 import {
-  ConversationEvent,
-  ProjectEvent,
-  SyncEvent,
-  UiEvent,
+  conversationEvent, // Updated import
+  projectEvent, // Updated import
+  syncEvent, // Updated import
+  uiEvent, // Updated import
 } from "@/types/litechat/modding";
 
-// Define a union type for items in the sidebar (now includes Project from ProjectStore)
 export type SidebarItem =
   | (Conversation & { itemType: "conversation" })
   | (Project & { itemType: "project" });
@@ -207,8 +201,7 @@ export const useConversationStore = create(
         const conversationToSave = get().getConversationById(newId);
         if (conversationToSave) {
           await PersistenceService.saveConversation(conversationToSave);
-          // Use new event constant
-          emitter.emit(ConversationEvent.ADDED, {
+          emitter.emit(conversationEvent.added, {
             conversation: conversationToSave,
           });
         } else {
@@ -284,8 +277,7 @@ export const useConversationStore = create(
         try {
           const plainData = JSON.parse(JSON.stringify(updatedConversationData));
           await PersistenceService.saveConversation(plainData);
-          // Use new event constant
-          emitter.emit(ConversationEvent.UPDATED, {
+          emitter.emit(conversationEvent.updated, {
             conversationId: id,
             updates: updates,
           });
@@ -368,16 +360,14 @@ export const useConversationStore = create(
       try {
         await PersistenceService.deleteConversation(id);
         await PersistenceService.deleteInteractionsForConversation(id);
-        // Use new event constant
-        emitter.emit(ConversationEvent.DELETED, { conversationId: id });
+        emitter.emit(conversationEvent.deleted, { conversationId: id });
 
         if (
           currentSelectedId === id &&
           currentSelectedType === "conversation"
         ) {
           await useInteractionStore.getState().setCurrentConversationId(null);
-          // Use new event constant
-          emitter.emit(UiEvent.CONTEXT_CHANGED, {
+          emitter.emit(uiEvent.contextChanged, {
             selectedItemId: null,
             selectedItemType: null,
           });
@@ -421,21 +411,17 @@ export const useConversationStore = create(
         await useInteractionStore
           .getState()
           .setCurrentConversationId(type === "conversation" ? id : null);
-        // Use new event constant
-        emitter.emit(UiEvent.CONTEXT_CHANGED, {
+        emitter.emit(uiEvent.contextChanged, {
           selectedItemId: id,
           selectedItemType: type,
         });
         if (type === "conversation") {
-          // Use new event constant
-          emitter.emit(ConversationEvent.SELECTED, { conversationId: id });
+          emitter.emit(conversationEvent.selected, { conversationId: id });
         } else if (type === "project") {
-          // Use new event constant
-          emitter.emit(ProjectEvent.SELECTED, { projectId: id });
+          emitter.emit(projectEvent.selected, { projectId: id });
         } else {
-          // Use new event constants
-          emitter.emit(ConversationEvent.SELECTED, { conversationId: null });
-          emitter.emit(ProjectEvent.SELECTED, { projectId: null });
+          emitter.emit(conversationEvent.selected, { conversationId: null });
+          emitter.emit(projectEvent.selected, { projectId: null });
         }
       } else {
         console.log(`Item ${id} (${type}) already selected.`);
@@ -492,8 +478,7 @@ export const useConversationStore = create(
         if (repoToSave) {
           const plainData = JSON.parse(JSON.stringify(repoToSave));
           await PersistenceService.saveSyncRepo(plainData);
-          // Use new event constant
-          emitter.emit(SyncEvent.REPO_CHANGED, {
+          emitter.emit(syncEvent.repoChanged, {
             repoId: newId,
             action: "added",
           });
@@ -536,8 +521,7 @@ export const useConversationStore = create(
         try {
           const plainData = JSON.parse(JSON.stringify(repoToSave));
           await PersistenceService.saveSyncRepo(plainData);
-          // Use new event constant
-          emitter.emit(SyncEvent.REPO_CHANGED, {
+          emitter.emit(syncEvent.repoChanged, {
             repoId: id,
             action: "updated",
           });
@@ -591,8 +575,7 @@ export const useConversationStore = create(
 
       try {
         await PersistenceService.deleteSyncRepo(id);
-        // Use new event constant
-        emitter.emit(SyncEvent.REPO_CHANGED, {
+        emitter.emit(syncEvent.repoChanged, {
           repoId: id,
           action: "deleted",
         });
@@ -648,8 +631,7 @@ export const useConversationStore = create(
           console.error(`Sync error for ${conversationId}: ${error}`);
         }
       });
-      // Use new event constant
-      emitter.emit(ConversationEvent.SYNC_STATUS_CHANGED, {
+      emitter.emit(conversationEvent.syncStatusChanged, {
         conversationId,
         status,
       });
@@ -659,8 +641,7 @@ export const useConversationStore = create(
       set((state) => {
         state.repoInitializationStatus[repoId] = status;
       });
-      // Use new event constant
-      emitter.emit(SyncEvent.REPO_INIT_STATUS_CHANGED, { repoId, status });
+      emitter.emit(syncEvent.repoInitStatusChanged, { repoId, status });
     },
 
     initializeOrSyncRepo: async (repoId) => {

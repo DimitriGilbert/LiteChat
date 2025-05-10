@@ -4,10 +4,10 @@ import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import {
   type LiteChatModApi,
-  InteractionEvent,
-  ProviderEvent,
-  SettingsEvent,
-  PromptEvent,
+  interactionEvent, // Updated import
+  providerEvent, // Updated import
+  settingsEvent, // Updated import
+  promptEvent, // Updated import
 } from "@/types/litechat/modding";
 import { ParameterControlTrigger } from "@/controls/components/parameter/ParameterControlTrigger";
 import { useSettingsStore } from "@/store/settings.store";
@@ -44,33 +44,29 @@ export class ParameterControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
-    // modApi parameter is used here for subscriptions
     this.loadInitialState();
     this.updateSupportedParams();
 
-    const unsubStatus = modApi.on(
-      InteractionEvent.STATUS_CHANGED,
-      (payload) => {
-        if (this.isStreaming !== (payload.status === "streaming")) {
-          this.isStreaming = payload.status === "streaming";
-          this.notifyComponentUpdate?.();
-        }
+    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
+      if (this.isStreaming !== (payload.status === "streaming")) {
+        this.isStreaming = payload.status === "streaming";
+        this.notifyComponentUpdate?.();
       }
-    );
-    const unsubModel = modApi.on(ProviderEvent.MODEL_SELECTION_CHANGED, () => {
+    });
+    const unsubModel = modApi.on(providerEvent.modelSelectionChanged, () => {
       this.updateSupportedParams();
       this.updateVisibility();
       this.notifyComponentUpdate?.();
     });
     const unsubSettings = modApi.on(
-      SettingsEvent.ENABLE_ADVANCED_SETTINGS_CHANGED,
+      settingsEvent.enableAdvancedSettingsChanged,
       () => {
         this.updateVisibility();
         this.notifyComponentUpdate?.();
       }
     );
     const unsubPromptParams = modApi.on(
-      PromptEvent.PARAMS_CHANGED,
+      promptEvent.paramsChanged,
       (payload) => {
         let changed = false;
         if (
@@ -253,6 +249,7 @@ export class ParameterControlModule implements ControlModule {
         addParam("frequency_penalty", this.frequencyPenalty);
         return Object.keys(params).length > 0 ? params : undefined;
       },
+      // show method removed, visibility handled by ParameterControlTrigger
     });
     console.log(`[${this.id}] Registered.`);
   }

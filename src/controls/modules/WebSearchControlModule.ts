@@ -4,9 +4,9 @@ import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import {
   type LiteChatModApi,
-  InteractionEvent,
-  ProviderEvent,
-  PromptEvent,
+  interactionEvent, // Updated import
+  providerEvent, // Updated import
+  promptEvent, // Updated import
 } from "@/types/litechat/modding";
 import { WebSearchControlTrigger } from "@/controls/components/web-search/WebSearchControlTrigger";
 import { useProviderStore } from "@/store/provider.store";
@@ -24,26 +24,22 @@ export class WebSearchControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
-    // modApi parameter is used here for subscriptions
     this.webSearchEnabled = usePromptStateStore.getState().webSearchEnabled;
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.updateVisibility();
 
-    const unsubStatus = modApi.on(
-      InteractionEvent.STATUS_CHANGED,
-      (payload) => {
-        if (this.isStreaming !== (payload.status === "streaming")) {
-          this.isStreaming = payload.status === "streaming";
-          this.notifyComponentUpdate?.();
-        }
+    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
+      if (this.isStreaming !== (payload.status === "streaming")) {
+        this.isStreaming = payload.status === "streaming";
+        this.notifyComponentUpdate?.();
       }
-    );
-    const unsubModel = modApi.on(ProviderEvent.MODEL_SELECTION_CHANGED, () => {
+    });
+    const unsubModel = modApi.on(providerEvent.modelSelectionChanged, () => {
       this.updateVisibility();
       this.notifyComponentUpdate?.();
     });
     const unsubPromptParams = modApi.on(
-      PromptEvent.PARAMS_CHANGED,
+      promptEvent.paramsChanged,
       (payload) => {
         if (
           "webSearchEnabled" in payload.params &&
@@ -103,7 +99,7 @@ export class WebSearchControlModule implements ControlModule {
       clearOnSubmit: () => {
         usePromptStateStore.getState().setWebSearchEnabled(null);
       },
-      show: () => this.isVisible,
+      // show method removed, visibility handled by WebSearchControlTrigger
     });
     console.log(`[${this.id}] Registered.`);
   }

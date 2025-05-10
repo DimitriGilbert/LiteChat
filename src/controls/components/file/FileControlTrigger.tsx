@@ -12,8 +12,6 @@ import {
 } from "@/components/ui/tooltip";
 import type { FileControlModule } from "@/controls/modules/FileControlModule";
 
-// const MAX_FILE_SIZE_BYTES is defined in the module now
-
 interface FileControlTriggerProps {
   module: FileControlModule;
 }
@@ -24,13 +22,13 @@ export const FileControlTrigger: React.FC<FileControlTriggerProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [, forceUpdate] = useState({});
 
-  const isStreaming = module.getIsStreaming();
-  const modelSupportsNonText = module.getModelSupportsNonText();
-
   useEffect(() => {
     module.setNotifyCallback(() => forceUpdate({}));
     return () => module.setNotifyCallback(null);
   }, [module]);
+
+  const isStreaming = module.getIsStreaming();
+  const modelSupportsNonText = module.getModelSupportsNonText();
 
   const handleFileChange = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {

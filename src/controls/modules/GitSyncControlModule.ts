@@ -4,10 +4,10 @@ import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import {
   type LiteChatModApi,
-  ConversationEvent,
-  InteractionEvent,
-  UiEvent,
-  SyncEvent, // Added SyncEvent for repo changes
+  conversationEvent, // Updated import
+  interactionEvent, // Updated import
+  uiEvent, // Updated import
+  syncEvent, // Updated import
 } from "@/types/litechat/modding";
 import { GitSyncControlTrigger } from "@/controls/components/git-sync/GitSyncControlTrigger";
 import { useConversationStore } from "@/store/conversation.store";
@@ -30,20 +30,19 @@ export class GitSyncControlModule implements ControlModule {
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.loadInitialState();
 
-    const unsubContext = modApi.on(UiEvent.CONTEXT_CHANGED, (payload) => {
+    const unsubContext = modApi.on(uiEvent.contextChanged, (payload) => {
       this.selectedItemId = payload.selectedItemId;
       this.selectedItemType = payload.selectedItemType;
       this.notifyComponentUpdate?.();
     });
 
-    // Listen to SyncEvent.REPO_CHANGED to update the list of syncRepos
-    const unsubRepoChanged = modApi.on(SyncEvent.REPO_CHANGED, () => {
+    const unsubRepoChanged = modApi.on(syncEvent.repoChanged, () => {
       this.syncRepos = useConversationStore.getState().syncRepos;
       this.notifyComponentUpdate?.();
     });
 
     const unsubConvSync = modApi.on(
-      ConversationEvent.SYNC_STATUS_CHANGED,
+      conversationEvent.syncStatusChanged,
       (payload) => {
         this.conversationSyncStatus = {
           ...this.conversationSyncStatus,
@@ -53,13 +52,13 @@ export class GitSyncControlModule implements ControlModule {
       }
     );
     const unsubInteractionStatus = modApi.on(
-      InteractionEvent.STATUS_CHANGED,
+      interactionEvent.statusChanged,
       (payload) => {
         this.isStreaming = payload.status === "streaming";
         this.notifyComponentUpdate?.();
       }
     );
-    const unsubConvUpdated = modApi.on(ConversationEvent.UPDATED, (payload) => {
+    const unsubConvUpdated = modApi.on(conversationEvent.updated, (payload) => {
       if (
         payload.conversationId === this.selectedItemId &&
         payload.updates.syncRepoId !== undefined
@@ -71,7 +70,7 @@ export class GitSyncControlModule implements ControlModule {
 
     this.eventUnsubscribers.push(
       unsubContext,
-      unsubRepoChanged, // Use the new listener
+      unsubRepoChanged,
       unsubConvSync,
       unsubInteractionStatus,
       unsubConvUpdated
@@ -116,8 +115,7 @@ export class GitSyncControlModule implements ControlModule {
       id: this.id,
       triggerRenderer: () =>
         React.createElement(GitSyncControlTrigger, { module: this }),
-      show: () =>
-        this.selectedItemType === "conversation" && this.syncRepos.length > 0,
+      // show method removed, visibility handled by GitSyncControlTrigger
     });
     console.log(`[${this.id}] Registered.`);
   }
