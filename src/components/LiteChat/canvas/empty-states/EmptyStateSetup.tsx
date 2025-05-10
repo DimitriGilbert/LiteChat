@@ -18,7 +18,7 @@ import { useUIStateStore } from "@/store/ui.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { useShallow } from "zustand/react/shallow";
 import { ApiKeyForm } from "@/components/LiteChat/common/ApiKeysForm";
-import { AddProviderForm } from "@/controls/components/settings/AddProviderForm";
+import { AddProviderForm } from "@/controls/components/provider-settings/AddProviderForm";
 import type {
   DbProviderConfig,
   DbProviderType,

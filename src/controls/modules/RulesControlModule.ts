@@ -6,13 +6,15 @@ import { type LiteChatModApi } from "@/types/litechat/modding";
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { rulesEvent } from "@/types/litechat/events/rules.events";
 import { RulesControlTrigger } from "@/controls/components/rules/RulesControlTrigger";
+import { SettingsRulesAndTags } from "@/controls/components/rules/SettingsRulesAndTags";
 import { useRulesStore } from "@/store/rules.store";
 import { useInteractionStore } from "@/store/interaction.store";
-import { useUIStateStore } from "@/store/ui.store"; // For opening settings
+import { useUIStateStore } from "@/store/ui.store";
 
 export class RulesControlModule implements ControlModule {
   readonly id = "core-rules-tags";
-  private unregisterCallback: (() => void) | null = null;
+  private unregisterPromptControlCallback: (() => void) | null = null;
+  private unregisterSettingsTabCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
 
   public transientActiveTagIds = new Set<string>();
@@ -24,7 +26,7 @@ export class RulesControlModule implements ControlModule {
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.loadInitialState();
-    this.notifyComponentUpdate?.(); // Notify after initial state load
+    this.notifyComponentUpdate?.();
 
     const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
       if (this.isStreaming !== (payload.status === "streaming")) {
@@ -72,9 +74,9 @@ export class RulesControlModule implements ControlModule {
     if (!this.hasRulesOrTags) {
       useUIStateStore.getState().setInitialSettingsTabs("rules-tags");
       useUIStateStore.getState().toggleChatControlPanel("settingsModal", true);
-      return true; // Indicate action was taken
+      return true;
     }
-    return false; // Indicate popover should open
+    return false;
   };
 
   public getIsStreaming = (): boolean => this.isStreaming;
@@ -97,45 +99,57 @@ export class RulesControlModule implements ControlModule {
   };
 
   register(modApi: LiteChatModApi): void {
-    if (this.unregisterCallback) {
-      console.warn(`[${this.id}] Already registered. Skipping.`);
-      return;
+    if (!this.unregisterPromptControlCallback) {
+      this.unregisterPromptControlCallback = modApi.registerPromptControl({
+        id: this.id,
+        status: () => (this.isLoadingRules ? "loading" : "ready"),
+        triggerRenderer: () =>
+          React.createElement(RulesControlTrigger, { module: this }),
+        getMetadata: () => {
+          const tags = Array.from(this.transientActiveTagIds);
+          const rules = Array.from(this.transientActiveRuleIds);
+          if (tags.length > 0 || rules.length > 0) {
+            return { activeTagIds: tags, activeRuleIds: rules };
+          }
+          return undefined;
+        },
+        clearOnSubmit: () => {
+          let changed = false;
+          if (this.transientActiveTagIds.size > 0) {
+            this.transientActiveTagIds = new Set<string>();
+            changed = true;
+          }
+          if (this.transientActiveRuleIds.size > 0) {
+            this.transientActiveRuleIds = new Set<string>();
+            changed = true;
+          }
+          if (changed) this.notifyComponentUpdate?.();
+        },
+      });
+      console.log(`[${this.id}] Prompt control registered.`);
     }
-    this.unregisterCallback = modApi.registerPromptControl({
-      id: this.id,
-      status: () => (this.isLoadingRules ? "loading" : "ready"),
-      triggerRenderer: () =>
-        React.createElement(RulesControlTrigger, { module: this }),
-      getMetadata: () => {
-        const tags = Array.from(this.transientActiveTagIds);
-        const rules = Array.from(this.transientActiveRuleIds);
-        if (tags.length > 0 || rules.length > 0) {
-          return { activeTagIds: tags, activeRuleIds: rules };
-        }
-        return undefined;
-      },
-      clearOnSubmit: () => {
-        let changed = false;
-        if (this.transientActiveTagIds.size > 0) {
-          this.transientActiveTagIds = new Set<string>();
-          changed = true;
-        }
-        if (this.transientActiveRuleIds.size > 0) {
-          this.transientActiveRuleIds = new Set<string>();
-          changed = true;
-        }
-        if (changed) this.notifyComponentUpdate?.();
-      },
-    });
-    console.log(`[${this.id}] Registered.`);
+
+    if (!this.unregisterSettingsTabCallback) {
+      this.unregisterSettingsTabCallback = modApi.registerSettingsTab({
+        id: "rules-tags",
+        title: "Rules & Tags",
+        component: SettingsRulesAndTags,
+        order: 50,
+      });
+      console.log(`[${this.id}] Settings tab registered.`);
+    }
   }
 
   destroy(): void {
     this.eventUnsubscribers.forEach((unsub) => unsub());
     this.eventUnsubscribers = [];
-    if (this.unregisterCallback) {
-      this.unregisterCallback();
-      this.unregisterCallback = null;
+    if (this.unregisterPromptControlCallback) {
+      this.unregisterPromptControlCallback();
+      this.unregisterPromptControlCallback = null;
+    }
+    if (this.unregisterSettingsTabCallback) {
+      this.unregisterSettingsTabCallback();
+      this.unregisterSettingsTabCallback = null;
     }
     this.notifyComponentUpdate = null;
     console.log(`[${this.id}] Destroyed.`);

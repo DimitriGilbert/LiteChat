@@ -10,10 +10,10 @@ import {
   TabbedLayout,
   TabDefinition,
 } from "@/components/LiteChat/common/TabbedLayout";
-import { SettingsAssistantPrompt } from "@/controls/components/assitant/SettingsAssistantPrompt";
-import { SettingsAssistantParameters } from "@/controls/components/assitant/SettingsAssistantParameters";
-import { SettingsAssistantTools } from "@/controls/components/assitant/SettingsAssistantTools";
-import { SettingsAssistantTitles } from "@/controls/components/assitant/SettingsAssistantTitles";
+import { SettingsAssistantPrompt } from "./SettingsAssistantPrompt";
+import { SettingsAssistantParameters } from "./SettingsAssistantParameters";
+import { SettingsAssistantTools } from "./SettingsAssistantTools";
+import { SettingsAssistantTitles } from "./SettingsAssistantTitles";
 
 const SettingsAssistantComponent: React.FC = () => {
   const { resetAssistantSettings } = useSettingsStore(

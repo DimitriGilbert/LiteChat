@@ -6,6 +6,7 @@ import type {
   DbMod,
   ModState as ModStoreState,
   ModActions as ModStoreActions,
+  CustomSettingTab, // Import CustomSettingTab
 } from "@/types/litechat/modding";
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
@@ -18,7 +19,7 @@ export const useModStore = create(
     // Initial State
     dbMods: [],
     loadedMods: [],
-    modSettingsTabs: [],
+    modSettingsTabs: [], // Initialize new state field
     isLoading: false,
     error: null,
 
@@ -142,6 +143,15 @@ export const useModStore = create(
       set((state) => {
         if (!state.modSettingsTabs.some((t) => t.id === tab.id)) {
           state.modSettingsTabs.push(tab);
+          state.modSettingsTabs.sort(
+            (a, b) => (a.order ?? 999) - (b.order ?? 999)
+          );
+        } else {
+          console.warn(
+            `ModStore: Settings tab with ID "${tab.id}" already registered. Overwriting.`
+          );
+          const index = state.modSettingsTabs.findIndex((t) => t.id === tab.id);
+          state.modSettingsTabs[index] = tab;
           state.modSettingsTabs.sort(
             (a, b) => (a.order ?? 999) - (b.order ?? 999)
           );

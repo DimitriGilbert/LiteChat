@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ApiKeySelector } from "@/controls/components/settings/ApiKeySelector.tsx";
+import { ApiKeySelector } from "./ApiKeySelector";
 import {
   requiresApiKey,
   requiresBaseURL,

@@ -1,4 +1,5 @@
 // src/components/LiteChat/common/TabbedLayout.tsx
+// FULL FILE
 import React, { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -9,6 +10,7 @@ export interface TabDefinition {
   label: string | React.ReactNode;
   content: React.ReactNode;
   disabled?: boolean;
+  order?: number; // Added order property
 }
 
 interface TabbedLayoutProps {
@@ -33,7 +35,7 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
   scrollable,
 }) => {
   const [internalValue, setInternalValue] = useState(
-    initialValue ?? defaultValue ?? tabs[0]?.value,
+    initialValue ?? defaultValue ?? tabs[0]?.value
   );
 
   // Effect to sync with external initialValue if provided
@@ -59,13 +61,13 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
     "data-[state=active]:border-primary",
     "dark:data-[state=active]:bg-primary/20 dark:data-[state=active]:text-primary",
     "dark:data-[state=active]:border-primary/70",
-    "hover:bg-muted/50 hover:text-primary/80",
+    "hover:bg-muted/50 hover:text-primary/80"
   );
 
   const CntWrap: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const clnm = cn(
       "flex-grow overflow-y-auto pb-6 pr-2 -mr-2",
-      contentContainerClassName,
+      contentContainerClassName
     );
     if (scrollable) {
       return <ScrollArea className={clnm}>{children}</ScrollArea>;
@@ -84,7 +86,7 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
       <TabsList
         className={cn(
           "flex-shrink-0 sticky top-0 bg-background z-10 mb-4 flex-wrap h-auto justify-start border-b gap-1 p-1 -mx-6 px-6",
-          listClassName,
+          listClassName
         )}
       >
         {tabs.map((tab) => (

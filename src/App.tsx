@@ -26,17 +26,36 @@ import { ReasoningControlModule } from "@/controls/modules/ReasoningControlModul
 import { WebSearchControlModule } from "@/controls/modules/WebSearchControlModule";
 import { RulesControlModule } from "@/controls/modules/RulesControlModule";
 import { AutoTitleControlModule } from "@/controls/modules/AutoTitleControlModule";
-import { UrlParameterControlModule } from "@/controls/modules/UrlParameterControlModule"; // New Module
+import { UrlParameterControlModule } from "@/controls/modules/UrlParameterControlModule";
+
+// Import new/updated Settings Modules
+import { GeneralSettingsModule } from "@/controls/modules/GeneralSettingsModule";
+import { ThemeSettingsControlModule } from "@/controls/modules/ThemeSettingsControlModule"; // Corrected name
+import { ProviderSettingsModule } from "@/controls/modules/ProviderSettingsModule";
+import { AssistantSettingsModule } from "@/controls/modules/AssistantSettingsModule";
+// GitSettingsModule is no longer separate; GitSyncControlModule handles its settings tab
+import { DataSettingsModule } from "@/controls/modules/DataSettingsModule";
+import { ModSettingsModule } from "@/controls/modules/ModSettingsModule";
 
 // Define the application's specific control module registration order HERE
 const controlModulesToRegister: ControlModuleConstructor[] = [
   // Core functional modules (no UI, but initialize early)
-  UrlParameterControlModule, // New: Handles URL parameters on init
+  UrlParameterControlModule,
+
+  // Settings Modules (Register their tabs early, order prop in tab def handles display order)
+  GeneralSettingsModule,
+  ThemeSettingsControlModule, // Corrected name
+  ProviderSettingsModule,
+  AssistantSettingsModule,
+  DataSettingsModule,
+  ModSettingsModule,
+  // RulesControlModule also registers a settings tab
+  // GitSyncControlModule also registers a settings tab
 
   // Layout Controls (Sidebar, Header, Footer)
   ConversationListControlModule,
   SidebarToggleControlModule,
-  SettingsControlModule,
+  SettingsControlModule, // This module now only opens the modal shell
   ProjectSettingsControlModule,
 
   // Prompt Controls (Order matters for visual layout in the prompt bar)
@@ -47,12 +66,12 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   WebSearchControlModule,
   FileControlModule,
   VfsControlModule,
-  RulesControlModule,
+  RulesControlModule, // Registers prompt control and settings tab
   SystemPromptControlModule,
   ToolSelectorControlModule,
   ParameterControlModule,
   StructuredOutputControlModule,
-  GitSyncControlModule,
+  GitSyncControlModule, // Registers prompt control and settings tab
 
   // Tools (Registration order doesn't affect UI directly)
   VfsToolsModule,
