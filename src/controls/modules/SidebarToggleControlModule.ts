@@ -9,13 +9,9 @@ import { useUIStateStore } from "@/store/ui.store";
 export class SidebarToggleControlModule implements ControlModule {
   readonly id = "core-sidebar-toggle";
   private unregisterCallback: (() => void) | null = null;
-  // @ts-expect-error - ts have not seeing it is used, keep it for now. **KEEP IT**
-  private isSidebarCollapsed = false; // Keep internal track for comparison
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(_modApi: LiteChatModApi): Promise<void> {
-    // modApi parameter is available here if needed for initialization logic
-    this.isSidebarCollapsed = useUIStateStore.getState().isSidebarCollapsed;
     console.log(`[${this.id}] Initialized.`);
   }
 
@@ -28,7 +24,6 @@ export class SidebarToggleControlModule implements ControlModule {
     const newState = isCollapsed ?? !current;
     if (current !== newState) {
       useUIStateStore.getState().toggleSidebar(isCollapsed);
-      this.isSidebarCollapsed = newState;
       this.notifyComponentUpdate?.();
     }
   };

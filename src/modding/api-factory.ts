@@ -39,7 +39,6 @@ export function createModApi(mod: DbMod): LiteChatModApi {
     modId,
     modName,
     registerPromptControl: (control: ModPromptControl) => {
-      // ModPromptControl and CorePromptControl have compatible renderer/triggerRenderer (React.ReactNode)
       const u = controlStoreActions.registerPromptControl(
         control as CorePromptControl
       );
@@ -47,7 +46,6 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       return u;
     },
     registerChatControl: (control: ModChatControl) => {
-      // ModChatControl's renderers now return React.ReactElement | null, matching CoreChatControl
       const controlWithDefaults: CoreChatControl = {
         ...control,
         status: control.status ?? (() => "ready"),
@@ -63,7 +61,7 @@ export function createModApi(mod: DbMod): LiteChatModApi {
     ) => {
       console.log(`[${modName}] Registering tool: ${toolName}`);
       const u = controlStoreActions.registerTool(
-        modId, // modId is passed here as the first argument to the store's registerTool
+        modId,
         toolName,
         definition,
         implementation
@@ -79,6 +77,13 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       const u = () => emitter.off(eventName, callback);
       unsubscribers.push(u);
       return u;
+    },
+    // Add emit method implementation
+    emit: <K extends keyof ModEventPayloadMap>(
+      eventName: K,
+      payload: ModEventPayloadMap[K]
+    ) => {
+      emitter.emit(eventName, payload);
     },
     addMiddleware: <H extends ModMiddlewareHookName>(
       hN: H,

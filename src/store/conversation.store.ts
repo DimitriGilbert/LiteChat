@@ -364,6 +364,7 @@ export const useConversationStore = create(
           currentSelectedId === id &&
           currentSelectedType === "conversation"
         ) {
+          // Explicitly set to null before emitting context change
           await useInteractionStore.getState().setCurrentConversationId(null);
           emitter.emit(uiEvent.contextChanged, {
             selectedItemId: null,
@@ -404,25 +405,49 @@ export const useConversationStore = create(
     },
 
     selectItem: async (id, type) => {
-      if (get().selectedItemId !== id || get().selectedItemType !== type) {
-        set({ selectedItemId: id, selectedItemType: type });
-        await useInteractionStore
-          .getState()
-          .setCurrentConversationId(type === "conversation" ? id : null);
-        emitter.emit(uiEvent.contextChanged, {
-          selectedItemId: id,
-          selectedItemType: type,
-        });
-        if (type === "conversation") {
-          emitter.emit(conversationEvent.selected, { conversationId: id });
-        } else if (type === "project") {
-          emitter.emit(projectEvent.selected, { projectId: id });
-        } else {
-          emitter.emit(conversationEvent.selected, { conversationId: null });
-          emitter.emit(projectEvent.selected, { projectId: null });
-        }
+      const currentSelId = get().selectedItemId;
+      const currentSelType = get().selectedItemType;
+
+      // If already selected, do nothing.
+      if (currentSelId === id && currentSelType === type) {
+        console.log(
+          `ConversationStore: Item ${id} (${type}) already selected.`
+        );
+        return;
+      }
+
+      console.log(
+        `ConversationStore: Selecting item. ID: ${id}, Type: ${type}. Previous: ${currentSelId} (${currentSelType})`
+      );
+
+      // Update the store's selection state
+      set({ selectedItemId: id, selectedItemType: type });
+
+      // Determine the conversation ID to pass to InteractionStore
+      const conversationIdForInteractionStore =
+        type === "conversation" ? id : null;
+
+      console.log(
+        `ConversationStore: Calling InteractionStore.setCurrentConversationId with: ${conversationIdForInteractionStore}`
+      );
+      // Update InteractionStore's current conversation ID
+      await useInteractionStore
+        .getState()
+        .setCurrentConversationId(conversationIdForInteractionStore);
+
+      // Emit events after all state updates
+      emitter.emit(uiEvent.contextChanged, {
+        selectedItemId: id,
+        selectedItemType: type,
+      });
+      if (type === "conversation") {
+        emitter.emit(conversationEvent.selected, { conversationId: id });
+      } else if (type === "project") {
+        emitter.emit(projectEvent.selected, { projectId: id });
       } else {
-        console.log(`Item ${id} (${type}) already selected.`);
+        // This case handles deselecting or selecting null
+        emitter.emit(conversationEvent.selected, { conversationId: null });
+        emitter.emit(projectEvent.selected, { projectId: null });
       }
     },
 

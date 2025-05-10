@@ -293,6 +293,8 @@ export const ConversationListControlComponent: React.FC<
 
   const handleSelectItem = useCallback(
     (id: string, type: SidebarItemType) => {
+      // Ensure 'type' is always defined when calling this from ConversationItemRenderer
+      console.log("handleSelectItem", id, type); // Add this log
       if (id === editingItemId && type === editingItemType) return;
       if (editingItemId && (id !== editingItemId || type !== editingItemType)) {
         handleCancelEdit();
@@ -544,12 +546,15 @@ export const ConversationListControlComponent: React.FC<
                     className="px-1"
                   >
                     <ConversationItemRenderer
-                      item={itemData.data as SidebarItem}
+                      item={itemData.data as SidebarItem} // Pass the original item data
                       level={itemData.level}
                       selectedItemId={selectedItemId}
                       conversationSyncStatus={conversationSyncStatus}
                       repoNameMap={repoNameMap}
-                      onSelectItem={handleSelectItem}
+                      // Ensure item.type is passed correctly here
+                      onSelectItem={() =>
+                        handleSelectItem(itemData.originalId, itemData.type)
+                      }
                       onDeleteConversation={handleDeleteConversation}
                       onDeleteProject={handleDeleteProject}
                       onExportConversation={handleExportConversation}

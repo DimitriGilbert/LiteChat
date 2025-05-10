@@ -5,17 +5,18 @@ import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { rulesEvent } from "@/types/litechat/events/rules.events";
+import { uiEvent } from "@/types/litechat/events/ui.events";
 import { RulesControlTrigger } from "@/controls/components/rules/RulesControlTrigger";
 import { SettingsRulesAndTags } from "@/controls/components/rules/SettingsRulesAndTags";
 import { useRulesStore } from "@/store/rules.store";
 import { useInteractionStore } from "@/store/interaction.store";
-import { useUIStateStore } from "@/store/ui.store";
 
 export class RulesControlModule implements ControlModule {
   readonly id = "core-rules-tags";
   private unregisterPromptControlCallback: (() => void) | null = null;
   private unregisterSettingsTabCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
+  private modApiRef: LiteChatModApi | null = null;
 
   public transientActiveTagIds = new Set<string>();
   public transientActiveRuleIds = new Set<string>();
@@ -25,6 +26,7 @@ export class RulesControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
+    this.modApiRef = modApi;
     this.loadInitialState();
     this.notifyComponentUpdate?.();
 
@@ -71,9 +73,10 @@ export class RulesControlModule implements ControlModule {
   }
 
   public handleTriggerClick = () => {
-    if (!this.hasRulesOrTags) {
-      useUIStateStore.getState().setInitialSettingsTabs("rules-tags");
-      useUIStateStore.getState().toggleChatControlPanel("settingsModal", true);
+    if (!this.hasRulesOrTags && this.modApiRef) {
+      this.modApiRef.emit(uiEvent.openSettingsModalRequest, {
+        tabId: "rules-tags",
+      });
       return true;
     }
     return false;
@@ -99,6 +102,8 @@ export class RulesControlModule implements ControlModule {
   };
 
   register(modApi: LiteChatModApi): void {
+    this.modApiRef = modApi;
+
     if (!this.unregisterPromptControlCallback) {
       this.unregisterPromptControlCallback = modApi.registerPromptControl({
         id: this.id,
@@ -152,6 +157,7 @@ export class RulesControlModule implements ControlModule {
       this.unregisterSettingsTabCallback = null;
     }
     this.notifyComponentUpdate = null;
+    this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
 }

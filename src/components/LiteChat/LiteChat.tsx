@@ -24,11 +24,6 @@ import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Loader2, Menu, X } from "lucide-react";
-// import { useInputStore } from "@/store/input.store"; // No longer directly used here
-// import { nanoid } from "nanoid"; // No longer directly used here
-// import { runMiddleware } from "@/lib/litechat/ai-helpers"; // No longer directly used here
-// import { PromptEvent, ModMiddlewareHook } from "@/types/litechat/modding"; // No longer directly used here
-// import { emitter } from "@/lib/litechat/event-emitter"; // No longer directly used here
 import { performFullInitialization } from "@/lib/litechat/initialization";
 import { usePromptStateStore } from "@/store/prompt.store";
 import type {
@@ -37,9 +32,9 @@ import type {
 } from "@/types/litechat/control";
 import { createModApi } from "@/modding/api-factory";
 import { useVfsStore } from "@/store/vfs.store"; // For VFS key logic
+import type { SidebarItemType } from "@/types/litechat/chat";
 
 let initializedControlModules: ControlModule[] = [];
-// Ensure appInitializationPromise and hasInitialized are module-scoped correctly
 let appInitializationPromise: Promise<ControlModule[]> | null = null;
 let hasInitializedSuccessfully = false;
 
@@ -52,13 +47,18 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const inputAreaRef = useRef<InputAreaRef>(null);
 
-  const selectedItemId = useConversationStore((state) => state.selectedItemId);
-  const selectedItemType = useConversationStore(
-    (state) => state.selectedItemType
+  const {
+    selectedItemId,
+    selectedItemType,
+    getConversationById: getConversationByIdFromStore,
+  } = useConversationStore(
+    useShallow((state) => ({
+      selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType,
+      getConversationById: state.getConversationById,
+    }))
   );
-  const getConversationById = useConversationStore(
-    (state) => state.getConversationById
-  );
+
   const { getEffectiveProjectSettings } = useProjectStore(
     useShallow((state) => ({
       getEffectiveProjectSettings: state.getEffectiveProjectSettings,
@@ -122,26 +122,21 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
 
     const initializeApp = async () => {
       if (hasInitializedSuccessfully) {
-        console.log(
-          "[LiteChat] App: Skipping re-initialization (already run successfully)."
-        );
         setIsInitializing(false);
         return;
       }
 
-      console.log("[LiteChat] App: Starting initialization...");
       setIsInitializing(true);
       try {
         initializedControlModules = await performFullInitialization(
           controls,
           coreModApi
         );
-        hasInitializedSuccessfully = true; // Set flag on successful completion
+        hasInitializedSuccessfully = true;
       } catch (error) {
         console.error("[LiteChat] App: Top-level initialization error:", error);
-        hasInitializedSuccessfully = false; // Ensure it's false on error
+        hasInitializedSuccessfully = false;
       } finally {
-        console.log("[LiteChat] App: Initialization attempt complete.");
         setIsInitializing(false);
       }
     };
@@ -151,21 +146,11 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         () => initializedControlModules
       );
     }
-
-    return () => {
-      console.log("[LiteChat] App: StrictMode unmount or component unmount.");
-      // Cleanup only if this is a "true" unmount, not just StrictMode.
-      // For StrictMode, we want modules to persist for the remount.
-      // If we had a way to detect true unmount vs. StrictMode unmount,
-      // we could be more precise. For now, the `hasInitializedSuccessfully` flag
-      // prevents re-running the full init.
-      // The `destroy` logic for modules should ideally be tied to application shutdown.
-    };
   }, [controls]);
 
   const prevContextRef = useRef<{
     itemId: string | null;
-    itemType: string | null;
+    itemType: SidebarItemType | null;
   }>({ itemId: null, itemType: null });
 
   useEffect(() => {
@@ -180,12 +165,13 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       currentContext.itemId !== prevContextRef.current.itemId ||
       currentContext.itemType !== prevContextRef.current.itemType
     ) {
-      const currentProjectId =
-        selectedItemType === "project"
-          ? selectedItemId
-          : selectedItemType === "conversation"
-          ? getConversationById(selectedItemId)?.projectId ?? null
-          : null;
+      let currentProjectId: string | null = null;
+      if (selectedItemType === "project") {
+        currentProjectId = selectedItemId;
+      } else if (selectedItemType === "conversation" && selectedItemId) {
+        const conversation = getConversationByIdFromStore(selectedItemId);
+        currentProjectId = conversation?.projectId ?? null;
+      }
 
       const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
       initializePromptState(effectiveSettings);
@@ -194,13 +180,12 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
   }, [
     selectedItemId,
     selectedItemType,
-    getConversationById,
+    getConversationByIdFromStore,
     getEffectiveProjectSettings,
     initializePromptState,
     isInitializing,
   ]);
 
-  // VFS Key Management Effect (from VfsControlModule logic)
   useEffect(() => {
     if (isInitializing || !hasInitializedSuccessfully) return;
 
@@ -209,13 +194,13 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       if (selectedItemType === "project") {
         targetVfsKey = selectedItemId;
       } else if (selectedItemType === "conversation") {
-        const convo = getConversationById(selectedItemId);
+        const convo = getConversationByIdFromStore(selectedItemId);
         targetVfsKey = convo?.projectId ?? "orphan";
       } else {
         targetVfsKey = "orphan";
       }
     } else if (selectedItemType === "conversation") {
-      const convo = getConversationById(selectedItemId);
+      const convo = getConversationByIdFromStore(selectedItemId);
       targetVfsKey = convo?.projectId ?? "orphan";
     }
 
@@ -227,7 +212,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     selectedItemId,
     selectedItemType,
     setVfsKey,
-    getConversationById,
+    getConversationByIdFromStore,
     isInitializing,
   ]);
 

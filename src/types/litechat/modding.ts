@@ -116,6 +116,11 @@ export interface LiteChatModApi {
     eventName: K,
     callback: (payload: ModEventPayloadMap[K]) => void
   ) => () => void;
+  // Add emit method to the API
+  emit: <K extends keyof ModEventPayloadMap>(
+    eventName: K,
+    payload: ModEventPayloadMap[K]
+  ) => void;
   addMiddleware: <H extends ModMiddlewareHookName>(
     hookName: H,
     callback: (
@@ -297,6 +302,11 @@ export type ModEventPayloadMap = {
   [uiEvent.contextChanged]: {
     selectedItemId: string | null;
     selectedItemType: SidebarItemType | null;
+  };
+  [uiEvent.openSettingsModalRequest]: {
+    // Ensure this is correctly defined
+    tabId: string;
+    subTabId?: string;
   };
   [rulesEvent.rulesLoaded]: { rules: DbRule[] };
   [rulesEvent.tagsLoaded]: { tags: DbTag[] };

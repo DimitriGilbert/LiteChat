@@ -41,7 +41,6 @@ interface InteractionActions {
 
 export const useInteractionStore = create(
   immer<InteractionState & InteractionActions>((set, get) => ({
-    // Initial State
     interactions: [],
     currentConversationId: null,
     streamingInteractionIds: [],
@@ -50,50 +49,73 @@ export const useInteractionStore = create(
     error: null,
     status: "idle",
 
-    // --- Async Load ---
     loadInteractions: async (conversationId) => {
-      if (!conversationId) {
-        get().clearInteractions();
+      // This function is now called by setCurrentConversationId AFTER currentConversationId is set.
+      // It should only proceed if the conversationId matches the store's currentConversationId.
+      if (get().currentConversationId !== conversationId) {
+        console.warn(
+          `InteractionStore: loadInteractions called for ${conversationId}, but current is ${
+            get().currentConversationId
+          }. Aborting load.`
+        );
         return;
       }
+
       const previousStatus = get().status;
       set({
         status: "loading",
         error: null,
-        interactions: [],
+        interactions: [], // Clear interactions for the new conversation
         streamingInteractionIds: [],
         activeStreamBuffers: {},
         activeReasoningBuffers: {},
-        currentConversationId: conversationId,
       });
       if (previousStatus !== "loading") {
         emitter.emit(interactionEvent.statusChanged, { status: "loading" });
       }
+
       try {
         const dbInteractions =
           await PersistenceService.loadInteractionsForConversation(
             conversationId
           );
         dbInteractions.sort((a, b) => a.index - b.index);
-        set({ interactions: dbInteractions, status: "idle" });
-        emitter.emit(interactionEvent.statusChanged, { status: "idle" });
+
+        // Double-check after await, in case currentConversationId changed again
+        if (get().currentConversationId === conversationId) {
+          set({ interactions: dbInteractions, status: "idle" });
+          emitter.emit(interactionEvent.statusChanged, { status: "idle" });
+        } else {
+          console.warn(
+            `InteractionStore: loadInteractions for ${conversationId} completed, but currentConversationId changed during fetch to ${
+              get().currentConversationId
+            }. Discarding.`
+          );
+        }
       } catch (e) {
-        console.error("InteractionStore: Error loading interactions", e);
-        set({ error: "Failed load interactions", status: "error" });
-        emitter.emit(interactionEvent.statusChanged, { status: "error" });
+        console.error(
+          `InteractionStore: Error loading interactions for ${conversationId}`,
+          e
+        );
+        if (get().currentConversationId === conversationId) {
+          set({ error: "Failed load interactions", status: "error" });
+          emitter.emit(interactionEvent.statusChanged, { status: "error" });
+        }
       }
     },
 
-    // --- Synchronous State Updates ONLY ---
     _addInteractionToState: (interaction) => {
       set((state) => {
+        if (state.currentConversationId !== interaction.conversationId) {
+          console.warn(
+            `InteractionStore: Attempted to add interaction for ${interaction.conversationId} but current is ${state.currentConversationId}. Skipping.`
+          );
+          return;
+        }
         if (!state.interactions.some((i) => i.id === interaction.id)) {
           state.interactions.push(interaction);
           state.interactions.sort((a, b) => a.index - b.index);
         } else {
-          console.warn(
-            `InteractionStore: Interaction ${interaction.id} already exists. Updating instead.`
-          );
           const index = state.interactions.findIndex(
             (i) => i.id === interaction.id
           );
@@ -111,6 +133,15 @@ export const useInteractionStore = create(
       set((state) => {
         const index = state.interactions.findIndex((i) => i.id === id);
         if (index !== -1) {
+          if (
+            state.currentConversationId !==
+            state.interactions[index].conversationId
+          ) {
+            console.warn(
+              `InteractionStore: Attempted to update interaction ${id} which is not in the current conversation ${state.currentConversationId}. Skipping.`
+            );
+            return;
+          }
           const existingInteraction = state.interactions[index];
           let newMetadata = { ...(existingInteraction.metadata || {}) };
           if (updates.metadata) {
@@ -131,32 +162,29 @@ export const useInteractionStore = create(
               newMetadata.reasoning = updates.metadata.reasoning;
             }
           }
-
           const updatedInteraction = {
             ...existingInteraction,
             ...updates,
             metadata: newMetadata,
           };
-
           if ("response" in updates) {
             updatedInteraction.response = updates.response;
           }
           if ("rating" in updates) {
             updatedInteraction.rating = updates.rating;
           }
-
           state.interactions[index] = updatedInteraction;
-        } else {
-          console.warn(
-            `InteractionStore: Interaction ${id} not found for sync state update.`
-          );
         }
       });
     },
 
     appendInteractionResponseChunk: (id, chunk) => {
       set((state) => {
-        if (state.streamingInteractionIds.includes(id)) {
+        if (
+          state.streamingInteractionIds.includes(id) &&
+          state.currentConversationId ===
+            state.interactions.find((i) => i.id === id)?.conversationId
+        ) {
           state.activeStreamBuffers[id] =
             (state.activeStreamBuffers[id] || "") + chunk;
         }
@@ -165,7 +193,11 @@ export const useInteractionStore = create(
 
     appendReasoningChunk: (id, chunk) => {
       set((state) => {
-        if (state.streamingInteractionIds.includes(id)) {
+        if (
+          state.streamingInteractionIds.includes(id) &&
+          state.currentConversationId ===
+            state.interactions.find((i) => i.id === id)?.conversationId
+        ) {
           state.activeReasoningBuffers[id] =
             (state.activeReasoningBuffers[id] || "") + chunk;
         }
@@ -178,25 +210,16 @@ export const useInteractionStore = create(
       });
     },
 
-    // --- Persistence Actions ---
     rateInteraction: async (interactionId, rating) => {
       const interaction = get().interactions.find(
         (i) => i.id === interactionId
       );
-      if (!interaction) {
-        console.error(
-          `InteractionStore: Interaction ${interactionId} not found for rating.`
-        );
-        return;
-      }
+      if (!interaction) return;
+      if (get().currentConversationId !== interaction.conversationId) return;
       get()._updateInteractionInState(interactionId, { rating });
       try {
         await PersistenceService.saveInteraction({ ...interaction, rating });
       } catch (error) {
-        console.error(
-          `InteractionStore: Failed to persist rating for ${interactionId}`,
-          error
-        );
         get()._updateInteractionInState(interactionId, {
           rating: interaction.rating,
         });
@@ -204,25 +227,48 @@ export const useInteractionStore = create(
       }
     },
 
-    // --- Other Actions ---
     setCurrentConversationId: async (id) => {
-      if (get().currentConversationId !== id) {
-        console.log(
-          `InteractionStore: Setting current conversation ID to ${id}`
-        );
-        if (id) {
+      const currentIdInStore = get().currentConversationId;
+
+      if (currentIdInStore === id) {
+        // If it's the same ID, but interactions are empty and not loading, force a reload.
+        // This handles cases where a previous load might have failed or been interrupted.
+        if (
+          id &&
+          get().interactions.length === 0 &&
+          get().status !== "loading"
+        ) {
+          console.warn(
+            `InteractionStore: Current ID ${id} matches, but no interactions. Forcing reload.`
+          );
+          // No need to `set` currentConversationId again, just call load.
           await get().loadInteractions(id);
         } else {
-          get().clearInteractions();
+          console.log(
+            `InteractionStore: setCurrentConversationId called with the same ID (${id}). No change needed or already handled.`
+          );
         }
+        return;
+      }
+
+      console.log(
+        `InteractionStore: Setting current conversation ID from ${currentIdInStore} to ${id}`
+      );
+      // Synchronously update the currentConversationId.
+      // This ensures that any subsequent calls to loadInteractions or other actions
+      // within this async function operate on the *new* ID.
+      set({ currentConversationId: id });
+
+      if (id) {
+        // Now that currentConversationId is updated, load interactions for it.
+        await get().loadInteractions(id);
       } else {
-        console.log(
-          `InteractionStore: Conversation ID ${id} is already current.`
-        );
+        // If the new ID is null, clear out everything.
+        get().clearInteractions(); // clearInteractions also sets currentConversationId to null.
       }
     },
+
     clearInteractions: () => {
-      console.log("InteractionStore: Clearing interactions.");
       const previousStatus = get().status;
       set({
         interactions: [],
@@ -237,6 +283,7 @@ export const useInteractionStore = create(
         emitter.emit(interactionEvent.statusChanged, { status: "idle" });
       }
     },
+
     setError: (error) => {
       const previousStatus = get().status;
       let newStatus: InteractionState["status"] = "idle";
@@ -257,12 +304,14 @@ export const useInteractionStore = create(
         emitter.emit(interactionEvent.statusChanged, { status: newStatus });
       }
     },
+
     setStatus: (status) => {
       if (get().status !== status) {
         set({ status });
         emitter.emit(interactionEvent.statusChanged, { status });
       }
     },
+
     _addStreamingId: (id) => {
       let statusChanged = false;
       set((state) => {
@@ -281,6 +330,7 @@ export const useInteractionStore = create(
         emitter.emit(interactionEvent.statusChanged, { status: "streaming" });
       }
     },
+
     _removeStreamingId: (id) => {
       let statusChanged = false;
       set((state) => {
@@ -289,7 +339,6 @@ export const useInteractionStore = create(
           state.streamingInteractionIds.splice(index, 1);
           delete state.activeStreamBuffers[id];
           delete state.activeReasoningBuffers[id];
-          console.log(`InteractionStore: Cleaned up buffers for ${id}.`);
           if (
             state.streamingInteractionIds.length === 0 &&
             state.status === "streaming"

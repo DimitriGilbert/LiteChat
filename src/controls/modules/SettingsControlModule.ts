@@ -3,16 +3,25 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { SettingsTriggerComponent } from "@/controls/components/settings/SettingsTriggerComponent"; // Updated path
+import { uiEvent } from "@/types/litechat/events/ui.events";
+import { SettingsTriggerComponent } from "@/controls/components/settings/SettingsTriggerComponent";
 import { SettingsModal } from "@/controls/components/settings/SettingsModal";
 import { useUIStateStore } from "@/store/ui.store";
 
 export class SettingsControlModule implements ControlModule {
   readonly id = "core-settings-trigger";
   private unregisterCallback: (() => void) | null = null;
+  private eventUnsubscribers: (() => void)[] = [];
 
-  async initialize(_modApi: LiteChatModApi): Promise<void> {
-    console.log(`[${this.id}] Initialized.`);
+  async initialize(modApi: LiteChatModApi): Promise<void> {
+    const unsubOpenRequest = modApi.on(
+      uiEvent.openSettingsModalRequest,
+      (payload) => {
+        this.openSettingsModal(payload.tabId, payload.subTabId);
+      }
+    );
+    this.eventUnsubscribers.push(unsubOpenRequest);
+    console.log(`[${this.id}] Initialized and listening for open requests.`);
   }
 
   public openSettingsModal = (initialTab?: string, initialSubTab?: string) => {
@@ -62,6 +71,8 @@ export class SettingsControlModule implements ControlModule {
   }
 
   destroy(): void {
+    this.eventUnsubscribers.forEach((unsub) => unsub());
+    this.eventUnsubscribers = [];
     if (this.unregisterCallback) {
       this.unregisterCallback();
       this.unregisterCallback = null;
