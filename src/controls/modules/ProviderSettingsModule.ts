@@ -1,6 +1,5 @@
 // src/controls/modules/ProviderSettingsModule.ts
-// FULL FILE (This might be new or an update depending on previous state)
-import React from "react";
+// FULL FILE
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { SettingsProviders } from "@/controls/components/provider-settings/SettingsProviders";

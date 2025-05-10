@@ -15,7 +15,7 @@ import {
 } from "@/components/LiteChat/common/TabbedLayout";
 import { GlobalModelOrganizer } from "./GlobalModelOrganizer";
 import { ModelDataDisplay } from "./ModelDataDisplay";
-import { SettingsApiKeys } from "./SettingsApiKeys";
+import { SettingsApiKeys } from "@/components/LiteChat/settings/ApiKeys";
 import { ModelBrowserList } from "./ModelBrowserList";
 
 const ProviderConfigList: React.FC<{

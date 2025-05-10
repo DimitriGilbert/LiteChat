@@ -8,7 +8,7 @@ import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import { syncEvent } from "@/types/litechat/events/sync.events";
 import { GitSyncControlTrigger } from "@/controls/components/git-sync/GitSyncControlTrigger";
-import { SettingsGit } from "@/controls/components/git-settings/SettingsGit"; // Import settings UI
+import { SettingsGit } from "@/controls/components/git-settings/SettingsGit"; // Corrected import path
 import { useConversationStore } from "@/store/conversation.store";
 import { useInteractionStore } from "@/store/interaction.store";
 import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";

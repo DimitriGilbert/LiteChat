@@ -1,6 +1,5 @@
 // src/controls/modules/DataSettingsModule.ts
 // FULL FILE
-import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { SettingsDataManagement } from "@/controls/components/data-settings/SettingsDataManagement";

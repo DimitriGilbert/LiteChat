@@ -25,7 +25,6 @@ import type {
 } from "@/types/litechat/provider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { ModelEnablementList } from "@/controls/components/settings/ModelEnablementList";
 import { Lnk } from "@/components/ui/lnk";
 import {
   requiresApiKey,
@@ -48,6 +47,7 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import { ActionCards } from "./ActionCards";
+import { ModelEnablementList } from "@/controls/components/provider-settings/ModelEnablementList";
 
 const SetupStep: React.FC<{
   stepNumber: number;

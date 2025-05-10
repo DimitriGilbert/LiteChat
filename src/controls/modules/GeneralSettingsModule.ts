@@ -1,6 +1,5 @@
 // src/controls/modules/GeneralSettingsModule.ts
 // FULL FILE
-import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { SettingsGeneral } from "@/controls/components/general-settings/SettingsGeneral";

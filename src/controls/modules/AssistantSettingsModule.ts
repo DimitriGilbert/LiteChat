@@ -1,6 +1,5 @@
 // src/controls/modules/AssistantSettingsModule.ts
 // FULL FILE
-import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { SettingsAssistant } from "@/controls/components/assistant-settings/SettingsAssistant";

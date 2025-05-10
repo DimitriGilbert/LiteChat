@@ -30,10 +30,10 @@ import { UrlParameterControlModule } from "@/controls/modules/UrlParameterContro
 
 // Import new/updated Settings Modules
 import { GeneralSettingsModule } from "@/controls/modules/GeneralSettingsModule";
-import { ThemeSettingsControlModule } from "@/controls/modules/ThemeSettingsControlModule"; // Corrected name
+import { ThemeSettingsControlModule } from "@/controls/modules/ThemeSettingsControlModule";
 import { ProviderSettingsModule } from "@/controls/modules/ProviderSettingsModule";
 import { AssistantSettingsModule } from "@/controls/modules/AssistantSettingsModule";
-// GitSettingsModule is no longer separate; GitSyncControlModule handles its settings tab
+// GitSettingsModule is removed; GitSyncControlModule handles its settings tab
 import { DataSettingsModule } from "@/controls/modules/DataSettingsModule";
 import { ModSettingsModule } from "@/controls/modules/ModSettingsModule";
 
@@ -44,7 +44,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
 
   // Settings Modules (Register their tabs early, order prop in tab def handles display order)
   GeneralSettingsModule,
-  ThemeSettingsControlModule, // Corrected name
+  ThemeSettingsControlModule,
   ProviderSettingsModule,
   AssistantSettingsModule,
   DataSettingsModule,

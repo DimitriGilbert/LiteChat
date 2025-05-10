@@ -6,7 +6,6 @@ import type {
   DbMod,
   ModState as ModStoreState,
   ModActions as ModStoreActions,
-  CustomSettingTab, // Import CustomSettingTab
 } from "@/types/litechat/modding";
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";

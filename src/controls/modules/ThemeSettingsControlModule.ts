@@ -1,6 +1,5 @@
 // src/controls/modules/ThemeSettingsControlModule.ts
 // NEW FILE
-import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { SettingsTheme } from "@/controls/components/theme-settings/SettingsTheme";

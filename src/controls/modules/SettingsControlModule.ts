@@ -3,7 +3,7 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { SettingsTriggerComponent } from "@/controls/components/settings/SettingsTriggerComponent";
+import { SettingsTriggerComponent } from "@/controls/components/settings/SettingsTriggerComponent"; // Updated path
 import { SettingsModal } from "@/controls/components/settings/SettingsModal";
 import { useUIStateStore } from "@/store/ui.store";
 
@@ -12,7 +12,6 @@ export class SettingsControlModule implements ControlModule {
   private unregisterCallback: (() => void) | null = null;
 
   async initialize(_modApi: LiteChatModApi): Promise<void> {
-    // modApi parameter is available here if needed for initialization logic
     console.log(`[${this.id}] Initialized.`);
   }
 
