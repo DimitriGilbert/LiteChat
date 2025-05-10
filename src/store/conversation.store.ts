@@ -21,12 +21,10 @@ import type { fs as FsType } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { useProjectStore } from "./project.store";
 import { emitter } from "@/lib/litechat/event-emitter";
-import {
-  conversationEvent, // Updated import
-  projectEvent, // Updated import
-  syncEvent, // Updated import
-  uiEvent, // Updated import
-} from "@/types/litechat/modding";
+import { conversationEvent } from "@/types/litechat/events/conversation.events";
+import { projectEvent } from "@/types/litechat/events/project.events";
+import { syncEvent } from "@/types/litechat/events/sync.events";
+import { uiEvent } from "@/types/litechat/events/ui.events";
 
 export type SidebarItem =
   | (Conversation & { itemType: "conversation" })

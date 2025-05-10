@@ -2,10 +2,8 @@
 // FULL FILE
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
-import {
-  type LiteChatModApi,
-  uiEvent, // Updated import
-} from "@/types/litechat/modding";
+import { type LiteChatModApi } from "@/types/litechat/modding";
+import { uiEvent } from "@/types/litechat/events/ui.events";
 import { VfsTriggerButton } from "@/controls/components/vfs/VfsTriggerButton";
 import { VfsModalPanel } from "@/controls/components/vfs/VfsModalPanel";
 import { useVfsStore } from "@/store/vfs.store";

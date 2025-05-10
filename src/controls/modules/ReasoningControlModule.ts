@@ -2,12 +2,10 @@
 // FULL FILE
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
-import {
-  type LiteChatModApi,
-  interactionEvent, // Updated import
-  providerEvent, // Updated import
-  promptEvent, // Updated import
-} from "@/types/litechat/modding";
+import { type LiteChatModApi } from "@/types/litechat/modding";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { ReasoningControlTrigger } from "@/controls/components/reasoning/ReasoningControlTrigger";
 import { useProviderStore } from "@/store/provider.store";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -27,6 +25,7 @@ export class ReasoningControlModule implements ControlModule {
     this.reasoningEnabled = usePromptStateStore.getState().reasoningEnabled;
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.updateVisibility();
+    this.notifyComponentUpdate?.(); // Notify after initial visibility update
 
     const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
       if (this.isStreaming !== (payload.status === "streaming")) {
@@ -98,7 +97,6 @@ export class ReasoningControlModule implements ControlModule {
       clearOnSubmit: () => {
         usePromptStateStore.getState().setReasoningEnabled(null);
       },
-      // show method removed, visibility handled by ReasoningControlTrigger
     });
     console.log(`[${this.id}] Registered.`);
   }

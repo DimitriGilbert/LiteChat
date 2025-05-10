@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { promptEvent } from "@/types/litechat/modding"; // Updated import
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 
 // State for the *next* prompt submission
 export interface PromptState {

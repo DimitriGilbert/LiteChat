@@ -5,7 +5,7 @@ import { IndexedDB } from "@zenfs/dom";
 import { toast } from "sonner";
 import type { FileSystemEntry } from "@/types/litechat/vfs";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { vfsEvent } from "@/types/litechat/modding"; // Updated import
+import { vfsEvent } from "@/types/litechat/events/vfs.events";
 import JSZip from "jszip";
 import {
   normalizePath,

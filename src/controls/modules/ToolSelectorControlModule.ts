@@ -2,13 +2,11 @@
 // FULL FILE
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
-import {
-  type LiteChatModApi,
-  interactionEvent, // Updated import
-  providerEvent, // Updated import
-  uiEvent, // Updated import
-  settingsEvent, // Updated import
-} from "@/types/litechat/modding";
+import { type LiteChatModApi } from "@/types/litechat/modding";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
+import { uiEvent } from "@/types/litechat/events/ui.events";
+import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { ToolSelectorTrigger } from "@/controls/components/tool-selector/ToolSelectorTrigger";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useProviderStore } from "@/store/provider.store";
@@ -37,6 +35,7 @@ export class ToolSelectorControlModule implements ControlModule {
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.loadInitialState();
     this.updateVisibility();
+    this.notifyComponentUpdate?.();
 
     const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
       if (this.isStreaming !== (payload.status === "streaming")) {
@@ -51,6 +50,7 @@ export class ToolSelectorControlModule implements ControlModule {
     const unsubContext = modApi.on(uiEvent.contextChanged, (payload) => {
       this.selectedItemId = payload.selectedItemId;
       this.selectedItemType = payload.selectedItemType;
+      this.updateVisibility();
       this.notifyComponentUpdate?.();
     });
     const unsubSettings = modApi.on(
@@ -61,11 +61,30 @@ export class ToolSelectorControlModule implements ControlModule {
       }
     );
 
+    // Corrected subscribe usage: listener gets full state, compare slice internally.
+    const controlStoreUnsubscribe = useControlRegistryStore.subscribe(
+      (currentState, previousState) => {
+        const currentTools = currentState.tools;
+        const previousTools = previousState.tools;
+
+        if (
+          Object.keys(currentTools).length !==
+            Object.keys(previousTools).length ||
+          JSON.stringify(currentTools) !== JSON.stringify(previousTools)
+        ) {
+          this.allToolsCount = Object.keys(currentTools).length;
+          this.updateVisibility();
+          this.notifyComponentUpdate?.();
+        }
+      }
+    );
+
     this.eventUnsubscribers.push(
       unsubStatus,
       unsubModel,
       unsubContext,
-      unsubSettings
+      unsubSettings,
+      controlStoreUnsubscribe
     );
     console.log(`[${this.id}] Initialized.`);
   }
@@ -83,12 +102,16 @@ export class ToolSelectorControlModule implements ControlModule {
   private updateVisibility() {
     const { getSelectedModel } = useProviderStore.getState();
     const selectedModel = getSelectedModel();
-    const hasRegisteredTools =
-      Object.keys(useControlRegistryStore.getState().tools).length > 0;
+    const hasRegisteredTools = this.allToolsCount > 0;
+
+    const modelSupportsTools =
+      selectedModel?.metadata?.supported_parameters?.includes("tools") ?? false;
+
     const newVisibility =
       hasRegisteredTools &&
-      (selectedModel?.metadata?.supported_parameters?.includes("tools") ??
-        false);
+      modelSupportsTools &&
+      this.selectedItemType === "conversation";
+
     if (this.isVisible !== newVisibility) {
       this.isVisible = newVisibility;
     }
@@ -153,7 +176,6 @@ export class ToolSelectorControlModule implements ControlModule {
         }
         if (changed) this.notifyComponentUpdate?.();
       },
-      // show method removed, visibility handled by ToolSelectorTrigger
     });
     console.log(`[${this.id}] Registered.`);
   }

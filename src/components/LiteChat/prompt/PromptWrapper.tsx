@@ -18,7 +18,8 @@ import { runMiddleware } from "@/lib/litechat/ai-helpers";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
-import { promptEvent, ModMiddlewareHook } from "@/types/litechat/modding"; // Updated import
+import { ModMiddlewareHook } from "@/types/litechat/modding";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 import type { SidebarItemType } from "@/types/litechat/chat";
 import { usePromptStateStore } from "@/store/prompt.store"; // Added for modelId
 

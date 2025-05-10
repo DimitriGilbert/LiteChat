@@ -22,7 +22,6 @@ import { AddProviderForm } from "@/controls/components/settings/AddProviderForm"
 import type {
   DbProviderConfig,
   DbProviderType,
-  OpenRouterModel,
 } from "@/types/litechat/provider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -199,6 +198,7 @@ export const EmptyStateSetup: React.FC = () => {
   );
 
   const [isSavingKey, setIsSavingKey] = useState(false);
+  // @ts-expect-error - we do not use it but cant remove, thank you unamed array destruct ! @AI DONT TOUCH !!
   const [isSavingProvider, setIsSavingProvider] = useState(false);
   const [isStartingChat, setIsStartingChat] = useState(false);
   const [isUpdatingModels, setIsUpdatingModels] = useState(false);

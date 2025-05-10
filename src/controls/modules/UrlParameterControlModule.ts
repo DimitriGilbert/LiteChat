@@ -3,9 +3,9 @@
 import { type ControlModule } from "@/types/litechat/control";
 import {
   type LiteChatModApi,
-  promptEvent, // Updated import
   ModMiddlewareHook, // Updated import
 } from "@/types/litechat/modding";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { parseAppUrlParameters } from "@/lib/litechat/url-helpers";
 import { useConversationStore } from "@/store/conversation.store";
 import { useProviderStore } from "@/store/provider.store";

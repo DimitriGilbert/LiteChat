@@ -38,8 +38,6 @@ export const ToolSelectorTrigger: React.FC<ToolSelectorTriggerProps> = ({
   const enabledTools = module.getEnabledTools();
   const maxStepsOverride = module.getMaxStepsOverride();
   const isStreaming = module.getIsStreaming();
-  const selectedItemType = module.getSelectedItemType();
-  const allToolsCount = module.getAllToolsCount();
   const isVisible = module.getIsVisible(); // Get visibility from module
 
   useEffect(() => {
@@ -54,8 +52,7 @@ export const ToolSelectorTrigger: React.FC<ToolSelectorTriggerProps> = ({
   };
 
   const hasActiveSettings = enabledTools.size > 0 || maxStepsOverride !== null;
-  const isDisabled =
-    isStreaming || allToolsCount === 0 || selectedItemType !== "conversation";
+  const isDisabledByStreaming = isStreaming;
 
   if (!isVisible) {
     return null;
@@ -71,7 +68,7 @@ export const ToolSelectorTrigger: React.FC<ToolSelectorTriggerProps> = ({
                 variant={hasActiveSettings ? "secondary" : "ghost"}
                 size="icon"
                 className="h-8 w-8"
-                disabled={isDisabled}
+                disabled={isDisabledByStreaming} // Only disable due to streaming
                 aria-label="Configure Tools"
               >
                 <WrenchIcon className="h-4 w-4" />
@@ -79,9 +76,7 @@ export const ToolSelectorTrigger: React.FC<ToolSelectorTriggerProps> = ({
             </PopoverTrigger>
           </TooltipTrigger>
           <TooltipContent side="top">
-            {isDisabled
-              ? "Tools unavailable (select conversation)"
-              : `Tools (${enabledTools.size} enabled)`}
+            {`Tools (${enabledTools.size} enabled)`}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

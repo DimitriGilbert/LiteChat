@@ -11,7 +11,7 @@ import { useSettingsStore } from "./settings.store";
 import { useProviderStore } from "./provider.store";
 import { useConversationStore } from "./conversation.store";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { projectEvent } from "@/types/litechat/modding"; // Updated import
+import { projectEvent } from "@/types/litechat/events/project.events";
 
 interface ProjectState {
   projects: Project[];

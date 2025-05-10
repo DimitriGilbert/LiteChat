@@ -2,14 +2,12 @@
 // FULL FILE
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
-import {
-  type LiteChatModApi,
-  promptEvent, // Updated import
-  inputEvent, // Updated import
-  providerEvent, // Updated import
-  interactionEvent, // Updated import
-  uiEvent, // Updated import
-} from "@/types/litechat/modding";
+import { type LiteChatModApi } from "@/types/litechat/modding";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
+import { inputEvent } from "@/types/litechat/events/input.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { uiEvent } from "@/types/litechat/events/ui.events";
 import { UsageDisplayControl } from "@/controls/components/usage-display/UsageDisplayControl";
 import { useProviderStore } from "@/store/provider.store";
 import { useInputStore } from "@/store/input.store";

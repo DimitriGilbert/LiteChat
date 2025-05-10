@@ -2,12 +2,10 @@
 // FULL FILE
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
-import {
-  type LiteChatModApi,
-  interactionEvent, // Updated import
-  uiEvent, // Updated import
-  settingsEvent, // Updated import
-} from "@/types/litechat/modding";
+import { type LiteChatModApi } from "@/types/litechat/modding";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { uiEvent } from "@/types/litechat/events/ui.events";
+import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { AutoTitleControlTrigger } from "@/controls/components/auto-title/AutoTitleControlTrigger";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useSettingsStore } from "@/store/settings.store";
@@ -28,6 +26,7 @@ export class AutoTitleControlModule implements ControlModule {
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.globalAutoTitleEnabled = useSettingsStore.getState().autoTitleEnabled;
     this.checkFirstInteraction();
+    this.notifyComponentUpdate?.(); // Notify after initial state load
 
     const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
       if (this.isStreaming !== (payload.status === "streaming")) {
@@ -79,6 +78,7 @@ export class AutoTitleControlModule implements ControlModule {
     if (this.isFirstInteraction !== isFirst) {
       this.isFirstInteraction = isFirst;
       if (!isFirst && this.turnAutoTitleEnabled) {
+        // If it's no longer the first interaction, reset turn-specific enable
         this.turnAutoTitleEnabled = false;
       }
     }
@@ -125,7 +125,6 @@ export class AutoTitleControlModule implements ControlModule {
           this.notifyComponentUpdate?.();
         }
       },
-      // show method removed, visibility handled by AutoTitleControlTrigger
     });
     console.log(`[${this.id}] Registered.`);
   }

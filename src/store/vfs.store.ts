@@ -14,7 +14,7 @@ import { fs } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { vfsEvent } from "@/types/litechat/modding"; // Updated import
+import { vfsEvent } from "@/types/litechat/events/vfs.events"; // Updated import
 
 interface VfsState {
   nodes: Record<string, VfsNode>;

@@ -5,7 +5,7 @@ import { immer } from "zustand/middleware/immer";
 import type { Interaction } from "@/types/litechat/interaction";
 import { PersistenceService } from "@/services/persistence.service";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { interactionEvent } from "@/types/litechat/modding"; // Updated import
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { toast } from "sonner";
 
 export interface InteractionState {

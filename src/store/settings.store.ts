@@ -5,7 +5,7 @@ import { immer } from "zustand/middleware/immer";
 import { PersistenceService } from "@/services/persistence.service";
 import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { settingsEvent } from "@/types/litechat/modding"; // Updated import
+import { settingsEvent } from "@/types/litechat/events/settings.events";
 
 export interface CustomThemeColors {
   background?: string;

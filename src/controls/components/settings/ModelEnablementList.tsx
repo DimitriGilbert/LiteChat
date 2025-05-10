@@ -1,12 +1,6 @@
 // src/controls/components/settings/ModelEnablementList.tsx
 // FULL FILE
-import React, {
-  useState,
-  useMemo,
-  useEffect,
-  useRef,
-  useCallback,
-} from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -61,22 +55,18 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   listHeightClass = "h-[26rem]",
   onModelClick,
 }) => {
-  const [scrollAreaContainer, setScrollAreaContainer] =
-    useState<HTMLDivElement | null>(null);
   const [viewportElement, setViewportElement] = useState<HTMLDivElement | null>(
     null
   );
 
   const scrollAreaRef = useCallback((node: HTMLDivElement | null) => {
     if (node) {
-      setScrollAreaContainer(node);
       const vp = node.querySelector<HTMLDivElement>(
         "[data-radix-scroll-area-viewport]"
       );
       if (vp) {
         setViewportElement(vp);
       } else {
-        // Fallback if viewport not immediately available
         const observer = new MutationObserver(() => {
           const observedVp = node.querySelector<HTMLDivElement>(
             "[data-radix-scroll-area-viewport]"
@@ -87,11 +77,9 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
           }
         });
         observer.observe(node, { childList: true, subtree: true });
-        // Consider a timeout for the observer as well
         return () => observer.disconnect();
       }
     } else {
-      setScrollAreaContainer(null);
       setViewportElement(null);
     }
   }, []);

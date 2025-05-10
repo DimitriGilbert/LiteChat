@@ -8,9 +8,8 @@ import type {
   ToolImplementation,
   ModMiddlewareHookName,
   ModEventPayloadMap,
-  // Explicitly import PromptControl and ChatControl from modding types
-  PromptControl as ModPromptControl,
-  ChatControl as ModChatControl,
+  ModPromptControl,
+  ModChatControl,
 } from "@/types/litechat/modding";
 // Import the stricter ChatControl type for the store
 import type { ChatControl as CoreChatControl } from "@/types/litechat/chat";

@@ -2,11 +2,9 @@
 // FULL FILE
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
-import {
-  type LiteChatModApi,
-  providerEvent, // Updated import
-  promptEvent, // Updated import
-} from "@/types/litechat/modding";
+import { type LiteChatModApi } from "@/types/litechat/modding";
+import { providerEvent } from "@/types/litechat/events/provider.events";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { VisibleStructuredOutputControl } from "@/controls/components/structured-output/VisibleStructuredOutputControl";
 import { useProviderStore } from "@/store/provider.store";
 import { usePromptStateStore } from "@/store/prompt.store";
@@ -24,6 +22,7 @@ export class StructuredOutputControlModule implements ControlModule {
     this.structuredOutputJson =
       usePromptStateStore.getState().structuredOutputJson;
     this.updateVisibility();
+    this.notifyComponentUpdate?.(); // Notify after initial visibility update
 
     const unsubModel = modApi.on(providerEvent.modelSelectionChanged, () => {
       this.updateVisibility();
@@ -99,7 +98,6 @@ export class StructuredOutputControlModule implements ControlModule {
       clearOnSubmit: () => {
         usePromptStateStore.getState().setStructuredOutputJson(null);
       },
-      // show method removed, visibility handled by VisibleStructuredOutputControl
     });
     console.log(`[${this.id}] Registered.`);
   }

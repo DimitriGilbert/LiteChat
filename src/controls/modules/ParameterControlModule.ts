@@ -2,13 +2,12 @@
 // FULL FILE
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
-import {
-  type LiteChatModApi,
-  interactionEvent, // Updated import
-  providerEvent, // Updated import
-  settingsEvent, // Updated import
-  promptEvent, // Updated import
-} from "@/types/litechat/modding";
+
+import { type LiteChatModApi } from "@/types/litechat/modding";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { settingsEvent } from "@/types/litechat/events/settings.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { ParameterControlTrigger } from "@/controls/components/parameter/ParameterControlTrigger";
 import { useSettingsStore } from "@/store/settings.store";
 import { useInteractionStore } from "@/store/interaction.store";

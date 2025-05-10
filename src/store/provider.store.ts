@@ -21,7 +21,8 @@ import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { providerEvent, settingsEvent } from "@/types/litechat/modding"; // Updated import
+import { providerEvent } from "@/types/litechat/events/provider.events";
+import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { instantiateModelInstance } from "@/lib/litechat/provider-helpers";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";

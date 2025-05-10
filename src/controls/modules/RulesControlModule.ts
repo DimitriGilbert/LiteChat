@@ -2,14 +2,13 @@
 // FULL FILE
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
-import {
-  type LiteChatModApi,
-  interactionEvent, // Updated import
-  rulesEvent, // Updated import
-} from "@/types/litechat/modding";
+import { type LiteChatModApi } from "@/types/litechat/modding";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { rulesEvent } from "@/types/litechat/events/rules.events";
 import { RulesControlTrigger } from "@/controls/components/rules/RulesControlTrigger";
 import { useRulesStore } from "@/store/rules.store";
 import { useInteractionStore } from "@/store/interaction.store";
+import { useUIStateStore } from "@/store/ui.store"; // For opening settings
 
 export class RulesControlModule implements ControlModule {
   readonly id = "core-rules-tags";
@@ -25,6 +24,7 @@ export class RulesControlModule implements ControlModule {
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.loadInitialState();
+    this.notifyComponentUpdate?.(); // Notify after initial state load
 
     const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
       if (this.isStreaming !== (payload.status === "streaming")) {
@@ -67,6 +67,15 @@ export class RulesControlModule implements ControlModule {
       this.hasRulesOrTags = newHasRulesOrTags;
     }
   }
+
+  public handleTriggerClick = () => {
+    if (!this.hasRulesOrTags) {
+      useUIStateStore.getState().setInitialSettingsTabs("rules-tags");
+      useUIStateStore.getState().toggleChatControlPanel("settingsModal", true);
+      return true; // Indicate action was taken
+    }
+    return false; // Indicate popover should open
+  };
 
   public getIsStreaming = (): boolean => this.isStreaming;
   public getHasRulesOrTags = (): boolean => this.hasRulesOrTags;
@@ -117,7 +126,6 @@ export class RulesControlModule implements ControlModule {
         }
         if (changed) this.notifyComponentUpdate?.();
       },
-      // show method removed, visibility handled by RulesControlTrigger
     });
     console.log(`[${this.id}] Registered.`);
   }

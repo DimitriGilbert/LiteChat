@@ -4,9 +4,9 @@ import {
   type DbMod,
   type ModInstance,
   type LiteChatModApi,
-  modEvent, // Updated import
-  appEvent, // Updated import
 } from "@/types/litechat/modding";
+import { modEvent } from "@/types/litechat/events/mod.events";
+import { appEvent } from "@/types/litechat/events/app.events";
 import { createModApi } from "./api-factory";
 import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";

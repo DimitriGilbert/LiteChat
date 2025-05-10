@@ -1,0 +1,36 @@
+// src/types/litechat/events/settings.events.ts
+// NEW FILE
+export const settingsEvent = {
+  themeChanged: "settings.themeChanged",
+  globalSystemPromptChanged: "settings.globalSystemPromptChanged",
+  temperatureChanged: "settings.temperatureChanged",
+  maxTokensChanged: "settings.maxTokensChanged",
+  topPChanged: "settings.topPChanged",
+  topKChanged: "settings.topKChanged",
+  presencePenaltyChanged: "settings.presencePenaltyChanged",
+  frequencyPenaltyChanged: "settings.frequencyPenaltyChanged",
+  enableAdvancedSettingsChanged: "settings.enableAdvancedSettingsChanged",
+  enableStreamingMarkdownChanged: "settings.enableStreamingMarkdownChanged",
+  enableStreamingCodeBlockParsingChanged:
+    "settings.enableStreamingCodeBlockParsingChanged",
+  foldStreamingCodeBlocksChanged: "settings.foldStreamingCodeBlocksChanged",
+  foldUserMessagesOnCompletionChanged:
+    "settings.foldUserMessagesOnCompletionChanged",
+  streamingRenderFpsChanged: "settings.streamingRenderFpsChanged",
+  gitUserNameChanged: "settings.gitUserNameChanged",
+  gitUserEmailChanged: "settings.gitUserEmailChanged",
+  toolMaxStepsChanged: "settings.toolMaxStepsChanged",
+  prismThemeUrlChanged: "settings.prismThemeUrlChanged",
+  autoTitleEnabledChanged: "settings.autoTitleEnabledChanged",
+  autoTitleModelIdChanged: "settings.autoTitleModelIdChanged",
+  autoTitlePromptMaxLengthChanged: "settings.autoTitlePromptMaxLengthChanged",
+  autoTitleIncludeFilesChanged: "settings.autoTitleIncludeFilesChanged",
+  autoTitleIncludeRulesChanged: "settings.autoTitleIncludeRulesChanged",
+  customFontFamilyChanged: "settings.customFontFamilyChanged",
+  customFontSizeChanged: "settings.customFontSizeChanged",
+  chatMaxWidthChanged: "settings.chatMaxWidthChanged",
+  customThemeColorsChanged: "settings.customThemeColorsChanged",
+  autoScrollIntervalChanged: "settings.autoScrollIntervalChanged",
+  enableAutoScrollOnStreamChanged: "settings.enableAutoScrollOnStreamChanged",
+  enableApiKeyManagementChanged: "settings.enableApiKeyManagementChanged",
+} as const;

@@ -1,12 +1,6 @@
 // src/controls/components/settings/ModelBrowserList.tsx
 // FULL FILE
-import React, {
-  useState,
-  useMemo,
-  useCallback,
-  useEffect,
-  useRef,
-} from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import { Input } from "@/components/ui/input";
@@ -45,6 +39,7 @@ type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
 export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
   onSelectModelForDetails,
 }) => {
+  // @ts-expect-error we do not use it but cant remove, thank you unamed array destruct ! @AI DONT TOUCH !!
   const [scrollAreaContainer, setScrollAreaContainer] =
     useState<HTMLDivElement | null>(null);
   const [viewportElement, setViewportElement] = useState<HTMLDivElement | null>(

@@ -26,8 +26,8 @@ import { z } from "zod";
 import {
   type ToolImplementation,
   ModMiddlewareHook,
-  interactionEvent, // Updated import
 } from "@/types/litechat/modding";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import {
   type Tool,
   type ToolCallPart,

@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { useInputStore } from "@/store/input.store";
 import type { InputAreaRef } from "@/types/litechat/prompt";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { promptEvent } from "@/types/litechat/modding"; // Updated import
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 
 interface InputAreaProps {
   initialValue?: string;

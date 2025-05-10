@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { inputEvent } from "@/types/litechat/modding"; // Updated import
+import { inputEvent } from "@/types/litechat/events/input.events"; // Updated import
 
 // Define a unified structure for attached file metadata
 export interface AttachedFileMetadata {

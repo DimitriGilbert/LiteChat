@@ -2,11 +2,9 @@
 // FULL FILE
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
-import {
-  type LiteChatModApi,
-  interactionEvent,
-  providerEvent,
-} from "@/types/litechat/modding";
+import { type LiteChatModApi } from "@/types/litechat/modding";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
 import { GlobalModelSelector } from "@/controls/components/global-model-selector/GlobalModelSelector";
 import { useProviderStore } from "@/store/provider.store";
 import { useInteractionStore } from "@/store/interaction.store";

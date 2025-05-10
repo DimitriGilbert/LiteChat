@@ -2,12 +2,10 @@
 // FULL FILE
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
-import {
-  type LiteChatModApi,
-  interactionEvent,
-  providerEvent,
-  inputEvent,
-} from "@/types/litechat/modding";
+import { type LiteChatModApi } from "@/types/litechat/modding";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
+import { inputEvent } from "@/types/litechat/events/input.events";
 import { FileControlTrigger } from "@/controls/components/file/FileControlTrigger";
 import { FileControlPanel } from "@/controls/components/file/FileControlPanel";
 import { useInputStore } from "@/store/input.store";
@@ -22,7 +20,7 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 export class FileControlModule implements ControlModule {
   readonly id = "core-file-attachment";
-  private modApi: LiteChatModApi | null = null;
+  // private modApi: LiteChatModApi | null = null; // Removed as it was unused
   private unregisterCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
 
@@ -33,10 +31,11 @@ export class FileControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
-    this.modApi = modApi;
+    // this.modApi = modApi; // Removed
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.attachedFiles = useInputStore.getState().attachedFilesMetadata;
     this.updateModelSupport();
+    this.notifyComponentUpdate?.(); // Notify after initial state load
 
     const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
       if (this.isStreaming !== (payload.status === "streaming")) {
@@ -127,7 +126,7 @@ export class FileControlModule implements ControlModule {
       this.unregisterCallback = null;
     }
     this.notifyComponentUpdate = null;
-    this.modApi = null;
+    // this.modApi = null; // Removed
     console.log(`[${this.id}] Destroyed.`);
   }
 }

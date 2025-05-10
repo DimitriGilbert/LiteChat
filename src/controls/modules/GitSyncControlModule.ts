@@ -2,13 +2,11 @@
 // FULL FILE
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
-import {
-  type LiteChatModApi,
-  conversationEvent, // Updated import
-  interactionEvent, // Updated import
-  uiEvent, // Updated import
-  syncEvent, // Updated import
-} from "@/types/litechat/modding";
+import { type LiteChatModApi } from "@/types/litechat/modding";
+import { conversationEvent } from "@/types/litechat/events/conversation.events";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { uiEvent } from "@/types/litechat/events/ui.events";
+import { syncEvent } from "@/types/litechat/events/sync.events";
 import { GitSyncControlTrigger } from "@/controls/components/git-sync/GitSyncControlTrigger";
 import { useConversationStore } from "@/store/conversation.store";
 import { useInteractionStore } from "@/store/interaction.store";
