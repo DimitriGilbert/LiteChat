@@ -110,7 +110,7 @@ Object.freeze(COMMON_TEXT_EXTENSIONS);
 // Helper function to check if a file is likely text-based
 export const isLikelyTextFile = (
   name: string | undefined | null,
-  mimeType?: string | undefined | null,
+  mimeType?: string | undefined | null
 ): boolean => {
   if (!name) return false;
 
@@ -136,6 +136,9 @@ export const isLikelyTextFile = (
   }
 
   // Fallback: Check extension against the common list
+  const fsplitname = fileNameLower.split(".");
+  // no ext === text !
+  if (fsplitname.length < 2) return true;
   const extension = "." + fileNameLower.split(".").pop();
   return COMMON_TEXT_EXTENSIONS.has(extension);
 };
