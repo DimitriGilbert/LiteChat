@@ -5,47 +5,38 @@ import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { ProjectSettingsModal } from "@/controls/components/project-settings/ProjectSettingsModal";
 import { uiEvent } from "@/types/litechat/events/ui.events";
-import { rulesEvent } from "@/types/litechat/events/rules.events"; // Import rulesEvent
-import type { DbRule, DbTag } from "@/types/litechat/rules"; // Import DbRule and DbTag
+import { rulesEvent } from "@/types/litechat/events/rules.events";
+import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
 
 export class ProjectSettingsControlModule implements ControlModule {
   readonly id = "core-project-settings";
-  public readonly modalId = "projectSettingsModal";
+  public readonly modalId = "projectSettingsModal"; // Unique ID for this modal
   private unregisterModalProviderCallback: (() => void) | null = null;
   private modApiRef: LiteChatModApi | null = null;
-  private eventUnsubscribers: (() => void)[] = []; // For cleaning up event listeners
+  private eventUnsubscribers: (() => void)[] = [];
 
-  // Internal state for rules and tags
   private allRules: DbRule[] = [];
   private allTags: DbTag[] = [];
-  private tagRuleLinks: { tagId: string; ruleId: string }[] = []; // Simplified link structure
+  private tagRuleLinks: { tagId: string; ruleId: string }[] = [];
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApiRef = modApi;
 
-    // Subscribe to rules data loaded event
     const unsubRules = modApi.on(rulesEvent.dataLoaded, (payload) => {
       if (payload) {
         this.allRules = payload.rules || [];
         this.allTags = payload.tags || [];
-        this.tagRuleLinks = (payload.links || []).map((l) => ({
+        this.tagRuleLinks = (payload.links || []).map((l: DbTagRuleLink) => ({
           tagId: l.tagId,
           ruleId: l.ruleId,
         }));
-        // Potentially notify if modal is open and needs re-render, though modal usually re-fetches on open
       }
     });
     this.eventUnsubscribers.push(unsubRules);
-
-    // Request initial load of rules and tags if not already loaded
-    // This assumes stores might load data independently, so a request ensures it happens
-    // or that the module gets the data if already loaded.
     modApi.emit(rulesEvent.loadRulesAndTagsRequest, undefined);
-
     console.log(`[${this.id}] Initialized.`);
   }
 
-  // Getter methods for UI
   public getAllRules = (): DbRule[] => this.allRules;
   public getAllTags = (): DbTag[] => this.allTags;
   public getRulesForTag = (tagId: string): DbRule[] => {
@@ -85,8 +76,8 @@ export class ProjectSettingsControlModule implements ControlModule {
           isOpen: props.isOpen,
           onClose: props.onClose,
           projectId: props.targetId || null,
-          // Pass down the data getters from this module instance
-          module: this,
+          module: this, // Pass the module instance
+          // initialTab: props.initialTab, // If ProjectSettingsModal uses it
         });
       }
     );

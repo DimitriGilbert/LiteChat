@@ -6,30 +6,29 @@ import { SettingsProviders } from "@/controls/components/provider-settings/Setti
 
 export class ProviderSettingsModule implements ControlModule {
   readonly id = "core-settings-providers";
-  private unregisterCallback: (() => void) | null = null;
+  private unregisterSettingsTabCallback: (() => void) | null = null;
 
   async initialize(_modApi: LiteChatModApi): Promise<void> {
-    // console.log(`[${this.id}] Initialized.`);
+    // Initialization logic if needed
   }
 
   register(modApi: LiteChatModApi): void {
-    if (this.unregisterCallback) {
-      console.warn(`[${this.id}] Already registered. Skipping.`);
+    if (this.unregisterSettingsTabCallback) {
+      console.warn(`[${this.id}] Settings tab already registered. Skipping.`);
       return;
     }
-    this.unregisterCallback = modApi.registerSettingsTab({
+    this.unregisterSettingsTabCallback = modApi.registerSettingsTab({
       id: "providers",
       title: "Providers & Models",
       component: SettingsProviders,
       order: 30,
     });
-    // console.log(`[${this.id}] Settings tab registered.`);
   }
 
   destroy(): void {
-    if (this.unregisterCallback) {
-      this.unregisterCallback();
-      this.unregisterCallback = null;
+    if (this.unregisterSettingsTabCallback) {
+      this.unregisterSettingsTabCallback();
+      this.unregisterSettingsTabCallback = null;
     }
     console.log(`[${this.id}] Destroyed.`);
   }

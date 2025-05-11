@@ -16,7 +16,7 @@ import type { ChatControl as CoreChatControlFromTypes } from "@/types/litechat/c
 import type { PromptControl as CorePromptControlFromTypes } from "@/types/litechat/prompt";
 
 import { Tool } from "ai";
-import { useControlRegistryStore } from "@/store/control.store";
+// Removed unused useControlRegistryStore
 import { useInteractionStore } from "@/store/interaction.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { useSettingsStore } from "@/store/settings.store";
@@ -28,21 +28,25 @@ import type { z } from "zod";
 import { splitModelId } from "@/lib/litechat/provider-helpers";
 import { useVfsStore } from "@/store/vfs.store";
 import type { fs } from "@zenfs/core";
+import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
+// Removed unused modEvent
 
 export function createModApi(mod: DbMod): LiteChatModApi {
   const modId = mod.id;
   const modName = mod.name;
-  const controlStoreActions = useControlRegistryStore.getState();
-  const modStoreActions = useModStore.getState();
   const unsubscribers: (() => void)[] = [];
 
   const api: LiteChatModApi = {
     modId,
     modName,
     registerPromptControl: (control: ModPromptControl) => {
-      const u = controlStoreActions.registerPromptControl(
-        control as CorePromptControlFromTypes
-      );
+      emitter.emit(controlRegistryEvent.registerPromptControlRequest, {
+        control: control as CorePromptControlFromTypes,
+      });
+      const u = () =>
+        emitter.emit(controlRegistryEvent.unregisterPromptControlRequest, {
+          id: control.id,
+        });
       unsubscribers.push(u);
       return u;
     },
@@ -51,7 +55,13 @@ export function createModApi(mod: DbMod): LiteChatModApi {
         ...control,
         status: control.status ?? (() => "ready"),
       };
-      const u = controlStoreActions.registerChatControl(controlWithDefaults);
+      emitter.emit(controlRegistryEvent.registerChatControlRequest, {
+        control: controlWithDefaults,
+      });
+      const u = () =>
+        emitter.emit(controlRegistryEvent.unregisterChatControlRequest, {
+          id: control.id,
+        });
       unsubscribers.push(u);
       return u;
     },
@@ -61,12 +71,14 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       implementation?: ToolImplementation<P>
     ) => {
       console.log(`[${modName}] Registering tool: ${toolName}`);
-      const u = controlStoreActions.registerTool(
+      emitter.emit(controlRegistryEvent.registerToolRequest, {
         modId,
         toolName,
         definition,
-        implementation
-      );
+        implementation,
+      });
+      const u = () =>
+        emitter.emit(controlRegistryEvent.unregisterToolRequest, { toolName });
       unsubscribers.push(u);
       return u;
     },
@@ -86,20 +98,30 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       emitter.emit(eventName, payload);
     },
     addMiddleware: <H extends ModMiddlewareHookName>(
-      hN: H,
-      cb: (
+      hookName: H,
+      callback: (
         payload: any
       ) =>
         | import("@/types/litechat/modding").ModMiddlewareReturnMap[H]
         | Promise<import("@/types/litechat/modding").ModMiddlewareReturnMap[H]>
     ) => {
-      const u = controlStoreActions.registerMiddleware(hN, modId, cb);
+      emitter.emit(controlRegistryEvent.registerMiddlewareRequest, {
+        hookName,
+        modId,
+        callback,
+      });
+      const u = () =>
+        emitter.emit(controlRegistryEvent.unregisterMiddlewareRequest, {
+          hookName,
+          modId,
+          callback,
+        });
       unsubscribers.push(u);
       return u;
     },
     registerSettingsTab: (tab: CustomSettingTab) => {
-      modStoreActions._addSettingsTab(tab);
-      const u = () => modStoreActions._removeSettingsTab(tab.id);
+      useModStore.getState()._addSettingsTab(tab);
+      const u = () => useModStore.getState()._removeSettingsTab(tab.id);
       unsubscribers.push(u);
       return u;
     },
@@ -138,7 +160,14 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       console[l](`[Mod: ${modName}]`, ...a);
     },
     registerModalProvider: (modalId: string, provider: ModalProvider) => {
-      const u = controlStoreActions.registerModalProvider(modalId, provider);
+      emitter.emit(controlRegistryEvent.registerModalProviderRequest, {
+        modalId,
+        provider,
+      });
+      const u = () =>
+        emitter.emit(controlRegistryEvent.unregisterModalProviderRequest, {
+          modalId,
+        });
       unsubscribers.push(u);
       return u;
     },

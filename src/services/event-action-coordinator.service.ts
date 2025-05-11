@@ -31,7 +31,6 @@ const storesWithActionHandlers = [
   useUIStateStore,
   useVfsStore,
   useControlRegistryStore,
-  // Add other stores here as they implement getRegisteredActionHandlers
 ];
 
 export class EventActionCoordinatorService {
@@ -51,7 +50,7 @@ export class EventActionCoordinatorService {
     const allActionHandlers: RegisteredActionHandler<any>[] = [];
 
     storesWithActionHandlers.forEach((storeHook) => {
-      const storeState = storeHook.getState() as any; // Cast to any to access potential method
+      const storeState = storeHook.getState() as any;
       if (
         storeState &&
         typeof storeState.getRegisteredActionHandlers === "function"
@@ -73,9 +72,6 @@ export class EventActionCoordinatorService {
             error
           );
         }
-      } else {
-        // This is expected for stores that don't manage actions via this pattern (e.g., if some are purely data holders)
-        // console.log(`[Coordinator] Store does not have getRegisteredActionHandlers: ${storeHook.name || 'Unknown Store'}`);
       }
     });
 
@@ -91,9 +87,6 @@ export class EventActionCoordinatorService {
           typeof registeredHandler.handler === "function"
         ) {
           emitter.on(registeredHandler.eventName, registeredHandler.handler);
-          // console.log(
-          //   `[Coordinator] Registered handler for "${registeredHandler.eventName}" from store "${registeredHandler.storeId}"`
-          // );
         } else {
           console.error(
             "[Coordinator] Invalid action handler structure encountered:",

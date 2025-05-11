@@ -578,7 +578,7 @@ export const useSettingsStore = create(
         emitter.emit(settingsEvent.loaded, { settings: loadedSettings });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);
-        emitter.emit(settingsEvent.loaded, { settings: get() }); // Emit current state on error
+        emitter.emit(settingsEvent.loaded, { settings: get() });
       }
     },
 

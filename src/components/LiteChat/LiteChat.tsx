@@ -38,6 +38,7 @@ import { ModalManager } from "@/components/LiteChat/common/ModalManager";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { vfsEvent } from "@/types/litechat/events/vfs.events";
+import { uiEvent } from "@/types/litechat/events/ui.events"; // For legacy contextChanged
 
 let initializedControlModules: ControlModule[] = [];
 let appInitializationPromise: Promise<ControlModule[]> | null = null;
@@ -75,12 +76,14 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       status: state.status,
     }))
   );
-  const { globalError, isSidebarCollapsed } = useUIStateStore(
-    useShallow((state) => ({
-      globalError: state.globalError,
-      isSidebarCollapsed: state.isSidebarCollapsed,
-    }))
-  );
+  const { globalError, isSidebarCollapsed, isChatControlPanelOpen } =
+    useUIStateStore(
+      useShallow((state) => ({
+        globalError: state.globalError,
+        isSidebarCollapsed: state.isSidebarCollapsed,
+        isChatControlPanelOpen: state.isChatControlPanelOpen,
+      }))
+    );
   const chatControls = useControlRegistryStore(
     useShallow((state) => Object.values(state.chatControls))
   );
@@ -165,6 +168,11 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       emitter.emit(promptEvent.initializePromptStateRequest, {
         effectiveSettings,
       });
+      // Emit legacy contextChanged for modules that might still use it during transition
+      emitter.emit(uiEvent.contextChanged, {
+        selectedItemId,
+        selectedItemType,
+      });
       prevContextRef.current = currentContext;
     }
   }, [
@@ -179,8 +187,9 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     if (isInitializing || !hasInitializedSuccessfully) return;
 
     let targetVfsKey: string | null = null;
-    const isVfsModalOpen =
-      useUIStateStore.getState().isChatControlPanelOpen["core-vfs-modal-panel"];
+    // Check against the new ModalManager state if possible, or fallback to UIStateStore
+    // For now, using UIStateStore as ModalManager state isn't directly exposed here.
+    const isVfsModalOpen = isChatControlPanelOpen["core-vfs-modal-panel"];
 
     if (isVfsModalOpen || selectedItemType === "project") {
       if (selectedItemType === "project") {
@@ -204,7 +213,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     selectedItemType,
     getConversationByIdFromStore,
     isInitializing,
-    useUIStateStore.getState().isChatControlPanelOpen["core-vfs-modal-panel"],
+    isChatControlPanelOpen,
   ]);
 
   const handlePromptSubmit = useCallback(async (turnData: PromptTurnObject) => {

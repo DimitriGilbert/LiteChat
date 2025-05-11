@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { SearchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ToolSelectorControlModule } from "@/controls/modules/ToolSelectorControlModule"; // Import module type
+import type { ToolSelectorControlModule } from "@/controls/modules/ToolSelectorControlModule";
 
 interface ToolSelectorControlComponentProps {
   module: ToolSelectorControlModule;
@@ -23,7 +23,7 @@ export const ToolSelectorControlComponent: React.FC<
 > = ({ module, popoverMaxSteps, setPopoverMaxSteps, className }) => {
   const enabledTools = module.getEnabledTools();
   const selectedItemId = module.getSelectedItemId();
-  const selectedItemType = module.getSelectedItemType();
+  const selectedItemType = module.getSelectedItemType(); // Use the new getter
   const globalDefaultMaxSteps = module.getGlobalDefaultMaxSteps();
 
   const allTools = useControlRegistryStore((state) => state.tools);

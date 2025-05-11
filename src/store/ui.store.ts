@@ -7,16 +7,19 @@ import { uiEvent, UiEventPayloads } from "@/types/litechat/events/ui.events";
 import type { RegisteredActionHandler } from "@/types/litechat/control";
 
 interface UIState {
-  isChatControlPanelOpen: Record<string, boolean>;
+  isChatControlPanelOpen: Record<string, boolean>; // For legacy panels like settingsModal
   isPromptControlPanelOpen: Record<string, boolean>;
   isSidebarCollapsed: boolean;
   globalLoading: boolean;
   globalError: string | null;
   focusInputOnNextRender: boolean;
+  // The following are for the legacy settings modal, will be superseded by ModalManager
   initialSettingsTab: string | null;
   initialSettingsSubTab: string | null;
+  // The following are for the legacy project settings modal
   isProjectSettingsModalOpen: boolean;
   projectSettingsModalTargetId: string | null;
+  // The following is for the legacy VFS modal
   isVfsModalOpen: boolean;
 }
 
@@ -27,10 +30,13 @@ interface UIActions {
   setGlobalLoading: (loading: boolean) => void;
   setGlobalError: (error: string | null) => void;
   setFocusInputFlag: (focus: boolean) => void;
+  // Legacy settings modal actions
   setInitialSettingsTabs: (tab: string | null, subTab?: string | null) => void;
   clearInitialSettingsTabs: () => void;
+  // Legacy project settings modal actions
   openProjectSettingsModal: (projectId: string) => void;
   closeProjectSettingsModal: () => void;
+  // Legacy VFS modal action
   toggleVfsModal: (isOpen?: boolean) => void;
   getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
@@ -58,6 +64,7 @@ export const useUIStateStore = create(
       if (currentOpenState !== newOpenState) {
         set((state) => {
           state.isChatControlPanelOpen[panelId] = newOpenState;
+          // If this was the settings modal and it's closing, clear initial tabs
           if (panelId === "settingsModal" && !newOpenState) {
             state.initialSettingsTab = null;
             state.initialSettingsSubTab = null;
@@ -67,6 +74,27 @@ export const useUIStateStore = create(
           panelId,
           isOpen: newOpenState,
         });
+        // If this panelId corresponds to a modal managed by ModalManager,
+        // emit the generic modal state change as well.
+        // This part might need refinement based on how panelIds map to modalIds.
+        if (panelId === "settingsModal" || panelId === "projectSettingsModal") {
+          emitter.emit(uiEvent.modalStateChanged, {
+            modalId: panelId, // Assuming panelId is the modalId
+            isOpen: newOpenState,
+            targetId:
+              panelId === "projectSettingsModal"
+                ? get().projectSettingsModalTargetId
+                : undefined,
+            initialTab:
+              panelId === "settingsModal"
+                ? get().initialSettingsTab
+                : undefined,
+            initialSubTab:
+              panelId === "settingsModal"
+                ? get().initialSettingsSubTab
+                : undefined,
+          });
+        }
       }
     },
 
@@ -121,7 +149,6 @@ export const useUIStateStore = create(
 
     setInitialSettingsTabs: (tab, subTab = null) => {
       set({ initialSettingsTab: tab, initialSettingsSubTab: subTab });
-      // No specific event for this internal UI state, modal opening will trigger its own events
     },
 
     clearInitialSettingsTabs: () => {
@@ -133,21 +160,23 @@ export const useUIStateStore = create(
         isProjectSettingsModalOpen: true,
         projectSettingsModalTargetId: projectId,
       });
-      emitter.emit(uiEvent.modalStateChanged, {
-        modalId: "projectSettingsModal",
-        isOpen: true,
-        targetId: projectId,
-      });
+      // This will be handled by ModalManager via openModalRequest
+      // emitter.emit(uiEvent.modalStateChanged, {
+      //   modalId: "projectSettingsModal",
+      //   isOpen: true,
+      //   targetId: projectId,
+      // });
     },
     closeProjectSettingsModal: () => {
       set({
         isProjectSettingsModalOpen: false,
         projectSettingsModalTargetId: null,
       });
-      emitter.emit(uiEvent.modalStateChanged, {
-        modalId: "projectSettingsModal",
-        isOpen: false,
-      });
+      // This will be handled by ModalManager via closeModalRequest
+      // emitter.emit(uiEvent.modalStateChanged, {
+      //   modalId: "projectSettingsModal",
+      //   isOpen: false,
+      // });
     },
 
     toggleVfsModal: (isOpen) => {
@@ -156,10 +185,11 @@ export const useUIStateStore = create(
 
       if (currentOpenState !== newOpenState) {
         set({ isVfsModalOpen: newOpenState });
-        emitter.emit(uiEvent.modalStateChanged, {
-          modalId: "core-vfs-modal-panel", // Assuming this is the modalId
-          isOpen: newOpenState,
-        });
+        // This will be handled by ModalManager
+        // emitter.emit(uiEvent.modalStateChanged, {
+        //   modalId: "core-vfs-modal-panel",
+        //   isOpen: newOpenState,
+        // });
       }
     },
     getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
@@ -207,6 +237,7 @@ export const useUIStateStore = create(
           storeId,
         },
         // openModalRequest and closeModalRequest are handled by ModalManager directly
+        // and should not be registered here as store actions.
       ];
     },
   }))

@@ -7,7 +7,14 @@ import { controlRegistryEvent } from "@/types/litechat/events/control.registry.e
 import type {
   ControlState as ControlStateInterface,
   ControlActions as ControlActionsInterface,
+  RegisteredActionHandler,
 } from "@/types/litechat/control";
+import type {
+  ModalProvider,
+  ModMiddlewareHookName,
+  ToolImplementation,
+} from "@/types/litechat/modding";
+import type { Tool } from "ai";
 
 export const useControlRegistryStore = create(
   immer<ControlStateInterface & ControlActionsInterface>((set, get) => ({
@@ -193,6 +200,99 @@ export const useControlRegistryStore = create(
       emitter.emit(controlRegistryEvent.modalProvidersChanged, {
         providers: get().modalProviders,
       });
+    },
+    getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
+      const storeId = "controlRegistryStore";
+      const actions = get();
+      return [
+        {
+          eventName: controlRegistryEvent.registerPromptControlRequest,
+          handler: (payload) => {
+            actions.registerPromptControl(payload.control);
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.unregisterPromptControlRequest,
+          handler: (payload) => {
+            actions.unregisterPromptControl(payload.id);
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.registerChatControlRequest,
+          handler: (payload) => {
+            actions.registerChatControl(payload.control);
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.unregisterChatControlRequest,
+          handler: (payload) => {
+            actions.unregisterChatControl(payload.id);
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.registerMiddlewareRequest,
+          handler: (payload) => {
+            actions.registerMiddleware(
+              payload.hookName as ModMiddlewareHookName,
+              payload.modId,
+              payload.callback,
+              payload.order
+            );
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.unregisterMiddlewareRequest,
+          handler: (payload) => {
+            actions.unregisterMiddleware(
+              payload.hookName as ModMiddlewareHookName,
+              payload.modId,
+              payload.callback
+            );
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.registerToolRequest,
+          handler: (payload) => {
+            actions.registerTool(
+              payload.modId,
+              payload.toolName,
+              payload.definition as Tool<any>,
+              payload.implementation as ToolImplementation<any> | undefined
+            );
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.unregisterToolRequest,
+          handler: (payload) => {
+            actions.unregisterTool(payload.toolName);
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.registerModalProviderRequest,
+          handler: (payload) => {
+            actions.registerModalProvider(
+              payload.modalId,
+              payload.provider as ModalProvider
+            );
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.unregisterModalProviderRequest,
+          handler: (payload) => {
+            actions.unregisterModalProvider(payload.modalId);
+          },
+          storeId,
+        },
+      ];
     },
   }))
 );

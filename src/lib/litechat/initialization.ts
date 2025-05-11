@@ -3,8 +3,7 @@
 import { toast } from "sonner";
 import { useConversationStore } from "@/store/conversation.store";
 import { useModStore } from "@/store/mod.store";
-import { useProviderStore } from "@/store/provider.store";
-import { useSettingsStore } from "@/store/settings.store";
+// Removed unused useProviderStore and useSettingsStore
 import { usePromptStateStore } from "@/store/prompt.store";
 import { useProjectStore } from "@/store/project.store";
 import { useUIStateStore } from "@/store/ui.store";
@@ -14,15 +13,21 @@ import type {
   ControlModuleConstructor,
 } from "@/types/litechat/control";
 import type { LiteChatModApi } from "@/types/litechat/modding";
-import { rulesEvent } from "@/types/litechat/events/rules.events"; // Import rulesEvent
-import { emitter } from "./event-emitter"; // Import emitter
+import { rulesEvent } from "@/types/litechat/events/rules.events";
+import { emitter } from "./event-emitter";
+import { appEvent } from "@/types/litechat/events/app.events";
+import { settingsEvent } from "@/types/litechat/events/settings.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
+import { conversationEvent } from "@/types/litechat/events/conversation.events";
+import { modEvent } from "@/types/litechat/events/mod.events";
+import { promptEvent as promptStateEvent } from "@/types/litechat/events/prompt.events";
 
 interface CoreStores {
-  loadSettings: () => Promise<void>;
-  loadProviderData: () => Promise<void>;
-  requestLoadRulesAndTags: () => void; // Changed signature
-  loadSidebarItems: () => Promise<void>;
-  loadDbMods: () => Promise<void>;
+  requestLoadSettings: () => void;
+  requestLoadProviderData: () => void;
+  requestLoadRulesAndTags: () => void;
+  requestLoadSidebarItems: () => void;
+  requestLoadDbMods: () => void;
   setLoadedMods: (loadedMods: any[]) => void;
   getConversationById: (id: string | null) => any;
   getEffectiveProjectSettings: (projectId: string | null) => any;
@@ -84,13 +89,51 @@ function resolveDependencyOrder(
   return sorted;
 }
 
-export async function loadCoreData(stores: CoreStores): Promise<void> {
-  console.log("[Init] Core Data: Loading...");
-  await stores.loadSettings();
-  await stores.loadProviderData();
-  stores.requestLoadRulesAndTags(); // Emit request instead of direct call
-  await stores.loadSidebarItems();
-  console.log("[Init] Core Data: Loaded.");
+export async function loadCoreData(
+  _stores: CoreStores,
+  modApi: LiteChatModApi
+): Promise<void> {
+  console.log("[Init] Core Data: Requesting loads...");
+  modApi.emit(settingsEvent.loadSettingsRequest, undefined);
+  modApi.emit(providerEvent.loadInitialDataRequest, undefined);
+  modApi.emit(rulesEvent.loadRulesAndTagsRequest, undefined);
+  modApi.emit(conversationEvent.loadSidebarItemsRequest, undefined);
+
+  await new Promise<void>((resolve) => {
+    let settingsLoaded = false;
+    let providersLoaded = false;
+    let rulesLoaded = false;
+    let sidebarLoaded = false;
+
+    const checkDone = () => {
+      if (settingsLoaded && providersLoaded && rulesLoaded && sidebarLoaded) {
+        resolve();
+      }
+    };
+
+    const unsubSettings = modApi.on(settingsEvent.loaded, () => {
+      settingsLoaded = true;
+      unsubSettings();
+      checkDone();
+    });
+    const unsubProvider = modApi.on(providerEvent.initialDataLoaded, () => {
+      providersLoaded = true;
+      unsubProvider();
+      checkDone();
+    });
+    const unsubRules = modApi.on(rulesEvent.dataLoaded, () => {
+      rulesLoaded = true;
+      unsubRules();
+      checkDone();
+    });
+    const unsubSidebar = modApi.on(conversationEvent.sidebarItemsLoaded, () => {
+      sidebarLoaded = true;
+      unsubSidebar();
+      checkDone();
+    });
+  });
+  emitter.emit(appEvent.initializationPhaseCompleted, { phase: "coreData" });
+  console.log("[Init] Core Data: Loaded (or load requested).");
 }
 
 export async function initializeControlModules(
@@ -131,6 +174,9 @@ export async function initializeControlModules(
       );
     }
   }
+  emitter.emit(appEvent.initializationPhaseCompleted, {
+    phase: "controlModulesInit",
+  });
   console.log("[Init] Control Modules: Initialization COMPLETE.");
   return sortedModules;
 }
@@ -155,24 +201,43 @@ export function registerControlModules(
       );
     }
   }
+  emitter.emit(appEvent.initializationPhaseCompleted, {
+    phase: "controlModulesRegister",
+  });
   console.log("[Init] Control Modules: Registration COMPLETE.");
 }
 
-export async function loadAndProcessMods(stores: CoreStores): Promise<void> {
+export async function loadAndProcessMods(
+  _stores: CoreStores,
+  modApi: LiteChatModApi
+): Promise<void> {
   console.log("[Init] External Mods: Loading DB records...");
-  await stores.loadDbMods();
+  modApi.emit(modEvent.loadDbModsRequest, undefined);
+  await new Promise<void>((resolve) => {
+    const unsub = modApi.on(modEvent.dbModsLoaded, () => {
+      unsub();
+      resolve();
+    });
+  });
+
   const currentDbMods = useModStore.getState().dbMods;
   console.log(
     `[Init] External Mods: Processing ${currentDbMods.length} mods...`
   );
   const loadedModInstances = await loadMods(currentDbMods);
-  stores.setLoadedMods(loadedModInstances);
+  useModStore.getState().setLoadedMods(loadedModInstances);
+  emitter.emit(appEvent.initializationPhaseCompleted, {
+    phase: "externalMods",
+  });
   console.log(
     `[Init] External Mods: ${loadedModInstances.length} mods processed.`
   );
 }
 
-export function initializeCoreUiStates(stores: CoreStores): void {
+export function initializeCoreUiStates(
+  stores: CoreStores,
+  modApi: LiteChatModApi
+): void {
   console.log("[Init] Core UI States: Initializing...");
   const initialSelItemId = stores.selectedItemId;
   const initialSelItemType = stores.selectedItemType;
@@ -186,9 +251,13 @@ export function initializeCoreUiStates(stores: CoreStores): void {
 
   const initialEffectiveSettings =
     stores.getEffectiveProjectSettings(initialProjectId);
-  stores.initializePromptState(initialEffectiveSettings);
+
+  modApi.emit(promptStateEvent.initializePromptStateRequest, {
+    effectiveSettings: initialEffectiveSettings,
+  });
+  emitter.emit(appEvent.initializationPhaseCompleted, { phase: "uiStateSync" });
   console.log(
-    "[Init] Core UI States: Initial prompt state synchronized with context."
+    "[Init] Core UI States: Initial prompt state synchronization requested."
   );
 }
 
@@ -198,12 +267,16 @@ export async function performFullInitialization(
 ): Promise<ControlModule[]> {
   console.log("LiteChat: Full initialization sequence START.");
   const stores: CoreStores = {
-    loadSettings: useSettingsStore.getState().loadSettings,
-    loadProviderData: useProviderStore.getState().loadInitialData,
+    requestLoadSettings: () =>
+      coreModApi.emit(settingsEvent.loadSettingsRequest, undefined),
+    requestLoadProviderData: () =>
+      coreModApi.emit(providerEvent.loadInitialDataRequest, undefined),
     requestLoadRulesAndTags: () =>
-      emitter.emit(rulesEvent.loadRulesAndTagsRequest, undefined), // Emit request
-    loadSidebarItems: useConversationStore.getState().loadSidebarItems,
-    loadDbMods: useModStore.getState().loadDbMods,
+      coreModApi.emit(rulesEvent.loadRulesAndTagsRequest, undefined),
+    requestLoadSidebarItems: () =>
+      coreModApi.emit(conversationEvent.loadSidebarItemsRequest, undefined),
+    requestLoadDbMods: () =>
+      coreModApi.emit(modEvent.loadDbModsRequest, undefined),
     setLoadedMods: useModStore.getState().setLoadedMods,
     getConversationById: useConversationStore.getState().getConversationById,
     getEffectiveProjectSettings:
@@ -215,14 +288,15 @@ export async function performFullInitialization(
 
   let initializedModules: ControlModule[] = [];
   try {
-    await loadCoreData(stores);
+    await loadCoreData(stores, coreModApi);
     initializedModules = await initializeControlModules(
       moduleConstructors,
       coreModApi
     );
     registerControlModules(initializedModules, coreModApi);
-    await loadAndProcessMods(stores);
-    initializeCoreUiStates(stores);
+    await loadAndProcessMods(stores, coreModApi);
+    initializeCoreUiStates(stores, coreModApi);
+    emitter.emit(appEvent.initializationPhaseCompleted, { phase: "all" });
     console.log("LiteChat: Full initialization sequence COMPLETE.");
   } catch (error) {
     console.error("LiteChat: Full initialization sequence FAILED:", error);

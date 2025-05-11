@@ -9,23 +9,13 @@ import { SettingsModal } from "@/controls/components/settings/SettingsModal";
 
 export class SettingsControlModule implements ControlModule {
   readonly id = "core-settings-trigger";
-  public readonly modalId = "settingsModal";
+  public readonly modalId = "settingsModal"; // Unique ID for the settings modal
   private unregisterChatControlCallback: (() => void) | null = null;
   private unregisterModalProviderCallback: (() => void) | null = null;
-  private eventUnsubscribers: (() => void)[] = [];
   private modApiRef: LiteChatModApi | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApiRef = modApi;
-    // const unsubOpenRequest = modApi.on(uiEvent.openModalRequest, (payload) => {
-    //   if (payload.modalId === this.modalId) {
-    //     console.log(
-    //       `[${this.id}] Received open request for modal: ${payload.modalId}`
-    //     );
-    //   }
-    // });
-    // this.eventUnsubscribers.push(unsubOpenRequest);
-    // console.log(`[${this.id}] Initialized and listening for open requests.`);
   }
 
   public openSettingsModal = (initialTab?: string, initialSubTab?: string) => {
@@ -63,7 +53,6 @@ export class SettingsControlModule implements ControlModule {
           React.createElement(SettingsTriggerComponent, { module: this }),
         show: () => true,
       });
-      // console.log(`[${this.id}] Trigger registered.`);
     }
 
     if (!this.unregisterModalProviderCallback) {
@@ -73,17 +62,15 @@ export class SettingsControlModule implements ControlModule {
           React.createElement(SettingsModal, {
             isOpen: props.isOpen,
             onClose: props.onClose,
+            // Pass initialTab and initialSubTab if SettingsModal is designed to use them
+            // initialTab: props.initialTab,
+            // initialSubTab: props.initialSubTab,
           })
       );
-      // console.log(
-      //   `[${this.id}] Modal provider registered for ${this.modalId}.`
-      // );
     }
   }
 
   destroy(): void {
-    this.eventUnsubscribers.forEach((unsub) => unsub());
-    this.eventUnsubscribers = [];
     if (this.unregisterChatControlCallback) {
       this.unregisterChatControlCallback();
       this.unregisterChatControlCallback = null;

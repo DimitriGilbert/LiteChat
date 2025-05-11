@@ -14,6 +14,7 @@ import { useProviderStore } from "@/store/provider.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useSettingsStore } from "@/store/settings.store";
+import type { SidebarItemType } from "@/types/litechat/chat";
 
 export class ToolSelectorControlModule implements ControlModule {
   readonly id = "core-tool-selector";
@@ -26,6 +27,7 @@ export class ToolSelectorControlModule implements ControlModule {
   public isStreaming = false;
   public isVisible = true;
   public selectedItemId: string | null = null;
+  public selectedItemType: SidebarItemType | null = null; // Added property
   public allToolsCount = 0;
   public globalDefaultMaxSteps = 5;
 
@@ -50,6 +52,7 @@ export class ToolSelectorControlModule implements ControlModule {
     });
     const unsubContext = modApi.on(uiEvent.contextChanged, (payload) => {
       this.selectedItemId = payload.selectedItemId;
+      this.selectedItemType = payload.selectedItemType; // Update selectedItemType
       this.updateVisibility();
       this.notifyComponentUpdate?.();
     });
@@ -63,7 +66,6 @@ export class ToolSelectorControlModule implements ControlModule {
       }
     );
 
-    // Listen to changes in registered tools
     const unsubToolsChanged = modApi.on(
       controlRegistryEvent.toolsChanged,
       (payload) => {
@@ -83,17 +85,16 @@ export class ToolSelectorControlModule implements ControlModule {
       unsubModel,
       unsubContext,
       unsubSettings,
-      unsubToolsChanged // Add new unsubscriber
+      unsubToolsChanged
     );
-    // console.log(`[${this.id}] Initialized.`);
   }
 
   private loadInitialState() {
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.selectedItemId = useConversationStore.getState().selectedItemId;
-    // this.selectedItemType = useConversationStore.getState().selectedItemType;
+    this.selectedItemType = useConversationStore.getState().selectedItemType; // Initialize selectedItemType
     this.allToolsCount = Object.keys(
-      useControlRegistryStore.getState().tools // Get initial count
+      useControlRegistryStore.getState().tools
     ).length;
     this.globalDefaultMaxSteps = useSettingsStore.getState().toolMaxSteps;
   }
@@ -119,6 +120,8 @@ export class ToolSelectorControlModule implements ControlModule {
   public getIsStreaming = (): boolean => this.isStreaming;
   public getIsVisible = (): boolean => this.isVisible;
   public getSelectedItemId = (): string | null => this.selectedItemId;
+  public getSelectedItemType = (): SidebarItemType | null =>
+    this.selectedItemType; // Getter for selectedItemType
   public getAllToolsCount = (): number => this.allToolsCount;
   public getGlobalDefaultMaxSteps = (): number => this.globalDefaultMaxSteps;
 
@@ -171,7 +174,6 @@ export class ToolSelectorControlModule implements ControlModule {
         if (changed) this.notifyComponentUpdate?.();
       },
     });
-    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {
