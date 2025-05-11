@@ -15,7 +15,7 @@ import type {
 } from "@/types/litechat/prompt";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { runMiddleware } from "@/lib/litechat/ai-helpers";
+import { runMiddleware } from "@/lib/litechat/ai-helpers"; // Corrected: Ensure this is exported
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
@@ -118,8 +118,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         metadata.modelId = currentModelIdFromPromptStore;
       }
 
-      // Resolve rule content here if RulesControlModule is accessible
-      // This is a simplified example; a more robust way would be to get the module instance
       const rulesModule = promptControls.find(
         (c) => c.id === "core-rules-tags"
       ) as RulesControlModule | undefined;

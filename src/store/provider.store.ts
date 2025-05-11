@@ -16,13 +16,17 @@ import {
   combineModelId,
   splitModelId,
   DEFAULT_SUPPORTED_PARAMS,
+  instantiateModelInstance,
 } from "@/lib/litechat/provider-helpers";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { providerEvent } from "@/types/litechat/events/provider.events";
-import { instantiateModelInstance } from "@/lib/litechat/provider-helpers";
+import {
+  providerEvent,
+  ProviderEventPayloads,
+} from "@/types/litechat/events/provider.events";
+import type { RegisteredActionHandler } from "@/types/litechat/control";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
 const LAST_SELECTION_KEY = "provider:lastModelSelection";
@@ -77,6 +81,7 @@ export interface ProviderActions {
   ) => AiModelConfig | undefined;
   _updateGloballyEnabledModelDefinitions: () => void;
   getGloballyEnabledModelDefinitions: () => ModelListItem[];
+  getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
 export const useProviderStore = create(
@@ -596,6 +601,88 @@ export const useProviderStore = create(
         });
       });
       return listItems;
+    },
+    getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
+      const storeId = "providerStore";
+      const actions = get();
+
+      return [
+        {
+          eventName: providerEvent.loadInitialDataRequest,
+          handler: actions.loadInitialData,
+          storeId,
+        },
+        {
+          eventName: providerEvent.selectModelRequest,
+          handler: (
+            p: ProviderEventPayloads[typeof providerEvent.selectModelRequest]
+          ) => actions.selectModel(p.modelId),
+          storeId,
+        },
+        {
+          eventName: providerEvent.addApiKeyRequest,
+          handler: (
+            p: ProviderEventPayloads[typeof providerEvent.addApiKeyRequest]
+          ) => actions.addApiKey(p.name, p.providerId, p.value).then(() => {}),
+          storeId,
+        },
+        {
+          eventName: providerEvent.deleteApiKeyRequest,
+          handler: (
+            p: ProviderEventPayloads[typeof providerEvent.deleteApiKeyRequest]
+          ) => actions.deleteApiKey(p.id),
+          storeId,
+        },
+        {
+          eventName: providerEvent.addProviderConfigRequest,
+          handler: (
+            p: ProviderEventPayloads[typeof providerEvent.addProviderConfigRequest]
+          ) => actions.addProviderConfig(p).then(() => {}),
+          storeId,
+        },
+        {
+          eventName: providerEvent.updateProviderConfigRequest,
+          handler: (
+            p: ProviderEventPayloads[typeof providerEvent.updateProviderConfigRequest]
+          ) => actions.updateProviderConfig(p.id, p.changes),
+          storeId,
+        },
+        {
+          eventName: providerEvent.deleteProviderConfigRequest,
+          handler: (
+            p: ProviderEventPayloads[typeof providerEvent.deleteProviderConfigRequest]
+          ) => actions.deleteProviderConfig(p.id),
+          storeId,
+        },
+        {
+          eventName: providerEvent.fetchModelsRequest,
+          handler: (
+            p: ProviderEventPayloads[typeof providerEvent.fetchModelsRequest]
+          ) => actions.fetchModels(p.providerConfigId),
+          storeId,
+        },
+        {
+          eventName: providerEvent.setGlobalModelSortOrderRequest,
+          handler: (
+            p: ProviderEventPayloads[typeof providerEvent.setGlobalModelSortOrderRequest]
+          ) => actions.setGlobalModelSortOrder(p.ids),
+          storeId,
+        },
+        {
+          eventName: providerEvent.setEnableApiKeyManagementRequest,
+          handler: (
+            p: ProviderEventPayloads[typeof providerEvent.setEnableApiKeyManagementRequest]
+          ) => actions.setEnableApiKeyManagement(p.enabled),
+          storeId,
+        },
+        {
+          eventName: providerEvent.setSelectedModelForDetailsRequest,
+          handler: (
+            p: ProviderEventPayloads[typeof providerEvent.setSelectedModelForDetailsRequest]
+          ) => actions.setSelectedModelForDetails(p.modelId),
+          storeId,
+        },
+      ];
     },
   }))
 );

@@ -3,7 +3,11 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { promptEvent } from "@/types/litechat/events/prompt.events";
+import {
+  promptEvent,
+  PromptEventPayloads,
+} from "@/types/litechat/events/prompt.events";
+import type { RegisteredActionHandler } from "@/types/litechat/control";
 
 // State for the *next* prompt submission
 export interface PromptState {
@@ -40,6 +44,7 @@ interface PromptActions {
     frequencyPenalty: number | null;
   }) => void;
   resetTransientParameters: () => void;
+  getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
 const emitParamChange = (
@@ -215,6 +220,94 @@ export const usePromptStateStore = create(
         emitter.emit(promptEvent.parameterChanged, { params: changes });
       }
       emitter.emit(promptEvent.transientParametersReset, undefined);
+    },
+    getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
+      const storeId = "promptStateStore";
+      const actions = get();
+      return [
+        {
+          eventName: promptEvent.setModelIdRequest,
+          handler: (
+            p: PromptEventPayloads[typeof promptEvent.setModelIdRequest]
+          ) => actions.setModelId(p.id),
+          storeId,
+        },
+        {
+          eventName: promptEvent.setTemperatureRequest,
+          handler: (
+            p: PromptEventPayloads[typeof promptEvent.setTemperatureRequest]
+          ) => actions.setTemperature(p.value),
+          storeId,
+        },
+        {
+          eventName: promptEvent.setMaxTokensRequest,
+          handler: (
+            p: PromptEventPayloads[typeof promptEvent.setMaxTokensRequest]
+          ) => actions.setMaxTokens(p.value),
+          storeId,
+        },
+        {
+          eventName: promptEvent.setTopPRequest,
+          handler: (
+            p: PromptEventPayloads[typeof promptEvent.setTopPRequest]
+          ) => actions.setTopP(p.value),
+          storeId,
+        },
+        {
+          eventName: promptEvent.setTopKRequest,
+          handler: (
+            p: PromptEventPayloads[typeof promptEvent.setTopKRequest]
+          ) => actions.setTopK(p.value),
+          storeId,
+        },
+        {
+          eventName: promptEvent.setPresencePenaltyRequest,
+          handler: (
+            p: PromptEventPayloads[typeof promptEvent.setPresencePenaltyRequest]
+          ) => actions.setPresencePenalty(p.value),
+          storeId,
+        },
+        {
+          eventName: promptEvent.setFrequencyPenaltyRequest,
+          handler: (
+            p: PromptEventPayloads[typeof promptEvent.setFrequencyPenaltyRequest]
+          ) => actions.setFrequencyPenalty(p.value),
+          storeId,
+        },
+        {
+          eventName: promptEvent.setReasoningEnabledRequest,
+          handler: (
+            p: PromptEventPayloads[typeof promptEvent.setReasoningEnabledRequest]
+          ) => actions.setReasoningEnabled(p.enabled),
+          storeId,
+        },
+        {
+          eventName: promptEvent.setWebSearchEnabledRequest,
+          handler: (
+            p: PromptEventPayloads[typeof promptEvent.setWebSearchEnabledRequest]
+          ) => actions.setWebSearchEnabled(p.enabled),
+          storeId,
+        },
+        {
+          eventName: promptEvent.setStructuredOutputJsonRequest,
+          handler: (
+            p: PromptEventPayloads[typeof promptEvent.setStructuredOutputJsonRequest]
+          ) => actions.setStructuredOutputJson(p.json),
+          storeId,
+        },
+        {
+          eventName: promptEvent.initializePromptStateRequest,
+          handler: (
+            p: PromptEventPayloads[typeof promptEvent.initializePromptStateRequest]
+          ) => actions.initializePromptState(p.effectiveSettings),
+          storeId,
+        },
+        {
+          eventName: promptEvent.resetTransientParametersRequest,
+          handler: () => actions.resetTransientParameters(),
+          storeId,
+        },
+      ];
     },
   }))
 );

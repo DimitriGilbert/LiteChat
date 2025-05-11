@@ -14,7 +14,7 @@ import { useConversationStore } from "@/store/conversation.store";
 import { useVfsStore } from "@/store/vfs.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { PersistenceService } from "./persistence.service";
-import { runMiddleware, getContextSnapshot } from "@/lib/litechat/ai-helpers";
+import { runMiddleware, getContextSnapshot } from "@/lib/litechat/ai-helpers"; // Corrected: Ensure these are exported
 import {
   splitModelId,
   instantiateModelInstance,
@@ -39,7 +39,7 @@ import {
   type LanguageModelV1,
   type CoreMessage,
 } from "ai";
-import type { fs } from "@zenfs/core"; // Corrected import
+import type { fs } from "@zenfs/core";
 
 interface AIServiceCallOptions {
   model: LanguageModelV1;
@@ -63,7 +63,7 @@ interface AIServiceCallOptions {
 }
 
 type ToolContext = ReadonlyChatContextSnapshot & {
-  fsInstance?: typeof fs; // Corrected type
+  fsInstance?: typeof fs;
 };
 
 export const InteractionService = {
@@ -250,7 +250,7 @@ export const InteractionService = {
                       .getConversationById(currentConvId)
                   : null;
                 const targetVfsKey = conversation?.projectId ?? "orphan";
-                let fsInstance: typeof fs | undefined | null; // Corrected type
+                let fsInstance: typeof fs | undefined | null;
                 try {
                   fsInstance = await useVfsStore
                     .getState()
@@ -267,7 +267,6 @@ export const InteractionService = {
                   const implementation: ToolImplementation<any> =
                     toolInfo.implementation!;
                   const contextWithFs: ToolContext = {
-                    // Use corrected ToolContext
                     ...contextSnapshot,
                     fsInstance,
                   };

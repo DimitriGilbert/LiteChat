@@ -14,7 +14,11 @@ import { fs } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { vfsEvent } from "@/types/litechat/events/vfs.events";
+import { vfsEvent, VfsEventPayloads } from "@/types/litechat/events/vfs.events";
+import type {
+  RegisteredActionHandler,
+  ActionHandler,
+} from "@/types/litechat/control";
 
 interface VfsState {
   nodes: Record<string, VfsNode>;
@@ -63,6 +67,7 @@ interface VfsActions {
     vfsKey: string,
     options?: { force?: boolean }
   ) => Promise<typeof fs>;
+  getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
 export const useVfsStore = create(
@@ -809,6 +814,102 @@ export const useVfsStore = create(
       emitter.emit(vfsEvent.selectionChanged, {
         selectedFileIds: [],
       });
+    },
+    getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
+      const storeId = "vfsStore";
+      const actions = get();
+      const wrapPromiseFs =
+        <P>(fn: (payload: P) => Promise<typeof fs>): ActionHandler<P> =>
+        async (payload: P) => {
+          await fn(payload);
+        };
+      const wrapPromiseBlob =
+        <P>(
+          fn: (payload: P) => Promise<{ name: string; blob: Blob } | null>
+        ): ActionHandler<P> =>
+        async (payload: P) => {
+          await fn(payload);
+        };
+
+      return [
+        {
+          eventName: vfsEvent.setVfsKeyRequest,
+          handler: (p: VfsEventPayloads[typeof vfsEvent.setVfsKeyRequest]) =>
+            actions.setVfsKey(p.key),
+          storeId,
+        },
+        {
+          eventName: vfsEvent.initializeVFSRequest,
+          handler: wrapPromiseFs(actions.initializeVFS),
+          storeId,
+        },
+        {
+          eventName: vfsEvent.fetchNodesRequest,
+          handler: (p: VfsEventPayloads[typeof vfsEvent.fetchNodesRequest]) =>
+            actions.fetchNodes(p.parentId),
+          storeId,
+        },
+        {
+          eventName: vfsEvent.setCurrentPathRequest,
+          handler: (
+            p: VfsEventPayloads[typeof vfsEvent.setCurrentPathRequest]
+          ) => actions.setCurrentPath(p.path),
+          storeId,
+        },
+        {
+          eventName: vfsEvent.createDirectoryRequest,
+          handler: (
+            p: VfsEventPayloads[typeof vfsEvent.createDirectoryRequest]
+          ) => actions.createDirectory(p.parentId, p.name),
+          storeId,
+        },
+        {
+          eventName: vfsEvent.uploadFilesRequest,
+          handler: (p: VfsEventPayloads[typeof vfsEvent.uploadFilesRequest]) =>
+            actions.uploadFiles(p.parentId, p.files),
+          storeId,
+        },
+        {
+          eventName: vfsEvent.deleteNodesRequest,
+          handler: (p: VfsEventPayloads[typeof vfsEvent.deleteNodesRequest]) =>
+            actions.deleteNodes(p.ids),
+          storeId,
+        },
+        {
+          eventName: vfsEvent.renameNodeRequest,
+          handler: (p: VfsEventPayloads[typeof vfsEvent.renameNodeRequest]) =>
+            actions.renameNode(p.id, p.newName),
+          storeId,
+        },
+        {
+          eventName: vfsEvent.downloadFileRequest,
+          handler: wrapPromiseBlob(actions.downloadFile),
+          storeId,
+        },
+        {
+          eventName: vfsEvent.selectFileRequest,
+          handler: (p: VfsEventPayloads[typeof vfsEvent.selectFileRequest]) =>
+            actions.selectFile(p.fileId),
+          storeId,
+        },
+        {
+          eventName: vfsEvent.deselectFileRequest,
+          handler: (p: VfsEventPayloads[typeof vfsEvent.deselectFileRequest]) =>
+            actions.deselectFile(p.fileId),
+          storeId,
+        },
+        {
+          eventName: vfsEvent.clearSelectionRequest,
+          handler: actions.clearSelection,
+          storeId,
+        },
+        {
+          eventName: vfsEvent.setEnableVfsRequest,
+          handler: (p: VfsEventPayloads[typeof vfsEvent.setEnableVfsRequest]) =>
+            actions._setEnableVfs(p.enabled),
+          storeId,
+        },
+      ];
     },
   }))
 );

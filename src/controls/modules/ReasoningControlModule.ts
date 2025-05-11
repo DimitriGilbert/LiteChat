@@ -56,7 +56,7 @@ export class ReasoningControlModule implements ControlModule {
     );
 
     this.eventUnsubscribers.push(unsubStatus, unsubModel, unsubPromptParams);
-    console.log(`[${this.id}] Initialized.`);
+    // console.log(`[${this.id}] Initialized.`);
   }
 
   private updateVisibility() {
@@ -103,7 +103,7 @@ export class ReasoningControlModule implements ControlModule {
         usePromptStateStore.getState().setReasoningEnabled(null);
       },
     });
-    console.log(`[${this.id}] Registered.`);
+    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {

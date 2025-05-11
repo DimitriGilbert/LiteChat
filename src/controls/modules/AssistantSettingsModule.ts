@@ -29,7 +29,7 @@ export class AssistantSettingsModule implements ControlModule {
       }
     );
     this.eventUnsubscribers.push(unsubSettings);
-    console.log(`[${this.id}] Initialized. Visible: ${this.isVisible}`);
+    // console.log(`[${this.id}] Initialized. Visible: ${this.isVisible}`);
   }
 
   private reregisterTab() {
@@ -53,19 +53,19 @@ export class AssistantSettingsModule implements ControlModule {
           component: SettingsAssistant,
           order: 40,
         });
-        console.log(`[${this.id}] Settings tab registered.`);
+        // console.log(`[${this.id}] Settings tab registered.`);
       }
     } else {
       if (this.unregisterCallback) {
         this.unregisterCallback();
         this.unregisterCallback = null;
-        console.log(
-          `[${this.id}] Settings tab unregistered as it's not visible.`
-        );
+        // console.log(
+        //   `[${this.id}] Settings tab unregistered as it's not visible.`
+        // );
       } else {
-        console.log(
-          `[${this.id}] Settings tab not registered as it's not visible.`
-        );
+        // console.log(
+        //   `[${this.id}] Settings tab not registered as it's not visible.`
+        // );
       }
     }
   }

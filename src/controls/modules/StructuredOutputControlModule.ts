@@ -45,7 +45,7 @@ export class StructuredOutputControlModule implements ControlModule {
     );
 
     this.eventUnsubscribers.push(unsubModel, unsubPromptParams);
-    console.log(`[${this.id}] Initialized.`);
+    // console.log(`[${this.id}] Initialized.`);
   }
 
   private updateVisibility() {
@@ -100,7 +100,7 @@ export class StructuredOutputControlModule implements ControlModule {
         usePromptStateStore.getState().setStructuredOutputJson(null);
       },
     });
-    console.log(`[${this.id}] Registered.`);
+    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {

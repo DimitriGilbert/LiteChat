@@ -21,8 +21,15 @@ import type { fs } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { useProjectStore } from "./project.store";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { conversationEvent } from "@/types/litechat/events/conversation.events";
+import {
+  conversationEvent,
+  ConversationEventPayloads,
+} from "@/types/litechat/events/conversation.events";
 import { syncEvent } from "@/types/litechat/events/sync.events";
+import type {
+  RegisteredActionHandler,
+  ActionHandler,
+} from "@/types/litechat/control";
 
 export type SidebarItem =
   | (Conversation & { itemType: "conversation" })
@@ -90,6 +97,7 @@ interface ConversationActions {
   }) => Promise<void>;
   _ensureSyncVfsReady: () => Promise<typeof fs>;
   _unlinkConversationsFromProjects: (projectIds: string[]) => void;
+  getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
 const SYNC_REPO_BASE_DIR = "/synced_repos";
@@ -794,6 +802,129 @@ export const useConversationStore = create(
             : c
         );
       });
+    },
+    getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
+      const storeId = "conversationStore";
+      const actions = get();
+      // Wrap actions that return non-void promises
+      const wrapPromiseString =
+        <P>(fn: (payload: P) => Promise<string>): ActionHandler<P> =>
+        async (payload: P) => {
+          await fn(payload);
+        };
+
+      return [
+        {
+          eventName: conversationEvent.loadSidebarItemsRequest,
+          handler: actions.loadSidebarItems,
+          storeId,
+        },
+        {
+          eventName: conversationEvent.addConversationRequest,
+          handler: wrapPromiseString(actions.addConversation),
+          storeId,
+        },
+        {
+          eventName: conversationEvent.updateConversationRequest,
+          handler: (
+            p: ConversationEventPayloads[typeof conversationEvent.updateConversationRequest]
+          ) => actions.updateConversation(p.id, p.updates),
+          storeId,
+        },
+        {
+          eventName: conversationEvent.deleteConversationRequest,
+          handler: (
+            p: ConversationEventPayloads[typeof conversationEvent.deleteConversationRequest]
+          ) => actions.deleteConversation(p.id),
+          storeId,
+        },
+        {
+          eventName: conversationEvent.selectItemRequest,
+          handler: (
+            p: ConversationEventPayloads[typeof conversationEvent.selectItemRequest]
+          ) => actions.selectItem(p.id, p.type),
+          storeId,
+        },
+        {
+          eventName: conversationEvent.importConversationRequest,
+          handler: (
+            p: ConversationEventPayloads[typeof conversationEvent.importConversationRequest]
+          ) => actions.importConversation(p.file),
+          storeId,
+        },
+        {
+          eventName: conversationEvent.exportConversationRequest,
+          handler: (
+            p: ConversationEventPayloads[typeof conversationEvent.exportConversationRequest]
+          ) => actions.exportConversation(p.conversationId, p.format),
+          storeId,
+        },
+        {
+          eventName: conversationEvent.exportProjectRequest,
+          handler: (
+            p: ConversationEventPayloads[typeof conversationEvent.exportProjectRequest]
+          ) => actions.exportProject(p.projectId),
+          storeId,
+        },
+        {
+          eventName: conversationEvent.exportAllConversationsRequest,
+          handler: actions.exportAllConversations,
+          storeId,
+        },
+        {
+          eventName: conversationEvent.loadSyncReposRequest,
+          handler: actions.loadSyncRepos,
+          storeId,
+        },
+        {
+          eventName: conversationEvent.addSyncRepoRequest,
+          handler: wrapPromiseString(actions.addSyncRepo),
+          storeId,
+        },
+        {
+          eventName: conversationEvent.updateSyncRepoRequest,
+          handler: (
+            p: ConversationEventPayloads[typeof conversationEvent.updateSyncRepoRequest]
+          ) => actions.updateSyncRepo(p.id, p.updates),
+          storeId,
+        },
+        {
+          eventName: conversationEvent.deleteSyncRepoRequest,
+          handler: (
+            p: ConversationEventPayloads[typeof conversationEvent.deleteSyncRepoRequest]
+          ) => actions.deleteSyncRepo(p.id),
+          storeId,
+        },
+        {
+          eventName: conversationEvent.linkConversationToRepoRequest,
+          handler: (
+            p: ConversationEventPayloads[typeof conversationEvent.linkConversationToRepoRequest]
+          ) => actions.linkConversationToRepo(p.conversationId, p.repoId),
+          storeId,
+        },
+        {
+          eventName: conversationEvent.syncConversationRequest,
+          handler: (
+            p: ConversationEventPayloads[typeof conversationEvent.syncConversationRequest]
+          ) => actions.syncConversation(p.conversationId),
+          storeId,
+        },
+        {
+          eventName: conversationEvent.initializeOrSyncRepoRequest,
+          handler: (
+            p: ConversationEventPayloads[typeof conversationEvent.initializeOrSyncRepoRequest]
+          ) => actions.initializeOrSyncRepo(p.repoId),
+          storeId,
+        },
+        {
+          eventName:
+            conversationEvent.updateCurrentConversationToolSettingsRequest,
+          handler: (
+            p: ConversationEventPayloads[typeof conversationEvent.updateCurrentConversationToolSettingsRequest]
+          ) => actions.updateCurrentConversationToolSettings(p),
+          storeId,
+        },
+      ];
     },
   }))
 );

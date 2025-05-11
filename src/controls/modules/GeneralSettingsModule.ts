@@ -9,7 +9,7 @@ export class GeneralSettingsModule implements ControlModule {
   private unregisterCallback: (() => void) | null = null;
 
   async initialize(_modApi: LiteChatModApi): Promise<void> {
-    console.log(`[${this.id}] Initialized.`);
+    // console.log(`[${this.id}] Initialized.`);
   }
 
   register(modApi: LiteChatModApi): void {
@@ -23,7 +23,7 @@ export class GeneralSettingsModule implements ControlModule {
       component: SettingsGeneral,
       order: 10,
     });
-    console.log(`[${this.id}] Settings tab registered.`);
+    // console.log(`[${this.id}] Settings tab registered.`);
   }
 
   destroy(): void {

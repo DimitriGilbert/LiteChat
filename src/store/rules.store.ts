@@ -7,7 +7,14 @@ import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { rulesEvent } from "@/types/litechat/events/rules.events";
+import {
+  rulesEvent,
+  RulesEventPayloads,
+} from "@/types/litechat/events/rules.events";
+import type {
+  RegisteredActionHandler,
+  ActionHandler,
+} from "@/types/litechat/control";
 
 interface RulesState {
   rules: DbRule[];
@@ -42,6 +49,7 @@ interface RulesActions {
   getRuleById: (ruleId: string) => DbRule | undefined;
   getTagById: (tagId: string) => DbTag | undefined;
   getRulesByIds: (ruleIds: string[]) => DbRule[];
+  getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
 export const useRulesStore = create(
@@ -348,6 +356,74 @@ export const useRulesStore = create(
     getRulesByIds: (ruleIds) => {
       const idSet = new Set(ruleIds);
       return get().rules.filter((r) => idSet.has(r.id));
+    },
+    getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
+      const storeId = "rulesStore";
+      const actions = get();
+      const wrapPromiseString =
+        <P>(fn: (payload: P) => Promise<string>): ActionHandler<P> =>
+        async (payload: P) => {
+          await fn(payload);
+        };
+      return [
+        {
+          eventName: rulesEvent.loadRulesAndTagsRequest,
+          handler: actions.loadRulesAndTags,
+          storeId,
+        },
+        {
+          eventName: rulesEvent.addRuleRequest,
+          handler: wrapPromiseString(actions.addRule),
+          storeId,
+        },
+        {
+          eventName: rulesEvent.updateRuleRequest,
+          handler: (
+            p: RulesEventPayloads[typeof rulesEvent.updateRuleRequest]
+          ) => actions.updateRule(p.id, p.updates),
+          storeId,
+        },
+        {
+          eventName: rulesEvent.deleteRuleRequest,
+          handler: (
+            p: RulesEventPayloads[typeof rulesEvent.deleteRuleRequest]
+          ) => actions.deleteRule(p.id),
+          storeId,
+        },
+        {
+          eventName: rulesEvent.addTagRequest,
+          handler: wrapPromiseString(actions.addTag),
+          storeId,
+        },
+        {
+          eventName: rulesEvent.updateTagRequest,
+          handler: (
+            p: RulesEventPayloads[typeof rulesEvent.updateTagRequest]
+          ) => actions.updateTag(p.id, p.updates),
+          storeId,
+        },
+        {
+          eventName: rulesEvent.deleteTagRequest,
+          handler: (
+            p: RulesEventPayloads[typeof rulesEvent.deleteTagRequest]
+          ) => actions.deleteTag(p.id),
+          storeId,
+        },
+        {
+          eventName: rulesEvent.linkTagToRuleRequest,
+          handler: (
+            p: RulesEventPayloads[typeof rulesEvent.linkTagToRuleRequest]
+          ) => actions.linkTagToRule(p.tagId, p.ruleId),
+          storeId,
+        },
+        {
+          eventName: rulesEvent.unlinkTagFromRuleRequest,
+          handler: (
+            p: RulesEventPayloads[typeof rulesEvent.unlinkTagFromRuleRequest]
+          ) => actions.unlinkTagFromRule(p.tagId, p.ruleId),
+          storeId,
+        },
+      ];
     },
   }))
 );

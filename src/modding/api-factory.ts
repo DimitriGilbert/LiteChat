@@ -132,7 +132,7 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       });
     },
     showToast: (t, m) => {
-      toast[t](`[${modName}] ${m}`);
+      toast[t](`[Mod: ${modName}] ${m}`);
     },
     log: (l, ...a) => {
       console[l](`[Mod: ${modName}]`, ...a);

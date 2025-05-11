@@ -116,7 +116,7 @@ export class ParameterControlModule implements ControlModule {
       unsubSettings,
       unsubPromptParams
     );
-    console.log(`[${this.id}] Initialized.`);
+    // console.log(`[${this.id}] Initialized.`);
   }
 
   private loadInitialState() {
@@ -251,7 +251,7 @@ export class ParameterControlModule implements ControlModule {
         return Object.keys(params).length > 0 ? params : undefined;
       },
     });
-    console.log(`[${this.id}] Registered.`);
+    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {

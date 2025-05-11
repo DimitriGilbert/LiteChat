@@ -91,7 +91,7 @@ export class GitSyncControlModule implements ControlModule {
       unsubInteractionStatus,
       unsubConvUpdated
     );
-    console.log(`[${this.id}] Initialized.`);
+    // console.log(`[${this.id}] Initialized.`);
   }
 
   private loadInitialState() {
@@ -129,7 +129,7 @@ export class GitSyncControlModule implements ControlModule {
         triggerRenderer: () =>
           React.createElement(GitSyncControlTrigger, { module: this }),
       });
-      console.log(`[${this.id}] Prompt control registered.`);
+      // console.log(`[${this.id}] Prompt control registered.`);
     }
 
     if (!this.unregisterSettingsTabCallback) {
@@ -139,7 +139,7 @@ export class GitSyncControlModule implements ControlModule {
         component: SettingsGit,
         order: 60,
       });
-      console.log(`[${this.id}] Settings tab registered.`);
+      // console.log(`[${this.id}] Settings tab registered.`);
     }
   }
 

@@ -11,7 +11,11 @@ import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { modEvent } from "@/types/litechat/events/mod.events";
+import { modEvent, ModEventPayloads } from "@/types/litechat/events/mod.events";
+import type {
+  RegisteredActionHandler,
+  ActionHandler,
+} from "@/types/litechat/control";
 
 export const useModStore = create(
   immer<ModStoreState & ModStoreActions>((set, get) => ({
@@ -190,6 +194,41 @@ export const useModStore = create(
       emitter.emit(modEvent.settingsTabsChanged, {
         tabs: get().modSettingsTabs,
       });
+    },
+    getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
+      const storeId = "modStore";
+      const actions = get();
+      const wrapPromiseStringUndefined =
+        <P>(
+          fn: (payload: P) => Promise<string | undefined>
+        ): ActionHandler<P> =>
+        async (payload: P) => {
+          await fn(payload);
+        };
+      return [
+        {
+          eventName: modEvent.loadDbModsRequest,
+          handler: actions.loadDbMods,
+          storeId,
+        },
+        {
+          eventName: modEvent.addDbModRequest,
+          handler: wrapPromiseStringUndefined(actions.addDbMod),
+          storeId,
+        },
+        {
+          eventName: modEvent.updateDbModRequest,
+          handler: (p: ModEventPayloads[typeof modEvent.updateDbModRequest]) =>
+            actions.updateDbMod(p.id, p.changes),
+          storeId,
+        },
+        {
+          eventName: modEvent.deleteDbModRequest,
+          handler: (p: ModEventPayloads[typeof modEvent.deleteDbModRequest]) =>
+            actions.deleteDbMod(p.id),
+          storeId,
+        },
+      ];
     },
   }))
 );

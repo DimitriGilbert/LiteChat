@@ -6,29 +6,40 @@ import {
   ModMiddlewareHook,
 } from "@/types/litechat/modding";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
+import { appEvent } from "@/types/litechat/events/app.events"; // Corrected import
 import { parseAppUrlParameters } from "@/lib/litechat/url-helpers";
-import { useConversationStore } from "@/store/conversation.store";
-import { useProviderStore } from "@/store/provider.store";
-import { useInputStore } from "@/store/input.store";
-import { useVfsStore } from "@/store/vfs.store";
-import { usePromptStateStore } from "@/store/prompt.store";
 import { toast } from "sonner";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
 import { basename } from "@/lib/litechat/file-manager-utils";
 import { nanoid } from "nanoid";
-import { emitter } from "@/lib/litechat/event-emitter";
 import { runMiddleware } from "@/lib/litechat/ai-helpers";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
 import { ConversationService } from "@/services/conversation.service";
+import { conversationEvent } from "@/types/litechat/events/conversation.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
+import { inputEvent } from "@/types/litechat/events/input.events";
+// Removed unused vfsEvent import
+import { useProviderStore } from "@/store/provider.store";
+import { useInputStore } from "@/store/input.store";
 
 export class UrlParameterControlModule implements ControlModule {
   readonly id = "core-url-parameters";
+  private modApiRef: LiteChatModApi | null = null;
 
-  async initialize(_modApi: LiteChatModApi): Promise<void> {
+  async initialize(modApi: LiteChatModApi): Promise<void> {
+    this.modApiRef = modApi;
     console.log(`[${this.id}] Initializing...`);
-    await this.processUrlParameters();
-    console.log(`[${this.id}] Initialized.`);
+    modApi.on(appEvent.initializationPhaseCompleted, (payload) => {
+      // Corrected: Use appEvent directly
+      if (payload.phase === "all") {
+        this.processUrlParameters().catch((err) => {
+          console.error(`[${this.id}] Error processing URL parameters:`, err);
+          toast.error("Failed to process URL parameters.");
+        });
+      }
+    });
+    console.log(`[${this.id}] Initialized, awaiting full app load.`);
   }
 
   register(_modApi: LiteChatModApi): void {
@@ -36,32 +47,59 @@ export class UrlParameterControlModule implements ControlModule {
   }
 
   destroy(): void {
-    // No resources to clean up
+    this.modApiRef = null;
   }
 
   private async processUrlParameters(): Promise<void> {
+    if (!this.modApiRef) {
+      console.warn(
+        `[${this.id}] ModAPI not available, cannot process URL parameters.`
+      );
+      return;
+    }
+    const modApi = this.modApiRef;
+
     const urlParams = parseAppUrlParameters();
     if (!urlParams.query && !urlParams.modelId && !urlParams.vfsFiles?.length) {
       return;
     }
 
     toast.info("Processing parameters from URL...");
-    const { addConversation, selectItem } = useConversationStore.getState();
-    const { setModelId: setPromptModelId } = usePromptStateStore.getState();
-    const { addAttachedFile } = useInputStore.getState();
-    const { getAvailableModelListItems } = useProviderStore.getState();
-    const { initializeVFS: initVfs } = useVfsStore.getState();
 
     try {
-      const newConversationId = await addConversation({
-        title: urlParams.query
-          ? `From URL: ${urlParams.query.substring(0, 30)}...`
-          : "From URL Parameters",
+      const newConversationId = await new Promise<string>((resolve, reject) => {
+        // Removed unused tempId
+        const unsub = modApi.on(
+          conversationEvent.conversationAdded,
+          (payload) => {
+            if (payload.conversation.title.startsWith("From URL:")) {
+              unsub();
+              resolve(payload.conversation.id);
+            }
+          }
+        );
+        setTimeout(() => {
+          // Removed unused timeout variable
+          unsub();
+          reject(new Error("Timeout waiting for conversation creation event."));
+        }, 5000);
+
+        modApi.emit(conversationEvent.addConversationRequest, {
+          title: urlParams.query
+            ? `From URL: ${urlParams.query.substring(0, 30)}...`
+            : "From URL Parameters",
+        });
       });
-      await selectItem(newConversationId, "conversation");
+
+      modApi.emit(conversationEvent.selectItemRequest, {
+        id: newConversationId,
+        type: "conversation",
+      });
 
       if (urlParams.modelId) {
-        const availableModels = getAvailableModelListItems();
+        const availableModels = useProviderStore
+          .getState()
+          .getAvailableModelListItems();
         let foundModelId: string | null = null;
         const modelParamLower = urlParams.modelId.toLowerCase();
 
@@ -93,7 +131,10 @@ export class UrlParameterControlModule implements ControlModule {
         }
 
         if (foundModelId) {
-          setPromptModelId(foundModelId);
+          modApi.emit(promptEvent.setModelIdRequest, { id: foundModelId });
+          modApi.emit(providerEvent.selectModelRequest, {
+            modelId: foundModelId,
+          });
           const foundModelDetails = availableModels.find(
             (m) => m.id === foundModelId
           );
@@ -111,7 +152,9 @@ export class UrlParameterControlModule implements ControlModule {
         const vfsKeyForUrl = "orphan";
         let fsInstance;
         try {
-          fsInstance = await initVfs(vfsKeyForUrl, { force: true });
+          fsInstance = await modApi.getVfsInstance(vfsKeyForUrl);
+          if (!fsInstance)
+            throw new Error("Failed to get VFS instance via ModAPI.");
         } catch (vfsError) {
           toast.error(
             `Failed to initialize VFS for URL files: ${
@@ -147,7 +190,7 @@ export class UrlParameterControlModule implements ControlModule {
                 fileData.contentBase64 = window.btoa(binary);
               }
 
-              addAttachedFile({
+              modApi.emit(inputEvent.addAttachedFileRequest, {
                 source: "vfs",
                 name: fileName,
                 type: mimeType,
@@ -175,7 +218,7 @@ export class UrlParameterControlModule implements ControlModule {
 
       if (urlParams.query) {
         if (urlParams.submit === "0") {
-          emitter.emit(promptEvent.inputChanged, {
+          modApi.emit(promptEvent.inputChanged, {
             value: urlParams.query,
           });
           toast.info("Query from URL loaded into input area.");
@@ -201,7 +244,7 @@ export class UrlParameterControlModule implements ControlModule {
             metadata,
           };
 
-          emitter.emit(promptEvent.submitted, { turnData });
+          modApi.emit(promptEvent.submitted, { turnData });
 
           const middlewareResult = await runMiddleware(
             ModMiddlewareHook.PROMPT_TURN_FINALIZE,

@@ -60,7 +60,7 @@ export class RulesControlModule implements ControlModule {
     });
 
     this.eventUnsubscribers.push(unsubStatus, unsubRulesLoaded);
-    console.log(`[${this.id}] Initialized.`);
+    // console.log(`[${this.id}] Initialized.`);
   }
 
   private updateHasRulesOrTags() {
@@ -231,7 +231,7 @@ export class RulesControlModule implements ControlModule {
           React.createElement(SettingsRulesAndTags, { module: this }),
         order: 50,
       });
-      console.log(`[${this.id}] Settings tab registered.`);
+      // console.log(`[${this.id}] Settings tab registered.`);
     }
   }
 

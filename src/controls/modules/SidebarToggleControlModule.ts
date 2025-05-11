@@ -12,7 +12,7 @@ export class SidebarToggleControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(_modApi: LiteChatModApi): Promise<void> {
-    console.log(`[${this.id}] Initialized.`);
+    // console.log(`[${this.id}] Initialized.`);
   }
 
   public getIsSidebarCollapsed = (): boolean => {
@@ -48,7 +48,7 @@ export class SidebarToggleControlModule implements ControlModule {
       iconRenderer: renderer,
       show: () => true,
     });
-    console.log(`[${this.id}] Registered.`);
+    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {

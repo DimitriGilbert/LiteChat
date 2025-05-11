@@ -5,7 +5,11 @@ import { immer } from "zustand/middleware/immer";
 import { PersistenceService } from "@/services/persistence.service";
 import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { settingsEvent } from "@/types/litechat/events/settings.events";
+import {
+  settingsEvent,
+  SettingsEventPayloads,
+} from "@/types/litechat/events/settings.events";
+import type { RegisteredActionHandler } from "@/types/litechat/control";
 
 export interface CustomThemeColors {
   background?: string;
@@ -112,6 +116,7 @@ interface SettingsActions {
   resetGeneralSettings: () => Promise<void>;
   resetAssistantSettings: () => Promise<void>;
   resetThemeSettings: () => Promise<void>;
+  getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
 // Define default constants
@@ -633,6 +638,242 @@ export const useSettingsStore = create(
         console.error("SettingsStore: Error resetting theme settings", error);
         toast.error("Failed to reset theme settings.");
       }
+    },
+    getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
+      const storeId = "settingsStore";
+      const actions = get();
+      return [
+        {
+          eventName: settingsEvent.setThemeRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setThemeRequest]
+          ) => actions.setTheme(p.theme),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setGlobalSystemPromptRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setGlobalSystemPromptRequest]
+          ) => actions.setGlobalSystemPrompt(p.prompt),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setTemperatureRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setTemperatureRequest]
+          ) => actions.setTemperature(p.value),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setMaxTokensRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setMaxTokensRequest]
+          ) => actions.setMaxTokens(p.value),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setTopPRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setTopPRequest]
+          ) => actions.setTopP(p.value),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setTopKRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setTopKRequest]
+          ) => actions.setTopK(p.value),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setPresencePenaltyRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setPresencePenaltyRequest]
+          ) => actions.setPresencePenalty(p.value),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setFrequencyPenaltyRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setFrequencyPenaltyRequest]
+          ) => actions.setFrequencyPenalty(p.value),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setEnableAdvancedSettingsRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setEnableAdvancedSettingsRequest]
+          ) => actions.setEnableAdvancedSettings(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setEnableStreamingMarkdownRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setEnableStreamingMarkdownRequest]
+          ) => actions.setEnableStreamingMarkdown(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setEnableStreamingCodeBlockParsingRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setEnableStreamingCodeBlockParsingRequest]
+          ) => actions.setEnableStreamingCodeBlockParsing(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setFoldStreamingCodeBlocksRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setFoldStreamingCodeBlocksRequest]
+          ) => actions.setFoldStreamingCodeBlocks(p.fold),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setFoldUserMessagesOnCompletionRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setFoldUserMessagesOnCompletionRequest]
+          ) => actions.setFoldUserMessagesOnCompletion(p.fold),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setStreamingRenderFpsRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setStreamingRenderFpsRequest]
+          ) => actions.setStreamingRenderFPS(p.fps),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setGitUserNameRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setGitUserNameRequest]
+          ) => actions.setGitUserName(p.name),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setGitUserEmailRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setGitUserEmailRequest]
+          ) => actions.setGitUserEmail(p.email),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setToolMaxStepsRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setToolMaxStepsRequest]
+          ) => actions.setToolMaxSteps(p.steps),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setPrismThemeUrlRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setPrismThemeUrlRequest]
+          ) => actions.setPrismThemeUrl(p.url),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoTitleEnabledRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setAutoTitleEnabledRequest]
+          ) => actions.setAutoTitleEnabled(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoTitleModelIdRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setAutoTitleModelIdRequest]
+          ) => actions.setAutoTitleModelId(p.modelId),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoTitlePromptMaxLengthRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setAutoTitlePromptMaxLengthRequest]
+          ) => actions.setAutoTitlePromptMaxLength(p.length),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoTitleIncludeFilesRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setAutoTitleIncludeFilesRequest]
+          ) => actions.setAutoTitleIncludeFiles(p.include),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoTitleIncludeRulesRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setAutoTitleIncludeRulesRequest]
+          ) => actions.setAutoTitleIncludeRules(p.include),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setCustomFontFamilyRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setCustomFontFamilyRequest]
+          ) => actions.setCustomFontFamily(p.fontFamily),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setCustomFontSizeRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setCustomFontSizeRequest]
+          ) => actions.setCustomFontSize(p.fontSize),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setChatMaxWidthRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setChatMaxWidthRequest]
+          ) => actions.setChatMaxWidth(p.maxWidth),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setCustomThemeColorsRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setCustomThemeColorsRequest]
+          ) => actions.setCustomThemeColors(p.colors),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setCustomThemeColorRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setCustomThemeColorRequest]
+          ) => actions.setCustomThemeColor(p.colorKey, p.value),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoScrollIntervalRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setAutoScrollIntervalRequest]
+          ) => actions.setAutoScrollInterval(p.interval),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setEnableAutoScrollOnStreamRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setEnableAutoScrollOnStreamRequest]
+          ) => actions.setEnableAutoScrollOnStream(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.loadSettingsRequest,
+          handler: () => actions.loadSettings(),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.resetGeneralSettingsRequest,
+          handler: () => actions.resetGeneralSettings(),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.resetAssistantSettingsRequest,
+          handler: () => actions.resetAssistantSettings(),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.resetThemeSettingsRequest,
+          handler: () => actions.resetThemeSettings(),
+          storeId,
+        },
+      ];
     },
   }))
 );

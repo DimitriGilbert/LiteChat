@@ -60,7 +60,7 @@ export class GitToolsModule implements ControlModule {
   private unregisterCallbacks: (() => void)[] = [];
 
   async initialize(_modApi: LiteChatModApi): Promise<void> {
-    console.log(`[${this.id}] Initialized.`);
+    // console.log(`[${this.id}] Initialized.`);
   }
 
   register(modApi: LiteChatModApi): void {
@@ -68,7 +68,7 @@ export class GitToolsModule implements ControlModule {
       console.warn(`[${this.id}] Already registered. Skipping.`);
       return;
     }
-    console.log(`[${this.id}] Registering Core Git Tools...`);
+    // console.log(`[${this.id}] Registering Core Git Tools...`);
 
     const gitInitTool: Tool<typeof gitInitSchema> = {
       description: "Initialize an empty Git repository in a VFS directory.",
@@ -232,7 +232,7 @@ export class GitToolsModule implements ControlModule {
       )
     );
 
-    console.log(`[${this.id}] Core Git Tools Registered.`);
+    // console.log(`[${this.id}] Core Git Tools Registered.`);
   }
 
   destroy(): void {

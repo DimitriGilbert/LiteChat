@@ -4,7 +4,11 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { inputEvent } from "@/types/litechat/events/input.events";
+import {
+  inputEvent,
+  InputEventPayloads,
+} from "@/types/litechat/events/input.events";
+import type { RegisteredActionHandler } from "@/types/litechat/control";
 
 // Define a unified structure for attached file metadata
 export interface AttachedFileMetadata {
@@ -33,6 +37,7 @@ export interface InputActions {
   removeAttachedFile: (attachmentId: string) => void;
   // Clear only attached files for the next prompt
   clearAttachedFiles: () => void;
+  getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
 export const useInputStore = create(
@@ -94,6 +99,31 @@ export const useInputStore = create(
       if (hadFiles) {
         emitter.emit(inputEvent.attachedFilesChanged, { files: [] });
       }
+    },
+    getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
+      const storeId = "inputStore";
+      const actions = get();
+      return [
+        {
+          eventName: inputEvent.addAttachedFileRequest,
+          handler: (
+            p: InputEventPayloads[typeof inputEvent.addAttachedFileRequest]
+          ) => actions.addAttachedFile(p),
+          storeId,
+        },
+        {
+          eventName: inputEvent.removeAttachedFileRequest,
+          handler: (
+            p: InputEventPayloads[typeof inputEvent.removeAttachedFileRequest]
+          ) => actions.removeAttachedFile(p.attachmentId),
+          storeId,
+        },
+        {
+          eventName: inputEvent.clearAttachedFilesRequest,
+          handler: () => actions.clearAttachedFiles(),
+          storeId,
+        },
+      ];
     },
   }))
 );

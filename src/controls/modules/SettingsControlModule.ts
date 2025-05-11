@@ -17,15 +17,15 @@ export class SettingsControlModule implements ControlModule {
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApiRef = modApi;
-    const unsubOpenRequest = modApi.on(uiEvent.openModalRequest, (payload) => {
-      if (payload.modalId === this.modalId) {
-        console.log(
-          `[${this.id}] Received open request for modal: ${payload.modalId}`
-        );
-      }
-    });
-    this.eventUnsubscribers.push(unsubOpenRequest);
-    console.log(`[${this.id}] Initialized and listening for open requests.`);
+    // const unsubOpenRequest = modApi.on(uiEvent.openModalRequest, (payload) => {
+    //   if (payload.modalId === this.modalId) {
+    //     console.log(
+    //       `[${this.id}] Received open request for modal: ${payload.modalId}`
+    //     );
+    //   }
+    // });
+    // this.eventUnsubscribers.push(unsubOpenRequest);
+    // console.log(`[${this.id}] Initialized and listening for open requests.`);
   }
 
   public openSettingsModal = (initialTab?: string, initialSubTab?: string) => {
@@ -63,7 +63,7 @@ export class SettingsControlModule implements ControlModule {
           React.createElement(SettingsTriggerComponent, { module: this }),
         show: () => true,
       });
-      console.log(`[${this.id}] Trigger registered.`);
+      // console.log(`[${this.id}] Trigger registered.`);
     }
 
     if (!this.unregisterModalProviderCallback) {
@@ -75,9 +75,9 @@ export class SettingsControlModule implements ControlModule {
             onClose: props.onClose,
           })
       );
-      console.log(
-        `[${this.id}] Modal provider registered for ${this.modalId}.`
-      );
+      // console.log(
+      //   `[${this.id}] Modal provider registered for ${this.modalId}.`
+      // );
     }
   }
 

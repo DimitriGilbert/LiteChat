@@ -9,6 +9,7 @@ import type {
   ToolImplementation,
   LiteChatModApi,
   ModalProvider,
+  ModEventPayloadMap, // Import ModEventPayloadMap
 } from "@/types/litechat/modding";
 import { Tool } from "ai";
 import type { z } from "zod";
@@ -25,6 +26,17 @@ type MiddlewareRegistry = {
   [H in ModMiddlewareHookName]?: RegisteredMiddleware<H>[];
 };
 
+// New types for dynamic action handling
+export type ActionHandler<P = any> = (payload: P) => void | Promise<void>;
+
+export interface RegisteredActionHandler<
+  K extends keyof ModEventPayloadMap = any
+> {
+  eventName: K;
+  handler: ActionHandler<ModEventPayloadMap[K]>;
+  storeId: string; // Identifier for the store registering the handler
+}
+
 export interface ControlState {
   promptControls: Record<string, CorePromptControlFromTypes>;
   chatControls: Record<string, CoreChatControlFromTypes>;
@@ -38,6 +50,7 @@ export interface ControlState {
     }
   >;
   modalProviders: Record<string, ModalProvider>;
+  // No need to store actionHandlers here, they are registered by stores directly with the coordinator
 }
 
 export interface ControlActions {

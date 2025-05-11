@@ -11,7 +11,14 @@ import { useSettingsStore } from "./settings.store";
 import { useProviderStore } from "./provider.store";
 import { useConversationStore } from "./conversation.store";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { projectEvent } from "@/types/litechat/events/project.events";
+import {
+  projectEvent,
+  ProjectEventPayloads,
+} from "@/types/litechat/events/project.events";
+import type {
+  RegisteredActionHandler,
+  ActionHandler,
+} from "@/types/litechat/control";
 
 interface ProjectState {
   projects: Project[];
@@ -46,6 +53,7 @@ interface ProjectActions {
     defaultTagIds: string[] | null;
     defaultRuleIds: string[] | null;
   };
+  getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
 export const useProjectStore = create(
@@ -291,6 +299,42 @@ export const useProjectStore = create(
             ? project.defaultRuleIds
             : parentSettings.defaultRuleIds,
       };
+    },
+    getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
+      const storeId = "projectStore";
+      const actions = get();
+      const wrapPromiseString =
+        <P>(fn: (payload: P) => Promise<string>): ActionHandler<P> =>
+        async (payload: P) => {
+          await fn(payload);
+        };
+
+      return [
+        {
+          eventName: projectEvent.loadProjectsRequest,
+          handler: actions.loadProjects,
+          storeId,
+        },
+        {
+          eventName: projectEvent.addProjectRequest,
+          handler: wrapPromiseString(actions.addProject),
+          storeId,
+        },
+        {
+          eventName: projectEvent.updateProjectRequest,
+          handler: (
+            p: ProjectEventPayloads[typeof projectEvent.updateProjectRequest]
+          ) => actions.updateProject(p.id, p.updates),
+          storeId,
+        },
+        {
+          eventName: projectEvent.deleteProjectRequest,
+          handler: (
+            p: ProjectEventPayloads[typeof projectEvent.deleteProjectRequest]
+          ) => actions.deleteProject(p.id),
+          storeId,
+        },
+      ];
     },
   }))
 );

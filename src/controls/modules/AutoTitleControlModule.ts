@@ -68,7 +68,7 @@ export class AutoTitleControlModule implements ControlModule {
       unsubComplete,
       unsubSettings
     );
-    console.log(`[${this.id}] Initialized.`);
+    // console.log(`[${this.id}] Initialized.`);
   }
 
   private checkFirstInteraction() {
@@ -129,7 +129,7 @@ export class AutoTitleControlModule implements ControlModule {
         }
       },
     });
-    console.log(`[${this.id}] Registered.`);
+    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {

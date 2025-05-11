@@ -59,7 +59,7 @@ export class FileControlModule implements ControlModule {
     });
 
     this.eventUnsubscribers.push(unsubStatus, unsubModel, unsubFiles);
-    console.log(`[${this.id}] Initialized.`);
+    // console.log(`[${this.id}] Initialized.`);
   }
 
   private updateModelSupport() {
@@ -117,7 +117,7 @@ export class FileControlModule implements ControlModule {
         React.createElement(FileControlTrigger, { module: this }),
       renderer: () => React.createElement(FileControlPanel, { module: this }),
     });
-    console.log(`[${this.id}] Registered.`);
+    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {

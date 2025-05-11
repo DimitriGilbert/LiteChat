@@ -57,7 +57,7 @@ export class SystemPromptControlModule implements ControlModule {
       unsubProject,
       unsubSettings
     );
-    console.log(`[${this.id}] Initialized.`);
+    // console.log(`[${this.id}] Initialized.`);
   }
 
   private updateEffectivePrompt() {
@@ -118,7 +118,7 @@ export class SystemPromptControlModule implements ControlModule {
         }
       },
     });
-    console.log(`[${this.id}] Registered.`);
+    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {

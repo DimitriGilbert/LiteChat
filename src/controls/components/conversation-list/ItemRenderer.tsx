@@ -83,7 +83,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
   }) => {
     const isSelected = item.id === selectedItemId;
     const isProject = item.itemType === "project";
-    console.log("ConversationItemRenderer", item.itemType);
+    // console.log("ConversationItemRenderer", item.itemType);
 
     const isGloballyEditingThis =
       item.id === editingItemId && item.itemType === editingItemType;

@@ -56,7 +56,7 @@ export class GlobalModelSelectorModule implements ControlModule {
       unsubModelChange,
       unsubProviderLoading
     );
-    console.log(`[${this.id}] Initialized.`);
+    // console.log(`[${this.id}] Initialized.`);
   }
 
   private loadInitialState() {
@@ -88,7 +88,7 @@ export class GlobalModelSelectorModule implements ControlModule {
       triggerRenderer: () =>
         React.createElement(GlobalModelSelector, { module: this }),
     });
-    console.log(`[${this.id}] Registered.`);
+    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {

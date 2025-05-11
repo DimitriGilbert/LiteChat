@@ -11,8 +11,8 @@ import { useProjectStore } from "@/store/project.store";
 import { usePromptStateStore } from "@/store/prompt.store";
 import { useVfsStore } from "@/store/vfs.store";
 import {
-  buildHistoryMessages,
-  processFileMetaToUserContent,
+  buildHistoryMessages, // Corrected: Ensure this is exported
+  processFileMetaToUserContent, // Corrected: Ensure this is exported
 } from "@/lib/litechat/ai-helpers";
 import type { CoreMessage, ImagePart, TextPart } from "ai";
 import { toast } from "sonner";
@@ -187,9 +187,6 @@ ${userContent}`;
         console.log(
           "[ConversationService] Triggering asynchronous title generation."
         );
-        // For title generation, we might not need full rule content, just names or a flag.
-        // For simplicity, passing an empty array for activeRulesForTurn if full content isn't easily available here.
-        // Or, the title generation logic could be simplified to not depend on rule *content*.
         const rulesForTitleContext: DbRule[] = (
           turnData.metadata?.effectiveRulesContent ?? []
         ).map((erc) => ({
@@ -229,7 +226,7 @@ ${userContent}`;
   async generateConversationTitle(
     conversationId: string,
     originalTurnData: PromptTurnObject,
-    activeRulesForTurn: DbRule[] // DbRule[] for simplicity, assuming names are sufficient
+    activeRulesForTurn: DbRule[]
   ): Promise<void> {
     const settings = useSettingsStore.getState();
 
@@ -354,7 +351,6 @@ ${userContent}`;
     let userContent = originalTurnData.content;
     const userMessageContentParts: (TextPart | ImagePart)[] = [];
 
-    // Use pre-resolved rule content from original turnData metadata
     const effectiveRulesContent: ResolvedRuleContent[] =
       originalTurnData.metadata?.effectiveRulesContent ?? [];
 
@@ -444,9 +440,9 @@ ${userContent}`;
       metadata: {
         ...(({
           turnSystemPrompt: _turnSystemPrompt,
-          activeTagIds, // Keep original IDs for reference
-          activeRuleIds, // Keep original IDs for reference
-          effectiveRulesContent: _effectiveRulesContent, // Exclude, already applied
+          activeTagIds,
+          activeRuleIds,
+          effectiveRulesContent: _effectiveRulesContent,
           autoTitleEnabledForTurn,
           ...restMeta
         }) => ({

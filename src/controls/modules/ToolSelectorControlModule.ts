@@ -7,13 +7,13 @@ import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { providerEvent } from "@/types/litechat/events/provider.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import { settingsEvent } from "@/types/litechat/events/settings.events";
+import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
 import { ToolSelectorTrigger } from "@/controls/components/tool-selector/ToolSelectorTrigger";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useSettingsStore } from "@/store/settings.store";
-import type { SidebarItemType } from "@/types/litechat/chat";
 
 export class ToolSelectorControlModule implements ControlModule {
   readonly id = "core-tool-selector";
@@ -25,7 +25,6 @@ export class ToolSelectorControlModule implements ControlModule {
 
   public isStreaming = false;
   public isVisible = true;
-  public selectedItemType: SidebarItemType | null = null;
   public selectedItemId: string | null = null;
   public allToolsCount = 0;
   public globalDefaultMaxSteps = 5;
@@ -51,7 +50,6 @@ export class ToolSelectorControlModule implements ControlModule {
     });
     const unsubContext = modApi.on(uiEvent.contextChanged, (payload) => {
       this.selectedItemId = payload.selectedItemId;
-      this.selectedItemType = payload.selectedItemType;
       this.updateVisibility();
       this.notifyComponentUpdate?.();
     });
@@ -65,19 +63,17 @@ export class ToolSelectorControlModule implements ControlModule {
       }
     );
 
-    const controlStoreUnsubscribe = useControlRegistryStore.subscribe(
-      (currentState, previousState) => {
-        const currentTools = currentState.tools;
-        const previousTools = previousState.tools;
-
-        if (
-          Object.keys(currentTools).length !==
-            Object.keys(previousTools).length ||
-          JSON.stringify(currentTools) !== JSON.stringify(previousTools)
-        ) {
-          this.allToolsCount = Object.keys(currentTools).length;
-          this.updateVisibility();
-          this.notifyComponentUpdate?.();
+    // Listen to changes in registered tools
+    const unsubToolsChanged = modApi.on(
+      controlRegistryEvent.toolsChanged,
+      (payload) => {
+        if (payload && typeof payload.tools === "object") {
+          const newToolCount = Object.keys(payload.tools).length;
+          if (this.allToolsCount !== newToolCount) {
+            this.allToolsCount = newToolCount;
+            this.updateVisibility();
+            this.notifyComponentUpdate?.();
+          }
         }
       }
     );
@@ -87,17 +83,17 @@ export class ToolSelectorControlModule implements ControlModule {
       unsubModel,
       unsubContext,
       unsubSettings,
-      controlStoreUnsubscribe
+      unsubToolsChanged // Add new unsubscriber
     );
-    console.log(`[${this.id}] Initialized.`);
+    // console.log(`[${this.id}] Initialized.`);
   }
 
   private loadInitialState() {
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.selectedItemId = useConversationStore.getState().selectedItemId;
-    this.selectedItemType = useConversationStore.getState().selectedItemType;
+    // this.selectedItemType = useConversationStore.getState().selectedItemType;
     this.allToolsCount = Object.keys(
-      useControlRegistryStore.getState().tools
+      useControlRegistryStore.getState().tools // Get initial count
     ).length;
     this.globalDefaultMaxSteps = useSettingsStore.getState().toolMaxSteps;
   }
@@ -110,10 +106,7 @@ export class ToolSelectorControlModule implements ControlModule {
     const modelSupportsTools =
       selectedModel?.metadata?.supported_parameters?.includes("tools") ?? false;
 
-    const newVisibility =
-      hasRegisteredTools &&
-      modelSupportsTools &&
-      this.selectedItemType === "conversation";
+    const newVisibility = hasRegisteredTools && modelSupportsTools;
 
     if (this.isVisible !== newVisibility) {
       this.isVisible = newVisibility;
@@ -125,8 +118,6 @@ export class ToolSelectorControlModule implements ControlModule {
     this.transientMaxStepsOverride;
   public getIsStreaming = (): boolean => this.isStreaming;
   public getIsVisible = (): boolean => this.isVisible;
-  public getSelectedItemType = (): SidebarItemType | null =>
-    this.selectedItemType;
   public getSelectedItemId = (): string | null => this.selectedItemId;
   public getAllToolsCount = (): number => this.allToolsCount;
   public getGlobalDefaultMaxSteps = (): number => this.globalDefaultMaxSteps;
@@ -180,7 +171,7 @@ export class ToolSelectorControlModule implements ControlModule {
         if (changed) this.notifyComponentUpdate?.();
       },
     });
-    console.log(`[${this.id}] Registered.`);
+    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {

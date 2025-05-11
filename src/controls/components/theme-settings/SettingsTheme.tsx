@@ -481,24 +481,26 @@ const SettingsThemeComponent: React.FC = () => {
         </p>
       </SettingsSection>
 
-      {/* Custom Theme Colors */}
-      <SettingsSection
-        title="Custom Theme Colors"
-        description="Define custom colors. Applies only when 'User Custom' theme is selected. Use valid CSS color values (hex, rgb, oklch, etc.). Leave blank to use default light/dark theme colors."
-        contentClassName="rounded-lg border p-4 shadow-sm bg-card"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
-          {colorKeys.map(({ key, label }) => (
-            <ColorInput
-              key={key}
-              label={label}
-              colorKey={key}
-              value={customThemeColors?.[key]}
-              onChange={setCustomThemeColor}
-            />
-          ))}
-        </div>
-      </SettingsSection>
+      {/* Custom Theme Colors, only display if selected theme is custom */}
+      {theme === "custom" && (
+        <SettingsSection
+          title="Custom Theme Colors"
+          description="Define custom colors. Use valid CSS color values (hex, rgb, oklch, etc.). Leave blank to use default light/dark theme colors."
+          contentClassName="rounded-lg border p-4 shadow-sm bg-card"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
+            {colorKeys.map(({ key, label }) => (
+              <ColorInput
+                key={key}
+                label={label}
+                colorKey={key}
+                value={customThemeColors?.[key]}
+                onChange={setCustomThemeColor}
+              />
+            ))}
+          </div>
+        </SettingsSection>
+      )}
 
       {/* Reset Button */}
       <Separator />

@@ -5,8 +5,12 @@ import { immer } from "zustand/middleware/immer";
 import type { Interaction } from "@/types/litechat/interaction";
 import { PersistenceService } from "@/services/persistence.service";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import {
+  interactionEvent,
+  InteractionEventPayloads,
+} from "@/types/litechat/events/interaction.events";
 import { toast } from "sonner";
+import type { RegisteredActionHandler } from "@/types/litechat/control";
 
 export interface InteractionState {
   interactions: Interaction[];
@@ -37,6 +41,7 @@ interface InteractionActions {
   setStatus: (status: InteractionState["status"]) => void;
   _addStreamingId: (id: string) => void;
   _removeStreamingId: (id: string) => void;
+  getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
 export const useInteractionStore = create(
@@ -386,6 +391,52 @@ export const useInteractionStore = create(
       emitter.emit(interactionEvent.streamingIdsChanged, {
         streamingIds: get().streamingInteractionIds,
       });
+    },
+    getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
+      const storeId = "interactionStore";
+      const actions = get();
+      return [
+        {
+          eventName: interactionEvent.loadInteractionsRequest,
+          handler: (
+            p: InteractionEventPayloads[typeof interactionEvent.loadInteractionsRequest]
+          ) => actions.loadInteractions(p.conversationId),
+          storeId,
+        },
+        {
+          eventName: interactionEvent.rateInteractionRequest,
+          handler: (
+            p: InteractionEventPayloads[typeof interactionEvent.rateInteractionRequest]
+          ) => actions.rateInteraction(p.interactionId, p.rating),
+          storeId,
+        },
+        {
+          eventName: interactionEvent.setCurrentConversationIdRequest,
+          handler: (
+            p: InteractionEventPayloads[typeof interactionEvent.setCurrentConversationIdRequest]
+          ) => actions.setCurrentConversationId(p.id),
+          storeId,
+        },
+        {
+          eventName: interactionEvent.clearInteractionsRequest,
+          handler: () => actions.clearInteractions(),
+          storeId,
+        },
+        {
+          eventName: interactionEvent.setErrorRequest,
+          handler: (
+            p: InteractionEventPayloads[typeof interactionEvent.setErrorRequest]
+          ) => actions.setError(p.error),
+          storeId,
+        },
+        {
+          eventName: interactionEvent.setStatusRequest,
+          handler: (
+            p: InteractionEventPayloads[typeof interactionEvent.setStatusRequest]
+          ) => actions.setStatus(p.status),
+          storeId,
+        },
+      ];
     },
   }))
 );

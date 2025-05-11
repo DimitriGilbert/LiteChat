@@ -128,6 +128,8 @@ export interface LiteChatModApi {
     provider: ModalProvider
   ) => () => void;
   getVfsInstance: (vfsKey: string) => Promise<typeof fs | null>;
+  // No registerActionHandler here, it's not for mods to register store actions.
+  // Mods emit action requests, stores handle them.
 }
 
 // --- Tool Implementation ---

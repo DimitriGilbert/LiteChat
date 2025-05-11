@@ -20,9 +20,9 @@ export class ConversationListControlModule implements ControlModule {
     this.isLoading =
       useConversationStore.getState().isLoading ||
       useProjectStore.getState().isLoading;
-    console.log(
-      `[${this.id}] Initialized. Initial loading state: ${this.isLoading}`
-    );
+    // console.log(
+    //   `[${this.id}] Initialized. Initial loading state: ${this.isLoading}`
+    // );
   }
 
   public updateLoadingState() {
@@ -66,7 +66,7 @@ export class ConversationListControlModule implements ControlModule {
         React.createElement(ConversationListIconRenderer, { module: this }),
       show: () => true,
     });
-    console.log(`[Init] Module "${this.id}" registered.`);
+    // console.log(`[Init] Module "${this.id}" registered.`);
   }
 
   destroy(): void {
