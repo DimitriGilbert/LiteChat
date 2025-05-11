@@ -5,7 +5,7 @@ import { IndexedDB } from "@zenfs/dom";
 import { toast } from "sonner";
 import type { FileSystemEntry } from "@/types/litechat/vfs";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { vfsEvent } from "@/types/litechat/events/vfs.events";
+import { vfsStoreEvent } from "@/types/litechat/events/vfs.events";
 import JSZip from "jszip";
 import {
   normalizePath,
@@ -139,7 +139,7 @@ export const readFileOp = async (
   const normalizedPath = normalizePath(path);
   try {
     const data = await fsToUse.promises.readFile(normalizedPath);
-    emitter.emit(vfsEvent.fileRead, { path: normalizedPath });
+    emitter.emit(vfsStoreEvent.fileRead, { path: normalizedPath });
     return data;
   } catch (err: unknown) {
     console.error(`[VFS Op] Failed to read file ${normalizedPath}:`, err);
@@ -165,7 +165,7 @@ export const writeFileOp = async (
       await createDirectoryRecursive(parentDir, { fsInstance: fsToUse });
     }
     await fsToUse.promises.writeFile(normalized, data);
-    emitter.emit(vfsEvent.fileWritten, { path: normalized });
+    emitter.emit(vfsStoreEvent.fileWritten, { path: normalized });
   } catch (err: unknown) {
     if (
       !(
@@ -198,10 +198,10 @@ export const deleteItemOp = async (
     const fileStat = await fsToUse.promises.stat(normalized);
     if (fileStat.isDirectory()) {
       await fsToUse.promises.rm(normalized, { recursive });
-      emitter.emit(vfsEvent.fileDeleted, { path: normalized });
+      emitter.emit(vfsStoreEvent.fileDeleted, { path: normalized });
     } else {
       await fsToUse.promises.unlink(normalized);
-      emitter.emit(vfsEvent.fileDeleted, { path: normalized });
+      emitter.emit(vfsStoreEvent.fileDeleted, { path: normalized });
     }
     toast.success(`"${basename(normalized)}" deleted.`);
   } catch (err: unknown) {

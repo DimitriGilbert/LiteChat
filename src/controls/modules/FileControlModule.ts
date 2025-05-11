@@ -3,9 +3,9 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { interactionEvent } from "@/types/litechat/events/interaction.events";
-import { providerEvent } from "@/types/litechat/events/provider.events";
-import { inputEvent } from "@/types/litechat/events/input.events";
+import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
+import { providerStoreEvent } from "@/types/litechat/events/provider.events";
+import { inputStoreEvent } from "@/types/litechat/events/input.events";
 import { FileControlTrigger } from "@/controls/components/file/FileControlTrigger";
 import { FileControlPanel } from "@/controls/components/file/FileControlPanel";
 import { useInputStore } from "@/store/input.store";
@@ -20,7 +20,6 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 export class FileControlModule implements ControlModule {
   readonly id = "core-file-attachment";
-  // private modApi: LiteChatModApi | null = null; // Removed as it was unused
   private unregisterCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
 
@@ -31,30 +30,42 @@ export class FileControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
-    // this.modApi = modApi; // Removed
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.attachedFiles = useInputStore.getState().attachedFilesMetadata;
     this.updateModelSupport();
-    this.notifyComponentUpdate?.(); // Notify after initial state load
+    this.notifyComponentUpdate?.();
 
-    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
-      if (this.isStreaming !== (payload.status === "streaming")) {
-        this.isStreaming = payload.status === "streaming";
+    const unsubStatus = modApi.on(
+      interactionStoreEvent.statusChanged,
+      (payload) => {
+        if (typeof payload === "object" && payload && "status" in payload) {
+          if (this.isStreaming !== (payload.status === "streaming")) {
+            this.isStreaming = payload.status === "streaming";
+            this.notifyComponentUpdate?.();
+          }
+        }
+      }
+    );
+    const unsubModel = modApi.on(
+      providerStoreEvent.selectedModelChanged,
+      () => {
+        this.updateModelSupport();
         this.notifyComponentUpdate?.();
       }
-    });
-    const unsubModel = modApi.on(providerEvent.modelSelectionChanged, () => {
-      this.updateModelSupport();
-      this.notifyComponentUpdate?.();
-    });
-    const unsubFiles = modApi.on(inputEvent.attachedFilesChanged, (payload) => {
-      if (
-        JSON.stringify(this.attachedFiles) !== JSON.stringify(payload.files)
-      ) {
-        this.attachedFiles = payload.files;
-        this.notifyComponentUpdate?.();
+    );
+    const unsubFiles = modApi.on(
+      inputStoreEvent.attachedFilesChanged,
+      (payload) => {
+        if (typeof payload === "object" && payload && "files" in payload) {
+          if (
+            JSON.stringify(this.attachedFiles) !== JSON.stringify(payload.files)
+          ) {
+            this.attachedFiles = payload.files;
+            this.notifyComponentUpdate?.();
+          }
+        }
       }
-    });
+    );
 
     this.eventUnsubscribers.push(unsubStatus, unsubModel, unsubFiles);
     console.log(`[${this.id}] Initialized.`);
@@ -126,7 +137,6 @@ export class FileControlModule implements ControlModule {
       this.unregisterCallback = null;
     }
     this.notifyComponentUpdate = null;
-    // this.modApi = null; // Removed
     console.log(`[${this.id}] Destroyed.`);
   }
 }

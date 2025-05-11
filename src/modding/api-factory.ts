@@ -10,11 +10,10 @@ import type {
   ModEventPayloadMap,
   ModPromptControl,
   ModChatControl,
+  ModalProvider,
 } from "@/types/litechat/modding";
-// Import the stricter ChatControl type for the store
-import type { ChatControl as CoreChatControl } from "@/types/litechat/chat";
-// Import the stricter PromptControl type for the store
-import type { PromptControl as CorePromptControl } from "@/types/litechat/prompt";
+import type { ChatControl as CoreChatControlFromTypes } from "@/types/litechat/chat";
+import type { PromptControl as CorePromptControlFromTypes } from "@/types/litechat/prompt";
 
 import { Tool } from "ai";
 import { useControlRegistryStore } from "@/store/control.store";
@@ -27,6 +26,8 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { toast } from "sonner";
 import type { z } from "zod";
 import { splitModelId } from "@/lib/litechat/provider-helpers";
+import { useVfsStore } from "@/store/vfs.store";
+import type { fs } from "@zenfs/core";
 
 export function createModApi(mod: DbMod): LiteChatModApi {
   const modId = mod.id;
@@ -40,13 +41,13 @@ export function createModApi(mod: DbMod): LiteChatModApi {
     modName,
     registerPromptControl: (control: ModPromptControl) => {
       const u = controlStoreActions.registerPromptControl(
-        control as CorePromptControl
+        control as CorePromptControlFromTypes
       );
       unsubscribers.push(u);
       return u;
     },
     registerChatControl: (control: ModChatControl) => {
-      const controlWithDefaults: CoreChatControl = {
+      const controlWithDefaults: CoreChatControlFromTypes = {
         ...control,
         status: control.status ?? (() => "ready"),
       };
@@ -78,7 +79,6 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       unsubscribers.push(u);
       return u;
     },
-    // Add emit method implementation
     emit: <K extends keyof ModEventPayloadMap>(
       eventName: K,
       payload: ModEventPayloadMap[K]
@@ -127,6 +127,8 @@ export function createModApi(mod: DbMod): LiteChatModApi {
         temperature: sS.temperature,
         maxTokens: sS.maxTokens,
         theme: sS.theme,
+        gitUserName: sS.gitUserName,
+        gitUserEmail: sS.gitUserEmail,
       });
     },
     showToast: (t, m) => {
@@ -134,6 +136,14 @@ export function createModApi(mod: DbMod): LiteChatModApi {
     },
     log: (l, ...a) => {
       console[l](`[Mod: ${modName}]`, ...a);
+    },
+    registerModalProvider: (modalId: string, provider: ModalProvider) => {
+      const u = controlStoreActions.registerModalProvider(modalId, provider);
+      unsubscribers.push(u);
+      return u;
+    },
+    getVfsInstance: async (vfsKey: string): Promise<typeof fs | null> => {
+      return useVfsStore.getState().initializeVFS(vfsKey, { force: true });
     },
   };
 

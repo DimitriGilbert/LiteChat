@@ -11,7 +11,7 @@ import { useSettingsStore } from "./settings.store";
 import { useProviderStore } from "./provider.store";
 import { useConversationStore } from "./conversation.store";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { projectEvent } from "@/types/litechat/events/project.events";
+import { projectStoreEvent } from "@/types/litechat/events/project.events";
 
 interface ProjectState {
   projects: Project[];
@@ -59,9 +59,14 @@ export const useProjectStore = create(
       try {
         const dbProjects = await PersistenceService.loadProjects();
         set({ projects: dbProjects, isLoading: false });
+        emitter.emit(projectStoreEvent.loaded, { projects: dbProjects });
       } catch (e) {
         console.error("ProjectStore: Error loading projects", e);
         set({ error: "Failed to load projects", isLoading: false });
+        emitter.emit(projectStoreEvent.loadingStateChanged, {
+          isLoading: false,
+          error: "Failed to load projects",
+        });
       }
     },
 
@@ -105,7 +110,7 @@ export const useProjectStore = create(
             (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
           );
         });
-        emitter.emit(projectEvent.added, { project: newProject });
+        emitter.emit(projectStoreEvent.added, { project: newProject });
         return newId;
       } catch (e) {
         console.error("ProjectStore: Error adding project", e);
@@ -149,7 +154,7 @@ export const useProjectStore = create(
             );
           }
         });
-        emitter.emit(projectEvent.updated, {
+        emitter.emit(projectStoreEvent.updated, {
           projectId: id,
           updates: updatedProjectData,
         });
@@ -183,7 +188,7 @@ export const useProjectStore = create(
         useConversationStore
           .getState()
           ._unlinkConversationsFromProjects(Array.from(projectsToDeleteIds));
-        emitter.emit(projectEvent.deleted, { projectId: id });
+        emitter.emit(projectStoreEvent.deleted, { projectId: id });
         toast.success(
           `Project "${projectToDelete.name}" and its contents deleted.`
         );

@@ -32,12 +32,13 @@ import type { ConversationListControlModule } from "@/controls/modules/Conversat
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-interface VirtualListItem {
-  id: string;
-  originalId: string;
+export interface VirtualListItem {
+  id: string; // Unique ID for the virtual list item (e.g., `project-${projectId}` or `conversation-${conversationId}`)
+  originalId: string; // The actual ID of the project or conversation
   type: SidebarItemType;
   level: number;
-  data: Project | Conversation;
+  data: Project | Conversation; // The actual project or conversation data
+  updatedAt: Date; // For sorting
 }
 
 const itemMatchesFilterOrHasMatchingDescendant = (
@@ -293,8 +294,6 @@ export const ConversationListControlComponent: React.FC<
 
   const handleSelectItem = useCallback(
     (id: string, type: SidebarItemType) => {
-      // Ensure 'type' is always defined when calling this from ConversationItemRenderer
-      console.log("handleSelectItem", id, type); // Add this log
       if (id === editingItemId && type === editingItemType) return;
       if (editingItemId && (id !== editingItemId || type !== editingItemType)) {
         handleCancelEdit();
@@ -393,8 +392,8 @@ export const ConversationListControlComponent: React.FC<
     const memoCache: Record<string, boolean> = {};
 
     function addChildren(parentId: string | null, level: number) {
-      const childProjects = (projectsByParentId.get(parentId) || [])
-        .filter((p) =>
+      const childProjects = (projectsByParentId.get(parentId) || []).filter(
+        (p) =>
           itemMatchesFilterOrHasMatchingDescendant(
             p.id,
             "project",
@@ -406,33 +405,49 @@ export const ConversationListControlComponent: React.FC<
             projectsByParentId,
             memoCache
           )
-        )
-        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      );
 
-      const childConversations = (conversationsByProjectId.get(parentId) || [])
-        .filter((c) => c.title.toLowerCase().includes(lowerCaseFilter))
-        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      const childConversations = (
+        conversationsByProjectId.get(parentId) || []
+      ).filter((c) => c.title.toLowerCase().includes(lowerCaseFilter));
 
-      childProjects.forEach((p) => {
-        flatList.push({
-          id: `project-${p.id}`,
-          originalId: p.id,
-          type: "project",
-          level,
-          data: p,
-        });
-        if (expandedProjects.has(p.id)) {
-          addChildren(p.id, level + 1);
+      // Combine projects and conversations at this level
+      const combinedChildren: (Project | Conversation)[] = [
+        ...childProjects,
+        ...childConversations,
+      ];
+
+      // Sort combined children by updatedAt descending
+      combinedChildren.sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+
+      combinedChildren.forEach((item) => {
+        if ("path" in item) {
+          // It's a Project
+          flatList.push({
+            id: `project-${item.id}`,
+            originalId: item.id,
+            type: "project",
+            level,
+            data: item,
+            updatedAt: item.updatedAt,
+          });
+          if (expandedProjects.has(item.id)) {
+            addChildren(item.id, level + 1);
+          }
+        } else {
+          // It's a Conversation
+          flatList.push({
+            id: `conversation-${item.id}`,
+            originalId: item.id,
+            type: "conversation",
+            level,
+            data: item,
+            updatedAt: item.updatedAt,
+          });
         }
-      });
-      childConversations.forEach((c) => {
-        flatList.push({
-          id: `conversation-${c.id}`,
-          originalId: c.id,
-          type: "conversation",
-          level,
-          data: c,
-        });
       });
     }
 
@@ -532,6 +547,12 @@ export const ConversationListControlComponent: React.FC<
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                 const itemData = flattenedVisibleItems[virtualRow.index];
                 if (!itemData) return null;
+
+                const itemForRenderer: SidebarItem = {
+                  ...(itemData.data as any),
+                  itemType: itemData.type,
+                };
+
                 return (
                   <div
                     key={itemData.id}
@@ -546,12 +567,11 @@ export const ConversationListControlComponent: React.FC<
                     className="px-1"
                   >
                     <ConversationItemRenderer
-                      item={itemData.data as SidebarItem} // Pass the original item data
+                      item={itemForRenderer}
                       level={itemData.level}
                       selectedItemId={selectedItemId}
                       conversationSyncStatus={conversationSyncStatus}
                       repoNameMap={repoNameMap}
-                      // Ensure item.type is passed correctly here
                       onSelectItem={() =>
                         handleSelectItem(itemData.originalId, itemData.type)
                       }

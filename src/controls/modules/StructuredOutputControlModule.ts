@@ -3,8 +3,8 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { providerEvent } from "@/types/litechat/events/provider.events";
-import { promptEvent } from "@/types/litechat/events/prompt.events";
+import { providerStoreEvent } from "@/types/litechat/events/provider.events";
+import { promptStoreEvent } from "@/types/litechat/events/prompt.events";
 import { VisibleStructuredOutputControl } from "@/controls/components/structured-output/VisibleStructuredOutputControl";
 import { useProviderStore } from "@/store/provider.store";
 import { usePromptStateStore } from "@/store/prompt.store";
@@ -22,23 +22,27 @@ export class StructuredOutputControlModule implements ControlModule {
     this.structuredOutputJson =
       usePromptStateStore.getState().structuredOutputJson;
     this.updateVisibility();
-    this.notifyComponentUpdate?.(); // Notify after initial visibility update
+    this.notifyComponentUpdate?.();
 
-    const unsubModel = modApi.on(providerEvent.modelSelectionChanged, () => {
-      this.updateVisibility();
-      this.notifyComponentUpdate?.();
-    });
+    const unsubModel = modApi.on(
+      providerStoreEvent.selectedModelChanged,
+      () => {
+        this.updateVisibility();
+        this.notifyComponentUpdate?.();
+      }
+    );
     const unsubPromptParams = modApi.on(
-      promptEvent.paramsChanged,
+      promptStoreEvent.parameterChanged,
       (payload) => {
-        if (
-          "structuredOutputJson" in payload.params &&
-          this.structuredOutputJson !==
-            (payload.params.structuredOutputJson ?? null)
-        ) {
-          this.structuredOutputJson =
-            payload.params.structuredOutputJson ?? null;
-          this.notifyComponentUpdate?.();
+        if (typeof payload === "object" && payload && "params" in payload) {
+          const params = payload.params;
+          if (
+            "structuredOutputJson" in params &&
+            this.structuredOutputJson !== (params.structuredOutputJson ?? null)
+          ) {
+            this.structuredOutputJson = params.structuredOutputJson ?? null;
+            this.notifyComponentUpdate?.();
+          }
         }
       }
     );

@@ -3,19 +3,19 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { conversationEvent } from "@/types/litechat/events/conversation.events";
-import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { conversationStoreEvent } from "@/types/litechat/events/conversation.events";
+import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
-import { syncEvent } from "@/types/litechat/events/sync.events";
+import { syncStoreEvent } from "@/types/litechat/events/sync.events";
 import { GitSyncControlTrigger } from "@/controls/components/git-sync/GitSyncControlTrigger";
-import { SettingsGit } from "@/controls/components/git-settings/SettingsGit"; // Corrected import path
+import { SettingsGit } from "@/controls/components/git-settings/SettingsGit";
 import { useConversationStore } from "@/store/conversation.store";
 import { useInteractionStore } from "@/store/interaction.store";
 import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
 import type { SidebarItemType } from "@/types/litechat/chat";
 
 export class GitSyncControlModule implements ControlModule {
-  readonly id = "core-git-sync"; // Used for prompt control
+  readonly id = "core-git-sync";
   private unregisterPromptControlCallback: (() => void) | null = null;
   private unregisterSettingsTabCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
@@ -36,37 +36,53 @@ export class GitSyncControlModule implements ControlModule {
       this.notifyComponentUpdate?.();
     });
 
-    const unsubRepoChanged = modApi.on(syncEvent.repoChanged, () => {
+    const unsubRepoChanged = modApi.on(syncStoreEvent.repoChanged, () => {
       this.syncRepos = useConversationStore.getState().syncRepos;
       this.notifyComponentUpdate?.();
     });
 
     const unsubConvSync = modApi.on(
-      conversationEvent.syncStatusChanged,
+      conversationStoreEvent.conversationSyncStatusChanged,
       (payload) => {
-        this.conversationSyncStatus = {
-          ...this.conversationSyncStatus,
-          [payload.conversationId]: payload.status,
-        };
-        this.notifyComponentUpdate?.();
+        if (
+          typeof payload === "object" &&
+          payload &&
+          "conversationId" in payload &&
+          "status" in payload
+        ) {
+          this.conversationSyncStatus = {
+            ...this.conversationSyncStatus,
+            [payload.conversationId]: payload.status,
+          };
+          this.notifyComponentUpdate?.();
+        }
       }
     );
     const unsubInteractionStatus = modApi.on(
-      interactionEvent.statusChanged,
+      interactionStoreEvent.statusChanged,
       (payload) => {
-        this.isStreaming = payload.status === "streaming";
-        this.notifyComponentUpdate?.();
+        if (typeof payload === "object" && payload && "status" in payload) {
+          this.isStreaming = payload.status === "streaming";
+          this.notifyComponentUpdate?.();
+        }
       }
     );
-    const unsubConvUpdated = modApi.on(conversationEvent.updated, (payload) => {
-      if (
-        payload.conversationId === this.selectedItemId &&
-        payload.updates.syncRepoId !== undefined
-      ) {
-        this.loadInitialState(); // Reload to get updated conversation details
-        this.notifyComponentUpdate?.();
+    const unsubConvUpdated = modApi.on(
+      conversationStoreEvent.conversationUpdated,
+      (payload) => {
+        if (
+          typeof payload === "object" &&
+          payload &&
+          "conversationId" in payload &&
+          "updates" in payload &&
+          payload.conversationId === this.selectedItemId &&
+          payload.updates.syncRepoId !== undefined
+        ) {
+          this.loadInitialState();
+          this.notifyComponentUpdate?.();
+        }
       }
-    });
+    );
 
     this.eventUnsubscribers.push(
       unsubContext,
@@ -118,7 +134,7 @@ export class GitSyncControlModule implements ControlModule {
 
     if (!this.unregisterSettingsTabCallback) {
       this.unregisterSettingsTabCallback = modApi.registerSettingsTab({
-        id: "git", // ID for the settings tab
+        id: "git",
         title: "Git",
         component: SettingsGit,
         order: 60,

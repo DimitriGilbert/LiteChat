@@ -69,6 +69,8 @@ export function getContextSnapshot(): ReadonlyChatContextSnapshot {
     temperature: sS.temperature,
     maxTokens: sS.maxTokens,
     theme: sS.theme,
+    gitUserName: sS.gitUserName,
+    gitUserEmail: sS.gitUserEmail,
   };
   return Object.freeze(snapshot);
 }

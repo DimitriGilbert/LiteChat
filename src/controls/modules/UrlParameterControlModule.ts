@@ -3,9 +3,9 @@
 import { type ControlModule } from "@/types/litechat/control";
 import {
   type LiteChatModApi,
-  ModMiddlewareHook, // Updated import
+  ModMiddlewareHook,
 } from "@/types/litechat/modding";
-import { promptEvent } from "@/types/litechat/events/prompt.events";
+import { promptStoreEvent } from "@/types/litechat/events/prompt.events";
 import { parseAppUrlParameters } from "@/lib/litechat/url-helpers";
 import { useConversationStore } from "@/store/conversation.store";
 import { useProviderStore } from "@/store/provider.store";
@@ -175,7 +175,9 @@ export class UrlParameterControlModule implements ControlModule {
 
       if (urlParams.query) {
         if (urlParams.submit === "0") {
-          emitter.emit(promptEvent.inputChanged, { value: urlParams.query });
+          emitter.emit(promptStoreEvent.inputChanged, {
+            value: urlParams.query,
+          });
           toast.info("Query from URL loaded into input area.");
           window.history.replaceState(
             {},
@@ -199,7 +201,7 @@ export class UrlParameterControlModule implements ControlModule {
             metadata,
           };
 
-          emitter.emit(promptEvent.submitted, { turnData });
+          emitter.emit(promptStoreEvent.submitted, { turnData });
 
           const middlewareResult = await runMiddleware(
             ModMiddlewareHook.PROMPT_TURN_FINALIZE,

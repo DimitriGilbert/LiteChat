@@ -3,8 +3,8 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { interactionEvent } from "@/types/litechat/events/interaction.events";
-import { rulesEvent } from "@/types/litechat/events/rules.events";
+import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
+import { rulesStoreEvent } from "@/types/litechat/events/rules.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import { RulesControlTrigger } from "@/controls/components/rules/RulesControlTrigger";
 import { SettingsRulesAndTags } from "@/controls/components/rules/SettingsRulesAndTags";
@@ -30,28 +30,24 @@ export class RulesControlModule implements ControlModule {
     this.loadInitialState();
     this.notifyComponentUpdate?.();
 
-    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
-      if (this.isStreaming !== (payload.status === "streaming")) {
-        this.isStreaming = payload.status === "streaming";
-        this.notifyComponentUpdate?.();
+    const unsubStatus = modApi.on(
+      interactionStoreEvent.statusChanged,
+      (payload) => {
+        if (typeof payload === "object" && payload && "status" in payload) {
+          if (this.isStreaming !== (payload.status === "streaming")) {
+            this.isStreaming = payload.status === "streaming";
+            this.notifyComponentUpdate?.();
+          }
+        }
       }
-    });
-    const unsubRulesLoaded = modApi.on(rulesEvent.rulesLoaded, () => {
-      this.updateHasRulesOrTags();
-      this.isLoadingRules = false;
-      this.notifyComponentUpdate?.();
-    });
-    const unsubTagsLoaded = modApi.on(rulesEvent.tagsLoaded, () => {
+    );
+    const unsubRulesLoaded = modApi.on(rulesStoreEvent.dataLoaded, () => {
       this.updateHasRulesOrTags();
       this.isLoadingRules = false;
       this.notifyComponentUpdate?.();
     });
 
-    this.eventUnsubscribers.push(
-      unsubStatus,
-      unsubRulesLoaded,
-      unsubTagsLoaded
-    );
+    this.eventUnsubscribers.push(unsubStatus, unsubRulesLoaded);
     console.log(`[${this.id}] Initialized.`);
   }
 
@@ -74,8 +70,9 @@ export class RulesControlModule implements ControlModule {
 
   public handleTriggerClick = () => {
     if (!this.hasRulesOrTags && this.modApiRef) {
-      this.modApiRef.emit(uiEvent.openSettingsModalRequest, {
-        tabId: "rules-tags",
+      this.modApiRef.emit(uiEvent.openModalRequest, {
+        modalId: "settings",
+        initialTab: "rules-tags",
       });
       return true;
     }

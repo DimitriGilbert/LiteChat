@@ -6,8 +6,8 @@ import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
-// No direct event emissions from this store in this iteration,
-// but if added, they would use the new `rulesEvent` constants.
+import { emitter } from "@/lib/litechat/event-emitter";
+import { rulesStoreEvent } from "@/types/litechat/events/rules.events";
 
 interface RulesState {
   rules: DbRule[];
@@ -66,10 +66,19 @@ export const useRulesStore = create(
           tagRuleLinks: dbLinks,
           isLoading: false,
         });
+        emitter.emit(rulesStoreEvent.dataLoaded, {
+          rules: dbRules,
+          tags: dbTags,
+          links: dbLinks,
+        });
       } catch (e) {
         console.error("RulesStore: Error loading rules and tags", e);
         set({ error: "Failed load rules/tags", isLoading: false });
         toast.error("Failed to load rules and tags.");
+        emitter.emit(rulesStoreEvent.loadingStateChanged, {
+          isLoading: false,
+          error: "Failed load rules/tags",
+        });
       }
     },
 
@@ -89,6 +98,7 @@ export const useRulesStore = create(
       try {
         await PersistenceService.saveRule(newRule);
         toast.success(`Rule "${newRule.name}" added.`);
+        emitter.emit(rulesStoreEvent.ruleSaved, { rule: newRule });
         return newId;
       } catch (e) {
         console.error("RulesStore: Error adding rule", e);
@@ -122,6 +132,7 @@ export const useRulesStore = create(
       try {
         await PersistenceService.saveRule(updatedRuleData);
         toast.success(`Rule "${updatedRuleData.name}" updated.`);
+        emitter.emit(rulesStoreEvent.ruleSaved, { rule: updatedRuleData });
       } catch (e) {
         console.error("RulesStore: Error updating rule", e);
         set((state) => {
@@ -152,6 +163,7 @@ export const useRulesStore = create(
       try {
         await PersistenceService.deleteRule(id);
         toast.success(`Rule "${ruleToDelete.name}" deleted.`);
+        emitter.emit(rulesStoreEvent.ruleDeleted, { ruleId: id });
       } catch (e) {
         console.error("RulesStore: Error deleting rule", e);
         set((state) => {
@@ -181,6 +193,7 @@ export const useRulesStore = create(
       try {
         await PersistenceService.saveTag(newTag);
         toast.success(`Tag "${newTag.name}" added.`);
+        emitter.emit(rulesStoreEvent.tagSaved, { tag: newTag });
         return newId;
       } catch (e) {
         console.error("RulesStore: Error adding tag", e);
@@ -214,6 +227,7 @@ export const useRulesStore = create(
       try {
         await PersistenceService.saveTag(updatedTagData);
         toast.success(`Tag "${updatedTagData.name}" updated.`);
+        emitter.emit(rulesStoreEvent.tagSaved, { tag: updatedTagData });
       } catch (e) {
         console.error("RulesStore: Error updating tag", e);
         set((state) => {
@@ -244,6 +258,7 @@ export const useRulesStore = create(
       try {
         await PersistenceService.deleteTag(id);
         toast.success(`Tag "${tagToDelete.name}" deleted.`);
+        emitter.emit(rulesStoreEvent.tagDeleted, { tagId: id });
       } catch (e) {
         console.error("RulesStore: Error deleting tag", e);
         set((state) => {
@@ -268,6 +283,7 @@ export const useRulesStore = create(
       });
       try {
         await PersistenceService.saveTagRuleLink(newLink);
+        emitter.emit(rulesStoreEvent.linkSaved, { link: newLink });
       } catch (e) {
         console.error("RulesStore: Error linking tag to rule", e);
         set((state) => ({
@@ -289,6 +305,7 @@ export const useRulesStore = create(
       }));
       try {
         await PersistenceService.deleteTagRuleLink(linkId);
+        emitter.emit(rulesStoreEvent.linkDeleted, { linkId });
       } catch (e) {
         console.error("RulesStore: Error unlinking tag from rule", e);
         set((state) => {

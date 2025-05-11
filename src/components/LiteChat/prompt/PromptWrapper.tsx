@@ -19,9 +19,9 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 import { ModMiddlewareHook } from "@/types/litechat/modding";
-import { promptEvent } from "@/types/litechat/events/prompt.events";
+import { promptStoreEvent } from "@/types/litechat/events/prompt.events";
 import type { SidebarItemType } from "@/types/litechat/chat";
-import { usePromptStateStore } from "@/store/prompt.store"; // Added for modelId
+import { usePromptStateStore } from "@/store/prompt.store";
 
 interface PromptWrapperProps {
   InputAreaRenderer: InputAreaRenderer;
@@ -70,8 +70,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   }, [selectedItemId, selectedItemType, inputAreaRef]);
 
   const promptControls = useMemo(() => {
-    // The `show` method is no longer on the PromptControl interface.
-    // Visibility is handled by the control's own trigger/renderer component.
     return Object.values(registeredPromptControls);
   }, [registeredPromptControls]);
 
@@ -114,7 +112,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         metadata.attachedFiles = [...currentAttachedFiles];
       }
 
-      // Ensure modelId from prompt store is included if not already set by a control
       if (!metadata.modelId && currentModelIdFromPromptStore) {
         metadata.modelId = currentModelIdFromPromptStore;
       }
@@ -126,7 +123,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         metadata,
       };
 
-      emitter.emit(promptEvent.submitted, { turnData });
+      emitter.emit(promptStoreEvent.submitted, { turnData });
 
       const middlewareResult = await runMiddleware(
         ModMiddlewareHook.PROMPT_TURN_FINALIZE,
@@ -171,7 +168,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     promptControls,
     onSubmit,
     clearAttachedFiles,
-    currentModelIdFromPromptStore, // Added dependency
+    currentModelIdFromPromptStore,
   ]);
 
   const handleInputValueChange = useCallback((value: string) => {

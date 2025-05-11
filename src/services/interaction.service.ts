@@ -26,8 +26,9 @@ import { z } from "zod";
 import {
   type ToolImplementation,
   ModMiddlewareHook,
+  type ReadonlyChatContextSnapshot,
 } from "@/types/litechat/modding";
-import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
 import {
   type Tool,
   type ToolCallPart,
@@ -38,7 +39,7 @@ import {
   type LanguageModelV1,
   type CoreMessage,
 } from "ai";
-import type { fs as FsType } from "@zenfs/core";
+import type { fs } from "@zenfs/core"; // Corrected import
 
 interface AIServiceCallOptions {
   model: LanguageModelV1;
@@ -60,6 +61,10 @@ interface AIServiceCallOptions {
   maxSteps?: number;
   providerOptions?: Record<string, any>;
 }
+
+type ToolContext = ReadonlyChatContextSnapshot & {
+  fsInstance?: typeof fs; // Corrected type
+};
 
 export const InteractionService = {
   _activeControllers: new Map<string, AbortController>(),
@@ -163,7 +168,7 @@ export const InteractionService = {
       );
     });
 
-    emitter.emit(interactionEvent.started, {
+    emitter.emit(interactionStoreEvent.started, {
       interactionId,
       conversationId,
       type: interactionData.type,
@@ -245,7 +250,7 @@ export const InteractionService = {
                       .getConversationById(currentConvId)
                   : null;
                 const targetVfsKey = conversation?.projectId ?? "orphan";
-                let fsInstance: typeof FsType | undefined;
+                let fsInstance: typeof fs | undefined | null; // Corrected type
                 try {
                   fsInstance = await useVfsStore
                     .getState()
@@ -261,8 +266,12 @@ export const InteractionService = {
                   const parsedArgs = toolInfo.definition.parameters.parse(args);
                   const implementation: ToolImplementation<any> =
                     toolInfo.implementation!;
-                  const contextWithFs = { ...contextSnapshot, fsInstance };
-                  return await implementation(parsedArgs, contextWithFs as any);
+                  const contextWithFs: ToolContext = {
+                    // Use corrected ToolContext
+                    ...contextSnapshot,
+                    fsInstance,
+                  };
+                  return await implementation(parsedArgs, contextWithFs);
                 } catch (e) {
                   const toolError = e instanceof Error ? e.message : String(e);
                   if (e instanceof z.ZodError) {
@@ -391,7 +400,7 @@ export const InteractionService = {
       useInteractionStore
         .getState()
         .appendInteractionResponseChunk(interactionId, processedChunk);
-      emitter.emit(interactionEvent.streamChunk, {
+      emitter.emit(interactionStoreEvent.streamChunk, {
         interactionId,
         chunk: processedChunk,
       });
@@ -630,7 +639,7 @@ export const InteractionService = {
       );
     }
 
-    emitter.emit(interactionEvent.completed, {
+    emitter.emit(interactionStoreEvent.completed, {
       interactionId,
       status: status,
       error: error?.message,

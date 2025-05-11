@@ -3,10 +3,10 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { interactionEvent } from "@/types/litechat/events/interaction.events";
-import { providerEvent } from "@/types/litechat/events/provider.events";
+import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
+import { providerStoreEvent } from "@/types/litechat/events/provider.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
-import { settingsEvent } from "@/types/litechat/events/settings.events";
+import { settingsStoreEvent } from "@/types/litechat/events/settings.events";
 import { ToolSelectorTrigger } from "@/controls/components/tool-selector/ToolSelectorTrigger";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useProviderStore } from "@/store/provider.store";
@@ -37,16 +37,24 @@ export class ToolSelectorControlModule implements ControlModule {
     this.updateVisibility();
     this.notifyComponentUpdate?.();
 
-    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
-      if (this.isStreaming !== (payload.status === "streaming")) {
-        this.isStreaming = payload.status === "streaming";
+    const unsubStatus = modApi.on(
+      interactionStoreEvent.statusChanged,
+      (payload) => {
+        if (typeof payload === "object" && payload && "status" in payload) {
+          if (this.isStreaming !== (payload.status === "streaming")) {
+            this.isStreaming = payload.status === "streaming";
+            this.notifyComponentUpdate?.();
+          }
+        }
+      }
+    );
+    const unsubModel = modApi.on(
+      providerStoreEvent.selectedModelChanged,
+      () => {
+        this.updateVisibility();
         this.notifyComponentUpdate?.();
       }
-    });
-    const unsubModel = modApi.on(providerEvent.modelSelectionChanged, () => {
-      this.updateVisibility();
-      this.notifyComponentUpdate?.();
-    });
+    );
     const unsubContext = modApi.on(uiEvent.contextChanged, (payload) => {
       this.selectedItemId = payload.selectedItemId;
       this.selectedItemType = payload.selectedItemType;
@@ -54,14 +62,15 @@ export class ToolSelectorControlModule implements ControlModule {
       this.notifyComponentUpdate?.();
     });
     const unsubSettings = modApi.on(
-      settingsEvent.toolMaxStepsChanged,
+      settingsStoreEvent.toolMaxStepsChanged,
       (payload) => {
-        this.globalDefaultMaxSteps = payload.steps;
-        this.notifyComponentUpdate?.();
+        if (typeof payload === "object" && payload && "steps" in payload) {
+          this.globalDefaultMaxSteps = payload.steps;
+          this.notifyComponentUpdate?.();
+        }
       }
     );
 
-    // Corrected subscribe usage: listener gets full state, compare slice internally.
     const controlStoreUnsubscribe = useControlRegistryStore.subscribe(
       (currentState, previousState) => {
         const currentTools = currentState.tools;

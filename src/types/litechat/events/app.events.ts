@@ -1,5 +1,7 @@
 // src/types/litechat/events/app.events.ts
-// NEW FILE
+// FULL FILE
 export const appEvent = {
   loaded: "app.loaded",
+  errorBoundaryTriggered: "app.error.boundary.triggered",
+  initializationPhaseCompleted: "app.initialization.phase.completed",
 } as const;

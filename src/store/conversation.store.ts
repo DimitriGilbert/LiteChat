@@ -17,14 +17,13 @@ import {
 import { ImportExportService } from "@/services/import-export.service";
 import { SYNC_VFS_KEY } from "@/lib/litechat/constants";
 import { useVfsStore } from "./vfs.store";
-import type { fs as FsType } from "@zenfs/core";
+import type { fs } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { useProjectStore } from "./project.store";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { conversationEvent } from "@/types/litechat/events/conversation.events";
-import { projectEvent } from "@/types/litechat/events/project.events";
-import { syncEvent } from "@/types/litechat/events/sync.events";
-import { uiEvent } from "@/types/litechat/events/ui.events";
+import { conversationStoreEvent } from "@/types/litechat/events/conversation.events";
+import { syncStoreEvent } from "@/types/litechat/events/sync.events";
+// Removed unused projectStoreEvent and uiEvent
 
 export type SidebarItem =
   | (Conversation & { itemType: "conversation" })
@@ -90,7 +89,7 @@ interface ConversationActions {
     enabledTools?: string[];
     toolMaxStepsOverride?: number | null;
   }) => Promise<void>;
-  _ensureSyncVfsReady: () => Promise<typeof FsType>;
+  _ensureSyncVfsReady: () => Promise<typeof fs>;
   _unlinkConversationsFromProjects: (projectIds: string[]) => void;
 }
 
@@ -164,9 +163,20 @@ export const useConversationStore = create(
           repoInitializationStatus: {},
           isLoading: false,
         });
+        emitter.emit(conversationStoreEvent.sidebarItemsLoaded, {
+          conversations: dbConvos,
+          projects: useProjectStore.getState().projects,
+        });
+        emitter.emit(conversationStoreEvent.syncReposLoaded, {
+          repos: dbSyncRepos,
+        });
       } catch (e) {
         console.error("ConversationStore: Error loading sidebar items", e);
         set({ error: "Failed load sidebar items", isLoading: false });
+        emitter.emit(conversationStoreEvent.loadingStateChanged, {
+          isLoading: false,
+          error: "Failed load sidebar items",
+        });
       }
     },
 
@@ -199,7 +209,7 @@ export const useConversationStore = create(
         const conversationToSave = get().getConversationById(newId);
         if (conversationToSave) {
           await PersistenceService.saveConversation(conversationToSave);
-          emitter.emit(conversationEvent.added, {
+          emitter.emit(conversationStoreEvent.conversationAdded, {
             conversation: conversationToSave,
           });
         } else {
@@ -275,7 +285,7 @@ export const useConversationStore = create(
         try {
           const plainData = JSON.parse(JSON.stringify(updatedConversationData));
           await PersistenceService.saveConversation(plainData);
-          emitter.emit(conversationEvent.updated, {
+          emitter.emit(conversationStoreEvent.conversationUpdated, {
             conversationId: id,
             updates: updates,
           });
@@ -358,17 +368,18 @@ export const useConversationStore = create(
       try {
         await PersistenceService.deleteConversation(id);
         await PersistenceService.deleteInteractionsForConversation(id);
-        emitter.emit(conversationEvent.deleted, { conversationId: id });
+        emitter.emit(conversationStoreEvent.conversationDeleted, {
+          conversationId: id,
+        });
 
         if (
           currentSelectedId === id &&
           currentSelectedType === "conversation"
         ) {
-          // Explicitly set to null before emitting context change
           await useInteractionStore.getState().setCurrentConversationId(null);
-          emitter.emit(uiEvent.contextChanged, {
-            selectedItemId: null,
-            selectedItemType: null,
+          emitter.emit(conversationStoreEvent.selectedItemChanged, {
+            itemId: null,
+            itemType: null,
           });
         }
       } catch (e) {
@@ -408,7 +419,6 @@ export const useConversationStore = create(
       const currentSelId = get().selectedItemId;
       const currentSelType = get().selectedItemType;
 
-      // If already selected, do nothing.
       if (currentSelId === id && currentSelType === type) {
         console.log(
           `ConversationStore: Item ${id} (${type}) already selected.`
@@ -420,35 +430,22 @@ export const useConversationStore = create(
         `ConversationStore: Selecting item. ID: ${id}, Type: ${type}. Previous: ${currentSelId} (${currentSelType})`
       );
 
-      // Update the store's selection state
       set({ selectedItemId: id, selectedItemType: type });
 
-      // Determine the conversation ID to pass to InteractionStore
       const conversationIdForInteractionStore =
         type === "conversation" ? id : null;
 
       console.log(
         `ConversationStore: Calling InteractionStore.setCurrentConversationId with: ${conversationIdForInteractionStore}`
       );
-      // Update InteractionStore's current conversation ID
       await useInteractionStore
         .getState()
         .setCurrentConversationId(conversationIdForInteractionStore);
 
-      // Emit events after all state updates
-      emitter.emit(uiEvent.contextChanged, {
-        selectedItemId: id,
-        selectedItemType: type,
+      emitter.emit(conversationStoreEvent.selectedItemChanged, {
+        itemId: id,
+        itemType: type,
       });
-      if (type === "conversation") {
-        emitter.emit(conversationEvent.selected, { conversationId: id });
-      } else if (type === "project") {
-        emitter.emit(projectEvent.selected, { projectId: id });
-      } else {
-        // This case handles deselecting or selecting null
-        emitter.emit(conversationEvent.selected, { conversationId: null });
-        emitter.emit(projectEvent.selected, { projectId: null });
-      }
     },
 
     importConversation: async (file) => {
@@ -474,9 +471,14 @@ export const useConversationStore = create(
       try {
         const repos = await PersistenceService.loadSyncRepos();
         set({ syncRepos: repos, isLoading: false });
+        emitter.emit(conversationStoreEvent.syncReposLoaded, { repos });
       } catch (e) {
         console.error("ConversationStore: Error loading sync repos", e);
         set({ error: "Failed load sync repositories", isLoading: false });
+        emitter.emit(conversationStoreEvent.loadingStateChanged, {
+          isLoading: false,
+          error: "Failed load sync repositories",
+        });
       }
     },
 
@@ -501,7 +503,7 @@ export const useConversationStore = create(
         if (repoToSave) {
           const plainData = JSON.parse(JSON.stringify(repoToSave));
           await PersistenceService.saveSyncRepo(plainData);
-          emitter.emit(syncEvent.repoChanged, {
+          emitter.emit(syncStoreEvent.repoChanged, {
             repoId: newId,
             action: "added",
           });
@@ -544,7 +546,7 @@ export const useConversationStore = create(
         try {
           const plainData = JSON.parse(JSON.stringify(repoToSave));
           await PersistenceService.saveSyncRepo(plainData);
-          emitter.emit(syncEvent.repoChanged, {
+          emitter.emit(syncStoreEvent.repoChanged, {
             repoId: id,
             action: "updated",
           });
@@ -580,7 +582,7 @@ export const useConversationStore = create(
 
       const repoDir = normalizePath(`${SYNC_REPO_BASE_DIR}/${id}`);
 
-      let fsInstance: typeof FsType | undefined;
+      let fsInstance: typeof fs | undefined;
       try {
         fsInstance = await get()._ensureSyncVfsReady();
       } catch (fsError) {
@@ -598,7 +600,7 @@ export const useConversationStore = create(
 
       try {
         await PersistenceService.deleteSyncRepo(id);
-        emitter.emit(syncEvent.repoChanged, {
+        emitter.emit(syncStoreEvent.repoChanged, {
           repoId: id,
           action: "deleted",
         });
@@ -654,7 +656,7 @@ export const useConversationStore = create(
           console.error(`Sync error for ${conversationId}: ${error}`);
         }
       });
-      emitter.emit(conversationEvent.syncStatusChanged, {
+      emitter.emit(conversationStoreEvent.conversationSyncStatusChanged, {
         conversationId,
         status,
       });
@@ -664,7 +666,7 @@ export const useConversationStore = create(
       set((state) => {
         state.repoInitializationStatus[repoId] = status;
       });
-      emitter.emit(syncEvent.repoInitStatusChanged, { repoId, status });
+      emitter.emit(syncStoreEvent.repoInitStatusChanged, { repoId, status });
     },
 
     initializeOrSyncRepo: async (repoId) => {
@@ -673,7 +675,7 @@ export const useConversationStore = create(
         toast.error("Sync repsitory configuration not found.");
         return;
       }
-      let fsInstance: typeof FsType;
+      let fsInstance: typeof fs;
       try {
         fsInstance = await get()._ensureSyncVfsReady();
       } catch (fsError) {
@@ -710,7 +712,7 @@ export const useConversationStore = create(
         return;
       }
 
-      let fsInstance: typeof FsType | undefined;
+      let fsInstance: typeof fs | undefined;
       try {
         fsInstance = await get()._ensureSyncVfsReady();
       } catch (fsError) {

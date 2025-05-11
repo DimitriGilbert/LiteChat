@@ -4,10 +4,10 @@ import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { interactionEvent } from "@/types/litechat/events/interaction.events";
-import { settingsEvent } from "@/types/litechat/events/settings.events";
-import { providerEvent } from "@/types/litechat/events/provider.events";
-import { promptEvent } from "@/types/litechat/events/prompt.events";
+import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
+import { settingsStoreEvent } from "@/types/litechat/events/settings.events";
+import { providerStoreEvent } from "@/types/litechat/events/provider.events";
+import { promptStoreEvent } from "@/types/litechat/events/prompt.events";
 import { ParameterControlTrigger } from "@/controls/components/parameter/ParameterControlTrigger";
 import { useSettingsStore } from "@/store/settings.store";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -46,65 +46,73 @@ export class ParameterControlModule implements ControlModule {
     this.loadInitialState();
     this.updateSupportedParams();
 
-    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
-      if (this.isStreaming !== (payload.status === "streaming")) {
-        this.isStreaming = payload.status === "streaming";
+    const unsubStatus = modApi.on(
+      interactionStoreEvent.statusChanged,
+      (payload) => {
+        if (typeof payload === "object" && payload && "status" in payload) {
+          if (this.isStreaming !== (payload.status === "streaming")) {
+            this.isStreaming = payload.status === "streaming";
+            this.notifyComponentUpdate?.();
+          }
+        }
+      }
+    );
+    const unsubModel = modApi.on(
+      providerStoreEvent.selectedModelChanged,
+      () => {
+        this.updateSupportedParams();
+        this.updateVisibility();
         this.notifyComponentUpdate?.();
       }
-    });
-    const unsubModel = modApi.on(providerEvent.modelSelectionChanged, () => {
-      this.updateSupportedParams();
-      this.updateVisibility();
-      this.notifyComponentUpdate?.();
-    });
+    );
     const unsubSettings = modApi.on(
-      settingsEvent.enableAdvancedSettingsChanged,
+      settingsStoreEvent.enableAdvancedSettingsChanged,
       () => {
         this.updateVisibility();
         this.notifyComponentUpdate?.();
       }
     );
     const unsubPromptParams = modApi.on(
-      promptEvent.paramsChanged,
+      promptStoreEvent.parameterChanged,
       (payload) => {
-        let changed = false;
-        if (
-          "temperature" in payload.params &&
-          this.temperature !== payload.params.temperature
-        ) {
-          this.temperature = payload.params.temperature ?? null;
-          changed = true;
+        if (typeof payload === "object" && payload && "params" in payload) {
+          const params = payload.params;
+          let changed = false;
+          if (
+            "temperature" in params &&
+            this.temperature !== params.temperature
+          ) {
+            this.temperature = params.temperature ?? null;
+            changed = true;
+          }
+          if ("topP" in params && this.topP !== params.topP) {
+            this.topP = params.topP ?? null;
+            changed = true;
+          }
+          if ("maxTokens" in params && this.maxTokens !== params.maxTokens) {
+            this.maxTokens = params.maxTokens ?? null;
+            changed = true;
+          }
+          if ("topK" in params && this.topK !== params.topK) {
+            this.topK = params.topK ?? null;
+            changed = true;
+          }
+          if (
+            "presencePenalty" in params &&
+            this.presencePenalty !== params.presencePenalty
+          ) {
+            this.presencePenalty = params.presencePenalty ?? null;
+            changed = true;
+          }
+          if (
+            "frequencyPenalty" in params &&
+            this.frequencyPenalty !== params.frequencyPenalty
+          ) {
+            this.frequencyPenalty = params.frequencyPenalty ?? null;
+            changed = true;
+          }
+          if (changed) this.notifyComponentUpdate?.();
         }
-        if ("topP" in payload.params && this.topP !== payload.params.topP) {
-          this.topP = payload.params.topP ?? null;
-          changed = true;
-        }
-        if (
-          "maxTokens" in payload.params &&
-          this.maxTokens !== payload.params.maxTokens
-        ) {
-          this.maxTokens = payload.params.maxTokens ?? null;
-          changed = true;
-        }
-        if ("topK" in payload.params && this.topK !== payload.params.topK) {
-          this.topK = payload.params.topK ?? null;
-          changed = true;
-        }
-        if (
-          "presencePenalty" in payload.params &&
-          this.presencePenalty !== payload.params.presencePenalty
-        ) {
-          this.presencePenalty = payload.params.presencePenalty ?? null;
-          changed = true;
-        }
-        if (
-          "frequencyPenalty" in payload.params &&
-          this.frequencyPenalty !== payload.params.frequencyPenalty
-        ) {
-          this.frequencyPenalty = payload.params.frequencyPenalty ?? null;
-          changed = true;
-        }
-        if (changed) this.notifyComponentUpdate?.();
       }
     );
 
@@ -248,7 +256,6 @@ export class ParameterControlModule implements ControlModule {
         addParam("frequency_penalty", this.frequencyPenalty);
         return Object.keys(params).length > 0 ? params : undefined;
       },
-      // show method removed, visibility handled by ParameterControlTrigger
     });
     console.log(`[${this.id}] Registered.`);
   }

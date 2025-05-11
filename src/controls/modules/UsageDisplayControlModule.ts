@@ -3,10 +3,10 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { promptEvent } from "@/types/litechat/events/prompt.events";
-import { inputEvent } from "@/types/litechat/events/input.events";
-import { providerEvent } from "@/types/litechat/events/provider.events";
-import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { promptStoreEvent } from "@/types/litechat/events/prompt.events";
+import { inputStoreEvent } from "@/types/litechat/events/input.events";
+import { providerStoreEvent } from "@/types/litechat/events/provider.events";
+import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import { UsageDisplayControl } from "@/controls/components/usage-display/UsageDisplayControl";
 import { useProviderStore } from "@/store/provider.store";
@@ -53,24 +53,33 @@ export class UsageDisplayControlModule implements ControlModule {
     this.loadInitialState();
     this.updateContextLength();
 
-    const unsubInput = modApi.on(promptEvent.inputChanged, (payload) => {
-      this.currentInputText = payload.value;
-      this.notifyComponentUpdate?.();
-    });
-    const unsubFiles = modApi.on(inputEvent.attachedFilesChanged, (payload) => {
-      this.attachedFiles = payload.files;
-      this.notifyComponentUpdate?.();
-    });
-    const unsubModel = modApi.on(
-      providerEvent.modelSelectionChanged,
-      (payload) => {
-        this.selectedModelId = payload.modelId;
-        this.updateContextLength();
+    const unsubInput = modApi.on(promptStoreEvent.inputChanged, (payload) => {
+      if (typeof payload === "object" && payload && "value" in payload) {
+        this.currentInputText = payload.value;
         this.notifyComponentUpdate?.();
+      }
+    });
+    const unsubFiles = modApi.on(
+      inputStoreEvent.attachedFilesChanged,
+      (payload) => {
+        if (typeof payload === "object" && payload && "files" in payload) {
+          this.attachedFiles = payload.files;
+          this.notifyComponentUpdate?.();
+        }
+      }
+    );
+    const unsubModel = modApi.on(
+      providerStoreEvent.selectedModelChanged,
+      (payload) => {
+        if (typeof payload === "object" && payload && "modelId" in payload) {
+          this.selectedModelId = payload.modelId;
+          this.updateContextLength();
+          this.notifyComponentUpdate?.();
+        }
       }
     );
     const unsubInteractionComplete = modApi.on(
-      interactionEvent.completed,
+      interactionStoreEvent.completed,
       () => {
         this.updateHistoryTokens();
         this.notifyComponentUpdate?.();
@@ -180,7 +189,6 @@ export class UsageDisplayControlModule implements ControlModule {
       status: () => "ready",
       triggerRenderer: () =>
         React.createElement(UsageDisplayControl, { module: this }),
-      // show method removed, visibility handled by UsageDisplayControl
     });
     console.log(`[${this.id}] Registered.`);
   }

@@ -31,8 +31,13 @@ import type {
   ControlModuleConstructor,
 } from "@/types/litechat/control";
 import { createModApi } from "@/modding/api-factory";
-import { useVfsStore } from "@/store/vfs.store"; // For VFS key logic
+import { useVfsStore } from "@/store/vfs.store";
 import type { SidebarItemType } from "@/types/litechat/chat";
+import { EventActionCoordinatorService } from "@/services/event-action-coordinator.service";
+import { ModalManager } from "@/components/LiteChat/common/ModalManager";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { promptStoreEvent } from "@/types/litechat/events/prompt.events";
+import { vfsStoreEvent } from "@/types/litechat/events/vfs.events";
 
 let initializedControlModules: ControlModule[] = [];
 let appInitializationPromise: Promise<ControlModule[]> | null = null;
@@ -70,33 +75,14 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       status: state.status,
     }))
   );
-  const {
-    globalError,
-    isSidebarCollapsed,
-    isChatControlPanelOpen,
-    isProjectSettingsModalOpen,
-    isVfsModalOpen,
-  } = useUIStateStore(
+  const { globalError, isSidebarCollapsed } = useUIStateStore(
     useShallow((state) => ({
       globalError: state.globalError,
       isSidebarCollapsed: state.isSidebarCollapsed,
-      isChatControlPanelOpen: state.isChatControlPanelOpen,
-      isProjectSettingsModalOpen: state.isProjectSettingsModalOpen,
-      isVfsModalOpen: state.isVfsModalOpen,
     }))
   );
   const chatControls = useControlRegistryStore(
     useShallow((state) => Object.values(state.chatControls))
-  );
-  const { initializePromptState } = usePromptStateStore(
-    useShallow((state) => ({
-      initializePromptState: state.initializePromptState,
-    }))
-  );
-  const { setVfsKey } = useVfsStore(
-    useShallow((state) => ({
-      setVfsKey: state.setVfsKey,
-    }))
   );
 
   const toggleMobileSidebar = useCallback(() => {
@@ -119,6 +105,8 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       loadOrder: -1000,
       createdAt: new Date(),
     });
+
+    EventActionCoordinatorService.initialize();
 
     const initializeApp = async () => {
       if (hasInitializedSuccessfully) {
@@ -174,7 +162,9 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       }
 
       const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
-      initializePromptState(effectiveSettings);
+      emitter.emit(promptStoreEvent.initializePromptStateRequest, {
+        effectiveSettings,
+      });
       prevContextRef.current = currentContext;
     }
   }, [
@@ -182,7 +172,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     selectedItemType,
     getConversationByIdFromStore,
     getEffectiveProjectSettings,
-    initializePromptState,
     isInitializing,
   ]);
 
@@ -190,6 +179,9 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     if (isInitializing || !hasInitializedSuccessfully) return;
 
     let targetVfsKey: string | null = null;
+    const isVfsModalOpen =
+      useUIStateStore.getState().isChatControlPanelOpen["core-vfs-modal-panel"];
+
     if (isVfsModalOpen || selectedItemType === "project") {
       if (selectedItemType === "project") {
         targetVfsKey = selectedItemId;
@@ -205,15 +197,14 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     }
 
     if (useVfsStore.getState().vfsKey !== targetVfsKey) {
-      setVfsKey(targetVfsKey);
+      emitter.emit(vfsStoreEvent.setVfsKeyRequest, { key: targetVfsKey });
     }
   }, [
-    isVfsModalOpen,
     selectedItemId,
     selectedItemType,
-    setVfsKey,
     getConversationByIdFromStore,
     isInitializing,
+    useUIStateStore.getState().isChatControlPanelOpen["core-vfs-modal-panel"],
   ]);
 
   const handlePromptSubmit = useCallback(async (turnData: PromptTurnObject) => {
@@ -233,10 +224,11 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
 
     if (!currentConvId) {
       try {
-        const newId = await conversationState.addConversation({
+        const newConvPayload = {
           title: "New Chat",
           projectId: currentProjectId,
-        });
+        };
+        const newId = await conversationState.addConversation(newConvPayload);
         await conversationState.selectItem(newId, "conversation");
         currentConvId = useConversationStore.getState().selectedItemId;
       } catch (error) {
@@ -298,23 +290,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     [chatControls]
   );
 
-  const settingsModalRenderer = useMemo(
-    () =>
-      chatControls.find((c) => c.id === "core-settings-trigger")
-        ?.settingsRenderer,
-    [chatControls]
-  );
-  const projectSettingsModalRenderer = useMemo(
-    () =>
-      chatControls.find((c) => c.id === "core-project-settings-trigger")
-        ?.settingsRenderer,
-    [chatControls]
-  );
-  const vfsModalRenderer = useMemo(
-    () => chatControls.find((c) => c.id === "core-vfs-modal-panel")?.renderer,
-    [chatControls]
-  );
-
   const currentConversationIdForCanvas =
     selectedItemType === "conversation" ? selectedItemId : null;
 
@@ -333,6 +308,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
 
   return (
     <>
+      <ModalManager />
       <div className="flex h-full w-full border border-border rounded-lg overflow-hidden bg-background text-foreground">
         <div
           className={cn(
@@ -460,15 +436,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
           />
         </div>
       </div>
-
-      {isChatControlPanelOpen["settingsModal"] &&
-        settingsModalRenderer &&
-        settingsModalRenderer()}
-      {isProjectSettingsModalOpen &&
-        projectSettingsModalRenderer &&
-        projectSettingsModalRenderer()}
-      {isVfsModalOpen && vfsModalRenderer && vfsModalRenderer()}
-
       <Toaster richColors position="bottom-right" closeButton />
     </>
   );

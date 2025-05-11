@@ -3,9 +3,9 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { interactionEvent } from "@/types/litechat/events/interaction.events";
-import { providerEvent } from "@/types/litechat/events/provider.events";
-import { promptEvent } from "@/types/litechat/events/prompt.events";
+import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
+import { providerStoreEvent } from "@/types/litechat/events/provider.events";
+import { promptStoreEvent } from "@/types/litechat/events/prompt.events";
 import { WebSearchControlTrigger } from "@/controls/components/web-search/WebSearchControlTrigger";
 import { useProviderStore } from "@/store/provider.store";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -25,27 +25,38 @@ export class WebSearchControlModule implements ControlModule {
     this.webSearchEnabled = usePromptStateStore.getState().webSearchEnabled;
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.updateVisibility();
-    this.notifyComponentUpdate?.(); // Notify after initial visibility update
+    this.notifyComponentUpdate?.();
 
-    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
-      if (this.isStreaming !== (payload.status === "streaming")) {
-        this.isStreaming = payload.status === "streaming";
+    const unsubStatus = modApi.on(
+      interactionStoreEvent.statusChanged,
+      (payload) => {
+        if (typeof payload === "object" && payload && "status" in payload) {
+          if (this.isStreaming !== (payload.status === "streaming")) {
+            this.isStreaming = payload.status === "streaming";
+            this.notifyComponentUpdate?.();
+          }
+        }
+      }
+    );
+    const unsubModel = modApi.on(
+      providerStoreEvent.selectedModelChanged,
+      () => {
+        this.updateVisibility();
         this.notifyComponentUpdate?.();
       }
-    });
-    const unsubModel = modApi.on(providerEvent.modelSelectionChanged, () => {
-      this.updateVisibility();
-      this.notifyComponentUpdate?.();
-    });
+    );
     const unsubPromptParams = modApi.on(
-      promptEvent.paramsChanged,
+      promptStoreEvent.parameterChanged,
       (payload) => {
-        if (
-          "webSearchEnabled" in payload.params &&
-          this.webSearchEnabled !== payload.params.webSearchEnabled
-        ) {
-          this.webSearchEnabled = payload.params.webSearchEnabled ?? null;
-          this.notifyComponentUpdate?.();
+        if (typeof payload === "object" && payload && "params" in payload) {
+          const params = payload.params;
+          if (
+            "webSearchEnabled" in params &&
+            this.webSearchEnabled !== params.webSearchEnabled
+          ) {
+            this.webSearchEnabled = params.webSearchEnabled ?? null;
+            this.notifyComponentUpdate?.();
+          }
         }
       }
     );

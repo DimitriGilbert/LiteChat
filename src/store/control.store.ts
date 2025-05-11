@@ -1,89 +1,35 @@
 // src/store/control.store.ts
+// FULL FILE
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import type { PromptControl } from "@/types/litechat/prompt";
-import type { ChatControl } from "@/types/litechat/chat";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { controlRegistryStoreEvent } from "@/types/litechat/events/control.registry.events";
 import type {
-  ModMiddlewareHookName,
-  ModMiddlewarePayloadMap,
-  ModMiddlewareReturnMap,
-  ToolImplementation,
-} from "@/types/litechat/modding";
-import { Tool } from "ai";
-import type { z } from "zod";
-
-interface RegisteredMiddleware<H extends ModMiddlewareHookName> {
-  modId: string;
-  callback: (
-    payload: ModMiddlewarePayloadMap[H],
-  ) => ModMiddlewareReturnMap[H] | Promise<ModMiddlewareReturnMap[H]>;
-  order?: number;
-}
-
-type MiddlewareRegistry = {
-  [H in ModMiddlewareHookName]?: RegisteredMiddleware<H>[];
-};
-
-interface ControlState {
-  promptControls: Record<string, PromptControl>;
-  chatControls: Record<string, ChatControl>;
-  middlewareRegistry: MiddlewareRegistry;
-  tools: Record<
-    string,
-    {
-      definition: Tool<any>;
-      implementation?: ToolImplementation<any>;
-      modId: string;
-    }
-  >;
-}
-
-interface ControlActions {
-  registerPromptControl: (control: PromptControl) => () => void;
-  unregisterPromptControl: (id: string) => void;
-  registerChatControl: (control: ChatControl) => () => void;
-  unregisterChatControl: (id: string) => void;
-  registerMiddleware: <H extends ModMiddlewareHookName>(
-    hookName: H,
-    modId: string,
-    callback: RegisteredMiddleware<H>["callback"],
-    order?: number,
-  ) => () => void;
-  unregisterMiddleware: <H extends ModMiddlewareHookName>(
-    hookName: H,
-    modId: string,
-    callback: RegisteredMiddleware<H>["callback"],
-  ) => void;
-  getMiddlewareForHook: <H extends ModMiddlewareHookName>(
-    hookName: H,
-  ) => ReadonlyArray<RegisteredMiddleware<H>>;
-  registerTool: <P extends z.ZodSchema<any>>(
-    modId: string,
-    toolName: string,
-    definition: Tool<P>,
-    implementation?: ToolImplementation<P>,
-  ) => () => void;
-  unregisterTool: (toolName: string) => void;
-  getRegisteredTools: () => Readonly<ControlState["tools"]>
-}
+  ControlState as ControlStateInterface, // Import the interface
+  ControlActions as ControlActionsInterface, // Import the interface
+} from "@/types/litechat/control"; // Import interfaces from types
 
 export const useControlRegistryStore = create(
-  immer<ControlState & ControlActions>((set, get) => ({
+  immer<ControlStateInterface & ControlActionsInterface>((set, get) => ({
     // Initial State
     promptControls: {},
     chatControls: {},
     middlewareRegistry: {},
     tools: {},
+    modalProviders: {}, // Initialize modalProviders
 
     // Actions
     registerPromptControl: (control) => {
       set((state) => {
         if (state.promptControls[control.id]) {
           console.warn(
-            `ControlRegistryStore: PromptControl with ID "${control.id}" already registered. Overwriting.`,
+            `ControlRegistryStore: PromptControl with ID "${control.id}" already registered. Overwriting.`
           );
         }
         state.promptControls[control.id] = control;
+      });
+      emitter.emit(controlRegistryStoreEvent.promptControlsChanged, {
+        controls: get().promptControls,
       });
       return () => get().unregisterPromptControl(control.id);
     },
@@ -94,9 +40,12 @@ export const useControlRegistryStore = create(
           delete state.promptControls[id];
         } else {
           console.warn(
-            `ControlRegistryStore: PromptControl with ID "${id}" not found for unregistration.`,
+            `ControlRegistryStore: PromptControl with ID "${id}" not found for unregistration.`
           );
         }
+      });
+      emitter.emit(controlRegistryStoreEvent.promptControlsChanged, {
+        controls: get().promptControls,
       });
     },
 
@@ -104,10 +53,13 @@ export const useControlRegistryStore = create(
       set((state) => {
         if (state.chatControls[control.id]) {
           console.warn(
-            `ControlRegistryStore: ChatControl with ID "${control.id}" already registered. Overwriting.`,
+            `ControlRegistryStore: ChatControl with ID "${control.id}" already registered. Overwriting.`
           );
         }
         state.chatControls[control.id] = control;
+      });
+      emitter.emit(controlRegistryStoreEvent.chatControlsChanged, {
+        controls: get().chatControls,
       });
       return () => get().unregisterChatControl(control.id);
     },
@@ -118,14 +70,18 @@ export const useControlRegistryStore = create(
           delete state.chatControls[id];
         } else {
           console.warn(
-            `ControlRegistryStore: ChatControl with ID "${id}" not found for unregistration.`,
+            `ControlRegistryStore: ChatControl with ID "${id}" not found for unregistration.`
           );
         }
+      });
+      emitter.emit(controlRegistryStoreEvent.chatControlsChanged, {
+        controls: get().chatControls,
       });
     },
 
     registerMiddleware: (hookName, modId, callback, order = 0) => {
-      const registration: RegisteredMiddleware<any> = {
+      const registration: any = {
+        // Use any for RegisteredMiddleware<any>
         modId,
         callback,
         order,
@@ -134,12 +90,13 @@ export const useControlRegistryStore = create(
         if (!state.middlewareRegistry[hookName]) {
           state.middlewareRegistry[hookName] = [];
         }
-        (
-          state.middlewareRegistry[hookName] as RegisteredMiddleware<any>[]
-        ).push(registration);
-        (
-          state.middlewareRegistry[hookName] as RegisteredMiddleware<any>[]
-        ).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        (state.middlewareRegistry[hookName] as any[]).push(registration); // Use any[]
+        (state.middlewareRegistry[hookName] as any[]).sort(
+          (a, b) => (a.order ?? 0) - (b.order ?? 0)
+        );
+      });
+      emitter.emit(controlRegistryStoreEvent.middlewareChanged, {
+        middleware: get().middlewareRegistry,
       });
       return () => get().unregisterMiddleware(hookName, modId, callback);
     },
@@ -148,28 +105,32 @@ export const useControlRegistryStore = create(
       set((state) => {
         if (state.middlewareRegistry[hookName]) {
           state.middlewareRegistry[hookName] = (
-            state.middlewareRegistry[hookName] as RegisteredMiddleware<any>[]
-          ).filter(
-            (reg) => !(reg.modId === modId && reg.callback === callback),
-          );
+            state.middlewareRegistry[hookName] as any[]
+          ) // Use any[]
+            .filter(
+              (reg) => !(reg.modId === modId && reg.callback === callback)
+            );
           if (state.middlewareRegistry[hookName]?.length === 0) {
             delete state.middlewareRegistry[hookName];
           }
         } else {
           console.warn(
-            `ControlRegistryStore: Middleware hook "${hookName}" not found for unregistration.`,
+            `ControlRegistryStore: Middleware hook "${hookName}" not found for unregistration.`
           );
         }
+      });
+      emitter.emit(controlRegistryStoreEvent.middlewareChanged, {
+        middleware: get().middlewareRegistry,
       });
     },
 
     getMiddlewareForHook: (hookName) => {
       const middleware = get().middlewareRegistry[hookName] ?? [];
-      // Return a frozen copy to prevent mutation
       return Object.freeze(
-        [...(middleware as RegisteredMiddleware<any>[])].sort(
-          (a, b) => (a.order ?? 0) - (b.order ?? 0),
-        ),
+        [...(middleware as any[])].sort(
+          // Use any[]
+          (a, b) => (a.order ?? 0) - (b.order ?? 0)
+        )
       );
     },
 
@@ -177,10 +138,13 @@ export const useControlRegistryStore = create(
       set((state) => {
         if (state.tools[toolName]) {
           console.warn(
-            `ControlRegistryStore: Tool "${toolName}" already registered by mod "${state.tools[toolName].modId}". Overwriting with registration from mod "${modId}".`,
+            `ControlRegistryStore: Tool "${toolName}" already registered by mod "${state.tools[toolName].modId}". Overwriting with registration from mod "${modId}".`
           );
         }
         state.tools[toolName] = { definition, implementation, modId };
+      });
+      emitter.emit(controlRegistryStoreEvent.toolsChanged, {
+        tools: get().tools,
       });
       return () => get().unregisterTool(toolName);
     },
@@ -191,16 +155,47 @@ export const useControlRegistryStore = create(
           delete state.tools[toolName];
         } else {
           console.warn(
-            `ControlRegistryStore: Tool "${toolName}" not found for unregistration.`,
+            `ControlRegistryStore: Tool "${toolName}" not found for unregistration.`
           );
         }
       });
+      emitter.emit(controlRegistryStoreEvent.toolsChanged, {
+        tools: get().tools,
+      });
     },
 
-    // Correctly implement and return getRegisteredTools
     getRegisteredTools: () => {
-      // Return a frozen shallow copy
       return Object.freeze({ ...get().tools });
     },
-  })),
+
+    registerModalProvider: (modalId, provider) => {
+      set((state) => {
+        if (state.modalProviders[modalId]) {
+          console.warn(
+            `ControlRegistryStore: ModalProvider with ID "${modalId}" already registered. Overwriting.`
+          );
+        }
+        state.modalProviders[modalId] = provider;
+      });
+      emitter.emit(controlRegistryStoreEvent.modalProvidersChanged, {
+        providers: get().modalProviders,
+      });
+      return () => get().unregisterModalProvider(modalId);
+    },
+
+    unregisterModalProvider: (modalId) => {
+      set((state) => {
+        if (state.modalProviders[modalId]) {
+          delete state.modalProviders[modalId];
+        } else {
+          console.warn(
+            `ControlRegistryStore: ModalProvider with ID "${modalId}" not found for unregistration.`
+          );
+        }
+      });
+      emitter.emit(controlRegistryStoreEvent.modalProvidersChanged, {
+        providers: get().modalProviders,
+      });
+    },
+  }))
 );

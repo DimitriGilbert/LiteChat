@@ -6,77 +6,102 @@ import { type LiteChatModApi } from "@/types/litechat/modding";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import { SettingsTriggerComponent } from "@/controls/components/settings/SettingsTriggerComponent";
 import { SettingsModal } from "@/controls/components/settings/SettingsModal";
-import { useUIStateStore } from "@/store/ui.store";
+// No direct store access needed for modal state here anymore
 
 export class SettingsControlModule implements ControlModule {
-  readonly id = "core-settings-trigger";
-  private unregisterCallback: (() => void) | null = null;
+  readonly id = "core-settings-trigger"; // This ID is for the trigger control
+  public readonly modalId = "settingsModal"; // Unique ID for the modal content
+  private unregisterChatControlCallback: (() => void) | null = null;
+  private unregisterModalProviderCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
+  private modApiRef: LiteChatModApi | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
-    const unsubOpenRequest = modApi.on(
-      uiEvent.openSettingsModalRequest,
-      (payload) => {
-        this.openSettingsModal(payload.tabId, payload.subTabId);
+    this.modApiRef = modApi;
+    const unsubOpenRequest = modApi.on(uiEvent.openModalRequest, (payload) => {
+      if (payload.modalId === this.modalId) {
+        // This module is responsible for opening its own modal type
+        // The ModalManager will handle the actual display.
+        // We don't need to call useUIStateStore here.
+        console.log(
+          `[${this.id}] Received open request for modal: ${payload.modalId}`
+        );
       }
-    );
+    });
     this.eventUnsubscribers.push(unsubOpenRequest);
     console.log(`[${this.id}] Initialized and listening for open requests.`);
   }
 
+  // This method is now called by its UI trigger component
   public openSettingsModal = (initialTab?: string, initialSubTab?: string) => {
-    useUIStateStore
-      .getState()
-      .setInitialSettingsTabs(initialTab || null, initialSubTab || null);
-    useUIStateStore.getState().toggleChatControlPanel("settingsModal", true);
+    this.modApiRef?.emit(uiEvent.openModalRequest, {
+      modalId: this.modalId,
+      initialTab: initialTab || "general", // Default to general if not provided
+      initialSubTab: initialSubTab,
+    });
   };
 
+  // This method is now called by the ModalProvider via ModalManager
   public closeSettingsModal = () => {
-    useUIStateStore.getState().toggleChatControlPanel("settingsModal", false);
-    useUIStateStore.getState().clearInitialSettingsTabs();
-  };
-
-  public getIsSettingsModalOpen = (): boolean => {
-    return (
-      useUIStateStore.getState().isChatControlPanelOpen["settingsModal"] ??
-      false
-    );
+    this.modApiRef?.emit(uiEvent.closeModalRequest, {
+      modalId: this.modalId,
+    });
   };
 
   register(modApi: LiteChatModApi): void {
-    if (this.unregisterCallback) {
+    this.modApiRef = modApi;
+    if (
+      this.unregisterChatControlCallback &&
+      this.unregisterModalProviderCallback
+    ) {
       console.warn(`[${this.id}] Already registered. Skipping.`);
       return;
     }
 
-    const settingsTriggerRenderer = () =>
-      React.createElement(SettingsTriggerComponent, { module: this });
-
-    const settingsModalRenderer = () =>
-      React.createElement(SettingsModal, {
-        isOpen: this.getIsSettingsModalOpen(),
-        onClose: this.closeSettingsModal,
+    // Register the trigger button as a chat control
+    if (!this.unregisterChatControlCallback) {
+      this.unregisterChatControlCallback = modApi.registerChatControl({
+        id: this.id, // ID for the trigger
+        panel: "sidebar-footer",
+        status: () => "ready",
+        renderer: () =>
+          React.createElement(SettingsTriggerComponent, { module: this }),
+        iconRenderer: () =>
+          React.createElement(SettingsTriggerComponent, { module: this }),
+        show: () => true,
       });
+      console.log(`[${this.id}] Trigger registered.`);
+    }
 
-    this.unregisterCallback = modApi.registerChatControl({
-      id: this.id,
-      panel: "sidebar-footer",
-      status: () => "ready",
-      renderer: settingsTriggerRenderer,
-      iconRenderer: settingsTriggerRenderer,
-      settingsRenderer: settingsModalRenderer,
-      show: () => true,
-    });
-    console.log(`[${this.id}] Registered.`);
+    // Register the modal content provider
+    if (!this.unregisterModalProviderCallback) {
+      this.unregisterModalProviderCallback = modApi.registerModalProvider(
+        this.modalId, // Use the unique modalId
+        (props) =>
+          React.createElement(SettingsModal, {
+            isOpen: props.isOpen,
+            onClose: props.onClose,
+            // initialTab and initialSubTab will be passed by ModalManager
+          })
+      );
+      console.log(
+        `[${this.id}] Modal provider registered for ${this.modalId}.`
+      );
+    }
   }
 
   destroy(): void {
     this.eventUnsubscribers.forEach((unsub) => unsub());
     this.eventUnsubscribers = [];
-    if (this.unregisterCallback) {
-      this.unregisterCallback();
-      this.unregisterCallback = null;
+    if (this.unregisterChatControlCallback) {
+      this.unregisterChatControlCallback();
+      this.unregisterChatControlCallback = null;
     }
+    if (this.unregisterModalProviderCallback) {
+      this.unregisterModalProviderCallback();
+      this.unregisterModalProviderCallback = null;
+    }
+    this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
 }

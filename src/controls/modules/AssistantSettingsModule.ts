@@ -4,7 +4,7 @@ import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { SettingsAssistant } from "@/controls/components/assistant-settings/SettingsAssistant";
 import { useSettingsStore } from "@/store/settings.store";
-import { settingsEvent } from "@/types/litechat/events/settings.events";
+import { settingsStoreEvent } from "@/types/litechat/events/settings.events";
 
 export class AssistantSettingsModule implements ControlModule {
   readonly id = "core-settings-assistant";
@@ -15,15 +15,17 @@ export class AssistantSettingsModule implements ControlModule {
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApiRef = modApi;
-    // Initialize visibility based on the current state of enableAdvancedSettings
     this.isVisible = useSettingsStore.getState().enableAdvancedSettings;
 
     const unsubSettings = modApi.on(
-      settingsEvent.enableAdvancedSettingsChanged,
+      settingsStoreEvent.enableAdvancedSettingsChanged,
       (payload) => {
-        if (this.isVisible !== payload.enabled) {
-          this.isVisible = payload.enabled;
-          this.reregisterTab();
+        // Check if payload has 'enabled' property
+        if (typeof payload === "object" && payload && "enabled" in payload) {
+          if (this.isVisible !== payload.enabled) {
+            this.isVisible = payload.enabled;
+            this.reregisterTab();
+          }
         }
       }
     );
@@ -32,21 +34,19 @@ export class AssistantSettingsModule implements ControlModule {
   }
 
   private reregisterTab() {
-    // Always unregister if a callback exists, then re-evaluate registration
     if (this.unregisterCallback) {
       this.unregisterCallback();
       this.unregisterCallback = null;
     }
     if (this.modApiRef) {
-      this.register(this.modApiRef); // register will check isVisible
+      this.register(this.modApiRef);
     }
   }
 
   register(modApi: LiteChatModApi): void {
-    this.modApiRef = modApi; // Ensure modApiRef is set
+    this.modApiRef = modApi;
 
     if (this.isVisible) {
-      // Only register if visible and not already registered by this call instance
       if (!this.unregisterCallback) {
         this.unregisterCallback = modApi.registerSettingsTab({
           id: "assistant",
@@ -57,7 +57,6 @@ export class AssistantSettingsModule implements ControlModule {
         console.log(`[${this.id}] Settings tab registered.`);
       }
     } else {
-      // If not visible, ensure it's unregistered if it was previously
       if (this.unregisterCallback) {
         this.unregisterCallback();
         this.unregisterCallback = null;

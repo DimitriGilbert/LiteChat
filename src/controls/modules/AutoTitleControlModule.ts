@@ -3,9 +3,9 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
-import { settingsEvent } from "@/types/litechat/events/settings.events";
+import { settingsStoreEvent } from "@/types/litechat/events/settings.events";
 import { AutoTitleControlTrigger } from "@/controls/components/auto-title/AutoTitleControlTrigger";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useSettingsStore } from "@/store/settings.store";
@@ -26,14 +26,19 @@ export class AutoTitleControlModule implements ControlModule {
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.globalAutoTitleEnabled = useSettingsStore.getState().autoTitleEnabled;
     this.checkFirstInteraction();
-    this.notifyComponentUpdate?.(); // Notify after initial state load
+    this.notifyComponentUpdate?.();
 
-    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
-      if (this.isStreaming !== (payload.status === "streaming")) {
-        this.isStreaming = payload.status === "streaming";
-        this.notifyComponentUpdate?.();
+    const unsubStatus = modApi.on(
+      interactionStoreEvent.statusChanged,
+      (payload) => {
+        if (typeof payload === "object" && payload && "status" in payload) {
+          if (this.isStreaming !== (payload.status === "streaming")) {
+            this.isStreaming = payload.status === "streaming";
+            this.notifyComponentUpdate?.();
+          }
+        }
       }
-    });
+    );
     const unsubContext = modApi.on(uiEvent.contextChanged, () => {
       const oldIsFirst = this.isFirstInteraction;
       this.checkFirstInteraction();
@@ -41,7 +46,7 @@ export class AutoTitleControlModule implements ControlModule {
         this.notifyComponentUpdate?.();
       }
     });
-    const unsubComplete = modApi.on(interactionEvent.completed, () => {
+    const unsubComplete = modApi.on(interactionStoreEvent.completed, () => {
       const oldIsFirst = this.isFirstInteraction;
       this.checkFirstInteraction();
       if (oldIsFirst !== this.isFirstInteraction) {
@@ -49,11 +54,13 @@ export class AutoTitleControlModule implements ControlModule {
       }
     });
     const unsubSettings = modApi.on(
-      settingsEvent.autoTitleEnabledChanged,
+      settingsStoreEvent.autoTitleEnabledChanged,
       (payload) => {
-        if (this.globalAutoTitleEnabled !== payload.enabled) {
-          this.globalAutoTitleEnabled = payload.enabled;
-          this.notifyComponentUpdate?.();
+        if (typeof payload === "object" && payload && "enabled" in payload) {
+          if (this.globalAutoTitleEnabled !== payload.enabled) {
+            this.globalAutoTitleEnabled = payload.enabled;
+            this.notifyComponentUpdate?.();
+          }
         }
       }
     );
@@ -78,7 +85,6 @@ export class AutoTitleControlModule implements ControlModule {
     if (this.isFirstInteraction !== isFirst) {
       this.isFirstInteraction = isFirst;
       if (!isFirst && this.turnAutoTitleEnabled) {
-        // If it's no longer the first interaction, reset turn-specific enable
         this.turnAutoTitleEnabled = false;
       }
     }

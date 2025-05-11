@@ -9,6 +9,7 @@ import { useSettingsStore } from "@/store/settings.store";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { z } from "zod";
 import { Tool } from "ai";
+import type { fs as FsType } from "@zenfs/core"; // Corrected import
 
 const gitInitSchema = z.object({
   path: z
@@ -49,8 +50,9 @@ const gitStatusSchema = z.object({
     ),
 });
 
+// Corrected ToolContext to use FsType from @zenfs/core
 type ToolContext = ReadonlyChatContextSnapshot & {
-  fsInstance?: typeof VfsOps.VFS;
+  fsInstance?: typeof FsType;
 };
 
 export class GitToolsModule implements ControlModule {
@@ -58,7 +60,6 @@ export class GitToolsModule implements ControlModule {
   private unregisterCallbacks: (() => void)[] = [];
 
   async initialize(_modApi: LiteChatModApi): Promise<void> {
-    // modApi parameter is available here if needed for initialization logic
     console.log(`[${this.id}] Initialized.`);
   }
 
