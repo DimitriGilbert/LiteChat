@@ -3,13 +3,13 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
-import { rulesStoreEvent } from "@/types/litechat/events/rules.events";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { rulesEvent } from "@/types/litechat/events/rules.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import { RulesControlTrigger } from "@/controls/components/rules/RulesControlTrigger";
 import { SettingsRulesAndTags } from "@/controls/components/rules/SettingsRulesAndTags";
-import { useRulesStore } from "@/store/rules.store";
-import { useInteractionStore } from "@/store/interaction.store";
+import type { DbRule, DbTag } from "@/types/litechat/rules";
+import type { ResolvedRuleContent } from "@/types/litechat/prompt"; // Import new type
 
 export class RulesControlModule implements ControlModule {
   readonly id = "core-rules-tags";
@@ -18,60 +18,121 @@ export class RulesControlModule implements ControlModule {
   private eventUnsubscribers: (() => void)[] = [];
   private modApiRef: LiteChatModApi | null = null;
 
+  private allRules: DbRule[] = [];
+  private allTags: DbTag[] = [];
+  private tagRuleLinks: { tagId: string; ruleId: string }[] = [];
+
   public transientActiveTagIds = new Set<string>();
   public transientActiveRuleIds = new Set<string>();
   public isStreaming = false;
   public hasRulesOrTags = false;
   public isLoadingRules = true;
   private notifyComponentUpdate: (() => void) | null = null;
+  private notifySettingsComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApiRef = modApi;
-    this.loadInitialState();
-    this.notifyComponentUpdate?.();
+    this.isStreaming = modApi.getContextSnapshot().isStreaming;
 
-    const unsubStatus = modApi.on(
-      interactionStoreEvent.statusChanged,
-      (payload) => {
-        if (typeof payload === "object" && payload && "status" in payload) {
-          if (this.isStreaming !== (payload.status === "streaming")) {
-            this.isStreaming = payload.status === "streaming";
-            this.notifyComponentUpdate?.();
-          }
+    modApi.emit(rulesEvent.loadRulesAndTagsRequest, undefined);
+
+    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
+      if (typeof payload === "object" && payload && "status" in payload) {
+        if (this.isStreaming !== (payload.status === "streaming")) {
+          this.isStreaming = payload.status === "streaming";
+          this.notifyComponentUpdate?.();
         }
       }
-    );
-    const unsubRulesLoaded = modApi.on(rulesStoreEvent.dataLoaded, () => {
+    });
+    const unsubRulesLoaded = modApi.on(rulesEvent.dataLoaded, (payload) => {
+      if (payload) {
+        this.allRules = payload.rules || [];
+        this.allTags = payload.tags || [];
+        this.tagRuleLinks = (payload.links || []).map((l) => ({
+          tagId: l.tagId,
+          ruleId: l.ruleId,
+        }));
+      }
       this.updateHasRulesOrTags();
       this.isLoadingRules = false;
       this.notifyComponentUpdate?.();
+      this.notifySettingsComponentUpdate?.();
     });
 
     this.eventUnsubscribers.push(unsubStatus, unsubRulesLoaded);
     console.log(`[${this.id}] Initialized.`);
   }
 
-  private loadInitialState() {
-    const rulesState = useRulesStore.getState();
-    this.isStreaming = useInteractionStore.getState().status === "streaming";
-    this.hasRulesOrTags =
-      rulesState.rules.length > 0 || rulesState.tags.length > 0;
-    this.isLoadingRules = rulesState.isLoading;
-  }
-
   private updateHasRulesOrTags() {
-    const rulesState = useRulesStore.getState();
     const newHasRulesOrTags =
-      rulesState.rules.length > 0 || rulesState.tags.length > 0;
+      this.allRules.length > 0 || this.allTags.length > 0;
     if (this.hasRulesOrTags !== newHasRulesOrTags) {
       this.hasRulesOrTags = newHasRulesOrTags;
     }
   }
 
+  public getAllRules = (): DbRule[] => this.allRules;
+  public getAllTags = (): DbTag[] => this.allTags;
+  public getTagRuleLinks = (): { tagId: string; ruleId: string }[] =>
+    this.tagRuleLinks;
+
+  public getRulesForTag = (tagId: string): DbRule[] => {
+    const ruleIds = new Set(
+      this.tagRuleLinks
+        .filter((link) => link.tagId === tagId)
+        .map((link) => link.ruleId)
+    );
+    return this.allRules.filter((rule) => ruleIds.has(rule.id));
+  };
+  public getRuleById = (ruleId: string): DbRule | undefined => {
+    return this.allRules.find((r) => r.id === ruleId);
+  };
+  public getTagById = (tagId: string): DbTag | undefined => {
+    return this.allTags.find((t) => t.id === tagId);
+  };
+  public getRulesByIds = (ruleIds: string[]): DbRule[] => {
+    const idSet = new Set(ruleIds);
+    return this.allRules.filter((r) => idSet.has(r.id));
+  };
+
+  public addRule = (data: Omit<DbRule, "id" | "createdAt" | "updatedAt">) => {
+    this.modApiRef?.emit(rulesEvent.addRuleRequest, data);
+  };
+  public updateRule = (
+    id: string,
+    updates: Partial<Omit<DbRule, "id" | "createdAt">>
+  ) => {
+    this.modApiRef?.emit(rulesEvent.updateRuleRequest, { id, updates });
+  };
+  public deleteRule = (id: string) => {
+    this.modApiRef?.emit(rulesEvent.deleteRuleRequest, { id });
+  };
+  public addTag = (data: Omit<DbTag, "id" | "createdAt" | "updatedAt">) => {
+    this.modApiRef?.emit(rulesEvent.addTagRequest, data);
+  };
+  public updateTag = (
+    id: string,
+    updates: Partial<Omit<DbTag, "id" | "createdAt">>
+  ) => {
+    this.modApiRef?.emit(rulesEvent.updateTagRequest, { id, updates });
+  };
+  public deleteTag = (id: string) => {
+    this.modApiRef?.emit(rulesEvent.deleteTagRequest, { id });
+  };
+  public linkTagToRule = (tagId: string, ruleId: string) => {
+    this.modApiRef?.emit(rulesEvent.linkTagToRuleRequest, { tagId, ruleId });
+  };
+  public unlinkTagFromRule = (tagId: string, ruleId: string) => {
+    this.modApiRef?.emit(rulesEvent.unlinkTagFromRuleRequest, {
+      tagId,
+      ruleId,
+    });
+  };
+
   public handleTriggerClick = () => {
     if (!this.hasRulesOrTags && this.modApiRef) {
       this.modApiRef.emit(uiEvent.openModalRequest, {
-        modalId: "settings",
+        modalId: "settingsModal",
         initialTab: "rules-tags",
       });
       return true;
@@ -97,6 +158,9 @@ export class RulesControlModule implements ControlModule {
   public setNotifyCallback = (cb: (() => void) | null) => {
     this.notifyComponentUpdate = cb;
   };
+  public setNotifySettingsCallback = (cb: (() => void) | null) => {
+    this.notifySettingsComponentUpdate = cb;
+  };
 
   register(modApi: LiteChatModApi): void {
     this.modApiRef = modApi;
@@ -108,10 +172,38 @@ export class RulesControlModule implements ControlModule {
         triggerRenderer: () =>
           React.createElement(RulesControlTrigger, { module: this }),
         getMetadata: () => {
-          const tags = Array.from(this.transientActiveTagIds);
-          const rules = Array.from(this.transientActiveRuleIds);
-          if (tags.length > 0 || rules.length > 0) {
-            return { activeTagIds: tags, activeRuleIds: rules };
+          const activeTagIds = Array.from(this.transientActiveTagIds);
+          const activeRuleIds = Array.from(this.transientActiveRuleIds);
+          const effectiveRulesContent: ResolvedRuleContent[] = [];
+
+          const allEffectiveRuleIds = new Set<string>(activeRuleIds);
+          activeTagIds.forEach((tagId) => {
+            this.getRulesForTag(tagId).forEach((rule) =>
+              allEffectiveRuleIds.add(rule.id)
+            );
+          });
+
+          allEffectiveRuleIds.forEach((ruleId) => {
+            const rule = this.getRuleById(ruleId);
+            if (rule) {
+              effectiveRulesContent.push({
+                type: rule.type,
+                content: rule.content,
+                sourceRuleId: rule.id,
+              });
+            }
+          });
+
+          if (
+            activeTagIds.length > 0 ||
+            activeRuleIds.length > 0 ||
+            effectiveRulesContent.length > 0
+          ) {
+            return {
+              activeTagIds,
+              activeRuleIds,
+              effectiveRulesContent, // Add resolved content
+            };
           }
           return undefined;
         },
@@ -135,7 +227,8 @@ export class RulesControlModule implements ControlModule {
       this.unregisterSettingsTabCallback = modApi.registerSettingsTab({
         id: "rules-tags",
         title: "Rules & Tags",
-        component: SettingsRulesAndTags,
+        component: () =>
+          React.createElement(SettingsRulesAndTags, { module: this }),
         order: 50,
       });
       console.log(`[${this.id}] Settings tab registered.`);
@@ -154,6 +247,7 @@ export class RulesControlModule implements ControlModule {
       this.unregisterSettingsTabCallback = null;
     }
     this.notifyComponentUpdate = null;
+    this.notifySettingsComponentUpdate = null;
     this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }

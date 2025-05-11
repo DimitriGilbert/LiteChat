@@ -4,7 +4,7 @@ import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { SettingsAssistant } from "@/controls/components/assistant-settings/SettingsAssistant";
 import { useSettingsStore } from "@/store/settings.store";
-import { settingsStoreEvent } from "@/types/litechat/events/settings.events";
+import { settingsEvent } from "@/types/litechat/events/settings.events";
 
 export class AssistantSettingsModule implements ControlModule {
   readonly id = "core-settings-assistant";
@@ -18,9 +18,8 @@ export class AssistantSettingsModule implements ControlModule {
     this.isVisible = useSettingsStore.getState().enableAdvancedSettings;
 
     const unsubSettings = modApi.on(
-      settingsStoreEvent.enableAdvancedSettingsChanged,
+      settingsEvent.enableAdvancedSettingsChanged,
       (payload) => {
-        // Check if payload has 'enabled' property
         if (typeof payload === "object" && payload && "enabled" in payload) {
           if (this.isVisible !== payload.enabled) {
             this.isVisible = payload.enabled;

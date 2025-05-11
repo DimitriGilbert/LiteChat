@@ -3,8 +3,8 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { providerStoreEvent } from "@/types/litechat/events/provider.events";
-import { promptStoreEvent } from "@/types/litechat/events/prompt.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { VisibleStructuredOutputControl } from "@/controls/components/structured-output/VisibleStructuredOutputControl";
 import { useProviderStore } from "@/store/provider.store";
 import { usePromptStateStore } from "@/store/prompt.store";
@@ -24,15 +24,12 @@ export class StructuredOutputControlModule implements ControlModule {
     this.updateVisibility();
     this.notifyComponentUpdate?.();
 
-    const unsubModel = modApi.on(
-      providerStoreEvent.selectedModelChanged,
-      () => {
-        this.updateVisibility();
-        this.notifyComponentUpdate?.();
-      }
-    );
+    const unsubModel = modApi.on(providerEvent.selectedModelChanged, () => {
+      this.updateVisibility();
+      this.notifyComponentUpdate?.();
+    });
     const unsubPromptParams = modApi.on(
-      promptStoreEvent.parameterChanged,
+      promptEvent.parameterChanged,
       (payload) => {
         if (typeof payload === "object" && payload && "params" in payload) {
           const params = payload.params;

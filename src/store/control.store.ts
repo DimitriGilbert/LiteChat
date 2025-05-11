@@ -3,11 +3,11 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { controlRegistryStoreEvent } from "@/types/litechat/events/control.registry.events";
+import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
 import type {
-  ControlState as ControlStateInterface, // Import the interface
-  ControlActions as ControlActionsInterface, // Import the interface
-} from "@/types/litechat/control"; // Import interfaces from types
+  ControlState as ControlStateInterface,
+  ControlActions as ControlActionsInterface,
+} from "@/types/litechat/control";
 
 export const useControlRegistryStore = create(
   immer<ControlStateInterface & ControlActionsInterface>((set, get) => ({
@@ -16,7 +16,7 @@ export const useControlRegistryStore = create(
     chatControls: {},
     middlewareRegistry: {},
     tools: {},
-    modalProviders: {}, // Initialize modalProviders
+    modalProviders: {},
 
     // Actions
     registerPromptControl: (control) => {
@@ -28,7 +28,7 @@ export const useControlRegistryStore = create(
         }
         state.promptControls[control.id] = control;
       });
-      emitter.emit(controlRegistryStoreEvent.promptControlsChanged, {
+      emitter.emit(controlRegistryEvent.promptControlsChanged, {
         controls: get().promptControls,
       });
       return () => get().unregisterPromptControl(control.id);
@@ -44,7 +44,7 @@ export const useControlRegistryStore = create(
           );
         }
       });
-      emitter.emit(controlRegistryStoreEvent.promptControlsChanged, {
+      emitter.emit(controlRegistryEvent.promptControlsChanged, {
         controls: get().promptControls,
       });
     },
@@ -58,7 +58,7 @@ export const useControlRegistryStore = create(
         }
         state.chatControls[control.id] = control;
       });
-      emitter.emit(controlRegistryStoreEvent.chatControlsChanged, {
+      emitter.emit(controlRegistryEvent.chatControlsChanged, {
         controls: get().chatControls,
       });
       return () => get().unregisterChatControl(control.id);
@@ -74,14 +74,13 @@ export const useControlRegistryStore = create(
           );
         }
       });
-      emitter.emit(controlRegistryStoreEvent.chatControlsChanged, {
+      emitter.emit(controlRegistryEvent.chatControlsChanged, {
         controls: get().chatControls,
       });
     },
 
     registerMiddleware: (hookName, modId, callback, order = 0) => {
       const registration: any = {
-        // Use any for RegisteredMiddleware<any>
         modId,
         callback,
         order,
@@ -90,12 +89,12 @@ export const useControlRegistryStore = create(
         if (!state.middlewareRegistry[hookName]) {
           state.middlewareRegistry[hookName] = [];
         }
-        (state.middlewareRegistry[hookName] as any[]).push(registration); // Use any[]
+        (state.middlewareRegistry[hookName] as any[]).push(registration);
         (state.middlewareRegistry[hookName] as any[]).sort(
           (a, b) => (a.order ?? 0) - (b.order ?? 0)
         );
       });
-      emitter.emit(controlRegistryStoreEvent.middlewareChanged, {
+      emitter.emit(controlRegistryEvent.middlewareChanged, {
         middleware: get().middlewareRegistry,
       });
       return () => get().unregisterMiddleware(hookName, modId, callback);
@@ -106,10 +105,9 @@ export const useControlRegistryStore = create(
         if (state.middlewareRegistry[hookName]) {
           state.middlewareRegistry[hookName] = (
             state.middlewareRegistry[hookName] as any[]
-          ) // Use any[]
-            .filter(
-              (reg) => !(reg.modId === modId && reg.callback === callback)
-            );
+          ).filter(
+            (reg) => !(reg.modId === modId && reg.callback === callback)
+          );
           if (state.middlewareRegistry[hookName]?.length === 0) {
             delete state.middlewareRegistry[hookName];
           }
@@ -119,7 +117,7 @@ export const useControlRegistryStore = create(
           );
         }
       });
-      emitter.emit(controlRegistryStoreEvent.middlewareChanged, {
+      emitter.emit(controlRegistryEvent.middlewareChanged, {
         middleware: get().middlewareRegistry,
       });
     },
@@ -128,7 +126,6 @@ export const useControlRegistryStore = create(
       const middleware = get().middlewareRegistry[hookName] ?? [];
       return Object.freeze(
         [...(middleware as any[])].sort(
-          // Use any[]
           (a, b) => (a.order ?? 0) - (b.order ?? 0)
         )
       );
@@ -143,7 +140,7 @@ export const useControlRegistryStore = create(
         }
         state.tools[toolName] = { definition, implementation, modId };
       });
-      emitter.emit(controlRegistryStoreEvent.toolsChanged, {
+      emitter.emit(controlRegistryEvent.toolsChanged, {
         tools: get().tools,
       });
       return () => get().unregisterTool(toolName);
@@ -159,7 +156,7 @@ export const useControlRegistryStore = create(
           );
         }
       });
-      emitter.emit(controlRegistryStoreEvent.toolsChanged, {
+      emitter.emit(controlRegistryEvent.toolsChanged, {
         tools: get().tools,
       });
     },
@@ -177,7 +174,7 @@ export const useControlRegistryStore = create(
         }
         state.modalProviders[modalId] = provider;
       });
-      emitter.emit(controlRegistryStoreEvent.modalProvidersChanged, {
+      emitter.emit(controlRegistryEvent.modalProvidersChanged, {
         providers: get().modalProviders,
       });
       return () => get().unregisterModalProvider(modalId);
@@ -193,7 +190,7 @@ export const useControlRegistryStore = create(
           );
         }
       });
-      emitter.emit(controlRegistryStoreEvent.modalProvidersChanged, {
+      emitter.emit(controlRegistryEvent.modalProvidersChanged, {
         providers: get().modalProviders,
       });
     },

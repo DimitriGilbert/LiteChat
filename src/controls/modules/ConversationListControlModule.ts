@@ -13,8 +13,6 @@ export class ConversationListControlModule implements ControlModule {
   private unregisterCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
 
-  // isLoading now primarily reflects the *initial* load state.
-  // Add/delete operations should feel instant due to optimistic UI updates in stores.
   public isLoading = true;
   private notifyComponentUpdate: (() => void) | null = null;
 
@@ -22,28 +20,11 @@ export class ConversationListControlModule implements ControlModule {
     this.isLoading =
       useConversationStore.getState().isLoading ||
       useProjectStore.getState().isLoading;
-    // Subscribe to store loading state changes if they exist and are granular
-    // For now, we assume initial load is handled by the main app sequence.
-    // This module's isLoading will primarily be true until the first data is available.
     console.log(
       `[${this.id}] Initialized. Initial loading state: ${this.isLoading}`
     );
-
-    // If stores have a way to notify when their initial load is done, subscribe here.
-    // Example (conceptual - depends on store implementation):
-    // const unsubConvLoad = useConversationStore.subscribe(
-    //   (state) => state.isLoading,
-    //   (loading) => this.updateLoadingState()
-    // );
-    // const unsubProjLoad = useProjectStore.subscribe(
-    //   (state) => state.isLoading,
-    //   (loading) => this.updateLoadingState()
-    // );
-    // this.eventUnsubscribers.push(unsubConvLoad, unsubProjLoad);
-    // For now, we'll rely on the component to re-read this.isLoading if the module re-renders.
   }
 
-  // Call this if stores provide fine-grained loading state updates
   public updateLoadingState() {
     const newLoadingState =
       useConversationStore.getState().isLoading ||
@@ -54,9 +35,6 @@ export class ConversationListControlModule implements ControlModule {
     }
   }
 
-  // This method is now primarily for actions *within the component* that might need
-  // to show a temporary loading state (e.g., if an action was complex and not optimistic).
-  // For simple add/delete, the stores handle optimistic updates.
   public setIsLoading = (loading: boolean) => {
     if (this.isLoading !== loading) {
       this.isLoading = loading;

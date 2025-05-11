@@ -3,10 +3,10 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
-import { projectStoreEvent } from "@/types/litechat/events/project.events";
-import { settingsStoreEvent } from "@/types/litechat/events/settings.events";
+import { projectEvent } from "@/types/litechat/events/project.events";
+import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { SystemPromptControlTrigger } from "@/controls/components/system-prompt/SystemPromptControlTrigger";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useProjectStore } from "@/store/project.store";
@@ -27,27 +27,24 @@ export class SystemPromptControlModule implements ControlModule {
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.updateEffectivePrompt();
 
-    const unsubStatus = modApi.on(
-      interactionStoreEvent.statusChanged,
-      (payload) => {
-        if (typeof payload === "object" && payload && "status" in payload) {
-          if (this.isStreaming !== (payload.status === "streaming")) {
-            this.isStreaming = payload.status === "streaming";
-            this.notifyComponentUpdate?.();
-          }
+    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
+      if (typeof payload === "object" && payload && "status" in payload) {
+        if (this.isStreaming !== (payload.status === "streaming")) {
+          this.isStreaming = payload.status === "streaming";
+          this.notifyComponentUpdate?.();
         }
       }
-    );
+    });
     const unsubContext = modApi.on(uiEvent.contextChanged, () => {
       this.updateEffectivePrompt();
       this.notifyComponentUpdate?.();
     });
-    const unsubProject = modApi.on(projectStoreEvent.updated, () => {
+    const unsubProject = modApi.on(projectEvent.updated, () => {
       this.updateEffectivePrompt();
       this.notifyComponentUpdate?.();
     });
     const unsubSettings = modApi.on(
-      settingsStoreEvent.globalSystemPromptChanged,
+      settingsEvent.globalSystemPromptChanged,
       () => {
         this.updateEffectivePrompt();
         this.notifyComponentUpdate?.();

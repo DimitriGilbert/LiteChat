@@ -21,7 +21,7 @@ import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { fetchModelsForProvider } from "@/services/model-fetcher";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { providerStoreEvent } from "@/types/litechat/events/provider.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
 import { instantiateModelInstance } from "@/lib/litechat/provider-helpers";
 
 type FetchStatus = "idle" | "fetching" | "error" | "success";
@@ -129,7 +129,7 @@ export const useProviderStore = create(
         }
       });
       set({ globallyEnabledModelDefinitions: sortedEnabledModels });
-      emitter.emit(providerStoreEvent.globallyEnabledModelsUpdated, {
+      emitter.emit(providerEvent.globallyEnabledModelsUpdated, {
         models: sortedEnabledModels,
       });
     },
@@ -167,7 +167,7 @@ export const useProviderStore = create(
     setEnableApiKeyManagement: (enabled) => {
       set({ enableApiKeyManagement: enabled });
       PersistenceService.saveSetting("enableApiKeyManagement", enabled);
-      emitter.emit(providerStoreEvent.enableApiKeyManagementChanged, {
+      emitter.emit(providerEvent.enableApiKeyManagementChanged, {
         enabled,
       });
     },
@@ -222,13 +222,13 @@ export const useProviderStore = create(
         });
 
         await PersistenceService.saveSetting(LAST_SELECTION_KEY, modelToSelect);
-        emitter.emit(providerStoreEvent.initialDataLoaded, {
+        emitter.emit(providerEvent.initialDataLoaded, {
           configs,
           apiKeys: keys,
           selectedModelId: modelToSelect,
           globalSortOrder: validSavedOrder,
         });
-        emitter.emit(providerStoreEvent.selectedModelChanged, {
+        emitter.emit(providerEvent.selectedModelChanged, {
           modelId: modelToSelect,
         });
       } catch (e) {
@@ -246,7 +246,7 @@ export const useProviderStore = create(
       if (currentId !== combinedId) {
         set({ selectedModelId: combinedId });
         PersistenceService.saveSetting(LAST_SELECTION_KEY, combinedId);
-        emitter.emit(providerStoreEvent.selectedModelChanged, {
+        emitter.emit(providerEvent.selectedModelChanged, {
           modelId: combinedId,
         });
       }
@@ -269,7 +269,7 @@ export const useProviderStore = create(
           state.dbApiKeys.push(newKey);
         });
         toast.success(`API Key "${name}" added.`);
-        emitter.emit(providerStoreEvent.apiKeysChanged, {
+        emitter.emit(providerEvent.apiKeysChanged, {
           apiKeys: get().dbApiKeys,
         });
         return newId;
@@ -294,10 +294,10 @@ export const useProviderStore = create(
           );
         });
         toast.success(`API Key "${keyName}" deleted.`);
-        emitter.emit(providerStoreEvent.apiKeysChanged, {
+        emitter.emit(providerEvent.apiKeysChanged, {
           apiKeys: get().dbApiKeys,
         });
-        emitter.emit(providerStoreEvent.configsChanged, {
+        emitter.emit(providerEvent.configsChanged, {
           providerConfigs: get().dbProviderConfigs,
         });
       } catch (e) {
@@ -335,7 +335,7 @@ export const useProviderStore = create(
         });
         get()._updateGloballyEnabledModelDefinitions();
         toast.success(`Provider "${configData.name}" added.`);
-        emitter.emit(providerStoreEvent.configsChanged, {
+        emitter.emit(providerEvent.configsChanged, {
           providerConfigs: get().dbProviderConfigs,
         });
         get()
@@ -383,7 +383,7 @@ export const useProviderStore = create(
           if (index !== -1) state.dbProviderConfigs[index] = updatedConfigData;
         });
         get()._updateGloballyEnabledModelDefinitions();
-        emitter.emit(providerStoreEvent.configsChanged, {
+        emitter.emit(providerEvent.configsChanged, {
           providerConfigs: get().dbProviderConfigs,
         });
         const currentOrder = get().globalModelSortOrder;
@@ -419,7 +419,7 @@ export const useProviderStore = create(
           delete state.providerFetchStatus[id];
         });
         get()._updateGloballyEnabledModelDefinitions();
-        emitter.emit(providerStoreEvent.configsChanged, {
+        emitter.emit(providerEvent.configsChanged, {
           providerConfigs: get().dbProviderConfigs,
         });
         const currentGloballyEnabledModels =
@@ -474,7 +474,7 @@ export const useProviderStore = create(
         uniqueIds
       );
       get()._updateGloballyEnabledModelDefinitions();
-      emitter.emit(providerStoreEvent.globalModelSortOrderChanged, {
+      emitter.emit(providerEvent.globalModelSortOrderChanged, {
         ids: uniqueIds,
       });
 
@@ -500,7 +500,7 @@ export const useProviderStore = create(
       set((state) => {
         state.providerFetchStatus[providerId] = status;
       });
-      emitter.emit(providerStoreEvent.fetchStatusChanged, {
+      emitter.emit(providerEvent.fetchStatusChanged, {
         providerId,
         status,
       });
@@ -508,7 +508,7 @@ export const useProviderStore = create(
 
     setSelectedModelForDetails: (combinedId) => {
       set({ _selectedModelForDetails: combinedId });
-      emitter.emit(providerStoreEvent.selectedModelForDetailsChanged, {
+      emitter.emit(providerEvent.selectedModelForDetailsChanged, {
         modelId: combinedId,
       });
     },

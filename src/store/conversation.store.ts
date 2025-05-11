@@ -21,9 +21,8 @@ import type { fs } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { useProjectStore } from "./project.store";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { conversationStoreEvent } from "@/types/litechat/events/conversation.events";
-import { syncStoreEvent } from "@/types/litechat/events/sync.events";
-// Removed unused projectStoreEvent and uiEvent
+import { conversationEvent } from "@/types/litechat/events/conversation.events";
+import { syncEvent } from "@/types/litechat/events/sync.events";
 
 export type SidebarItem =
   | (Conversation & { itemType: "conversation" })
@@ -163,17 +162,17 @@ export const useConversationStore = create(
           repoInitializationStatus: {},
           isLoading: false,
         });
-        emitter.emit(conversationStoreEvent.sidebarItemsLoaded, {
+        emitter.emit(conversationEvent.sidebarItemsLoaded, {
           conversations: dbConvos,
           projects: useProjectStore.getState().projects,
         });
-        emitter.emit(conversationStoreEvent.syncReposLoaded, {
+        emitter.emit(conversationEvent.syncReposLoaded, {
           repos: dbSyncRepos,
         });
       } catch (e) {
         console.error("ConversationStore: Error loading sidebar items", e);
         set({ error: "Failed load sidebar items", isLoading: false });
-        emitter.emit(conversationStoreEvent.loadingStateChanged, {
+        emitter.emit(conversationEvent.loadingStateChanged, {
           isLoading: false,
           error: "Failed load sidebar items",
         });
@@ -209,7 +208,7 @@ export const useConversationStore = create(
         const conversationToSave = get().getConversationById(newId);
         if (conversationToSave) {
           await PersistenceService.saveConversation(conversationToSave);
-          emitter.emit(conversationStoreEvent.conversationAdded, {
+          emitter.emit(conversationEvent.conversationAdded, {
             conversation: conversationToSave,
           });
         } else {
@@ -285,7 +284,7 @@ export const useConversationStore = create(
         try {
           const plainData = JSON.parse(JSON.stringify(updatedConversationData));
           await PersistenceService.saveConversation(plainData);
-          emitter.emit(conversationStoreEvent.conversationUpdated, {
+          emitter.emit(conversationEvent.conversationUpdated, {
             conversationId: id,
             updates: updates,
           });
@@ -368,7 +367,7 @@ export const useConversationStore = create(
       try {
         await PersistenceService.deleteConversation(id);
         await PersistenceService.deleteInteractionsForConversation(id);
-        emitter.emit(conversationStoreEvent.conversationDeleted, {
+        emitter.emit(conversationEvent.conversationDeleted, {
           conversationId: id,
         });
 
@@ -377,7 +376,7 @@ export const useConversationStore = create(
           currentSelectedType === "conversation"
         ) {
           await useInteractionStore.getState().setCurrentConversationId(null);
-          emitter.emit(conversationStoreEvent.selectedItemChanged, {
+          emitter.emit(conversationEvent.selectedItemChanged, {
             itemId: null,
             itemType: null,
           });
@@ -442,7 +441,7 @@ export const useConversationStore = create(
         .getState()
         .setCurrentConversationId(conversationIdForInteractionStore);
 
-      emitter.emit(conversationStoreEvent.selectedItemChanged, {
+      emitter.emit(conversationEvent.selectedItemChanged, {
         itemId: id,
         itemType: type,
       });
@@ -471,11 +470,11 @@ export const useConversationStore = create(
       try {
         const repos = await PersistenceService.loadSyncRepos();
         set({ syncRepos: repos, isLoading: false });
-        emitter.emit(conversationStoreEvent.syncReposLoaded, { repos });
+        emitter.emit(conversationEvent.syncReposLoaded, { repos });
       } catch (e) {
         console.error("ConversationStore: Error loading sync repos", e);
         set({ error: "Failed load sync repositories", isLoading: false });
-        emitter.emit(conversationStoreEvent.loadingStateChanged, {
+        emitter.emit(conversationEvent.loadingStateChanged, {
           isLoading: false,
           error: "Failed load sync repositories",
         });
@@ -503,7 +502,7 @@ export const useConversationStore = create(
         if (repoToSave) {
           const plainData = JSON.parse(JSON.stringify(repoToSave));
           await PersistenceService.saveSyncRepo(plainData);
-          emitter.emit(syncStoreEvent.repoChanged, {
+          emitter.emit(syncEvent.repoChanged, {
             repoId: newId,
             action: "added",
           });
@@ -546,7 +545,7 @@ export const useConversationStore = create(
         try {
           const plainData = JSON.parse(JSON.stringify(repoToSave));
           await PersistenceService.saveSyncRepo(plainData);
-          emitter.emit(syncStoreEvent.repoChanged, {
+          emitter.emit(syncEvent.repoChanged, {
             repoId: id,
             action: "updated",
           });
@@ -600,7 +599,7 @@ export const useConversationStore = create(
 
       try {
         await PersistenceService.deleteSyncRepo(id);
-        emitter.emit(syncStoreEvent.repoChanged, {
+        emitter.emit(syncEvent.repoChanged, {
           repoId: id,
           action: "deleted",
         });
@@ -656,7 +655,7 @@ export const useConversationStore = create(
           console.error(`Sync error for ${conversationId}: ${error}`);
         }
       });
-      emitter.emit(conversationStoreEvent.conversationSyncStatusChanged, {
+      emitter.emit(conversationEvent.conversationSyncStatusChanged, {
         conversationId,
         status,
       });
@@ -666,7 +665,7 @@ export const useConversationStore = create(
       set((state) => {
         state.repoInitializationStatus[repoId] = status;
       });
-      emitter.emit(syncStoreEvent.repoInitStatusChanged, { repoId, status });
+      emitter.emit(syncEvent.repoInitStatusChanged, { repoId, status });
     },
 
     initializeOrSyncRepo: async (repoId) => {

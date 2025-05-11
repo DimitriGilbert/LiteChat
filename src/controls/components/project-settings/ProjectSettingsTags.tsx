@@ -1,26 +1,28 @@
-// src/components/LiteChat/project-settings/ProjectSettingsTags.tsx
+// src/controls/components/project-settings/ProjectSettingsTags.tsx
 // FULL FILE
 import React, { useMemo, useCallback } from "react";
 import { Label } from "@/components/ui/label";
-import { useRulesStore } from "@/store/rules.store";
 import { ProjectDefaultTagSelector } from "./ProjectDefaultTagSelector";
+import type { DbTag, DbRule } from "@/types/litechat/rules"; // Import DbRule
 
 interface ProjectSettingsTagsProps {
   defaultTagIds: string[] | null;
   setDefaultTagIds: (ids: string[] | null) => void;
   isSaving: boolean;
+  allTags: DbTag[]; // Add prop for allTags
+  getRulesForTag: (tagId: string) => DbRule[]; // Add prop for getRulesForTag
 }
 
 export const ProjectSettingsTags: React.FC<ProjectSettingsTagsProps> = ({
   defaultTagIds,
   setDefaultTagIds,
   isSaving,
+  allTags, // Destructure allTags
+  getRulesForTag, // Destructure getRulesForTag
 }) => {
-  const allTags = useRulesStore((state) => state.tags);
-
   const selectedTagIdsSet = useMemo(
     () => new Set(defaultTagIds ?? []),
-    [defaultTagIds],
+    [defaultTagIds]
   );
 
   const handleSelectionChange = useCallback(
@@ -34,7 +36,7 @@ export const ProjectSettingsTags: React.FC<ProjectSettingsTagsProps> = ({
       const nextArray = Array.from(nextSet);
       setDefaultTagIds(nextArray.length > 0 ? nextArray : null);
     },
-    [selectedTagIdsSet, setDefaultTagIds],
+    [selectedTagIdsSet, setDefaultTagIds]
   );
 
   return (
@@ -46,10 +48,11 @@ export const ProjectSettingsTags: React.FC<ProjectSettingsTagsProps> = ({
         per-conversation or per-turn.
       </p>
       <ProjectDefaultTagSelector
-        allTags={allTags}
+        allTags={allTags} // Pass down allTags
         selectedTagIds={selectedTagIdsSet}
         onSelectionChange={handleSelectionChange}
         disabled={isSaving}
+        getRulesForTag={getRulesForTag} // Pass down getRulesForTag
       />
     </div>
   );

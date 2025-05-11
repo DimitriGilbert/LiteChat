@@ -1,39 +1,115 @@
-// src/types/litechat/events/stores/conversation.events.ts
+// src/types/litechat/events/conversation.events.ts
 // FULL FILE
-export const conversationStoreEvent = {
+import type { Conversation, SidebarItemType } from "@/types/litechat/chat";
+import type { Project } from "@/types/litechat/project";
+import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
+
+export const conversationEvent = {
   // State Change Events
-  sidebarItemsLoaded: "stores.conversation.sidebar.items.loaded",
-  selectedItemChanged: "stores.conversation.selected.item.changed",
-  conversationAdded: "stores.conversation.added",
-  conversationUpdated: "stores.conversation.updated",
-  conversationDeleted: "stores.conversation.deleted",
-  conversationSyncStatusChanged: "stores.conversation.sync.status.changed",
-  syncReposLoaded: "stores.conversation.sync.repos.loaded",
-  syncRepoChanged: "stores.conversation.sync.repo.changed",
-  syncRepoInitStatusChanged:
-    "stores.conversation.sync.repo.init.status.changed",
-  loadingStateChanged: "stores.conversation.loading.state.changed", // Added this event
+  sidebarItemsLoaded: "conversation.sidebar.items.loaded",
+  selectedItemChanged: "conversation.selected.item.changed",
+  conversationAdded: "conversation.added",
+  conversationUpdated: "conversation.updated",
+  conversationDeleted: "conversation.deleted",
+  conversationSyncStatusChanged: "conversation.sync.status.changed",
+  syncReposLoaded: "conversation.sync.repos.loaded",
+  syncRepoChanged: "conversation.sync.repo.changed",
+  syncRepoInitStatusChanged: "conversation.sync.repo.init.status.changed",
+  loadingStateChanged: "conversation.loading.state.changed",
 
   // Action Request Events
-  loadSidebarItemsRequest: "stores.conversation.load.sidebar.items.request",
-  addConversationRequest: "stores.conversation.add.conversation.request",
-  updateConversationRequest: "stores.conversation.update.conversation.request",
-  deleteConversationRequest: "stores.conversation.delete.conversation.request",
-  selectItemRequest: "stores.conversation.select.item.request",
-  importConversationRequest: "stores.conversation.import.conversation.request",
-  exportConversationRequest: "stores.conversation.export.conversation.request",
-  exportProjectRequest: "stores.conversation.export.project.request",
+  loadSidebarItemsRequest: "conversation.load.sidebar.items.request",
+  addConversationRequest: "conversation.add.conversation.request",
+  updateConversationRequest: "conversation.update.conversation.request",
+  deleteConversationRequest: "conversation.delete.conversation.request",
+  selectItemRequest: "conversation.select.item.request",
+  importConversationRequest: "conversation.import.conversation.request",
+  exportConversationRequest: "conversation.export.conversation.request",
+  exportProjectRequest: "conversation.export.project.request",
   exportAllConversationsRequest:
-    "stores.conversation.export.all.conversations.request",
-  loadSyncReposRequest: "stores.conversation.load.sync.repos.request",
-  addSyncRepoRequest: "stores.conversation.add.sync.repo.request",
-  updateSyncRepoRequest: "stores.conversation.update.sync.repo.request",
-  deleteSyncRepoRequest: "stores.conversation.delete.sync.repo.request",
+    "conversation.export.all.conversations.request",
+  loadSyncReposRequest: "conversation.load.sync.repos.request",
+  addSyncRepoRequest: "conversation.add.sync.repo.request",
+  updateSyncRepoRequest: "conversation.update.sync.repo.request",
+  deleteSyncRepoRequest: "conversation.delete.sync.repo.request",
   linkConversationToRepoRequest:
-    "stores.conversation.link.conversation.to.repo.request",
-  syncConversationRequest: "stores.conversation.sync.conversation.request",
-  initializeOrSyncRepoRequest:
-    "stores.conversation.initialize.or.sync.repo.request",
+    "conversation.link.conversation.to.repo.request",
+  syncConversationRequest: "conversation.sync.conversation.request",
+  initializeOrSyncRepoRequest: "conversation.initialize.or.sync.repo.request",
   updateCurrentConversationToolSettingsRequest:
-    "stores.conversation.update.current.conversation.tool.settings.request",
+    "conversation.update.current.conversation.tool.settings.request",
 } as const;
+
+export interface ConversationEventPayloads {
+  [conversationEvent.sidebarItemsLoaded]: {
+    conversations: Conversation[];
+    projects: Project[];
+  };
+  [conversationEvent.selectedItemChanged]: {
+    itemId: string | null;
+    itemType: SidebarItemType | null;
+  };
+  [conversationEvent.conversationAdded]: { conversation: Conversation };
+  [conversationEvent.conversationUpdated]: {
+    conversationId: string;
+    updates: Partial<Conversation>;
+  };
+  [conversationEvent.conversationDeleted]: { conversationId: string };
+  [conversationEvent.conversationSyncStatusChanged]: {
+    conversationId: string;
+    status: SyncStatus;
+  };
+  [conversationEvent.syncReposLoaded]: { repos: SyncRepo[] };
+  [conversationEvent.syncRepoChanged]: {
+    repoId: string;
+    action: "added" | "updated" | "deleted";
+  };
+  [conversationEvent.syncRepoInitStatusChanged]: {
+    repoId: string;
+    status: SyncStatus;
+  };
+  [conversationEvent.loadingStateChanged]: {
+    isLoading: boolean;
+    error: string | null;
+  };
+  [conversationEvent.loadSidebarItemsRequest]: undefined;
+  [conversationEvent.addConversationRequest]: Partial<
+    Omit<Conversation, "id" | "createdAt">
+  > & { title: string; projectId?: string | null };
+  [conversationEvent.updateConversationRequest]: {
+    id: string;
+    updates: Partial<Omit<Conversation, "id" | "createdAt">>;
+  };
+  [conversationEvent.deleteConversationRequest]: { id: string };
+  [conversationEvent.selectItemRequest]: {
+    id: string | null;
+    type: SidebarItemType | null;
+  };
+  [conversationEvent.importConversationRequest]: { file: File };
+  [conversationEvent.exportConversationRequest]: {
+    conversationId: string;
+    format: "json" | "md";
+  };
+  [conversationEvent.exportProjectRequest]: { projectId: string };
+  [conversationEvent.exportAllConversationsRequest]: undefined;
+  [conversationEvent.loadSyncReposRequest]: undefined;
+  [conversationEvent.addSyncRepoRequest]: Omit<
+    SyncRepo,
+    "id" | "createdAt" | "updatedAt"
+  >;
+  [conversationEvent.updateSyncRepoRequest]: {
+    id: string;
+    updates: Partial<Omit<SyncRepo, "id" | "createdAt">>;
+  };
+  [conversationEvent.deleteSyncRepoRequest]: { id: string };
+  [conversationEvent.linkConversationToRepoRequest]: {
+    conversationId: string;
+    repoId: string | null;
+  };
+  [conversationEvent.syncConversationRequest]: { conversationId: string };
+  [conversationEvent.initializeOrSyncRepoRequest]: { repoId: string };
+  [conversationEvent.updateCurrentConversationToolSettingsRequest]: {
+    enabledTools?: string[];
+    toolMaxStepsOverride?: number | null;
+  };
+}

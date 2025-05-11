@@ -1,13 +1,15 @@
 // src/services/conversation.service.ts
 // FULL FILE
-import type { PromptObject, PromptTurnObject } from "@/types/litechat/prompt";
+import type {
+  PromptObject,
+  PromptTurnObject,
+  ResolvedRuleContent,
+} from "@/types/litechat/prompt";
 import { InteractionService } from "./interaction.service";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useProjectStore } from "@/store/project.store";
 import { usePromptStateStore } from "@/store/prompt.store";
 import { useVfsStore } from "@/store/vfs.store";
-import { useRulesStore } from "@/store/rules.store";
-import * as VfsOps from "@/lib/litechat/vfs-operations";
 import {
   buildHistoryMessages,
   processFileMetaToUserContent,
@@ -20,6 +22,7 @@ import { useConversationStore } from "@/store/conversation.store";
 import type { DbRule } from "@/types/litechat/rules";
 import { useSettingsStore } from "@/store/settings.store";
 import { nanoid } from "nanoid";
+import * as VfsOps from "@/lib/litechat/vfs-operations";
 
 export const ConversationService = {
   async submitPrompt(turnData: PromptTurnObject): Promise<void> {
@@ -28,7 +31,6 @@ export const ConversationService = {
     const projectStoreState = useProjectStore.getState();
     const promptState = usePromptStateStore.getState();
     const conversationStoreState = useConversationStore.getState();
-    const rulesStoreState = useRulesStore.getState();
     const settingsStoreState = useSettingsStore.getState();
 
     const conversationId = interactionStoreState.currentConversationId;
@@ -66,48 +68,30 @@ export const ConversationService = {
     let userContent = turnData.content;
     const userMessageContentParts: (TextPart | ImagePart)[] = [];
 
-    const projectDefaultTagIds = effectiveSettings.defaultTagIds ?? [];
-    const projectDefaultRuleIds = effectiveSettings.defaultRuleIds ?? [];
-    const turnActiveTagIds = turnData.metadata?.activeTagIds ?? [];
-    const turnActiveRuleIds = turnData.metadata?.activeRuleIds ?? [];
+    // Use pre-resolved rule content from turnData.metadata
+    const effectiveRulesContent: ResolvedRuleContent[] =
+      turnData.metadata?.effectiveRulesContent ?? [];
 
-    const combinedActiveTagIds = Array.from(
-      new Set([...projectDefaultTagIds, ...turnActiveTagIds])
-    );
-    const combinedActiveRuleIds = Array.from(
-      new Set([...projectDefaultRuleIds, ...turnActiveRuleIds])
-    );
-
-    const allEffectiveRuleIds = new Set<string>(combinedActiveRuleIds);
-    combinedActiveTagIds.forEach((tagId: string) => {
-      rulesStoreState
-        .getRulesForTag(tagId)
-        .forEach((rule) => allEffectiveRuleIds.add(rule.id));
-    });
-
-    const activeRules: DbRule[] =
-      rulesStoreState.getRulesByIds(Array.from(allEffectiveRuleIds)) || [];
-
-    const systemRules = activeRules
+    const systemRulesContent = effectiveRulesContent
       .filter((r) => r.type === "system")
       .map((r) => r.content);
-    const beforeRules = activeRules
+    const beforeRulesContent = effectiveRulesContent
       .filter((r) => r.type === "before")
       .map((r) => r.content);
-    const afterRules = activeRules
+    const afterRulesContent = effectiveRulesContent
       .filter((r) => r.type === "after")
       .map((r) => r.content);
 
-    if (beforeRules.length > 0) {
-      userContent = `${beforeRules.join(`
+    if (beforeRulesContent.length > 0) {
+      userContent = `${beforeRulesContent.join(`
 `)}
 
 ${userContent}`;
     }
-    if (afterRules.length > 0) {
+    if (afterRulesContent.length > 0) {
       userContent = `${userContent}
 
-    ${afterRules.join(`
+    ${afterRulesContent.join(`
 `)}`;
     }
 
@@ -138,14 +122,14 @@ ${userContent}`;
     let baseSystemPrompt =
       turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
 
-    if (systemRules.length > 0) {
+    if (systemRulesContent.length > 0) {
       baseSystemPrompt = `${
         baseSystemPrompt
           ? `${baseSystemPrompt}
 
         `
           : ""
-      }${systemRules.join(`
+      }${systemRulesContent.join(`
 `)}`;
     }
 
@@ -173,15 +157,17 @@ ${userContent}`;
       parameters: finalParameters,
       metadata: {
         ...(({
-          turnSystemPrompt,
+          turnSystemPrompt: _turnSystemPrompt,
           activeTagIds,
           activeRuleIds,
+          effectiveRulesContent: _effectiveRulesContent, // Exclude from direct pass-through
           autoTitleEnabledForTurn,
           ...restMeta
         }) => ({
           ...restMeta,
-          effectivelyAppliedTagIds: combinedActiveTagIds,
-          effectivelyAppliedRuleIds: Array.from(allEffectiveRuleIds),
+          // Store original IDs for reference if needed, though content is primary now
+          effectivelyAppliedTagIds: activeTagIds,
+          effectivelyAppliedRuleIds: activeRuleIds,
         }))(turnData.metadata ?? {}),
         modelId: promptState.modelId ?? undefined,
         attachedFiles: turnData.metadata.attachedFiles?.map(
@@ -201,10 +187,26 @@ ${userContent}`;
         console.log(
           "[ConversationService] Triggering asynchronous title generation."
         );
+        // For title generation, we might not need full rule content, just names or a flag.
+        // For simplicity, passing an empty array for activeRulesForTurn if full content isn't easily available here.
+        // Or, the title generation logic could be simplified to not depend on rule *content*.
+        const rulesForTitleContext: DbRule[] = (
+          turnData.metadata?.effectiveRulesContent ?? []
+        ).map((erc) => ({
+          id: erc.sourceRuleId || nanoid(),
+          name: erc.sourceRuleId
+            ? `Rule ${erc.sourceRuleId.substring(0, 4)}`
+            : "Context Rule",
+          content: erc.content,
+          type: erc.type,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
+
         this.generateConversationTitle(
           conversationId,
           turnData,
-          activeRules
+          rulesForTitleContext
         ).catch((titleError) => {
           console.error(
             "[ConversationService] Background title generation failed:",
@@ -227,7 +229,7 @@ ${userContent}`;
   async generateConversationTitle(
     conversationId: string,
     originalTurnData: PromptTurnObject,
-    activeRulesForTurn: DbRule[]
+    activeRulesForTurn: DbRule[] // DbRule[] for simplicity, assuming names are sufficient
   ): Promise<void> {
     const settings = useSettingsStore.getState();
 
@@ -318,7 +320,6 @@ ${userContent}`;
     const projectStoreState = useProjectStore.getState();
     const promptState = usePromptStateStore.getState();
     const conversationStoreState = useConversationStore.getState();
-    const rulesStoreState = useRulesStore.getState();
 
     const targetInteraction = interactionStoreState.interactions.find(
       (i) => i.id === interactionId
@@ -353,44 +354,30 @@ ${userContent}`;
     let userContent = originalTurnData.content;
     const userMessageContentParts: (TextPart | ImagePart)[] = [];
 
-    const originalEffectivelyAppliedTagIds =
-      targetInteraction.metadata?.effectivelyAppliedTagIds ??
-      originalTurnData.metadata?.activeTagIds ??
-      [];
-    const originalEffectivelyAppliedRuleIds =
-      targetInteraction.metadata?.effectivelyAppliedRuleIds ??
-      originalTurnData.metadata?.activeRuleIds ??
-      [];
+    // Use pre-resolved rule content from original turnData metadata
+    const effectiveRulesContent: ResolvedRuleContent[] =
+      originalTurnData.metadata?.effectiveRulesContent ?? [];
 
-    const allEffectiveRuleIds = new Set<string>(
-      originalEffectivelyAppliedRuleIds
-    );
-    originalEffectivelyAppliedTagIds.forEach((tagId: string) => {
-      rulesStoreState
-        .getRulesForTag(tagId)
-        .forEach((rule) => allEffectiveRuleIds.add(rule.id));
-    });
-
-    const activeRules: DbRule[] =
-      rulesStoreState.getRulesByIds(Array.from(allEffectiveRuleIds)) || [];
-
-    const beforeRules = activeRules
+    const systemRulesContent = effectiveRulesContent
+      .filter((r) => r.type === "system")
+      .map((r) => r.content);
+    const beforeRulesContent = effectiveRulesContent
       .filter((r) => r.type === "before")
       .map((r) => r.content);
-    const afterRules = activeRules
+    const afterRulesContent = effectiveRulesContent
       .filter((r) => r.type === "after")
       .map((r) => r.content);
 
-    if (beforeRules.length > 0) {
-      userContent = `${beforeRules.join(`
+    if (beforeRulesContent.length > 0) {
+      userContent = `${beforeRulesContent.join(`
 `)}
 
 ${userContent}`;
     }
-    if (afterRules.length > 0) {
+    if (afterRulesContent.length > 0) {
       userContent = `${userContent}
 
-    ${afterRules.join(`
+    ${afterRulesContent.join(`
 `)}`;
     }
 
@@ -421,17 +408,14 @@ ${userContent}`;
     let baseSystemPrompt =
       turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
 
-    const systemRules = activeRules
-      .filter((r) => r.type === "system")
-      .map((r) => r.content);
-    if (systemRules.length > 0) {
+    if (systemRulesContent.length > 0) {
       baseSystemPrompt = `${
         baseSystemPrompt
           ? `${baseSystemPrompt}
 
         `
           : ""
-      }${systemRules.join(`
+      }${systemRulesContent.join(`
 `)}`;
     }
 
@@ -459,17 +443,16 @@ ${userContent}`;
       parameters: finalParameters,
       metadata: {
         ...(({
-          turnSystemPrompt,
-          activeTagIds,
-          activeRuleIds,
+          turnSystemPrompt: _turnSystemPrompt,
+          activeTagIds, // Keep original IDs for reference
+          activeRuleIds, // Keep original IDs for reference
+          effectiveRulesContent: _effectiveRulesContent, // Exclude, already applied
           autoTitleEnabledForTurn,
-          effectivelyAppliedTagIds,
-          effectivelyAppliedRuleIds,
           ...restMeta
         }) => ({
           ...restMeta,
-          effectivelyAppliedTagIds: originalEffectivelyAppliedTagIds,
-          effectivelyAppliedRuleIds: Array.from(allEffectiveRuleIds),
+          effectivelyAppliedTagIds: activeTagIds,
+          effectivelyAppliedRuleIds: activeRuleIds,
         }))(originalTurnData.metadata ?? {}),
         modelId: promptState.modelId ?? undefined,
         regeneratedFromId: interactionId,

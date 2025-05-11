@@ -3,9 +3,9 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
-import { providerStoreEvent } from "@/types/litechat/events/provider.events";
-import { promptStoreEvent } from "@/types/litechat/events/prompt.events";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { WebSearchControlTrigger } from "@/controls/components/web-search/WebSearchControlTrigger";
 import { useProviderStore } from "@/store/provider.store";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -27,26 +27,20 @@ export class WebSearchControlModule implements ControlModule {
     this.updateVisibility();
     this.notifyComponentUpdate?.();
 
-    const unsubStatus = modApi.on(
-      interactionStoreEvent.statusChanged,
-      (payload) => {
-        if (typeof payload === "object" && payload && "status" in payload) {
-          if (this.isStreaming !== (payload.status === "streaming")) {
-            this.isStreaming = payload.status === "streaming";
-            this.notifyComponentUpdate?.();
-          }
+    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
+      if (typeof payload === "object" && payload && "status" in payload) {
+        if (this.isStreaming !== (payload.status === "streaming")) {
+          this.isStreaming = payload.status === "streaming";
+          this.notifyComponentUpdate?.();
         }
       }
-    );
-    const unsubModel = modApi.on(
-      providerStoreEvent.selectedModelChanged,
-      () => {
-        this.updateVisibility();
-        this.notifyComponentUpdate?.();
-      }
-    );
+    });
+    const unsubModel = modApi.on(providerEvent.selectedModelChanged, () => {
+      this.updateVisibility();
+      this.notifyComponentUpdate?.();
+    });
     const unsubPromptParams = modApi.on(
-      promptStoreEvent.parameterChanged,
+      promptEvent.parameterChanged,
       (payload) => {
         if (typeof payload === "object" && payload && "params" in payload) {
           const params = payload.params;

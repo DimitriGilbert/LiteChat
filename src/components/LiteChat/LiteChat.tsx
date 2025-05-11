@@ -36,8 +36,8 @@ import type { SidebarItemType } from "@/types/litechat/chat";
 import { EventActionCoordinatorService } from "@/services/event-action-coordinator.service";
 import { ModalManager } from "@/components/LiteChat/common/ModalManager";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { promptStoreEvent } from "@/types/litechat/events/prompt.events";
-import { vfsStoreEvent } from "@/types/litechat/events/vfs.events";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
+import { vfsEvent } from "@/types/litechat/events/vfs.events";
 
 let initializedControlModules: ControlModule[] = [];
 let appInitializationPromise: Promise<ControlModule[]> | null = null;
@@ -162,7 +162,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       }
 
       const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
-      emitter.emit(promptStoreEvent.initializePromptStateRequest, {
+      emitter.emit(promptEvent.initializePromptStateRequest, {
         effectiveSettings,
       });
       prevContextRef.current = currentContext;
@@ -197,7 +197,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     }
 
     if (useVfsStore.getState().vfsKey !== targetVfsKey) {
-      emitter.emit(vfsStoreEvent.setVfsKeyRequest, { key: targetVfsKey });
+      emitter.emit(vfsEvent.setVfsKeyRequest, { key: targetVfsKey });
     }
   }, [
     selectedItemId,

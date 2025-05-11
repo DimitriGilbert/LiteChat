@@ -1,11 +1,20 @@
-// src/types/litechat/events/stores/input.events.ts
-// NEW FILE
-export const inputStoreEvent = {
+// src/types/litechat/events/input.events.ts
+// FULL FILE
+import type { AttachedFileMetadata } from "@/store/input.store";
+
+export const inputEvent = {
   // State Change Events
-  attachedFilesChanged: "stores.input.attached.files.changed",
+  attachedFilesChanged: "input.attached.files.changed",
 
   // Action Request Events
-  addAttachedFileRequest: "stores.input.add.attached.file.request",
-  removeAttachedFileRequest: "stores.input.remove.attached.file.request",
-  clearAttachedFilesRequest: "stores.input.clear.attached.files.request",
+  addAttachedFileRequest: "input.add.attached.file.request",
+  removeAttachedFileRequest: "input.remove.attached.file.request",
+  clearAttachedFilesRequest: "input.clear.attached.files.request",
 } as const;
+
+export interface InputEventPayloads {
+  [inputEvent.attachedFilesChanged]: { files: AttachedFileMetadata[] };
+  [inputEvent.addAttachedFileRequest]: Omit<AttachedFileMetadata, "id">;
+  [inputEvent.removeAttachedFileRequest]: { attachmentId: string };
+  [inputEvent.clearAttachedFilesRequest]: undefined;
+}

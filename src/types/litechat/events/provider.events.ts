@@ -1,36 +1,77 @@
-// src/types/litechat/events/stores/provider.events.ts
+// src/types/litechat/events/provider.events.ts
 // FULL FILE
-export const providerStoreEvent = {
+import type {
+  DbProviderConfig,
+  DbApiKey,
+  ModelListItem,
+} from "@/types/litechat/provider";
+
+export const providerEvent = {
   // State Change Events
-  initialDataLoaded: "stores.provider.initial.data.loaded",
-  configsChanged: "stores.provider.configs.changed",
-  apiKeysChanged: "stores.provider.api.keys.changed",
-  selectedModelChanged: "stores.provider.selected.model.changed",
-  globalModelSortOrderChanged:
-    "stores.provider.global.model.sort.order.changed",
-  fetchStatusChanged: "stores.provider.fetch.status.changed",
-  globallyEnabledModelsUpdated:
-    "stores.provider.globally.enabled.models.updated",
-  selectedModelForDetailsChanged:
-    "stores.provider.selected.model.for.details.changed",
-  // Added this event
-  enableApiKeyManagementChanged:
-    "stores.provider.enable.api.key.management.changed",
+  initialDataLoaded: "provider.initial.data.loaded",
+  configsChanged: "provider.configs.changed",
+  apiKeysChanged: "provider.api.keys.changed",
+  selectedModelChanged: "provider.selected.model.changed",
+  globalModelSortOrderChanged: "provider.global.model.sort.order.changed",
+  fetchStatusChanged: "provider.fetch.status.changed",
+  globallyEnabledModelsUpdated: "provider.globally.enabled.models.updated",
+  selectedModelForDetailsChanged: "provider.selected.model.for.details.changed",
+  enableApiKeyManagementChanged: "provider.enable.api.key.management.changed",
 
   // Action Request Events
-  loadInitialDataRequest: "stores.provider.load.initial.data.request",
-  selectModelRequest: "stores.provider.select.model.request",
-  addApiKeyRequest: "stores.provider.add.api.key.request",
-  deleteApiKeyRequest: "stores.provider.delete.api.key.request",
-  addProviderConfigRequest: "stores.provider.add.config.request",
-  updateProviderConfigRequest: "stores.provider.update.config.request",
-  deleteProviderConfigRequest: "stores.provider.delete.config.request",
-  fetchModelsRequest: "stores.provider.fetch.models.request",
+  loadInitialDataRequest: "provider.load.initial.data.request",
+  selectModelRequest: "provider.select.model.request",
+  addApiKeyRequest: "provider.add.api.key.request",
+  deleteApiKeyRequest: "provider.delete.api.key.request",
+  addProviderConfigRequest: "provider.add.config.request",
+  updateProviderConfigRequest: "provider.update.config.request",
+  deleteProviderConfigRequest: "provider.delete.config.request",
+  fetchModelsRequest: "provider.fetch.models.request",
   setGlobalModelSortOrderRequest:
-    "stores.provider.set.global.model.sort.order.request",
-  // Added this request
+    "provider.set.global.model.sort.order.request",
   setEnableApiKeyManagementRequest:
-    "stores.provider.set.enable.api.key.management.request",
+    "provider.set.enable.api.key.management.request",
   setSelectedModelForDetailsRequest:
-    "stores.provider.set.selected.model.for.details.request",
+    "provider.set.selected.model.for.details.request",
 } as const;
+
+export interface ProviderEventPayloads {
+  [providerEvent.initialDataLoaded]: {
+    configs: DbProviderConfig[];
+    apiKeys: DbApiKey[];
+    selectedModelId: string | null;
+    globalSortOrder: string[];
+  };
+  [providerEvent.configsChanged]: { providerConfigs: DbProviderConfig[] };
+  [providerEvent.apiKeysChanged]: { apiKeys: DbApiKey[] };
+  [providerEvent.selectedModelChanged]: { modelId: string | null };
+  [providerEvent.globalModelSortOrderChanged]: { ids: string[] };
+  [providerEvent.fetchStatusChanged]: {
+    providerId: string;
+    status: "idle" | "fetching" | "error" | "success";
+  };
+  [providerEvent.globallyEnabledModelsUpdated]: { models: ModelListItem[] };
+  [providerEvent.selectedModelForDetailsChanged]: { modelId: string | null };
+  [providerEvent.enableApiKeyManagementChanged]: { enabled: boolean };
+  [providerEvent.loadInitialDataRequest]: undefined;
+  [providerEvent.selectModelRequest]: { modelId: string | null };
+  [providerEvent.addApiKeyRequest]: {
+    name: string;
+    providerId: string;
+    value: string;
+  };
+  [providerEvent.deleteApiKeyRequest]: { id: string };
+  [providerEvent.addProviderConfigRequest]: Omit<
+    DbProviderConfig,
+    "id" | "createdAt" | "updatedAt"
+  >;
+  [providerEvent.updateProviderConfigRequest]: {
+    id: string;
+    changes: Partial<DbProviderConfig>;
+  };
+  [providerEvent.deleteProviderConfigRequest]: { id: string };
+  [providerEvent.fetchModelsRequest]: { providerConfigId: string };
+  [providerEvent.setGlobalModelSortOrderRequest]: { ids: string[] };
+  [providerEvent.setEnableApiKeyManagementRequest]: { enabled: boolean };
+  [providerEvent.setSelectedModelForDetailsRequest]: { modelId: string | null };
+}

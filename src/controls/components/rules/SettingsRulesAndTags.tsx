@@ -1,28 +1,41 @@
-// src/components/LiteChat/settings/SettingsRulesAndTags.tsx
+// src/controls/components/rules/SettingsRulesAndTags.tsx
 // FULL FILE
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import { SettingsRules } from "@/controls/components/rules/SettingsRules";
 import { SettingsTags } from "@/controls/components/rules/SettingsTags";
 import {
   TabbedLayout,
   TabDefinition,
 } from "@/components/LiteChat/common/TabbedLayout";
+import type { RulesControlModule } from "@/controls/modules/RulesControlModule";
 
-export const SettingsRulesAndTags: React.FC = () => {
+interface SettingsRulesAndTagsProps {
+  module: RulesControlModule;
+}
+
+export const SettingsRulesAndTags: React.FC<SettingsRulesAndTagsProps> = ({
+  module,
+}) => {
+  const [, forceUpdate] = useState({});
+  useEffect(() => {
+    module.setNotifySettingsCallback(() => forceUpdate({}));
+    return () => module.setNotifySettingsCallback(null);
+  }, [module]);
+
   const tabs: TabDefinition[] = useMemo(
     () => [
       {
         value: "rules",
         label: "Rules",
-        content: <SettingsRules />,
+        content: <SettingsRules module={module} />,
       },
       {
         value: "tags",
         label: "Tags",
-        content: <SettingsTags />,
+        content: <SettingsTags module={module} />,
       },
     ],
-    []
+    [module]
   );
 
   return (

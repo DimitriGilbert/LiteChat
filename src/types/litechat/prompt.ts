@@ -4,6 +4,14 @@ import type React from "react";
 import type { CoreMessage, Tool } from "ai";
 import { ChatControlStatus } from "./chat";
 
+// Define a structure for resolved rule content in metadata
+export interface ResolvedRuleContent {
+  type: "system" | "before" | "after";
+  content: string;
+  sourceRuleId?: string; // Optional: for tracing back to original rule
+  sourceTagId?: string; // Optional: if applied via a tag
+}
+
 export interface PromptTurnObject {
   id: string;
   content: string;
@@ -20,12 +28,13 @@ export interface PromptTurnObject {
       contentBase64?: string;
     }[];
     enabledTools?: string[];
-    // Add metadata from transient controls
     turnSystemPrompt?: string;
-    activeTagIds?: string[];
-    activeRuleIds?: string[];
+    activeTagIds?: string[]; // IDs of tags explicitly activated for the turn
+    activeRuleIds?: string[]; // IDs of rules explicitly activated for the turn
+    // New field for pre-resolved rule content
+    effectiveRulesContent?: ResolvedRuleContent[];
     autoTitleEnabledForTurn?: boolean;
-    maxSteps?: number; // From tool selector
+    maxSteps?: number;
   };
 }
 
@@ -49,7 +58,6 @@ export interface PromptObject {
       size: number;
       path?: string;
     }[];
-    // Add other relevant metadata for AI service
     modelId?: string;
     regeneratedFromId?: string;
     isTitleGeneration?: boolean;
@@ -90,7 +98,7 @@ export type PromptControlArea = "panel" | "trigger";
 
 export interface InputAreaRef {
   getValue: () => string;
-  setValue: (value: string) => void; // Add setValue method
+  setValue: (value: string) => void;
   focus: () => void;
   clearValue: () => void;
 }

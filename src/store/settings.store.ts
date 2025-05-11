@@ -5,7 +5,7 @@ import { immer } from "zustand/middleware/immer";
 import { PersistenceService } from "@/services/persistence.service";
 import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { settingsStoreEvent } from "@/types/litechat/events/settings.events"; // Updated import
+import { settingsEvent } from "@/types/litechat/events/settings.events";
 
 export interface CustomThemeColors {
   background?: string;
@@ -181,58 +181,58 @@ export const useSettingsStore = create(
     setTheme: (theme) => {
       set({ theme: theme });
       PersistenceService.saveSetting("theme", theme);
-      emitter.emit(settingsStoreEvent.themeChanged, { theme });
+      emitter.emit(settingsEvent.themeChanged, { theme });
     },
     setGlobalSystemPrompt: (prompt) => {
       set({ globalSystemPrompt: prompt });
       PersistenceService.saveSetting("globalSystemPrompt", prompt);
-      emitter.emit(settingsStoreEvent.globalSystemPromptChanged, { prompt });
+      emitter.emit(settingsEvent.globalSystemPromptChanged, { prompt });
     },
     setTemperature: (temp) => {
       set({ temperature: temp });
       PersistenceService.saveSetting("temperature", temp);
-      emitter.emit(settingsStoreEvent.temperatureChanged, { value: temp });
+      emitter.emit(settingsEvent.temperatureChanged, { value: temp });
     },
     setMaxTokens: (tokens) => {
       set({ maxTokens: tokens });
       PersistenceService.saveSetting("maxTokens", tokens);
-      emitter.emit(settingsStoreEvent.maxTokensChanged, { value: tokens });
+      emitter.emit(settingsEvent.maxTokensChanged, { value: tokens });
     },
     setTopP: (topP) => {
       set({ topP: topP });
       PersistenceService.saveSetting("topP", topP);
-      emitter.emit(settingsStoreEvent.topPChanged, { value: topP });
+      emitter.emit(settingsEvent.topPChanged, { value: topP });
     },
     setTopK: (topK) => {
       set({ topK: topK });
       PersistenceService.saveSetting("topK", topK);
-      emitter.emit(settingsStoreEvent.topKChanged, { value: topK });
+      emitter.emit(settingsEvent.topKChanged, { value: topK });
     },
     setPresencePenalty: (penalty) => {
       set({ presencePenalty: penalty });
       PersistenceService.saveSetting("presencePenalty", penalty);
-      emitter.emit(settingsStoreEvent.presencePenaltyChanged, {
+      emitter.emit(settingsEvent.presencePenaltyChanged, {
         value: penalty,
       });
     },
     setFrequencyPenalty: (penalty) => {
       set({ frequencyPenalty: penalty });
       PersistenceService.saveSetting("frequencyPenalty", penalty);
-      emitter.emit(settingsStoreEvent.frequencyPenaltyChanged, {
+      emitter.emit(settingsEvent.frequencyPenaltyChanged, {
         value: penalty,
       });
     },
     setEnableAdvancedSettings: (enabled) => {
       set({ enableAdvancedSettings: enabled });
       PersistenceService.saveSetting("enableAdvancedSettings", enabled);
-      emitter.emit(settingsStoreEvent.enableAdvancedSettingsChanged, {
+      emitter.emit(settingsEvent.enableAdvancedSettingsChanged, {
         enabled,
       });
     },
     setEnableStreamingMarkdown: (enabled) => {
       set({ enableStreamingMarkdown: enabled });
       PersistenceService.saveSetting("enableStreamingMarkdown", enabled);
-      emitter.emit(settingsStoreEvent.enableStreamingMarkdownChanged, {
+      emitter.emit(settingsEvent.enableStreamingMarkdownChanged, {
         enabled,
       });
     },
@@ -242,19 +242,19 @@ export const useSettingsStore = create(
         "enableStreamingCodeBlockParsing",
         enabled
       );
-      emitter.emit(settingsStoreEvent.enableStreamingCodeBlockParsingChanged, {
+      emitter.emit(settingsEvent.enableStreamingCodeBlockParsingChanged, {
         enabled,
       });
     },
     setFoldStreamingCodeBlocks: (fold) => {
       set({ foldStreamingCodeBlocks: fold });
       PersistenceService.saveSetting("foldStreamingCodeBlocks", fold);
-      emitter.emit(settingsStoreEvent.foldStreamingCodeBlocksChanged, { fold });
+      emitter.emit(settingsEvent.foldStreamingCodeBlocksChanged, { fold });
     },
     setFoldUserMessagesOnCompletion: (fold) => {
       set({ foldUserMessagesOnCompletion: fold });
       PersistenceService.saveSetting("foldUserMessagesOnCompletion", fold);
-      emitter.emit(settingsStoreEvent.foldUserMessagesOnCompletionChanged, {
+      emitter.emit(settingsEvent.foldUserMessagesOnCompletionChanged, {
         fold,
       });
     },
@@ -262,7 +262,7 @@ export const useSettingsStore = create(
       const clampedFps = Math.max(3, Math.min(60, fps));
       set({ streamingRenderFPS: clampedFps });
       PersistenceService.saveSetting("streamingRenderFPS", clampedFps);
-      emitter.emit(settingsStoreEvent.streamingRenderFpsChanged, {
+      emitter.emit(settingsEvent.streamingRenderFpsChanged, {
         fps: clampedFps,
       });
     },
@@ -270,7 +270,7 @@ export const useSettingsStore = create(
       const trimmedName = name?.trim() || null;
       set({ gitUserName: trimmedName });
       PersistenceService.saveSetting("gitUserName", trimmedName);
-      emitter.emit(settingsStoreEvent.gitUserNameChanged, {
+      emitter.emit(settingsEvent.gitUserNameChanged, {
         name: trimmedName,
       });
     },
@@ -278,7 +278,7 @@ export const useSettingsStore = create(
       const trimmedEmail = email?.trim() || null;
       set({ gitUserEmail: trimmedEmail });
       PersistenceService.saveSetting("gitUserEmail", trimmedEmail);
-      emitter.emit(settingsStoreEvent.gitUserEmailChanged, {
+      emitter.emit(settingsEvent.gitUserEmailChanged, {
         email: trimmedEmail,
       });
     },
@@ -286,7 +286,7 @@ export const useSettingsStore = create(
       const clampedSteps = Math.max(1, Math.min(20, steps));
       set({ toolMaxSteps: clampedSteps });
       PersistenceService.saveSetting("toolMaxSteps", clampedSteps);
-      emitter.emit(settingsStoreEvent.toolMaxStepsChanged, {
+      emitter.emit(settingsEvent.toolMaxStepsChanged, {
         steps: clampedSteps,
       });
     },
@@ -294,39 +294,39 @@ export const useSettingsStore = create(
       const trimmedUrl = url?.trim() || null;
       set({ prismThemeUrl: trimmedUrl });
       PersistenceService.saveSetting("prismThemeUrl", trimmedUrl);
-      emitter.emit(settingsStoreEvent.prismThemeUrlChanged, {
+      emitter.emit(settingsEvent.prismThemeUrlChanged, {
         url: trimmedUrl,
       });
     },
     setAutoTitleEnabled: (enabled) => {
       set({ autoTitleEnabled: enabled });
       PersistenceService.saveSetting("autoTitleEnabled", enabled);
-      emitter.emit(settingsStoreEvent.autoTitleEnabledChanged, { enabled });
+      emitter.emit(settingsEvent.autoTitleEnabledChanged, { enabled });
     },
     setAutoTitleModelId: (modelId) => {
       set({ autoTitleModelId: modelId });
       PersistenceService.saveSetting("autoTitleModelId", modelId);
-      emitter.emit(settingsStoreEvent.autoTitleModelIdChanged, { modelId });
+      emitter.emit(settingsEvent.autoTitleModelIdChanged, { modelId });
     },
     setAutoTitlePromptMaxLength: (length) => {
       const clampedLength = Math.max(100, Math.min(4000, length));
       set({ autoTitlePromptMaxLength: clampedLength });
       PersistenceService.saveSetting("autoTitlePromptMaxLength", clampedLength);
-      emitter.emit(settingsStoreEvent.autoTitlePromptMaxLengthChanged, {
+      emitter.emit(settingsEvent.autoTitlePromptMaxLengthChanged, {
         length: clampedLength,
       });
     },
     setAutoTitleIncludeFiles: (include) => {
       set({ autoTitleIncludeFiles: include });
       PersistenceService.saveSetting("autoTitleIncludeFiles", include);
-      emitter.emit(settingsStoreEvent.autoTitleIncludeFilesChanged, {
+      emitter.emit(settingsEvent.autoTitleIncludeFilesChanged, {
         include,
       });
     },
     setAutoTitleIncludeRules: (include) => {
       set({ autoTitleIncludeRules: include });
       PersistenceService.saveSetting("autoTitleIncludeRules", include);
-      emitter.emit(settingsStoreEvent.autoTitleIncludeRulesChanged, {
+      emitter.emit(settingsEvent.autoTitleIncludeRulesChanged, {
         include,
       });
     },
@@ -334,7 +334,7 @@ export const useSettingsStore = create(
       const trimmedFont = fontFamily?.trim() || null;
       set({ customFontFamily: trimmedFont });
       PersistenceService.saveSetting("customFontFamily", trimmedFont);
-      emitter.emit(settingsStoreEvent.customFontFamilyChanged, {
+      emitter.emit(settingsEvent.customFontFamilyChanged, {
         fontFamily: trimmedFont,
       });
     },
@@ -343,21 +343,21 @@ export const useSettingsStore = create(
         fontSize === null ? null : Math.max(10, Math.min(24, fontSize));
       set({ customFontSize: clampedSize });
       PersistenceService.saveSetting("customFontSize", clampedSize);
-      emitter.emit(settingsStoreEvent.customFontSizeChanged, {
+      emitter.emit(settingsEvent.customFontSizeChanged, {
         fontSize: clampedSize,
       });
     },
     setChatMaxWidth: (maxWidthClass) => {
       set({ chatMaxWidth: maxWidthClass });
       PersistenceService.saveSetting("chatMaxWidth", maxWidthClass);
-      emitter.emit(settingsStoreEvent.chatMaxWidthChanged, {
+      emitter.emit(settingsEvent.chatMaxWidthChanged, {
         maxWidth: maxWidthClass,
       });
     },
     setCustomThemeColors: (colors) => {
       set({ customThemeColors: colors });
       PersistenceService.saveSetting("customThemeColors", colors);
-      emitter.emit(settingsStoreEvent.customThemeColorsChanged, { colors });
+      emitter.emit(settingsEvent.customThemeColorsChanged, { colors });
     },
     setCustomThemeColor: (colorName, value) => {
       set((state) => {
@@ -373,7 +373,7 @@ export const useSettingsStore = create(
       });
       const newColors = get().customThemeColors;
       PersistenceService.saveSetting("customThemeColors", newColors);
-      emitter.emit(settingsStoreEvent.customThemeColorsChanged, {
+      emitter.emit(settingsEvent.customThemeColorsChanged, {
         colors: newColors,
       });
     },
@@ -381,14 +381,14 @@ export const useSettingsStore = create(
       const clampedInterval = Math.max(50, interval);
       set({ autoScrollInterval: clampedInterval });
       PersistenceService.saveSetting("autoScrollInterval", clampedInterval);
-      emitter.emit(settingsStoreEvent.autoScrollIntervalChanged, {
+      emitter.emit(settingsEvent.autoScrollIntervalChanged, {
         interval: clampedInterval,
       });
     },
     setEnableAutoScrollOnStream: (enabled) => {
       set({ enableAutoScrollOnStream: enabled });
       PersistenceService.saveSetting("enableAutoScrollOnStream", enabled);
-      emitter.emit(settingsStoreEvent.enableAutoScrollOnStreamChanged, {
+      emitter.emit(settingsEvent.enableAutoScrollOnStreamChanged, {
         enabled,
       });
     },
@@ -570,10 +570,10 @@ export const useSettingsStore = create(
           enableAutoScrollOnStream,
         };
         set(loadedSettings);
-        emitter.emit(settingsStoreEvent.loaded, { settings: loadedSettings });
+        emitter.emit(settingsEvent.loaded, { settings: loadedSettings });
       } catch (error) {
         console.error("SettingsStore: Error loading settings", error);
-        emitter.emit(settingsStoreEvent.loaded, { settings: get() }); // Emit current state on error
+        emitter.emit(settingsEvent.loaded, { settings: get() }); // Emit current state on error
       }
     },
 

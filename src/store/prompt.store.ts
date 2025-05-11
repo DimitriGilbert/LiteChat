@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { promptStoreEvent } from "@/types/litechat/events/prompt.events";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 
 // State for the *next* prompt submission
 export interface PromptState {
@@ -46,7 +46,7 @@ const emitParamChange = (
   key: keyof PromptState,
   value: PromptState[keyof PromptState]
 ) => {
-  emitter.emit(promptStoreEvent.parameterChanged, { params: { [key]: value } });
+  emitter.emit(promptEvent.parameterChanged, { params: { [key]: value } });
 };
 
 export const usePromptStateStore = create(
@@ -162,9 +162,9 @@ export const usePromptStateStore = create(
 
       if (changed) {
         set(changes);
-        emitter.emit(promptStoreEvent.parameterChanged, { params: changes });
+        emitter.emit(promptEvent.parameterChanged, { params: changes });
       }
-      emitter.emit(promptStoreEvent.initialized, { state: { ...get() } });
+      emitter.emit(promptEvent.initialized, { state: { ...get() } });
     },
 
     resetTransientParameters: () => {
@@ -212,9 +212,9 @@ export const usePromptStateStore = create(
 
       if (changed) {
         set(changes);
-        emitter.emit(promptStoreEvent.parameterChanged, { params: changes });
+        emitter.emit(promptEvent.parameterChanged, { params: changes });
       }
-      emitter.emit(promptStoreEvent.transientParametersReset, undefined);
+      emitter.emit(promptEvent.transientParametersReset, undefined);
     },
   }))
 );

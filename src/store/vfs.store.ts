@@ -14,7 +14,7 @@ import { fs } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { vfsStoreEvent } from "@/types/litechat/events/vfs.events";
+import { vfsEvent } from "@/types/litechat/events/vfs.events";
 
 interface VfsState {
   nodes: Record<string, VfsNode>;
@@ -88,7 +88,7 @@ export const useVfsStore = create(
         state.loading = loading;
         if (loading) state.error = null;
       });
-      emitter.emit(vfsStoreEvent.loadingStateChanged, {
+      emitter.emit(vfsEvent.loadingStateChanged, {
         isLoading: get().loading,
         operationLoading: get().operationLoading,
         error: get().error,
@@ -98,7 +98,7 @@ export const useVfsStore = create(
       set((state) => {
         state.operationLoading = loading;
       });
-      emitter.emit(vfsStoreEvent.loadingStateChanged, {
+      emitter.emit(vfsEvent.loadingStateChanged, {
         isLoading: get().loading,
         operationLoading: get().operationLoading,
         error: get().error,
@@ -114,7 +114,7 @@ export const useVfsStore = create(
           toast.error(`VFS Error: ${error}`);
         }
       });
-      emitter.emit(vfsStoreEvent.loadingStateChanged, {
+      emitter.emit(vfsEvent.loadingStateChanged, {
         isLoading: get().loading,
         operationLoading: get().operationLoading,
         error: get().error,
@@ -147,7 +147,7 @@ export const useVfsStore = create(
           }
         }
       });
-      emitter.emit(vfsStoreEvent.nodesUpdated, {
+      emitter.emit(vfsEvent.nodesUpdated, {
         vfsKey: get().vfsKey,
         nodes: get().nodes,
         childrenMap: get().childrenMap,
@@ -159,7 +159,7 @@ export const useVfsStore = create(
           Object.assign(state.nodes[id], changes);
         }
       });
-      emitter.emit(vfsStoreEvent.nodesUpdated, {
+      emitter.emit(vfsEvent.nodesUpdated, {
         vfsKey: get().vfsKey,
         nodes: get().nodes,
         childrenMap: get().childrenMap,
@@ -191,23 +191,23 @@ export const useVfsStore = create(
           }
         });
       });
-      emitter.emit(vfsStoreEvent.nodesUpdated, {
+      emitter.emit(vfsEvent.nodesUpdated, {
         vfsKey: get().vfsKey,
         nodes: get().nodes,
         childrenMap: get().childrenMap,
       });
-      emitter.emit(vfsStoreEvent.selectionChanged, {
+      emitter.emit(vfsEvent.selectionChanged, {
         selectedFileIds: Array.from(get().selectedFileIds),
       });
     },
     _setFsInstance: (fsInstance) => {
       set({ fs: fsInstance });
-      emitter.emit(vfsStoreEvent.fsInstanceChanged, { fsInstance });
+      emitter.emit(vfsEvent.fsInstanceChanged, { fsInstance });
     },
     _setEnableVfs: (enabled) => {
       console.log(`[VfsStore] Setting global enableVfs to: ${enabled}`);
       set({ enableVfs: enabled });
-      emitter.emit(vfsStoreEvent.vfsEnabledChanged, { enabled });
+      emitter.emit(vfsEvent.vfsEnabledChanged, { enabled });
       if (!enabled) {
         set({
           fs: null,
@@ -222,7 +222,7 @@ export const useVfsStore = create(
           operationLoading: false,
           initializingKey: null,
         });
-        emitter.emit(vfsStoreEvent.vfsKeyChanged, {
+        emitter.emit(vfsEvent.vfsKeyChanged, {
           vfsKey: null,
           configuredVfsKey: null,
         });
@@ -234,7 +234,7 @@ export const useVfsStore = create(
     },
     _setConfiguredVfsKey: (key) => {
       set({ configuredVfsKey: key });
-      emitter.emit(vfsStoreEvent.vfsKeyChanged, {
+      emitter.emit(vfsEvent.vfsKeyChanged, {
         vfsKey: get().vfsKey,
         configuredVfsKey: key,
       });
@@ -280,7 +280,7 @@ export const useVfsStore = create(
         selectedFileIds: new Set(),
         initializingKey: null,
       });
-      emitter.emit(vfsStoreEvent.vfsKeyChanged, {
+      emitter.emit(vfsEvent.vfsKeyChanged, {
         vfsKey: key,
         configuredVfsKey: null,
       });
@@ -790,7 +790,7 @@ export const useVfsStore = create(
           state.selectedFileIds.add(fileId);
         }
       });
-      emitter.emit(vfsStoreEvent.selectionChanged, {
+      emitter.emit(vfsEvent.selectionChanged, {
         selectedFileIds: Array.from(get().selectedFileIds),
       });
     },
@@ -798,7 +798,7 @@ export const useVfsStore = create(
       set((state) => {
         state.selectedFileIds.delete(fileId);
       });
-      emitter.emit(vfsStoreEvent.selectionChanged, {
+      emitter.emit(vfsEvent.selectionChanged, {
         selectedFileIds: Array.from(get().selectedFileIds),
       });
     },
@@ -806,7 +806,7 @@ export const useVfsStore = create(
       set((state) => {
         state.selectedFileIds.clear();
       });
-      emitter.emit(vfsStoreEvent.selectionChanged, {
+      emitter.emit(vfsEvent.selectionChanged, {
         selectedFileIds: [],
       });
     },

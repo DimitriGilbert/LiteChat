@@ -1,26 +1,26 @@
-// src/components/LiteChat/project-settings/ProjectSettingsRules.tsx
+// src/controls/components/project-settings/ProjectSettingsRules.tsx
 // FULL FILE
 import React, { useMemo, useCallback } from "react";
 import { Label } from "@/components/ui/label";
-import { useRulesStore } from "@/store/rules.store";
 import { ProjectDefaultRuleSelector } from "./ProjectDefaultRuleSelector";
+import type { DbRule } from "@/types/litechat/rules"; // Import DbRule
 
 interface ProjectSettingsRulesProps {
   defaultRuleIds: string[] | null;
   setDefaultRuleIds: (ids: string[] | null) => void;
   isSaving: boolean;
+  allRules: DbRule[]; // Add prop for allRules
 }
 
 export const ProjectSettingsRules: React.FC<ProjectSettingsRulesProps> = ({
   defaultRuleIds,
   setDefaultRuleIds,
   isSaving,
+  allRules, // Destructure allRules
 }) => {
-  const allRules = useRulesStore((state) => state.rules);
-
   const selectedRuleIdsSet = useMemo(
     () => new Set(defaultRuleIds ?? []),
-    [defaultRuleIds],
+    [defaultRuleIds]
   );
 
   const handleSelectionChange = useCallback(
@@ -34,7 +34,7 @@ export const ProjectSettingsRules: React.FC<ProjectSettingsRulesProps> = ({
       const nextArray = Array.from(nextSet);
       setDefaultRuleIds(nextArray.length > 0 ? nextArray : null);
     },
-    [selectedRuleIdsSet, setDefaultRuleIds],
+    [selectedRuleIdsSet, setDefaultRuleIds]
   );
 
   return (
@@ -46,7 +46,7 @@ export const ProjectSettingsRules: React.FC<ProjectSettingsRulesProps> = ({
         per-turn.
       </p>
       <ProjectDefaultRuleSelector
-        allRules={allRules}
+        allRules={allRules} // Pass down allRules
         selectedRuleIds={selectedRuleIdsSet}
         onSelectionChange={handleSelectionChange}
         disabled={isSaving}

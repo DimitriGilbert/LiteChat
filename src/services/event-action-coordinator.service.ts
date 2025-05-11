@@ -4,29 +4,29 @@ import { emitter } from "@/lib/litechat/event-emitter";
 
 // Import ALL store actions and event type constants
 import { useSettingsStore } from "@/store/settings.store";
-import { settingsStoreEvent } from "@/types/litechat/events/settings.events";
+import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { useProviderStore } from "@/store/provider.store";
-import { providerStoreEvent } from "@/types/litechat/events/provider.events";
-import { useRulesStore } from "@/store/rules.store";
-import { rulesStoreEvent } from "@/types/litechat/events/rules.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
+import { rulesEvent } from "@/types/litechat/events/rules.events"; // Correct: Only import event constants
 import { useConversationStore } from "@/store/conversation.store";
-import { conversationStoreEvent } from "@/types/litechat/events/conversation.events";
+import { conversationEvent } from "@/types/litechat/events/conversation.events";
 import { useProjectStore } from "@/store/project.store";
-import { projectStoreEvent } from "@/types/litechat/events/project.events";
+import { projectEvent } from "@/types/litechat/events/project.events";
 import { useInteractionStore } from "@/store/interaction.store";
-import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { useInputStore } from "@/store/input.store";
-import { inputStoreEvent } from "@/types/litechat/events/input.events";
+import { inputEvent } from "@/types/litechat/events/input.events";
 import { usePromptStateStore } from "@/store/prompt.store";
-import { promptStoreEvent } from "@/types/litechat/events/prompt.events";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { useModStore } from "@/store/mod.store";
-import { modStoreEvent } from "@/types/litechat/events/mod.events";
+import { modEvent } from "@/types/litechat/events/mod.events";
 import { useUIStateStore } from "@/store/ui.store";
-import { uiEvent } from "@/types/litechat/events/ui.events"; // UI events are not store-specific in naming yet
+import { uiEvent } from "@/types/litechat/events/ui.events";
 import { useVfsStore } from "@/store/vfs.store";
-import { vfsStoreEvent } from "@/types/litechat/events/vfs.events";
+import { vfsEvent } from "@/types/litechat/events/vfs.events";
 import { useControlRegistryStore } from "@/store/control.store";
-import { controlRegistryStoreEvent } from "@/types/litechat/events/control.registry.events";
+import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
+import { useRulesStore } from "@/store/rules.store"; // This import is for accessing getState() for actions
 
 export class EventActionCoordinatorService {
   private static isInitialized = false;
@@ -44,322 +44,321 @@ export class EventActionCoordinatorService {
 
     // --- SettingsStore Listeners ---
     const settingsActions = useSettingsStore.getState();
-    emitter.on(settingsStoreEvent.setThemeRequest, (p) =>
+    emitter.on(settingsEvent.setThemeRequest, (p) =>
       settingsActions.setTheme(p.theme)
     );
-    emitter.on(settingsStoreEvent.setGlobalSystemPromptRequest, (p) =>
+    emitter.on(settingsEvent.setGlobalSystemPromptRequest, (p) =>
       settingsActions.setGlobalSystemPrompt(p.prompt)
     );
-    emitter.on(settingsStoreEvent.setTemperatureRequest, (p) =>
+    emitter.on(settingsEvent.setTemperatureRequest, (p) =>
       settingsActions.setTemperature(p.value)
     );
-    emitter.on(settingsStoreEvent.setMaxTokensRequest, (p) =>
+    emitter.on(settingsEvent.setMaxTokensRequest, (p) =>
       settingsActions.setMaxTokens(p.value)
     );
-    emitter.on(settingsStoreEvent.setTopPRequest, (p) =>
+    emitter.on(settingsEvent.setTopPRequest, (p) =>
       settingsActions.setTopP(p.value)
     );
-    emitter.on(settingsStoreEvent.setTopKRequest, (p) =>
+    emitter.on(settingsEvent.setTopKRequest, (p) =>
       settingsActions.setTopK(p.value)
     );
-    emitter.on(settingsStoreEvent.setPresencePenaltyRequest, (p) =>
+    emitter.on(settingsEvent.setPresencePenaltyRequest, (p) =>
       settingsActions.setPresencePenalty(p.value)
     );
-    emitter.on(settingsStoreEvent.setFrequencyPenaltyRequest, (p) =>
+    emitter.on(settingsEvent.setFrequencyPenaltyRequest, (p) =>
       settingsActions.setFrequencyPenalty(p.value)
     );
-    emitter.on(settingsStoreEvent.setEnableAdvancedSettingsRequest, (p) =>
+    emitter.on(settingsEvent.setEnableAdvancedSettingsRequest, (p) =>
       settingsActions.setEnableAdvancedSettings(p.enabled)
     );
-    emitter.on(settingsStoreEvent.setEnableStreamingMarkdownRequest, (p) =>
+    emitter.on(settingsEvent.setEnableStreamingMarkdownRequest, (p) =>
       settingsActions.setEnableStreamingMarkdown(p.enabled)
     );
-    emitter.on(
-      settingsStoreEvent.setEnableStreamingCodeBlockParsingRequest,
-      (p) => settingsActions.setEnableStreamingCodeBlockParsing(p.enabled)
+    emitter.on(settingsEvent.setEnableStreamingCodeBlockParsingRequest, (p) =>
+      settingsActions.setEnableStreamingCodeBlockParsing(p.enabled)
     );
-    emitter.on(settingsStoreEvent.setFoldStreamingCodeBlocksRequest, (p) =>
+    emitter.on(settingsEvent.setFoldStreamingCodeBlocksRequest, (p) =>
       settingsActions.setFoldStreamingCodeBlocks(p.fold)
     );
-    emitter.on(settingsStoreEvent.setFoldUserMessagesOnCompletionRequest, (p) =>
+    emitter.on(settingsEvent.setFoldUserMessagesOnCompletionRequest, (p) =>
       settingsActions.setFoldUserMessagesOnCompletion(p.fold)
     );
-    emitter.on(settingsStoreEvent.setStreamingRenderFpsRequest, (p) =>
+    emitter.on(settingsEvent.setStreamingRenderFpsRequest, (p) =>
       settingsActions.setStreamingRenderFPS(p.fps)
     );
-    emitter.on(settingsStoreEvent.setGitUserNameRequest, (p) =>
+    emitter.on(settingsEvent.setGitUserNameRequest, (p) =>
       settingsActions.setGitUserName(p.name)
     );
-    emitter.on(settingsStoreEvent.setGitUserEmailRequest, (p) =>
+    emitter.on(settingsEvent.setGitUserEmailRequest, (p) =>
       settingsActions.setGitUserEmail(p.email)
     );
-    emitter.on(settingsStoreEvent.setToolMaxStepsRequest, (p) =>
+    emitter.on(settingsEvent.setToolMaxStepsRequest, (p) =>
       settingsActions.setToolMaxSteps(p.steps)
     );
-    emitter.on(settingsStoreEvent.setPrismThemeUrlRequest, (p) =>
+    emitter.on(settingsEvent.setPrismThemeUrlRequest, (p) =>
       settingsActions.setPrismThemeUrl(p.url)
     );
-    emitter.on(settingsStoreEvent.setAutoTitleEnabledRequest, (p) =>
+    emitter.on(settingsEvent.setAutoTitleEnabledRequest, (p) =>
       settingsActions.setAutoTitleEnabled(p.enabled)
     );
-    emitter.on(settingsStoreEvent.setAutoTitleModelIdRequest, (p) =>
+    emitter.on(settingsEvent.setAutoTitleModelIdRequest, (p) =>
       settingsActions.setAutoTitleModelId(p.modelId)
     );
-    emitter.on(settingsStoreEvent.setAutoTitlePromptMaxLengthRequest, (p) =>
+    emitter.on(settingsEvent.setAutoTitlePromptMaxLengthRequest, (p) =>
       settingsActions.setAutoTitlePromptMaxLength(p.length)
     );
-    emitter.on(settingsStoreEvent.setAutoTitleIncludeFilesRequest, (p) =>
+    emitter.on(settingsEvent.setAutoTitleIncludeFilesRequest, (p) =>
       settingsActions.setAutoTitleIncludeFiles(p.include)
     );
-    emitter.on(settingsStoreEvent.setAutoTitleIncludeRulesRequest, (p) =>
+    emitter.on(settingsEvent.setAutoTitleIncludeRulesRequest, (p) =>
       settingsActions.setAutoTitleIncludeRules(p.include)
     );
-    emitter.on(settingsStoreEvent.setCustomFontFamilyRequest, (p) =>
+    emitter.on(settingsEvent.setCustomFontFamilyRequest, (p) =>
       settingsActions.setCustomFontFamily(p.fontFamily)
     );
-    emitter.on(settingsStoreEvent.setCustomFontSizeRequest, (p) =>
+    emitter.on(settingsEvent.setCustomFontSizeRequest, (p) =>
       settingsActions.setCustomFontSize(p.fontSize)
     );
-    emitter.on(settingsStoreEvent.setChatMaxWidthRequest, (p) =>
+    emitter.on(settingsEvent.setChatMaxWidthRequest, (p) =>
       settingsActions.setChatMaxWidth(p.maxWidth)
     );
-    emitter.on(settingsStoreEvent.setCustomThemeColorsRequest, (p) =>
+    emitter.on(settingsEvent.setCustomThemeColorsRequest, (p) =>
       settingsActions.setCustomThemeColors(p.colors)
     );
-    emitter.on(settingsStoreEvent.setCustomThemeColorRequest, (p) =>
+    emitter.on(settingsEvent.setCustomThemeColorRequest, (p) =>
       settingsActions.setCustomThemeColor(p.colorKey, p.value)
     );
-    emitter.on(settingsStoreEvent.setAutoScrollIntervalRequest, (p) =>
+    emitter.on(settingsEvent.setAutoScrollIntervalRequest, (p) =>
       settingsActions.setAutoScrollInterval(p.interval)
     );
-    emitter.on(settingsStoreEvent.setEnableAutoScrollOnStreamRequest, (p) =>
+    emitter.on(settingsEvent.setEnableAutoScrollOnStreamRequest, (p) =>
       settingsActions.setEnableAutoScrollOnStream(p.enabled)
     );
-    emitter.on(settingsStoreEvent.setEnableApiKeyManagementRequest, (p) =>
-      useProviderStore.getState().setEnableApiKeyManagement(p.enabled)
-    ); // This action moved to ProviderStore
-    emitter.on(settingsStoreEvent.loadSettingsRequest, () =>
+    emitter.on(settingsEvent.loadSettingsRequest, () =>
       settingsActions.loadSettings()
     );
-    emitter.on(settingsStoreEvent.resetGeneralSettingsRequest, () =>
+    emitter.on(settingsEvent.resetGeneralSettingsRequest, () =>
       settingsActions.resetGeneralSettings()
     );
-    emitter.on(settingsStoreEvent.resetAssistantSettingsRequest, () =>
+    emitter.on(settingsEvent.resetAssistantSettingsRequest, () =>
       settingsActions.resetAssistantSettings()
     );
-    emitter.on(settingsStoreEvent.resetThemeSettingsRequest, () =>
+    emitter.on(settingsEvent.resetThemeSettingsRequest, () =>
       settingsActions.resetThemeSettings()
     );
 
     // --- ProviderStore Listeners ---
     const providerActions = useProviderStore.getState();
-    emitter.on(providerStoreEvent.loadInitialDataRequest, () =>
+    emitter.on(providerEvent.loadInitialDataRequest, () =>
       providerActions.loadInitialData()
     );
-    emitter.on(providerStoreEvent.selectModelRequest, (p) =>
+    emitter.on(providerEvent.selectModelRequest, (p) =>
       providerActions.selectModel(p.modelId)
     );
-    emitter.on(providerStoreEvent.addApiKeyRequest, (p) =>
+    emitter.on(providerEvent.addApiKeyRequest, (p) =>
       providerActions.addApiKey(p.name, p.providerId, p.value)
     );
-    emitter.on(providerStoreEvent.deleteApiKeyRequest, (p) =>
+    emitter.on(providerEvent.deleteApiKeyRequest, (p) =>
       providerActions.deleteApiKey(p.id)
     );
-    emitter.on(providerStoreEvent.addProviderConfigRequest, (p) =>
+    emitter.on(providerEvent.addProviderConfigRequest, (p) =>
       providerActions.addProviderConfig(p)
     );
-    emitter.on(providerStoreEvent.updateProviderConfigRequest, (p) =>
+    emitter.on(providerEvent.updateProviderConfigRequest, (p) =>
       providerActions.updateProviderConfig(p.id, p.changes)
     );
-    emitter.on(providerStoreEvent.deleteProviderConfigRequest, (p) =>
+    emitter.on(providerEvent.deleteProviderConfigRequest, (p) =>
       providerActions.deleteProviderConfig(p.id)
     );
-    emitter.on(providerStoreEvent.fetchModelsRequest, (p) =>
+    emitter.on(providerEvent.fetchModelsRequest, (p) =>
       providerActions.fetchModels(p.providerConfigId)
     );
-    emitter.on(providerStoreEvent.setGlobalModelSortOrderRequest, (p) =>
+    emitter.on(providerEvent.setGlobalModelSortOrderRequest, (p) =>
       providerActions.setGlobalModelSortOrder(p.ids)
     );
-    emitter.on(providerStoreEvent.setSelectedModelForDetailsRequest, (p) =>
+    emitter.on(providerEvent.setEnableApiKeyManagementRequest, (p) =>
+      providerActions.setEnableApiKeyManagement(p.enabled)
+    );
+    emitter.on(providerEvent.setSelectedModelForDetailsRequest, (p) =>
       providerActions.setSelectedModelForDetails(p.modelId)
     );
 
     // --- RulesStore Listeners ---
     const rulesActions = useRulesStore.getState();
-    emitter.on(rulesStoreEvent.loadRulesAndTagsRequest, () =>
+    emitter.on(rulesEvent.loadRulesAndTagsRequest, () =>
       rulesActions.loadRulesAndTags()
     );
-    emitter.on(rulesStoreEvent.addRuleRequest, (p) => rulesActions.addRule(p));
-    emitter.on(rulesStoreEvent.updateRuleRequest, (p) =>
+    emitter.on(rulesEvent.addRuleRequest, (p) => rulesActions.addRule(p));
+    emitter.on(rulesEvent.updateRuleRequest, (p) =>
       rulesActions.updateRule(p.id, p.updates)
     );
-    emitter.on(rulesStoreEvent.deleteRuleRequest, (p) =>
+    emitter.on(rulesEvent.deleteRuleRequest, (p) =>
       rulesActions.deleteRule(p.id)
     );
-    emitter.on(rulesStoreEvent.addTagRequest, (p) => rulesActions.addTag(p));
-    emitter.on(rulesStoreEvent.updateTagRequest, (p) =>
+    emitter.on(rulesEvent.addTagRequest, (p) => rulesActions.addTag(p));
+    emitter.on(rulesEvent.updateTagRequest, (p) =>
       rulesActions.updateTag(p.id, p.updates)
     );
-    emitter.on(rulesStoreEvent.deleteTagRequest, (p) =>
+    emitter.on(rulesEvent.deleteTagRequest, (p) =>
       rulesActions.deleteTag(p.id)
     );
-    emitter.on(rulesStoreEvent.linkTagToRuleRequest, (p) =>
+    emitter.on(rulesEvent.linkTagToRuleRequest, (p) =>
       rulesActions.linkTagToRule(p.tagId, p.ruleId)
     );
-    emitter.on(rulesStoreEvent.unlinkTagFromRuleRequest, (p) =>
+    emitter.on(rulesEvent.unlinkTagFromRuleRequest, (p) =>
       rulesActions.unlinkTagFromRule(p.tagId, p.ruleId)
     );
 
     // --- ConversationStore Listeners ---
     const conversationActions = useConversationStore.getState();
-    emitter.on(conversationStoreEvent.loadSidebarItemsRequest, () =>
+    emitter.on(conversationEvent.loadSidebarItemsRequest, () =>
       conversationActions.loadSidebarItems()
     );
-    emitter.on(conversationStoreEvent.addConversationRequest, (p) =>
+    emitter.on(conversationEvent.addConversationRequest, (p) =>
       conversationActions.addConversation(p)
     );
-    emitter.on(conversationStoreEvent.updateConversationRequest, (p) =>
+    emitter.on(conversationEvent.updateConversationRequest, (p) =>
       conversationActions.updateConversation(p.id, p.updates)
     );
-    emitter.on(conversationStoreEvent.deleteConversationRequest, (p) =>
+    emitter.on(conversationEvent.deleteConversationRequest, (p) =>
       conversationActions.deleteConversation(p.id)
     );
-    emitter.on(conversationStoreEvent.selectItemRequest, (p) =>
+    emitter.on(conversationEvent.selectItemRequest, (p) =>
       conversationActions.selectItem(p.id, p.type)
     );
-    emitter.on(conversationStoreEvent.importConversationRequest, (p) =>
+    emitter.on(conversationEvent.importConversationRequest, (p) =>
       conversationActions.importConversation(p.file)
     );
-    emitter.on(conversationStoreEvent.exportConversationRequest, (p) =>
+    emitter.on(conversationEvent.exportConversationRequest, (p) =>
       conversationActions.exportConversation(p.conversationId, p.format)
     );
-    emitter.on(conversationStoreEvent.exportProjectRequest, (p) =>
+    emitter.on(conversationEvent.exportProjectRequest, (p) =>
       conversationActions.exportProject(p.projectId)
     );
-    emitter.on(conversationStoreEvent.exportAllConversationsRequest, () =>
+    emitter.on(conversationEvent.exportAllConversationsRequest, () =>
       conversationActions.exportAllConversations()
     );
-    emitter.on(conversationStoreEvent.loadSyncReposRequest, () =>
+    emitter.on(conversationEvent.loadSyncReposRequest, () =>
       conversationActions.loadSyncRepos()
     );
-    emitter.on(conversationStoreEvent.addSyncRepoRequest, (p) =>
+    emitter.on(conversationEvent.addSyncRepoRequest, (p) =>
       conversationActions.addSyncRepo(p)
     );
-    emitter.on(conversationStoreEvent.updateSyncRepoRequest, (p) =>
+    emitter.on(conversationEvent.updateSyncRepoRequest, (p) =>
       conversationActions.updateSyncRepo(p.id, p.updates)
     );
-    emitter.on(conversationStoreEvent.deleteSyncRepoRequest, (p) =>
+    emitter.on(conversationEvent.deleteSyncRepoRequest, (p) =>
       conversationActions.deleteSyncRepo(p.id)
     );
-    emitter.on(conversationStoreEvent.linkConversationToRepoRequest, (p) =>
+    emitter.on(conversationEvent.linkConversationToRepoRequest, (p) =>
       conversationActions.linkConversationToRepo(p.conversationId, p.repoId)
     );
-    emitter.on(conversationStoreEvent.syncConversationRequest, (p) =>
+    emitter.on(conversationEvent.syncConversationRequest, (p) =>
       conversationActions.syncConversation(p.conversationId)
     );
-    emitter.on(conversationStoreEvent.initializeOrSyncRepoRequest, (p) =>
+    emitter.on(conversationEvent.initializeOrSyncRepoRequest, (p) =>
       conversationActions.initializeOrSyncRepo(p.repoId)
     );
     emitter.on(
-      conversationStoreEvent.updateCurrentConversationToolSettingsRequest,
+      conversationEvent.updateCurrentConversationToolSettingsRequest,
       (p) => conversationActions.updateCurrentConversationToolSettings(p)
     );
 
     // --- ProjectStore Listeners ---
     const projectActions = useProjectStore.getState();
-    emitter.on(projectStoreEvent.loadProjectsRequest, () =>
+    emitter.on(projectEvent.loadProjectsRequest, () =>
       projectActions.loadProjects()
     );
-    emitter.on(projectStoreEvent.addProjectRequest, (p) =>
+    emitter.on(projectEvent.addProjectRequest, (p) =>
       projectActions.addProject(p)
     );
-    emitter.on(projectStoreEvent.updateProjectRequest, (p) =>
+    emitter.on(projectEvent.updateProjectRequest, (p) =>
       projectActions.updateProject(p.id, p.updates)
     );
-    emitter.on(projectStoreEvent.deleteProjectRequest, (p) =>
+    emitter.on(projectEvent.deleteProjectRequest, (p) =>
       projectActions.deleteProject(p.id)
     );
 
     // --- InteractionStore Listeners ---
     const interactionActions = useInteractionStore.getState();
-    emitter.on(interactionStoreEvent.loadInteractionsRequest, (p) =>
+    emitter.on(interactionEvent.loadInteractionsRequest, (p) =>
       interactionActions.loadInteractions(p.conversationId)
     );
-    emitter.on(interactionStoreEvent.rateInteractionRequest, (p) =>
+    emitter.on(interactionEvent.rateInteractionRequest, (p) =>
       interactionActions.rateInteraction(p.interactionId, p.rating)
     );
-    emitter.on(interactionStoreEvent.setCurrentConversationIdRequest, (p) =>
+    emitter.on(interactionEvent.setCurrentConversationIdRequest, (p) =>
       interactionActions.setCurrentConversationId(p.id)
     );
-    emitter.on(interactionStoreEvent.clearInteractionsRequest, () =>
+    emitter.on(interactionEvent.clearInteractionsRequest, () =>
       interactionActions.clearInteractions()
     );
-    emitter.on(interactionStoreEvent.setErrorRequest, (p) =>
+    emitter.on(interactionEvent.setErrorRequest, (p) =>
       interactionActions.setError(p.error)
     );
-    emitter.on(interactionStoreEvent.setStatusRequest, (p) =>
+    emitter.on(interactionEvent.setStatusRequest, (p) =>
       interactionActions.setStatus(p.status)
     );
 
     // --- InputStore Listeners ---
     const inputActions = useInputStore.getState();
-    emitter.on(inputStoreEvent.addAttachedFileRequest, (p) =>
+    emitter.on(inputEvent.addAttachedFileRequest, (p) =>
       inputActions.addAttachedFile(p)
     );
-    emitter.on(inputStoreEvent.removeAttachedFileRequest, (p) =>
+    emitter.on(inputEvent.removeAttachedFileRequest, (p) =>
       inputActions.removeAttachedFile(p.attachmentId)
     );
-    emitter.on(inputStoreEvent.clearAttachedFilesRequest, () =>
+    emitter.on(inputEvent.clearAttachedFilesRequest, () =>
       inputActions.clearAttachedFiles()
     );
 
     // --- PromptStateStore Listeners ---
     const promptStateActions = usePromptStateStore.getState();
-    emitter.on(promptStoreEvent.setModelIdRequest, (p) =>
+    emitter.on(promptEvent.setModelIdRequest, (p) =>
       promptStateActions.setModelId(p.id)
     );
-    emitter.on(promptStoreEvent.setTemperatureRequest, (p) =>
+    emitter.on(promptEvent.setTemperatureRequest, (p) =>
       promptStateActions.setTemperature(p.value)
     );
-    emitter.on(promptStoreEvent.setMaxTokensRequest, (p) =>
+    emitter.on(promptEvent.setMaxTokensRequest, (p) =>
       promptStateActions.setMaxTokens(p.value)
     );
-    emitter.on(promptStoreEvent.setTopPRequest, (p) =>
+    emitter.on(promptEvent.setTopPRequest, (p) =>
       promptStateActions.setTopP(p.value)
     );
-    emitter.on(promptStoreEvent.setTopKRequest, (p) =>
+    emitter.on(promptEvent.setTopKRequest, (p) =>
       promptStateActions.setTopK(p.value)
     );
-    emitter.on(promptStoreEvent.setPresencePenaltyRequest, (p) =>
+    emitter.on(promptEvent.setPresencePenaltyRequest, (p) =>
       promptStateActions.setPresencePenalty(p.value)
     );
-    emitter.on(promptStoreEvent.setFrequencyPenaltyRequest, (p) =>
+    emitter.on(promptEvent.setFrequencyPenaltyRequest, (p) =>
       promptStateActions.setFrequencyPenalty(p.value)
     );
-    emitter.on(promptStoreEvent.setReasoningEnabledRequest, (p) =>
+    emitter.on(promptEvent.setReasoningEnabledRequest, (p) =>
       promptStateActions.setReasoningEnabled(p.enabled)
     );
-    emitter.on(promptStoreEvent.setWebSearchEnabledRequest, (p) =>
+    emitter.on(promptEvent.setWebSearchEnabledRequest, (p) =>
       promptStateActions.setWebSearchEnabled(p.enabled)
     );
-    emitter.on(promptStoreEvent.setStructuredOutputJsonRequest, (p) =>
+    emitter.on(promptEvent.setStructuredOutputJsonRequest, (p) =>
       promptStateActions.setStructuredOutputJson(p.json)
     );
-    emitter.on(promptStoreEvent.initializePromptStateRequest, (p) =>
+    emitter.on(promptEvent.initializePromptStateRequest, (p) =>
       promptStateActions.initializePromptState(p.effectiveSettings)
     );
-    emitter.on(promptStoreEvent.resetTransientParametersRequest, () =>
+    emitter.on(promptEvent.resetTransientParametersRequest, () =>
       promptStateActions.resetTransientParameters()
     );
 
     // --- ModStore Listeners ---
     const modActions = useModStore.getState();
-    emitter.on(modStoreEvent.loadDbModsRequest, () => modActions.loadDbMods());
-    emitter.on(modStoreEvent.addDbModRequest, (p) => modActions.addDbMod(p));
-    emitter.on(modStoreEvent.updateDbModRequest, (p) =>
+    emitter.on(modEvent.loadDbModsRequest, () => modActions.loadDbMods());
+    emitter.on(modEvent.addDbModRequest, (p) => modActions.addDbMod(p));
+    emitter.on(modEvent.updateDbModRequest, (p) =>
       modActions.updateDbMod(p.id, p.changes)
     );
-    emitter.on(modStoreEvent.deleteDbModRequest, (p) =>
+    emitter.on(modEvent.deleteDbModRequest, (p) =>
       modActions.deleteDbMod(p.id)
     );
 
@@ -383,65 +382,68 @@ export class EventActionCoordinatorService {
     emitter.on(uiEvent.setFocusInputFlagRequest, (p) =>
       uiActions.setFocusInputFlag(p.focus)
     );
-    // Modal open/close requests will be handled by ModalManager in Phase 4
+    emitter.on(uiEvent.openModalRequest, (_p) => {
+      // This is now handled by ModalManager directly, which listens to this event.
+    });
+    emitter.on(uiEvent.closeModalRequest, (_p) => {
+      // Similar to open, ModalManager handles this.
+    });
 
     // --- VfsStore Listeners ---
     const vfsActions = useVfsStore.getState();
-    emitter.on(vfsStoreEvent.setVfsKeyRequest, (p) =>
-      vfsActions.setVfsKey(p.key)
-    );
-    emitter.on(vfsStoreEvent.initializeVFSRequest, (p) =>
+    emitter.on(vfsEvent.setVfsKeyRequest, (p) => vfsActions.setVfsKey(p.key));
+    emitter.on(vfsEvent.initializeVFSRequest, (p) =>
       vfsActions.initializeVFS(p.vfsKey, p.options)
     );
-    emitter.on(vfsStoreEvent.fetchNodesRequest, (p) =>
+    emitter.on(vfsEvent.fetchNodesRequest, (p) =>
       vfsActions.fetchNodes(p.parentId)
     );
-    emitter.on(vfsStoreEvent.setCurrentPathRequest, (p) =>
+    emitter.on(vfsEvent.setCurrentPathRequest, (p) =>
       vfsActions.setCurrentPath(p.path)
     );
-    emitter.on(vfsStoreEvent.createDirectoryRequest, (p) =>
+    emitter.on(vfsEvent.createDirectoryRequest, (p) =>
       vfsActions.createDirectory(p.parentId, p.name)
     );
-    emitter.on(vfsStoreEvent.uploadFilesRequest, (p) =>
+    emitter.on(vfsEvent.uploadFilesRequest, (p) =>
       vfsActions.uploadFiles(p.parentId, p.files)
     );
-    emitter.on(vfsStoreEvent.deleteNodesRequest, (p) =>
+    emitter.on(vfsEvent.deleteNodesRequest, (p) =>
       vfsActions.deleteNodes(p.ids)
     );
-    emitter.on(vfsStoreEvent.renameNodeRequest, (p) =>
+    emitter.on(vfsEvent.renameNodeRequest, (p) =>
       vfsActions.renameNode(p.id, p.newName)
     );
-    emitter.on(vfsStoreEvent.downloadFileRequest, (p) =>
+    emitter.on(vfsEvent.downloadFileRequest, (p) =>
       vfsActions.downloadFile(p.fileId)
     );
-    emitter.on(vfsStoreEvent.selectFileRequest, (p) =>
+    emitter.on(vfsEvent.selectFileRequest, (p) =>
       vfsActions.selectFile(p.fileId)
     );
-    emitter.on(vfsStoreEvent.deselectFileRequest, (p) =>
+    emitter.on(vfsEvent.deselectFileRequest, (p) =>
       vfsActions.deselectFile(p.fileId)
     );
-    emitter.on(vfsStoreEvent.clearSelectionRequest, () =>
+    emitter.on(vfsEvent.clearSelectionRequest, () =>
       vfsActions.clearSelection()
     );
-    emitter.on(vfsStoreEvent.setEnableVfsRequest, (p) =>
+    emitter.on(vfsEvent.setEnableVfsRequest, (p) =>
       vfsActions._setEnableVfs(p.enabled)
-    ); // Use internal setter
+    );
 
     // --- ControlRegistryStore Listeners ---
     const controlRegistryActions = useControlRegistryStore.getState();
-    emitter.on(controlRegistryStoreEvent.registerPromptControlRequest, (p) =>
+    emitter.on(controlRegistryEvent.registerPromptControlRequest, (p) =>
       controlRegistryActions.registerPromptControl(p.control)
     );
-    emitter.on(controlRegistryStoreEvent.unregisterPromptControlRequest, (p) =>
+    emitter.on(controlRegistryEvent.unregisterPromptControlRequest, (p) =>
       controlRegistryActions.unregisterPromptControl(p.id)
     );
-    emitter.on(controlRegistryStoreEvent.registerChatControlRequest, (p) =>
+    emitter.on(controlRegistryEvent.registerChatControlRequest, (p) =>
       controlRegistryActions.registerChatControl(p.control)
     );
-    emitter.on(controlRegistryStoreEvent.unregisterChatControlRequest, (p) =>
+    emitter.on(controlRegistryEvent.unregisterChatControlRequest, (p) =>
       controlRegistryActions.unregisterChatControl(p.id)
     );
-    emitter.on(controlRegistryStoreEvent.registerMiddlewareRequest, (p) =>
+    emitter.on(controlRegistryEvent.registerMiddlewareRequest, (p) =>
       controlRegistryActions.registerMiddleware(
         p.hookName,
         p.modId,
@@ -449,14 +451,14 @@ export class EventActionCoordinatorService {
         p.order
       )
     );
-    emitter.on(controlRegistryStoreEvent.unregisterMiddlewareRequest, (p) =>
+    emitter.on(controlRegistryEvent.unregisterMiddlewareRequest, (p) =>
       controlRegistryActions.unregisterMiddleware(
         p.hookName,
         p.modId,
         p.callback
       )
     );
-    emitter.on(controlRegistryStoreEvent.registerToolRequest, (p) =>
+    emitter.on(controlRegistryEvent.registerToolRequest, (p) =>
       controlRegistryActions.registerTool(
         p.modId,
         p.toolName,
@@ -464,10 +466,15 @@ export class EventActionCoordinatorService {
         p.implementation
       )
     );
-    emitter.on(controlRegistryStoreEvent.unregisterToolRequest, (p) =>
+    emitter.on(controlRegistryEvent.unregisterToolRequest, (p) =>
       controlRegistryActions.unregisterTool(p.toolName)
     );
-    // Modal provider registration will be added in Phase 4
+    emitter.on(controlRegistryEvent.registerModalProviderRequest, (p) =>
+      controlRegistryActions.registerModalProvider(p.modalId, p.provider)
+    );
+    emitter.on(controlRegistryEvent.unregisterModalProviderRequest, (p) =>
+      controlRegistryActions.unregisterModalProvider(p.modalId)
+    );
 
     this.isInitialized = true;
     console.log(

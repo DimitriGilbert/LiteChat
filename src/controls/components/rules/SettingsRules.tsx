@@ -1,24 +1,20 @@
-// src/components/LiteChat/settings/rules/SettingsRules.tsx
+// src/controls/components/rules/SettingsRules.tsx
 // FULL FILE
 import React, { useState, useCallback } from "react";
-import { useRulesStore } from "@/store/rules.store";
-import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { RuleForm } from "./RuleForm";
 import { RulesList } from "./RulesList";
 import type { DbRule } from "@/types/litechat/rules";
+import type { RulesControlModule } from "@/controls/modules/RulesControlModule";
 
-export const SettingsRules: React.FC = () => {
-  const { rules, addRule, updateRule, deleteRule, isLoading } = useRulesStore(
-    useShallow((state) => ({
-      rules: state.rules,
-      addRule: state.addRule,
-      updateRule: state.updateRule,
-      deleteRule: state.deleteRule,
-      isLoading: state.isLoading,
-    })),
-  );
+interface SettingsRulesProps {
+  module: RulesControlModule;
+}
+
+export const SettingsRules: React.FC<SettingsRulesProps> = ({ module }) => {
+  const rules = module.getAllRules();
+  const isLoading = module.getIsLoadingRules();
 
   const [showForm, setShowForm] = useState(false);
   const [editingRule, setEditingRule] = useState<DbRule | null>(null);
@@ -46,36 +42,36 @@ export const SettingsRules: React.FC = () => {
       setIsSaving(true);
       try {
         if (editingRule) {
-          await updateRule(editingRule.id, data);
+          module.updateRule(editingRule.id, data);
         } else {
-          await addRule(data);
+          module.addRule(data);
         }
         handleCancel();
       } catch (error) {
-        // Error handled by store
+        // Error handled by store/emitter
       } finally {
         setIsSaving(false);
       }
     },
-    [addRule, updateRule, editingRule, handleCancel],
+    [module, editingRule, handleCancel]
   );
 
   const handleDelete = useCallback(
     async (id: string) => {
+      // name prop added for consistency, though not used in this specific confirm
       setIsDeleting((prev) => ({ ...prev, [id]: true }));
       try {
-        await deleteRule(id);
-        // If the deleted rule was being edited, close the form
+        module.deleteRule(id);
         if (editingRule?.id === id) {
           handleCancel();
         }
       } catch (error) {
-        // Error handled by store
+        // Error handled by store/emitter
       } finally {
         setIsDeleting((prev) => ({ ...prev, [id]: false }));
       }
     },
-    [deleteRule, editingRule, handleCancel],
+    [module, editingRule, handleCancel]
   );
 
   return (

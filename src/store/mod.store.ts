@@ -10,15 +10,15 @@ import type {
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
-// No direct event emissions from this store in this iteration,
-// but if added, they would use the new `modEvent` constants.
+import { emitter } from "@/lib/litechat/event-emitter";
+import { modEvent } from "@/types/litechat/events/mod.events";
 
 export const useModStore = create(
   immer<ModStoreState & ModStoreActions>((set, get) => ({
     // Initial State
     dbMods: [],
     loadedMods: [],
-    modSettingsTabs: [], // Initialize new state field
+    modSettingsTabs: [],
     isLoading: false,
     error: null,
 
@@ -28,10 +28,15 @@ export const useModStore = create(
       try {
         const mods = await PersistenceService.loadMods();
         set({ dbMods: mods, isLoading: false });
+        emitter.emit(modEvent.dbModsLoaded, { dbMods: mods });
       } catch (e) {
         const errorMsg = "Failed to load mods";
         console.error("ModStore: Error loading mods", e);
         set({ error: errorMsg, isLoading: false });
+        emitter.emit(modEvent.loadingStateChanged, {
+          isLoading: false,
+          error: errorMsg,
+        });
         toast.error(errorMsg);
       }
     },
@@ -51,6 +56,7 @@ export const useModStore = create(
       try {
         await PersistenceService.saveMod(newMod);
         toast.success(`Mod "${newMod.name}" added.`);
+        emitter.emit(modEvent.dbModsLoaded, { dbMods: get().dbMods });
         return newId;
       } catch (e) {
         const errorMsg = "Failed to save new mod";
@@ -58,6 +64,10 @@ export const useModStore = create(
         set((state) => {
           state.dbMods = state.dbMods.filter((m) => m.id !== newId);
           state.error = errorMsg;
+        });
+        emitter.emit(modEvent.loadingStateChanged, {
+          isLoading: get().isLoading,
+          error: errorMsg,
         });
         toast.error(errorMsg);
         throw e;
@@ -87,6 +97,7 @@ export const useModStore = create(
         try {
           await PersistenceService.saveMod(updatedMod);
           toast.success(`Mod "${updatedMod.name}" updated.`);
+          emitter.emit(modEvent.dbModsLoaded, { dbMods: get().dbMods });
         } catch (e) {
           const errorMsg = "Failed to save mod update";
           console.error("ModStore: Error updating mod", e);
@@ -97,6 +108,10 @@ export const useModStore = create(
               state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
             }
             state.error = errorMsg;
+          });
+          emitter.emit(modEvent.loadingStateChanged, {
+            isLoading: get().isLoading,
+            error: errorMsg,
           });
           toast.error(errorMsg);
           throw e;
@@ -121,6 +136,7 @@ export const useModStore = create(
       try {
         await PersistenceService.deleteMod(id);
         toast.success(`Mod "${modName}" deleted.`);
+        emitter.emit(modEvent.dbModsLoaded, { dbMods: get().dbMods });
       } catch (e) {
         const errorMsg = "Failed to delete mod";
         console.error("ModStore: Error deleting mod", e);
@@ -129,6 +145,10 @@ export const useModStore = create(
           state.dbMods.sort((a, b) => a.loadOrder - b.loadOrder);
           state.error = errorMsg;
         });
+        emitter.emit(modEvent.loadingStateChanged, {
+          isLoading: get().isLoading,
+          error: errorMsg,
+        });
         toast.error(errorMsg);
         throw e;
       }
@@ -136,6 +156,7 @@ export const useModStore = create(
 
     setLoadedMods: (loadedMods) => {
       set({ loadedMods });
+      emitter.emit(modEvent.loadedInstancesChanged, { loadedMods });
     },
 
     _addSettingsTab: (tab) => {
@@ -156,12 +177,18 @@ export const useModStore = create(
           );
         }
       });
+      emitter.emit(modEvent.settingsTabsChanged, {
+        tabs: get().modSettingsTabs,
+      });
     },
     _removeSettingsTab: (tabId) => {
       set((state) => {
         state.modSettingsTabs = state.modSettingsTabs.filter(
           (t) => t.id !== tabId
         );
+      });
+      emitter.emit(modEvent.settingsTabsChanged, {
+        tabs: get().modSettingsTabs,
       });
     },
   }))

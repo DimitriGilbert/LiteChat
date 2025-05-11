@@ -3,10 +3,10 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { conversationStoreEvent } from "@/types/litechat/events/conversation.events";
-import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
+import { conversationEvent } from "@/types/litechat/events/conversation.events";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
-import { syncStoreEvent } from "@/types/litechat/events/sync.events";
+import { syncEvent } from "@/types/litechat/events/sync.events";
 import { GitSyncControlTrigger } from "@/controls/components/git-sync/GitSyncControlTrigger";
 import { SettingsGit } from "@/controls/components/git-settings/SettingsGit";
 import { useConversationStore } from "@/store/conversation.store";
@@ -36,13 +36,13 @@ export class GitSyncControlModule implements ControlModule {
       this.notifyComponentUpdate?.();
     });
 
-    const unsubRepoChanged = modApi.on(syncStoreEvent.repoChanged, () => {
+    const unsubRepoChanged = modApi.on(syncEvent.repoChanged, () => {
       this.syncRepos = useConversationStore.getState().syncRepos;
       this.notifyComponentUpdate?.();
     });
 
     const unsubConvSync = modApi.on(
-      conversationStoreEvent.conversationSyncStatusChanged,
+      conversationEvent.conversationSyncStatusChanged,
       (payload) => {
         if (
           typeof payload === "object" &&
@@ -59,7 +59,7 @@ export class GitSyncControlModule implements ControlModule {
       }
     );
     const unsubInteractionStatus = modApi.on(
-      interactionStoreEvent.statusChanged,
+      interactionEvent.statusChanged,
       (payload) => {
         if (typeof payload === "object" && payload && "status" in payload) {
           this.isStreaming = payload.status === "streaming";
@@ -68,7 +68,7 @@ export class GitSyncControlModule implements ControlModule {
       }
     );
     const unsubConvUpdated = modApi.on(
-      conversationStoreEvent.conversationUpdated,
+      conversationEvent.conversationUpdated,
       (payload) => {
         if (
           typeof payload === "object" &&

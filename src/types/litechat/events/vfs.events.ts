@@ -1,31 +1,73 @@
-// src/types/litechat/events/stores/vfs.events.ts
-// NEW FILE
-export const vfsStoreEvent = {
-  // State Change Events
-  vfsKeyChanged: "stores.vfs.key.changed", // When the active VFS key (context) changes
-  nodesUpdated: "stores.vfs.nodes.updated", // When the file/folder list for the current VFS key is updated
-  selectionChanged: "stores.vfs.selection.changed", // When selected files in the VFS manager change
-  loadingStateChanged: "stores.vfs.loading.state.changed", // For isLoading, operationLoading, error
-  fsInstanceChanged: "stores.vfs.instance.changed", // When the ZenFS instance is set or cleared
-  vfsEnabledChanged: "stores.vfs.enabled.changed", // When global VFS enable/disable state changes
+// src/types/litechat/events/vfs.events.ts
+// FULL FILE
+import type { VfsNode } from "@/types/litechat/vfs";
+import type { fs as FsType } from "@zenfs/core";
 
-  // Original events (can be re-emitted by VFS operations if needed by mods)
-  fileWritten: "vfs.fileWritten",
-  fileRead: "vfs.fileRead",
-  fileDeleted: "vfs.fileDeleted",
+export const vfsEvent = {
+  // State Change Events
+  vfsKeyChanged: "vfs.key.changed",
+  nodesUpdated: "vfs.nodes.updated",
+  selectionChanged: "vfs.selection.changed",
+  loadingStateChanged: "vfs.loading.state.changed",
+  fsInstanceChanged: "vfs.instance.changed",
+  vfsEnabledChanged: "vfs.enabled.changed",
+
+  // Original events
+  fileWritten: "vfs.sdk.fileWritten",
+  fileRead: "vfs.sdk.fileRead",
+  fileDeleted: "vfs.sdk.fileDeleted",
 
   // Action Request Events
-  setVfsKeyRequest: "stores.vfs.set.vfs.key.request",
-  initializeVFSRequest: "stores.vfs.initialize.vfs.request",
-  fetchNodesRequest: "stores.vfs.fetch.nodes.request",
-  setCurrentPathRequest: "stores.vfs.set.current.path.request",
-  createDirectoryRequest: "stores.vfs.create.directory.request",
-  uploadFilesRequest: "stores.vfs.upload.files.request",
-  deleteNodesRequest: "stores.vfs.delete.nodes.request",
-  renameNodeRequest: "stores.vfs.rename.node.request",
-  downloadFileRequest: "stores.vfs.download.file.request",
-  selectFileRequest: "stores.vfs.select.file.request",
-  deselectFileRequest: "stores.vfs.deselect.file.request",
-  clearSelectionRequest: "stores.vfs.clear.selection.request",
-  setEnableVfsRequest: "stores.vfs.set.enable.vfs.request",
+  setVfsKeyRequest: "vfs.set.vfs.key.request",
+  initializeVFSRequest: "vfs.initialize.vfs.request",
+  fetchNodesRequest: "vfs.fetch.nodes.request",
+  setCurrentPathRequest: "vfs.set.current.path.request",
+  createDirectoryRequest: "vfs.create.directory.request",
+  uploadFilesRequest: "vfs.upload.files.request",
+  deleteNodesRequest: "vfs.delete.nodes.request",
+  renameNodeRequest: "vfs.rename.node.request",
+  downloadFileRequest: "vfs.download.file.request",
+  selectFileRequest: "vfs.select.file.request",
+  deselectFileRequest: "vfs.deselect.file.request",
+  clearSelectionRequest: "vfs.clear.selection.request",
+  setEnableVfsRequest: "vfs.set.enable.vfs.request",
 } as const;
+
+export interface VfsEventPayloads {
+  [vfsEvent.vfsKeyChanged]: {
+    vfsKey: string | null;
+    configuredVfsKey: string | null;
+  };
+  [vfsEvent.nodesUpdated]: {
+    vfsKey: string | null;
+    nodes: Record<string, VfsNode>;
+    childrenMap: Record<string, string[]>;
+  };
+  [vfsEvent.selectionChanged]: { selectedFileIds: string[] };
+  [vfsEvent.loadingStateChanged]: {
+    isLoading: boolean;
+    operationLoading: boolean;
+    error: string | null;
+  };
+  [vfsEvent.fsInstanceChanged]: { fsInstance: typeof FsType | null };
+  [vfsEvent.vfsEnabledChanged]: { enabled: boolean };
+  [vfsEvent.fileWritten]: { path: string };
+  [vfsEvent.fileRead]: { path: string };
+  [vfsEvent.fileDeleted]: { path: string };
+  [vfsEvent.setVfsKeyRequest]: { key: string | null };
+  [vfsEvent.initializeVFSRequest]: {
+    vfsKey: string;
+    options?: { force?: boolean };
+  };
+  [vfsEvent.fetchNodesRequest]: { parentId?: string | null };
+  [vfsEvent.setCurrentPathRequest]: { path: string };
+  [vfsEvent.createDirectoryRequest]: { parentId: string | null; name: string };
+  [vfsEvent.uploadFilesRequest]: { parentId: string | null; files: FileList };
+  [vfsEvent.deleteNodesRequest]: { ids: string[] };
+  [vfsEvent.renameNodeRequest]: { id: string; newName: string };
+  [vfsEvent.downloadFileRequest]: { fileId: string };
+  [vfsEvent.selectFileRequest]: { fileId: string };
+  [vfsEvent.deselectFileRequest]: { fileId: string };
+  [vfsEvent.clearSelectionRequest]: undefined;
+  [vfsEvent.setEnableVfsRequest]: { enabled: boolean };
+}

@@ -5,7 +5,7 @@ import {
   type LiteChatModApi,
   ModMiddlewareHook,
 } from "@/types/litechat/modding";
-import { promptStoreEvent } from "@/types/litechat/events/prompt.events";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { parseAppUrlParameters } from "@/lib/litechat/url-helpers";
 import { useConversationStore } from "@/store/conversation.store";
 import { useProviderStore } from "@/store/provider.store";
@@ -175,7 +175,7 @@ export class UrlParameterControlModule implements ControlModule {
 
       if (urlParams.query) {
         if (urlParams.submit === "0") {
-          emitter.emit(promptStoreEvent.inputChanged, {
+          emitter.emit(promptEvent.inputChanged, {
             value: urlParams.query,
           });
           toast.info("Query from URL loaded into input area.");
@@ -201,7 +201,7 @@ export class UrlParameterControlModule implements ControlModule {
             metadata,
           };
 
-          emitter.emit(promptStoreEvent.submitted, { turnData });
+          emitter.emit(promptEvent.submitted, { turnData });
 
           const middlewareResult = await runMiddleware(
             ModMiddlewareHook.PROMPT_TURN_FINALIZE,

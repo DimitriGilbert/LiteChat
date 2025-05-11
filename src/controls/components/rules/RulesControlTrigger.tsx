@@ -35,7 +35,12 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
   const activeTagIds = module.getActiveTagIds();
   const activeRuleIds = module.getActiveRuleIds();
   const isStreaming = module.getIsStreaming();
-  const hasRulesOrTags = module.getHasRulesOrTags(); // For conditional behavior
+  const hasRulesOrTags = module.getHasRulesOrTags();
+
+  // Get data from module for the dialog
+  const allRules = module.getAllRules();
+  const allTags = module.getAllTags();
+  const getRulesForTag = module.getRulesForTag;
 
   const handleToggleTag = useCallback(
     (tagId: string, isActive: boolean) => {
@@ -65,28 +70,21 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
     if (!hasRulesOrTags) {
       const settingsOpened = module.handleTriggerClick();
       if (settingsOpened) {
-        setPopoverOpen(false); // Ensure popover doesn't open if settings modal is triggered
+        setPopoverOpen(false);
       }
     } else {
-      setPopoverOpen((prev) => !prev); // Default popover toggle
+      setPopoverOpen((prev) => !prev);
     }
   };
 
   const hasActiveSettings = activeTagIds.size > 0 || activeRuleIds.size > 0;
   const isDisabled = isStreaming;
 
-  // This control is always visible if registered.
-  // The behavior of the click changes based on whether rules/tags exist.
-
   return (
     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
       <TooltipProvider delayDuration={100}>
         <Tooltip>
           <TooltipTrigger asChild>
-            {/*
-              If rules/tags exist, PopoverTrigger wraps the button.
-              If not, the button directly calls handleTriggerClick.
-            */}
             {hasRulesOrTags ? (
               <PopoverTrigger asChild>
                 <Button
@@ -95,7 +93,7 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
                   className="h-8 w-8"
                   disabled={isDisabled}
                   aria-label="Configure Rules & Tags for Next Turn"
-                  onClick={handleTriggerClick} // Still call this to allow popover to open
+                  onClick={handleTriggerClick}
                 >
                   <ShieldAlertIcon className="h-4 w-4" />
                 </Button>
@@ -122,13 +120,16 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      {hasRulesOrTags && ( // Only render PopoverContent if there are rules/tags
+      {hasRulesOrTags && (
         <PopoverContent className="w-auto p-0" align="start">
           <RulesControlDialogContent
             activeTagIds={activeTagIds}
             activeRuleIds={activeRuleIds}
             onToggleTag={handleToggleTag}
             onToggleRule={handleToggleRule}
+            allRules={allRules}
+            allTags={allTags}
+            getRulesForTag={getRulesForTag}
           />
         </PopoverContent>
       )}

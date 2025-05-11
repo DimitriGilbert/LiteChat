@@ -6,11 +6,10 @@ import { type LiteChatModApi } from "@/types/litechat/modding";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import { SettingsTriggerComponent } from "@/controls/components/settings/SettingsTriggerComponent";
 import { SettingsModal } from "@/controls/components/settings/SettingsModal";
-// No direct store access needed for modal state here anymore
 
 export class SettingsControlModule implements ControlModule {
-  readonly id = "core-settings-trigger"; // This ID is for the trigger control
-  public readonly modalId = "settingsModal"; // Unique ID for the modal content
+  readonly id = "core-settings-trigger";
+  public readonly modalId = "settingsModal";
   private unregisterChatControlCallback: (() => void) | null = null;
   private unregisterModalProviderCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
@@ -20,9 +19,6 @@ export class SettingsControlModule implements ControlModule {
     this.modApiRef = modApi;
     const unsubOpenRequest = modApi.on(uiEvent.openModalRequest, (payload) => {
       if (payload.modalId === this.modalId) {
-        // This module is responsible for opening its own modal type
-        // The ModalManager will handle the actual display.
-        // We don't need to call useUIStateStore here.
         console.log(
           `[${this.id}] Received open request for modal: ${payload.modalId}`
         );
@@ -32,16 +28,14 @@ export class SettingsControlModule implements ControlModule {
     console.log(`[${this.id}] Initialized and listening for open requests.`);
   }
 
-  // This method is now called by its UI trigger component
   public openSettingsModal = (initialTab?: string, initialSubTab?: string) => {
     this.modApiRef?.emit(uiEvent.openModalRequest, {
       modalId: this.modalId,
-      initialTab: initialTab || "general", // Default to general if not provided
+      initialTab: initialTab || "general",
       initialSubTab: initialSubTab,
     });
   };
 
-  // This method is now called by the ModalProvider via ModalManager
   public closeSettingsModal = () => {
     this.modApiRef?.emit(uiEvent.closeModalRequest, {
       modalId: this.modalId,
@@ -58,10 +52,9 @@ export class SettingsControlModule implements ControlModule {
       return;
     }
 
-    // Register the trigger button as a chat control
     if (!this.unregisterChatControlCallback) {
       this.unregisterChatControlCallback = modApi.registerChatControl({
-        id: this.id, // ID for the trigger
+        id: this.id,
         panel: "sidebar-footer",
         status: () => "ready",
         renderer: () =>
@@ -73,15 +66,13 @@ export class SettingsControlModule implements ControlModule {
       console.log(`[${this.id}] Trigger registered.`);
     }
 
-    // Register the modal content provider
     if (!this.unregisterModalProviderCallback) {
       this.unregisterModalProviderCallback = modApi.registerModalProvider(
-        this.modalId, // Use the unique modalId
+        this.modalId,
         (props) =>
           React.createElement(SettingsModal, {
             isOpen: props.isOpen,
             onClose: props.onClose,
-            // initialTab and initialSubTab will be passed by ModalManager
           })
       );
       console.log(

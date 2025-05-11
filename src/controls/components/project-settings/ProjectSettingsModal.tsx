@@ -1,4 +1,4 @@
-// src/components/LiteChat/project-settings/ProjectSettingsModal.tsx
+// src/controls/components/project-settings/ProjectSettingsModal.tsx
 // FULL FILE
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
@@ -30,17 +30,20 @@ import {
   TabDefinition,
 } from "@/components/LiteChat/common/TabbedLayout";
 import { cn } from "@/lib/utils";
+import type { ProjectSettingsControlModule } from "@/controls/modules/ProjectSettingsControlModule"; // Import module type
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   projectId: string | null;
+  module: ProjectSettingsControlModule; // Add module prop
 }
 
 export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   isOpen,
   onClose,
   projectId,
+  module, // Destructure module
 }) => {
   const { getProjectById, updateProject } = useProjectStore(
     useShallow((state) => ({
@@ -357,11 +360,14 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
               defaultRuleIds={defaultRuleIds}
               setDefaultRuleIds={setDefaultRuleIds}
               isSaving={isSaving}
+              allRules={module.getAllRules()} // Pass from module
             />
             <ProjectSettingsTags
               defaultTagIds={defaultTagIds}
               setDefaultTagIds={setDefaultTagIds}
               isSaving={isSaving}
+              allTags={module.getAllTags()} // Pass from module
+              getRulesForTag={module.getRulesForTag} // Pass from module
             />
           </div>
         ),
@@ -415,6 +421,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
       syncRepos,
       projectId,
       project?.name,
+      module, // Add module as dependency
     ]
   );
 

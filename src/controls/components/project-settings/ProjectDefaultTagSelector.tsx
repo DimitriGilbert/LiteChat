@@ -1,8 +1,7 @@
-// src/components/LiteChat/project-settings/ProjectDefaultTagSelector.tsx
+// src/controls/components/project-settings/ProjectDefaultTagSelector.tsx
 // FULL FILE
 import React, { useState, useMemo } from "react";
-import type { DbTag } from "@/types/litechat/rules";
-import { useRulesStore } from "@/store/rules.store"; // Needed for getRulesForTag
+import type { DbTag, DbRule } from "@/types/litechat/rules"; // Import DbRule
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -14,13 +13,19 @@ interface ProjectDefaultTagSelectorProps {
   selectedTagIds: Set<string>;
   onSelectionChange: (tagId: string, selected: boolean) => void;
   disabled?: boolean;
+  getRulesForTag: (tagId: string) => DbRule[]; // Add prop
 }
 
 export const ProjectDefaultTagSelector: React.FC<
   ProjectDefaultTagSelectorProps
-> = ({ allTags, selectedTagIds, onSelectionChange, disabled = false }) => {
+> = ({
+  allTags,
+  selectedTagIds,
+  onSelectionChange,
+  disabled = false,
+  getRulesForTag, // Destructure prop
+}) => {
   const [filterText, setFilterText] = useState("");
-  const getRulesForTag = useRulesStore((state) => state.getRulesForTag); // Get function from store
 
   const filteredTags = useMemo(() => {
     const lowerFilter = filterText.toLowerCase();
@@ -28,7 +33,7 @@ export const ProjectDefaultTagSelector: React.FC<
     return allTags.filter(
       (tag) =>
         tag.name.toLowerCase().includes(lowerFilter) ||
-        tag.description?.toLowerCase().includes(lowerFilter),
+        tag.description?.toLowerCase().includes(lowerFilter)
     );
   }, [allTags, filterText]);
 
@@ -55,7 +60,7 @@ export const ProjectDefaultTagSelector: React.FC<
         ) : (
           <div className="space-y-1">
             {filteredTags.map((tag) => {
-              const rulesInTag = getRulesForTag(tag.id); // Use the store function
+              const rulesInTag = getRulesForTag(tag.id); // Use the passed function
               return (
                 <div
                   key={tag.id}

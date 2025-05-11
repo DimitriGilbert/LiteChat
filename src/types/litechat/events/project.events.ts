@@ -1,16 +1,38 @@
-// src/types/litechat/events/stores/project.events.ts
+// src/types/litechat/events/project.events.ts
 // FULL FILE
-export const projectStoreEvent = {
+import type { Project } from "@/types/litechat/project";
+
+export const projectEvent = {
   // State Change Events
-  loaded: "stores.project.loaded",
-  added: "stores.project.added",
-  updated: "stores.project.updated",
-  deleted: "stores.project.deleted",
-  loadingStateChanged: "stores.project.loading.state.changed", // Added this event
+  loaded: "project.loaded",
+  added: "project.added",
+  updated: "project.updated",
+  deleted: "project.deleted",
+  loadingStateChanged: "project.loading.state.changed",
 
   // Action Request Events
-  loadProjectsRequest: "stores.project.load.projects.request",
-  addProjectRequest: "stores.project.add.project.request",
-  updateProjectRequest: "stores.project.update.project.request",
-  deleteProjectRequest: "stores.project.delete.project.request",
+  loadProjectsRequest: "project.load.projects.request",
+  addProjectRequest: "project.add.project.request",
+  updateProjectRequest: "project.update.project.request",
+  deleteProjectRequest: "project.delete.project.request",
 } as const;
+
+export interface ProjectEventPayloads {
+  [projectEvent.loaded]: { projects: Project[] };
+  [projectEvent.added]: { project: Project };
+  [projectEvent.updated]: { projectId: string; updates: Partial<Project> };
+  [projectEvent.deleted]: { projectId: string };
+  [projectEvent.loadingStateChanged]: {
+    isLoading: boolean;
+    error: string | null;
+  };
+  [projectEvent.loadProjectsRequest]: undefined;
+  [projectEvent.addProjectRequest]: Partial<
+    Omit<Project, "id" | "createdAt" | "path">
+  > & { name: string; parentId?: string | null };
+  [projectEvent.updateProjectRequest]: {
+    id: string;
+    updates: Partial<Omit<Project, "id" | "createdAt" | "path">>;
+  };
+  [projectEvent.deleteProjectRequest]: { id: string };
+}

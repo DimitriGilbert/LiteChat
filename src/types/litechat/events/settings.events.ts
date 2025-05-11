@@ -1,98 +1,245 @@
-// src/types/litechat/events/stores/settings.events.ts
-// NEW FILE
-export const settingsStoreEvent = {
+// src/types/litechat/events/settings.events.ts
+// FULL FILE
+import type { SettingsState, CustomThemeColors } from "@/store/settings.store";
+
+export const settingsEvent = {
   // State Change Events
-  loaded: "stores.settings.loaded",
-  themeChanged: "stores.settings.theme.changed",
-  globalSystemPromptChanged: "stores.settings.global.system.prompt.changed",
-  temperatureChanged: "stores.settings.temperature.changed",
-  maxTokensChanged: "stores.settings.max.tokens.changed",
-  topPChanged: "stores.settings.top.p.changed",
-  topKChanged: "stores.settings.top.k.changed",
-  presencePenaltyChanged: "stores.settings.presence.penalty.changed",
-  frequencyPenaltyChanged: "stores.settings.frequency.penalty.changed",
-  enableAdvancedSettingsChanged:
-    "stores.settings.enable.advanced.settings.changed",
-  enableStreamingMarkdownChanged:
-    "stores.settings.enable.streaming.markdown.changed",
+  loaded: "settings.loaded",
+  themeChanged: "settings.theme.changed",
+  globalSystemPromptChanged: "settings.global.system.prompt.changed",
+  temperatureChanged: "settings.temperature.changed",
+  maxTokensChanged: "settings.max.tokens.changed",
+  topPChanged: "settings.top.p.changed",
+  topKChanged: "settings.top.k.changed",
+  presencePenaltyChanged: "settings.presence.penalty.changed",
+  frequencyPenaltyChanged: "settings.frequency.penalty.changed",
+  enableAdvancedSettingsChanged: "settings.enable.advanced.settings.changed",
+  enableStreamingMarkdownChanged: "settings.enable.streaming.markdown.changed",
   enableStreamingCodeBlockParsingChanged:
-    "stores.settings.enable.streaming.code.block.parsing.changed",
-  foldStreamingCodeBlocksChanged:
-    "stores.settings.fold.streaming.code.blocks.changed",
+    "settings.enable.streaming.code.block.parsing.changed",
+  foldStreamingCodeBlocksChanged: "settings.fold.streaming.code.blocks.changed",
   foldUserMessagesOnCompletionChanged:
-    "stores.settings.fold.user.messages.on.completion.changed",
-  streamingRenderFpsChanged: "stores.settings.streaming.render.fps.changed",
-  gitUserNameChanged: "stores.settings.git.user.name.changed",
-  gitUserEmailChanged: "stores.settings.git.user.email.changed",
-  toolMaxStepsChanged: "stores.settings.tool.max.steps.changed",
-  prismThemeUrlChanged: "stores.settings.prism.theme.url.changed",
-  autoTitleEnabledChanged: "stores.settings.auto.title.enabled.changed",
-  autoTitleModelIdChanged: "stores.settings.auto.title.model.id.changed",
+    "settings.fold.user.messages.on.completion.changed",
+  streamingRenderFpsChanged: "settings.streaming.render.fps.changed",
+  gitUserNameChanged: "settings.git.user.name.changed",
+  gitUserEmailChanged: "settings.git.user.email.changed",
+  toolMaxStepsChanged: "settings.tool.max.steps.changed",
+  prismThemeUrlChanged: "settings.prism.theme.url.changed",
+  autoTitleEnabledChanged: "settings.auto.title.enabled.changed",
+  autoTitleModelIdChanged: "settings.auto.title.model.id.changed",
   autoTitlePromptMaxLengthChanged:
-    "stores.settings.auto.title.prompt.max.length.changed",
-  autoTitleIncludeFilesChanged:
-    "stores.settings.auto.title.include.files.changed",
-  autoTitleIncludeRulesChanged:
-    "stores.settings.auto.title.include.rules.changed",
-  customFontFamilyChanged: "stores.settings.custom.font.family.changed",
-  customFontSizeChanged: "stores.settings.custom.font.size.changed",
-  chatMaxWidthChanged: "stores.settings.chat.max.width.changed",
-  customThemeColorsChanged: "stores.settings.custom.theme.colors.changed",
-  autoScrollIntervalChanged: "stores.settings.auto.scroll.interval.changed",
+    "settings.auto.title.prompt.max.length.changed",
+  autoTitleIncludeFilesChanged: "settings.auto.title.include.files.changed",
+  autoTitleIncludeRulesChanged: "settings.auto.title.include.rules.changed",
+  customFontFamilyChanged: "settings.custom.font.family.changed",
+  customFontSizeChanged: "settings.custom.font.size.changed",
+  chatMaxWidthChanged: "settings.chat.max.width.changed",
+  customThemeColorsChanged: "settings.custom.theme.colors.changed",
+  autoScrollIntervalChanged: "settings.auto.scroll.interval.changed",
   enableAutoScrollOnStreamChanged:
-    "stores.settings.enable.auto.scroll.on.stream.changed",
-  enableApiKeyManagementChanged:
-    "stores.settings.enable.api.key.management.changed", // Renamed from toggled
+    "settings.enable.auto.scroll.on.stream.changed",
 
   // Action Request Events
-  setThemeRequest: "stores.settings.set.theme.request",
-  setGlobalSystemPromptRequest:
-    "stores.settings.set.global.system.prompt.request",
-  setTemperatureRequest: "stores.settings.set.temperature.request",
-  setMaxTokensRequest: "stores.settings.set.max.tokens.request",
-  setTopPRequest: "stores.settings.set.top.p.request",
-  setTopKRequest: "stores.settings.set.top.k.request",
-  setPresencePenaltyRequest: "stores.settings.set.presence.penalty.request",
-  setFrequencyPenaltyRequest: "stores.settings.set.frequency.penalty.request",
+  setThemeRequest: "settings.set.theme.request",
+  setGlobalSystemPromptRequest: "settings.set.global.system.prompt.request",
+  setTemperatureRequest: "settings.set.temperature.request",
+  setMaxTokensRequest: "settings.set.max.tokens.request",
+  setTopPRequest: "settings.set.top.p.request",
+  setTopKRequest: "settings.set.top.k.request",
+  setPresencePenaltyRequest: "settings.set.presence.penalty.request",
+  setFrequencyPenaltyRequest: "settings.set.frequency.penalty.request",
   setEnableAdvancedSettingsRequest:
-    "stores.settings.set.enable.advanced.settings.request",
+    "settings.set.enable.advanced.settings.request",
   setEnableStreamingMarkdownRequest:
-    "stores.settings.set.enable.streaming.markdown.request",
+    "settings.set.enable.streaming.markdown.request",
   setEnableStreamingCodeBlockParsingRequest:
-    "stores.settings.set.enable.streaming.code.block.parsing.request",
+    "settings.set.enable.streaming.code.block.parsing.request",
   setFoldStreamingCodeBlocksRequest:
-    "stores.settings.set.fold.streaming.code.blocks.request",
+    "settings.set.fold.streaming.code.blocks.request",
   setFoldUserMessagesOnCompletionRequest:
-    "stores.settings.set.fold.user.messages.on.completion.request",
-  setStreamingRenderFpsRequest:
-    "stores.settings.set.streaming.render.fps.request",
-  setGitUserNameRequest: "stores.settings.set.git.user.name.request",
-  setGitUserEmailRequest: "stores.settings.set.git.user.email.request",
-  setToolMaxStepsRequest: "stores.settings.set.tool.max.steps.request",
-  setPrismThemeUrlRequest: "stores.settings.set.prism.theme.url.request",
-  setAutoTitleEnabledRequest: "stores.settings.set.auto.title.enabled.request",
-  setAutoTitleModelIdRequest: "stores.settings.set.auto.title.model.id.request",
+    "settings.set.fold.user.messages.on.completion.request",
+  setStreamingRenderFpsRequest: "settings.set.streaming.render.fps.request",
+  setGitUserNameRequest: "settings.set.git.user.name.request",
+  setGitUserEmailRequest: "settings.set.git.user.email.request",
+  setToolMaxStepsRequest: "settings.set.tool.max.steps.request",
+  setPrismThemeUrlRequest: "settings.set.prism.theme.url.request",
+  setAutoTitleEnabledRequest: "settings.set.auto.title.enabled.request",
+  setAutoTitleModelIdRequest: "settings.set.auto.title.model.id.request",
   setAutoTitlePromptMaxLengthRequest:
-    "stores.settings.set.auto.title.prompt.max.length.request",
+    "settings.set.auto.title.prompt.max.length.request",
   setAutoTitleIncludeFilesRequest:
-    "stores.settings.set.auto.title.include.files.request",
+    "settings.set.auto.title.include.files.request",
   setAutoTitleIncludeRulesRequest:
-    "stores.settings.set.auto.title.include.rules.request",
-  setCustomFontFamilyRequest: "stores.settings.set.custom.font.family.request",
-  setCustomFontSizeRequest: "stores.settings.set.custom.font.size.request",
-  setChatMaxWidthRequest: "stores.settings.set.chat.max.width.request",
-  setCustomThemeColorsRequest:
-    "stores.settings.set.custom.theme.colors.request",
-  setCustomThemeColorRequest: "stores.settings.set.custom.theme.color.request",
-  setAutoScrollIntervalRequest:
-    "stores.settings.set.auto.scroll.interval.request",
+    "settings.set.auto.title.include.rules.request",
+  setCustomFontFamilyRequest: "settings.set.custom.font.family.request",
+  setCustomFontSizeRequest: "settings.set.custom.font.size.request",
+  setChatMaxWidthRequest: "settings.set.chat.max.width.request",
+  setCustomThemeColorsRequest: "settings.set.custom.theme.colors.request",
+  setCustomThemeColorRequest: "settings.set.custom.theme.color.request",
+  setAutoScrollIntervalRequest: "settings.set.auto.scroll.interval.request",
   setEnableAutoScrollOnStreamRequest:
-    "stores.settings.set.enable.auto.scroll.on.stream.request",
-  setEnableApiKeyManagementRequest:
-    "stores.settings.set.enable.api.key.management.request",
-  loadSettingsRequest: "stores.settings.load.settings.request",
-  resetGeneralSettingsRequest: "stores.settings.reset.general.settings.request",
-  resetAssistantSettingsRequest:
-    "stores.settings.reset.assistant.settings.request",
-  resetThemeSettingsRequest: "stores.settings.reset.theme.settings.request",
+    "settings.set.enable.auto.scroll.on.stream.request",
+  loadSettingsRequest: "settings.load.settings.request",
+  resetGeneralSettingsRequest: "settings.reset.general.settings.request",
+  resetAssistantSettingsRequest: "settings.reset.assistant.settings.request",
+  resetThemeSettingsRequest: "settings.reset.theme.settings.request",
 } as const;
+
+export interface SettingsEventPayloads {
+  [settingsEvent.loaded]: { settings: SettingsState };
+  [settingsEvent.themeChanged]: { theme: SettingsState["theme"] };
+  [settingsEvent.globalSystemPromptChanged]: {
+    prompt: SettingsState["globalSystemPrompt"];
+  };
+  [settingsEvent.temperatureChanged]: { value: SettingsState["temperature"] };
+  [settingsEvent.maxTokensChanged]: { value: SettingsState["maxTokens"] };
+  [settingsEvent.topPChanged]: { value: SettingsState["topP"] };
+  [settingsEvent.topKChanged]: { value: SettingsState["topK"] };
+  [settingsEvent.presencePenaltyChanged]: {
+    value: SettingsState["presencePenalty"];
+  };
+  [settingsEvent.frequencyPenaltyChanged]: {
+    value: SettingsState["frequencyPenalty"];
+  };
+  [settingsEvent.enableAdvancedSettingsChanged]: {
+    enabled: SettingsState["enableAdvancedSettings"];
+  };
+  [settingsEvent.enableStreamingMarkdownChanged]: {
+    enabled: SettingsState["enableStreamingMarkdown"];
+  };
+  [settingsEvent.enableStreamingCodeBlockParsingChanged]: {
+    enabled: SettingsState["enableStreamingCodeBlockParsing"];
+  };
+  [settingsEvent.foldStreamingCodeBlocksChanged]: {
+    fold: SettingsState["foldStreamingCodeBlocks"];
+  };
+  [settingsEvent.foldUserMessagesOnCompletionChanged]: {
+    fold: SettingsState["foldUserMessagesOnCompletion"];
+  };
+  [settingsEvent.streamingRenderFpsChanged]: {
+    fps: SettingsState["streamingRenderFPS"];
+  };
+  [settingsEvent.gitUserNameChanged]: { name: SettingsState["gitUserName"] };
+  [settingsEvent.gitUserEmailChanged]: { email: SettingsState["gitUserEmail"] };
+  [settingsEvent.toolMaxStepsChanged]: { steps: SettingsState["toolMaxSteps"] };
+  [settingsEvent.prismThemeUrlChanged]: { url: SettingsState["prismThemeUrl"] };
+  [settingsEvent.autoTitleEnabledChanged]: {
+    enabled: SettingsState["autoTitleEnabled"];
+  };
+  [settingsEvent.autoTitleModelIdChanged]: {
+    modelId: SettingsState["autoTitleModelId"];
+  };
+  [settingsEvent.autoTitlePromptMaxLengthChanged]: {
+    length: SettingsState["autoTitlePromptMaxLength"];
+  };
+  [settingsEvent.autoTitleIncludeFilesChanged]: {
+    include: SettingsState["autoTitleIncludeFiles"];
+  };
+  [settingsEvent.autoTitleIncludeRulesChanged]: {
+    include: SettingsState["autoTitleIncludeRules"];
+  };
+  [settingsEvent.customFontFamilyChanged]: {
+    fontFamily: SettingsState["customFontFamily"];
+  };
+  [settingsEvent.customFontSizeChanged]: {
+    fontSize: SettingsState["customFontSize"];
+  };
+  [settingsEvent.chatMaxWidthChanged]: {
+    maxWidth: SettingsState["chatMaxWidth"];
+  };
+  [settingsEvent.customThemeColorsChanged]: {
+    colors: SettingsState["customThemeColors"];
+  };
+  [settingsEvent.autoScrollIntervalChanged]: {
+    interval: SettingsState["autoScrollInterval"];
+  };
+  [settingsEvent.enableAutoScrollOnStreamChanged]: {
+    enabled: SettingsState["enableAutoScrollOnStream"];
+  };
+
+  [settingsEvent.setThemeRequest]: { theme: SettingsState["theme"] };
+  [settingsEvent.setGlobalSystemPromptRequest]: {
+    prompt: SettingsState["globalSystemPrompt"];
+  };
+  [settingsEvent.setTemperatureRequest]: {
+    value: SettingsState["temperature"];
+  };
+  [settingsEvent.setMaxTokensRequest]: { value: SettingsState["maxTokens"] };
+  [settingsEvent.setTopPRequest]: { value: SettingsState["topP"] };
+  [settingsEvent.setTopKRequest]: { value: SettingsState["topK"] };
+  [settingsEvent.setPresencePenaltyRequest]: {
+    value: SettingsState["presencePenalty"];
+  };
+  [settingsEvent.setFrequencyPenaltyRequest]: {
+    value: SettingsState["frequencyPenalty"];
+  };
+  [settingsEvent.setEnableAdvancedSettingsRequest]: {
+    enabled: SettingsState["enableAdvancedSettings"];
+  };
+  [settingsEvent.setEnableStreamingMarkdownRequest]: {
+    enabled: SettingsState["enableStreamingMarkdown"];
+  };
+  [settingsEvent.setEnableStreamingCodeBlockParsingRequest]: {
+    enabled: SettingsState["enableStreamingCodeBlockParsing"];
+  };
+  [settingsEvent.setFoldStreamingCodeBlocksRequest]: {
+    fold: SettingsState["foldStreamingCodeBlocks"];
+  };
+  [settingsEvent.setFoldUserMessagesOnCompletionRequest]: {
+    fold: SettingsState["foldUserMessagesOnCompletion"];
+  };
+  [settingsEvent.setStreamingRenderFpsRequest]: {
+    fps: SettingsState["streamingRenderFPS"];
+  };
+  [settingsEvent.setGitUserNameRequest]: { name: SettingsState["gitUserName"] };
+  [settingsEvent.setGitUserEmailRequest]: {
+    email: SettingsState["gitUserEmail"];
+  };
+  [settingsEvent.setToolMaxStepsRequest]: {
+    steps: SettingsState["toolMaxSteps"];
+  };
+  [settingsEvent.setPrismThemeUrlRequest]: {
+    url: SettingsState["prismThemeUrl"];
+  };
+  [settingsEvent.setAutoTitleEnabledRequest]: {
+    enabled: SettingsState["autoTitleEnabled"];
+  };
+  [settingsEvent.setAutoTitleModelIdRequest]: {
+    modelId: SettingsState["autoTitleModelId"];
+  };
+  [settingsEvent.setAutoTitlePromptMaxLengthRequest]: {
+    length: SettingsState["autoTitlePromptMaxLength"];
+  };
+  [settingsEvent.setAutoTitleIncludeFilesRequest]: {
+    include: SettingsState["autoTitleIncludeFiles"];
+  };
+  [settingsEvent.setAutoTitleIncludeRulesRequest]: {
+    include: SettingsState["autoTitleIncludeRules"];
+  };
+  [settingsEvent.setCustomFontFamilyRequest]: {
+    fontFamily: SettingsState["customFontFamily"];
+  };
+  [settingsEvent.setCustomFontSizeRequest]: {
+    fontSize: SettingsState["customFontSize"];
+  };
+  [settingsEvent.setChatMaxWidthRequest]: {
+    maxWidth: SettingsState["chatMaxWidth"];
+  };
+  [settingsEvent.setCustomThemeColorsRequest]: {
+    colors: SettingsState["customThemeColors"];
+  };
+  [settingsEvent.setCustomThemeColorRequest]: {
+    colorKey: keyof CustomThemeColors;
+    value: string | null;
+  };
+  [settingsEvent.setAutoScrollIntervalRequest]: {
+    interval: SettingsState["autoScrollInterval"];
+  };
+  [settingsEvent.setEnableAutoScrollOnStreamRequest]: {
+    enabled: SettingsState["enableAutoScrollOnStream"];
+  };
+  [settingsEvent.loadSettingsRequest]: undefined;
+  [settingsEvent.resetGeneralSettingsRequest]: undefined;
+  [settingsEvent.resetAssistantSettingsRequest]: undefined;
+  [settingsEvent.resetThemeSettingsRequest]: undefined;
+}

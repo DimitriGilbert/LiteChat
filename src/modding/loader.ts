@@ -5,7 +5,7 @@ import {
   type ModInstance,
   type LiteChatModApi,
 } from "@/types/litechat/modding";
-import { modStoreEvent } from "@/types/litechat/events/mod.events";
+import { modEvent } from "@/types/litechat/events/mod.events";
 import { appEvent } from "@/types/litechat/events/app.events";
 import { createModApi } from "./api-factory";
 import { toast } from "sonner";
@@ -66,17 +66,14 @@ export async function loadMods(dbMods: DbMod[]): Promise<ModInstance[]> {
         id: mod.id,
         name: mod.name,
         api: modApi,
-        error: instanceError, // Changed from ?? undefined to allow null
+        error: instanceError,
       };
 
-      emitter.emit(
-        instance.error ? modStoreEvent.modError : modStoreEvent.modLoaded,
-        {
-          id: mod.id,
-          name: mod.name,
-          error: instance.error ?? "unknown error",
-        }
-      );
+      emitter.emit(instance.error ? modEvent.modError : modEvent.modLoaded, {
+        id: mod.id,
+        name: mod.name,
+        error: instance.error ?? "unknown error",
+      });
 
       return instance;
     })

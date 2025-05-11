@@ -1,8 +1,6 @@
-// src/components/LiteChat/prompt/control/rules/RulesControlDialogContent.tsx
+// src/controls/components/rules/RulesControlDialogContent.tsx
 // FULL FILE
 import React, { useState, useMemo, useCallback } from "react";
-import { useRulesStore } from "@/store/rules.store";
-import { useShallow } from "zustand/react/shallow";
 import {
   TabbedLayout,
   TabDefinition,
@@ -12,61 +10,65 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { SearchIcon } from "lucide-react";
+import type { DbRule, DbTag } from "@/types/litechat/rules"; // Import types
 
 interface RulesControlDialogContentProps {
   activeTagIds: Set<string>;
   activeRuleIds: Set<string>;
   onToggleTag: (tagId: string, isActive: boolean) => void;
   onToggleRule: (ruleId: string, isActive: boolean) => void;
+  allRules: DbRule[]; // Add prop
+  allTags: DbTag[]; // Add prop
+  getRulesForTag: (tagId: string) => DbRule[]; // Add prop
 }
 
 export const RulesControlDialogContent: React.FC<
   RulesControlDialogContentProps
-> = ({ activeTagIds, activeRuleIds, onToggleTag, onToggleRule }) => {
-  const { rules, tags, getRulesForTag } = useRulesStore(
-    useShallow((state) => ({
-      rules: state.rules,
-      tags: state.tags,
-      getRulesForTag: state.getRulesForTag,
-    })),
-  );
-
+> = ({
+  activeTagIds,
+  activeRuleIds,
+  onToggleTag,
+  onToggleRule,
+  allRules, // Destructure
+  allTags, // Destructure
+  getRulesForTag, // Destructure
+}) => {
   const [tagFilter, setTagFilter] = useState("");
   const [ruleFilter, setRuleFilter] = useState("");
 
   const filteredTags = useMemo(() => {
     const lowerFilter = tagFilter.toLowerCase();
-    if (!lowerFilter) return tags;
-    return tags.filter(
+    if (!lowerFilter) return allTags;
+    return allTags.filter(
       (tag) =>
         tag.name.toLowerCase().includes(lowerFilter) ||
-        tag.description?.toLowerCase().includes(lowerFilter),
+        tag.description?.toLowerCase().includes(lowerFilter)
     );
-  }, [tags, tagFilter]);
+  }, [allTags, tagFilter]);
 
   const filteredRules = useMemo(() => {
     const lowerFilter = ruleFilter.toLowerCase();
-    if (!lowerFilter) return rules;
-    return rules.filter(
+    if (!lowerFilter) return allRules;
+    return allRules.filter(
       (rule) =>
         rule.name.toLowerCase().includes(lowerFilter) ||
         rule.content.toLowerCase().includes(lowerFilter) ||
-        rule.type.toLowerCase().includes(lowerFilter),
+        rule.type.toLowerCase().includes(lowerFilter)
     );
-  }, [rules, ruleFilter]);
+  }, [allRules, ruleFilter]);
 
   const handleTagToggle = useCallback(
     (tagId: string, checked: boolean) => {
       onToggleTag(tagId, checked);
     },
-    [onToggleTag],
+    [onToggleTag]
   );
 
   const handleRuleToggle = useCallback(
     (ruleId: string, checked: boolean) => {
       onToggleRule(ruleId, checked);
     },
-    [onToggleRule],
+    [onToggleRule]
   );
 
   const renderTagList = () => (
@@ -84,7 +86,9 @@ export const RulesControlDialogContent: React.FC<
       <ScrollArea className="h-64 border rounded-md p-2 bg-background/50">
         {filteredTags.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
-            {tags.length === 0 ? "No tags defined." : "No tags match filter."}
+            {allTags.length === 0
+              ? "No tags defined."
+              : "No tags match filter."}
           </p>
         ) : (
           <div className="space-y-1">
@@ -145,7 +149,7 @@ export const RulesControlDialogContent: React.FC<
       <ScrollArea className="h-64 border rounded-md p-2 bg-background/50">
         {filteredRules.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
-            {rules.length === 0
+            {allRules.length === 0
               ? "No rules defined."
               : "No rules match filter."}
           </p>

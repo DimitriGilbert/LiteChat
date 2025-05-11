@@ -28,7 +28,7 @@ import {
   ModMiddlewareHook,
   type ReadonlyChatContextSnapshot,
 } from "@/types/litechat/modding";
-import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import {
   type Tool,
   type ToolCallPart,
@@ -168,7 +168,7 @@ export const InteractionService = {
       );
     });
 
-    emitter.emit(interactionStoreEvent.started, {
+    emitter.emit(interactionEvent.started, {
       interactionId,
       conversationId,
       type: interactionData.type,
@@ -400,7 +400,7 @@ export const InteractionService = {
       useInteractionStore
         .getState()
         .appendInteractionResponseChunk(interactionId, processedChunk);
-      emitter.emit(interactionStoreEvent.streamChunk, {
+      emitter.emit(interactionEvent.streamChunk, {
         interactionId,
         chunk: processedChunk,
       });
@@ -639,7 +639,7 @@ export const InteractionService = {
       );
     }
 
-    emitter.emit(interactionStoreEvent.completed, {
+    emitter.emit(interactionEvent.completed, {
       interactionId,
       status: status,
       error: error?.message,

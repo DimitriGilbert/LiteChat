@@ -5,7 +5,6 @@ import { useConversationStore } from "@/store/conversation.store";
 import { useModStore } from "@/store/mod.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useSettingsStore } from "@/store/settings.store";
-import { useRulesStore } from "@/store/rules.store";
 import { usePromptStateStore } from "@/store/prompt.store";
 import { useProjectStore } from "@/store/project.store";
 import { useUIStateStore } from "@/store/ui.store";
@@ -15,11 +14,13 @@ import type {
   ControlModuleConstructor,
 } from "@/types/litechat/control";
 import type { LiteChatModApi } from "@/types/litechat/modding";
+import { rulesEvent } from "@/types/litechat/events/rules.events"; // Import rulesEvent
+import { emitter } from "./event-emitter"; // Import emitter
 
 interface CoreStores {
   loadSettings: () => Promise<void>;
   loadProviderData: () => Promise<void>;
-  loadRulesAndTags: () => Promise<void>;
+  requestLoadRulesAndTags: () => void; // Changed signature
   loadSidebarItems: () => Promise<void>;
   loadDbMods: () => Promise<void>;
   setLoadedMods: (loadedMods: any[]) => void;
@@ -87,7 +88,7 @@ export async function loadCoreData(stores: CoreStores): Promise<void> {
   console.log("[Init] Core Data: Loading...");
   await stores.loadSettings();
   await stores.loadProviderData();
-  await stores.loadRulesAndTags();
+  stores.requestLoadRulesAndTags(); // Emit request instead of direct call
   await stores.loadSidebarItems();
   console.log("[Init] Core Data: Loaded.");
 }
@@ -199,7 +200,8 @@ export async function performFullInitialization(
   const stores: CoreStores = {
     loadSettings: useSettingsStore.getState().loadSettings,
     loadProviderData: useProviderStore.getState().loadInitialData,
-    loadRulesAndTags: useRulesStore.getState().loadRulesAndTags,
+    requestLoadRulesAndTags: () =>
+      emitter.emit(rulesEvent.loadRulesAndTagsRequest, undefined), // Emit request
     loadSidebarItems: useConversationStore.getState().loadSidebarItems,
     loadDbMods: useModStore.getState().loadDbMods,
     setLoadedMods: useModStore.getState().setLoadedMods,

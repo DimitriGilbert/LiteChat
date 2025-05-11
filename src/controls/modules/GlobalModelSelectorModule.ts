@@ -3,8 +3,8 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
-import { providerStoreEvent } from "@/types/litechat/events/provider.events";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
 import { GlobalModelSelector } from "@/controls/components/global-model-selector/GlobalModelSelector";
 import { useProviderStore } from "@/store/provider.store";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -23,19 +23,16 @@ export class GlobalModelSelectorModule implements ControlModule {
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.loadInitialState();
 
-    const unsubStatus = modApi.on(
-      interactionStoreEvent.statusChanged,
-      (payload) => {
-        if (typeof payload === "object" && payload && "status" in payload) {
-          if (this.isStreaming !== (payload.status === "streaming")) {
-            this.isStreaming = payload.status === "streaming";
-            this.notifyComponentUpdate?.();
-          }
+    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
+      if (typeof payload === "object" && payload && "status" in payload) {
+        if (this.isStreaming !== (payload.status === "streaming")) {
+          this.isStreaming = payload.status === "streaming";
+          this.notifyComponentUpdate?.();
         }
       }
-    );
+    });
     const unsubModelChange = modApi.on(
-      providerStoreEvent.selectedModelChanged,
+      providerEvent.selectedModelChanged,
       (payload) => {
         if (typeof payload === "object" && payload && "modelId" in payload) {
           if (this.selectedModelId !== payload.modelId) {
@@ -46,16 +43,13 @@ export class GlobalModelSelectorModule implements ControlModule {
         }
       }
     );
-    const unsubProviderLoading = modApi.on(
-      providerStoreEvent.configsChanged, // Or a more specific loading event if available
-      () => {
-        const newLoadingState = useProviderStore.getState().isLoading;
-        if (this.isLoadingProviders !== newLoadingState) {
-          this.isLoadingProviders = newLoadingState;
-          this.notifyComponentUpdate?.();
-        }
+    const unsubProviderLoading = modApi.on(providerEvent.configsChanged, () => {
+      const newLoadingState = useProviderStore.getState().isLoading;
+      if (this.isLoadingProviders !== newLoadingState) {
+        this.isLoadingProviders = newLoadingState;
+        this.notifyComponentUpdate?.();
       }
-    );
+    });
 
     this.eventUnsubscribers.push(
       unsubStatus,

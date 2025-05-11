@@ -1,8 +1,6 @@
-// src/components/LiteChat/settings/tags/SettingsTags.tsx
-
+// src/controls/components/rules/SettingsTags.tsx
+// FULL FILE
 import React, { useState, useCallback, useMemo } from "react";
-import { useRulesStore } from "@/store/rules.store";
-import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { TagForm } from "./TagForm";
@@ -10,33 +8,18 @@ import { TagsList } from "./TagsList";
 import { TagRuleLinker } from "./TagRuleLinker";
 import type { DbTag, DbRule } from "@/types/litechat/rules";
 import { Separator } from "@/components/ui/separator";
+import type { RulesControlModule } from "@/controls/modules/RulesControlModule";
 
-export const SettingsTags: React.FC = () => {
-  const {
-    tags,
-    rules,
-    tagRuleLinks,
-    addTag,
-    updateTag,
-    deleteTag,
-    linkTagToRule,
-    unlinkTagFromRule,
-    getRulesForTag,
-    isLoading,
-  } = useRulesStore(
-    useShallow((state) => ({
-      tags: state.tags,
-      rules: state.rules,
-      tagRuleLinks: state.tagRuleLinks,
-      addTag: state.addTag,
-      updateTag: state.updateTag,
-      deleteTag: state.deleteTag,
-      linkTagToRule: state.linkTagToRule,
-      unlinkTagFromRule: state.unlinkTagFromRule,
-      getRulesForTag: state.getRulesForTag,
-      isLoading: state.isLoading,
-    })),
-  );
+interface SettingsTagsProps {
+  module: RulesControlModule;
+}
+
+export const SettingsTags: React.FC<SettingsTagsProps> = ({ module }) => {
+  const tags = module.getAllTags();
+  const rules = module.getAllRules();
+  const tagRuleLinks = module.getTagRuleLinks();
+  const getRulesForTag = module.getRulesForTag;
+  const isLoading = module.getIsLoadingRules();
 
   const [showForm, setShowForm] = useState(false);
   const [editingTag, setEditingTag] = useState<DbTag | null>(null);
@@ -64,54 +47,53 @@ export const SettingsTags: React.FC = () => {
       setIsSaving(true);
       try {
         if (editingTag) {
-          await updateTag(editingTag.id, data);
+          module.updateTag(editingTag.id, data);
         } else {
-          await addTag(data);
+          module.addTag(data);
         }
-        // Keep form open if editing, close if adding
         if (!editingTag) {
           handleCancel();
         }
       } catch (error) {
-        // Error handled by store
+        // Error handled by store/emitter
       } finally {
         setIsSaving(false);
       }
     },
-    [addTag, updateTag, editingTag, handleCancel],
+    [module, editingTag, handleCancel]
   );
 
   const handleDelete = useCallback(
     async (id: string) => {
+      // name prop added for consistency
       setIsDeleting((prev) => ({ ...prev, [id]: true }));
       try {
-        await deleteTag(id);
-        // If the deleted tag was being edited, close the form
+        module.deleteTag(id);
         if (editingTag?.id === id) {
           handleCancel();
         }
       } catch (error) {
-        // Error handled by store
+        // Error handled by store/emitter
       } finally {
         setIsDeleting((prev) => ({ ...prev, [id]: false }));
       }
     },
-    [deleteTag, editingTag, handleCancel],
+    [module, editingTag, handleCancel]
   );
 
   const handleLinkChange = useCallback(
     async (tagId: string, ruleId: string, isLinked: boolean) => {
       try {
         if (isLinked) {
-          await linkTagToRule(tagId, ruleId);
+          module.linkTagToRule(tagId, ruleId);
         } else {
-          await unlinkTagFromRule(tagId, ruleId);
+          module.unlinkTagFromRule(tagId, ruleId);
         }
       } catch (error) {
-        // Error handled by store
+        // Error handled by store/emitter
       }
     },
-    [linkTagToRule, unlinkTagFromRule],
+    [module]
   );
 
   const rulesByTagId = useMemo(() => {
@@ -127,7 +109,7 @@ export const SettingsTags: React.FC = () => {
     return new Set(
       tagRuleLinks
         .filter((link) => link.tagId === editingTag.id)
-        .map((link) => link.ruleId),
+        .map((link) => link.ruleId)
     );
   }, [editingTag, tagRuleLinks]);
 
@@ -155,7 +137,6 @@ export const SettingsTags: React.FC = () => {
       )}
 
       {showForm && (
-        // Grid layout for form and linker side-by-side on larger screens
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <TagForm
             initialData={editingTag ?? undefined}
@@ -163,7 +144,6 @@ export const SettingsTags: React.FC = () => {
             onSave={handleSave}
             onCancel={handleCancel}
           />
-          {/* TagRuleLinker now uses a combobox internally */}
           {editingTag && (
             <TagRuleLinker
               tag={editingTag}

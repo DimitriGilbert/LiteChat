@@ -11,6 +11,7 @@ import type {
   PromptTurnObject,
   InputAreaRenderer,
   InputAreaRef,
+  ResolvedRuleContent,
 } from "@/types/litechat/prompt";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
@@ -19,9 +20,10 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 import { ModMiddlewareHook } from "@/types/litechat/modding";
-import { promptStoreEvent } from "@/types/litechat/events/prompt.events";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 import type { SidebarItemType } from "@/types/litechat/chat";
 import { usePromptStateStore } from "@/store/prompt.store";
+import type { RulesControlModule } from "@/controls/modules/RulesControlModule"; // Import type
 
 interface PromptWrapperProps {
   InputAreaRenderer: InputAreaRenderer;
@@ -116,6 +118,35 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         metadata.modelId = currentModelIdFromPromptStore;
       }
 
+      // Resolve rule content here if RulesControlModule is accessible
+      // This is a simplified example; a more robust way would be to get the module instance
+      const rulesModule = promptControls.find(
+        (c) => c.id === "core-rules-tags"
+      ) as RulesControlModule | undefined;
+
+      if (rulesModule && metadata.activeRuleIds && metadata.activeTagIds) {
+        const effectiveRulesContent: ResolvedRuleContent[] = [];
+        const allEffectiveRuleIds = new Set<string>(metadata.activeRuleIds);
+
+        metadata.activeTagIds.forEach((tagId: string) => {
+          rulesModule
+            .getRulesForTag(tagId)
+            .forEach((rule) => allEffectiveRuleIds.add(rule.id));
+        });
+
+        allEffectiveRuleIds.forEach((ruleId) => {
+          const rule = rulesModule.getRuleById(ruleId);
+          if (rule) {
+            effectiveRulesContent.push({
+              type: rule.type,
+              content: rule.content,
+              sourceRuleId: rule.id,
+            });
+          }
+        });
+        metadata.effectiveRulesContent = effectiveRulesContent;
+      }
+
       let turnData: PromptTurnObject = {
         id: nanoid(),
         content: trimmedValue,
@@ -123,7 +154,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         metadata,
       };
 
-      emitter.emit(promptStoreEvent.submitted, { turnData });
+      emitter.emit(promptEvent.submitted, { turnData });
 
       const middlewareResult = await runMiddleware(
         ModMiddlewareHook.PROMPT_TURN_FINALIZE,

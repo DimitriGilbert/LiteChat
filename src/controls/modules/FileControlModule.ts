@@ -3,9 +3,9 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { interactionStoreEvent } from "@/types/litechat/events/interaction.events";
-import { providerStoreEvent } from "@/types/litechat/events/provider.events";
-import { inputStoreEvent } from "@/types/litechat/events/input.events";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
+import { inputEvent } from "@/types/litechat/events/input.events";
 import { FileControlTrigger } from "@/controls/components/file/FileControlTrigger";
 import { FileControlPanel } from "@/controls/components/file/FileControlPanel";
 import { useInputStore } from "@/store/input.store";
@@ -35,37 +35,28 @@ export class FileControlModule implements ControlModule {
     this.updateModelSupport();
     this.notifyComponentUpdate?.();
 
-    const unsubStatus = modApi.on(
-      interactionStoreEvent.statusChanged,
-      (payload) => {
-        if (typeof payload === "object" && payload && "status" in payload) {
-          if (this.isStreaming !== (payload.status === "streaming")) {
-            this.isStreaming = payload.status === "streaming";
-            this.notifyComponentUpdate?.();
-          }
+    const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
+      if (typeof payload === "object" && payload && "status" in payload) {
+        if (this.isStreaming !== (payload.status === "streaming")) {
+          this.isStreaming = payload.status === "streaming";
+          this.notifyComponentUpdate?.();
         }
       }
-    );
-    const unsubModel = modApi.on(
-      providerStoreEvent.selectedModelChanged,
-      () => {
-        this.updateModelSupport();
-        this.notifyComponentUpdate?.();
-      }
-    );
-    const unsubFiles = modApi.on(
-      inputStoreEvent.attachedFilesChanged,
-      (payload) => {
-        if (typeof payload === "object" && payload && "files" in payload) {
-          if (
-            JSON.stringify(this.attachedFiles) !== JSON.stringify(payload.files)
-          ) {
-            this.attachedFiles = payload.files;
-            this.notifyComponentUpdate?.();
-          }
+    });
+    const unsubModel = modApi.on(providerEvent.selectedModelChanged, () => {
+      this.updateModelSupport();
+      this.notifyComponentUpdate?.();
+    });
+    const unsubFiles = modApi.on(inputEvent.attachedFilesChanged, (payload) => {
+      if (typeof payload === "object" && payload && "files" in payload) {
+        if (
+          JSON.stringify(this.attachedFiles) !== JSON.stringify(payload.files)
+        ) {
+          this.attachedFiles = payload.files;
+          this.notifyComponentUpdate?.();
         }
       }
-    );
+    });
 
     this.eventUnsubscribers.push(unsubStatus, unsubModel, unsubFiles);
     console.log(`[${this.id}] Initialized.`);
