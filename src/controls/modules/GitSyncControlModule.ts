@@ -19,6 +19,7 @@ export class GitSyncControlModule implements ControlModule {
   private unregisterPromptControlCallback: (() => void) | null = null;
   private unregisterSettingsTabCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
+  private modApiRef: LiteChatModApi | null = null;
 
   public selectedItemId: string | null = null;
   public selectedItemType: SidebarItemType | null = null;
@@ -28,6 +29,7 @@ export class GitSyncControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
+    this.modApiRef = modApi;
     this.loadInitialState();
 
     const unsubContext = modApi.on(uiEvent.contextChanged, (payload) => {
@@ -91,7 +93,6 @@ export class GitSyncControlModule implements ControlModule {
       unsubInteractionStatus,
       unsubConvUpdated
     );
-    // console.log(`[${this.id}] Initialized.`);
   }
 
   private loadInitialState() {
@@ -107,12 +108,15 @@ export class GitSyncControlModule implements ControlModule {
     conversationId: string,
     repoId: string | null
   ) => {
-    return useConversationStore
-      .getState()
-      .linkConversationToRepo(conversationId, repoId);
+    this.modApiRef?.emit(conversationEvent.linkConversationToRepoRequest, {
+      conversationId,
+      repoId,
+    });
   };
   public syncConversation = (conversationId: string) => {
-    return useConversationStore.getState().syncConversation(conversationId);
+    this.modApiRef?.emit(conversationEvent.syncConversationRequest, {
+      conversationId,
+    });
   };
   public getConversationById = (id: string | null) => {
     return useConversationStore.getState().getConversationById(id);
@@ -123,13 +127,13 @@ export class GitSyncControlModule implements ControlModule {
   };
 
   register(modApi: LiteChatModApi): void {
+    this.modApiRef = modApi;
     if (!this.unregisterPromptControlCallback) {
       this.unregisterPromptControlCallback = modApi.registerPromptControl({
         id: this.id,
         triggerRenderer: () =>
           React.createElement(GitSyncControlTrigger, { module: this }),
       });
-      // console.log(`[${this.id}] Prompt control registered.`);
     }
 
     if (!this.unregisterSettingsTabCallback) {
@@ -139,7 +143,6 @@ export class GitSyncControlModule implements ControlModule {
         component: SettingsGit,
         order: 60,
       });
-      // console.log(`[${this.id}] Settings tab registered.`);
     }
   }
 
@@ -155,6 +158,7 @@ export class GitSyncControlModule implements ControlModule {
       this.unregisterSettingsTabCallback = null;
     }
     this.notifyComponentUpdate = null;
+    this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
 }

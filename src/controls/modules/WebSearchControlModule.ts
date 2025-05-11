@@ -5,7 +5,7 @@ import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { providerEvent } from "@/types/litechat/events/provider.events";
-import { promptEvent } from "@/types/litechat/events/prompt.events";
+import { promptEvent as promptStateEvent } from "@/types/litechat/events/prompt.events";
 import { WebSearchControlTrigger } from "@/controls/components/web-search/WebSearchControlTrigger";
 import { useProviderStore } from "@/store/provider.store";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -15,6 +15,7 @@ export class WebSearchControlModule implements ControlModule {
   readonly id = "core-web-search";
   private unregisterCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
+  private modApiRef: LiteChatModApi | null = null;
 
   public webSearchEnabled: boolean | null = null;
   public isStreaming = false;
@@ -22,6 +23,7 @@ export class WebSearchControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
+    this.modApiRef = modApi;
     this.webSearchEnabled = usePromptStateStore.getState().webSearchEnabled;
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.updateVisibility();
@@ -40,7 +42,7 @@ export class WebSearchControlModule implements ControlModule {
       this.notifyComponentUpdate?.();
     });
     const unsubPromptParams = modApi.on(
-      promptEvent.parameterChanged,
+      promptStateEvent.parameterChanged,
       (payload) => {
         if (typeof payload === "object" && payload && "params" in payload) {
           const params = payload.params;
@@ -56,7 +58,6 @@ export class WebSearchControlModule implements ControlModule {
     );
 
     this.eventUnsubscribers.push(unsubStatus, unsubModel, unsubPromptParams);
-    console.log(`[${this.id}] Initialized.`);
   }
 
   private updateVisibility() {
@@ -77,7 +78,9 @@ export class WebSearchControlModule implements ControlModule {
 
   public setWebSearchEnabled = (enabled: boolean | null) => {
     this.webSearchEnabled = enabled;
-    usePromptStateStore.getState().setWebSearchEnabled(enabled);
+    this.modApiRef?.emit(promptStateEvent.setWebSearchEnabledRequest, {
+      enabled,
+    });
     this.notifyComponentUpdate?.();
   };
 
@@ -86,6 +89,7 @@ export class WebSearchControlModule implements ControlModule {
   };
 
   register(modApi: LiteChatModApi): void {
+    this.modApiRef = modApi;
     if (this.unregisterCallback) {
       console.warn(`[${this.id}] Already registered. Skipping.`);
       return;
@@ -101,10 +105,11 @@ export class WebSearchControlModule implements ControlModule {
           : undefined;
       },
       clearOnSubmit: () => {
-        usePromptStateStore.getState().setWebSearchEnabled(null);
+        this.modApiRef?.emit(promptStateEvent.setWebSearchEnabledRequest, {
+          enabled: null,
+        });
       },
     });
-    console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {
@@ -115,6 +120,7 @@ export class WebSearchControlModule implements ControlModule {
       this.unregisterCallback = null;
     }
     this.notifyComponentUpdate = null;
+    this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
 }

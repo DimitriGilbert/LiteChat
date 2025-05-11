@@ -1,5 +1,5 @@
 // src/components/LiteChat/file-manager/FileManager.tsx
-
+// FULL FILE
 import React, {
   useState,
   useEffect,
@@ -26,9 +26,11 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { FileManagerList } from "./FileManagerList";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { vfsEvent } from "@/types/litechat/events/vfs.events";
+import type { ModEventPayloadMap } from "@/types/litechat/modding";
 
 export const FileManager = memo(() => {
-  // --- VFS Store State & Actions ---
   const {
     nodes,
     childrenMap,
@@ -36,23 +38,11 @@ export const FileManager = memo(() => {
     loading,
     operationLoading: fsOperationLoading,
     error,
-    fetchNodes,
-    createDirectory,
-    uploadFiles,
-    deleteNodes,
-    renameNode,
-    setCurrentPath,
     rootId,
-    selectFile,
-    deselectFile,
     selectedFileIds,
     vfsKey,
     configuredVfsKey,
     initializingKey,
-    _setError,
-    _setOperationLoading,
-    findNodeByPath,
-    initializeVFS,
   } = useVfsStore(
     useShallow((state) => ({
       nodes: state.nodes,
@@ -62,33 +52,19 @@ export const FileManager = memo(() => {
       loading: state.loading,
       operationLoading: state.operationLoading,
       error: state.error,
-      fetchNodes: state.fetchNodes,
-      createDirectory: state.createDirectory,
-      uploadFiles: state.uploadFiles,
-      deleteNodes: state.deleteNodes,
-      renameNode: state.renameNode,
-      selectFile: state.selectFile,
-      deselectFile: state.deselectFile,
-      setCurrentPath: state.setCurrentPath,
       rootId: state.rootId,
       vfsKey: state.vfsKey,
       configuredVfsKey: state.configuredVfsKey,
       initializingKey: state.initializingKey,
-      // Destructure actions
-      _setError: state._setError,
-      _setOperationLoading: state._setOperationLoading,
-      findNodeByPath: state.findNodeByPath,
-      initializeVFS: state.initializeVFS,
-    })),
+    }))
   );
 
-  // --- Local UI State ---
   const [newName, setNewName] = useState("");
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [gitRepoStatus, setGitRepoStatus] = useState<Record<string, boolean>>(
-    {},
+    {}
   );
   const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
   const [cloneRepoUrl, setCloneRepoUrl] = useState("");
@@ -99,7 +75,7 @@ export const FileManager = memo(() => {
   const [commitMessage, setCommitMessage] = useState("");
   const [isCommitting, setIsCommitting] = useState(false);
   const [isGitOpLoading, setIsGitOpLoading] = useState<Record<string, boolean>>(
-    {},
+    {}
   );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -108,7 +84,6 @@ export const FileManager = memo(() => {
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const newFolderInputRef = useRef<HTMLInputElement | null>(null);
 
-  // --- Derived State ---
   const currentDirectory = currentParentId ? nodes[currentParentId] : null;
   const currentPath = currentDirectory ? currentDirectory.path : "/";
   const currentChildrenIds = childrenMap[currentParentId || rootId || ""] || [];
@@ -134,7 +109,6 @@ export const FileManager = memo(() => {
     isCommitting ||
     Object.values(isGitOpLoading).some(Boolean);
 
-  // --- Effects ---
   useEffect(() => {
     if (
       currentParentId !== null &&
@@ -142,7 +116,7 @@ export const FileManager = memo(() => {
       !isVfsLoading &&
       configuredVfsKey === vfsKey
     ) {
-      fetchNodes(currentParentId);
+      emitter.emit(vfsEvent.fetchNodesRequest, { parentId: currentParentId });
     } else if (
       currentParentId === null &&
       rootId &&
@@ -150,14 +124,13 @@ export const FileManager = memo(() => {
       !isVfsLoading &&
       configuredVfsKey === vfsKey
     ) {
-      fetchNodes(rootId);
+      emitter.emit(vfsEvent.fetchNodesRequest, { parentId: rootId });
     }
   }, [
     currentParentId,
     childrenMap,
     rootId,
     isVfsLoading,
-    fetchNodes,
     configuredVfsKey,
     vfsKey,
   ]);
@@ -203,83 +176,89 @@ export const FileManager = memo(() => {
     checkGitStatus();
   }, [currentFolderPaths, isVfsLoading, gitRepoStatus]);
 
-  // --- Handlers ---
-
-  // Use actions directly from the hook destructuring
   const runOperation = useCallback(
-    async (op: () => Promise<any>, setLoadingState?: boolean) => {
+    async <E extends keyof ModEventPayloadMap>(
+      requestEvent: E,
+      payload: ModEventPayloadMap[E],
+      setLoadingState?: boolean
+    ) => {
       if (isAnyOperationLoading || isVfsLoading) return;
-      if (setLoadingState !== false) _setOperationLoading(true);
-      _setError(null);
+      if (setLoadingState !== false)
+        emitter.emit(vfsEvent.loadingStateChanged, {
+          isLoading: loading,
+          operationLoading: true,
+          error: null,
+        });
+
       try {
-        await op();
+        emitter.emit(requestEvent, payload);
       } catch (err) {
         console.error("[FileManager Operation Error]:", err);
+        emitter.emit(vfsEvent.loadingStateChanged, {
+          isLoading: loading,
+          operationLoading: fsOperationLoading,
+          error: err instanceof Error ? err.message : String(err),
+        });
       } finally {
-        if (setLoadingState !== false) _setOperationLoading(false);
+        if (setLoadingState !== false)
+          emitter.emit(vfsEvent.loadingStateChanged, {
+            isLoading: loading,
+            operationLoading: false,
+            error: error,
+          });
       }
     },
-    [isAnyOperationLoading, isVfsLoading, _setError, _setOperationLoading],
+    [isAnyOperationLoading, isVfsLoading, loading, fsOperationLoading, error]
   );
 
   const handleNavigate = useCallback(
     (entry: VfsNode) => {
       if (isAnyOperationLoading || isVfsLoading || editingPath) return;
       if (entry.type === "folder") {
-        runOperation(() => setCurrentPath(entry.path), false);
+        runOperation(
+          vfsEvent.setCurrentPathRequest,
+          { path: entry.path },
+          false
+        );
       }
     },
-    [
-      isAnyOperationLoading,
-      isVfsLoading,
-      editingPath,
-      setCurrentPath,
-      runOperation,
-    ],
+    [isAnyOperationLoading, isVfsLoading, editingPath, runOperation]
   );
 
   const handleNavigateUp = useCallback(() => {
     if (isAnyOperationLoading || isVfsLoading || currentPath === "/") return;
     const parentPath = dirname(currentPath);
-    runOperation(() => setCurrentPath(parentPath), false);
-  }, [
-    isAnyOperationLoading,
-    isVfsLoading,
-    currentPath,
-    setCurrentPath,
-    runOperation,
-  ]);
+    runOperation(vfsEvent.setCurrentPathRequest, { path: parentPath }, false);
+  }, [isAnyOperationLoading, isVfsLoading, currentPath, runOperation]);
 
   const handleNavigateHome = useCallback(() => {
     if (isAnyOperationLoading || isVfsLoading || currentPath === "/") return;
-    runOperation(() => setCurrentPath("/"), false);
-  }, [
-    isAnyOperationLoading,
-    isVfsLoading,
-    currentPath,
-    setCurrentPath,
-    runOperation,
-  ]);
+    runOperation(vfsEvent.setCurrentPathRequest, { path: "/" }, false);
+  }, [isAnyOperationLoading, isVfsLoading, currentPath, runOperation]);
 
   const handleRefresh = useCallback(() => {
     if (isVfsLoading) return;
-    runOperation(() => fetchNodes(currentParentId), false);
-  }, [runOperation, fetchNodes, currentParentId, isVfsLoading]);
+    runOperation(
+      vfsEvent.fetchNodesRequest,
+      { parentId: currentParentId },
+      false
+    );
+  }, [runOperation, currentParentId, isVfsLoading]);
 
   const handleCheckboxChange = useCallback(
     (checked: boolean, nodeId: string) => {
       const node = nodes[nodeId];
       if (node && node.type === "file") {
         if (checked) {
-          selectFile(nodeId);
+          emitter.emit(vfsEvent.selectFileRequest, { fileId: nodeId });
         } else {
-          deselectFile(nodeId);
+          emitter.emit(vfsEvent.deselectFileRequest, { fileId: nodeId });
         }
       } else if (node && node.type === "folder") {
         toast.info("Folders cannot be attached to the prompt.");
       }
     },
-    [selectFile, deselectFile, nodes],
+    [nodes]
   );
 
   const startEditing = useCallback(
@@ -289,7 +268,7 @@ export const FileManager = memo(() => {
       setNewName(entry.name);
       setCreatingFolder(false);
     },
-    [isAnyOperationLoading, isVfsLoading, creatingFolder],
+    [isAnyOperationLoading, isVfsLoading, creatingFolder]
   );
 
   const cancelEditing = useCallback(() => {
@@ -302,19 +281,15 @@ export const FileManager = memo(() => {
       cancelEditing();
       return;
     }
-    const node = findNodeByPath(editingPath);
+    const node = Object.values(nodes).find((n) => n.path === editingPath);
     if (node && node.name !== newName.trim()) {
-      await runOperation(() => renameNode(node.id, newName.trim()));
+      await runOperation(vfsEvent.renameNodeRequest, {
+        id: node.id,
+        newName: newName.trim(),
+      });
     }
     cancelEditing();
-  }, [
-    editingPath,
-    newName,
-    renameNode,
-    cancelEditing,
-    findNodeByPath,
-    runOperation,
-  ]);
+  }, [editingPath, newName, nodes, cancelEditing, runOperation]);
 
   const startCreatingFolder = useCallback(() => {
     if (isAnyOperationLoading || isVfsLoading || editingPath) return;
@@ -333,17 +308,12 @@ export const FileManager = memo(() => {
       cancelCreatingFolder();
       return;
     }
-    await runOperation(() =>
-      createDirectory(currentParentId, newFolderName.trim()),
-    );
+    await runOperation(vfsEvent.createDirectoryRequest, {
+      parentId: currentParentId,
+      name: newFolderName.trim(),
+    });
     cancelCreatingFolder();
-  }, [
-    newFolderName,
-    createDirectory,
-    currentParentId,
-    cancelCreatingFolder,
-    runOperation,
-  ]);
+  }, [newFolderName, currentParentId, cancelCreatingFolder, runOperation]);
 
   const handleUploadClick = () => fileInputRef.current?.click();
   const handleFolderUploadClick = () => folderInputRef.current?.click();
@@ -353,25 +323,43 @@ export const FileManager = memo(() => {
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (files && files.length > 0) {
-        await runOperation(() => uploadFiles(currentParentId, files));
+        await runOperation(vfsEvent.uploadFilesRequest, {
+          parentId: currentParentId,
+          files,
+        });
         if (e.target) e.target.value = "";
       }
     },
-    [uploadFiles, currentParentId, runOperation],
+    [currentParentId, runOperation]
   );
 
   const handleArchiveChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
-        await runOperation(async () => {
-          await VfsOps.uploadAndExtractZipOp(file, currentPath);
-          await fetchNodes(currentParentId);
+        emitter.emit(vfsEvent.loadingStateChanged, {
+          isLoading: loading,
+          operationLoading: true,
+          error: null,
         });
-        if (e.target) e.target.value = "";
+        try {
+          await VfsOps.uploadAndExtractZipOp(file, currentPath);
+          emitter.emit(vfsEvent.fetchNodesRequest, {
+            parentId: currentParentId,
+          });
+        } catch (err) {
+          console.error("Archive upload error:", err);
+        } finally {
+          emitter.emit(vfsEvent.loadingStateChanged, {
+            isLoading: loading,
+            operationLoading: false,
+            error: error,
+          });
+          if (e.target) e.target.value = "";
+        }
       }
     },
-    [currentPath, fetchNodes, currentParentId, runOperation],
+    [currentPath, currentParentId, loading, error]
   );
 
   const handleDelete = useCallback(
@@ -383,43 +371,71 @@ export const FileManager = memo(() => {
 
 WARNING: This will delete all contents inside`
             : ""
-        }`,
+        }`
       );
       if (confirmation) {
-        await runOperation(() => deleteNodes([entry.id]));
+        await runOperation(vfsEvent.deleteNodesRequest, { ids: [entry.id] });
       }
     },
-    [deleteNodes, runOperation],
+    [runOperation]
   );
 
   const handleDownload = useCallback(
     async (entry: VfsNode) => {
-      await runOperation(async () => {
+      emitter.emit(vfsEvent.loadingStateChanged, {
+        isLoading: loading,
+        operationLoading: true,
+        error: null,
+      });
+      try {
         if (entry.type === "file") {
           await VfsOps.downloadFileOp(entry.path);
         } else {
           await VfsOps.downloadAllAsZipOp(`${entry.name}.zip`, entry.path);
         }
-      });
+      } catch (err) {
+        console.error("Download error:", err);
+      } finally {
+        emitter.emit(vfsEvent.loadingStateChanged, {
+          isLoading: loading,
+          operationLoading: false,
+          error: error,
+        });
+      }
     },
-    [runOperation],
+    [loading, error]
   );
 
   const handleDownloadAll = useCallback(async () => {
     if (currentNodes.length === 0) return;
-    await runOperation(async () => {
+    emitter.emit(vfsEvent.loadingStateChanged, {
+      isLoading: loading,
+      operationLoading: true,
+      error: null,
+    });
+    try {
       const dirName = basename(currentPath) || "root";
       await VfsOps.downloadAllAsZipOp(`${dirName}_export.zip`, currentPath);
-    });
-  }, [currentPath, currentNodes.length, runOperation]);
+    } catch (err) {
+      console.error("Download all error:", err);
+    } finally {
+      emitter.emit(vfsEvent.loadingStateChanged, {
+        isLoading: loading,
+        operationLoading: false,
+        error: error,
+      });
+    }
+  }, [currentPath, currentNodes.length, loading, error]);
 
-  // --- Git Action Handlers ---
-  // Use actions directly from the hook destructuring
   const runGitOperation = useCallback(
     async (path: string, op: () => Promise<any>) => {
       if (isGitOpLoading[path] || isVfsLoading || fsOperationLoading) return;
       setIsGitOpLoading((prev) => ({ ...prev, [path]: true }));
-      _setError(null);
+      emitter.emit(vfsEvent.loadingStateChanged, {
+        isLoading: loading,
+        operationLoading: fsOperationLoading,
+        error: null,
+      });
       try {
         await op();
       } catch (err) {
@@ -428,7 +444,7 @@ WARNING: This will delete all contents inside`
         setIsGitOpLoading((prev) => ({ ...prev, [path]: false }));
       }
     },
-    [_setError, isGitOpLoading, isVfsLoading, fsOperationLoading],
+    [isGitOpLoading, isVfsLoading, fsOperationLoading, loading]
   );
 
   const handleGitInit = useCallback(
@@ -438,7 +454,7 @@ WARNING: This will delete all contents inside`
         setGitRepoStatus((prev) => ({ ...prev, [path]: true }));
       });
     },
-    [runGitOperation],
+    [runGitOperation]
   );
 
   const handleGitPull = useCallback(
@@ -446,7 +462,7 @@ WARNING: This will delete all contents inside`
       toast.info("Pulling default branch (auth not implemented yet)...");
       runGitOperation(path, () => VfsOps.gitPullOp(path, "main"));
     },
-    [runGitOperation],
+    [runGitOperation]
   );
 
   const handleGitCommit = useCallback((path: string) => {
@@ -460,14 +476,14 @@ WARNING: This will delete all contents inside`
       toast.info("Pushing default branch (auth not implemented yet)...");
       runGitOperation(path, () => VfsOps.gitPushOp(path, "main"));
     },
-    [runGitOperation],
+    [runGitOperation]
   );
 
   const handleGitStatus = useCallback(
     (path: string) => {
       runGitOperation(path, () => VfsOps.gitStatusOp(path));
     },
-    [runGitOperation],
+    [runGitOperation]
   );
 
   const handleCloneClick = useCallback(() => {
@@ -482,7 +498,11 @@ WARNING: This will delete all contents inside`
       return;
     }
     setIsCloning(true);
-    _setError(null);
+    emitter.emit(vfsEvent.loadingStateChanged, {
+      isLoading: loading,
+      operationLoading: fsOperationLoading,
+      error: null,
+    });
     try {
       const repoName =
         basename(cloneRepoUrl.trim().replace(/\.git$/, "")) || "cloned_repo";
@@ -491,16 +511,23 @@ WARNING: This will delete all contents inside`
       await VfsOps.gitCloneOp(
         cloneTargetPath,
         cloneRepoUrl.trim(),
-        cloneBranch.trim() || undefined,
+        cloneBranch.trim() || undefined
       );
       setIsCloneDialogOpen(false);
-      await handleRefresh();
+      emitter.emit(vfsEvent.fetchNodesRequest, { parentId: currentParentId });
     } catch (_err) {
       // Error handled by gitCloneOp
     } finally {
       setIsCloning(false);
     }
-  }, [cloneRepoUrl, cloneBranch, currentPath, _setError, handleRefresh]);
+  }, [
+    cloneRepoUrl,
+    cloneBranch,
+    currentPath,
+    currentParentId,
+    loading,
+    fsOperationLoading,
+  ]);
 
   const onSubmitCommit = useCallback(async () => {
     if (!commitPath || !commitMessage.trim()) {
@@ -508,7 +535,11 @@ WARNING: This will delete all contents inside`
       return;
     }
     setIsCommitting(true);
-    _setError(null);
+    emitter.emit(vfsEvent.loadingStateChanged, {
+      isLoading: loading,
+      operationLoading: fsOperationLoading,
+      error: null,
+    });
     try {
       await VfsOps.gitCommitOp(commitPath, commitMessage.trim());
       setIsCommitDialogOpen(false);
@@ -517,9 +548,7 @@ WARNING: This will delete all contents inside`
     } finally {
       setIsCommitting(false);
     }
-  }, [commitPath, commitMessage, _setError]);
-
-  // --- Render Logic ---
+  }, [commitPath, commitMessage, loading, fsOperationLoading]);
 
   if (isVfsLoading) {
     return (
@@ -542,7 +571,11 @@ WARNING: This will delete all contents inside`
         <Button
           variant="outline"
           size="sm"
-          onClick={() => initializeVFS(vfsKey || "default_fallback_key")} // Use action
+          onClick={() =>
+            emitter.emit(vfsEvent.initializeVFSRequest, {
+              vfsKey: vfsKey || "default_fallback_key",
+            })
+          }
           className="mt-2"
         >
           Retry
@@ -552,9 +585,7 @@ WARNING: This will delete all contents inside`
   }
 
   return (
-    // Ensure this top-level div allows flex children to grow/shrink
     <div className={cn("flex h-full flex-col bg-card text-card-foreground")}>
-      {/* Toolbar remains flex-shrink-0 */}
       <FileManagerToolbar
         currentPath={currentPath}
         isAnyLoading={isAnyOperationLoading || isVfsLoading}
@@ -577,8 +608,6 @@ WARNING: This will delete all contents inside`
         handleFileChange={handleFileChange}
         handleArchiveChange={handleArchiveChange}
       />
-
-      {/* Table container (Desktop) */}
       <div className="flex-grow overflow-auto hidden md:block">
         <FileManagerTable
           entries={currentNodes}
@@ -609,8 +638,6 @@ WARNING: This will delete all contents inside`
           handleGitStatus={handleGitStatus}
         />
       </div>
-
-      {/* List container (Mobile) */}
       <div className="flex-grow overflow-auto block md:hidden">
         <FileManagerList
           entries={currentNodes}
@@ -641,8 +668,6 @@ WARNING: This will delete all contents inside`
           handleGitStatus={handleGitStatus}
         />
       </div>
-
-      {/* Dialogs */}
       <CloneDialog
         isOpen={isCloneDialogOpen}
         onOpenChange={setIsCloneDialogOpen}

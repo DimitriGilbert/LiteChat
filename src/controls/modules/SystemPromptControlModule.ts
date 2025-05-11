@@ -17,6 +17,8 @@ export class SystemPromptControlModule implements ControlModule {
   readonly id = "core-system-prompt";
   private unregisterCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
+  // @ts-expect-error ts not seeing properly, @AI KEEP IT OR FIX !
+  private modApiRef: LiteChatModApi | null = null;
 
   public turnSystemPromptValue = "";
   public effectiveSystemPrompt: string | null | undefined = null;
@@ -24,6 +26,7 @@ export class SystemPromptControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
+    this.modApiRef = modApi;
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.updateEffectivePrompt();
 
@@ -57,7 +60,6 @@ export class SystemPromptControlModule implements ControlModule {
       unsubProject,
       unsubSettings
     );
-    // console.log(`[${this.id}] Initialized.`);
   }
 
   private updateEffectivePrompt() {
@@ -98,6 +100,7 @@ export class SystemPromptControlModule implements ControlModule {
   };
 
   register(modApi: LiteChatModApi): void {
+    this.modApiRef = modApi;
     if (this.unregisterCallback) {
       console.warn(`[${this.id}] Already registered. Skipping.`);
       return;
@@ -118,7 +121,6 @@ export class SystemPromptControlModule implements ControlModule {
         }
       },
     });
-    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {
@@ -129,6 +131,7 @@ export class SystemPromptControlModule implements ControlModule {
       this.unregisterCallback = null;
     }
     this.notifyComponentUpdate = null;
+    this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
 }

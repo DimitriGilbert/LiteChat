@@ -4,7 +4,7 @@ import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { providerEvent } from "@/types/litechat/events/provider.events";
-import { promptEvent } from "@/types/litechat/events/prompt.events";
+import { promptEvent as promptStateEvent } from "@/types/litechat/events/prompt.events";
 import { VisibleStructuredOutputControl } from "@/controls/components/structured-output/VisibleStructuredOutputControl";
 import { useProviderStore } from "@/store/provider.store";
 import { usePromptStateStore } from "@/store/prompt.store";
@@ -13,12 +13,14 @@ export class StructuredOutputControlModule implements ControlModule {
   readonly id = "core-structured-output";
   private unregisterCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
+  private modApiRef: LiteChatModApi | null = null;
 
   public structuredOutputJson: string | null = null;
   public isVisible = true;
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
+    this.modApiRef = modApi;
     this.structuredOutputJson =
       usePromptStateStore.getState().structuredOutputJson;
     this.updateVisibility();
@@ -29,7 +31,7 @@ export class StructuredOutputControlModule implements ControlModule {
       this.notifyComponentUpdate?.();
     });
     const unsubPromptParams = modApi.on(
-      promptEvent.parameterChanged,
+      promptStateEvent.parameterChanged,
       (payload) => {
         if (typeof payload === "object" && payload && "params" in payload) {
           const params = payload.params;
@@ -45,7 +47,6 @@ export class StructuredOutputControlModule implements ControlModule {
     );
 
     this.eventUnsubscribers.push(unsubModel, unsubPromptParams);
-    // console.log(`[${this.id}] Initialized.`);
   }
 
   private updateVisibility() {
@@ -66,7 +67,9 @@ export class StructuredOutputControlModule implements ControlModule {
 
   public setStructuredOutputJson = (json: string | null) => {
     this.structuredOutputJson = json;
-    usePromptStateStore.getState().setStructuredOutputJson(json);
+    this.modApiRef?.emit(promptStateEvent.setStructuredOutputJsonRequest, {
+      json,
+    });
     this.notifyComponentUpdate?.();
   };
 
@@ -75,6 +78,7 @@ export class StructuredOutputControlModule implements ControlModule {
   };
 
   register(modApi: LiteChatModApi): void {
+    this.modApiRef = modApi;
     if (this.unregisterCallback) {
       console.warn(`[${this.id}] Already registered. Skipping.`);
       return;
@@ -97,10 +101,11 @@ export class StructuredOutputControlModule implements ControlModule {
         return undefined;
       },
       clearOnSubmit: () => {
-        usePromptStateStore.getState().setStructuredOutputJson(null);
+        this.modApiRef?.emit(promptStateEvent.setStructuredOutputJsonRequest, {
+          json: null,
+        });
       },
     });
-    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {
@@ -111,6 +116,7 @@ export class StructuredOutputControlModule implements ControlModule {
       this.unregisterCallback = null;
     }
     this.notifyComponentUpdate = null;
+    this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
 }

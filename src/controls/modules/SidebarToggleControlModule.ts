@@ -5,14 +5,16 @@ import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { SidebarToggleControlComponent } from "@/controls/components/sidebar-toggle/SidebarToggleControlComponent";
 import { useUIStateStore } from "@/store/ui.store";
+import { uiEvent } from "@/types/litechat/events/ui.events";
 
 export class SidebarToggleControlModule implements ControlModule {
   readonly id = "core-sidebar-toggle";
   private unregisterCallback: (() => void) | null = null;
   private notifyComponentUpdate: (() => void) | null = null;
+  private modApiRef: LiteChatModApi | null = null;
 
-  async initialize(_modApi: LiteChatModApi): Promise<void> {
-    // console.log(`[${this.id}] Initialized.`);
+  async initialize(modApi: LiteChatModApi): Promise<void> {
+    this.modApiRef = modApi;
   }
 
   public getIsSidebarCollapsed = (): boolean => {
@@ -23,7 +25,9 @@ export class SidebarToggleControlModule implements ControlModule {
     const current = useUIStateStore.getState().isSidebarCollapsed;
     const newState = isCollapsed ?? !current;
     if (current !== newState) {
-      useUIStateStore.getState().toggleSidebar(isCollapsed);
+      this.modApiRef?.emit(uiEvent.toggleSidebarRequest, {
+        isCollapsed: newState,
+      });
       this.notifyComponentUpdate?.();
     }
   };
@@ -33,6 +37,7 @@ export class SidebarToggleControlModule implements ControlModule {
   };
 
   register(modApi: LiteChatModApi): void {
+    this.modApiRef = modApi;
     if (this.unregisterCallback) {
       console.warn(`[${this.id}] Already registered. Skipping.`);
       return;
@@ -48,7 +53,6 @@ export class SidebarToggleControlModule implements ControlModule {
       iconRenderer: renderer,
       show: () => true,
     });
-    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {
@@ -57,6 +61,7 @@ export class SidebarToggleControlModule implements ControlModule {
       this.unregisterCallback = null;
     }
     this.notifyComponentUpdate = null;
+    this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
 }

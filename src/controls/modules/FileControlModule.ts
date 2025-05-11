@@ -22,6 +22,7 @@ export class FileControlModule implements ControlModule {
   readonly id = "core-file-attachment";
   private unregisterCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
+  private modApiRef: LiteChatModApi | null = null;
 
   private isStreaming = false;
   private modelSupportsNonText = true;
@@ -30,6 +31,7 @@ export class FileControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
+    this.modApiRef = modApi;
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.attachedFiles = useInputStore.getState().attachedFilesMetadata;
     this.updateModelSupport();
@@ -59,7 +61,6 @@ export class FileControlModule implements ControlModule {
     });
 
     this.eventUnsubscribers.push(unsubStatus, unsubModel, unsubFiles);
-    // console.log(`[${this.id}] Initialized.`);
   }
 
   private updateModelSupport() {
@@ -94,11 +95,13 @@ export class FileControlModule implements ControlModule {
       );
       return;
     }
-    useInputStore.getState().addAttachedFile(fileData);
+    this.modApiRef?.emit(inputEvent.addAttachedFileRequest, fileData);
   };
 
   public onFileRemove = (attachmentId: string) => {
-    useInputStore.getState().removeAttachedFile(attachmentId);
+    this.modApiRef?.emit(inputEvent.removeAttachedFileRequest, {
+      attachmentId,
+    });
   };
 
   public setNotifyCallback = (cb: (() => void) | null) => {
@@ -106,6 +109,7 @@ export class FileControlModule implements ControlModule {
   };
 
   register(modApi: LiteChatModApi): void {
+    this.modApiRef = modApi;
     if (this.unregisterCallback) {
       console.warn(`[${this.id}] Already registered. Skipping.`);
       return;
@@ -117,7 +121,6 @@ export class FileControlModule implements ControlModule {
         React.createElement(FileControlTrigger, { module: this }),
       renderer: () => React.createElement(FileControlPanel, { module: this }),
     });
-    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {
@@ -128,6 +131,7 @@ export class FileControlModule implements ControlModule {
       this.unregisterCallback = null;
     }
     this.notifyComponentUpdate = null;
+    this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
 }

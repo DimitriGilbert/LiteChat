@@ -9,7 +9,7 @@ import { uiEvent } from "@/types/litechat/events/ui.events";
 import { RulesControlTrigger } from "@/controls/components/rules/RulesControlTrigger";
 import { SettingsRulesAndTags } from "@/controls/components/rules/SettingsRulesAndTags";
 import type { DbRule, DbTag } from "@/types/litechat/rules";
-import type { ResolvedRuleContent } from "@/types/litechat/prompt"; // Import new type
+import type { ResolvedRuleContent } from "@/types/litechat/prompt";
 
 export class RulesControlModule implements ControlModule {
   readonly id = "core-rules-tags";
@@ -60,7 +60,6 @@ export class RulesControlModule implements ControlModule {
     });
 
     this.eventUnsubscribers.push(unsubStatus, unsubRulesLoaded);
-    // console.log(`[${this.id}] Initialized.`);
   }
 
   private updateHasRulesOrTags() {
@@ -202,7 +201,7 @@ export class RulesControlModule implements ControlModule {
             return {
               activeTagIds,
               activeRuleIds,
-              effectiveRulesContent, // Add resolved content
+              effectiveRulesContent,
             };
           }
           return undefined;
@@ -220,7 +219,6 @@ export class RulesControlModule implements ControlModule {
           if (changed) this.notifyComponentUpdate?.();
         },
       });
-      console.log(`[${this.id}] Prompt control registered.`);
     }
 
     if (!this.unregisterSettingsTabCallback) {
@@ -231,7 +229,6 @@ export class RulesControlModule implements ControlModule {
           React.createElement(SettingsRulesAndTags, { module: this }),
         order: 50,
       });
-      // console.log(`[${this.id}] Settings tab registered.`);
     }
   }
 

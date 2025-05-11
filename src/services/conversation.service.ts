@@ -11,8 +11,8 @@ import { useProjectStore } from "@/store/project.store";
 import { usePromptStateStore } from "@/store/prompt.store";
 import { useVfsStore } from "@/store/vfs.store";
 import {
-  buildHistoryMessages, // Corrected: Ensure this is exported
-  processFileMetaToUserContent, // Corrected: Ensure this is exported
+  buildHistoryMessages,
+  processFileMetaToUserContent,
 } from "@/lib/litechat/ai-helpers";
 import type { CoreMessage, ImagePart, TextPart } from "ai";
 import { toast } from "sonner";
@@ -23,6 +23,8 @@ import type { DbRule } from "@/types/litechat/rules";
 import { useSettingsStore } from "@/store/settings.store";
 import { nanoid } from "nanoid";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { vfsEvent, VfsEventPayloads } from "@/types/litechat/events/vfs.events";
 
 export const ConversationService = {
   async submitPrompt(turnData: PromptTurnObject): Promise<void> {
@@ -68,7 +70,6 @@ export const ConversationService = {
     let userContent = turnData.content;
     const userMessageContentParts: (TextPart | ImagePart)[] = [];
 
-    // Use pre-resolved rule content from turnData.metadata
     const effectiveRulesContent: ResolvedRuleContent[] =
       turnData.metadata?.effectiveRulesContent ?? [];
 
@@ -160,12 +161,11 @@ ${userContent}`;
           turnSystemPrompt: _turnSystemPrompt,
           activeTagIds,
           activeRuleIds,
-          effectiveRulesContent: _effectiveRulesContent, // Exclude from direct pass-through
+          effectiveRulesContent: _effectiveRulesContent,
           autoTitleEnabledForTurn,
           ...restMeta
         }) => ({
           ...restMeta,
-          // Store original IDs for reference if needed, though content is primary now
           effectivelyAppliedTagIds: activeTagIds,
           effectivelyAppliedRuleIds: activeRuleIds,
         }))(turnData.metadata ?? {}),
@@ -551,18 +551,72 @@ ${userContent}`;
     console.log(
       `[ConversationService] Ensuring VFS ready for key "${targetVfsKey}"...`
     );
-    try {
-      const fsInstance = await useVfsStore
-        .getState()
-        .initializeVFS(targetVfsKey, { force: true });
-      console.log(`[ConversationService] VFS ready for key "${targetVfsKey}".`);
-      return fsInstance;
-    } catch (vfsError) {
-      console.error(
-        `[ConversationService] Failed to ensure VFS ready for key ${targetVfsKey}:`,
-        vfsError
-      );
-      throw vfsError;
-    }
+    return new Promise((resolve, reject) => {
+      const handleFsInstanceChanged = (
+        payload: VfsEventPayloads[typeof vfsEvent.fsInstanceChanged]
+      ) => {
+        if (useVfsStore.getState().configuredVfsKey === targetVfsKey) {
+          cleanupSubscriptions();
+          resolve(payload.fsInstance as typeof FsType | undefined);
+        }
+      };
+
+      const handleLoadingStateChanged = (
+        payload: VfsEventPayloads[typeof vfsEvent.loadingStateChanged]
+      ) => {
+        if (
+          useVfsStore.getState().configuredVfsKey === targetVfsKey &&
+          !payload.isLoading &&
+          !payload.operationLoading
+        ) {
+          if (payload.error) {
+            cleanupSubscriptions();
+            reject(new Error(payload.error));
+          } else {
+            const fsInstance = useVfsStore.getState().fs;
+            if (fsInstance) {
+              cleanupSubscriptions();
+              resolve(fsInstance);
+            }
+          }
+        }
+      };
+
+      const cleanupSubscriptions = () => {
+        emitter.off(vfsEvent.fsInstanceChanged, handleFsInstanceChanged);
+        emitter.off(vfsEvent.loadingStateChanged, handleLoadingStateChanged);
+      };
+
+      emitter.on(vfsEvent.fsInstanceChanged, handleFsInstanceChanged);
+      emitter.on(vfsEvent.loadingStateChanged, handleLoadingStateChanged);
+
+      const vfsState = useVfsStore.getState();
+      if (
+        vfsState.configuredVfsKey === targetVfsKey &&
+        vfsState.fs &&
+        !vfsState.loading &&
+        !vfsState.operationLoading &&
+        !vfsState.error
+      ) {
+        cleanupSubscriptions();
+        resolve(vfsState.fs);
+        return;
+      }
+      if (
+        vfsState.configuredVfsKey === targetVfsKey &&
+        vfsState.error &&
+        !vfsState.loading &&
+        !vfsState.operationLoading
+      ) {
+        cleanupSubscriptions();
+        reject(new Error(vfsState.error));
+        return;
+      }
+
+      emitter.emit(vfsEvent.initializeVFSRequest, {
+        vfsKey: targetVfsKey,
+        options: { force: true },
+      });
+    });
   },
 };

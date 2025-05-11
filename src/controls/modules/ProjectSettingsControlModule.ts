@@ -10,7 +10,7 @@ import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
 
 export class ProjectSettingsControlModule implements ControlModule {
   readonly id = "core-project-settings";
-  public readonly modalId = "projectSettingsModal"; // Unique ID for this modal
+  public readonly modalId = "projectSettingsModal";
   private unregisterModalProviderCallback: (() => void) | null = null;
   private modApiRef: LiteChatModApi | null = null;
   private eventUnsubscribers: (() => void)[] = [];
@@ -76,8 +76,7 @@ export class ProjectSettingsControlModule implements ControlModule {
           isOpen: props.isOpen,
           onClose: props.onClose,
           projectId: props.targetId || null,
-          module: this, // Pass the module instance
-          // initialTab: props.initialTab, // If ProjectSettingsModal uses it
+          module: this,
         });
       }
     );

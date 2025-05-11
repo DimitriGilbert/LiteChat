@@ -74,7 +74,8 @@ export class AutoTitleControlModule implements ControlModule {
   private checkFirstInteraction() {
     const interactionState = useInteractionStore.getState();
     const isFirst =
-      interactionState.currentConversationId !== null &&
+      // if no conversation selected, it is a new conversation !
+      interactionState.currentConversationId === null ||
       interactionState.interactions.filter(
         (i) => i.conversationId === interactionState.currentConversationId
       ).length === 0;

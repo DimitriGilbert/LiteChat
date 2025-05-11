@@ -8,12 +8,13 @@ import { providerEvent } from "@/types/litechat/events/provider.events";
 import { GlobalModelSelector } from "@/controls/components/global-model-selector/GlobalModelSelector";
 import { useProviderStore } from "@/store/provider.store";
 import { useInteractionStore } from "@/store/interaction.store";
-import { usePromptStateStore } from "@/store/prompt.store";
+import { promptEvent as promptStateEvent } from "@/types/litechat/events/prompt.events";
 
 export class GlobalModelSelectorModule implements ControlModule {
   readonly id = "core-global-model-selector";
   private unregisterCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
+  private modApiRef: LiteChatModApi | null = null;
 
   public selectedModelId: string | null = null;
   public isStreaming = false;
@@ -21,6 +22,7 @@ export class GlobalModelSelectorModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
+    this.modApiRef = modApi;
     this.loadInitialState();
 
     const unsubStatus = modApi.on(interactionEvent.statusChanged, (payload) => {
@@ -37,7 +39,10 @@ export class GlobalModelSelectorModule implements ControlModule {
         if (typeof payload === "object" && payload && "modelId" in payload) {
           if (this.selectedModelId !== payload.modelId) {
             this.selectedModelId = payload.modelId;
-            usePromptStateStore.getState().setModelId(payload.modelId);
+            // Emit request instead of direct call
+            this.modApiRef?.emit(promptStateEvent.setModelIdRequest, {
+              id: payload.modelId,
+            });
             this.notifyComponentUpdate?.();
           }
         }
@@ -56,7 +61,6 @@ export class GlobalModelSelectorModule implements ControlModule {
       unsubModelChange,
       unsubProviderLoading
     );
-    // console.log(`[${this.id}] Initialized.`);
   }
 
   private loadInitialState() {
@@ -64,12 +68,20 @@ export class GlobalModelSelectorModule implements ControlModule {
     this.selectedModelId = providerState.selectedModelId;
     this.isLoadingProviders = providerState.isLoading;
     this.isStreaming = useInteractionStore.getState().status === "streaming";
-    usePromptStateStore.getState().setModelId(this.selectedModelId);
+    // Emit request instead of direct call
+    this.modApiRef?.emit(promptStateEvent.setModelIdRequest, {
+      id: this.selectedModelId,
+    });
   }
 
   public handleSelectionChange = (newModelId: string | null) => {
-    useProviderStore.getState().selectModel(newModelId);
-    usePromptStateStore.getState().setModelId(newModelId);
+    // Emit requests instead of direct store calls
+    this.modApiRef?.emit(providerEvent.selectModelRequest, {
+      modelId: newModelId,
+    });
+    this.modApiRef?.emit(promptStateEvent.setModelIdRequest, {
+      id: newModelId,
+    });
   };
 
   public setNotifyCallback = (cb: (() => void) | null) => {
@@ -77,6 +89,7 @@ export class GlobalModelSelectorModule implements ControlModule {
   };
 
   register(modApi: LiteChatModApi): void {
+    this.modApiRef = modApi;
     if (this.unregisterCallback) {
       console.warn(`[${this.id}] Already registered. Skipping.`);
       return;
@@ -88,7 +101,6 @@ export class GlobalModelSelectorModule implements ControlModule {
       triggerRenderer: () =>
         React.createElement(GlobalModelSelector, { module: this }),
     });
-    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {
@@ -99,6 +111,7 @@ export class GlobalModelSelectorModule implements ControlModule {
       this.unregisterCallback = null;
     }
     this.notifyComponentUpdate = null;
+    this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
 }

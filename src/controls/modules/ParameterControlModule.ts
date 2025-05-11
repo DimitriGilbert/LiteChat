@@ -7,7 +7,7 @@ import { type LiteChatModApi } from "@/types/litechat/modding";
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { providerEvent } from "@/types/litechat/events/provider.events";
-import { promptEvent } from "@/types/litechat/events/prompt.events";
+import { promptEvent as promptStateEvent } from "@/types/litechat/events/prompt.events";
 import { ParameterControlTrigger } from "@/controls/components/parameter/ParameterControlTrigger";
 import { useSettingsStore } from "@/store/settings.store";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -22,6 +22,7 @@ export class ParameterControlModule implements ControlModule {
   readonly id = "core-parameters";
   private unregisterCallback: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
+  private modApiRef: LiteChatModApi | null = null;
 
   public temperature: number | null = null;
   public topP: number | null = null;
@@ -43,6 +44,7 @@ export class ParameterControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
+    this.modApiRef = modApi;
     this.loadInitialState();
     this.updateSupportedParams();
 
@@ -67,7 +69,7 @@ export class ParameterControlModule implements ControlModule {
       }
     );
     const unsubPromptParams = modApi.on(
-      promptEvent.parameterChanged,
+      promptStateEvent.parameterChanged,
       (payload) => {
         if (typeof payload === "object" && payload && "params" in payload) {
           const params = payload.params;
@@ -116,7 +118,6 @@ export class ParameterControlModule implements ControlModule {
       unsubSettings,
       unsubPromptParams
     );
-    // console.log(`[${this.id}] Initialized.`);
   }
 
   private loadInitialState() {
@@ -194,32 +195,34 @@ export class ParameterControlModule implements ControlModule {
 
   public setTemperature = (value: number | null) => {
     this.temperature = value;
-    usePromptStateStore.getState().setTemperature(value);
+    this.modApiRef?.emit(promptStateEvent.setTemperatureRequest, { value });
     this.notifyComponentUpdate?.();
   };
   public setTopP = (value: number | null) => {
     this.topP = value;
-    usePromptStateStore.getState().setTopP(value);
+    this.modApiRef?.emit(promptStateEvent.setTopPRequest, { value });
     this.notifyComponentUpdate?.();
   };
   public setMaxTokens = (value: number | null) => {
     this.maxTokens = value;
-    usePromptStateStore.getState().setMaxTokens(value);
+    this.modApiRef?.emit(promptStateEvent.setMaxTokensRequest, { value });
     this.notifyComponentUpdate?.();
   };
   public setTopK = (value: number | null) => {
     this.topK = value;
-    usePromptStateStore.getState().setTopK(value);
+    this.modApiRef?.emit(promptStateEvent.setTopKRequest, { value });
     this.notifyComponentUpdate?.();
   };
   public setPresencePenalty = (value: number | null) => {
     this.presencePenalty = value;
-    usePromptStateStore.getState().setPresencePenalty(value);
+    this.modApiRef?.emit(promptStateEvent.setPresencePenaltyRequest, { value });
     this.notifyComponentUpdate?.();
   };
   public setFrequencyPenalty = (value: number | null) => {
     this.frequencyPenalty = value;
-    usePromptStateStore.getState().setFrequencyPenalty(value);
+    this.modApiRef?.emit(promptStateEvent.setFrequencyPenaltyRequest, {
+      value,
+    });
     this.notifyComponentUpdate?.();
   };
 
@@ -228,6 +231,7 @@ export class ParameterControlModule implements ControlModule {
   };
 
   register(modApi: LiteChatModApi): void {
+    this.modApiRef = modApi;
     if (this.unregisterCallback) {
       console.warn(`[${this.id}] Already registered. Skipping.`);
       return;
@@ -251,7 +255,6 @@ export class ParameterControlModule implements ControlModule {
         return Object.keys(params).length > 0 ? params : undefined;
       },
     });
-    // console.log(`[${this.id}] Registered.`);
   }
 
   destroy(): void {
@@ -262,6 +265,7 @@ export class ParameterControlModule implements ControlModule {
       this.unregisterCallback = null;
     }
     this.notifyComponentUpdate = null;
+    this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
 }

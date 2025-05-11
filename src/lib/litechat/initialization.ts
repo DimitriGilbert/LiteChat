@@ -31,7 +31,7 @@ interface CoreStores {
   setLoadedMods: (loadedMods: any[]) => void;
   getConversationById: (id: string | null) => any;
   getEffectiveProjectSettings: (projectId: string | null) => any;
-  initializePromptState: (settings: any) => void;
+  initializePromptState: (settings: any) => void; // This will be unused after refactor
   selectedItemId: string | null;
   selectedItemType: string | null;
 }

@@ -14,7 +14,7 @@ import { useConversationStore } from "@/store/conversation.store";
 import { useVfsStore } from "@/store/vfs.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { PersistenceService } from "./persistence.service";
-import { runMiddleware, getContextSnapshot } from "@/lib/litechat/ai-helpers"; // Corrected: Ensure these are exported
+import { runMiddleware, getContextSnapshot } from "@/lib/litechat/ai-helpers";
 import {
   splitModelId,
   instantiateModelInstance,
@@ -40,6 +40,8 @@ import {
   type CoreMessage,
 } from "ai";
 import type { fs } from "@zenfs/core";
+import { conversationEvent } from "@/types/litechat/events/conversation.events";
+import { vfsEvent } from "@/types/litechat/events/vfs.events";
 
 interface AIServiceCallOptions {
   model: LanguageModelV1;
@@ -252,9 +254,24 @@ export const InteractionService = {
                 const targetVfsKey = conversation?.projectId ?? "orphan";
                 let fsInstance: typeof fs | undefined | null;
                 try {
-                  fsInstance = await useVfsStore
-                    .getState()
-                    .initializeVFS(targetVfsKey, { force: true });
+                  // Emit event to initialize VFS
+                  emitter.emit(vfsEvent.initializeVFSRequest, {
+                    vfsKey: targetVfsKey,
+                    options: { force: true },
+                  });
+                  // Wait for VFS to be ready (this part might need a more robust async wait mechanism)
+                  // For simplicity here, we'll assume it becomes available quickly or rely on VfsOps to handle it.
+                  // A more robust solution would involve waiting for a vfsEvent.fsInstanceChanged event.
+                  await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay
+                  fsInstance = useVfsStore.getState().fs;
+                  if (
+                    useVfsStore.getState().configuredVfsKey !== targetVfsKey ||
+                    !fsInstance
+                  ) {
+                    throw new Error(
+                      `Filesystem for key "${targetVfsKey}" not ready after request.`
+                    );
+                  }
                 } catch (initError: any) {
                   return {
                     _isError: true,
@@ -588,14 +605,10 @@ export const InteractionService = {
         console.log(
           `[InteractionService] Updating conversation ${currentInteraction.conversationId} title to: "${generatedTitle}"`
         );
-        useConversationStore
-          .getState()
-          .updateConversation(currentInteraction.conversationId, {
-            title: generatedTitle,
-          })
-          .catch((e) =>
-            console.error("Failed to update conversation title:", e)
-          );
+        emitter.emit(conversationEvent.updateConversationRequest, {
+          id: currentInteraction.conversationId,
+          updates: { title: generatedTitle },
+        });
       }
     }
 
