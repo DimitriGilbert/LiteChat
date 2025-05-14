@@ -62,9 +62,8 @@ export class SettingsControlModule implements ControlModule {
           React.createElement(SettingsModal, {
             isOpen: props.isOpen,
             onClose: props.onClose,
-            // Pass initialTab and initialSubTab if SettingsModal is designed to use them
-            // initialTab: props.initialTab,
-            // initialSubTab: props.initialSubTab,
+            initialTab: props.initialTab,
+            initialSubTab: props.initialSubTab,
           })
       );
     }
