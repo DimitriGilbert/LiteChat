@@ -792,10 +792,7 @@ export const useVfsStore = create(
 
     selectFile: (fileId) => {
       set((state) => {
-        const node = state.nodes[fileId];
-        if (node && node.type === "file") {
-          state.selectedFileIds.add(fileId);
-        }
+        state.selectedFileIds.add(fileId);
       });
       emitter.emit(vfsEvent.selectionChanged, {
         selectedFileIds: Array.from(get().selectedFileIds),

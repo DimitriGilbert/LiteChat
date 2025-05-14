@@ -1,6 +1,6 @@
 // src/controls/components/vfs/VfsModalPanel.tsx
 // FULL FILE
-import React from "react"; // Removed useState as it's not used
+import React, { useState, useEffect } from "react"; // Added useState, useEffect
 import { Button } from "@/components/ui/button";
 import { PaperclipIcon } from "lucide-react";
 import {
@@ -18,7 +18,12 @@ import { toast } from "sonner";
 import type { VfsControlModule } from "@/controls/modules/VfsControlModule";
 import { useConversationStore } from "@/store/conversation.store";
 import { useVfsStore } from "@/store/vfs.store";
-import type { ModalProviderProps } from "@/types/litechat/modding"; // Import ModalProviderProps
+import type { ModalProviderProps } from "@/types/litechat/modding";
+import { emitter } from "@/lib/litechat/event-emitter";
+import {
+  vfsEvent,
+  type VfsEventPayloads,
+} from "@/types/litechat/events/vfs.events";
 
 interface VfsModalPanelProps extends ModalProviderProps {
   module: VfsControlModule;
@@ -26,15 +31,29 @@ interface VfsModalPanelProps extends ModalProviderProps {
 
 export const VfsModalPanel: React.FC<VfsModalPanelProps> = ({
   module,
-  isOpen, // Prop from ModalManager
-  onClose, // Prop from ModalManager
+  isOpen,
+  onClose,
 }) => {
-  // Removed forceUpdate and useEffect for module.setNotifyModalUpdate
+  // Track selected count locally
+  const [selectedCount, setSelectedCount] = useState(
+    module.getSelectedFileIdsCount()
+  );
 
-  const selectedFileIdsCount = module.getSelectedFileIdsCount();
+  useEffect(() => {
+    const handleSelectionChange = (
+      payload: VfsEventPayloads[typeof vfsEvent.selectionChanged]
+    ) => {
+      setSelectedCount(payload.selectedFileIds.length);
+    };
+
+    emitter.on(vfsEvent.selectionChanged, handleSelectionChange);
+    return () => {
+      emitter.off(vfsEvent.selectionChanged, handleSelectionChange);
+    };
+  }, []);
+
   const vfsKey = useVfsStore.getState().vfsKey;
   const selectedItemType = useConversationStore.getState().selectedItemType;
-
   const addAttachedFile = useInputStore.getState().addAttachedFile;
 
   const handleAttachAndClose = () => {
@@ -65,7 +84,7 @@ export const VfsModalPanel: React.FC<VfsModalPanelProps> = ({
         `Attached ${attachedCount} file(s) from VFS to the next prompt.`
       );
       module.clearVfsSelection();
-      onClose(); // Use onClose from props
+      onClose();
     } else {
       toast.warning("No valid files were selected to attach.");
     }
@@ -73,7 +92,7 @@ export const VfsModalPanel: React.FC<VfsModalPanelProps> = ({
 
   const handleDialogClose = () => {
     module.clearVfsSelection();
-    onClose(); // Use onClose from props
+    onClose();
   };
 
   return (
@@ -97,12 +116,9 @@ export const VfsModalPanel: React.FC<VfsModalPanelProps> = ({
           <Button variant="outline" onClick={handleDialogClose}>
             Close
           </Button>
-          <Button
-            onClick={handleAttachAndClose}
-            disabled={selectedFileIdsCount === 0}
-          >
+          <Button onClick={handleAttachAndClose} disabled={selectedCount === 0}>
             <PaperclipIcon className="h-4 w-4 mr-2" />
-            Attach Selected ({selectedFileIdsCount})
+            Attach Selected ({selectedCount})
           </Button>
         </DialogFooter>
       </DialogContent>
