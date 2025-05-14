@@ -24,13 +24,28 @@ export const VfsTriggerButton: React.FC<VfsTriggerButtonProps> = ({
 }) => {
   const [, forceUpdate] = useState({});
   useEffect(() => {
-    module.setNotifyTriggerUpdate(() => forceUpdate({}));
-    return () => module.setNotifyTriggerUpdate(null);
+    if (module && typeof module.setNotifyTriggerUpdate === "function") {
+      module.setNotifyTriggerUpdate(() => forceUpdate({}));
+      return () => {
+        if (module && typeof module.setNotifyTriggerUpdate === "function") {
+          module.setNotifyTriggerUpdate(null);
+        }
+      };
+    }
   }, [module]);
 
-  const isVfsModalOpen = module.getIsVfsModalOpen();
-  const selectedFileIdsCount = module.getSelectedFileIdsCount();
-  const isVisible = module.getEnableVfs(); // Visibility based on module state
+  const isVfsModalOpen =
+    module && typeof module.getIsVfsModalOpen === "function"
+      ? module.getIsVfsModalOpen()
+      : false;
+  const selectedFileIdsCount =
+    module && typeof module.getSelectedFileIdsCount === "function"
+      ? module.getSelectedFileIdsCount()
+      : 0;
+  const isVisible =
+    module && typeof module.getEnableVfs === "function"
+      ? module.getEnableVfs()
+      : false;
 
   const addAttachedFile = useInputStore.getState().addAttachedFile;
 
@@ -42,7 +57,7 @@ export const VfsTriggerButton: React.FC<VfsTriggerButtonProps> = ({
     }
 
     let attachedCount = 0;
-    const nodes = module.getVfsNodes();
+    const nodes = module.getVfsNodes(); // Assuming getVfsNodes is safe to call
     selectedIds.forEach((fileId: string) => {
       const node = nodes[fileId];
       if (node && node.type === "file") {
@@ -61,8 +76,13 @@ export const VfsTriggerButton: React.FC<VfsTriggerButtonProps> = ({
       toast.success(
         `Attached ${attachedCount} file(s) from VFS to the next prompt.`
       );
-      module.clearVfsSelection();
-      module.toggleVfsModal(false);
+      if (typeof module.clearVfsSelection === "function") {
+        module.clearVfsSelection();
+      }
+      if (typeof module.toggleVfsModal === "function") {
+        // This should now emit a close request if the modal is open
+        // module.toggleVfsModal(); // Or explicitly module.closeVfsModal() if that exists
+      }
     } else {
       toast.warning("No valid files were selected to attach.");
     }
@@ -84,7 +104,11 @@ export const VfsTriggerButton: React.FC<VfsTriggerButtonProps> = ({
                 "h-8 w-8",
                 isVfsModalOpen && "bg-muted text-primary"
               )}
-              onClick={() => module.toggleVfsModal()}
+              onClick={() =>
+                module &&
+                typeof module.toggleVfsModal === "function" &&
+                module.toggleVfsModal()
+              }
               aria-label="Toggle Virtual File System"
             >
               <HardDriveIcon className="h-4 w-4" />

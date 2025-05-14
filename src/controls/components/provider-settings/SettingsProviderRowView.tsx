@@ -105,10 +105,10 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
   const enabledCount = provider.enabledModels?.length ?? 0;
   const availableCount = allAvailableModelsForView.length;
 
-  const handleModelClick = (modelId: string) => {
-    const combinedId = combineModelId(provider.id, modelId);
-    onSelectModelForDetails(combinedId);
-  };
+  // const handleModelClick = (modelId: string) => {
+  //   const combinedId = combineModelId(provider.id, modelId);
+  //   onSelectModelForDetails(combinedId);
+  // };
 
   return (
     <div className="space-y-4">
@@ -273,7 +273,7 @@ const ProviderRowViewModeComponent: React.FC<ProviderRowViewModeProps> = ({
             isLoading={fetchStatus === "fetching"}
             disabled={isDeleting}
             listHeightClass="h-[26rem]" // Updated height
-            onModelClick={handleModelClick}
+            // onModelClick={handleModelClick}
           />
         )}
       </div>

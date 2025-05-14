@@ -1,4 +1,4 @@
-// src/components/LiteChat/settings/SettingsModal.tsx
+// src/controls/components/settings/SettingsModal.tsx
 // FULL FILE
 import React, { memo, useState, useEffect, useMemo, useCallback } from "react";
 import {
@@ -13,30 +13,24 @@ import { Button } from "@/components/ui/button";
 import type { CustomSettingTab } from "@/types/litechat/modding";
 import { useShallow } from "zustand/react/shallow";
 import { useModStore } from "@/store/mod.store";
-import { useUIStateStore } from "@/store/ui.store";
+// Removed unused useUIStateStore import
 import {
   TabbedLayout,
   TabDefinition,
 } from "@/components/LiteChat/common/TabbedLayout";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import type { ModalProviderProps } from "@/types/litechat/modding";
 
-interface SettingsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+interface SettingsModalProps extends ModalProviderProps {
+  // isOpen and onClose are already in ModalProviderProps
 }
 
 const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
-  ({ isOpen, onClose }) => {
+  ({ isOpen, onClose, initialTab: propsInitialTab }) => {
     const { modSettingsTabs } = useModStore(
       useShallow((state) => ({
         modSettingsTabs: state.modSettingsTabs || [],
-      }))
-    );
-    const { initialSettingsTab, clearInitialSettingsTabs } = useUIStateStore(
-      useShallow((state) => ({
-        initialSettingsTab: state.initialSettingsTab,
-        clearInitialSettingsTabs: state.clearInitialSettingsTabs,
       }))
     );
 
@@ -66,51 +60,36 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
       getDefaultTab()
     );
 
-    // This effect should ONLY run when the modal opens OR when initialSettingsTab changes.
-    // It sets the activeTabValue based on these conditions.
     useEffect(() => {
       if (isOpen) {
         let targetTab = getDefaultTab();
         if (
-          initialSettingsTab &&
-          allTabs.some((t) => t.value === initialSettingsTab)
+          propsInitialTab &&
+          allTabs.some((t) => t.value === propsInitialTab)
         ) {
-          targetTab = initialSettingsTab;
-        } else if (initialSettingsTab) {
-          // initialSettingsTab is set but not found
+          targetTab = propsInitialTab;
+        } else if (propsInitialTab) {
           console.warn(
-            `[SettingsModal] Initial tab "${initialSettingsTab}" not found. Defaulting to "${targetTab}".`
+            `[SettingsModal] Initial tab "${propsInitialTab}" not found. Defaulting to "${targetTab}".`
           );
           toast.error(
-            `Settings tab "${initialSettingsTab}" not found. Opening default tab.`
+            `Settings tab "${propsInitialTab}" not found. Opening default tab.`
           );
         }
-        // Only update if the determined targetTab is different from the current activeTabValue
-        // This prevents overriding a user's click if initialSettingsTab hasn't changed.
-        if (activeTabValue !== targetTab) {
-          setActiveTabValue(targetTab);
-        }
+        setActiveTabValue(targetTab);
       }
-    }, [isOpen, initialSettingsTab, allTabs, getDefaultTab]); // Removed activeTabValue from dependency array
+    }, [isOpen, propsInitialTab, allTabs, getDefaultTab]);
 
     const handleOpenChange = (open: boolean) => {
       if (!open) {
         onClose();
-        clearInitialSettingsTabs();
-        // Optionally reset activeTabValue to default when modal closes,
-        // so it opens to default next time unless initialSettingsTab is set.
-        // setActiveTabValue(getDefaultTab());
+        // No need to call clearInitialSettingsTabs from UIStateStore here,
+        // as initialTab is now a prop.
       }
-      // If opening, the useEffect above will handle setting the active tab.
     };
 
-    // This function is passed to TabbedLayout's onValueChange
     const handleTabChangeByLayout = (value: string) => {
-      setActiveTabValue(value); // Update our state when user clicks a tab
-      // If the user manually changes the tab, clear the programmatic initial tab setting
-      if (value !== initialSettingsTab) {
-        clearInitialSettingsTabs();
-      }
+      setActiveTabValue(value);
     };
 
     return (
@@ -135,8 +114,8 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
           {allTabs.length > 0 ? (
             <TabbedLayout
               tabs={allTabs}
-              key={activeTabValue}
-              initialValue={activeTabValue}
+              key={activeTabValue} // Use activeTabValue as key to re-mount if it changes programmatically
+              initialValue={activeTabValue} // Set initialValue for TabbedLayout
               onValueChange={handleTabChangeByLayout}
               className="flex-grow overflow-hidden px-4 md:px-6"
               listClassName="-mx-4 md:-mx-6 px-2 md:px-6 py-1 md:py-0"

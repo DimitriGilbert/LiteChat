@@ -25,15 +25,19 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useProviderStore } from "@/store/provider.store";
-import { useShallow } from "zustand/react/shallow";
+// REMOVED: import { useProviderStore } from "@/store/provider.store";
+// REMOVED: import { useShallow } from "zustand/react/shallow";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { ModelListItem } from "@/types/litechat/provider";
+import type {
+  ModelListItem,
+  DbProviderConfig,
+} from "@/types/litechat/provider";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { GlobalModelSelectorModule } from "@/controls/modules/GlobalModelSelectorModule";
+import { useProviderStore } from "@/store/provider.store"; // Only for dbProviderConfigs for filter UI
 
 interface GlobalModelSelectorProps {
   module?: GlobalModelSelectorModule;
@@ -71,7 +75,20 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
       const isDisabled = isModuleDriven ? module.isStreaming : directDisabled;
       const isLoadingProviders = isModuleDriven
         ? module.isLoadingProviders
-        : useProviderStore((state) => state.isLoading);
+        : false; // Fallback for direct use, assuming data is ready
+
+      // Models are now passed directly from the module
+      const modelsFromSource: ModelListItem[] = isModuleDriven
+        ? module.globallyEnabledModels
+        : // For direct use, we might need a way to get this, or assume it's passed if not module-driven
+          // For now, let's assume direct use implies a simpler scenario or data passed differently.
+          // If direct use needs store access, it should be handled by the parent component.
+          [];
+
+      // dbProviderConfigs is only needed for rendering the provider filter UI
+      const dbProviderConfigs = useProviderStore(
+        (state) => state.dbProviderConfigs
+      );
 
       const [open, setOpen] = useState(false);
       const [providerFilterOpen, setProviderFilterOpen] = useState(false);
@@ -85,15 +102,6 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
         multimodal: false,
       });
 
-      const { dbProviderConfigs, globallyEnabledModelDefinitionsFromStore } =
-        useProviderStore(
-          useShallow((state) => ({
-            dbProviderConfigs: state.dbProviderConfigs,
-            globallyEnabledModelDefinitionsFromStore:
-              state.globallyEnabledModelDefinitions,
-          }))
-        );
-
       const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
         () => new Set(dbProviderConfigs.map((p) => p.id))
       );
@@ -102,14 +110,10 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
         setSelectedProviders(new Set(dbProviderConfigs.map((p) => p.id)));
       }, [dbProviderConfigs]);
 
-      const orderedModels: ModelListItem[] = useMemo(() => {
-        return globallyEnabledModelDefinitionsFromStore;
-      }, [globallyEnabledModelDefinitionsFromStore]);
-
       const filteredModels = useMemo(() => {
-        let providerFiltered = orderedModels;
+        let providerFiltered = modelsFromSource;
         if (selectedProviders.size !== dbProviderConfigs.length) {
-          providerFiltered = orderedModels.filter((model) =>
+          providerFiltered = modelsFromSource.filter((model) =>
             selectedProviders.has(model.providerId)
           );
         }
@@ -123,20 +127,20 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
               model.id.toLowerCase().includes(lowerFilter)
           );
         }
-        const activeFilters = Object.entries(capabilityFilters)
+        const activeCapabilityFilters = Object.entries(capabilityFilters)
           .filter(([, isActive]) => isActive)
           .map(([key]) => key as CapabilityFilter);
-        if (activeFilters.length === 0) {
+        if (activeCapabilityFilters.length === 0) {
           return textFiltered;
         }
-        return textFiltered.filter((model) => {
+        return textFiltered.filter((model: ModelListItem) => {
           const supportedParams = new Set(
             model.metadataSummary?.supported_parameters ?? []
           );
           const inputModalities = new Set(
             model.metadataSummary?.input_modalities ?? []
           );
-          return activeFilters.every((filter) => {
+          return activeCapabilityFilters.every((filter) => {
             switch (filter) {
               case "reasoning":
                 return supportedParams.has("reasoning");
@@ -157,7 +161,7 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
           });
         });
       }, [
-        orderedModels,
+        modelsFromSource,
         filterText,
         capabilityFilters,
         selectedProviders,
@@ -165,8 +169,10 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
       ]);
 
       const selectedModelDetails = useMemo(() => {
-        return orderedModels.find((m) => m.id === currentValue);
-      }, [orderedModels, currentValue]);
+        return modelsFromSource.find(
+          (m: ModelListItem) => m.id === currentValue
+        );
+      }, [modelsFromSource, currentValue]);
 
       const handleSelect = useCallback(
         (currentValFromCommand: string) => {
@@ -207,7 +213,7 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
         []
       );
 
-      if (isLoadingProviders && isModuleDriven) {
+      if (isLoadingProviders) {
         return <Skeleton className={cn("h-9 w-[250px]", className)} />;
       }
 
@@ -225,7 +231,7 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
               variant="outline"
               role="combobox"
               aria-expanded={open}
-              disabled={isDisabled || orderedModels.length === 0}
+              disabled={isDisabled || modelsFromSource.length === 0}
               className={cn(
                 "w-auto justify-between h-9 text-sm font-normal relative",
                 className
@@ -244,7 +250,13 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0">
+          <PopoverContent
+            className="w-[--radix-popover-trigger-width] p-0"
+            style={{
+              maxHeight: "min(40vh, 400px)",
+              overflow: "hidden",
+            }}
+          >
             <Command shouldFilter={false}>
               <div className="flex items-center border-b px-3">
                 <SearchIconLucide className="mr-2 h-4 w-4 shrink-0 opacity-50" />
@@ -285,29 +297,31 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
                           Filter by Provider
                         </Label>
                         <ScrollArea className="h-48">
-                          {dbProviderConfigs.map((provider) => (
-                            <div
-                              key={provider.id}
-                              className="flex items-center space-x-2 p-1.5 rounded hover:bg-muted"
-                            >
-                              <Checkbox
-                                id={`popover-provider-filter-${provider.id}`}
-                                checked={selectedProviders.has(provider.id)}
-                                onCheckedChange={(checked) =>
-                                  handleProviderFilterChange(
-                                    provider.id,
-                                    !!checked
-                                  )
-                                }
-                              />
-                              <Label
-                                htmlFor={`popover-provider-filter-${provider.id}`}
-                                className="text-sm font-normal cursor-pointer"
+                          {dbProviderConfigs.map(
+                            (provider: DbProviderConfig) => (
+                              <div
+                                key={provider.id}
+                                className="flex items-center space-x-2 p-1.5 rounded hover:bg-muted"
                               >
-                                {provider.name} ({provider.type})
-                              </Label>
-                            </div>
-                          ))}
+                                <Checkbox
+                                  id={`selector-provider-filter-${provider.id}`}
+                                  checked={selectedProviders.has(provider.id)}
+                                  onCheckedChange={(checked) =>
+                                    handleProviderFilterChange(
+                                      provider.id,
+                                      !!checked
+                                    )
+                                  }
+                                />
+                                <Label
+                                  htmlFor={`selector-provider-filter-${provider.id}`}
+                                  className="text-sm font-normal cursor-pointer"
+                                >
+                                  {provider.name} ({provider.type})
+                                </Label>
+                              </div>
+                            )
+                          )}
                         </ScrollArea>
                       </div>
                     </PopoverContent>
@@ -364,32 +378,68 @@ export const GlobalModelSelector: React.FC<GlobalModelSelectorProps> =
                   />
                 </div>
               </div>
-              <CommandList>
+              <CommandList className="max-h-[calc(min(40vh,400px)-70px)] overflow-y-auto">
                 <CommandEmpty>
                   {totalActiveFilters > 0
                     ? "No models match all active filters."
+                    : modelsFromSource.length === 0
+                    ? "No models enabled globally."
                     : "No model found."}
                 </CommandEmpty>
                 <CommandGroup>
-                  {filteredModels.map((model) => (
-                    <CommandItem
-                      key={model.id}
-                      value={model.id}
-                      onSelect={handleSelect}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          currentValue === model.id
-                            ? "opacity-100"
-                            : "opacity-0"
-                        )}
-                      />
-                      <span className="truncate">
-                        {model.name} ({model.providerName})
-                      </span>
-                    </CommandItem>
-                  ))}
+                  {filteredModels.map((model: ModelListItem) => {
+                    const supportedParams = new Set(
+                      model.metadataSummary?.supported_parameters ?? []
+                    );
+                    const inputModalities = new Set(
+                      model.metadataSummary?.input_modalities ?? []
+                    );
+                    const hasReasoning = supportedParams.has("reasoning");
+                    const hasWebSearch =
+                      supportedParams.has("web_search") ||
+                      supportedParams.has("web_search_options");
+                    const hasTools = supportedParams.has("tools");
+                    const isMultimodal = Array.from(inputModalities).some(
+                      (mod) => mod !== "text"
+                    );
+
+                    return (
+                      <CommandItem
+                        key={model.id}
+                        value={model.id}
+                        onSelect={handleSelect}
+                        className="flex justify-between items-center"
+                      >
+                        <div className="flex items-center min-w-0">
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4 flex-shrink-0",
+                              currentValue === model.id
+                                ? "opacity-100"
+                                : "opacity-0"
+                            )}
+                          />
+                          <span className="truncate">
+                            {model.name} ({model.providerName})
+                          </span>
+                        </div>
+                        <div className="ml-auto flex items-center gap-1 pl-2 flex-shrink-0">
+                          {hasReasoning && (
+                            <BrainCircuitIcon className="h-3 w-3 text-blue-500" />
+                          )}
+                          {hasWebSearch && (
+                            <SearchIconLucide className="h-3 w-3 text-green-500" />
+                          )}
+                          {hasTools && (
+                            <WrenchIcon className="h-3 w-3 text-orange-500" />
+                          )}
+                          {isMultimodal && (
+                            <ImageIcon className="h-3 w-3 text-purple-500" />
+                          )}
+                        </div>
+                      </CommandItem>
+                    );
+                  })}
                 </CommandGroup>
               </CommandList>
             </Command>

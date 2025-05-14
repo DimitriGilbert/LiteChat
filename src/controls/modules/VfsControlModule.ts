@@ -3,47 +3,61 @@
 import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { uiEvent } from "@/types/litechat/events/ui.events";
+import { uiEvent, UiEventPayloads } from "@/types/litechat/events/ui.events";
 import { vfsEvent } from "@/types/litechat/events/vfs.events";
 import { VfsTriggerButton } from "@/controls/components/vfs/VfsTriggerButton";
 import { VfsModalPanel } from "@/controls/components/vfs/VfsModalPanel";
 import { useVfsStore } from "@/store/vfs.store";
-import { useUIStateStore } from "@/store/ui.store";
 import { useConversationStore } from "@/store/conversation.store";
 
 export class VfsControlModule implements ControlModule {
   readonly id = "core-vfs";
+  public readonly modalId = "core-vfs-modal-panel";
   private unregisterCallbacks: (() => void)[] = [];
   private eventUnsubscribers: (() => void)[] = [];
   private modApiRef: LiteChatModApi | null = null;
 
   private notifyTriggerUpdate: (() => void) | null = null;
-  private notifyModalUpdate: (() => void) | null = null;
+  private isModalOpenByManager: boolean = false;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApiRef = modApi;
-    this.updateVfsKeyBasedOnContext();
+    this.updateVfsKeyBasedOnContext(); // Initial key update
 
     const unsubUiContext = modApi.on(uiEvent.contextChanged, () => {
       this.updateVfsKeyBasedOnContext();
       this.notifyTriggerUpdate?.();
-      this.notifyModalUpdate?.();
     });
 
-    this.eventUnsubscribers.push(unsubUiContext);
-    // console.log(`[${this.id}] Initialized.`);
+    const unsubModalState = modApi.on(
+      uiEvent.modalStateChanged,
+      (payload: UiEventPayloads[typeof uiEvent.modalStateChanged]) => {
+        if (payload.modalId === this.modalId) {
+          const newOpenState = payload.isOpen;
+          if (this.isModalOpenByManager !== newOpenState) {
+            this.isModalOpenByManager = newOpenState;
+            this.notifyTriggerUpdate?.();
+            // If modal is opening, ensure VFS key is correct
+            if (newOpenState) {
+              this.updateVfsKeyBasedOnContext();
+            }
+          }
+        }
+      }
+    );
+
+    this.eventUnsubscribers.push(unsubUiContext, unsubModalState);
   }
 
   private updateVfsKeyBasedOnContext() {
     const { selectedItemId, selectedItemType } =
       useConversationStore.getState();
-    const isVfsModalOpen =
-      useUIStateStore.getState().isChatControlPanelOpen["core-vfs-modal-panel"];
     const currentVfsStoreKey = useVfsStore.getState().vfsKey;
 
     let targetVfsKey: string | null = null;
 
-    if (isVfsModalOpen || selectedItemType === "project") {
+    // Prioritize VFS key based on modal state if it's open for this module
+    if (this.isModalOpenByManager) {
       if (selectedItemType === "project") {
         targetVfsKey = selectedItemId;
       } else if (selectedItemType === "conversation") {
@@ -52,13 +66,23 @@ export class VfsControlModule implements ControlModule {
           .getConversationById(selectedItemId);
         targetVfsKey = convo?.projectId ?? "orphan";
       } else {
+        targetVfsKey = "orphan"; // Default if modal is open without specific context
+      }
+    } else {
+      // If modal is not open, VFS key might still be relevant for background tasks or prompt attachments
+      if (selectedItemType === "project") {
+        targetVfsKey = selectedItemId;
+      } else if (selectedItemType === "conversation") {
+        const convo = useConversationStore
+          .getState()
+          .getConversationById(selectedItemId);
+        targetVfsKey = convo?.projectId ?? "orphan";
+      } else {
+        // If no project/conversation selected, and modal is closed,
+        // what should the VFS key be? "orphan" or null?
+        // Let's stick to "orphan" if VFS is generally enabled.
         targetVfsKey = "orphan";
       }
-    } else if (selectedItemType === "conversation") {
-      const convo = useConversationStore
-        .getState()
-        .getConversationById(selectedItemId);
-      targetVfsKey = convo?.projectId ?? "orphan";
     }
 
     if (currentVfsStoreKey !== targetVfsKey) {
@@ -70,24 +94,21 @@ export class VfsControlModule implements ControlModule {
   }
 
   public getEnableVfs = (): boolean => useVfsStore.getState().enableVfs;
-  public getIsVfsModalOpen = (): boolean =>
-    useUIStateStore.getState().isChatControlPanelOpen["core-vfs-modal-panel"] ??
-    false;
+  public getIsVfsModalOpen = (): boolean => this.isModalOpenByManager;
   public getSelectedFileIdsCount = (): number =>
     useVfsStore.getState().selectedFileIds.size;
 
-  public toggleVfsModal = (isOpen?: boolean) => {
-    const currentOpenState = this.getIsVfsModalOpen();
-    const newOpenState = isOpen ?? !currentOpenState;
-    if (currentOpenState !== newOpenState) {
-      this.modApiRef?.emit(uiEvent.toggleChatControlPanelRequest, {
-        panelId: "core-vfs-modal-panel",
-        isOpen: newOpenState,
+  public toggleVfsModal = () => {
+    if (this.isModalOpenByManager) {
+      this.modApiRef?.emit(uiEvent.closeModalRequest, {
+        modalId: this.modalId,
       });
-      this.updateVfsKeyBasedOnContext(); // Ensure key is updated when modal state changes
-      this.notifyTriggerUpdate?.();
-      this.notifyModalUpdate?.();
+    } else {
+      this.modApiRef?.emit(uiEvent.openModalRequest, {
+        modalId: this.modalId,
+      });
     }
+    // State update and notification will be handled by the modalStateChanged listener
   };
 
   public clearVfsSelection = () => {
@@ -97,9 +118,6 @@ export class VfsControlModule implements ControlModule {
 
   public setNotifyTriggerUpdate = (cb: (() => void) | null) => {
     this.notifyTriggerUpdate = cb;
-  };
-  public setNotifyModalUpdate = (cb: (() => void) | null) => {
-    this.notifyModalUpdate = cb;
   };
 
   register(modApi: LiteChatModApi): void {
@@ -116,16 +134,11 @@ export class VfsControlModule implements ControlModule {
     });
     this.unregisterCallbacks.push(unregisterTrigger);
 
-    const unregisterModal = modApi.registerChatControl({
-      id: "core-vfs-modal-panel",
-      panel: undefined,
-      show: () => this.getIsVfsModalOpen(),
-      renderer: () => React.createElement(VfsModalPanel, { module: this }),
-      status: () => "ready",
-    });
-    this.unregisterCallbacks.push(unregisterModal);
-
-    // console.log(`[${this.id}] Registered VFS Trigger and Modal Panel.`);
+    const unregisterModalProvider = modApi.registerModalProvider(
+      this.modalId,
+      (props) => React.createElement(VfsModalPanel, { module: this, ...props })
+    );
+    this.unregisterCallbacks.push(unregisterModalProvider);
   }
 
   destroy(): void {
@@ -134,7 +147,6 @@ export class VfsControlModule implements ControlModule {
     this.unregisterCallbacks.forEach((unsub) => unsub());
     this.unregisterCallbacks = [];
     this.notifyTriggerUpdate = null;
-    this.notifyModalUpdate = null;
     this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }

@@ -1,4 +1,4 @@
-// src/components/LiteChat/settings/SettingsAssistant.tsx
+// src/controls/components/assistant-settings/SettingsAssistant.tsx
 // FULL FILE
 import React, { useMemo } from "react";
 import { useSettingsStore } from "@/store/settings.store";
@@ -63,9 +63,10 @@ const SettingsAssistantComponent: React.FC = () => {
       <TabbedLayout
         tabs={tabs}
         defaultValue="prompt"
-        className="flex-grow"
+        className="flex-grow" // Ensure TabbedLayout itself can grow
         listClassName="bg-muted/50 rounded-md"
-        contentContainerClassName="mt-4"
+        contentContainerClassName="mt-4 flex-grow overflow-y-auto" // Make content area grow and scroll
+        scrollable={true} // Explicitly enable ScrollArea for content
       />
       {/* Reset Button Section */}
       <Separator className="mt-auto" />

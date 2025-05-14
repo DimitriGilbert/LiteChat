@@ -1,21 +1,50 @@
 // src/components/LiteChat/common/SortableModelItem.tsx
+// FULL FILE
 import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVerticalIcon } from "lucide-react";
+import {
+  GripVerticalIcon,
+  InfoIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  ChevronsUpIcon,
+  BrainCircuitIcon,
+  SearchIcon as SearchIconLucide,
+  WrenchIcon,
+  ImageIcon,
+} from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import type { ModelListItem } from "@/types/litechat/provider";
+import { ActionTooltipButton } from "./ActionTooltipButton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface SortableModelItemProps {
   id: string;
-  name: string;
-  disabled?: boolean;
+  modelDetails: ModelListItem;
+  buttonsDisabled?: boolean;
+  onMoveToTop: (id: string) => void;
+  onMoveUp: (id: string) => void;
+  onMoveDown: (id: string) => void;
+  isFirst: boolean;
+  isLast: boolean;
 }
 
 export const SortableModelItem: React.FC<SortableModelItemProps> = ({
   id,
-  name,
-  disabled,
+  modelDetails,
+  buttonsDisabled,
+  onMoveToTop,
+  onMoveUp,
+  onMoveDown,
+  isFirst,
+  isLast,
 }) => {
   const {
     attributes,
@@ -24,42 +53,116 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: id, disabled: disabled });
+  } = useSortable({ id: id, disabled: false });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 10 : undefined,
-    opacity: disabled ? 0.5 : 1,
   };
+
+  const supportedParams = new Set(
+    modelDetails.metadataSummary?.supported_parameters ?? []
+  );
+  const inputModalities = new Set(
+    modelDetails.metadataSummary?.input_modalities ?? []
+  );
+  const hasReasoning = supportedParams.has("reasoning");
+  const hasWebSearch =
+    supportedParams.has("web_search") ||
+    supportedParams.has("web_search_options");
+  const hasTools = supportedParams.has("tools");
+  const isMultimodal = Array.from(inputModalities).some(
+    (mod) => mod !== "text"
+  );
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
       className={cn(
         "flex items-center space-x-2 p-2 rounded border border-transparent bg-muted/50 hover:bg-muted mb-1",
         isDragging && "shadow-lg border-primary bg-card",
-        !disabled && "cursor-grab active:cursor-grabbing",
-        disabled && "cursor-not-allowed opacity-50",
+        "cursor-grab active:cursor-grabbing"
       )}
-      aria-label={`Drag to reorder model ${name}`}
+      aria-label={`Drag to reorder model ${modelDetails.name}`}
     >
-      <GripVerticalIcon
-        className={cn(
-          "h-5 w-5 text-muted-foreground flex-shrink-0",
-          !disabled && "hover:text-foreground",
-        )}
-      />
-      <Label
-        className={cn(
-          "text-sm font-normal text-foreground flex-grow truncate pointer-events-none",
-        )}
+      <button
+        {...attributes}
+        {...listeners}
+        type="button"
+        className={cn("p-1 flex-shrink-0", "hover:text-foreground")}
+        aria-hidden="true"
+        tabIndex={-1}
       >
-        {name || id}
-      </Label>
+        <GripVerticalIcon className="h-5 w-5 text-muted-foreground" />
+      </button>
+      <div className="flex-grow min-w-0">
+        <Label
+          className={cn(
+            "text-sm font-normal text-foreground flex-grow truncate pointer-events-none"
+          )}
+        >
+          {modelDetails.name}{" "}
+          <span className="text-xs text-muted-foreground">
+            ({modelDetails.providerName})
+          </span>
+        </Label>
+        <div className="flex items-center gap-1 mt-0.5">
+          {hasReasoning && (
+            <BrainCircuitIcon className="h-3 w-3 text-blue-500" />
+          )}
+          {hasWebSearch && (
+            <SearchIconLucide className="h-3 w-3 text-green-500" />
+          )}
+          {hasTools && <WrenchIcon className="h-3 w-3 text-orange-500" />}
+          {isMultimodal && <ImageIcon className="h-3 w-3 text-purple-500" />}
+        </div>
+      </div>
+      <div className="flex items-center gap-0.5 ml-auto flex-shrink-0">
+        {modelDetails.metadataSummary?.description && (
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="p-1 text-muted-foreground hover:text-foreground cursor-default"
+                  aria-label="Model information"
+                >
+                  <InfoIcon className="h-4 w-4" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                align="end"
+                className="max-w-xs break-words"
+              >
+                <p>{modelDetails.metadataSummary.description}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+        <ActionTooltipButton
+          tooltipText="Move to Top"
+          onClick={() => onMoveToTop(id)}
+          disabled={isFirst || buttonsDisabled}
+          icon={<ChevronsUpIcon />}
+          className="h-6 w-6"
+        />
+        <ActionTooltipButton
+          tooltipText="Move Up"
+          onClick={() => onMoveUp(id)}
+          disabled={isFirst || buttonsDisabled}
+          icon={<ArrowUpIcon />}
+          className="h-6 w-6"
+        />
+        <ActionTooltipButton
+          tooltipText="Move Down"
+          onClick={() => onMoveDown(id)}
+          disabled={isLast || buttonsDisabled}
+          icon={<ArrowDownIcon />}
+          className="h-6 w-6"
+        />
+      </div>
     </div>
   );
 };

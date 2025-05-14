@@ -246,63 +246,65 @@ export const useVfsStore = create(
     },
 
     setVfsKey: (key) => {
-      const currentDesiredKey = get().vfsKey;
-      const currentConfiguredKey = get().configuredVfsKey;
+      if (key !== null) {
+        const currentDesiredKey = get().vfsKey;
+        const currentConfiguredKey = get().configuredVfsKey;
 
-      if (key === currentDesiredKey) {
-        console.log(`[VfsStore] setVfsKey: Key ${key} is already desired.`);
-        if (key && key !== currentConfiguredKey && !get().initializingKey) {
-          console.log(
-            `[VfsStore] setVfsKey: Re-triggering initialization for desired key ${key} as it's not configured.`
-          );
+        if (key === currentDesiredKey) {
+          console.log(`[VfsStore] setVfsKey: Key ${key} is already desired.`);
+          if (key && key !== currentConfiguredKey && !get().initializingKey) {
+            console.log(
+              `[VfsStore] setVfsKey: Re-triggering initialization for desired key ${key} as it's not configured.`
+            );
+            get()
+              .initializeVFS(key)
+              .catch((err) => {
+                console.error(
+                  `[VfsStore] Error during re-initialization trigger for ${key}:`,
+                  err
+                );
+              });
+          }
+          return;
+        }
+
+        console.log(
+          `[VfsStore] setVfsKey: Changing desired key from ${currentDesiredKey} to ${key}. Configured: ${currentConfiguredKey}`
+        );
+        set({ vfsKey: key });
+
+        set({
+          fs: null,
+          configuredVfsKey: null,
+          rootId: null,
+          currentParentId: null,
+          nodes: {},
+          childrenMap: { "": [] },
+          error: null,
+          loading: false,
+          operationLoading: false,
+          selectedFileIds: new Set(),
+          initializingKey: null,
+        });
+        emitter.emit(vfsEvent.vfsKeyChanged, {
+          vfsKey: key,
+          configuredVfsKey: null,
+        });
+
+        if (key !== null) {
           get()
             .initializeVFS(key)
             .catch((err) => {
               console.error(
-                `[VfsStore] Error during re-initialization trigger for ${key}:`,
+                `[VfsStore] Error during initialization trigger for ${key}:`,
                 err
               );
             });
+        } else {
+          console.log(
+            "[VfsStore] setVfsKey: Desired key is null. State cleared."
+          );
         }
-        return;
-      }
-
-      console.log(
-        `[VfsStore] setVfsKey: Changing desired key from ${currentDesiredKey} to ${key}. Configured: ${currentConfiguredKey}`
-      );
-      set({ vfsKey: key });
-
-      set({
-        fs: null,
-        configuredVfsKey: null,
-        rootId: null,
-        currentParentId: null,
-        nodes: {},
-        childrenMap: { "": [] },
-        error: null,
-        loading: false,
-        operationLoading: false,
-        selectedFileIds: new Set(),
-        initializingKey: null,
-      });
-      emitter.emit(vfsEvent.vfsKeyChanged, {
-        vfsKey: key,
-        configuredVfsKey: null,
-      });
-
-      if (key !== null) {
-        get()
-          .initializeVFS(key)
-          .catch((err) => {
-            console.error(
-              `[VfsStore] Error during initialization trigger for ${key}:`,
-              err
-            );
-          });
-      } else {
-        console.log(
-          "[VfsStore] setVfsKey: Desired key is null. State cleared."
-        );
       }
     },
 

@@ -1,10 +1,9 @@
-// src/controls/components/assitant/SettingsAssistantTitles.tsx
+// src/controls/components/assistant-settings/SettingsAssistantTitles.tsx
 // FULL FILE
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-// Restored: Use GlobalModelSelector
 import { GlobalModelSelector } from "@/controls/components/global-model-selector/GlobalModelSelector";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
@@ -65,12 +64,10 @@ export const SettingsAssistantTitles: React.FC = () => {
             <Label htmlFor="auto-title-model-selector">
               Model for Title Generation
             </Label>
-            {/* Restored: Use GlobalModelSelector with direct props */}
             <GlobalModelSelector
               value={autoTitleModelId}
               onChange={setAutoTitleModelId}
               className="w-full"
-              // No module prop needed here, it will use direct value/onChange
             />
             <p className="text-xs text-muted-foreground">
               Select a fast and capable model for generating concise titles.

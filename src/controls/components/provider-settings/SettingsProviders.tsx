@@ -1,4 +1,4 @@
-// src/components/LiteChat/settings/SettingsProviders.tsx
+// src/controls/components/provider-settings/SettingsProviders.tsx
 // FULL FILE
 import React, { useState, useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -15,9 +15,11 @@ import {
 } from "@/components/LiteChat/common/TabbedLayout";
 import { GlobalModelOrganizer } from "./GlobalModelOrganizer";
 import { ModelDataDisplay } from "./ModelDataDisplay";
-import { SettingsApiKeys } from "@/components/LiteChat/settings/ApiKeys";
+import { SettingsApiKeys } from "./ApiKeys";
 import { ModelBrowserList } from "./ModelBrowserList";
+// Removed ProviderSettingsModule import as it's not directly used for data here
 
+// ProviderConfigList remains largely the same, fetching its own data from the store
 const ProviderConfigList: React.FC<{
   onSelectModelForDetails: (id: string | null) => void;
 }> = ({ onSelectModelForDetails }) => {
@@ -126,7 +128,14 @@ const ProviderConfigList: React.FC<{
   );
 };
 
-const SettingsProvidersComponent: React.FC = () => {
+interface SettingsProvidersProps {
+  // Only the action from the module is needed for GlobalModelOrganizer
+  setGlobalModelSortOrderFromModule: (ids: string[]) => void;
+}
+
+const SettingsProvidersComponent: React.FC<SettingsProvidersProps> = ({
+  setGlobalModelSortOrderFromModule,
+}) => {
   const { selectedModelForDetails, setSelectedModelForDetails } =
     useProviderStore(
       useShallow((state) => ({
@@ -161,7 +170,15 @@ const SettingsProvidersComponent: React.FC = () => {
       {
         value: "providers-order",
         label: "Model Order",
-        content: <GlobalModelOrganizer />,
+        content: (
+          // GlobalModelOrganizer now fetches its own data from the store,
+          // but receives the sort order update function from the module.
+          <GlobalModelOrganizer
+            setGlobalModelSortOrderFromModule={
+              setGlobalModelSortOrderFromModule
+            }
+          />
+        ),
       },
       {
         value: "api-keys",
@@ -183,7 +200,11 @@ const SettingsProvidersComponent: React.FC = () => {
         ),
       },
     ],
-    [selectedModelForDetails, handleSelectModelAndSwitchTab]
+    [
+      selectedModelForDetails,
+      handleSelectModelAndSwitchTab,
+      setGlobalModelSortOrderFromModule,
+    ]
   );
 
   return (

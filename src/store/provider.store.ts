@@ -98,15 +98,13 @@ export const useProviderStore = create(
     globallyEnabledModelDefinitions: [],
 
     _updateGloballyEnabledModelDefinitions: () => {
-      const {
-        dbProviderConfigs,
-        globalModelSortOrder,
-        getAvailableModelListItems,
-      } = get();
-      const allModelListItems = getAvailableModelListItems();
+      const { dbProviderConfigs, globalModelSortOrder } = get();
+      // getAvailableModelListItems already provides all models with provider info
+      const allModelListItems = get().getAvailableModelListItems();
       const modelItemsMap = new Map(allModelListItems.map((m) => [m.id, m]));
-      const globallyEnabledCombinedIds = new Set<string>();
 
+      // Determine which models are actually enabled across all provider configs
+      const globallyEnabledCombinedIds = new Set<string>();
       dbProviderConfigs.forEach((config) => {
         if (config.isEnabled && config.enabledModels) {
           config.enabledModels.forEach((modelId) => {
@@ -118,6 +116,7 @@ export const useProviderStore = create(
       const sortedEnabledModels: ModelListItem[] = [];
       const addedIds = new Set<string>();
 
+      // First, add models that are in globalModelSortOrder and are enabled
       globalModelSortOrder.forEach((combinedId) => {
         if (globallyEnabledCombinedIds.has(combinedId)) {
           const details = modelItemsMap.get(combinedId);
@@ -128,11 +127,17 @@ export const useProviderStore = create(
         }
       });
 
-      allModelListItems.forEach((item) => {
-        if (globallyEnabledCombinedIds.has(item.id) && !addedIds.has(item.id)) {
-          sortedEnabledModels.push(item);
-        }
-      });
+      // Then, add any remaining globally enabled models that weren't in the sort order
+      // These can be appended, perhaps alphabetically by name for consistent fallback order
+      const remainingEnabledModels = allModelListItems
+        .filter(
+          (item) =>
+            globallyEnabledCombinedIds.has(item.id) && !addedIds.has(item.id)
+        )
+        .sort((a, b) => a.name.localeCompare(b.name)); // Fallback sort
+
+      sortedEnabledModels.push(...remainingEnabledModels);
+
       set({ globallyEnabledModelDefinitions: sortedEnabledModels });
       emitter.emit(providerEvent.globallyEnabledModelsUpdated, {
         models: sortedEnabledModels,
@@ -140,6 +145,7 @@ export const useProviderStore = create(
     },
 
     getGloballyEnabledModelDefinitions: () => {
+      // This function should simply return the already processed and sorted list
       return get().globallyEnabledModelDefinitions;
     },
 
@@ -202,26 +208,26 @@ export const useProviderStore = create(
           dbProviderConfigs: configs,
           dbApiKeys: keys,
           enableApiKeyManagement: enableApiMgmt,
+          globalModelSortOrder: savedOrder, // Set the raw sort order first
         });
 
+        // Now, update the derived sorted list of enabled models
         get()._updateGloballyEnabledModelDefinitions();
+
+        // Determine the model to select after the list is sorted
         const currentGloballyEnabledModels =
           get().globallyEnabledModelDefinitions.map((m) => m.id);
         const enabledSet = new Set(currentGloballyEnabledModels);
 
-        const validSavedOrder = savedOrder.filter((id) => enabledSet.has(id));
         let modelToSelect = lastSelectedModelId;
         const isValidSelection = modelToSelect && enabledSet.has(modelToSelect);
 
         if (!isValidSelection) {
-          modelToSelect = validSavedOrder[0] ?? null;
-          if (!modelToSelect) {
-            modelToSelect = currentGloballyEnabledModels[0] ?? null;
-          }
+          // If last selection is invalid, try first from current sorted list
+          modelToSelect = currentGloballyEnabledModels[0] ?? null;
         }
 
         set({
-          globalModelSortOrder: validSavedOrder,
           selectedModelId: modelToSelect,
           isLoading: false,
         });
@@ -231,11 +237,17 @@ export const useProviderStore = create(
           configs,
           apiKeys: keys,
           selectedModelId: modelToSelect,
-          globalSortOrder: validSavedOrder,
+          globalSortOrder: get().globalModelSortOrder, // Emit the raw sort order
         });
-        emitter.emit(providerEvent.selectedModelChanged, {
-          modelId: modelToSelect,
-        });
+        // selectedModelChanged will be emitted by selectModel if it's different
+        if (get().selectedModelId !== modelToSelect) {
+          get().selectModel(modelToSelect);
+        } else {
+          // If it's the same, still emit to ensure prompt store syncs
+          emitter.emit(providerEvent.selectedModelChanged, {
+            modelId: modelToSelect,
+          });
+        }
       } catch (e) {
         console.error("ProviderStore: Error loading initial data", e);
         set({
@@ -387,19 +399,12 @@ export const useProviderStore = create(
           const index = state.dbProviderConfigs.findIndex((p) => p.id === id);
           if (index !== -1) state.dbProviderConfigs[index] = updatedConfigData;
         });
-        get()._updateGloballyEnabledModelDefinitions();
+        get()._updateGloballyEnabledModelDefinitions(); // This will re-sort and emit
         emitter.emit(providerEvent.configsChanged, {
+          // Emit that configs changed
           providerConfigs: get().dbProviderConfigs,
         });
-        const currentOrder = get().globalModelSortOrder;
-        const currentGloballyEnabledModels =
-          get().globallyEnabledModelDefinitions.map((m) => m.id);
-        const enabledSet = new Set(currentGloballyEnabledModels);
-        let newOrder = currentOrder.filter((mId) => enabledSet.has(mId));
-        enabledSet.forEach((mId) => {
-          if (!newOrder.includes(mId)) newOrder.push(mId);
-        });
-        await get().setGlobalModelSortOrder(newOrder);
+        // No need to call setGlobalModelSortOrder here, _updateGloballyEnabledModelDefinitions handles it
       } catch (e) {
         console.error("ProviderStore: Error updating provider config", e);
         toast.error(
@@ -423,16 +428,12 @@ export const useProviderStore = create(
           );
           delete state.providerFetchStatus[id];
         });
-        get()._updateGloballyEnabledModelDefinitions();
+        get()._updateGloballyEnabledModelDefinitions(); // This will re-sort and emit
         emitter.emit(providerEvent.configsChanged, {
+          // Emit that configs changed
           providerConfigs: get().dbProviderConfigs,
         });
-        const currentGloballyEnabledModels =
-          get().globallyEnabledModelDefinitions.map((m) => m.id);
-        const enabledSet = new Set(currentGloballyEnabledModels);
-        const currentOrder = get().globalModelSortOrder;
-        const newOrder = currentOrder.filter((mId) => enabledSet.has(mId));
-        await get().setGlobalModelSortOrder(newOrder);
+        // No need to call setGlobalModelSortOrder here
         toast.success(`Provider "${configName}" deleted.`);
       } catch (e) {
         console.error("ProviderStore: Error deleting provider config", e);
@@ -459,6 +460,7 @@ export const useProviderStore = create(
         const apiKeyId = config.apiKeyId;
         const apiKey = get().dbApiKeys.find((k) => k.id === apiKeyId)?.value;
         const fetched = await fetchModelsForProvider(config, apiKey);
+        // updateProviderConfig will call _updateGloballyEnabledModelDefinitions
         await get().updateProviderConfig(providerConfigId, {
           fetchedModels: fetched,
           modelsLastFetchedAt: new Date(),
@@ -478,23 +480,21 @@ export const useProviderStore = create(
         GLOBAL_MODEL_SORT_ORDER_KEY,
         uniqueIds
       );
+      // This will re-sort the globallyEnabledModelDefinitions and emit the update
       get()._updateGloballyEnabledModelDefinitions();
       emitter.emit(providerEvent.globalModelSortOrderChanged, {
+        // Emit that the raw sort order changed
         ids: uniqueIds,
       });
 
+      // Re-evaluate selected model
       const currentSelected = get().selectedModelId;
-      const enabledIdsSet = new Set(
-        get().globallyEnabledModelDefinitions.map((m) => m.id)
-      );
+      const currentGloballyEnabledModels =
+        get().globallyEnabledModelDefinitions.map((m) => m.id);
+      const enabledIdsSet = new Set(currentGloballyEnabledModels);
 
       if (!currentSelected || !enabledIdsSet.has(currentSelected)) {
-        const firstValidInNewOrder = uniqueIds.find((id) =>
-          enabledIdsSet.has(id)
-        );
-        const firstValidOverall =
-          get().globallyEnabledModelDefinitions[0]?.id ?? null;
-        const newSelection = firstValidInNewOrder ?? firstValidOverall;
+        const newSelection = currentGloballyEnabledModels[0] ?? null;
         if (newSelection !== currentSelected) {
           get().selectModel(newSelection);
         }
@@ -563,14 +563,14 @@ export const useProviderStore = create(
       return defaultDefs.map((m) => ({
         id: m.id,
         name: m.name,
-        context_length: 4096,
+        context_length: 4096, // Default placeholder
         architecture: {
           modality: "text->text",
           input_modalities: ["text"],
           output_modalities: ["text"],
         },
-        pricing: { prompt: "0", completion: "0" },
-        top_provider: { context_length: 4096 },
+        pricing: { prompt: "0", completion: "0" }, // Default placeholder
+        top_provider: { context_length: 4096 }, // Default placeholder
         supported_parameters: DEFAULT_SUPPORTED_PARAMS[config.type] ?? [],
       }));
     },
