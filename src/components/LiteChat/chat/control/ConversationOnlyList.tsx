@@ -17,7 +17,6 @@ import { useShallow } from "zustand/react/shallow";
 import type { SyncStatus } from "@/types/litechat/sync";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useUIStateStore } from "@/store/ui.store";
 import {
   Tooltip,
   TooltipContent,
@@ -30,7 +29,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { toast } from "sonner";
 import type { ConversationListControlModule } from "@/controls/modules/ConversationListControlModule";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { conversationEvent } from "@/types/litechat/events/conversation.events";

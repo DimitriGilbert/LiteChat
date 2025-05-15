@@ -1,7 +1,6 @@
 // src/types/litechat/events/conversation.events.ts
 // FULL FILE
 import type { Conversation, SidebarItemType } from "@/types/litechat/chat";
-import type { Project } from "@/types/litechat/project";
 import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
 
 export const conversationEvent = {

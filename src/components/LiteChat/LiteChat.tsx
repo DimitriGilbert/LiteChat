@@ -35,7 +35,6 @@ import { useVfsStore } from "@/store/vfs.store";
 import type { SidebarItemType } from "@/types/litechat/chat";
 import { EventActionCoordinatorService } from "@/services/event-action-coordinator.service";
 import { ModalManager } from "@/components/LiteChat/common/ModalManager";
-import { emitter } from "@/lib/litechat/event-emitter";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { vfsEvent } from "@/types/litechat/events/vfs.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";

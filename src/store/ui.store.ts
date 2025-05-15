@@ -5,7 +5,6 @@ import { immer } from "zustand/middleware/immer";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { uiEvent, UiEventPayloads } from "@/types/litechat/events/ui.events";
 import type { RegisteredActionHandler } from "@/types/litechat/control";
-import type { SidebarItemType } from "@/types/litechat/chat";
 
 interface UIState {
   isChatControlPanelOpen: Record<string, boolean>;
