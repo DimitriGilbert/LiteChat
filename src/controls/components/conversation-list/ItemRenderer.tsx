@@ -24,9 +24,10 @@ import type { SyncStatus } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project";
 import type { Conversation } from "@/types/litechat/chat";
 import { SidebarItem } from "@/store/conversation.store";
-import { useUIStateStore } from "@/store/ui.store";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { toast } from "sonner";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { uiEvent } from "@/types/litechat/events/ui.events";
 
 interface ConversationItemProps {
   item: SidebarItem;
@@ -136,9 +137,13 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
     const syncIndicator =
       !isProject && repoName ? getSyncIndicator(syncStatus, repoName) : null;
 
-    const openProjectSettingsModal = useUIStateStore(
-      (state) => state.openProjectSettingsModal
-    );
+    const handleSettingsClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      emitter.emit(uiEvent.openModalRequest, {
+        modalId: "projectSettingsModal",
+        targetId: item.id,
+      });
+    };
 
     const handleItemClick = () => {
       if (isGloballyEditingThis) return;
@@ -325,10 +330,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
               {isProject && (
                 <ActionTooltipButton
                   tooltipText="Project Settings"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openProjectSettingsModal(item.id);
-                  }}
+                  onClick={handleSettingsClick}
                   aria-label={`Settings for ${displayName}`}
                   icon={<CogIcon />}
                   className="h-5 w-5 text-muted-foreground hover:text-foreground"

@@ -14,7 +14,6 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { useProviderStore } from "@/store/provider.store";
-import { useUIStateStore } from "@/store/ui.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { useShallow } from "zustand/react/shallow";
 import { ApiKeyForm } from "@/components/LiteChat/common/ApiKeysForm";
@@ -48,6 +47,8 @@ import {
 } from "@/components/ui/tooltip";
 import { ActionCards } from "./ActionCards";
 import { ModelEnablementList } from "@/controls/components/provider-settings/ModelEnablementList";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { uiEvent } from "@/types/litechat/events/ui.events";
 
 const SetupStep: React.FC<{
   stepNumber: number;
@@ -180,13 +181,6 @@ export const EmptyStateSetup: React.FC = () => {
         state.getAllAvailableModelDefsForProvider,
       isLoading: state.isLoading,
       enableApiKeyManagement: state.enableApiKeyManagement,
-    }))
-  );
-
-  const { toggleChatControlPanel, setInitialSettingsTabs } = useUIStateStore(
-    useShallow((state) => ({
-      toggleChatControlPanel: state.toggleChatControlPanel,
-      setInitialSettingsTabs: state.setInitialSettingsTabs,
     }))
   );
 
@@ -357,9 +351,11 @@ export const EmptyStateSetup: React.FC = () => {
     }
   }, [addConversation, selectItem]);
 
-  const openSettings = (tab: string, subTab?: string) => {
-    setInitialSettingsTabs(tab, subTab);
-    toggleChatControlPanel("settingsModal", true);
+  const openSettings = () => {
+    emitter.emit(uiEvent.openModalRequest, {
+      modalId: "settingsModal",
+      initialTab: "providers",
+    });
   };
 
   const completedSteps = [
@@ -678,7 +674,7 @@ export const EmptyStateSetup: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => openSettings("providers")}
+                onClick={openSettings}
                 className="border-red-500/50 hover:bg-red-500/20 transition-colors"
               >
                 Open Provider Settings

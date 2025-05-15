@@ -7,8 +7,8 @@ import {
   KeyIcon,
   ArrowRightIcon,
 } from "lucide-react";
-import { useUIStateStore } from "@/store/ui.store";
-import { useShallow } from "zustand/react/shallow";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { uiEvent } from "@/types/litechat/events/ui.events";
 
 // Interface for the action card props
 interface ActionCardProps {
@@ -42,22 +42,18 @@ const ActionCard: React.FC<ActionCardProps> = ({
 );
 
 export const ActionCards: React.FC = () => {
-  const { toggleChatControlPanel, setInitialSettingsTabs, toggleVfsModal } =
-    useUIStateStore(
-      useShallow((state) => ({
-        toggleChatControlPanel: state.toggleChatControlPanel,
-        setInitialSettingsTabs: state.setInitialSettingsTabs,
-        toggleVfsModal: state.toggleVfsModal,
-      })),
-    );
-
   const openSettings = (tab: string, subTab?: string) => {
-    setInitialSettingsTabs(tab, subTab);
-    toggleChatControlPanel("settingsModal", true);
+    emitter.emit(uiEvent.openModalRequest, {
+      modalId: "settingsModal",
+      initialTab: tab,
+      initialSubTab: subTab,
+    });
   };
 
   const openVfs = () => {
-    toggleVfsModal(true);
+    emitter.emit(uiEvent.openModalRequest, {
+      modalId: "core-vfs-modal-panel",
+    });
   };
 
   const actions = [
