@@ -4,8 +4,7 @@ import React from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-// Restored: Use GlobalModelSelector
-import { GlobalModelSelector } from "@/controls/components/global-model-selector/GlobalModelSelector";
+import { ModelSelector } from "@/controls/components/global-model-selector/ModelSelector"; // Updated to use ModelSelector from global-model-selector
 import { useProviderStore } from "@/store/provider.store"; // To get effectiveModelId for placeholder
 import { useShallow } from "zustand/react/shallow";
 
@@ -74,14 +73,12 @@ export const ProjectSettingsPrompt: React.FC<ProjectSettingsPromptProps> = ({
         <Label htmlFor="project-model-selector">
           Default Model (Overrides Parent/Global)
         </Label>
-        {/* Restored: Use GlobalModelSelector with direct props */}
-        <GlobalModelSelector
-          value={modelId} // The project's specific override
+        <ModelSelector
+          models={availableModels}
+          value={modelId}
           onChange={setModelId}
           disabled={isSaving}
           className="w-full mt-1"
-          // The placeholder inside GlobalModelSelector will show "Select Model..."
-          // or the currently selected model. The "Inherited" part is handled by the button below.
         />
         <Button
           variant="link"
