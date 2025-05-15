@@ -86,11 +86,23 @@ export const useInteractionStore = create(
           );
         dbInteractions.sort((a, b) => a.index - b.index);
 
+        // --- PATCH: Merge in-memory interactions not present in dbInteractions ---
+        const inMemory = get().interactions.filter(
+          (i) => i.conversationId === conversationId
+        );
+        const dbIds = new Set(dbInteractions.map((i) => i.id));
+        const merged = [
+          ...dbInteractions,
+          ...inMemory.filter((i) => !dbIds.has(i.id)),
+        ];
+        merged.sort((a, b) => a.index - b.index);
+        // --- END PATCH ---
+
         if (get().currentConversationId === conversationId) {
-          set({ interactions: dbInteractions, status: "idle" });
+          set({ interactions: merged, status: "idle" });
           emitter.emit(interactionEvent.loaded, {
             conversationId,
-            interactions: dbInteractions,
+            interactions: merged,
           });
           emitter.emit(interactionEvent.statusChanged, { status: "idle" });
         } else {

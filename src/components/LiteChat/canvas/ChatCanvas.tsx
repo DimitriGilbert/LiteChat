@@ -23,6 +23,7 @@ import { useConversationStore } from "@/store/conversation.store";
 import { useProjectStore } from "@/store/project.store";
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
+import { useCanvasControlStore } from "@/store/canvas-control.store";
 
 const ChatCanvasHiddenInteractions = ["conversation.title_generation"];
 
@@ -53,6 +54,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   const streamingInteractionIds = useInteractionStore(
     (state) => state.streamingInteractionIds
   );
+
   const { chatMaxWidth, autoScrollInterval, enableAutoScrollOnStream } =
     useSettingsStore(
       useShallow((state) => ({
@@ -62,18 +64,29 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
       }))
     );
 
-  const { isLoading: isProviderLoading } = useProviderStore(
-    useShallow((state) => ({
+  // Memoize selector functions to prevent unnecessary re-renders
+  const selectProviderState = useMemo(
+    () => (state: ReturnType<typeof useProviderStore.getState>) => ({
       isLoading: state.isLoading,
-    }))
+    }),
+    []
   );
 
-  const { conversationCount, isConversationLoading } = useConversationStore(
-    useShallow((state) => ({
+  const selectConversationState = useMemo(
+    () => (state: ReturnType<typeof useConversationStore.getState>) => ({
       conversationCount: state.conversations.length,
       isConversationLoading: state.isLoading,
-    }))
+    }),
+    []
   );
+
+  const { isLoading: isProviderLoading } = useProviderStore(
+    useShallow(selectProviderState)
+  );
+  const { conversationCount, isConversationLoading } = useConversationStore(
+    useShallow(selectConversationState)
+  );
+
   const { projectCount, isProjectLoading } = useProjectStore(
     useShallow((state) => ({
       projectCount: state.projects.length,
@@ -110,6 +123,39 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     });
     return groups;
   }, [interactions]);
+
+  // Memoize the selector function for interaction controls
+  const selectInteractionControls = useMemo(
+    () => (state: ReturnType<typeof useCanvasControlStore.getState>) =>
+      state.getControlsByType("interaction"),
+    []
+  );
+
+  // Get all interaction controls
+  const interactionControls = useCanvasControlStore(
+    useShallow(selectInteractionControls)
+  );
+
+  // Create the renderSlot function for interaction cards
+  const renderSlot = useMemo(
+    () =>
+      (slotName: "actions" | "menu" | "content"): React.ReactNode[] =>
+        interactionControls
+          .map((control) => {
+            if (slotName === "actions" && control.actionRenderer) {
+              return control.actionRenderer();
+            }
+            if (slotName === "menu" && control.menuRenderer) {
+              return control.menuRenderer();
+            }
+            if (slotName === "content" && control.contentRenderer) {
+              return control.contentRenderer();
+            }
+            return null;
+          })
+          .filter((node): node is React.ReactNode => node !== null),
+    [interactionControls]
+  );
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     if (viewportRef.current) {
@@ -208,12 +254,14 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
           const isStreamingInteraction = streamingInteractionIds.includes(
             interaction.id
           );
+
           if (isStreamingInteraction) {
             return (
               <StreamingInteractionCard
                 key={`${interaction.id}-streaming`}
                 interactionId={interaction.id}
                 onStop={onStopInteraction}
+                renderSlot={renderSlot}
               />
             );
           } else {
@@ -224,6 +272,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                 onEdit={onEditInteraction}
                 onRegenerate={onRegenerateInteraction}
                 onDelete={undefined}
+                renderSlot={renderSlot}
               />
             );
           }
@@ -236,6 +285,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                 key={`${id}-streaming-new`}
                 interactionId={id}
                 onStop={onStopInteraction}
+                renderSlot={renderSlot}
               />
             ))}
       </div>

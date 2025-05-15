@@ -1,6 +1,12 @@
 // src/components/LiteChat/canvas/InteractionCard.tsx
 // FULL FILE
-import React, { useMemo, useState, useCallback } from "react";
+import React, {
+  useMemo,
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+} from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { UserPromptDisplay } from "@/components/LiteChat/canvas/UserPromptDisplay";
 import { cn } from "@/lib/utils";
@@ -11,6 +17,8 @@ import { useShallow } from "zustand/react/shallow";
 import { CardHeader } from "@/components/LiteChat/canvas/interaction/CardHeader";
 import { CardActions } from "@/components/LiteChat/canvas/interaction/CardActions";
 import { AssistantResponse } from "@/components/LiteChat/canvas/interaction/AssistantResponse";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { canvasEvent } from "@/types/litechat/events/canvas.events";
 
 interface InteractionCardProps {
   interaction: Interaction;
@@ -18,11 +26,50 @@ interface InteractionCardProps {
   onDelete?: (interactionId: string) => void;
   onEdit?: (interactionId: string) => void;
   className?: string;
+  renderSlot?: (slotName: "actions" | "menu" | "content") => React.ReactNode[];
 }
 
 export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
-  ({ interaction, onRegenerate, onDelete, onEdit, className }) => {
+  ({ interaction, onRegenerate, onDelete, onEdit, className, renderSlot }) => {
     const [isResponseFolded, setIsResponseFolded] = useState(false);
+    const cardRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      if (cardRef.current) {
+        emitter.emit(canvasEvent.interactionMounted, {
+          interactionId: interaction.id,
+          element: cardRef.current,
+        });
+
+        return () => {
+          emitter.emit(canvasEvent.interactionUnmounted, {
+            interactionId: interaction.id,
+          });
+        };
+      }
+    }, [interaction.id]);
+
+    const handleExpand = useCallback(() => {
+      setIsResponseFolded(false);
+      emitter.emit(canvasEvent.interactionExpanded, {
+        interactionId: interaction.id,
+      });
+    }, [interaction.id]);
+
+    const handleCollapse = useCallback(() => {
+      setIsResponseFolded(true);
+      emitter.emit(canvasEvent.interactionCollapsed, {
+        interactionId: interaction.id,
+      });
+    }, [interaction.id]);
+
+    const toggleResponseFold = useCallback(() => {
+      if (isResponseFolded) {
+        handleExpand();
+      } else {
+        handleCollapse();
+      }
+    }, [isResponseFolded, handleExpand, handleCollapse]);
 
     const { dbProviderConfigs, getAllAvailableModelDefsForProvider } =
       useProviderStore(
@@ -30,13 +77,8 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
           dbProviderConfigs: state.dbProviderConfigs,
           getAllAvailableModelDefsForProvider:
             state.getAllAvailableModelDefsForProvider,
-        })),
+        }))
       );
-
-    const toggleResponseFold = useCallback(
-      () => setIsResponseFolded((prev) => !prev),
-      [],
-    );
 
     const timeAgo = interaction.endedAt
       ? formatDistanceToNow(new Date(interaction.endedAt), { addSuffix: true })
@@ -84,11 +126,12 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
 
     return (
       <div
+        ref={cardRef}
         className={cn(
           "group/card relative rounded-lg border bg-card p-3 md:p-4 shadow-sm transition-colors hover:bg-muted/50",
           "overflow-wrap-anywhere",
           isError ? "border-destructive/50 bg-destructive/5" : "border-border",
-          className,
+          className
         )}
       >
         {interaction.prompt && (
@@ -100,6 +143,9 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
         )}
 
         <div className="mt-3 pt-3 border-t border-border/50 relative group/assistant">
+          {/* Render custom menu items if provided */}
+          {renderSlot?.("menu")}
+
           <CardHeader
             displayModelName={displayModelName}
             timeAgo={timeAgo}
@@ -116,11 +162,15 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
             timeToFirstToken={interaction.metadata?.timeToFirstToken}
             generationTime={interaction.metadata?.generationTime}
           />
+
+          {/* Render custom content if provided */}
+          {renderSlot?.("content")}
+
           <AssistantResponse
             response={interaction.response}
             toolCalls={interaction.metadata?.toolCalls}
             toolResults={interaction.metadata?.toolResults}
-            reasoning={interaction.metadata?.reasoning} // Pass reasoning
+            reasoning={interaction.metadata?.reasoning}
             isError={isError}
             errorMessage={interaction.metadata?.error}
             isFolded={isResponseFolded}
@@ -129,15 +179,19 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
         </div>
 
         {showActions && (
-          <CardActions
-            interaction={interaction} // Pass the full interaction object
-            onEdit={onEdit}
-            onRegenerate={onRegenerate}
-            onDelete={onDelete}
-          />
+          <>
+            {/* Render custom actions if provided */}
+            {renderSlot?.("actions")}
+            <CardActions
+              interaction={interaction}
+              onEdit={onEdit}
+              onRegenerate={onRegenerate}
+              onDelete={onDelete}
+            />
+          </>
         )}
       </div>
     );
-  },
+  }
 );
 InteractionCard.displayName = "InteractionCard";

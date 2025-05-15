@@ -40,7 +40,6 @@ import { vfsEvent } from "@/types/litechat/events/vfs.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { projectEvent } from "@/types/litechat/events/project.events";
-import { conversationEvent as conversationStoreEvent } from "@/types/litechat/events/conversation.events";
 import type { LiteChatModApi } from "@/types/litechat/modding";
 
 let initializedControlModules: ControlModule[] = [];
@@ -281,18 +280,35 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     isChatControlPanelOpen,
   ]);
 
+  // Helper function to create a conversation and wait for its selection
+  const createAndSelectConversation = async (data: {
+    title: string;
+    projectId: string | null;
+  }): Promise<string> => {
+    // First create the conversation and get its ID
+    const conversationState = useConversationStore.getState();
+    const newId = await conversationState.addConversation(data);
+    console.log("New conversation ID:", newId);
+
+    // Then select it - conversation store will handle interaction updates
+    await conversationState.selectItem(newId, "conversation");
+    console.log("conv selected:", newId);
+
+    return newId;
+  };
+
   const handlePromptSubmit = useCallback(async (turnData: PromptTurnObject) => {
     if (!coreModApiRef.current) {
       toast.error("Application core not ready. Please try again.");
       return;
     }
-    const modApi = coreModApiRef.current;
 
     const conversationState = useConversationStore.getState();
     let currentConvId =
       conversationState.selectedItemType === "conversation"
         ? conversationState.selectedItemId
         : null;
+
     const currentProjectId =
       conversationState.selectedItemType === "project"
         ? conversationState.selectedItemId
@@ -304,40 +320,11 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
 
     if (!currentConvId) {
       try {
-        const newConvPayload = {
+        currentConvId = await createAndSelectConversation({
           title: "New Chat",
           projectId: currentProjectId,
-        };
-        await new Promise<void>((resolve, reject) => {
-          const unsub = modApi.on(
-            conversationStoreEvent.conversationAdded,
-            (payload) => {
-              if (payload.conversation.title === newConvPayload.title) {
-                unsub();
-                currentConvId = payload.conversation.id;
-                modApi.emit(conversationStoreEvent.selectItemRequest, {
-                  id: currentConvId,
-                  type: "conversation",
-                });
-                resolve();
-              }
-            }
-          );
-          modApi.emit(
-            conversationStoreEvent.addConversationRequest,
-            newConvPayload
-          );
-          setTimeout(
-            () => reject(new Error("Timeout waiting for new conversation ID.")),
-            3000
-          );
         });
-
-        if (!currentConvId) {
-          throw new Error(
-            "Failed to obtain new conversation ID after creation request."
-          );
-        }
+        console.log("New conversation ID 2:", currentConvId);
       } catch (error) {
         console.error(
           "[LiteChat] App: Failed to create new conversation",
@@ -349,6 +336,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     }
 
     try {
+      // console.log("convID 3:", currentConvId);
       const currentPromptState = usePromptStateStore.getState();
       const finalTurnData = {
         ...turnData,
@@ -360,6 +348,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       await ConversationService.submitPrompt(finalTurnData);
     } catch (error) {
       console.error("[LiteChat] App: Error submitting prompt:", error);
+      toast.error("Failed to send message.");
     }
   }, []);
 

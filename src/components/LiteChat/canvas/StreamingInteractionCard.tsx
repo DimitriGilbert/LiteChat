@@ -1,5 +1,4 @@
 // src/components/LiteChat/canvas/StreamingInteractionCard.tsx
-// FULL FILE
 import React, {
   useMemo,
   useState,
@@ -26,15 +25,18 @@ import {
 } from "lucide-react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { toast } from "sonner";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { canvasEvent } from "@/types/litechat/events/canvas.events";
 
 interface StreamingInteractionCardProps {
   interactionId: string;
   onStop?: (interactionId: string) => void;
   className?: string;
+  renderSlot?: (slotName: "actions" | "menu" | "content") => React.ReactNode[];
 }
 
 export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
-  React.memo(({ interactionId, onStop, className }) => {
+  React.memo(({ interactionId, onStop, className, renderSlot }) => {
     const { interaction, interactionStatus } = useInteractionStore(
       useShallow((state) => {
         const interaction = state.interactions.find(
@@ -60,6 +62,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
 
     const animationFrameRef = useRef<number | null>(null);
     const lastUpdateTimeRef = useRef<number>(0);
+    const cardRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
       const interval = 1000 / streamingRenderFPS;
@@ -130,6 +133,21 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       }
     }, [interactionStatus, interactionId]);
 
+    useEffect(() => {
+      if (cardRef.current) {
+        emitter.emit(canvasEvent.interactionMounted, {
+          interactionId: interactionId,
+          element: cardRef.current,
+        });
+
+        return () => {
+          emitter.emit(canvasEvent.interactionUnmounted, {
+            interactionId: interactionId,
+          });
+        };
+      }
+    }, [interactionId]);
+
     const { dbProviderConfigs, getAllAvailableModelDefsForProvider } =
       useProviderStore(
         useShallow((state) => ({
@@ -160,10 +178,28 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       () => setIsReasoningFolded((prev) => !prev),
       []
     );
-    const toggleResponseFold = useCallback(
-      () => setIsResponseFolded((prev) => !prev),
-      []
-    );
+
+    const handleExpand = useCallback(() => {
+      setIsResponseFolded(false);
+      emitter.emit(canvasEvent.interactionExpanded, {
+        interactionId: interactionId,
+      });
+    }, [interactionId]);
+
+    const handleCollapse = useCallback(() => {
+      setIsResponseFolded(true);
+      emitter.emit(canvasEvent.interactionCollapsed, {
+        interactionId: interactionId,
+      });
+    }, [interactionId]);
+
+    const toggleResponseFold = useCallback(() => {
+      if (isResponseFolded) {
+        handleExpand();
+      } else {
+        handleCollapse();
+      }
+    }, [isResponseFolded, handleExpand, handleCollapse]);
 
     const handleCopyReasoning = useCallback(async () => {
       if (!reasoningContent) return;
@@ -225,6 +261,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
 
     return (
       <div
+        ref={cardRef}
         className={cn(
           "group/card relative rounded-lg border border-primary/30 bg-card p-4 shadow-sm animate-fadeIn",
           className
@@ -238,6 +275,9 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
           />
         )}
         <div className="mt-3 pt-3 border-t border-border/50">
+          {/* Render custom menu items if provided */}
+          {renderSlot?.("menu")}
+
           <div
             className={cn(
               "flex flex-col sm:flex-row justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-20 p-1 -m-1 rounded-t"
@@ -297,6 +337,8 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
 
           {!isResponseFolded && (
             <>
+              {/* Render custom content if provided */}
+              {renderSlot?.("content")}
               {reasoningContent && (
                 <div className="my-2 p-2 border border-blue-500/30 bg-blue-500/10 rounded-md text-xs">
                   <div
@@ -379,9 +421,16 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
           )}
         </div>
         {onStop && (
-          <div className="absolute bottom-1 right-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200">
-            <StopButton onStop={handleStopClick} aria-label="Stop Generation" />
-          </div>
+          <>
+            {/* Render custom actions if provided */}
+            {renderSlot?.("actions")}
+            <div className="absolute bottom-1 right-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200">
+              <StopButton
+                onStop={handleStopClick}
+                aria-label="Stop Generation"
+              />
+            </div>
+          </>
         )}
       </div>
     );

@@ -45,10 +45,12 @@ interface ConversationState {
   isLoading: boolean;
   error: string | null;
 }
+
 interface ConversationActions {
+  // Public actions
   loadConversations: () => Promise<void>;
   addConversation: (
-    conversationData: Partial<Omit<Conversation, "id" | "createdAt">> & {
+    data: Partial<Omit<Conversation, "id" | "createdAt">> & {
       title: string;
       projectId?: string | null;
     }
@@ -84,17 +86,19 @@ interface ConversationActions {
   ) => Promise<void>;
   syncConversation: (conversationId: string) => Promise<void>;
   initializeOrSyncRepo: (repoId: string) => Promise<void>;
+  getConversationById: (id: string | null) => Conversation | undefined;
+  updateCurrentConversationToolSettings: (settings: {
+    enabledTools?: string[];
+    toolMaxStepsOverride?: number | null;
+  }) => Promise<void>;
+
+  // Internal helpers
   _setConversationSyncStatus: (
     conversationId: string,
     status: SyncStatus,
     error?: string | null
   ) => void;
   _setRepoInitializationStatus: (repoId: string, status: SyncStatus) => void;
-  getConversationById: (id: string | null) => Conversation | undefined;
-  updateCurrentConversationToolSettings: (settings: {
-    enabledTools?: string[];
-    toolMaxStepsOverride?: number | null;
-  }) => Promise<void>;
   _ensureSyncVfsReady: () => Promise<typeof fs>;
   _unlinkConversationsFromProjects: (projectIds: string[]) => void;
   getRegisteredActionHandlers: () => RegisteredActionHandler[];
@@ -116,11 +120,7 @@ export const useConversationStore = create(
     _ensureSyncVfsReady: async () => {
       console.log("[ConversationStore] Ensuring Sync VFS is ready...");
       return new Promise<typeof fs>((resolve, reject) => {
-        const timeoutDuration = 10000; // 10 seconds timeout
-        let timeoutId: NodeJS.Timeout | null = null;
-
         const cleanupSubscriptions = () => {
-          if (timeoutId) clearTimeout(timeoutId);
           emitter.off(vfsEvent.fsInstanceChanged, handleFsInstanceChanged);
           emitter.off(vfsEvent.loadingStateChanged, handleLoadingStateChanged);
         };
@@ -168,13 +168,6 @@ export const useConversationStore = create(
 
         emitter.on(vfsEvent.fsInstanceChanged, handleFsInstanceChanged);
         emitter.on(vfsEvent.loadingStateChanged, handleLoadingStateChanged);
-
-        timeoutId = setTimeout(() => {
-          cleanupSubscriptions();
-          const errorMsg = `Timeout waiting for Sync VFS (${SYNC_VFS_KEY}) to become ready.`;
-          console.error(`[ConversationStore] ${errorMsg}`);
-          reject(new Error(errorMsg));
-        }, timeoutDuration);
 
         // Check current state first
         const currentVfsState = useVfsStore.getState();
@@ -268,36 +261,46 @@ export const useConversationStore = create(
         syncRepoId: conversationData.syncRepoId ?? null,
         lastSyncedAt: conversationData.lastSyncedAt ?? null,
       };
-      set((state) => {
-        if (!state.conversations.some((c) => c.id === newConversation.id)) {
-          state.conversations.unshift(newConversation);
-          state.conversationSyncStatus[newId] = newConversation.syncRepoId
-            ? "needs-sync"
-            : "idle";
-        }
-      });
+
+      let savedSuccessfully = false;
       try {
-        const conversationToSave = get().getConversationById(newId);
-        if (conversationToSave) {
-          await PersistenceService.saveConversation(conversationToSave);
-          emitter.emit(conversationEvent.conversationAdded, {
-            conversation: conversationToSave,
-          });
-        } else {
-          throw new Error("Failed to retrieve newly added conversation state");
-        }
+        // First try to save to persistence to ensure it works
+        const plainData = JSON.stringify(newConversation);
+        await PersistenceService.saveConversation(JSON.parse(plainData));
+        savedSuccessfully = true;
+
+        // Then update the state
+        set((state) => {
+          if (!state.conversations.some((c) => c.id === newConversation.id)) {
+            state.conversations.unshift(newConversation);
+            state.conversationSyncStatus[newId] = newConversation.syncRepoId
+              ? "needs-sync"
+              : "idle";
+          }
+        });
+
+        // Finally emit the event
+        emitter.emit(conversationEvent.conversationAdded, {
+          conversation: newConversation,
+        });
+
         return newId;
       } catch (e) {
         console.error("ConversationStore: Error adding conversation", e);
-        set((state) => ({
-          error: "Failed to save new conversation",
-          conversations: state.conversations.filter((c) => c.id !== newId),
-          conversationSyncStatus: Object.fromEntries(
-            Object.entries(state.conversationSyncStatus).filter(
-              ([id]) => id !== newId
-            )
-          ),
-        }));
+
+        // Only rollback state if we managed to save but failed to update state
+        if (savedSuccessfully) {
+          set((state) => ({
+            error: "Failed to save new conversation to state",
+            conversations: state.conversations.filter((c) => c.id !== newId),
+            conversationSyncStatus: Object.fromEntries(
+              Object.entries(state.conversationSyncStatus).filter(
+                ([id]) => id !== newId
+              )
+            ),
+          }));
+        }
+
         throw e;
       }
     },
@@ -493,9 +496,6 @@ export const useConversationStore = create(
       const currentSelType = get().selectedItemType;
 
       if (currentSelId === id && currentSelType === type) {
-        console.log(
-          `ConversationStore: Item ${id} (${type}) already selected.`
-        );
         return;
       }
 
@@ -503,18 +503,22 @@ export const useConversationStore = create(
         `ConversationStore: Selecting item. ID: ${id}, Type: ${type}. Previous: ${currentSelId} (${currentSelType})`
       );
 
+      // Update interaction store first if needed
+      const conversationIdForInteractions = type === "conversation" ? id : null;
+      if (conversationIdForInteractions) {
+        emitter.emit(interactionEvent.setCurrentConversationIdRequest, {
+          id: conversationIdForInteractions,
+        });
+        // Ensure interactions are loaded for the selected conversation
+        emitter.emit(interactionEvent.loadInteractionsRequest, {
+          conversationId: conversationIdForInteractions,
+        });
+      }
+
+      // Then update local state
       set({ selectedItemId: id, selectedItemType: type });
 
-      const conversationIdForInteractionStore =
-        type === "conversation" ? id : null;
-
-      console.log(
-        `ConversationStore: Emitting setCurrentConversationIdRequest with: ${conversationIdForInteractionStore}`
-      );
-      emitter.emit(interactionEvent.setCurrentConversationIdRequest, {
-        id: conversationIdForInteractionStore,
-      });
-
+      // Finally notify about the selection change
       emitter.emit(conversationEvent.selectedItemChanged, {
         itemId: id,
         itemType: type,
@@ -735,7 +739,10 @@ export const useConversationStore = create(
       });
     },
 
-    _setRepoInitializationStatus: (repoId, status) => {
+    _setRepoInitializationStatus: (
+      repoId: string,
+      status: SyncStatus
+    ): void => {
       set((state) => {
         state.repoInitializationStatus[repoId] = status;
       });
