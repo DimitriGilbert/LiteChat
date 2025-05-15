@@ -13,10 +13,10 @@ import type { FullExportOptions } from "./import-export.service";
 
 // Helper function to ensure date fields are Date objects
 const ensureDateFields = <
-  T extends { createdAt?: any; updatedAt?: any; [key: string]: any },
+  T extends { createdAt?: any; updatedAt?: any; [key: string]: any }
 >(
   item: T,
-  otherDateFields: string[] = [],
+  otherDateFields: string[] = []
 ): T => {
   const newItem = { ...item };
   if (item.createdAt && !(item.createdAt instanceof Date)) {
@@ -34,7 +34,7 @@ const ensureDateFields = <
   } else {
     console.warn(
       "[ensureDateFields] Expected otherDateFields to be an array, but received:",
-      otherDateFields,
+      otherDateFields
     );
   }
   return newItem;
@@ -98,19 +98,19 @@ export class PersistenceService {
 
   // Interactions
   static async loadInteractionsForConversation(
-    id: string,
+    id: string
   ): Promise<Interaction[]> {
     try {
       const interactions = await db.interactions
         .where({ conversationId: id })
         .sortBy("index");
       return interactions.map((i) =>
-        ensureDateFields(i, ["startedAt", "endedAt"]),
+        ensureDateFields(i, ["startedAt", "endedAt"])
       );
     } catch (error) {
       console.error(
         "PersistenceService: Error loading interactions for conversation:",
-        error,
+        error
       );
       throw error;
     }
@@ -140,7 +140,7 @@ export class PersistenceService {
     } catch (error) {
       console.error(
         "PersistenceService: Error deleting interactions for conversation:",
-        error,
+        error
       );
       throw error;
     }
@@ -203,7 +203,7 @@ export class PersistenceService {
     } catch (error) {
       console.error(
         "PersistenceService: Error loading provider configs:",
-        error,
+        error
       );
       throw error;
     }
@@ -224,7 +224,7 @@ export class PersistenceService {
     } catch (error) {
       console.error(
         "PersistenceService: Error deleting provider config:",
-        error,
+        error
       );
       throw error;
     }
@@ -260,11 +260,11 @@ export class PersistenceService {
 
         if (configsToUpdate.length > 0) {
           const updates = configsToUpdate.map((config) =>
-            db.providerConfigs.update(config.id, { apiKeyId: null }),
+            db.providerConfigs.update(config.id, { apiKeyId: null })
           );
           await Promise.all(updates);
           console.log(
-            `PersistenceService: Unlinked API key ${id} from ${configsToUpdate.length} provider configs.`,
+            `PersistenceService: Unlinked API key ${id} from ${configsToUpdate.length} provider configs.`
           );
         }
         await db.apiKeys.delete(id);
@@ -280,7 +280,7 @@ export class PersistenceService {
     try {
       const repos = await db.syncRepos.toArray();
       return repos.map((r) =>
-        ensureDateFields(r, ["lastPulledAt", "lastPushedAt"]),
+        ensureDateFields(r, ["lastPulledAt", "lastPushedAt"])
       );
     } catch (error) {
       console.error("PersistenceService: Error loading sync repos:", error);
@@ -306,11 +306,11 @@ export class PersistenceService {
           .toArray();
         if (convosToUpdate.length > 0) {
           const updates = convosToUpdate.map((convo) =>
-            db.conversations.update(convo.id, { syncRepoId: null }),
+            db.conversations.update(convo.id, { syncRepoId: null })
           );
           await Promise.all(updates);
           console.log(
-            `PersistenceService: Unlinked SyncRepo ${id} from ${convosToUpdate.length} conversations.`,
+            `PersistenceService: Unlinked SyncRepo ${id} from ${convosToUpdate.length} conversations.`
           );
         }
         await db.syncRepos.delete(id);
@@ -352,6 +352,8 @@ export class PersistenceService {
         topK: p.topK ?? null,
         presencePenalty: p.presencePenalty ?? null,
         frequencyPenalty: p.frequencyPenalty ?? null,
+        defaultTagIds: p.defaultTagIds ?? null,
+        defaultRuleIds: p.defaultRuleIds ?? null,
         metadata: p.metadata ? { ...p.metadata } : {},
       };
       return await db.projects.put(projectToSave);
@@ -371,23 +373,12 @@ export class PersistenceService {
         for (const child of childProjects) {
           await deleteRecursive(child.id);
         }
-        const convosToUnlink = await db.conversations
-          .where("projectId")
-          .equals(projectId)
-          .toArray();
-        if (convosToUnlink.length > 0) {
-          const updates = convosToUnlink.map((convo) =>
-            db.conversations.update(convo.id, { projectId: null }),
-          );
-          await Promise.all(updates);
-          console.log(
-            `PersistenceService: Unlinked Project ${projectId} from ${convosToUnlink.length} conversations.`,
-          );
-        }
+        // Conversations are unlinked by ProjectStore via an event,
+        // or ConversationStore listening to project.deleted
         await db.projects.delete(projectId);
         console.log(`PersistenceService: Deleted Project ${projectId}`);
       };
-      await db.transaction("rw", [db.projects, db.conversations], async () => {
+      await db.transaction("rw", [db.projects], async () => {
         await deleteRecursive(id);
       });
     } catch (error) {
@@ -490,7 +481,7 @@ export class PersistenceService {
 
   // --- Full Export/Import ---
   static async getAllDataForExport(
-    options: FullExportOptions,
+    options: FullExportOptions
   ): Promise<FullExportData> {
     const exportData: FullExportData = {
       version: 1,
@@ -546,11 +537,11 @@ export class PersistenceService {
       importRulesAndTags?: boolean;
       importMods?: boolean;
       importSyncRepos?: boolean;
-    },
+    }
   ): Promise<void> {
     if (data.version !== 1) {
       throw new Error(
-        `Unsupported export version: ${data.version}. Expected version 1.`,
+        `Unsupported export version: ${data.version}. Expected version 1.`
       );
     }
 
@@ -588,38 +579,36 @@ export class PersistenceService {
 
         if (options.importSettings && data.settings) {
           const settingsToPut: DbAppState[] = Object.entries(data.settings).map(
-            ([key, value]) => ({ key: `settings:${key}`, value }),
+            ([key, value]) => ({ key: `settings:${key}`, value })
           );
           await db.appState.bulkPut(settingsToPut);
         }
         if (options.importApiKeys && data.apiKeys) {
           await db.apiKeys.bulkPut(
-            data.apiKeys.map((k) => ensureDateFields(k)),
+            data.apiKeys.map((k) => ensureDateFields(k))
           );
         }
         if (options.importProviderConfigs && data.providerConfigs) {
           await db.providerConfigs.bulkPut(
             data.providerConfigs.map((c) =>
-              ensureDateFields(c, ["modelsLastFetchedAt"]),
-            ),
+              ensureDateFields(c, ["modelsLastFetchedAt"])
+            )
           );
         }
         if (options.importProjects && data.projects) {
           await db.projects.bulkPut(
-            data.projects.map((p) => ensureDateFields(p)),
+            data.projects.map((p) => ensureDateFields(p))
           );
         }
         if (options.importConversations && data.conversations) {
           await db.conversations.bulkPut(
-            data.conversations.map((c) =>
-              ensureDateFields(c, ["lastSyncedAt"]),
-            ),
+            data.conversations.map((c) => ensureDateFields(c, ["lastSyncedAt"]))
           );
           if (data.interactions) {
             await db.interactions.bulkPut(
               data.interactions.map((i) =>
-                ensureDateFields(i, ["startedAt", "endedAt"]),
-              ),
+                ensureDateFields(i, ["startedAt", "endedAt"])
+              )
             );
           }
         }
@@ -640,14 +629,14 @@ export class PersistenceService {
         if (options.importSyncRepos && data.syncRepos) {
           await db.syncRepos.bulkPut(
             data.syncRepos.map((r) =>
-              ensureDateFields(r, ["lastPulledAt", "lastPushedAt"]),
-            ),
+              ensureDateFields(r, ["lastPulledAt", "lastPushedAt"])
+            )
           );
         }
-      },
+      }
     );
   }
-  // --- End Full Export/Import ---
+  // --- End Full Config Export/Import ---
 
   // --- Clear All Data ---
   static async clearAllData(): Promise<void> {
@@ -679,7 +668,7 @@ export class PersistenceService {
           await db.rules.clear();
           await db.tags.clear();
           await db.tagRuleLinks.clear();
-        },
+        }
       );
       console.log("PersistenceService: All data cleared.");
     } catch (error) {

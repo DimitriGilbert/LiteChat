@@ -6,7 +6,7 @@ import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
 
 export const conversationEvent = {
   // State Change Events
-  sidebarItemsLoaded: "conversation.sidebar.items.loaded",
+  conversationsLoaded: "conversation.conversations.loaded", // Renamed from sidebarItemsLoaded
   selectedItemChanged: "conversation.selected.item.changed",
   conversationAdded: "conversation.added",
   conversationUpdated: "conversation.updated",
@@ -18,7 +18,7 @@ export const conversationEvent = {
   loadingStateChanged: "conversation.loading.state.changed",
 
   // Action Request Events
-  loadSidebarItemsRequest: "conversation.load.sidebar.items.request",
+  loadConversationsRequest: "conversation.load.conversations.request", // Renamed
   addConversationRequest: "conversation.add.conversation.request",
   updateConversationRequest: "conversation.update.conversation.request",
   deleteConversationRequest: "conversation.delete.conversation.request",
@@ -41,9 +41,8 @@ export const conversationEvent = {
 } as const;
 
 export interface ConversationEventPayloads {
-  [conversationEvent.sidebarItemsLoaded]: {
+  [conversationEvent.conversationsLoaded]: {
     conversations: Conversation[];
-    projects: Project[];
   };
   [conversationEvent.selectedItemChanged]: {
     itemId: string | null;
@@ -72,7 +71,7 @@ export interface ConversationEventPayloads {
     isLoading: boolean;
     error: string | null;
   };
-  [conversationEvent.loadSidebarItemsRequest]: undefined;
+  [conversationEvent.loadConversationsRequest]: undefined;
   [conversationEvent.addConversationRequest]: Partial<
     Omit<Conversation, "id" | "createdAt">
   > & { title: string; projectId?: string | null };

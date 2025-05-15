@@ -1,5 +1,5 @@
 // src/components/LiteChat/chat/control/ConversationOnlyList.tsx
-
+// FULL FILE
 import React from "react";
 import { useConversationStore } from "@/store/conversation.store";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,11 +31,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import type { ConversationListControlModule } from "@/controls/modules/ConversationListControlModule";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { conversationEvent } from "@/types/litechat/events/conversation.events";
+import { uiEvent } from "@/types/litechat/events/ui.events";
 
 // Helper to get sync icon and tooltip (remains the same)
 const getSyncIndicatorInternal = (
   status: SyncStatus | undefined,
-  repoName: string | undefined,
+  repoName: string | undefined
 ): React.ReactNode => {
   if (!repoName) return null;
 
@@ -80,76 +84,62 @@ const getSyncIndicatorInternal = (
   );
 };
 
-export const ConversationListControlComponent: React.FC = () => {
-  const {
-    conversations,
-    selectItem,
-    selectedItemId,
-    addConversation,
-    deleteConversation,
-    exportConversation,
-    isLoading,
-    syncRepos,
-    conversationSyncStatus,
-  } = useConversationStore(
-    useShallow((state) => ({
-      conversations: state.conversations,
-      // projects removed from selector
-      selectItem: state.selectItem,
-      selectedItemId: state.selectedItemId,
-      addConversation: state.addConversation,
-      deleteConversation: state.deleteConversation,
-      exportConversation: state.exportConversation,
-      isLoading: state.isLoading,
-      syncRepos: state.syncRepos,
-      conversationSyncStatus: state.conversationSyncStatus,
-    })),
-  );
-  const setFocusInputFlag = useUIStateStore((state) => state.setFocusInputFlag);
+interface ConversationListControlComponentProps {
+  module: ConversationListControlModule;
+}
+
+export const ConversationListControlComponent: React.FC<
+  ConversationListControlComponentProps
+> = ({ module }) => {
+  const { conversations, selectedItemId, syncRepos, conversationSyncStatus } =
+    useConversationStore(
+      useShallow((state) => ({
+        conversations: state.conversations,
+        selectedItemId: state.selectedItemId,
+        syncRepos: state.syncRepos,
+        conversationSyncStatus: state.conversationSyncStatus,
+      }))
+    );
+  const isLoading = module.isLoading;
 
   const handleNewChat = async () => {
     try {
-      // Pass null for projectId as this list doesn't handle projects
-      const newId = await addConversation({
+      emitter.emit(conversationEvent.addConversationRequest, {
         title: "New Chat",
         projectId: null,
       });
-      selectItem(newId, "conversation");
-      setTimeout(() => setFocusInputFlag(true), 0);
+      // Selection and focus will be handled by listeners to conversationAdded
     } catch (error) {
-      console.error("Failed to create new chat:", error);
+      console.error("Failed to request new chat creation:", error);
     }
   };
 
-  const handleSelectItem = (id: string, type: "conversation" | "project") => {
-    // This component only handles conversations
-    if (type !== "conversation") return;
+  const handleSelectItem = (id: string) => {
     if (id === selectedItemId) return;
-    selectItem(id, type);
-    setTimeout(() => setFocusInputFlag(true), 0);
+    emitter.emit(conversationEvent.selectItemRequest, {
+      id,
+      type: "conversation",
+    });
+    emitter.emit(uiEvent.setFocusInputFlagRequest, { focus: true });
   };
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm("Delete this conversation? This cannot be undone.")) {
-      deleteConversation(id).catch((error) => {
-        console.error("Failed to delete conversation:", error);
-        toast.error("Failed to delete conversation.");
-      });
+      emitter.emit(conversationEvent.deleteConversationRequest, { id });
     }
   };
 
   const handleExport = async (
     id: string,
     format: "json" | "md",
-    e: React.MouseEvent,
+    e: React.MouseEvent
   ) => {
     e.stopPropagation();
-    try {
-      await exportConversation(id, format);
-    } catch (error) {
-      console.error(`Failed to export conversation as ${format}:`, error);
-    }
+    emitter.emit(conversationEvent.exportConversationRequest, {
+      conversationId: id,
+      format,
+    });
   };
 
   const repoNameMap = React.useMemo(() => {
@@ -194,7 +184,7 @@ export const ConversationListControlComponent: React.FC = () => {
                 : undefined;
               const syncIndicator = getSyncIndicatorInternal(
                 syncStatus,
-                repoName,
+                repoName
               );
 
               return (
@@ -206,9 +196,9 @@ export const ConversationListControlComponent: React.FC = () => {
                     "hover:bg-muted/50 hover:text-primary/80",
                     c.id === selectedItemId
                       ? "bg-primary/10 text-primary font-medium border-primary dark:bg-primary/20 dark:border-primary/70"
-                      : "",
+                      : ""
                   )}
-                  onClick={() => handleSelectItem(c.id, "conversation")}
+                  onClick={() => handleSelectItem(c.id)}
                 >
                   <div className="flex items-center min-w-0">
                     <span className="truncate pr-1">

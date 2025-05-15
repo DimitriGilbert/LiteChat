@@ -4,7 +4,7 @@ import type { Project } from "@/types/litechat/project";
 
 export const projectEvent = {
   // State Change Events
-  loaded: "project.loaded",
+  loaded: "project.loaded", // Emitted when projects are loaded/reloaded
   added: "project.added",
   updated: "project.updated",
   deleted: "project.deleted",

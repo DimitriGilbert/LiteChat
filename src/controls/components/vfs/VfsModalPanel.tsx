@@ -1,6 +1,6 @@
 // src/controls/components/vfs/VfsModalPanel.tsx
 // FULL FILE
-import React, { useState, useEffect } from "react"; // Added useState, useEffect
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { PaperclipIcon } from "lucide-react";
 import {
@@ -13,17 +13,16 @@ import {
 } from "@/components/ui/dialog";
 import { FileManager } from "@/components/LiteChat/file-manager/FileManager";
 import { FileManagerBanner } from "@/components/LiteChat/file-manager/FileManagerBanner";
-import { useInputStore } from "@/store/input.store";
 import { toast } from "sonner";
 import type { VfsControlModule } from "@/controls/modules/VfsControlModule";
-import { useConversationStore } from "@/store/conversation.store";
-import { useVfsStore } from "@/store/vfs.store";
 import type { ModalProviderProps } from "@/types/litechat/modding";
 import { emitter } from "@/lib/litechat/event-emitter";
-import {
-  vfsEvent,
-  type VfsEventPayloads,
-} from "@/types/litechat/events/vfs.events";
+import { vfsEvent } from "@/types/litechat/events/vfs.events";
+import { inputEvent } from "@/types/litechat/events/input.events";
+import { conversationEvent } from "@/types/litechat/events/conversation.events";
+import type { VfsEventPayloads } from "@/types/litechat/events/vfs.events";
+import type { SidebarItemType } from "@/types/litechat/chat";
+import { useVfsStore } from "@/store/vfs.store";
 
 interface VfsModalPanelProps extends ModalProviderProps {
   module: VfsControlModule;
@@ -38,6 +37,8 @@ export const VfsModalPanel: React.FC<VfsModalPanelProps> = ({
   const [selectedCount, setSelectedCount] = useState(
     module.getSelectedFileIdsCount()
   );
+  const [selectedItemType, setSelectedItemType] =
+    useState<SidebarItemType | null>(null);
 
   useEffect(() => {
     const handleSelectionChange = (
@@ -46,29 +47,43 @@ export const VfsModalPanel: React.FC<VfsModalPanelProps> = ({
       setSelectedCount(payload.selectedFileIds.length);
     };
 
+    const handleSelectedItemChanged = (payload: {
+      itemId: string | null;
+      itemType: SidebarItemType | null;
+    }) => {
+      setSelectedItemType(payload.itemType);
+    };
+
     emitter.on(vfsEvent.selectionChanged, handleSelectionChange);
+    emitter.on(
+      conversationEvent.selectedItemChanged,
+      handleSelectedItemChanged
+    );
+
     return () => {
       emitter.off(vfsEvent.selectionChanged, handleSelectionChange);
+      emitter.off(
+        conversationEvent.selectedItemChanged,
+        handleSelectedItemChanged
+      );
     };
   }, []);
 
   const vfsKey = useVfsStore.getState().vfsKey;
-  const selectedItemType = useConversationStore.getState().selectedItemType;
-  const addAttachedFile = useInputStore.getState().addAttachedFile;
 
   const handleAttachAndClose = () => {
     const selectedIds = useVfsStore.getState().selectedFileIds;
+    const nodes = module.getVfsNodes();
     if (selectedIds.size === 0) {
       toast.info("No files selected in VFS to attach.");
       return;
     }
 
     let attachedCount = 0;
-    const nodes = module.getVfsNodes();
     selectedIds.forEach((fileId) => {
       const node = nodes[fileId];
       if (node && node.type === "file") {
-        addAttachedFile({
+        emitter.emit(inputEvent.addAttachedFileRequest, {
           source: "vfs",
           name: node.name,
           type: node.mimeType || "application/octet-stream",

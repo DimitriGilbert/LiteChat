@@ -7,6 +7,8 @@ import { ConversationListControlComponent } from "@/controls/components/conversa
 import { ConversationListIconRenderer } from "@/controls/components/conversation-list/IconRenderer";
 import { useConversationStore } from "@/store/conversation.store";
 import { useProjectStore } from "@/store/project.store";
+import { conversationEvent } from "@/types/litechat/events/conversation.events";
+import { projectEvent } from "@/types/litechat/events/project.events";
 
 export class ConversationListControlModule implements ControlModule {
   readonly id = "core-conversation-list";
@@ -14,21 +16,58 @@ export class ConversationListControlModule implements ControlModule {
   private eventUnsubscribers: (() => void)[] = [];
 
   public isLoading = true;
+  private conversationsLoading = true;
+  private projectsLoading = true;
   private notifyComponentUpdate: (() => void) | null = null;
 
-  async initialize(_modApi: LiteChatModApi): Promise<void> {
-    this.isLoading =
-      useConversationStore.getState().isLoading ||
-      useProjectStore.getState().isLoading;
-    // console.log(
-    //   `[${this.id}] Initialized. Initial loading state: ${this.isLoading}`
-    // );
+  async initialize(modApi: LiteChatModApi): Promise<void> {
+    this.conversationsLoading = useConversationStore.getState().isLoading;
+    this.projectsLoading = useProjectStore.getState().isLoading;
+    this.updateCombinedLoadingState();
+
+    modApi.emit(conversationEvent.loadConversationsRequest, undefined);
+    modApi.emit(projectEvent.loadProjectsRequest, undefined);
+
+    const unsubConversations = modApi.on(
+      conversationEvent.conversationsLoaded,
+      () => {
+        this.conversationsLoading = false;
+        this.updateCombinedLoadingState();
+      }
+    );
+    const unsubProjects = modApi.on(projectEvent.loaded, () => {
+      this.projectsLoading = false;
+      this.updateCombinedLoadingState();
+    });
+    const unsubConvLoading = modApi.on(
+      conversationEvent.loadingStateChanged,
+      (payload) => {
+        if (payload.isLoading !== this.conversationsLoading) {
+          this.conversationsLoading = payload.isLoading;
+          this.updateCombinedLoadingState();
+        }
+      }
+    );
+    const unsubProjLoading = modApi.on(
+      projectEvent.loadingStateChanged,
+      (payload) => {
+        if (payload.isLoading !== this.projectsLoading) {
+          this.projectsLoading = payload.isLoading;
+          this.updateCombinedLoadingState();
+        }
+      }
+    );
+
+    this.eventUnsubscribers.push(
+      unsubConversations,
+      unsubProjects,
+      unsubConvLoading,
+      unsubProjLoading
+    );
   }
 
-  public updateLoadingState() {
-    const newLoadingState =
-      useConversationStore.getState().isLoading ||
-      useProjectStore.getState().isLoading;
+  private updateCombinedLoadingState() {
+    const newLoadingState = this.conversationsLoading || this.projectsLoading;
     if (this.isLoading !== newLoadingState) {
       this.isLoading = newLoadingState;
       this.notifyComponentUpdate?.();
@@ -36,6 +75,7 @@ export class ConversationListControlModule implements ControlModule {
   }
 
   public setIsLoading = (loading: boolean) => {
+    // This might be called externally, but internal state is driven by store events
     if (this.isLoading !== loading) {
       this.isLoading = loading;
       this.notifyComponentUpdate?.();
@@ -66,7 +106,6 @@ export class ConversationListControlModule implements ControlModule {
         React.createElement(ConversationListIconRenderer, { module: this }),
       show: () => true,
     });
-    // console.log(`[Init] Module "${this.id}" registered.`);
   }
 
   destroy(): void {

@@ -39,6 +39,10 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { vfsEvent } from "@/types/litechat/events/vfs.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
+import { settingsEvent } from "@/types/litechat/events/settings.events";
+import { projectEvent } from "@/types/litechat/events/project.events";
+import { conversationEvent as conversationStoreEvent } from "@/types/litechat/events/conversation.events";
+import type { LiteChatModApi } from "@/types/litechat/modding";
 
 let initializedControlModules: ControlModule[] = [];
 let appInitializationPromise: Promise<ControlModule[]> | null = null;
@@ -52,6 +56,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const inputAreaRef = useRef<InputAreaRef>(null);
+  const coreModApiRef = useRef<LiteChatModApi | null>(null);
 
   const {
     selectedItemId,
@@ -99,15 +104,18 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
   }, [selectedItemId, selectedItemType, isMobileSidebarOpen]);
 
   useEffect(() => {
-    const coreModApi = createModApi({
-      id: "core-litechat-app",
-      name: "LiteChat App Core",
-      sourceUrl: null,
-      scriptContent: null,
-      enabled: true,
-      loadOrder: -1000,
-      createdAt: new Date(),
-    });
+    if (!coreModApiRef.current) {
+      coreModApiRef.current = createModApi({
+        id: "core-litechat-app",
+        name: "LiteChat App Core",
+        sourceUrl: null,
+        scriptContent: null,
+        enabled: true,
+        loadOrder: -1000,
+        createdAt: new Date(),
+      });
+    }
+    const modApiToUse = coreModApiRef.current;
 
     EventActionCoordinatorService.initialize();
 
@@ -121,7 +129,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       try {
         initializedControlModules = await performFullInitialization(
           controls,
-          coreModApi
+          modApiToUse
         );
         hasInitializedSuccessfully = true;
       } catch (error) {
@@ -142,37 +150,43 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
   const prevContextRef = useRef<{
     itemId: string | null;
     itemType: SidebarItemType | null;
-  }>({ itemId: null, itemType: null });
+    effectiveSettingsString: string;
+  }>({ itemId: null, itemType: null, effectiveSettingsString: "" });
 
   useEffect(() => {
-    if (isInitializing || !hasInitializedSuccessfully) return;
+    if (isInitializing || !hasInitializedSuccessfully || !coreModApiRef.current)
+      return;
+    const modApi = coreModApiRef.current;
 
     const currentContext = {
       itemId: selectedItemId,
       itemType: selectedItemType,
     };
 
+    let currentProjectId: string | null = null;
+    if (selectedItemType === "project") {
+      currentProjectId = selectedItemId;
+    } else if (selectedItemType === "conversation" && selectedItemId) {
+      const conversation = getConversationByIdFromStore(selectedItemId);
+      currentProjectId = conversation?.projectId ?? null;
+    }
+
+    const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
+    const effectiveSettingsString = JSON.stringify(effectiveSettings);
+
     if (
       currentContext.itemId !== prevContextRef.current.itemId ||
-      currentContext.itemType !== prevContextRef.current.itemType
+      currentContext.itemType !== prevContextRef.current.itemType ||
+      effectiveSettingsString !== prevContextRef.current.effectiveSettingsString
     ) {
-      let currentProjectId: string | null = null;
-      if (selectedItemType === "project") {
-        currentProjectId = selectedItemId;
-      } else if (selectedItemType === "conversation" && selectedItemId) {
-        const conversation = getConversationByIdFromStore(selectedItemId);
-        currentProjectId = conversation?.projectId ?? null;
-      }
-
-      const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
-      emitter.emit(promptEvent.initializePromptStateRequest, {
+      modApi.emit(promptEvent.initializePromptStateRequest, {
         effectiveSettings,
       });
-      emitter.emit(uiEvent.contextChanged, {
+      modApi.emit(uiEvent.contextChanged, {
         selectedItemId,
         selectedItemType,
       });
-      prevContextRef.current = currentContext;
+      prevContextRef.current = { ...currentContext, effectiveSettingsString };
     }
   }, [
     selectedItemId,
@@ -180,10 +194,64 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     getConversationByIdFromStore,
     getEffectiveProjectSettings,
     isInitializing,
+    hasInitializedSuccessfully,
   ]);
 
   useEffect(() => {
-    if (isInitializing || !hasInitializedSuccessfully) return;
+    if (isInitializing || !hasInitializedSuccessfully || !coreModApiRef.current)
+      return;
+    const modApi = coreModApiRef.current;
+
+    const updatePromptStateFromEffectiveSettings = () => {
+      let currentProjectId: string | null = null;
+      if (selectedItemType === "project") {
+        currentProjectId = selectedItemId;
+      } else if (selectedItemType === "conversation" && selectedItemId) {
+        const conversation = getConversationByIdFromStore(selectedItemId);
+        currentProjectId = conversation?.projectId ?? null;
+      }
+      const effectiveSettings = getEffectiveProjectSettings(currentProjectId);
+      modApi.emit(promptEvent.initializePromptStateRequest, {
+        effectiveSettings,
+      });
+    };
+
+    const unsubSettings = modApi.on(
+      settingsEvent.loaded,
+      updatePromptStateFromEffectiveSettings
+    );
+    const unsubProjectUpdated = modApi.on(
+      projectEvent.updated,
+      updatePromptStateFromEffectiveSettings
+    );
+    const unsubGlobalSystemPrompt = modApi.on(
+      settingsEvent.globalSystemPromptChanged,
+      updatePromptStateFromEffectiveSettings
+    );
+    const unsubTemperature = modApi.on(
+      settingsEvent.temperatureChanged,
+      updatePromptStateFromEffectiveSettings
+    );
+
+    return () => {
+      unsubSettings();
+      unsubProjectUpdated();
+      unsubGlobalSystemPrompt();
+      unsubTemperature();
+    };
+  }, [
+    selectedItemId,
+    selectedItemType,
+    getConversationByIdFromStore,
+    getEffectiveProjectSettings,
+    isInitializing,
+    hasInitializedSuccessfully,
+  ]);
+
+  useEffect(() => {
+    if (isInitializing || !hasInitializedSuccessfully || !coreModApiRef.current)
+      return;
+    const modApi = coreModApiRef.current;
 
     let targetVfsKey: string | null = null;
     const isVfsModalOpen = isChatControlPanelOpen["core-vfs-modal-panel"];
@@ -203,17 +271,24 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     }
 
     if (useVfsStore.getState().vfsKey !== targetVfsKey) {
-      emitter.emit(vfsEvent.setVfsKeyRequest, { key: targetVfsKey });
+      modApi.emit(vfsEvent.setVfsKeyRequest, { key: targetVfsKey });
     }
   }, [
     selectedItemId,
     selectedItemType,
     getConversationByIdFromStore,
     isInitializing,
+    hasInitializedSuccessfully,
     isChatControlPanelOpen,
   ]);
 
   const handlePromptSubmit = useCallback(async (turnData: PromptTurnObject) => {
+    if (!coreModApiRef.current) {
+      toast.error("Application core not ready. Please try again.");
+      return;
+    }
+    const modApi = coreModApiRef.current;
+
     const conversationState = useConversationStore.getState();
     let currentConvId =
       conversationState.selectedItemType === "conversation"
@@ -234,9 +309,36 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
           title: "New Chat",
           projectId: currentProjectId,
         };
-        const newId = await conversationState.addConversation(newConvPayload);
-        await conversationState.selectItem(newId, "conversation");
-        currentConvId = useConversationStore.getState().selectedItemId;
+        await new Promise<void>((resolve, reject) => {
+          const unsub = modApi.on(
+            conversationStoreEvent.conversationAdded,
+            (payload) => {
+              if (payload.conversation.title === newConvPayload.title) {
+                unsub();
+                currentConvId = payload.conversation.id;
+                modApi.emit(conversationStoreEvent.selectItemRequest, {
+                  id: currentConvId,
+                  type: "conversation",
+                });
+                resolve();
+              }
+            }
+          );
+          modApi.emit(
+            conversationStoreEvent.addConversationRequest,
+            newConvPayload
+          );
+          setTimeout(
+            () => reject(new Error("Timeout waiting for new conversation ID.")),
+            3000
+          );
+        });
+
+        if (!currentConvId) {
+          throw new Error(
+            "Failed to obtain new conversation ID after creation request."
+          );
+        }
       } catch (error) {
         console.error(
           "[LiteChat] App: Failed to create new conversation",

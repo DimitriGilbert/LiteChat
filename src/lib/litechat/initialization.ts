@@ -21,12 +21,14 @@ import { providerEvent } from "@/types/litechat/events/provider.events";
 import { conversationEvent } from "@/types/litechat/events/conversation.events";
 import { modEvent } from "@/types/litechat/events/mod.events";
 import { promptEvent as promptStateEvent } from "@/types/litechat/events/prompt.events";
+import { projectEvent } from "@/types/litechat/events/project.events";
 
 interface CoreStores {
   requestLoadSettings: () => void;
   requestLoadProviderData: () => void;
   requestLoadRulesAndTags: () => void;
-  requestLoadSidebarItems: () => void;
+  requestLoadConversations: () => void;
+  requestLoadProjects: () => void;
   requestLoadDbMods: () => void;
   setLoadedMods: (loadedMods: any[]) => void;
   getConversationById: (id: string | null) => any;
@@ -97,16 +99,24 @@ export async function loadCoreData(
   modApi.emit(settingsEvent.loadSettingsRequest, undefined);
   modApi.emit(providerEvent.loadInitialDataRequest, undefined);
   modApi.emit(rulesEvent.loadRulesAndTagsRequest, undefined);
-  modApi.emit(conversationEvent.loadSidebarItemsRequest, undefined);
+  modApi.emit(conversationEvent.loadConversationsRequest, undefined);
+  modApi.emit(projectEvent.loadProjectsRequest, undefined);
 
   await new Promise<void>((resolve) => {
     let settingsLoaded = false;
     let providersLoaded = false;
     let rulesLoaded = false;
-    let sidebarLoaded = false;
+    let conversationsLoaded = false;
+    let projectsLoaded = false;
 
     const checkDone = () => {
-      if (settingsLoaded && providersLoaded && rulesLoaded && sidebarLoaded) {
+      if (
+        settingsLoaded &&
+        providersLoaded &&
+        rulesLoaded &&
+        conversationsLoaded &&
+        projectsLoaded
+      ) {
         resolve();
       }
     };
@@ -126,9 +136,17 @@ export async function loadCoreData(
       unsubRules();
       checkDone();
     });
-    const unsubSidebar = modApi.on(conversationEvent.sidebarItemsLoaded, () => {
-      sidebarLoaded = true;
-      unsubSidebar();
+    const unsubConversations = modApi.on(
+      conversationEvent.conversationsLoaded,
+      () => {
+        conversationsLoaded = true;
+        unsubConversations();
+        checkDone();
+      }
+    );
+    const unsubProjects = modApi.on(projectEvent.loaded, () => {
+      projectsLoaded = true;
+      unsubProjects();
       checkDone();
     });
   });
@@ -273,8 +291,10 @@ export async function performFullInitialization(
       coreModApi.emit(providerEvent.loadInitialDataRequest, undefined),
     requestLoadRulesAndTags: () =>
       coreModApi.emit(rulesEvent.loadRulesAndTagsRequest, undefined),
-    requestLoadSidebarItems: () =>
-      coreModApi.emit(conversationEvent.loadSidebarItemsRequest, undefined),
+    requestLoadConversations: () =>
+      coreModApi.emit(conversationEvent.loadConversationsRequest, undefined),
+    requestLoadProjects: () =>
+      coreModApi.emit(projectEvent.loadProjectsRequest, undefined),
     requestLoadDbMods: () =>
       coreModApi.emit(modEvent.loadDbModsRequest, undefined),
     setLoadedMods: useModStore.getState().setLoadedMods,

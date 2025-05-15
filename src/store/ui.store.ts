@@ -5,22 +5,19 @@ import { immer } from "zustand/middleware/immer";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { uiEvent, UiEventPayloads } from "@/types/litechat/events/ui.events";
 import type { RegisteredActionHandler } from "@/types/litechat/control";
+import type { SidebarItemType } from "@/types/litechat/chat";
 
 interface UIState {
-  isChatControlPanelOpen: Record<string, boolean>; // For legacy panels like settingsModal
+  isChatControlPanelOpen: Record<string, boolean>;
   isPromptControlPanelOpen: Record<string, boolean>;
   isSidebarCollapsed: boolean;
   globalLoading: boolean;
   globalError: string | null;
   focusInputOnNextRender: boolean;
-  // The following are for the legacy settings modal, will be superseded by ModalManager
-  initialSettingsTab: string | null;
-  initialSettingsSubTab: string | null;
-  // The following are for the legacy project settings modal
-  isProjectSettingsModalOpen: boolean;
-  projectSettingsModalTargetId: string | null;
-  // The following is for the legacy VFS modal
-  isVfsModalOpen: boolean;
+  // Removed modal-specific state:
+  // initialSettingsTab, initialSettingsSubTab,
+  // isProjectSettingsModalOpen, projectSettingsModalTargetId,
+  // isVfsModalOpen
 }
 
 interface UIActions {
@@ -30,14 +27,10 @@ interface UIActions {
   setGlobalLoading: (loading: boolean) => void;
   setGlobalError: (error: string | null) => void;
   setFocusInputFlag: (focus: boolean) => void;
-  // Legacy settings modal actions
-  setInitialSettingsTabs: (tab: string | null, subTab?: string | null) => void;
-  clearInitialSettingsTabs: () => void;
-  // Legacy project settings modal actions
-  openProjectSettingsModal: (projectId: string) => void;
-  closeProjectSettingsModal: () => void;
-  // Legacy VFS modal action
-  toggleVfsModal: (isOpen?: boolean) => void;
+  // Removed modal-specific actions:
+  // setInitialSettingsTabs, clearInitialSettingsTabs,
+  // openProjectSettingsModal, closeProjectSettingsModal,
+  // toggleVfsModal
   getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
@@ -50,11 +43,6 @@ export const useUIStateStore = create(
     globalLoading: false,
     globalError: null,
     focusInputOnNextRender: false,
-    initialSettingsTab: null,
-    initialSettingsSubTab: null,
-    isProjectSettingsModalOpen: false,
-    projectSettingsModalTargetId: null,
-    isVfsModalOpen: false,
 
     // Actions
     toggleChatControlPanel: (panelId, isOpen) => {
@@ -64,37 +52,11 @@ export const useUIStateStore = create(
       if (currentOpenState !== newOpenState) {
         set((state) => {
           state.isChatControlPanelOpen[panelId] = newOpenState;
-          // If this was the settings modal and it's closing, clear initial tabs
-          if (panelId === "settingsModal" && !newOpenState) {
-            state.initialSettingsTab = null;
-            state.initialSettingsSubTab = null;
-          }
         });
         emitter.emit(uiEvent.chatControlPanelVisibilityChanged, {
           panelId,
           isOpen: newOpenState,
         });
-        // If this panelId corresponds to a modal managed by ModalManager,
-        // emit the generic modal state change as well.
-        // This part might need refinement based on how panelIds map to modalIds.
-        if (panelId === "settingsModal" || panelId === "projectSettingsModal") {
-          emitter.emit(uiEvent.modalStateChanged, {
-            modalId: panelId, // Assuming panelId is the modalId
-            isOpen: newOpenState,
-            targetId:
-              panelId === "projectSettingsModal"
-                ? get().projectSettingsModalTargetId
-                : undefined,
-            initialTab:
-              panelId === "settingsModal"
-                ? get().initialSettingsTab
-                : undefined,
-            initialSubTab:
-              panelId === "settingsModal"
-                ? get().initialSettingsSubTab
-                : undefined,
-          });
-        }
       }
     },
 
@@ -144,52 +106,6 @@ export const useUIStateStore = create(
       if (get().focusInputOnNextRender !== focus) {
         set({ focusInputOnNextRender: focus });
         emitter.emit(uiEvent.focusInputFlagChanged, { focus });
-      }
-    },
-
-    setInitialSettingsTabs: (tab, subTab = null) => {
-      set({ initialSettingsTab: tab, initialSettingsSubTab: subTab });
-    },
-
-    clearInitialSettingsTabs: () => {
-      set({ initialSettingsTab: null, initialSettingsSubTab: null });
-    },
-
-    openProjectSettingsModal: (projectId) => {
-      set({
-        isProjectSettingsModalOpen: true,
-        projectSettingsModalTargetId: projectId,
-      });
-      // This will be handled by ModalManager via openModalRequest
-      // emitter.emit(uiEvent.modalStateChanged, {
-      //   modalId: "projectSettingsModal",
-      //   isOpen: true,
-      //   targetId: projectId,
-      // });
-    },
-    closeProjectSettingsModal: () => {
-      set({
-        isProjectSettingsModalOpen: false,
-        projectSettingsModalTargetId: null,
-      });
-      // This will be handled by ModalManager via closeModalRequest
-      // emitter.emit(uiEvent.modalStateChanged, {
-      //   modalId: "projectSettingsModal",
-      //   isOpen: false,
-      // });
-    },
-
-    toggleVfsModal: (isOpen) => {
-      const currentOpenState = get().isVfsModalOpen;
-      const newOpenState = isOpen ?? !currentOpenState;
-
-      if (currentOpenState !== newOpenState) {
-        set({ isVfsModalOpen: newOpenState });
-        // This will be handled by ModalManager
-        // emitter.emit(uiEvent.modalStateChanged, {
-        //   modalId: "core-vfs-modal-panel",
-        //   isOpen: newOpenState,
-        // });
       }
     },
     getRegisteredActionHandlers: (): RegisteredActionHandler[] => {

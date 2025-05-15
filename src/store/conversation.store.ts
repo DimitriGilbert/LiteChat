@@ -5,7 +5,6 @@ import { immer } from "zustand/middleware/immer";
 import type { Conversation, SidebarItemType } from "@/types/litechat/chat";
 import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project";
-import { useInteractionStore } from "./interaction.store";
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
@@ -16,10 +15,8 @@ import {
 } from "@/services/sync.service";
 import { ImportExportService } from "@/services/import-export.service";
 import { SYNC_VFS_KEY } from "@/lib/litechat/constants";
-import { useVfsStore } from "./vfs.store";
 import type { fs } from "@zenfs/core";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
-import { useProjectStore } from "./project.store";
 import { emitter } from "@/lib/litechat/event-emitter";
 import {
   conversationEvent,
@@ -30,6 +27,9 @@ import type {
   RegisteredActionHandler,
   ActionHandler,
 } from "@/types/litechat/control";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+import { vfsEvent, VfsEventPayloads } from "@/types/litechat/events/vfs.events";
+import { useVfsStore } from "./vfs.store";
 
 export type SidebarItem =
   | (Conversation & { itemType: "conversation" })
@@ -46,7 +46,7 @@ interface ConversationState {
   error: string | null;
 }
 interface ConversationActions {
-  loadSidebarItems: () => Promise<void>;
+  loadConversations: () => Promise<void>;
   addConversation: (
     conversationData: Partial<Omit<Conversation, "id" | "createdAt">> & {
       title: string;
@@ -115,29 +115,94 @@ export const useConversationStore = create(
 
     _ensureSyncVfsReady: async () => {
       console.log("[ConversationStore] Ensuring Sync VFS is ready...");
-      try {
-        const fsInstance = await useVfsStore
-          .getState()
-          .initializeVFS(SYNC_VFS_KEY, { force: true });
-        console.log(
-          `[ConversationStore] Sync VFS ready for key ${SYNC_VFS_KEY}.`
-        );
-        return fsInstance;
-      } catch (error) {
-        console.error("[ConversationStore] Failed to ensure Sync VFS:", error);
-        toast.error(
-          `Filesystem error for sync: ${
-            error instanceof Error ? error.message : String(error)
-          }`
-        );
-        throw error;
-      }
+      return new Promise<typeof fs>((resolve, reject) => {
+        const timeoutDuration = 10000; // 10 seconds timeout
+        let timeoutId: NodeJS.Timeout | null = null;
+
+        const cleanupSubscriptions = () => {
+          if (timeoutId) clearTimeout(timeoutId);
+          emitter.off(vfsEvent.fsInstanceChanged, handleFsInstanceChanged);
+          emitter.off(vfsEvent.loadingStateChanged, handleLoadingStateChanged);
+        };
+
+        const handleFsInstanceChanged = (
+          payload: VfsEventPayloads[typeof vfsEvent.fsInstanceChanged]
+        ) => {
+          const vfsState = useVfsStore.getState();
+          if (
+            vfsState.configuredVfsKey === SYNC_VFS_KEY &&
+            payload.fsInstance
+          ) {
+            console.log(
+              `[ConversationStore] Sync VFS ready via fsInstanceChanged for key ${SYNC_VFS_KEY}.`
+            );
+            cleanupSubscriptions();
+            resolve(payload.fsInstance as typeof fs);
+          }
+        };
+
+        const handleLoadingStateChanged = (
+          payload: VfsEventPayloads[typeof vfsEvent.loadingStateChanged]
+        ) => {
+          const vfsState = useVfsStore.getState();
+          if (vfsState.configuredVfsKey === SYNC_VFS_KEY) {
+            if (payload.error) {
+              console.error(
+                `[ConversationStore] Sync VFS initialization error for key ${SYNC_VFS_KEY}: ${payload.error}`
+              );
+              cleanupSubscriptions();
+              reject(new Error(payload.error));
+            } else if (
+              !payload.isLoading &&
+              !payload.operationLoading &&
+              vfsState.fs
+            ) {
+              console.log(
+                `[ConversationStore] Sync VFS ready via loadingStateChanged for key ${SYNC_VFS_KEY}.`
+              );
+              cleanupSubscriptions();
+              resolve(vfsState.fs);
+            }
+          }
+        };
+
+        emitter.on(vfsEvent.fsInstanceChanged, handleFsInstanceChanged);
+        emitter.on(vfsEvent.loadingStateChanged, handleLoadingStateChanged);
+
+        timeoutId = setTimeout(() => {
+          cleanupSubscriptions();
+          const errorMsg = `Timeout waiting for Sync VFS (${SYNC_VFS_KEY}) to become ready.`;
+          console.error(`[ConversationStore] ${errorMsg}`);
+          reject(new Error(errorMsg));
+        }, timeoutDuration);
+
+        // Check current state first
+        const currentVfsState = useVfsStore.getState();
+        if (
+          currentVfsState.configuredVfsKey === SYNC_VFS_KEY &&
+          currentVfsState.fs &&
+          !currentVfsState.loading &&
+          !currentVfsState.operationLoading &&
+          !currentVfsState.error
+        ) {
+          console.log(
+            `[ConversationStore] Sync VFS already ready for key ${SYNC_VFS_KEY}.`
+          );
+          cleanupSubscriptions();
+          resolve(currentVfsState.fs);
+          return;
+        }
+
+        emitter.emit(vfsEvent.initializeVFSRequest, {
+          vfsKey: SYNC_VFS_KEY,
+          options: { force: true },
+        });
+      });
     },
 
-    loadSidebarItems: async () => {
+    loadConversations: async () => {
       set({ isLoading: true, error: null });
       try {
-        await useProjectStore.getState().loadProjects();
         const [dbConvos, dbSyncRepos] = await Promise.all([
           PersistenceService.loadConversations(),
           PersistenceService.loadSyncRepos(),
@@ -170,19 +235,18 @@ export const useConversationStore = create(
           repoInitializationStatus: {},
           isLoading: false,
         });
-        emitter.emit(conversationEvent.sidebarItemsLoaded, {
+        emitter.emit(conversationEvent.conversationsLoaded, {
           conversations: dbConvos,
-          projects: useProjectStore.getState().projects,
         });
         emitter.emit(conversationEvent.syncReposLoaded, {
           repos: dbSyncRepos,
         });
       } catch (e) {
-        console.error("ConversationStore: Error loading sidebar items", e);
-        set({ error: "Failed load sidebar items", isLoading: false });
+        console.error("ConversationStore: Error loading conversations", e);
+        set({ error: "Failed load conversations", isLoading: false });
         emitter.emit(conversationEvent.loadingStateChanged, {
           isLoading: false,
-          error: "Failed load sidebar items",
+          error: "Failed load conversations",
         });
       }
     },
@@ -383,7 +447,9 @@ export const useConversationStore = create(
           currentSelectedId === id &&
           currentSelectedType === "conversation"
         ) {
-          await useInteractionStore.getState().setCurrentConversationId(null);
+          emitter.emit(interactionEvent.setCurrentConversationIdRequest, {
+            id: null,
+          });
           emitter.emit(conversationEvent.selectedItemChanged, {
             itemId: null,
             itemType: null,
@@ -443,11 +509,11 @@ export const useConversationStore = create(
         type === "conversation" ? id : null;
 
       console.log(
-        `ConversationStore: Calling InteractionStore.setCurrentConversationId with: ${conversationIdForInteractionStore}`
+        `ConversationStore: Emitting setCurrentConversationIdRequest with: ${conversationIdForInteractionStore}`
       );
-      await useInteractionStore
-        .getState()
-        .setCurrentConversationId(conversationIdForInteractionStore);
+      emitter.emit(interactionEvent.setCurrentConversationIdRequest, {
+        id: conversationIdForInteractionStore,
+      });
 
       emitter.emit(conversationEvent.selectedItemChanged, {
         itemId: id,
@@ -815,8 +881,8 @@ export const useConversationStore = create(
 
       return [
         {
-          eventName: conversationEvent.loadSidebarItemsRequest,
-          handler: actions.loadSidebarItems,
+          eventName: conversationEvent.loadConversationsRequest,
+          handler: actions.loadConversations,
           storeId,
         },
         {

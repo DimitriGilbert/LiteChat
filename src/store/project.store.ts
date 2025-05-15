@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import { normalizePath } from "@/lib/litechat/file-manager-utils";
 import { useSettingsStore } from "./settings.store";
 import { useProviderStore } from "./provider.store";
-import { useConversationStore } from "./conversation.store";
 import { emitter } from "@/lib/litechat/event-emitter";
 import {
   projectEvent,
@@ -19,6 +18,7 @@ import type {
   RegisteredActionHandler,
   ActionHandler,
 } from "@/types/litechat/control";
+import { conversationEvent } from "@/types/litechat/events/conversation.events";
 
 interface ProjectState {
   projects: Project[];
@@ -187,15 +187,15 @@ export const useProjectStore = create(
       findDescendants(id);
 
       try {
-        await PersistenceService.deleteProject(id);
+        await PersistenceService.deleteProject(id); // This handles recursive DB deletion
         set((state) => ({
           projects: state.projects.filter(
             (p) => !projectsToDeleteIds.has(p.id)
           ),
         }));
-        useConversationStore
-          .getState()
-          ._unlinkConversationsFromProjects(Array.from(projectsToDeleteIds));
+        // Emit an event to notify ConversationStore to unlink conversations
+        // This is a temporary solution. Ideally, ConversationStore would listen to project.deleted.
+        emitter.emit(conversationEvent.loadConversationsRequest, undefined);
         emitter.emit(projectEvent.deleted, { projectId: id });
         toast.success(
           `Project "${projectToDelete.name}" and its contents deleted.`

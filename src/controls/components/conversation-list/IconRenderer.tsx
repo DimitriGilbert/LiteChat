@@ -1,19 +1,10 @@
-// src/controls/components/conversation-list/IconRenderer.tsx
+// src/components/LiteChat/chat/control/ConversationListIconRenderer.tsx
 // FULL FILE
-import React, { useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import { PlusIcon, FolderPlusIcon } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import React from "react";
+import { MessageSquareTextIcon, FolderIcon, Loader2 } from "lucide-react";
 import { useConversationStore } from "@/store/conversation.store";
-import { useProjectStore } from "@/store/project.store";
 import { useShallow } from "zustand/react/shallow";
-import type { ConversationListControlModule } from "@/controls/modules/ConversationListControlModule"; // Import module type
-import { toast } from "sonner";
+import type { ConversationListControlModule } from "@/controls/modules/ConversationListControlModule";
 
 interface ConversationListIconRendererProps {
   module: ConversationListControlModule;
@@ -22,106 +13,25 @@ interface ConversationListIconRendererProps {
 export const ConversationListIconRenderer: React.FC<
   ConversationListIconRendererProps
 > = ({ module }) => {
-  const { addConversation, selectItem, selectedItemId, selectedItemType } =
-    useConversationStore(
-      useShallow((state) => ({
-        addConversation: state.addConversation,
-        selectItem: state.selectItem,
-        selectedItemId: state.selectedItemId,
-        selectedItemType: state.selectedItemType,
-        getConversationById: state.getConversationById,
-      }))
-    );
-  const { addProject } = useProjectStore(
+  const { selectedItemType } = useConversationStore(
     useShallow((state) => ({
-      addProject: state.addProject,
+      // selectedItemId: state.selectedItemId,
+      selectedItemType: state.selectedItemType,
     }))
   );
+  const isLoading = module.isLoading;
 
-  const getParentProjectId = useCallback(() => {
-    if (selectedItemType === "project") {
-      return selectedItemId;
-    } else if (selectedItemType === "conversation" && selectedItemId) {
-      const convo = useConversationStore
-        .getState()
-        .getConversationById(selectedItemId);
-      return convo?.projectId ?? null;
-    }
-    return null;
-  }, [selectedItemId, selectedItemType]);
+  if (isLoading) {
+    return <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />;
+  }
 
-  const handleNewChat = async () => {
-    module.setIsLoading(true);
-    try {
-      const parentProjectId = getParentProjectId();
-      const newId = await addConversation({
-        title: "New Chat",
-        projectId: parentProjectId,
-      });
-      selectItem(newId, "conversation");
-    } catch (error) {
-      console.error("Failed to create new chat:", error);
-      toast.error("Failed to create new chat.");
-    } finally {
-      module.setIsLoading(false);
-    }
-  };
+  if (selectedItemType === "project") {
+    return <FolderIcon className="h-5 w-5 text-primary" />;
+  }
+  if (selectedItemType === "conversation") {
+    return <MessageSquareTextIcon className="h-5 w-5 text-primary" />;
+  }
 
-  const handleNewProject = async () => {
-    module.setIsLoading(true);
-    try {
-      const parentProjectId = getParentProjectId();
-      const newId = await addProject({
-        name: "New Project",
-        parentId: parentProjectId,
-      });
-      selectItem(newId, "project");
-      // Note: Starting edit mode from here is complex due to module separation.
-      // The main list component handles starting edit for new projects.
-    } catch (error) {
-      console.error("Failed to create new project:", error);
-      toast.error("Failed to create new project.");
-    } finally {
-      module.setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <TooltipProvider delayDuration={100}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleNewProject}
-              className="h-8 w-8"
-              aria-label="New Project"
-              disabled={module.isLoading}
-            >
-              <FolderPlusIcon className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="right">New Project</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-      <TooltipProvider delayDuration={100}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleNewChat}
-              className="h-8 w-8"
-              aria-label="New Chat"
-              disabled={module.isLoading}
-            >
-              <PlusIcon className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="right">New Chat</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </div>
-  );
+  // Default icon if nothing is selected or if it's an unknown type
+  return <MessageSquareTextIcon className="h-5 w-5 text-muted-foreground" />;
 };
