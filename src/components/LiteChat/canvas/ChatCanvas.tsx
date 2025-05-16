@@ -8,7 +8,6 @@ import React, {
   useCallback,
 } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
-import { InteractionCard } from "./InteractionCard";
 import { StreamingInteractionCard } from "./StreamingInteractionCard";
 import { ResponseTabsContainer } from "./ResponseTabsContainer";
 import { UserPromptDisplay } from "./UserPromptDisplay";
@@ -298,9 +297,9 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
       } else if (activeInteraction.type === "message.assistant_regen" && activeInteraction.metadata?.regeneratedFromId) {
         // Find the original user_assistant interaction that this regen chain started from.
         // This original interaction should be a child of the current activeInteraction or one of its ancestors in the regen chain.
-        let originalInteractionForPrompt: Interaction | undefined = interactions.find(
-          i => i.id === activeInteraction.metadata?.regeneratedFromId
-        );
+        // let originalInteractionForPrompt: Interaction | undefined = interactions.find(
+        //   i => i.id === activeInteraction.metadata?.regeneratedFromId
+        // );
         // Walk up the chain if `regeneratedFromId` points to another regen.
         // The true original `message.user_assistant` will be the one whose `regeneratedFromId` is the prompt provider.
         // This logic might be complex if the direct `regeneratedFromId` isn't the one with the prompt.

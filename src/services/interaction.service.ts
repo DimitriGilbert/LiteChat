@@ -42,7 +42,7 @@ import {
 import type { fs } from "@zenfs/core";
 import { conversationEvent } from "@/types/litechat/events/conversation.events";
 import { vfsEvent } from "@/types/litechat/events/vfs.events";
-import { canvasEvent, type CanvasEvents /*, type CanvasEventPayloads */ } from "@/types/litechat/events/canvas.events";
+import { canvasEvent,} from "@/types/litechat/events/canvas.events";
 import { ConversationService } from "@/services/conversation.service";
 
 interface AIServiceCallOptions {
@@ -382,7 +382,19 @@ export const InteractionService = {
                       .getState()
                       .getConversationById(currentConvId)
                   : null;
-                const targetVfsKey = conversation?.projectId ?? "orphan";
+
+                let targetVfsKey: string;
+                if (conversation && conversation.projectId) {
+                  if (typeof conversation.projectId === 'string') {
+                    targetVfsKey = conversation.projectId;
+                  } else {
+                    console.warn(`[InteractionService] conversation.projectId for conversation ${currentConvId} is not a string (type: ${typeof conversation.projectId}). Defaulting VFS key to "orphan". Value:`, conversation.projectId);
+                    targetVfsKey = "orphan";
+                  }
+                } else {
+                  targetVfsKey = "orphan";
+                }
+                
                 let fsInstance: typeof fs | undefined | null;
                 try {
                   emitter.emit(vfsEvent.initializeVFSRequest, {

@@ -238,10 +238,6 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       InteractionService.abortInteraction(interactionId);
     };
 
-    const canFoldResponse =
-      (displayedContent && displayedContent.trim().length > 0) ||
-      (reasoningContent && reasoningContent.trim().length > 0);
-
     const headerActionsSlot = renderSlot?.(
       "header-actions",
       interaction,

@@ -22,7 +22,7 @@ import type { CanvasControl, CanvasControlRenderContext } from "@/types/litechat
 
 const StaticContentView: React.FC<{ markdownContent: string | null, interactionId: string }> = ({
   markdownContent,
-  interactionId
+  // interactionId
 }) => {
   const parsedContent = useMarkdownParser(markdownContent);
 

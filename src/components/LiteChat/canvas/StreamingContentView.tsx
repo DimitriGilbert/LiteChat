@@ -1,6 +1,6 @@
 // src/components/LiteChat/canvas/StreamingContentView.tsx
 // FULL FILE
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, {useMemo, useCallback } from "react";
 import {
   useMarkdownParser,
   CodeBlockData,
@@ -29,6 +29,7 @@ const renderBlock = (
   index: number,
   useFullCodeBlock: boolean,
   isStreamingBlock: boolean,
+  // @ts-expect-error unused, do not feel like fixing type for now
   interactionId: string
 ): React.ReactNode | null => {
   if (typeof item === "string") {
