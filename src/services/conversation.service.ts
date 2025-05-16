@@ -25,6 +25,8 @@ import { nanoid } from "nanoid";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { vfsEvent, VfsEventPayloads } from "@/types/litechat/events/vfs.events";
+import { PersistenceService } from "@/services/persistence.service";
+import type { Interaction } from "@/types/litechat/interaction";
 
 export const ConversationService = {
   async submitPrompt(turnData: PromptTurnObject): Promise<void> {
@@ -60,12 +62,37 @@ export const ConversationService = {
       turnData.metadata?.autoTitleEnabledForTurn === true &&
       settingsStoreState.autoTitleModelId;
 
-    const currentHistory = interactionStoreState.interactions;
-    const completedHistory = currentHistory.filter(
-      (i) => i.status === "COMPLETED" && i.type === "message.user_assistant"
-    );
+    // Correctly build history for the AI
+    const activeInteractionsOnSpine = interactionStoreState.interactions
+      .filter(i => i.parentId === null && i.status === "COMPLETED")
+      .sort((a, b) => a.index - b.index);
+
+    const turnsForHistoryBuilder: Interaction[] = activeInteractionsOnSpine.map(activeInteraction => {
+      if (activeInteraction.type === "message.assistant_regen" && activeInteraction.metadata?.regeneratedFromId) {
+        const originalInteraction = interactionStoreState.interactions.find(
+          orig => orig.id === activeInteraction.metadata!.regeneratedFromId
+        );
+        // Ensure the original interaction was a user_assistant type and had a prompt.
+        if (originalInteraction && originalInteraction.prompt && originalInteraction.type === "message.user_assistant") {
+          // Create a synthetic interaction for history: original prompt + regen's response & active status
+          return {
+            ...activeInteraction, // Includes regen's ID, response, status, parentId (null), index, etc.
+            prompt: originalInteraction.prompt, // Crucially, take the prompt from the original
+            type: "message.user_assistant", // Present it as a standard turn for buildHistoryMessages
+          } as Interaction;
+        }
+      }
+      // If it's already a user_assistant type with a prompt, or a regen whose original prompt couldn't be mapped cleanly,
+      // return it as is, but ensure it has a prompt if it's user_assistant type.
+      if (activeInteraction.type === "message.user_assistant" && activeInteraction.prompt) {
+        return activeInteraction;
+      }
+      // Return null for types that don't fit the user_assistant structure for buildHistoryMessages or are incomplete
+      return null;
+    }).filter(Boolean) as Interaction[]; // Filter out any nulls
+
     const historyMessages: CoreMessage[] =
-      buildHistoryMessages(completedHistory);
+      buildHistoryMessages(turnsForHistoryBuilder);
 
     let userContent = turnData.content;
     const userMessageContentParts: (TextPart | ImagePart)[] = [];
@@ -310,22 +337,25 @@ ${userContent}`;
 
   async regenerateInteraction(interactionId: string): Promise<void> {
     console.log(
-      "[ConversationService] regenerateInteraction called",
-      interactionId
+      `[ConversationService] regenerateInteraction called for ID: ${interactionId}`
     );
-    const interactionStoreState = useInteractionStore.getState();
+    const interactionStore = useInteractionStore.getState();
     const projectStoreState = useProjectStore.getState();
     const promptState = usePromptStateStore.getState();
     const conversationStoreState = useConversationStore.getState();
 
-    const targetInteraction = interactionStoreState.interactions.find(
+    const targetInteraction = interactionStore.interactions.find(
       (i) => i.id === interactionId
     );
+    console.log("[ConversationService] Target interaction for regen:", JSON.parse(JSON.stringify(targetInteraction)));
 
     if (!targetInteraction || !targetInteraction.prompt) {
       toast.error("Cannot regenerate: Original interaction data missing.");
       return;
     }
+
+    const newInteractionParentId = null;
+    const newInteractionIndex = targetInteraction.index;
 
     const originalTurnData = targetInteraction.prompt;
     const conversationId = targetInteraction.conversationId;
@@ -336,13 +366,14 @@ ${userContent}`;
       projectStoreState.getEffectiveProjectSettings(currentProjectId);
 
     const historyUpToIndex = targetInteraction.index;
-    const historyInteractions = interactionStoreState.interactions
+    const historyInteractions = interactionStore.interactions
       .filter(
         (i) =>
           i.conversationId === conversationId &&
           i.index < historyUpToIndex &&
           i.status === "COMPLETED" &&
-          i.type === "message.user_assistant"
+          i.type === "message.user_assistant" &&
+          i.parentId === null
       )
       .sort((a, b) => a.index - b.index);
     const historyMessages: CoreMessage[] =
@@ -458,20 +489,83 @@ ${userContent}`;
       },
     };
 
+    let newGeneratedInteraction: Interaction | null = null;
     try {
-      await InteractionService.startInteraction(
+      newGeneratedInteraction = await InteractionService.startInteraction(
         promptObject,
         conversationId,
         originalTurnData,
         "message.assistant_regen"
       );
+
+      if (!newGeneratedInteraction) {
+        throw new Error("Failed to create new interaction for regeneration.");
+      }
+
+      const updatesForNewInteraction: Partial<Omit<Interaction, "id">> = {};
+      let newInteractionWasModified = false;
+
+      if (newGeneratedInteraction.index !== newInteractionIndex) {
+        updatesForNewInteraction.index = newInteractionIndex;
+        newInteractionWasModified = true;
+      }
+      if (newGeneratedInteraction.parentId !== newInteractionParentId) {
+        updatesForNewInteraction.parentId = newInteractionParentId;
+        newInteractionWasModified = true;
+      }
+
+      let finalNewInteractionState = newGeneratedInteraction;
+      if (newInteractionWasModified) {
+        interactionStore._updateInteractionInState(newGeneratedInteraction.id, updatesForNewInteraction);
+        finalNewInteractionState = {
+            ...newGeneratedInteraction, 
+            ...updatesForNewInteraction
+        } as Interaction;
+        await PersistenceService.saveInteraction(finalNewInteractionState);
+      }
+      console.log("[ConversationService] New active interaction state after potential updates:", JSON.parse(JSON.stringify(finalNewInteractionState)));
+      
+      const versionsToUpdate: Interaction[] = [];
+      let currentInteractionInChain: Interaction | undefined | null = targetInteraction;
+
+      while (currentInteractionInChain) {
+        versionsToUpdate.push(currentInteractionInChain);
+        const regeneratedFromId: string | undefined = currentInteractionInChain.metadata?.regeneratedFromId;
+        if (regeneratedFromId) {
+          currentInteractionInChain = interactionStore.interactions.find(i => i.id === regeneratedFromId);
+        } else {
+          currentInteractionInChain = null;
+        }
+      }
+
+      const chronologicalVersionsToUpdate = versionsToUpdate.sort((a, b) => {
+        const timeA = a.startedAt?.getTime() ?? 0;
+        const timeB = b.startedAt?.getTime() ?? 0;
+        return timeA - timeB;
+      });
+
+      for (let i = 0; i < chronologicalVersionsToUpdate.length; i++) {
+        const interactionToUpdate = chronologicalVersionsToUpdate[i];
+        const updatesForOldVersion: Partial<Omit<Interaction, "id">> = {
+          parentId: finalNewInteractionState.id,
+          index: i, 
+        };
+        console.log(`[ConversationService] Updating old version ${interactionToUpdate.id} to be child of ${finalNewInteractionState.id} with childIndex ${i}`, JSON.parse(JSON.stringify(updatesForOldVersion)));
+
+        interactionStore._updateInteractionInState(interactionToUpdate.id, updatesForOldVersion);
+        await PersistenceService.saveInteraction({
+          ...interactionToUpdate,
+          ...updatesForOldVersion,
+        } as Interaction);
+      }
+
     } catch (error) {
       console.error(
-        "[ConversationService] Error starting regeneration interaction:",
+        "[ConversationService] Error during regeneration process:",
         error
       );
       toast.error(
-        `Failed to start regeneration: ${
+        `Failed to regenerate response: ${
           error instanceof Error ? error.message : String(error)
         }`
       );

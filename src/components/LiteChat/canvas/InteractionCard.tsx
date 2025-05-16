@@ -16,19 +16,21 @@ import { splitModelId } from "@/lib/litechat/provider-helpers";
 import { useShallow } from "zustand/react/shallow";
 import { CardHeader } from "@/components/LiteChat/canvas/interaction/CardHeader";
 import { AssistantResponse } from "@/components/LiteChat/canvas/interaction/AssistantResponse";
-import type { CanvasControl } from "@/types/litechat/canvas/control";
+import type { CanvasControl, CanvasControlRenderContext } from "@/types/litechat/canvas/control";
 
 interface InteractionCardProps {
   interaction: Interaction;
   className?: string;
   renderSlot?: (
     targetSlotName: CanvasControl["targetSlot"],
-    contextInteraction: Interaction
+    contextInteraction: Interaction,
+    overrideContext?: Partial<CanvasControlRenderContext>
   ) => React.ReactNode[];
+  showPrompt?: boolean;
 }
 
 export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
-  ({ interaction, className, renderSlot }) => {
+  ({ interaction, className, renderSlot, showPrompt = true }) => {
     const [isResponseFolded, setIsResponseFolded] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
 
@@ -103,13 +105,18 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
 
     const headerActionsSlot = renderSlot?.(
       "header-actions",
-      interaction
+      interaction,
+      {
+        isFolded: isResponseFolded,
+        toggleFold: toggleResponseFold,
+      }
     );
     const footerActionsSlot = renderSlot?.(
       "actions",
       interaction
     );
     const contentSlot = renderSlot?.("content", interaction);
+    const menuSlot = renderSlot?.("menu", interaction);
 
     return (
       <div
@@ -121,7 +128,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
           className
         )}
       >
-        {interaction.prompt && (
+        {showPrompt && interaction.prompt && (
           <UserPromptDisplay
             turnData={interaction.prompt}
             timestamp={interaction.startedAt}
@@ -129,8 +136,11 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
           />
         )}
 
-        <div className="mt-3 pt-3 border-t border-border/50 relative group/assistant">
-          {renderSlot?.("menu", interaction)}
+        <div className={cn(
+          "relative group/assistant",
+          showPrompt && interaction.prompt ? "mt-3 pt-3 border-t border-border/50" : ""
+        )}>
+          {menuSlot}
 
           <CardHeader
             displayModelName={displayModelName}

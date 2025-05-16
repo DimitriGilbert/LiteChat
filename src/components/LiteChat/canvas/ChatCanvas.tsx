@@ -10,6 +10,8 @@ import React, {
 import type { Interaction } from "@/types/litechat/interaction";
 import { InteractionCard } from "./InteractionCard";
 import { StreamingInteractionCard } from "./StreamingInteractionCard";
+import { ResponseTabsContainer } from "./ResponseTabsContainer";
+import { UserPromptDisplay } from "./UserPromptDisplay";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -34,6 +36,7 @@ import type {
   CanvasControl,
   CanvasControlRenderContext,
 } from "@/types/litechat/canvas/control";
+import type { PromptTurnObject } from "@/types/litechat/prompt";
 
 const ChatCanvasHiddenInteractions = ["conversation.title_generation"];
 
@@ -111,19 +114,23 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
   ]);
 
   const interactionGroups = useMemo(() => {
-    const groups: Interaction[][] = [];
-    const processedIds = new Set<string>();
-    const sortedInteractions = [...interactions].sort(
-      (a, b) => a.index - b.index
-    );
-    sortedInteractions.forEach((interaction) => {
-      if (processedIds.has(interaction.id)) return;
-      if (!ChatCanvasHiddenInteractions.includes(interaction.type)) {
-        const group = [interaction];
-        processedIds.add(interaction.id);
-        groups.push(group);
-      }
+    // Filter for active interactions (no parentId) and sort them by their index.
+    const activeInteractions = interactions
+      .filter((interaction) => interaction.parentId === null && 
+                             !ChatCanvasHiddenInteractions.includes(interaction.type))
+      .sort((a, b) => a.index - b.index);
+
+    const groups: Interaction[][] = activeInteractions.map((activeInteraction) => {
+      // Find all historical versions for this active interaction.
+      const historicalVersions = interactions
+        .filter((histInteraction) => histInteraction.parentId === activeInteraction.id &&
+                                   !ChatCanvasHiddenInteractions.includes(histInteraction.type) // Also filter hidden types here
+        )
+        .sort((a, b) => a.index - b.index); // Children are sorted by their own index (0, 1, 2...)
+      
+      return [activeInteraction, ...historicalVersions];
     });
+
     return groups;
   }, [interactions]);
 
@@ -135,7 +142,8 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
     (
       targetType: CanvasControl["type"],
       targetSlotName: CanvasControl["targetSlot"],
-      contextInteraction?: Interaction
+      contextInteraction?: Interaction,
+      overrideContext?: Partial<CanvasControlRenderContext>
     ): React.ReactNode[] => {
       // console.log(
       //   `[ChatCanvas] renderSlotForCanvas attempting to render: type='${targetType}', slot='${targetSlotName}'`
@@ -152,9 +160,6 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
         const typeMatch = c.type === targetType;
         const slotMatch = c.targetSlot === targetSlotName;
         const rendererExists = !!c.renderer;
-        // if (c.id.includes("copy") || c.id.includes("regenerate") || c.id.includes("rating")) {
-        //     console.log(`[ChatCanvas] Filtering control '${c.id}': typeMatch=${typeMatch} (expected ${targetType}), slotMatch=${slotMatch} (expected ${targetSlotName}), rendererExists=${rendererExists}`);
-        // }
         return typeMatch && slotMatch && rendererExists;
       });
 
@@ -167,24 +172,26 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
       return filteredControls
         .map((control) => {
           if (control.renderer) {
-            const context: CanvasControlRenderContext = {
+            const baseContext: CanvasControlRenderContext = {
               interaction: contextInteraction,
               interactionId: contextInteraction?.id,
               responseContent:
                 typeof contextInteraction?.response === "string"
                   ? contextInteraction.response
                   : undefined,
-              canvasContextType: targetType, 
+              canvasContextType: targetType,
             };
+            const finalContext = { ...baseContext, ...overrideContext };
+            
             return (
               <React.Fragment key={control.id}>
-                {control.renderer(context)}
+                {control.renderer(finalContext)}
               </React.Fragment>
             );
           }
           return null;
         })
-        .filter(Boolean);
+        .filter(Boolean) as React.ReactNode[];
     },
     [canvasControls]
   );
@@ -261,43 +268,149 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
   }, []);
 
   const renderedInteractionCards = useMemo(() => {
-    return interactionGroups.map((group) => {
-      const interaction = group[0];
-      const isStreamingInteraction = streamingInteractionIds.includes(
-        interaction.id
-      );
+    // console.log("[ChatCanvas] Full interactions array received by renderedInteractionCards:", JSON.parse(JSON.stringify(interactions))); // Log full interactions array
+    const elements: React.ReactNode[] = [];
 
-      if (isStreamingInteraction) {
-        return (
-          <StreamingInteractionCard
-            key={`${interaction.id}-streaming`}
-            interactionId={interaction.id}
-            renderSlot={(slotName) =>
-              renderSlotForCanvas(
-                "interaction",
-                slotName as CanvasControl["targetSlot"],
-                interaction
-              )
+    const allSortedInteractions = [...interactions].sort((a, b) => {
+      if (a.index !== b.index) return a.index - b.index; // Main conversation flow index
+      if (a.parentId === null && b.parentId !== null) return -1; // Active (null parentId) comes before children
+      if (a.parentId !== null && b.parentId === null) return 1;  // Children after active
+      if (a.parentId !== null && b.parentId !== null && a.parentId === b.parentId) {
+        return a.index - b.index; // Sort children by their own index under the same parent
+      }
+      // Fallback sort by time if structure is unusual, or for items at same main index but different parents (should not happen for display groups)
+      return (a.startedAt?.getTime() ?? 0) - (b.startedAt?.getTime() ?? 0);
+    });
+
+    // Identify active interactions on the main conversation spine
+    const activeInteractionsOnSpine = allSortedInteractions.filter(
+      i => i.parentId === null && !ChatCanvasHiddenInteractions.includes(i.type)
+    );
+    // console.log("[ChatCanvas] Active interactions on spine:", JSON.parse(JSON.stringify(activeInteractionsOnSpine))); // Log active spine interactions
+
+    activeInteractionsOnSpine.forEach(activeInteraction => {
+      // console.log("[ChatCanvas] Processing activeInteraction:", JSON.parse(JSON.stringify(activeInteraction))); // Log current active interaction being processed
+      let userPromptToDisplay: PromptTurnObject | null = null;
+      
+      // Determine the user prompt associated with this active interaction (turn)
+      if (activeInteraction.type === "message.user_assistant" && activeInteraction.prompt) {
+        userPromptToDisplay = activeInteraction.prompt;
+      } else if (activeInteraction.type === "message.assistant_regen" && activeInteraction.metadata?.regeneratedFromId) {
+        // Find the original user_assistant interaction that this regen chain started from.
+        // This original interaction should be a child of the current activeInteraction or one of its ancestors in the regen chain.
+        let originalInteractionForPrompt: Interaction | undefined = interactions.find(
+          i => i.id === activeInteraction.metadata?.regeneratedFromId
+        );
+        // Walk up the chain if `regeneratedFromId` points to another regen.
+        // The true original `message.user_assistant` will be the one whose `regeneratedFromId` is the prompt provider.
+        // This logic might be complex if the direct `regeneratedFromId` isn't the one with the prompt.
+        // A simpler way: the interaction that was regenerated *into* this activeInteraction should hold the original prompt
+        // or be part of the chain that leads to it.
+
+        // The `ConversationService.regenerateInteraction` ensures that the `activeInteraction` (a regen)
+        // has its `regeneratedFromId` pointing to the interaction it replaced.
+        // That replaced interaction (now a child) should be type `message.user_assistant` or another `message.assistant_regen`.
+        // We need to find the ultimate `message.user_assistant` at the root of this particular regeneration branch.
+        
+        let promptProviderInteraction: Interaction | undefined = undefined;
+        let currentForPromptLookup: Interaction | undefined = activeInteraction;
+        const visitedInLookup = new Set<string>(); // Prevent infinite loops
+
+        while(currentForPromptLookup && !visitedInLookup.has(currentForPromptLookup.id)) {
+            visitedInLookup.add(currentForPromptLookup.id);
+            if (currentForPromptLookup.type === "message.user_assistant" && currentForPromptLookup.prompt) {
+                promptProviderInteraction = currentForPromptLookup;
+                break;
             }
+            if (currentForPromptLookup.metadata?.regeneratedFromId) {
+                currentForPromptLookup = interactions.find(i => i.id === currentForPromptLookup!.metadata!.regeneratedFromId);
+            } else {
+                // If it's a regen but has no regeneratedFromId, or we hit a dead end.
+                break;
+            }
+        }
+
+        if (promptProviderInteraction) {
+            userPromptToDisplay = promptProviderInteraction.prompt;
+        } else {
+             // Fallback: If this activeInteraction itself has a prompt (e.g. if a user_assistant was directly made parentId:null)
+            if (activeInteraction.prompt) { 
+                userPromptToDisplay = activeInteraction.prompt;
+            } else {
+                console.warn(`[ChatCanvas] Could not reliably find user prompt for active interaction ${activeInteraction.id} of type ${activeInteraction.type}. Displaying turn without prompt.`);
+            }
+        }
+      }
+
+      // Only render the turn if we have a user prompt to show
+      if (userPromptToDisplay) {
+        elements.push(
+          <UserPromptDisplay
+            key={`prompt-${activeInteraction.id}`} // Keyed with activeInteraction's ID
+            turnData={userPromptToDisplay}
+            timestamp={activeInteraction.startedAt} // Timestamp from active interaction (latest in turn)
+            isAssistantComplete={activeInteraction.status === "COMPLETED" || activeInteraction.status === "ERROR"}
           />
         );
-      } else {
-        return (
-          <InteractionCard
-            key={interaction.id}
-            interaction={interaction}
-            renderSlot={(slotName) =>
+      } else if (activeInteraction.type !== "message.user_assistant" && activeInteraction.type !== "message.assistant_regen") {
+        // If it's some other type of active interaction on the spine that doesn't have a typical prompt/response structure, 
+        // it might need its own renderer or be skipped. For now, we skip if no prompt found for assistant types.
+        // This case should be rare for visible chat messages.
+        console.log("[ChatCanvas] Skipping active interaction on spine due to no user prompt and non-standard type:", activeInteraction.id, activeInteraction.type);
+        return; // Skip this iteration of forEach
+      }
+
+      // Historical versions are direct children of the current activeInteraction on the spine
+      const historicalVersions = interactions 
+        .filter(hist => hist.parentId === activeInteraction.id && 
+                       !ChatCanvasHiddenInteractions.includes(hist.type))
+        .sort((a, b) => a.index - b.index); 
+      // console.log(`[ChatCanvas] Historical versions found for activeInteraction ${activeInteraction.id}:`, JSON.parse(JSON.stringify(historicalVersions))); // Log historical versions found
+
+      const interactionGroupForTabs = [activeInteraction, ...historicalVersions];
+      
+      // Only render ResponseTabsContainer if there's an assistant part to show (the activeInteraction itself)
+      // or if there are historical versions implying an assistant part existed.
+      if (interactionGroupForTabs.length > 0) { // The activeInteraction is always present if we reach here for assistant types
+         elements.push(
+          <ResponseTabsContainer
+            key={`tabs-${activeInteraction.id}`} // CRUCIAL: Keyed by the ID of the *active* interaction for this turn
+            interactionGroup={interactionGroupForTabs}
+            renderSlot={(slotName, contextInteraction, overrideContext) =>
               renderSlotForCanvas(
-                "interaction",
-                slotName as CanvasControl["targetSlot"],
-                interaction
+                "interaction", 
+                slotName,
+                contextInteraction,
+                overrideContext
               )
             }
+            activeStreamingInteractionId={streamingInteractionIds.find(id => interactionGroupForTabs.some(v => v.id === id))}
           />
         );
       }
     });
-  }, [interactionGroups, streamingInteractionIds, renderSlotForCanvas]);
+
+    return elements;
+  }, [interactions, renderSlotForCanvas, streamingInteractionIds]);
+
+  const newStreamingInteractionCards = useMemo(() => {
+    return streamingInteractionIds
+      .filter((id) => !interactions.some((i) => i.id === id))
+      .map((id) => (
+        <StreamingInteractionCard
+          key={`${id}-streaming-new`}
+          interactionId={id}
+          renderSlot={(slotName, intFromChild, overrideCtx) =>
+            renderSlotForCanvas(
+              "interaction",
+              slotName as CanvasControl["targetSlot"],
+              intFromChild,
+              overrideCtx
+            )
+          }
+        />
+      ));
+  }, [streamingInteractionIds, interactions, renderSlotForCanvas]);
 
   const renderContent = () => {
     if (isProviderLoading || isConversationLoading || isProjectLoading) {
@@ -329,21 +442,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
     return (
       <div className="space-y-4 p-2 md:p-4 break-words">
         {renderedInteractionCards}
-        {status === "streaming" &&
-          streamingInteractionIds
-            .filter((id) => !interactions.some((i) => i.id === id))
-            .map((id) => (
-              <StreamingInteractionCard
-                key={`${id}-streaming-new`}
-                interactionId={id}
-                renderSlot={(slotName) =>
-                  renderSlotForCanvas(
-                    "interaction",
-                    slotName as CanvasControl["targetSlot"]
-                  )
-                }
-              />
-            ))}
+        {newStreamingInteractionCards}
       </div>
     );
   };

@@ -75,6 +75,7 @@ export const InteractionService = {
   _streamingToolData: new Map<string, { calls: string[]; results: string[] }>(),
   _firstChunkTimestamps: new Map<string, number>(),
   _interactionStartTimes: new Map<string, number>(),
+  _pendingRegenerations: new Set<string>(),
 
   initializeCanvasEventHandlers(): void {
     emitter.on(
@@ -114,6 +115,13 @@ export const InteractionService = {
       canvasEvent.regenerateInteractionRequest,
       async (payload) => {
         const { interactionId } = payload;
+        console.log(`[InteractionService] Received regenerateInteractionRequest for ${interactionId}`);
+
+        if (this._pendingRegenerations.has(interactionId)) {
+          console.warn(`[InteractionService] Regeneration already pending for ${interactionId}. Ignoring request.`);
+          return;
+        }
+
         const interaction = useInteractionStore
           .getState()
           .interactions.find((i) => i.id === interactionId);
@@ -154,7 +162,10 @@ export const InteractionService = {
         }
 
         try {
+          this._pendingRegenerations.add(interactionId);
+          console.log(`[InteractionService] Starting ConversationService.regenerateInteraction for ${interactionId}`);
           await ConversationService.regenerateInteraction(interactionId);
+          console.log(`[InteractionService] Finished ConversationService.regenerateInteraction for ${interactionId}`);
           // Feedback for starting regeneration might be good, or handled by UI changes
         } catch (error) {
           toast.error(`Failed to regenerate response: ${String(error)}`);
@@ -162,6 +173,8 @@ export const InteractionService = {
             `[InteractionService] Error regenerating interaction ${interactionId}:`,
             error
           );
+        } finally {
+          this._pendingRegenerations.delete(interactionId);
         }
       }
     );
@@ -199,7 +212,7 @@ export const InteractionService = {
     conversationId: string,
     initiatingTurnData: PromptTurnObject,
     interactionType: InteractionType = "message.user_assistant"
-  ): Promise<string | null> {
+  ): Promise<Interaction | null> {
     console.log(
       `[InteractionService] startInteraction called (Type: ${interactionType})`,
       prompt,
@@ -241,12 +254,10 @@ export const InteractionService = {
             (max, i) => Math.max(max, i.index),
             -1
           ) + 1;
-    const parentId =
-      interactionType === "conversation.title_generation"
-        ? null
-        : conversationInteractions.length > 0
-        ? conversationInteractions[conversationInteractions.length - 1].id
-        : null;
+    
+    // Default parentId for new interactions on the main spine should be null.
+    // It will only be set if this interaction is explicitly a child (e.g. during regeneration updates)
+    const defaultParentId = null; 
 
     const startTime = performance.now();
     this._interactionStartTimes.set(interactionId, startTime);
@@ -270,7 +281,7 @@ export const InteractionService = {
         isTitleGeneration: interactionType === "conversation.title_generation",
       },
       index: newIndex,
-      parentId: parentId,
+      parentId: defaultParentId,
     };
 
     if (interactionType !== "conversation.title_generation") {
@@ -344,7 +355,7 @@ export const InteractionService = {
         interactionId,
         "ERROR",
         new Error(
-          `Failed to instantiate model instance for ${targetModelId} from provider ${providerConfig.name}`
+          `Failed to instantiate model instance ${targetModelId} from provider ${providerConfig.name}`
         ),
         interactionType
       );
@@ -374,15 +385,11 @@ export const InteractionService = {
                 const targetVfsKey = conversation?.projectId ?? "orphan";
                 let fsInstance: typeof fs | undefined | null;
                 try {
-                  // Emit event to initialize VFS
                   emitter.emit(vfsEvent.initializeVFSRequest, {
                     vfsKey: targetVfsKey,
                     options: { force: true },
                   });
-                  // Wait for VFS to be ready (this part might need a more robust async wait mechanism)
-                  // For simplicity here, we'll assume it becomes available quickly or rely on VfsOps to handle it.
-                  // A more robust solution would involve waiting for a vfsEvent.fsInstanceChanged event.
-                  await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay
+                  await new Promise((resolve) => setTimeout(resolve, 100)); 
                   fsInstance = useVfsStore.getState().fs;
                   if (
                     useVfsStore.getState().configuredVfsKey !== targetVfsKey ||
@@ -431,6 +438,7 @@ export const InteractionService = {
       finalPrompt.parameters?.maxSteps ??
       useSettingsStore.getState().toolMaxSteps;
 
+    // Prepare options for AIService.executeInteraction
     const callOptions: AIServiceCallOptions = {
       model: modelInstance,
       messages: finalPrompt.messages,
@@ -447,13 +455,13 @@ export const InteractionService = {
         Object.keys(toolsWithExecute).length > 0 && {
           tools: toolsWithExecute,
         }),
-      toolChoice:
-        finalPrompt.toolChoice ??
-        (toolsWithExecute && Object.keys(toolsWithExecute).length > 0
-          ? "auto"
-          : "none"),
+      ...(finalPrompt.parameters?.providerOptions && {
+        providerOptions: finalPrompt.parameters.providerOptions,
+      }),
+      toolChoice: finalPrompt.toolChoice
     };
 
+    // Define callbacks within startInteraction to capture interactionId and interactionType in scope
     const callbacks: AIServiceCallbacks = {
       onChunk: (chunk) => this._handleChunk(interactionId, chunk),
       onReasoningChunk: (chunk) =>
@@ -473,20 +481,22 @@ export const InteractionService = {
     AIService.executeInteraction(interactionId, callOptions, callbacks).catch(
       (execError) => {
         console.error(
-          `[InteractionService] Error calling AIService.executeInteraction for ${interactionId}:`,
+          `[InteractionService] Error during AIService.executeInteraction for ${interactionId}:`,
           execError
         );
-        this._handleError(
-          interactionId,
-          execError instanceof Error
-            ? execError
-            : new Error("Failed to start AI execution"),
-          interactionType
-        );
+        const currentInteractionState = useInteractionStore.getState().interactions.find(i => i.id === interactionId);
+        if (currentInteractionState && currentInteractionState.status === "STREAMING") {
+            this._finalizeInteraction(
+            interactionId,
+            "ERROR",
+            execError instanceof Error ? execError : new Error(String(execError)),
+            interactionType
+          );
+        }
       }
     );
 
-    return interactionId;
+    return interactionData; 
   },
 
   abortInteraction(interactionId: string): void {

@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import type { Interaction } from "@/types/litechat/interaction";
-import type { CanvasControl } from "@/types/litechat/canvas/control";
+import type { CanvasControl, CanvasControlRenderContext } from "@/types/litechat/canvas/control";
 import { InteractionService } from "@/services/interaction.service";
 
 interface StreamingInteractionCardProps {
@@ -32,12 +32,14 @@ interface StreamingInteractionCardProps {
   className?: string;
   renderSlot?: (
     targetSlotName: CanvasControl["targetSlot"],
-    contextInteraction: Interaction
+    contextInteraction: Interaction,
+    overrideContext?: Partial<CanvasControlRenderContext>
   ) => React.ReactNode[];
+  showPrompt?: boolean;
 }
 
 export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
-  React.memo(({ interactionId, className, renderSlot }) => {
+  React.memo(({ interactionId, className, renderSlot, showPrompt = true }) => {
     const { interaction, interactionStatus } = useInteractionStore(
       useShallow((state) => {
         const currentInteraction = state.interactions.find(
@@ -180,15 +182,40 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
     }, [isResponseFolded, handleExpand, handleCollapse]);
 
     if (!interaction) {
-      return (
-        <div
-          className={cn(
-            "group/card relative rounded-lg border border-primary/30 bg-card p-4 shadow-sm animate-pulse",
-            className
-          )}
-        >
-          <div className="h-8 bg-muted rounded w-3/4 mb-4"></div>
-          <div className="mt-3 pt-3 border-t border-border/50">
+      if (showPrompt) {
+        return (
+          <div
+            className={cn(
+              "group/card relative rounded-lg border border-primary/30 bg-card p-4 shadow-sm animate-pulse",
+              className
+            )}
+          >
+            <div className="h-8 bg-muted rounded w-3/4 mb-4"></div>
+            <div className="mt-3 pt-3 border-t border-border/50">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Assistant (Loading...)
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Streaming...
+                </span>
+              </div>
+              <div className="space-y-2 mt-2">
+                <div className="h-4 bg-muted rounded w-full"></div>
+                <div className="h-4 bg-muted rounded w-5/6"></div>
+                <div className="h-4 bg-muted rounded w-full"></div>
+              </div>
+            </div>
+          </div>
+        );
+      } else {
+        return (
+          <div
+            className={cn(
+              "group/card relative rounded-lg border border-primary/30 bg-card p-4 shadow-sm animate-pulse",
+              className
+            )}
+          >
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-medium text-muted-foreground">
                 Assistant (Loading...)
@@ -197,10 +224,14 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
                 Streaming...
               </span>
             </div>
-            <div className="h-16 bg-muted rounded w-full"></div>
+            <div className="space-y-2 mt-2">
+              <div className="h-4 bg-muted rounded w-full"></div>
+              <div className="h-4 bg-muted rounded w-5/6"></div>
+              <div className="h-4 bg-muted rounded w-full"></div>
+            </div>
           </div>
-        </div>
-      );
+        );
+      }
     }
 
     const handleStopClick = () => {
@@ -213,31 +244,45 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
 
     const headerActionsSlot = renderSlot?.(
       "header-actions",
-      interaction
+      interaction,
+      {
+        isFolded: isResponseFolded,
+        toggleFold: toggleResponseFold,
+      }
     );
     const footerActionsSlot = renderSlot?.(
       "actions",
       interaction
     );
     const contentSlot = renderSlot?.("content", interaction);
+    const menuSlot = renderSlot?.("menu", interaction);
 
     return (
       <div
         ref={cardRef}
         className={cn(
-          "group/card relative rounded-lg border border-primary/30 bg-card p-4 shadow-sm animate-fadeIn",
+          "group/card relative rounded-lg border bg-card p-3 md:p-4 shadow-sm transition-colors",
+          interactionStatus === "ERROR"
+            ? "border-destructive/50 bg-destructive/5"
+            : interactionStatus === "STREAMING"
+            ? "border-primary/30"
+            : "border-border",
           className
         )}
       >
-        {interaction.prompt && (
+        {showPrompt && interaction.prompt && (
           <UserPromptDisplay
             turnData={interaction.prompt}
             timestamp={interaction.startedAt}
             isAssistantComplete={false}
           />
         )}
-        <div className="mt-3 pt-3 border-t border-border/50">
-          {renderSlot?.("menu", interaction)}
+
+        <div className={cn(
+          "relative group/assistant",
+          showPrompt && interaction.prompt ? "mt-3 pt-3 border-t border-border/50" : ""
+        )}>
+          {menuSlot}
 
           <div
             className={cn(
@@ -253,24 +298,6 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
                   </span>
                   <div className="flex items-center gap-0.5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity">
                     {headerActionsSlot}
-                    {canFoldResponse && (
-                      <ActionTooltipButton
-                        tooltipText={isResponseFolded ? "Unfold" : "Fold"}
-                        onClick={toggleResponseFold}
-                        aria-label={
-                          isResponseFolded ? "Unfold response" : "Fold response"
-                        }
-                        icon={
-                          isResponseFolded ? (
-                            <ChevronDownIcon />
-                          ) : (
-                            <ChevronUpIcon />
-                          )
-                        }
-                        iconClassName="h-3.5 w-3.5"
-                        className="h-5 w-5"
-                      />
-                    )}
                   </div>
                 </div>
               </div>
@@ -296,7 +323,6 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
                       (Streaming)
                     </span>
                     <div className="flex items-center opacity-0 group-hover/reasoning:opacity-100 focus-within:opacity-100 transition-opacity">
-                      {/* Copy for reasoning is internal to AssistantResponse for now */}
                       <ActionTooltipButton
                         tooltipText={
                           isReasoningFolded
