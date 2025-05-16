@@ -14,9 +14,9 @@ import type {
 } from "@/types/litechat/modding";
 import type { ChatControl as CoreChatControlFromTypes } from "@/types/litechat/chat";
 import type { PromptControl as CorePromptControlFromTypes } from "@/types/litechat/prompt";
+import type { CanvasControl as CoreCanvasControlFromTypes } from "@/types/litechat/canvas/control";
 
 import { Tool } from "ai";
-// Removed unused useControlRegistryStore
 import { useInteractionStore } from "@/store/interaction.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { useSettingsStore } from "@/store/settings.store";
@@ -29,7 +29,6 @@ import { splitModelId } from "@/lib/litechat/provider-helpers";
 import { useVfsStore } from "@/store/vfs.store";
 import type { fs } from "@zenfs/core";
 import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
-// Removed unused modEvent
 
 export function createModApi(mod: DbMod): LiteChatModApi {
   const modId = mod.id;
@@ -60,6 +59,17 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       });
       const u = () =>
         emitter.emit(controlRegistryEvent.unregisterChatControlRequest, {
+          id: control.id,
+        });
+      unsubscribers.push(u);
+      return u;
+    },
+    registerCanvasControl: (control: CoreCanvasControlFromTypes) => {
+      emitter.emit(controlRegistryEvent.registerCanvasControlRequest, {
+        control,
+      });
+      const u = () =>
+        emitter.emit(controlRegistryEvent.unregisterCanvasControlRequest, {
           id: control.id,
         });
       unsubscribers.push(u);

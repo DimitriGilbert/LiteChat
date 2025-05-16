@@ -1,5 +1,5 @@
 // src/components/LiteChat/common/CodeBlockRenderer.tsx
-
+// FULL FILE
 import React, {
   useState,
   useEffect,
@@ -20,17 +20,11 @@ import "prismjs/components/prism-yaml";
 import "prismjs/components/prism-rust";
 import "prismjs/components/prism-sql";
 
-import { Button } from "@/components/ui/button";
-import { CheckIcon, ClipboardIcon, ChevronsUpDownIcon } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { toast } from "sonner";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
+import type { CanvasControl } from "@/types/litechat/canvas/control"; // For renderSlot type
+import { useControlRegistryStore } from "@/store/control.store"; // To get canvas controls
+import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control";
 
 interface CodeBlockRendererProps {
   lang: string | undefined;
@@ -38,7 +32,6 @@ interface CodeBlockRendererProps {
   isStreaming?: boolean;
 }
 
-// Wrap the component logic in a named function before memo
 const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
   lang,
   code,
@@ -46,22 +39,59 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
 }) => {
   const { foldStreamingCodeBlocks } = useSettingsStore(
     useShallow((state) => ({
-      prismThemeUrl: state.prismThemeUrl,
-      theme: state.theme,
       foldStreamingCodeBlocks: state.foldStreamingCodeBlocks,
-    })),
+    }))
   );
 
-  const [isCopied, setIsCopied] = useState(false);
   const [isFolded, setIsFolded] = useState(
-    isStreaming ? foldStreamingCodeBlocks : false,
+    isStreaming ? foldStreamingCodeBlocks : false
   );
   const codeRef = useRef<HTMLElement>(null);
+
+  const canvasControls = useControlRegistryStore(
+    useShallow((state) => Object.values(state.canvasControls))
+  );
+
+  const renderSlotForCodeBlock = useCallback(
+    (
+      targetSlotName: CanvasControl["targetSlot"],
+      currentCode: string,
+      currentLang?: string,
+      currentIsFolded?: boolean,
+      currentToggleFold?: () => void
+    ): React.ReactNode[] => {
+      return canvasControls
+        .filter(
+          (c) =>
+            c.type === "codeblock" &&
+            c.targetSlot === targetSlotName &&
+            c.renderer
+        )
+        .map((control) => {
+          if (control.renderer) {
+            const context: CanvasControlRenderContext = {
+              codeBlockContent: currentCode,
+              codeBlockLang: currentLang,
+              isFolded: currentIsFolded,
+              toggleFold: currentToggleFold,
+              canvasContextType: "codeblock",
+            };
+            return (
+              <React.Fragment key={control.id}>
+                {control.renderer(context)}
+              </React.Fragment>
+            );
+          }
+          return null;
+        })
+        .filter(Boolean);
+    },
+    [canvasControls]
+  );
 
   const highlightCode = useCallback(() => {
     if (codeRef.current && code) {
       try {
-        // force pre-wrap DO NOT REMOVE !
         if (codeRef.current.style.whiteSpace !== "pre-wrap") {
           codeRef.current.style.whiteSpace = "pre-wrap";
         }
@@ -82,18 +112,6 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
     }
   }, [code, lang, isFolded, highlightCode]);
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setIsCopied(true);
-      toast.success("Code copied to clipboard!");
-      setTimeout(() => setIsCopied(false), 1500);
-    } catch (err) {
-      toast.error("Failed to copy code.");
-      console.error("Clipboard copy failed:", err);
-    }
-  };
-
   const toggleFold = () => {
     const unfolding = isFolded;
     setIsFolded((prev) => !prev);
@@ -109,59 +127,29 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
     return code
       .split(
         `
-`,
+`
       )
       .slice(0, 3).join(`
 `);
   }, [code]);
 
+  const codeBlockHeaderActions = renderSlotForCodeBlock(
+    "codeblock-header-actions",
+    code,
+    lang,
+    isFolded,
+    toggleFold
+  );
+
   return (
     <div className="code-block-container group/codeblock my-4 max-w-full">
-      {/* Apply sticky positioning and background to the header */}
       <div className="code-block-header sticky top-0 z-10 flex items-center justify-between">
         <div className="flex items-center gap-1">
           <div className="text-sm font-medium">
             {lang ? lang.toUpperCase() : "CODE"}
           </div>
           <div className="flex items-center gap-0.5 opacity-0 group-hover/codeblock:opacity-100 focus-within:opacity-100 transition-opacity">
-            <TooltipProvider delayDuration={100}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                    onClick={toggleFold}
-                    aria-label={isFolded ? "Unfold code" : "Fold code"}
-                  >
-                    <ChevronsUpDownIcon className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  {isFolded ? "Unfold" : "Fold"}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider delayDuration={100}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                    onClick={handleCopy}
-                    aria-label="Copy code"
-                  >
-                    {isCopied ? (
-                      <CheckIcon className="h-3.5 w-3.5 text-green-500" />
-                    ) : (
-                      <ClipboardIcon className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">Copy</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {codeBlockHeaderActions}
           </div>
         </div>
         <div></div>
@@ -169,9 +157,7 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
 
       {!isFolded && (
         <div className="overflow-hidden w-full">
-          {/* Ensure pre tag handles horizontal scroll and word breaks */}
           <pre className="overflow-x-auto w-full relative overflow-wrap-anywhere">
-            {/* Remove min-w-full from code tag */}
             <code ref={codeRef} className={languageClass + " block"}></code>
           </pre>
         </div>
@@ -190,5 +176,4 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
   );
 };
 
-// Export the memoized component
 export const CodeBlockRenderer = memo(CodeBlockRendererComponent);

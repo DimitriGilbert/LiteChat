@@ -42,6 +42,8 @@ import {
 import type { fs } from "@zenfs/core";
 import { conversationEvent } from "@/types/litechat/events/conversation.events";
 import { vfsEvent } from "@/types/litechat/events/vfs.events";
+import { canvasEvent, type CanvasEvents /*, type CanvasEventPayloads */ } from "@/types/litechat/events/canvas.events";
+import { ConversationService } from "@/services/conversation.service";
 
 interface AIServiceCallOptions {
   model: LanguageModelV1;
@@ -73,6 +75,124 @@ export const InteractionService = {
   _streamingToolData: new Map<string, { calls: string[]; results: string[] }>(),
   _firstChunkTimestamps: new Map<string, number>(),
   _interactionStartTimes: new Map<string, number>(),
+
+  initializeCanvasEventHandlers(): void {
+    emitter.on(
+      canvasEvent.copyInteractionResponseRequest,
+      async (payload) => {
+        const { interactionId } = payload;
+        const interaction = useInteractionStore
+          .getState()
+          .interactions.find((i) => i.id === interactionId);
+
+        if (!interaction) {
+          toast.error(`Copy failed: Interaction ${interactionId} not found.`);
+          console.warn(
+            `[InteractionService] Copy request for unknown interaction ${interactionId}`
+          );
+          return;
+        }
+
+        const contentToCopy = interaction.response ?? "";
+        if (typeof contentToCopy !== "string" || contentToCopy.trim() === "") {
+          toast.info("No response content to copy.");
+          return;
+        }
+
+        try {
+          await navigator.clipboard.writeText(contentToCopy);
+          toast.success("Response copied!");
+          // Optionally emit another event for UI update if needed, e.g., canvasEvent.interactionResponseCopied
+        } catch (err) {
+          toast.error("Failed to copy response.");
+          console.error("[InteractionService] Error copying response:", err);
+        }
+      }
+    );
+
+    emitter.on(
+      canvasEvent.regenerateInteractionRequest,
+      async (payload) => {
+        const { interactionId } = payload;
+        const interaction = useInteractionStore
+          .getState()
+          .interactions.find((i) => i.id === interactionId);
+
+        if (!interaction) {
+          toast.error(
+            `Regeneration failed: Interaction ${interactionId} not found.`
+          );
+          console.warn(
+            `[InteractionService] Regeneration request for unknown interaction ${interactionId}`
+          );
+          return;
+        }
+
+        // Add safety checks: is it the last one? Is global streaming off?
+        // The module should ideally enforce this via `disabled` state,
+        // but double-checking here can be good.
+        const interactionStoreState = useInteractionStore.getState();
+        const globalStreamingStatus = interactionStoreState.status;
+        if (globalStreamingStatus === "streaming") {
+          toast.info("Cannot regenerate while another response is streaming.");
+          return;
+        }
+
+        // Check if it's the last user_assistant message
+        const conversationInteractions = interactionStoreState.interactions.filter(
+          (i) => i.conversationId === interaction.conversationId && 
+                 i.type === "message.user_assistant"
+        ).sort((a, b) => a.index - b.index);
+        
+        const lastUserAssistantInteraction = conversationInteractions.length > 0 
+          ? conversationInteractions[conversationInteractions.length - 1] 
+          : null;
+
+        if (lastUserAssistantInteraction?.id !== interactionId) {
+          toast.info("Can only regenerate the last response in the conversation.");
+          return;
+        }
+
+        try {
+          await ConversationService.regenerateInteraction(interactionId);
+          // Feedback for starting regeneration might be good, or handled by UI changes
+        } catch (error) {
+          toast.error(`Failed to regenerate response: ${String(error)}`);
+          console.error(
+            `[InteractionService] Error regenerating interaction ${interactionId}:`,
+            error
+          );
+        }
+      }
+    );
+
+    // Handler for copyCodeBlockRequest
+    emitter.on(
+      canvasEvent.copyCodeBlockRequest,
+      async (payload) => {
+        const { content, interactionId, codeBlockId, language } = payload;
+        if (!content || content.trim() === "") {
+          toast.info("No code to copy.");
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(content);
+          toast.success(`Code block ${language ? `(${language}) ` : ''}copied!`);
+          console.log(
+            `[InteractionService] Code block copied. InteractionID: ${interactionId}, CodeBlockID: ${codeBlockId}, Language: ${language}`
+          );
+          // Optionally emit canvasEvent.codeBlockCopied if specific UI feedback is needed beyond toast
+        } catch (err) {
+          toast.error("Failed to copy code block.");
+          console.error("[InteractionService] Error copying code block:", err);
+        }
+      }
+    );
+
+    // TODO: Add listeners for other canvas events like regenerate, rate, etc.
+    // emitter.on(canvasEvent.regenerateInteractionRequest, async (payload) => { ... });
+    // emitter.on(canvasEvent.rateInteractionRequest, async (payload) => { ... });
+  },
 
   async startInteraction(
     prompt: PromptObject,

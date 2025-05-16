@@ -1,6 +1,12 @@
 // src/components/LiteChat/canvas/ChatCanvas.tsx
 // FULL FILE
-import React, { useMemo, useRef, useEffect, useState } from "react";
+import React, {
+  useMemo,
+  useRef,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { InteractionCard } from "./InteractionCard";
 import { StreamingInteractionCard } from "./StreamingInteractionCard";
@@ -23,7 +29,11 @@ import { useConversationStore } from "@/store/conversation.store";
 import { useProjectStore } from "@/store/project.store";
 import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/store/settings.store";
-import { useCanvasControlStore } from "@/store/canvas-control.store";
+import { useControlRegistryStore } from "@/store/control.store";
+import type {
+  CanvasControl,
+  CanvasControlRenderContext,
+} from "@/types/litechat/canvas/control";
 
 const ChatCanvasHiddenInteractions = ["conversation.title_generation"];
 
@@ -32,19 +42,13 @@ export interface ChatCanvasProps {
   interactions: Interaction[];
   status: "idle" | "loading" | "streaming" | "error";
   className?: string;
-  onRegenerateInteraction?: (interactionId: string) => void;
-  onEditInteraction?: (interactionId: string) => void;
-  onStopInteraction?: (interactionId: string) => void;
 }
 
-export const ChatCanvas: React.FC<ChatCanvasProps> = ({
+const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
   conversationId,
   interactions,
   status,
   className,
-  onRegenerateInteraction,
-  onEditInteraction,
-  onStopInteraction,
 }) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -64,7 +68,6 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
       }))
     );
 
-  // Memoize selector functions to prevent unnecessary re-renders
   const selectProviderState = useMemo(
     () => (state: ReturnType<typeof useProviderStore.getState>) => ({
       isLoading: state.isLoading,
@@ -124,37 +127,66 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     return groups;
   }, [interactions]);
 
-  // Memoize the selector function for interaction controls
-  const selectInteractionControls = useMemo(
-    () => (state: ReturnType<typeof useCanvasControlStore.getState>) =>
-      state.getControlsByType("interaction"),
-    []
+  const canvasControls = useControlRegistryStore(
+    useShallow((state) => Object.values(state.canvasControls))
   );
 
-  // Get all interaction controls
-  const interactionControls = useCanvasControlStore(
-    useShallow(selectInteractionControls)
-  );
+  const renderSlotForCanvas = useCallback(
+    (
+      targetType: CanvasControl["type"],
+      targetSlotName: CanvasControl["targetSlot"],
+      contextInteraction?: Interaction
+    ): React.ReactNode[] => {
+      console.log(
+        `[ChatCanvas] renderSlotForCanvas attempting to render: type='${targetType}', slot='${targetSlotName}'`
+      );
+      if (!canvasControls || canvasControls.length === 0) {
+        console.warn("[ChatCanvas] No canvas controls are registered in the store!");
+      } else {
+        // Log details of all available canvas controls for debugging
+        const controlDetails = canvasControls.map(c => ({ id: c.id, type: c.type, targetSlot: c.targetSlot, hasRenderer: !!c.renderer }));
+        console.log("[ChatCanvas] Available canvasControls:", JSON.stringify(controlDetails, null, 2));
+      }
 
-  // Create the renderSlot function for interaction cards
-  const renderSlot = useMemo(
-    () =>
-      (slotName: "actions" | "menu" | "content"): React.ReactNode[] =>
-        interactionControls
-          .map((control) => {
-            if (slotName === "actions" && control.actionRenderer) {
-              return control.actionRenderer();
-            }
-            if (slotName === "menu" && control.menuRenderer) {
-              return control.menuRenderer();
-            }
-            if (slotName === "content" && control.contentRenderer) {
-              return control.contentRenderer();
-            }
-            return null;
-          })
-          .filter((node): node is React.ReactNode => node !== null),
-    [interactionControls]
+      const filteredControls = canvasControls.filter((c) => {
+        const typeMatch = c.type === targetType;
+        const slotMatch = c.targetSlot === targetSlotName;
+        const rendererExists = !!c.renderer;
+        if (c.id.includes("copy") || c.id.includes("regenerate") || c.id.includes("rating")) {
+            console.log(`[ChatCanvas] Filtering control '${c.id}': typeMatch=${typeMatch} (expected ${targetType}), slotMatch=${slotMatch} (expected ${targetSlotName}), rendererExists=${rendererExists}`);
+        }
+        return typeMatch && slotMatch && rendererExists;
+      });
+
+      if (filteredControls.length === 0) {
+        console.warn(
+          `[ChatCanvas] No controls found after filtering for: type='${targetType}', slot='${targetSlotName}'`
+        );
+      }
+
+      return filteredControls
+        .map((control) => {
+          if (control.renderer) {
+            const context: CanvasControlRenderContext = {
+              interaction: contextInteraction,
+              interactionId: contextInteraction?.id,
+              responseContent:
+                typeof contextInteraction?.response === "string"
+                  ? contextInteraction.response
+                  : undefined,
+              canvasContextType: targetType, 
+            };
+            return (
+              <React.Fragment key={control.id}>
+                {control.renderer(context)}
+              </React.Fragment>
+            );
+          }
+          return null;
+        })
+        .filter(Boolean);
+    },
+    [canvasControls]
   );
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
@@ -204,17 +236,21 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     const viewport = viewportRef.current;
     if (!viewport) return;
     const handleScroll = () => {
-      const { scrollHeight, clientHeight, scrollTop } = viewport;
+      if (!viewportRef.current) return; // Add null check for viewportRef.current
+      const { scrollHeight, clientHeight, scrollTop } = viewportRef.current;
       const shouldShow =
         scrollTop < scrollHeight - clientHeight - clientHeight * 0.5;
       setShowJumpToBottom(shouldShow);
     };
     viewport.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll();
+    handleScroll(); // Initial check
     return () => {
-      viewport.removeEventListener("scroll", handleScroll);
+      if (viewportRef.current) {
+        // Add null check before removing listener
+        viewportRef.current.removeEventListener("scroll", handleScroll);
+      }
     };
-  }, []);
+  }, []); // Removed viewportRef.current from dependencies to avoid re-running on every render
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -223,6 +259,45 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
       );
     }
   }, []);
+
+  const renderedInteractionCards = useMemo(() => {
+    return interactionGroups.map((group) => {
+      const interaction = group[0];
+      const isStreamingInteraction = streamingInteractionIds.includes(
+        interaction.id
+      );
+
+      if (isStreamingInteraction) {
+        return (
+          <StreamingInteractionCard
+            key={`${interaction.id}-streaming`}
+            interactionId={interaction.id}
+            renderSlot={(slotName) =>
+              renderSlotForCanvas(
+                "interaction",
+                slotName as CanvasControl["targetSlot"],
+                interaction
+              )
+            }
+          />
+        );
+      } else {
+        return (
+          <InteractionCard
+            key={interaction.id}
+            interaction={interaction}
+            renderSlot={(slotName) =>
+              renderSlotForCanvas(
+                "interaction",
+                slotName as CanvasControl["targetSlot"],
+                interaction
+              )
+            }
+          />
+        );
+      }
+    });
+  }, [interactionGroups, streamingInteractionIds, renderSlotForCanvas]);
 
   const renderContent = () => {
     if (isProviderLoading || isConversationLoading || isProjectLoading) {
@@ -243,40 +318,17 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
       return <EmptyStateReady />;
     }
 
-    if (interactionGroups.length === 0 && status !== "streaming") {
+    if (
+      interactionGroups.length === 0 &&
+      status !== "streaming" &&
+      streamingInteractionIds.length === 0
+    ) {
       return <EmptyStateReady />;
     }
 
     return (
       <div className="space-y-4 p-2 md:p-4 break-words">
-        {interactionGroups.map((group) => {
-          const interaction = group[0];
-          const isStreamingInteraction = streamingInteractionIds.includes(
-            interaction.id
-          );
-
-          if (isStreamingInteraction) {
-            return (
-              <StreamingInteractionCard
-                key={`${interaction.id}-streaming`}
-                interactionId={interaction.id}
-                onStop={onStopInteraction}
-                renderSlot={renderSlot}
-              />
-            );
-          } else {
-            return (
-              <InteractionCard
-                key={interaction.id}
-                interaction={interaction}
-                onEdit={onEditInteraction}
-                onRegenerate={onRegenerateInteraction}
-                onDelete={undefined}
-                renderSlot={renderSlot}
-              />
-            );
-          }
-        })}
+        {renderedInteractionCards}
         {status === "streaming" &&
           streamingInteractionIds
             .filter((id) => !interactions.some((i) => i.id === id))
@@ -284,8 +336,12 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
               <StreamingInteractionCard
                 key={`${id}-streaming-new`}
                 interactionId={id}
-                onStop={onStopInteraction}
-                renderSlot={renderSlot}
+                renderSlot={(slotName) =>
+                  renderSlotForCanvas(
+                    "interaction",
+                    slotName as CanvasControl["targetSlot"]
+                  )
+                }
               />
             ))}
       </div>
@@ -322,3 +378,5 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     </div>
   );
 };
+
+export const ChatCanvas = React.memo(ChatCanvasComponent);

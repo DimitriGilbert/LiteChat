@@ -4,6 +4,7 @@ import type {
   ControlState,
   PromptControl as CorePromptControlAliased,
   ChatControl as CoreChatControlAliased,
+  CanvasControl as CoreCanvasControlAliased, // Added
 } from "@/types/litechat/control";
 import type {
   ToolImplementation,
@@ -16,6 +17,7 @@ export const controlRegistryEvent = {
   // State Change Events
   promptControlsChanged: "control.registry.prompt.controls.changed",
   chatControlsChanged: "control.registry.chat.controls.changed",
+  canvasControlsChanged: "control.registry.canvas.controls.changed", // Added
   middlewareChanged: "control.registry.middleware.changed",
   toolsChanged: "control.registry.tools.changed",
   modalProvidersChanged: "control.registry.modal.providers.changed",
@@ -28,6 +30,10 @@ export const controlRegistryEvent = {
   registerChatControlRequest: "control.registry.register.chat.control.request",
   unregisterChatControlRequest:
     "control.registry.unregister.chat.control.request",
+  registerCanvasControlRequest:
+    "control.registry.register.canvas.control.request", // Added
+  unregisterCanvasControlRequest:
+    "control.registry.unregister.canvas.control.request", // Added
   registerMiddlewareRequest: "control.registry.register.middleware.request",
   unregisterMiddlewareRequest: "control.registry.unregister.middleware.request",
   registerToolRequest: "control.registry.register.tool.request",
@@ -45,6 +51,10 @@ export interface ControlRegistryEventPayloads {
   [controlRegistryEvent.chatControlsChanged]: {
     controls: Record<string, CoreChatControlAliased>;
   };
+  [controlRegistryEvent.canvasControlsChanged]: {
+    // Added
+    controls: Record<string, CoreCanvasControlAliased>;
+  };
   [controlRegistryEvent.middlewareChanged]: {
     middleware: ControlState["middlewareRegistry"];
   };
@@ -60,6 +70,11 @@ export interface ControlRegistryEventPayloads {
     control: CoreChatControlAliased;
   };
   [controlRegistryEvent.unregisterChatControlRequest]: { id: string };
+  [controlRegistryEvent.registerCanvasControlRequest]: {
+    // Added
+    control: CoreCanvasControlAliased;
+  };
+  [controlRegistryEvent.unregisterCanvasControlRequest]: { id: string }; // Added
   [controlRegistryEvent.registerMiddlewareRequest]: {
     hookName: ModMiddlewareHookName;
     modId: string;

@@ -1,7 +1,9 @@
 // src/components/LiteChat/canvas/interaction/InteractionRating.tsx
 import React from "react";
 import { cn } from "@/lib/utils";
-import { useInteractionStore } from "@/store/interaction.store";
+// import { useInteractionStore } from "@/store/interaction.store"; // No longer directly calling store action
+import { emitter } from "@/lib/litechat/event-emitter"; // Added
+import { interactionEvent } from "@/types/litechat/events/interaction.events"; // Added
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { Star } from "lucide-react"; // Import star icon
 
@@ -14,12 +16,16 @@ export const InteractionRating: React.FC<InteractionRatingProps> = ({
   interactionId,
   currentRating,
 }) => {
-  const rateInteraction = useInteractionStore((state) => state.rateInteraction);
+  // const rateInteraction = useInteractionStore((state) => state.rateInteraction); // Removed
 
   const handleRate = (newRating: number | null) => {
     // If clicking the same rating again, clear it
     const ratingToSet = newRating === currentRating ? null : newRating;
-    rateInteraction(interactionId, ratingToSet);
+    // rateInteraction(interactionId, ratingToSet); // Removed
+    emitter.emit(interactionEvent.rateInteractionRequest, { // Added event emission
+      interactionId,
+      rating: ratingToSet,
+    });
   };
 
   // Create array of ratings from -5 to 5

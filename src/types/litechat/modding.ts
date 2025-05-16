@@ -15,19 +15,18 @@ import { type ControlRegistryEventPayloads } from "./events/control.registry.eve
 import { type InputEventPayloads } from "./events/input.events";
 import { type PromptEventPayloads } from "./events/prompt.events";
 import { type SettingsState } from "@/store/settings.store";
-import { type ModEventPayloads as ModSpecificEventPayloads } from "./events/mod.events"; // Alias to avoid name clash
+import { type ModEventPayloads as ModSpecificEventPayloads } from "./events/mod.events";
 import { type SyncEventPayloads } from "./events/sync.events";
 import { type UiEventPayloads } from "./events/ui.events";
 import { type VfsEventPayloads } from "./events/vfs.events";
+import type { CanvasControl as CoreCanvasControlFromTypes } from "./canvas/control";
 
-// Import middleware types
 import {
   type ModMiddlewareHookName,
   type ModMiddlewarePayloadMap,
   type ModMiddlewareReturnMap,
 } from "./middleware.types";
 
-// Re-export middleware types for convenience if needed by mods
 export type {
   ModMiddlewareHookName,
   ModMiddlewarePayloadMap,
@@ -35,7 +34,6 @@ export type {
 };
 export { ModMiddlewareHook } from "./middleware.types";
 
-// --- Mod Definition & Instance ---
 export interface DbMod {
   id: string;
   name: string;
@@ -53,7 +51,6 @@ export interface ModInstance {
   error?: Error | string | null;
 }
 
-// --- Mod Store State & Actions ---
 export interface ModState {
   dbMods: DbMod[];
   loadedMods: ModInstance[];
@@ -74,7 +71,6 @@ export interface ModActions {
   _removeSettingsTab: (tabId: string) => void;
 }
 
-// --- Mod API ---
 export interface ReadonlyChatContextSnapshot {
   readonly selectedConversationId: string | null;
   readonly interactions: ReadonlyArray<Readonly<Interaction>>;
@@ -94,6 +90,7 @@ export interface LiteChatModApi {
   readonly modName: string;
   registerPromptControl: (control: ModPromptControl) => () => void;
   registerChatControl: (control: ModChatControl) => () => void;
+  registerCanvasControl: (control: CoreCanvasControlFromTypes) => () => void; // Added
   registerTool: <P extends z.ZodSchema<any>>(
     toolName: string,
     definition: Tool<P>,
@@ -128,17 +125,13 @@ export interface LiteChatModApi {
     provider: ModalProvider
   ) => () => void;
   getVfsInstance: (vfsKey: string) => Promise<typeof fs | null>;
-  // No registerActionHandler here, it's not for mods to register store actions.
-  // Mods emit action requests, stores handle them.
 }
 
-// --- Tool Implementation ---
 export type ToolImplementation<P extends z.ZodSchema<any>> = (
   params: z.infer<P>,
   context: ReadonlyChatContextSnapshot & { fsInstance?: typeof fs }
 ) => Promise<any>;
 
-// --- Custom Settings Tab ---
 export interface CustomSettingTab {
   id: string;
   title: string;
@@ -146,7 +139,6 @@ export interface CustomSettingTab {
   order?: number;
 }
 
-// --- Modal Provider (For Phase 4) ---
 export interface ModalProviderProps<P = any> {
   isOpen: boolean;
   onClose: () => void;
@@ -157,9 +149,6 @@ export interface ModalProviderProps<P = any> {
 }
 export type ModalProvider<P = any> = React.ComponentType<ModalProviderProps<P>>;
 
-// --- Event Emitter Payload Map ---
-// This map is now composed of domain-specific payload types.
-// Intersecting with Record<string, any> to satisfy mitt's constraint more broadly.
 export type ModEventPayloadMap = AppEventPayloads &
   SettingsEventPayloads &
   ProviderEventPayloads &
@@ -169,14 +158,13 @@ export type ModEventPayloadMap = AppEventPayloads &
   InteractionEventPayloads &
   InputEventPayloads &
   PromptEventPayloads &
-  ModSpecificEventPayloads & // Use aliased import
+  ModSpecificEventPayloads &
   UiEventPayloads &
   VfsEventPayloads &
   SyncEventPayloads &
   ControlRegistryEventPayloads &
-  Record<string, any>; // Ensures a general string index signature
+  Record<string, any>;
 
-// --- Controls ---
 interface BaseControl {
   id: string;
   status?: () => "ready" | "loading" | "error";
@@ -203,3 +191,6 @@ export interface ModChatControl extends BaseControl {
   settingsRenderer?: () => React.ReactElement | null;
   show?: () => boolean;
 }
+
+// Re-export CanvasControlRenderContext from its correct location
+export type { CanvasControlRenderContext } from "./canvas/control";

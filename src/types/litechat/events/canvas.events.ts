@@ -1,69 +1,65 @@
+// src/types/litechat/events/canvas.events.ts
+// FULL FILE
+import type { Interaction } from "@/types/litechat/interaction";
+
 export const canvasEvent = {
-  // Interaction Lifecycle Events
-  interactionMounted: "canvas.interaction.mounted",
-  interactionUnmounted: "canvas.interaction.unmounted",
-  interactionGrouped: "canvas.interaction.grouped",
-  interactionUngrouped: "canvas.interaction.ungrouped",
+  // Interaction Action Request Events
+  copyInteractionResponseRequest:
+    "canvas.interaction.copy.response.request",
+  regenerateInteractionRequest: "canvas.interaction.regenerate.request",
+  // rateInteractionRequest: "canvas.interaction.rate.request", // Removed
+  // TODO: Add more interaction action requests as needed (e.g., edit, delete)
 
-  // UI Events
-  interactionExpanded: "canvas.interaction.expanded",
-  interactionCollapsed: "canvas.interaction.collapsed",
-  interactionFocused: "canvas.interaction.focused",
+  // CodeBlock Action Request Events
+  copyCodeBlockRequest: "canvas.codeblock.copy.request",
+  // foldCodeBlockRequest: "canvas.codeblock.fold.request", // Keep folding local for now
+  // TODO: Add more codeblock action requests (e.g., run, save to file)
 
-  // Action Events
-  interactionActionTriggered: "canvas.interaction.action.triggered",
-  interactionMenuRequested: "canvas.interaction.menu.requested",
+  // General Canvas Events (if any specific ones are needed beyond control registration)
+  // e.g., canvas.view.changed, canvas.element.focused
 
-  // View State Events
-  viewStateChanged: "canvas.view.state.changed",
-  scrollPositionChanged: "canvas.scroll.position.changed",
+  // Action Outcome Events (optional, could also be handled by generic UI notifications)
+  interactionResponseCopied: "canvas.interaction.response.copied",
+  codeBlockCopied: "canvas.codeblock.copied",
 } as const;
 
-// Event Payloads
 export interface CanvasEventPayloads {
-  [canvasEvent.interactionMounted]: {
+  // Interaction Payloads
+  [canvasEvent.copyInteractionResponseRequest]: {
     interactionId: string;
-    element: HTMLElement;
+    // If specific parts of response can be copied, add more fields here
+    // For now, assume it copies the primary response content.
   };
-  [canvasEvent.interactionUnmounted]: {
-    interactionId: string;
-  };
-  [canvasEvent.interactionGrouped]: {
-    groupId: string;
-    interactionIds: string[];
-    groupType: "folder" | "custom";
-    metadata?: Record<string, any>;
-  };
-  [canvasEvent.interactionUngrouped]: {
-    groupId: string;
-    interactionIds: string[];
-  };
-  [canvasEvent.interactionExpanded]: {
+  [canvasEvent.regenerateInteractionRequest]: {
     interactionId: string;
   };
-  [canvasEvent.interactionCollapsed]: {
+  // [canvasEvent.rateInteractionRequest]: { // Removed
+  //   interactionId: string;
+  //   rating: number | null;
+  // };
+  [canvasEvent.interactionResponseCopied]: {
     interactionId: string;
+    contentCopied: string;
   };
-  [canvasEvent.interactionFocused]: {
-    interactionId: string;
+
+  // CodeBlock Payloads
+  [canvasEvent.copyCodeBlockRequest]: {
+    interactionId?: string; // ID of the interaction containing this code block
+    codeBlockId?: string; // A unique ID for the code block within the interaction, if available
+    language?: string; // Language of the code block
+    content: string; // The code content (changed from contentToCopy for consistency)
   };
-  [canvasEvent.interactionActionTriggered]: {
-    interactionId: string;
-    actionId: string;
-    metadata?: Record<string, any>;
-  };
-  [canvasEvent.interactionMenuRequested]: {
-    interactionId: string;
-    menuType: "context" | "action";
-    metadata?: Record<string, any>;
-  };
-  [canvasEvent.viewStateChanged]: {
-    type: "layout" | "scroll" | "custom";
-    state: Record<string, any>;
-  };
-  [canvasEvent.scrollPositionChanged]: {
-    scrollTop: number;
-    scrollHeight: number;
-    clientHeight: number;
-  };
+  // [canvasEvent.codeBlockCopied]: { // Removing this for now, will add back if needed for feedback
+  //   interactionId?: string;
+  //   codeBlockId?: string;
+  //   content: string;
+  // };
+
+  // Add other payloads as new events are defined
 }
+
+// Helper type for emitter
+export interface CanvasEvents extends CanvasEventPayloads {
+  // This allows using canvasEvent.eventName directly with typed payloads
+  // Example: emitter.emit(canvasEvent.copyInteractionResponseRequest, payload);
+} 

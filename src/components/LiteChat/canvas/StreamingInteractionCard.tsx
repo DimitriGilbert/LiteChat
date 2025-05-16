@@ -1,4 +1,5 @@
 // src/components/LiteChat/canvas/StreamingInteractionCard.tsx
+// FULL FILE
 import React, {
   useMemo,
   useState,
@@ -20,31 +21,31 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   BotIcon,
-  ClipboardIcon,
-  CheckIcon,
 } from "lucide-react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
-import { toast } from "sonner";
-import { emitter } from "@/lib/litechat/event-emitter";
-import { canvasEvent } from "@/types/litechat/events/canvas.events";
+import type { Interaction } from "@/types/litechat/interaction";
+import type { CanvasControl } from "@/types/litechat/canvas/control";
+import { InteractionService } from "@/services/interaction.service";
 
 interface StreamingInteractionCardProps {
   interactionId: string;
-  onStop?: (interactionId: string) => void;
   className?: string;
-  renderSlot?: (slotName: "actions" | "menu" | "content") => React.ReactNode[];
+  renderSlot?: (
+    targetSlotName: CanvasControl["targetSlot"],
+    contextInteraction: Interaction
+  ) => React.ReactNode[];
 }
 
 export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
-  React.memo(({ interactionId, onStop, className, renderSlot }) => {
+  React.memo(({ interactionId, className, renderSlot }) => {
     const { interaction, interactionStatus } = useInteractionStore(
       useShallow((state) => {
-        const interaction = state.interactions.find(
+        const currentInteraction = state.interactions.find(
           (i) => i.id === interactionId
         );
         return {
-          interaction,
-          interactionStatus: interaction?.status,
+          interaction: currentInteraction,
+          interactionStatus: currentInteraction?.status,
         };
       })
     );
@@ -57,8 +58,6 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
     const [reasoningContent, setReasoningContent] = useState("");
     const [isReasoningFolded, setIsReasoningFolded] = useState(true);
     const [isResponseFolded, setIsResponseFolded] = useState(false);
-    const [isReasoningCopied, setIsReasoningCopied] = useState(false);
-    const [isResponseCopied, setIsResponseCopied] = useState(false);
 
     const animationFrameRef = useRef<number | null>(null);
     const lastUpdateTimeRef = useRef<number>(0);
@@ -133,21 +132,6 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       }
     }, [interactionStatus, interactionId]);
 
-    useEffect(() => {
-      if (cardRef.current) {
-        emitter.emit(canvasEvent.interactionMounted, {
-          interactionId: interactionId,
-          element: cardRef.current,
-        });
-
-        return () => {
-          emitter.emit(canvasEvent.interactionUnmounted, {
-            interactionId: interactionId,
-          });
-        };
-      }
-    }, [interactionId]);
-
     const { dbProviderConfigs, getAllAvailableModelDefsForProvider } =
       useProviderStore(
         useShallow((state) => ({
@@ -181,17 +165,11 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
 
     const handleExpand = useCallback(() => {
       setIsResponseFolded(false);
-      emitter.emit(canvasEvent.interactionExpanded, {
-        interactionId: interactionId,
-      });
-    }, [interactionId]);
+    }, []);
 
     const handleCollapse = useCallback(() => {
       setIsResponseFolded(true);
-      emitter.emit(canvasEvent.interactionCollapsed, {
-        interactionId: interactionId,
-      });
-    }, [interactionId]);
+    }, []);
 
     const toggleResponseFold = useCallback(() => {
       if (isResponseFolded) {
@@ -200,30 +178,6 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
         handleCollapse();
       }
     }, [isResponseFolded, handleExpand, handleCollapse]);
-
-    const handleCopyReasoning = useCallback(async () => {
-      if (!reasoningContent) return;
-      try {
-        await navigator.clipboard.writeText(reasoningContent);
-        setIsReasoningCopied(true);
-        toast.success("Reasoning copied!");
-        setTimeout(() => setIsReasoningCopied(false), 1500);
-      } catch (err) {
-        toast.error("Failed to copy reasoning.");
-      }
-    }, [reasoningContent]);
-
-    const handleCopyResponse = useCallback(async () => {
-      if (!displayedContent) return;
-      try {
-        await navigator.clipboard.writeText(displayedContent);
-        setIsResponseCopied(true);
-        toast.success("Response copied!");
-        setTimeout(() => setIsResponseCopied(false), 1500);
-      } catch (err) {
-        toast.error("Failed to copy response.");
-      }
-    }, [displayedContent]);
 
     if (!interaction) {
       return (
@@ -250,14 +204,22 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
     }
 
     const handleStopClick = () => {
-      if (onStop) {
-        onStop(interactionId);
-      }
+      InteractionService.abortInteraction(interactionId);
     };
 
     const canFoldResponse =
       (displayedContent && displayedContent.trim().length > 0) ||
       (reasoningContent && reasoningContent.trim().length > 0);
+
+    const headerActionsSlot = renderSlot?.(
+      "header-actions",
+      interaction
+    );
+    const footerActionsSlot = renderSlot?.(
+      "actions",
+      interaction
+    );
+    const contentSlot = renderSlot?.("content", interaction);
 
     return (
       <div
@@ -275,8 +237,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
           />
         )}
         <div className="mt-3 pt-3 border-t border-border/50">
-          {/* Render custom menu items if provided */}
-          {renderSlot?.("menu")}
+          {renderSlot?.("menu", interaction)}
 
           <div
             className={cn(
@@ -291,21 +252,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
                     Assistant ({displayModelName})
                   </span>
                   <div className="flex items-center gap-0.5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity">
-                    {displayedContent && (
-                      <ActionTooltipButton
-                        tooltipText="Copy Response"
-                        onClick={handleCopyResponse}
-                        aria-label="Copy assistant response"
-                        icon={
-                          isResponseCopied ? (
-                            <CheckIcon className="text-green-500" />
-                          ) : (
-                            <ClipboardIcon />
-                          )
-                        }
-                        className="h-5 w-5"
-                      />
-                    )}
+                    {headerActionsSlot}
                     {canFoldResponse && (
                       <ActionTooltipButton
                         tooltipText={isResponseFolded ? "Unfold" : "Fold"}
@@ -337,8 +284,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
 
           {!isResponseFolded && (
             <>
-              {/* Render custom content if provided */}
-              {renderSlot?.("content")}
+              {contentSlot}
               {reasoningContent && (
                 <div className="my-2 p-2 border border-blue-500/30 bg-blue-500/10 rounded-md text-xs">
                   <div
@@ -350,22 +296,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
                       (Streaming)
                     </span>
                     <div className="flex items-center opacity-0 group-hover/reasoning:opacity-100 focus-within:opacity-100 transition-opacity">
-                      <ActionTooltipButton
-                        tooltipText="Copy Reasoning"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopyReasoning();
-                        }}
-                        aria-label="Copy reasoning"
-                        icon={
-                          isReasoningCopied ? (
-                            <CheckIcon className="text-green-500" />
-                          ) : (
-                            <ClipboardIcon />
-                          )
-                        }
-                        className="h-5 w-5 text-muted-foreground"
-                      />
+                      {/* Copy for reasoning is internal to AssistantResponse for now */}
                       <ActionTooltipButton
                         tooltipText={
                           isReasoningFolded
@@ -420,18 +351,15 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
             </div>
           )}
         </div>
-        {onStop && (
-          <>
-            {/* Render custom actions if provided */}
-            {renderSlot?.("actions")}
-            <div className="absolute bottom-1 right-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200">
-              <StopButton
-                onStop={handleStopClick}
-                aria-label="Stop Generation"
-              />
-            </div>
-          </>
-        )}
+        <div
+          className={cn(
+            "absolute bottom-1 right-1 md:bottom-2 md:right-2 flex items-center space-x-0.5 md:space-x-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200",
+            "bg-card/80 backdrop-blur-sm p-0.5 md:p-1 rounded-md shadow-md z-20"
+          )}
+        >
+          {footerActionsSlot}
+          <StopButton onStop={handleStopClick} aria-label="Stop Generation" />
+        </div>
       </div>
     );
   });

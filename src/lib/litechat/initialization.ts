@@ -22,6 +22,7 @@ import { conversationEvent } from "@/types/litechat/events/conversation.events";
 import { modEvent } from "@/types/litechat/events/mod.events";
 import { promptEvent as promptStateEvent } from "@/types/litechat/events/prompt.events";
 import { projectEvent } from "@/types/litechat/events/project.events";
+import { InteractionService } from "@/services/interaction.service";
 
 interface CoreStores {
   requestLoadSettings: () => void;
@@ -283,7 +284,13 @@ export async function performFullInitialization(
   moduleConstructors: ControlModuleConstructor[],
   coreModApi: LiteChatModApi
 ): Promise<ControlModule[]> {
-  console.log("LiteChat: Full initialization sequence START.");
+  console.log("[Init] LiteChat Full Initialization START");
+  // emitter.emit(appEvent.initializationPhaseStarted, { phase: "full" }); // Event does not exist, removing
+
+  // Initialize core services event handlers early
+  InteractionService.initializeCanvasEventHandlers();
+
+  // Define CoreStores object with current store states and actions
   const stores: CoreStores = {
     requestLoadSettings: () =>
       coreModApi.emit(settingsEvent.loadSettingsRequest, undefined),

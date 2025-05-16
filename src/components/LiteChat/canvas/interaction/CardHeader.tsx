@@ -1,18 +1,7 @@
 // src/components/LiteChat/canvas/interaction/CardHeader.tsx
 // FULL FILE
-import React, { useState, useCallback } from "react";
-import {
-  BotIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  ClipboardIcon,
-  CheckIcon,
-  ClockIcon,
-  ZapIcon,
-  CoinsIcon,
-} from "lucide-react";
-import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
-import { toast } from "sonner";
+import React from "react";
+import { BotIcon, ClockIcon, ZapIcon, CoinsIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -24,14 +13,14 @@ import { cn } from "@/lib/utils";
 interface CardHeaderProps {
   displayModelName: string;
   timeAgo: string;
-  responseContent: string | null;
-  isFolded: boolean;
-  toggleFold: () => void;
-  canFold: boolean;
+  isFolded: boolean; // Maintained for consistency, fold button is now a control
+  toggleFold: () => void; // Maintained for consistency
+  canFold: boolean; // Maintained for consistency
   promptTokens?: number;
   completionTokens?: number;
   timeToFirstToken?: number;
   generationTime?: number;
+  headerActionsSlot?: React.ReactNode;
 }
 
 const formatMs = (ms: number | undefined): string => {
@@ -43,33 +32,16 @@ const formatMs = (ms: number | undefined): string => {
 export const CardHeader: React.FC<CardHeaderProps> = ({
   displayModelName,
   timeAgo,
-  responseContent,
-  isFolded,
-  toggleFold,
-  canFold,
+  // responseContent, // No longer needed here for copy
+  // isFolded, // Fold state managed by InteractionCard/StreamingInteractionCard
+  // toggleFold, // Fold action managed by InteractionCard/StreamingInteractionCard
+  // canFold, // Logic for canFold is in InteractionCard/StreamingInteractionCard
   promptTokens,
   completionTokens,
   timeToFirstToken,
   generationTime,
+  headerActionsSlot,
 }) => {
-  const [isCopied, setIsCopied] = useState(false);
-
-  const handleCopy = useCallback(async () => {
-    if (!responseContent || typeof responseContent !== "string") {
-      toast.info("No text response to copy.");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(responseContent);
-      setIsCopied(true);
-      toast.success("Assistant response copied!");
-      setTimeout(() => setIsCopied(false), 1500);
-    } catch (err) {
-      toast.error("Failed to copy response.");
-      console.error("Clipboard copy failed:", err);
-    }
-  }, [responseContent]);
-
   const totalTokens =
     promptTokens !== undefined && completionTokens !== undefined
       ? promptTokens + completionTokens
@@ -78,7 +50,7 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
   return (
     <div
       className={cn(
-        "flex flex-col sm:flex-row justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-20 p-1 -m-1 rounded-t",
+        "flex flex-col sm:flex-row justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-20 p-1 -m-1 rounded-t"
       )}
     >
       <div className="flex items-start gap-1 min-w-0 mb-1 sm:mb-0">
@@ -89,31 +61,7 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
               Assistant ({displayModelName})
             </span>
             <div className="flex items-center gap-0.5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity">
-              {responseContent && typeof responseContent === "string" && (
-                <ActionTooltipButton
-                  tooltipText="Copy Response"
-                  onClick={handleCopy}
-                  aria-label="Copy assistant response"
-                  icon={
-                    isCopied ? (
-                      <CheckIcon className="text-green-500" />
-                    ) : (
-                      <ClipboardIcon />
-                    )
-                  }
-                  className="h-5 w-5"
-                />
-              )}
-              {canFold && (
-                <ActionTooltipButton
-                  tooltipText={isFolded ? "Unfold" : "Fold"}
-                  onClick={toggleFold}
-                  aria-label={isFolded ? "Unfold response" : "Fold response"}
-                  icon={isFolded ? <ChevronDownIcon /> : <ChevronUpIcon />}
-                  iconClassName="h-3.5 w-3.5"
-                  className="h-5 w-5"
-                />
-              )}
+              {headerActionsSlot}
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">

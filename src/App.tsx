@@ -33,32 +33,31 @@ import { GeneralSettingsModule } from "@/controls/modules/GeneralSettingsModule"
 import { ThemeSettingsControlModule } from "@/controls/modules/ThemeSettingsControlModule";
 import { ProviderSettingsModule } from "@/controls/modules/ProviderSettingsModule";
 import { AssistantSettingsModule } from "@/controls/modules/AssistantSettingsModule";
-// GitSettingsModule is removed; GitSyncControlModule handles its settings tab
 import { DataSettingsModule } from "@/controls/modules/DataSettingsModule";
 import { ModSettingsModule } from "@/controls/modules/ModSettingsModule";
 
+// Import canvas action control modules
+import { CopyActionControlModule } from "@/controls/modules/canvas/CopyActionControlModule";
+import { RegenerateActionControlModule } from "@/controls/modules/canvas/RegenerateActionControlModule";
+import { RatingActionControlModule } from "@/controls/modules/canvas/RatingActionControlModule";
+import { ExampleCanvasControlModule } from "@/controls/modules/example";
+import { FoldInteractionControlModule } from "@/controls/modules/canvas/interaction/FoldInteractionControlModule";
+import { CopyCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/CopyCodeBlockControlModule";
+import { FoldCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/FoldCodeBlockControlModule";
+
 // Define the application's specific control module registration order HERE
 const controlModulesToRegister: ControlModuleConstructor[] = [
-  // Core functional modules (no UI, but initialize early)
   UrlParameterControlModule,
-
-  // Settings Modules (Register their tabs early, order prop in tab def handles display order)
   GeneralSettingsModule,
   ThemeSettingsControlModule,
   ProviderSettingsModule,
   AssistantSettingsModule,
   DataSettingsModule,
   ModSettingsModule,
-  // RulesControlModule also registers a settings tab
-  // GitSyncControlModule also registers a settings tab
-
-  // Layout Controls (Sidebar, Header, Footer)
   ConversationListControlModule,
   SidebarToggleControlModule,
-  SettingsControlModule, // This module now only opens the modal shell
+  SettingsControlModule,
   ProjectSettingsControlModule,
-
-  // Prompt Controls (Order matters for visual layout in the prompt bar)
   GlobalModelSelectorModule,
   AutoTitleControlModule,
   UsageDisplayControlModule,
@@ -66,16 +65,22 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   WebSearchControlModule,
   FileControlModule,
   VfsControlModule,
-  RulesControlModule, // Registers prompt control and settings tab
+  RulesControlModule,
   SystemPromptControlModule,
   ToolSelectorControlModule,
   ParameterControlModule,
   StructuredOutputControlModule,
-  GitSyncControlModule, // Registers prompt control and settings tab
-
-  // Tools (Registration order doesn't affect UI directly)
+  GitSyncControlModule,
   VfsToolsModule,
   GitToolsModule,
+  // Canvas Action Controls
+  CopyActionControlModule, // For InteractionCard header
+  FoldInteractionControlModule, // For InteractionCard header
+  RegenerateActionControlModule, // For InteractionCard footer
+  RatingActionControlModule, // For InteractionCard footer
+  CopyCodeBlockControlModule, // For CodeBlockRenderer header
+  FoldCodeBlockControlModule, // For CodeBlockRenderer header
+  ExampleCanvasControlModule,
 ];
 
 function App() {

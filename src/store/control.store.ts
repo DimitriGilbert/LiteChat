@@ -3,11 +3,15 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
+import {
+  controlRegistryEvent,
+  ControlRegistryEventPayloads,
+} from "@/types/litechat/events/control.registry.events";
 import type {
   ControlState as ControlStateInterface,
   ControlActions as ControlActionsInterface,
   RegisteredActionHandler,
+  CanvasControl as CoreCanvasControlAliased, // Added alias
 } from "@/types/litechat/control";
 import type {
   ModalProvider,
@@ -21,6 +25,7 @@ export const useControlRegistryStore = create(
     // Initial State
     promptControls: {},
     chatControls: {},
+    canvasControls: {}, // Added
     middlewareRegistry: {},
     tools: {},
     modalProviders: {},
@@ -83,6 +88,38 @@ export const useControlRegistryStore = create(
       });
       emitter.emit(controlRegistryEvent.chatControlsChanged, {
         controls: get().chatControls,
+      });
+    },
+
+    registerCanvasControl: (control) => {
+      // Added
+      set((state) => {
+        if (state.canvasControls[control.id]) {
+          console.warn(
+            `ControlRegistryStore: CanvasControl with ID "${control.id}" already registered. Overwriting.`
+          );
+        }
+        state.canvasControls[control.id] = control;
+      });
+      emitter.emit(controlRegistryEvent.canvasControlsChanged, {
+        controls: get().canvasControls,
+      });
+      return () => get().unregisterCanvasControl(control.id);
+    },
+
+    unregisterCanvasControl: (id) => {
+      // Added
+      set((state) => {
+        if (state.canvasControls[id]) {
+          delete state.canvasControls[id];
+        } else {
+          console.warn(
+            `ControlRegistryStore: CanvasControl with ID "${id}" not found for unregistration.`
+          );
+        }
+      });
+      emitter.emit(controlRegistryEvent.canvasControlsChanged, {
+        controls: get().canvasControls,
       });
     },
 
@@ -207,35 +244,67 @@ export const useControlRegistryStore = create(
       return [
         {
           eventName: controlRegistryEvent.registerPromptControlRequest,
-          handler: (payload) => {
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.registerPromptControlRequest]
+          ) => {
             actions.registerPromptControl(payload.control);
           },
           storeId,
         },
         {
           eventName: controlRegistryEvent.unregisterPromptControlRequest,
-          handler: (payload) => {
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.unregisterPromptControlRequest]
+          ) => {
             actions.unregisterPromptControl(payload.id);
           },
           storeId,
         },
         {
           eventName: controlRegistryEvent.registerChatControlRequest,
-          handler: (payload) => {
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.registerChatControlRequest]
+          ) => {
             actions.registerChatControl(payload.control);
           },
           storeId,
         },
         {
           eventName: controlRegistryEvent.unregisterChatControlRequest,
-          handler: (payload) => {
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.unregisterChatControlRequest]
+          ) => {
             actions.unregisterChatControl(payload.id);
           },
           storeId,
         },
         {
+          // Added handler for canvas control registration
+          eventName: controlRegistryEvent.registerCanvasControlRequest,
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.registerCanvasControlRequest]
+          ) => {
+            actions.registerCanvasControl(
+              payload.control as CoreCanvasControlAliased
+            );
+          },
+          storeId,
+        },
+        {
+          // Added handler for canvas control unregistration
+          eventName: controlRegistryEvent.unregisterCanvasControlRequest,
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.unregisterCanvasControlRequest]
+          ) => {
+            actions.unregisterCanvasControl(payload.id);
+          },
+          storeId,
+        },
+        {
           eventName: controlRegistryEvent.registerMiddlewareRequest,
-          handler: (payload) => {
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.registerMiddlewareRequest]
+          ) => {
             actions.registerMiddleware(
               payload.hookName as ModMiddlewareHookName,
               payload.modId,
@@ -247,7 +316,9 @@ export const useControlRegistryStore = create(
         },
         {
           eventName: controlRegistryEvent.unregisterMiddlewareRequest,
-          handler: (payload) => {
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.unregisterMiddlewareRequest]
+          ) => {
             actions.unregisterMiddleware(
               payload.hookName as ModMiddlewareHookName,
               payload.modId,
@@ -258,7 +329,9 @@ export const useControlRegistryStore = create(
         },
         {
           eventName: controlRegistryEvent.registerToolRequest,
-          handler: (payload) => {
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.registerToolRequest]
+          ) => {
             actions.registerTool(
               payload.modId,
               payload.toolName,
@@ -270,14 +343,18 @@ export const useControlRegistryStore = create(
         },
         {
           eventName: controlRegistryEvent.unregisterToolRequest,
-          handler: (payload) => {
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.unregisterToolRequest]
+          ) => {
             actions.unregisterTool(payload.toolName);
           },
           storeId,
         },
         {
           eventName: controlRegistryEvent.registerModalProviderRequest,
-          handler: (payload) => {
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.registerModalProviderRequest]
+          ) => {
             actions.registerModalProvider(
               payload.modalId,
               payload.provider as ModalProvider
@@ -287,7 +364,9 @@ export const useControlRegistryStore = create(
         },
         {
           eventName: controlRegistryEvent.unregisterModalProviderRequest,
-          handler: (payload) => {
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.unregisterModalProviderRequest]
+          ) => {
             actions.unregisterModalProvider(payload.modalId);
           },
           storeId,

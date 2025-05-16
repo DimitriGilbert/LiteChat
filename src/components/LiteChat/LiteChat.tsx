@@ -3,9 +3,9 @@
 import React, {
   useEffect,
   useCallback,
-  useMemo,
   useState,
   useRef,
+  useMemo,
 } from "react";
 import { PromptWrapper } from "@/components/LiteChat/prompt/PromptWrapper";
 import { ChatCanvas } from "@/components/LiteChat/canvas/ChatCanvas";
@@ -17,7 +17,6 @@ import { useUIStateStore } from "@/store/ui.store";
 import { useControlRegistryStore } from "@/store/control.store";
 import type { PromptTurnObject, InputAreaRef } from "@/types/litechat/prompt";
 import { ConversationService } from "@/services/conversation.service";
-import { InteractionService } from "@/services/interaction.service";
 import { Toaster } from "@/components/ui/sonner";
 import { InputArea } from "@/components/LiteChat/prompt/InputArea";
 import { useShallow } from "zustand/react/shallow";
@@ -87,8 +86,31 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         isChatControlPanelOpen: state.isChatControlPanelOpen,
       }))
     );
-  const chatControls = useControlRegistryStore(
+
+  const allChatControls = useControlRegistryStore(
     useShallow((state) => Object.values(state.chatControls))
+  );
+
+  const sidebarControls = useMemo(
+    () =>
+      allChatControls.filter(
+        (c) => (c.panel ?? "main") === "sidebar" && (c.show ? c.show() : true)
+      ),
+    [allChatControls]
+  );
+  const sidebarFooterControls = useMemo(
+    () =>
+      allChatControls.filter(
+        (c) => c.panel === "sidebar-footer" && (c.show ? c.show() : true)
+      ),
+    [allChatControls]
+  );
+  const headerControls = useMemo(
+    () =>
+      allChatControls.filter(
+        (c) => c.panel === "header" && (c.show ? c.show() : true)
+      ),
+    [allChatControls]
   );
 
   const toggleMobileSidebar = useCallback(() => {
@@ -280,20 +302,15 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     isChatControlPanelOpen,
   ]);
 
-  // Helper function to create a conversation and wait for its selection
   const createAndSelectConversation = async (data: {
     title: string;
     projectId: string | null;
   }): Promise<string> => {
-    // First create the conversation and get its ID
     const conversationState = useConversationStore.getState();
     const newId = await conversationState.addConversation(data);
     console.log("New conversation ID:", newId);
-
-    // Then select it - conversation store will handle interaction updates
     await conversationState.selectItem(newId, "conversation");
     console.log("conv selected:", newId);
-
     return newId;
   };
 
@@ -336,7 +353,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     }
 
     try {
-      // console.log("convID 3:", currentConvId);
       const currentPromptState = usePromptStateStore.getState();
       const finalTurnData = {
         ...turnData,
@@ -351,40 +367,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       toast.error("Failed to send message.");
     }
   }, []);
-
-  const onRegenerateInteraction = useCallback(async (interactionId: string) => {
-    try {
-      await ConversationService.regenerateInteraction(interactionId);
-    } catch (error) {
-      console.error("[LiteChat] App: Error regenerating interaction:", error);
-    }
-  }, []);
-
-  const onStopInteraction = useCallback((interactionId: string) => {
-    InteractionService.abortInteraction(interactionId);
-  }, []);
-
-  const sidebarControls = useMemo(
-    () =>
-      chatControls.filter(
-        (c) => (c.panel ?? "main") === "sidebar" && (c.show ? c.show() : true)
-      ),
-    [chatControls]
-  );
-  const sidebarFooterControls = useMemo(
-    () =>
-      chatControls.filter(
-        (c) => c.panel === "sidebar-footer" && (c.show ? c.show() : true)
-      ),
-    [chatControls]
-  );
-  const headerControls = useMemo(
-    () =>
-      chatControls.filter(
-        (c) => c.panel === "header" && (c.show ? c.show() : true)
-      ),
-    [chatControls]
-  );
 
   const currentConversationIdForCanvas =
     selectedItemType === "conversation" ? selectedItemId : null;
@@ -510,8 +492,6 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
           <ChatCanvas
             conversationId={currentConversationIdForCanvas}
             interactions={interactions}
-            onRegenerateInteraction={onRegenerateInteraction}
-            onStopInteraction={onStopInteraction}
             status={interactionStatus}
             className="flex-grow overflow-y-hidden"
           />
