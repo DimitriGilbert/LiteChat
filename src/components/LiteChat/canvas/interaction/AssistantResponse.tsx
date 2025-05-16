@@ -1,6 +1,6 @@
 // src/components/LiteChat/canvas/interaction/AssistantResponse.tsx
 // FULL FILE
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -14,13 +14,15 @@ import {
   CodeBlockData,
 } from "@/lib/litechat/useMarkdownParser";
 import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
-import { ToolCallPart, ToolResultPart } from "ai";
-import { ToolCallDisplay } from "@/components/LiteChat/canvas/tool/CallDisplay";
-import { ToolResultDisplay } from "@/components/LiteChat/canvas/tool/ResultDisplay";
+import { type ToolCallPart, type ToolResultPart } from "ai";
 import { toast } from "sonner";
+import { useControlRegistryStore } from "@/store/control.store";
+import { useShallow } from "zustand/react/shallow";
+import type { CanvasControl, CanvasControlRenderContext } from "@/types/litechat/canvas/control";
 
-const StaticContentView: React.FC<{ markdownContent: string | null }> = ({
+const StaticContentView: React.FC<{ markdownContent: string | null, interactionId: string }> = ({
   markdownContent,
+  interactionId
 }) => {
   const parsedContent = useMarkdownParser(markdownContent);
 
@@ -56,6 +58,7 @@ const StaticContentView: React.FC<{ markdownContent: string | null }> = ({
 };
 
 interface AssistantResponseProps {
+  interactionId: string;
   response: any | null;
   toolCalls: string[] | undefined;
   toolResults: string[] | undefined;
@@ -67,9 +70,10 @@ interface AssistantResponseProps {
 }
 
 export const AssistantResponse: React.FC<AssistantResponseProps> = ({
+  interactionId,
   response,
-  toolCalls,
-  toolResults,
+  toolCalls: toolCallStrings,
+  toolResults: toolResultStrings,
   reasoning,
   isError,
   errorMessage,
@@ -78,6 +82,48 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
 }) => {
   const [isReasoningFolded, setIsReasoningFolded] = useState(true);
   const [isReasoningCopied, setIsReasoningCopied] = useState(false);
+
+  const canvasControls = useControlRegistryStore(
+    useShallow((state) => Object.values(state.canvasControls))
+  );
+
+  const renderSlotForToolCallStep = useCallback(
+    (
+      targetSlotName: CanvasControl["targetSlot"],
+      context: CanvasControlRenderContext
+    ): React.ReactNode[] => {
+      return canvasControls
+        .filter(
+          (c) =>
+            c.type === "tool-call-step" &&
+            c.targetSlot === targetSlotName &&
+            c.renderer
+        )
+        .map((control) => {
+          if (control.renderer) {
+            return (
+              <React.Fragment key={control.id}>
+                {control.renderer(context)}
+              </React.Fragment>
+            );
+          }
+          return null;
+        })
+        .filter(Boolean) as React.ReactNode[];
+    },
+    [canvasControls]
+  );
+
+  const parsedToolSteps = useMemo(() => {
+    if (!toolCallStrings) return [];
+    const calls = toolCallStrings.map(str => JSON.parse(str) as ToolCallPart);
+    const results = toolResultStrings?.map(str => JSON.parse(str) as ToolResultPart) ?? [];
+    
+    return calls.map(call => {
+      const result = results.find(res => res.toolCallId === call.toolCallId);
+      return { call, result };
+    });
+  }, [toolCallStrings, toolResultStrings]);
 
   const toggleReasoningFold = useCallback(
     () => setIsReasoningFolded((prev) => !prev),
@@ -100,8 +146,7 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
   const hasReasoning = !!reasoning;
   const hasResponseContent =
     response && (typeof response !== "string" || response.trim().length > 0);
-  const hasToolCalls = toolCalls && toolCalls.length > 0;
-  const hasToolResults = toolResults && toolResults.length > 0;
+  const hasToolCalls = parsedToolSteps && parsedToolSteps.length > 0;
 
   if (isFolded) {
     return (
@@ -110,10 +155,10 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
         onClick={toggleFold}
       >
         {hasReasoning ? "[Reasoning] " : ""}
-        {hasToolCalls ? `[${toolCalls?.length} Tool Call(s)] ` : ""}
+        {hasToolCalls ? `[${parsedToolSteps?.length} Tool Call(s)] ` : ""}
         {hasResponseContent && typeof response === "string"
           ? `"${response.substring(0, 80)}${response.length > 80 ? "..." : ""}"`
-          : hasToolCalls || hasToolResults || hasReasoning
+          : hasToolCalls || hasReasoning
             ? ""
             : "[No text response]"}
       </div>
@@ -180,43 +225,27 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
           )}
         </div>
       )}
-      {toolCalls?.map((callStr, idx) => {
-        try {
-          const parsedCall = JSON.parse(callStr) as ToolCallPart;
-          return <ToolCallDisplay key={`call-${idx}`} toolCall={parsedCall} />;
-        } catch (e) {
-          console.error("Failed to parse tool call string:", e);
-          return (
-            <div key={`call-err-${idx}`} className="text-xs text-destructive">
-              [Error displaying tool call]
-            </div>
-          );
-        }
+      {parsedToolSteps.map(({ call, result }, idx) => {
+        const toolCallContext: CanvasControlRenderContext = {
+          interactionId,
+          toolCall: call,
+          toolResult: result,
+          canvasContextType: "tool-call-step",
+        };
+        return (
+          <React.Fragment key={`tool-step-${call.toolCallId || idx}`}>
+            {renderSlotForToolCallStep("tool-call-content", toolCallContext)}
+          </React.Fragment>
+        );
       })}
-      {toolResults?.map((resStr, idx) => {
-        try {
-          const parsedResult = JSON.parse(resStr) as ToolResultPart;
-          return (
-            <ToolResultDisplay key={`res-${idx}`} toolResult={parsedResult} />
-          );
-        } catch (e) {
-          console.error("Failed to parse tool result string:", e);
-          return (
-            <div key={`res-err-${idx}`} className="text-xs text-destructive">
-              [Error displaying tool result]
-            </div>
-          );
-        }
-      })}
-      <StaticContentView markdownContent={response} />
-      {!hasResponseContent &&
-        !hasToolCalls &&
-        !hasToolResults &&
-        !hasReasoning && (
-          <div className="text-muted-foreground italic">
-            No response content.
-          </div>
-        )}
+      {hasResponseContent && typeof response === "string" && (
+        <StaticContentView markdownContent={response} interactionId={interactionId} />
+      )}
+      {!hasResponseContent && !hasToolCalls && !hasReasoning && !isError && (
+         <div className="text-xs text-muted-foreground italic p-1">
+           [No text response]
+         </div>
+      )}
     </>
   );
 };

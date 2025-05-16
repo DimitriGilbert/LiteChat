@@ -1,16 +1,23 @@
 // src/components/LiteChat/canvas/StreamingContentView.tsx
 // FULL FILE
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   useMarkdownParser,
   CodeBlockData,
+  ParsedContent,
 } from "@/lib/litechat/useMarkdownParser";
 import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
 import { useSettingsStore } from "@/store/settings.store";
 import { cn } from "@/lib/utils";
 import { useShallow } from "zustand/react/shallow";
+import { type ToolCallPart, type ToolResultPart } from "ai";
+import { useControlRegistryStore } from "@/store/control.store";
+import type { CanvasControl, CanvasControlRenderContext } from "@/types/litechat/canvas/control";
+import { useInteractionStore } from "@/store/interaction.store";
+import MarkdownIt from "markdown-it";
 
 interface StreamingContentViewProps {
+  interactionId: string;
   markdownContent: string | null | undefined;
   isStreaming?: boolean;
   className?: string;
@@ -21,11 +28,10 @@ const renderBlock = (
   item: string | CodeBlockData,
   index: number,
   useFullCodeBlock: boolean,
-  isStreamingBlock: boolean
+  isStreamingBlock: boolean,
+  interactionId: string
 ): React.ReactNode | null => {
-  // Use ReactNode type
   if (typeof item === "string") {
-    // Ensure empty strings don't create empty divs if not desired
     if (!item.trim()) return null;
     return (
       <div
@@ -41,17 +47,15 @@ const renderBlock = (
       : "language-plaintext";
 
     if (useFullCodeBlock) {
-      // Pass isStreaming prop to CodeBlockRenderer
       return (
         <CodeBlockRenderer
           key={`code-${index}`}
           lang={codeData.lang}
           code={codeData.code}
-          isStreaming={isStreamingBlock} // Only the last block is actively streaming
+          isStreaming={isStreamingBlock}
         />
       );
     } else {
-      // Render basic pre/code block if setting is off
       return (
         <pre
           key={`pre-${index}`}
@@ -78,6 +82,7 @@ const renderBlock = (
 };
 
 export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
+  interactionId,
   markdownContent,
   isStreaming = false,
   className,
@@ -90,120 +95,105 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
       }))
     );
 
-  // Call useMarkdownParser at the top level
-  const parsedContent = useMarkdownParser(
+  const parsedContent: ParsedContent = useMarkdownParser(
     enableStreamingMarkdown ? markdownContent : null
   );
 
-  // State to store the rendered elements of finalized blocks
-  const [finalizedElements, setFinalizedElements] = useState<React.ReactNode[]>(
-    []
+  const canvasControls = useControlRegistryStore(
+    useShallow((state) => Object.values(state.canvasControls))
   );
-  // State to store the *data* of the currently streaming block
-  const [streamingBlockData, setStreamingBlockData] = useState<
-    string | CodeBlockData | null
-  >(null);
-  // Ref to track the number of finalized blocks rendered
-  const finalizedBlockCountRef = useRef(0);
 
-  // Effect to process markdown and update finalized/streaming blocks
-  useEffect(() => {
-    // If markdown streaming is off, handle raw content display
-    if (!enableStreamingMarkdown) {
-      setFinalizedElements([]);
-      setStreamingBlockData(markdownContent ?? null);
-      finalizedBlockCountRef.current = 0;
-      return;
-    }
-
-    // Use the parsedContent from the hook call above
-    const currentFinalizedCount = finalizedBlockCountRef.current;
-
-    // Identify new blocks that have been finalized (all except the last one)
-    const newlyFinalizedBlocks = parsedContent.slice(
-      currentFinalizedCount,
-      parsedContent.length - 1
-    );
-
-    if (newlyFinalizedBlocks.length > 0) {
-      const newElements = newlyFinalizedBlocks
-        .map((block, index) =>
-          renderBlock(
-            block,
-            currentFinalizedCount + index,
-            enableStreamingCodeBlockParsing,
-            false
-          )
+  const renderSlotForToolCallStep = useCallback(
+    (
+      targetSlotName: CanvasControl["targetSlot"],
+      context: CanvasControlRenderContext
+    ): React.ReactNode[] => {
+      return canvasControls
+        .filter(
+          (c) =>
+            c.type === "tool-call-step" &&
+            c.targetSlot === targetSlotName &&
+            c.renderer
         )
-        .filter((el): el is React.ReactNode => el !== null);
+        .map((control) => {
+          if (control.renderer) {
+            return (
+              <React.Fragment key={control.id}>
+                {control.renderer(context)}
+              </React.Fragment>
+            );
+          }
+          return null;
+        })
+        .filter(Boolean) as React.ReactNode[];
+    },
+    [canvasControls]
+  );
 
-      // Append new finalized elements
-      setFinalizedElements((prev) => [...prev, ...newElements]);
-      finalizedBlockCountRef.current += newlyFinalizedBlocks.length;
+  const { toolCallStrings, toolResultStrings } = useInteractionStore(
+    useShallow((state) => {
+      const interaction = state.interactions.find(i => i.id === interactionId);
+      return {
+        toolCallStrings: interaction?.metadata?.toolCalls,
+        toolResultStrings: interaction?.metadata?.toolResults,
+      };
+    })
+  );
+
+  const parsedToolSteps = useMemo(() => {
+    if (!toolCallStrings) return [];
+    try {
+      const calls = toolCallStrings.map(str => JSON.parse(str) as ToolCallPart);
+      const results = toolResultStrings?.map(str => JSON.parse(str) as ToolResultPart) ?? [];
+      return calls.map(call => {
+        const result = results.find(res => res.toolCallId === call.toolCallId);
+        return { call, result };
+      });
+    } catch (e) {
+      console.error("[StreamingContentView] Error parsing tool call/result strings:", e);
+      return [];
     }
+  }, [toolCallStrings, toolResultStrings]);
 
-    // Update the streaming block data (always the last block)
-    const lastBlock =
-      parsedContent.length > 0 ? parsedContent[parsedContent.length - 1] : null;
-
-    // Only update if the data actually changed
-    if (JSON.stringify(lastBlock) !== JSON.stringify(streamingBlockData)) {
-      setStreamingBlockData(lastBlock);
-    }
-
-    // Reset if content becomes empty or null/undefined
-    if (!markdownContent) {
-      setFinalizedElements([]);
-      setStreamingBlockData(null);
-      finalizedBlockCountRef.current = 0;
-    }
-  }, [
-    parsedContent,
-    enableStreamingMarkdown,
-    enableStreamingCodeBlockParsing,
-    streamingBlockData,
-    markdownContent,
-  ]);
-
-  // Render the streaming block separately using useMemo
-  const streamingElement = useMemo(() => {
-    if (!streamingBlockData || !enableStreamingMarkdown) return null;
-    // Render the last block, indicating it's the one actively streaming
-    return renderBlock(
-      streamingBlockData,
-      finalizedBlockCountRef.current,
+  const renderedMarkdownElements = useMemo(() => {
+    if (!enableStreamingMarkdown) return [];
+    return parsedContent.map((item, index) => renderBlock(
+      item,
+      index,
       enableStreamingCodeBlockParsing,
-      true
-    );
-  }, [
-    streamingBlockData,
-    enableStreamingCodeBlockParsing,
-    enableStreamingMarkdown,
-  ]);
+      isStreaming && index === parsedContent.length - 1,
+      interactionId
+    )).filter(Boolean);
+  }, [enableStreamingMarkdown, parsedContent, enableStreamingCodeBlockParsing, isStreaming, interactionId]);
 
-  // Fallback for empty content
-  if (!markdownContent?.trim() && finalizedElements.length === 0) {
-    return (
-      <div className={cn("text-muted-foreground italic", className)}>
-        {isStreaming ? "Generating response..." : "No response content."}
-      </div>
-    );
+  if (!enableStreamingMarkdown && !markdownContent && parsedToolSteps.length === 0) {
+      return isStreaming ? <div className={cn("text-muted-foreground italic", className)}>Generating response...</div> : null;
   }
 
-  // If markdown streaming is disabled, render raw text directly from markdownContent
-  if (!enableStreamingMarkdown) {
-    return (
-      <pre className={cn("whitespace-pre-wrap text-sm", className)}>
-        {markdownContent}
-      </pre>
-    );
-  }
-
-  // Render finalized elements + the separately rendered streaming element
   return (
-    <div className={cn(className)}>
-      {finalizedElements}
-      {streamingElement}
+    <div className={cn("streaming-content-view overflow-wrap-anywhere", className)}>
+      {/* Render Tool Calls First */}
+      {parsedToolSteps.map(({ call, result }, idx) => {
+        const toolCallContext: CanvasControlRenderContext = {
+          interactionId,
+          toolCall: call,
+          toolResult: result,
+          canvasContextType: "tool-call-step",
+        };
+        return (
+          <React.Fragment key={`tool-step-${call.toolCallId || idx}`}>
+            {renderSlotForToolCallStep("tool-call-content", toolCallContext)}
+          </React.Fragment>
+        );
+      })}
+
+      {/* Render markdown/code blocks */}
+      {enableStreamingMarkdown 
+        ? renderedMarkdownElements 
+        : markdownContent 
+          ? <div className="markdown-content" dangerouslySetInnerHTML={{ __html: new MarkdownIt().render(markdownContent) }} />
+          : null
+      }
     </div>
   );
 };

@@ -17,7 +17,7 @@ export class CopyActionControlModule implements ControlModule {
       type: "interaction",
       targetSlot: "header-actions",
       renderer: (context: CanvasControlRenderContext) => {
-        console.log("copy action render call")
+        // console.log("copy action render call")
         if (!context.interactionId) {
           console.warn(
             "CopyActionControlModule: interactionId is missing in context for an interaction control."

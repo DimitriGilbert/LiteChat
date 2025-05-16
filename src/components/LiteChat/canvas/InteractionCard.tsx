@@ -152,6 +152,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
           {contentSlot}
 
           <AssistantResponse
+            interactionId={interaction.id}
             response={interaction.response}
             toolCalls={interaction.metadata?.toolCalls}
             toolResults={interaction.metadata?.toolResults}

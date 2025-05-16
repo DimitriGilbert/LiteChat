@@ -44,6 +44,7 @@ import { ExampleCanvasControlModule } from "@/controls/modules/example";
 import { FoldInteractionControlModule } from "@/controls/modules/canvas/interaction/FoldInteractionControlModule";
 import { CopyCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/CopyCodeBlockControlModule";
 import { FoldCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/FoldCodeBlockControlModule";
+import { ToolCallStepControlModule } from "@/controls/modules/canvas/tool/ToolCallStepControlModule";
 
 // Define the application's specific control module registration order HERE
 const controlModulesToRegister: ControlModuleConstructor[] = [
@@ -81,6 +82,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   CopyCodeBlockControlModule, // For CodeBlockRenderer header
   FoldCodeBlockControlModule, // For CodeBlockRenderer header
   ExampleCanvasControlModule,
+  ToolCallStepControlModule,
 ];
 
 function App() {

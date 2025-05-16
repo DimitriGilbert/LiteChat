@@ -332,6 +332,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
                 </div>
               )}
               <StreamingContentView
+                interactionId={interactionId}
                 markdownContent={displayedContent}
                 isStreaming={true}
               />

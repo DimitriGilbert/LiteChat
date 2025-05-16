@@ -137,32 +137,32 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
       targetSlotName: CanvasControl["targetSlot"],
       contextInteraction?: Interaction
     ): React.ReactNode[] => {
-      console.log(
-        `[ChatCanvas] renderSlotForCanvas attempting to render: type='${targetType}', slot='${targetSlotName}'`
-      );
-      if (!canvasControls || canvasControls.length === 0) {
-        console.warn("[ChatCanvas] No canvas controls are registered in the store!");
-      } else {
-        // Log details of all available canvas controls for debugging
-        const controlDetails = canvasControls.map(c => ({ id: c.id, type: c.type, targetSlot: c.targetSlot, hasRenderer: !!c.renderer }));
-        console.log("[ChatCanvas] Available canvasControls:", JSON.stringify(controlDetails, null, 2));
-      }
+      // console.log(
+      //   `[ChatCanvas] renderSlotForCanvas attempting to render: type='${targetType}', slot='${targetSlotName}'`
+      // );
+      // if (!canvasControls || canvasControls.length === 0) {
+      //   console.warn("[ChatCanvas] No canvas controls are registered in the store!");
+      // } else {
+      //   // Log details of all available canvas controls for debugging
+      //   const controlDetails = canvasControls.map(c => ({ id: c.id, type: c.type, targetSlot: c.targetSlot, hasRenderer: !!c.renderer }));
+      //   console.log("[ChatCanvas] Available canvasControls:", JSON.stringify(controlDetails, null, 2));
+      // }
 
       const filteredControls = canvasControls.filter((c) => {
         const typeMatch = c.type === targetType;
         const slotMatch = c.targetSlot === targetSlotName;
         const rendererExists = !!c.renderer;
-        if (c.id.includes("copy") || c.id.includes("regenerate") || c.id.includes("rating")) {
-            console.log(`[ChatCanvas] Filtering control '${c.id}': typeMatch=${typeMatch} (expected ${targetType}), slotMatch=${slotMatch} (expected ${targetSlotName}), rendererExists=${rendererExists}`);
-        }
+        // if (c.id.includes("copy") || c.id.includes("regenerate") || c.id.includes("rating")) {
+        //     console.log(`[ChatCanvas] Filtering control '${c.id}': typeMatch=${typeMatch} (expected ${targetType}), slotMatch=${slotMatch} (expected ${targetSlotName}), rendererExists=${rendererExists}`);
+        // }
         return typeMatch && slotMatch && rendererExists;
       });
 
-      if (filteredControls.length === 0) {
-        console.warn(
-          `[ChatCanvas] No controls found after filtering for: type='${targetType}', slot='${targetSlotName}'`
-        );
-      }
+      // if (filteredControls.length === 0) {
+      //   console.warn(
+      //     `[ChatCanvas] No controls found after filtering for: type='${targetType}', slot='${targetSlotName}'`
+      //   );
+      // }
 
       return filteredControls
         .map((control) => {
