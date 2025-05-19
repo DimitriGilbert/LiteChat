@@ -1,276 +1,245 @@
 // src/controls/components/parameter/ParameterControlComponent.tsx
-// FULL FILE
-import React, { useState, useEffect, useCallback } from "react";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
-import { Input } from "@/components/ui/input";
+import React, { useEffect, useCallback } from "react";
+import { useForm,  } from "@tanstack/react-form";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ParameterControlModule } from "@/controls/modules/ParameterControlModule";
+
+import { NumberField } from "@/components/LiteChat/common/form-fields/NumberField";
+import { SliderField } from "@/components/LiteChat/common/form-fields/SliderField";
 
 interface ParameterControlComponentProps {
   module: ParameterControlModule;
   className?: string;
 }
 
-export const ParameterControlComponent: React.FC<
-  ParameterControlComponentProps
-> = ({ module, className }) => {
-  const [, forceUpdate] = useState({});
+const paramsSchema = z.object({
+  temperature: z.number().min(0).max(1),
+  topP: z.number().min(0).max(1),
+  maxTokens: z.number().min(1).nullable(),
+  topK: z.number().min(1).nullable(),
+  presencePenalty: z.number().min(-2).max(2),
+  frequencyPenalty: z.number().min(-2).max(2),
+});
+
+type ParamsFormValues = z.infer<typeof paramsSchema>;
+
+export const ParameterControlComponent: React.FC<ParameterControlComponentProps> = ({ module, className }) => {
+  const form = useForm({
+    defaultValues: {
+      temperature: module.temperature ?? module.defaultTemperature ?? 0.7,
+      topP: module.topP ?? module.defaultTopP ?? 1.0,
+      maxTokens: module.maxTokens ?? module.defaultMaxTokens ?? null,
+      topK: module.topK ?? module.defaultTopK ?? null,
+      presencePenalty: module.presencePenalty ?? module.defaultPresencePenalty ?? 0.0,
+      frequencyPenalty: module.frequencyPenalty ?? module.defaultFrequencyPenalty ?? 0.0,
+    } as ParamsFormValues,
+    validators: {
+      onChangeAsync: paramsSchema,
+      onChangeAsyncDebounceMs: 500,
+    },
+  });
+
   useEffect(() => {
-    module.setNotifyCallback(() => forceUpdate({}));
+    form.reset({
+      temperature: module.temperature ?? module.defaultTemperature ?? 0.7,
+      topP: module.topP ?? module.defaultTopP ?? 1.0,
+      maxTokens: module.maxTokens ?? module.defaultMaxTokens ?? null,
+      topK: module.topK ?? module.defaultTopK ?? null,
+      presencePenalty: module.presencePenalty ?? module.defaultPresencePenalty ?? 0.0,
+      frequencyPenalty: module.frequencyPenalty ?? module.defaultFrequencyPenalty ?? 0.0,
+    } as ParamsFormValues);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    module.temperature,
+    module.defaultTemperature,
+    module.topP,
+    module.defaultTopP,
+    module.maxTokens,
+    module.defaultMaxTokens,
+    module.topK,
+    module.defaultTopK,
+    module.presencePenalty,
+    module.defaultPresencePenalty,
+    module.frequencyPenalty,
+    module.defaultFrequencyPenalty,
+    // form instance removed from deps based on Tanstack Form guidance for reset
+  ]);
+
+  const [, forceUpdate] = React.useState({});
+  useEffect(() => {
+    const callback = () => forceUpdate({});
+    module.setNotifyCallback(callback);
     return () => module.setNotifyCallback(null);
   }, [module]);
 
-  const temperature = module.temperature;
-  const topP = module.topP;
-  const maxTokens = module.maxTokens;
-  const topK = module.topK;
-  const presencePenalty = module.presencePenalty;
-  const frequencyPenalty = module.frequencyPenalty;
-
-  const defaultTemperature = module.defaultTemperature;
-  const defaultTopP = module.defaultTopP;
-  const defaultMaxTokens = module.defaultMaxTokens;
-  const defaultTopK = module.defaultTopK;
-  const defaultPresencePenalty = module.defaultPresencePenalty;
-  const defaultFrequencyPenalty = module.defaultFrequencyPenalty;
-
-  const supportedParams = module.supportedParams;
-
-  const [localTemp, setLocalTemp] = useState(
-    temperature ?? defaultTemperature ?? 0.7
-  );
-  const [localTopP, setLocalTopP] = useState(topP ?? defaultTopP ?? 1.0);
-  const [localPresence, setLocalPresence] = useState(
-    presencePenalty ?? defaultPresencePenalty ?? 0.0
-  );
-  const [localFrequency, setLocalFrequency] = useState(
-    frequencyPenalty ?? defaultFrequencyPenalty ?? 0.0
-  );
-
-  useEffect(() => {
-    setLocalTemp(temperature ?? defaultTemperature ?? 0.7);
-  }, [temperature, defaultTemperature]);
-  useEffect(() => {
-    setLocalTopP(topP ?? defaultTopP ?? 1.0);
-  }, [topP, defaultTopP]);
-  useEffect(() => {
-    setLocalPresence(presencePenalty ?? defaultPresencePenalty ?? 0.0);
-  }, [presencePenalty, defaultPresencePenalty]);
-  useEffect(
-    () => setLocalFrequency(frequencyPenalty ?? defaultFrequencyPenalty ?? 0.0),
-    [frequencyPenalty, defaultFrequencyPenalty]
-  );
-
-  const handleNumberInputChange = useCallback(
-    (
-      setter: (value: number | null) => void,
-      e: React.ChangeEvent<HTMLInputElement>
-    ) => {
-      const value = e.target.value;
-      const numValue = value === "" ? null : parseInt(value, 10);
-      if (value === "" || (!isNaN(numValue!) && numValue !== null)) {
-        setter(numValue);
+  // Updated commit handlers to work with primitive field values
+  const handleSliderCommit = useCallback(
+    (fieldName: keyof ParamsFormValues, moduleSetter: (value: number | null) => void, value: number) => {
+      // Value is already set in form state by SliderField's internal handleChange on onValueChange
+      // SliderField's onValueCommit gives the committed value.
+      if (form.getFieldMeta(fieldName)?.errors.length === 0) {
+        moduleSetter(value);
       }
     },
-    []
+    [form, module]
   );
-
-  const handleSliderCommit = useCallback(
-    (setter: (value: number | null) => void, value: number[]) => {
-      setter(value[0]);
+  
+  const handleNumberInputBlur = useCallback(
+    (fieldName: keyof ParamsFormValues, moduleSetter: (value: number | null) => void) => {
+      // NumberField's onBlur is called after its internal handleChange updates form state
+      if (form.getFieldMeta(fieldName)?.errors.length === 0) {
+        const formValue = form.getFieldValue(fieldName);
+        moduleSetter(formValue as number | null); // formValue type should align with ParamsFormValues
+      }
     },
-    []
+    [form, module]
   );
 
   const handleUseDefault = useCallback(
-    (setter: (value: number | null) => void) => {
-      setter(null);
+    (fieldName: keyof ParamsFormValues, moduleSetter: (value: number | null) => void, defaultValueToSet: number | null) => {
+      form.setFieldValue(fieldName, defaultValueToSet);
+      // Simulate a commit to ensure module updates if necessary, or rely on blur/commit of the field
+      // For simplicity, we directly call moduleSetter(null) as per original logic.
+      moduleSetter(null); 
     },
-    []
+    [form, module]
   );
-
+  
+  const supportedParams = module.supportedParams;
   const showUseDefault =
-    defaultTemperature !== undefined ||
-    defaultTopP !== undefined ||
-    defaultMaxTokens !== undefined ||
-    defaultTopK !== undefined ||
-    defaultPresencePenalty !== undefined ||
-    defaultFrequencyPenalty !== undefined;
+    module.defaultTemperature !== undefined ||
+    module.defaultTopP !== undefined ||
+    module.defaultMaxTokens !== undefined ||
+    module.defaultTopK !== undefined ||
+    module.defaultPresencePenalty !== undefined ||
+    module.defaultFrequencyPenalty !== undefined;
+
+  // Helper to render the "Use Default" button
+  const renderUseDefaultButton = (
+    fieldName: keyof ParamsFormValues,
+    moduleValue: number | null | undefined, // current value in the module
+    moduleSetter: (value: number | null) => void, 
+    defaultValue: number | null | undefined,
+    defaultDisplayValue: string = "N/A"
+  ) => {
+    if (!showUseDefault || defaultValue === undefined) return null;
+    return (
+      <Button
+        variant="link"
+        size="sm"
+        className="text-xs h-auto p-0 mt-1 text-muted-foreground"
+        onClick={() => handleUseDefault(fieldName, moduleSetter, defaultValue ?? null)}
+        disabled={moduleValue === null} // Disabled if module is already using its internal default
+      >
+        Use Default ({defaultValue?.toFixed?.(2) ?? defaultDisplayValue})
+      </Button>
+    );
+  };
 
   return (
     <div className={cn("space-y-4 p-4", className)}>
       {supportedParams.has("temperature") && (
-        <div className="space-y-1.5">
-          <Label htmlFor="param-temperature" className="text-xs">
-            Temperature ({localTemp.toFixed(2)})
-          </Label>
-          <Slider
-            id="param-temperature"
+        <div className="space-y-0.5"> {/* Extra div to group SliderField and its default button */}
+          <SliderField
+            form={form}
+            name="temperature"
+            label="Temperature"
             min={0}
             max={1}
             step={0.01}
-            value={[localTemp]}
-            onValueChange={(v) => setLocalTemp(v[0])}
-            onValueCommit={(v) => handleSliderCommit(module.setTemperature, v)}
+            valueDisplayPrecision={2}
+            onValueCommit={(val) => handleSliderCommit("temperature", module.setTemperature, val[0])}
+            wrapperClassName="text-xs" // Apply text-xs to wrapper for label consistency
           />
-          {showUseDefault && (
-            <Button
-              variant="link"
-              size="sm"
-              className="text-xs h-auto p-0 text-muted-foreground"
-              onClick={() => handleUseDefault(module.setTemperature)}
-              disabled={temperature === null}
-            >
-              Use Default ({defaultTemperature?.toFixed(2) ?? "N/A"})
-            </Button>
-          )}
+          {renderUseDefaultButton("temperature", module.temperature, module.setTemperature, module.defaultTemperature, "0.70")}
         </div>
       )}
 
       {supportedParams.has("top_p") && (
-        <div className="space-y-1.5">
-          <Label htmlFor="param-top-p" className="text-xs">
-            Top P ({(localTopP ?? 0).toFixed(2)})
-          </Label>
-          <Slider
-            id="param-top-p"
+        <div className="space-y-0.5">
+          <SliderField
+            form={form}
+            name="topP"
+            label="Top P"
             min={0}
             max={1}
             step={0.01}
-            value={[localTopP ?? 1.0]}
-            onValueChange={(v) => setLocalTopP(v[0])}
-            onValueCommit={(v) => handleSliderCommit(module.setTopP, v)}
+            valueDisplayPrecision={2}
+            onValueCommit={(val) => handleSliderCommit("topP", module.setTopP, val[0])}
+            wrapperClassName="text-xs"
           />
-          {showUseDefault && (
-            <Button
-              variant="link"
-              size="sm"
-              className="text-xs h-auto p-0 text-muted-foreground"
-              onClick={() => handleUseDefault(module.setTopP)}
-              disabled={topP === null}
-            >
-              Use Default ({defaultTopP?.toFixed(2) ?? "N/A"})
-            </Button>
-          )}
+          {renderUseDefaultButton("topP", module.topP, module.setTopP, module.defaultTopP, "1.00")}
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 items-end">
+      <div className="grid grid-cols-2 gap-4 items-start"> {/* items-start for alignment with button */}
         {supportedParams.has("max_tokens") && (
-          <div className="space-y-1.5">
-            <Label htmlFor="param-max-tokens" className="text-xs">
-              Max Tokens
-            </Label>
-            <Input
-              id="param-max-tokens"
-              type="number"
-              placeholder={`Default: ${defaultMaxTokens ?? "None"}`}
-              value={maxTokens ?? ""}
-              onChange={(e) => handleNumberInputChange(module.setMaxTokens, e)}
-              min="1"
+          <div className="space-y-0.5">
+            <NumberField
+              form={form}
+              name="maxTokens"
+              label="Max Tokens"
+              placeholder={`Default: ${module.defaultMaxTokens ?? "None"}`}
+              min={1}
+              allowNull={true}
+              onBlurInput={() => handleNumberInputBlur("maxTokens", module.setMaxTokens)}
               className="h-8 text-xs"
+              wrapperClassName="text-xs"
             />
-            {showUseDefault && (
-              <Button
-                variant="link"
-                size="sm"
-                className="text-xs h-auto p-0 text-muted-foreground"
-                onClick={() => handleUseDefault(module.setMaxTokens)}
-                disabled={maxTokens === null}
-              >
-                Use Default
-              </Button>
-            )}
+            {renderUseDefaultButton("maxTokens", module.maxTokens, module.setMaxTokens, module.defaultMaxTokens, "None")}
           </div>
         )}
         {supportedParams.has("top_k") && (
-          <div className="space-y-1.5">
-            <Label htmlFor="param-top-k" className="text-xs">
-              Top K
-            </Label>
-            <Input
-              id="param-top-k"
-              type="number"
-              placeholder={`Default: ${defaultTopK ?? "None"}`}
-              value={topK ?? ""}
-              onChange={(e) => handleNumberInputChange(module.setTopK, e)}
-              min="1"
+          <div className="space-y-0.5">
+            <NumberField
+              form={form}
+              name="topK"
+              label="Top K"
+              placeholder={`Default: ${module.defaultTopK ?? "None"}`}
+              min={1}
+              allowNull={true}
+              onBlurInput={() => handleNumberInputBlur("topK", module.setTopK)}
               className="h-8 text-xs"
+              wrapperClassName="text-xs"
             />
-            {showUseDefault && (
-              <Button
-                variant="link"
-                size="sm"
-                className="text-xs h-auto p-0 text-muted-foreground"
-                onClick={() => handleUseDefault(module.setTopK)}
-                disabled={topK === null}
-              >
-                Use Default
-              </Button>
-            )}
+            {renderUseDefaultButton("topK", module.topK, module.setTopK, module.defaultTopK, "None")}
           </div>
         )}
       </div>
 
       {supportedParams.has("presence_penalty") && (
-        <div className="space-y-1.5">
-          <Label htmlFor="param-presence-penalty" className="text-xs">
-            Presence Penalty ({(localPresence ?? 0).toFixed(2)})
-          </Label>
-          <Slider
-            id="param-presence-penalty"
+         <div className="space-y-0.5">
+          <SliderField
+            form={form}
+            name="presencePenalty"
+            label="Presence Penalty"
             min={-2}
             max={2}
             step={0.01}
-            value={[localPresence ?? 0]}
-            onValueChange={(v) => setLocalPresence(v[0])}
-            onValueCommit={(v) =>
-              handleSliderCommit(module.setPresencePenalty, v)
-            }
+            valueDisplayPrecision={2}
+            onValueCommit={(val) => handleSliderCommit("presencePenalty", module.setPresencePenalty, val[0])}
+            wrapperClassName="text-xs"
           />
-          {showUseDefault && (
-            <Button
-              variant="link"
-              size="sm"
-              className="text-xs h-auto p-0 text-muted-foreground"
-              onClick={() => handleUseDefault(module.setPresencePenalty)}
-              disabled={presencePenalty === null}
-            >
-              Use Default ({defaultPresencePenalty?.toFixed(2) ?? "N/A"})
-            </Button>
-          )}
+          {renderUseDefaultButton("presencePenalty", module.presencePenalty, module.setPresencePenalty, module.defaultPresencePenalty, "0.00")}
         </div>
       )}
 
       {supportedParams.has("frequency_penalty") && (
-        <div className="space-y-1.5">
-          <Label htmlFor="param-frequency-penalty" className="text-xs">
-            Frequency Penalty ({(localFrequency ?? 0).toFixed(2)})
-          </Label>
-          <Slider
-            id="param-frequency-penalty"
+        <div className="space-y-0.5">
+          <SliderField
+            form={form}
+            name="frequencyPenalty"
+            label="Frequency Penalty"
             min={-2}
             max={2}
             step={0.01}
-            value={[localFrequency ?? 0]}
-            onValueChange={(v) => setLocalFrequency(v[0])}
-            onValueCommit={(v) =>
-              handleSliderCommit(module.setFrequencyPenalty, v)
-            }
+            valueDisplayPrecision={2}
+            onValueCommit={(val) => handleSliderCommit("frequencyPenalty", module.setFrequencyPenalty, val[0])}
+            wrapperClassName="text-xs"
           />
-          {showUseDefault && (
-            <Button
-              variant="link"
-              size="sm"
-              className="text-xs h-auto p-0 text-muted-foreground"
-              onClick={() => handleUseDefault(module.setFrequencyPenalty)}
-              disabled={frequencyPenalty === null}
-            >
-              Use Default ({defaultFrequencyPenalty?.toFixed(2) ?? "N/A"})
-            </Button>
-          )}
+          {renderUseDefaultButton("frequencyPenalty", module.frequencyPenalty, module.setFrequencyPenalty, module.defaultFrequencyPenalty, "0.00")}
         </div>
       )}
     </div>

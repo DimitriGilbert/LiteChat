@@ -1,6 +1,8 @@
 // src/components/LiteChat/settings/SettingsGitSyncRepos.tsx
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
+import { useForm, type AnyFieldApi } from "@tanstack/react-form";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +34,28 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
+import { FieldMetaMessages } from "@/components/LiteChat/common/form-fields/FieldMetaMessages";
+
+const syncRepoFormSchema = z.object({
+  name: z.string().min(1, "Repository Name is required."),
+  remoteUrl: z
+    .string()
+    .min(1, "Remote URL is required.")
+    .url("Invalid URL format (e.g., https://github.com/user/repo.git)"),
+  branch: z.string().min(1, "Branch name is required (e.g., main)."),
+  username: z.string().nullable().optional(),
+  password: z.string().nullable().optional(),
+});
+
+type SyncRepoFormData = z.infer<typeof syncRepoFormSchema>;
+
+const defaultFormValues: SyncRepoFormData = {
+  name: "",
+  remoteUrl: "",
+  branch: "main",
+  username: null,
+  password: null,
+};
 
 const SettingsGitSyncReposComponent: React.FC = () => {
   const {
@@ -41,7 +65,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
     deleteSyncRepo,
     initializeOrSyncRepo,
     repoInitializationStatus,
-    isLoading,
+    isLoading: isLoadingStore,
   } = useConversationStore(
     useShallow((state) => ({
       syncRepos: state.syncRepos,
@@ -56,75 +80,68 @@ const SettingsGitSyncReposComponent: React.FC = () => {
 
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<
-    Partial<Omit<SyncRepo, "id" | "createdAt" | "updatedAt">>
-  >({
-    name: "",
-    remoteUrl: "",
-    branch: "main",
-    username: "",
-    password: "",
-  });
-  const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
 
-  const resetForm = useCallback(() => {
-    setFormData({
-      name: "",
-      remoteUrl: "",
-      branch: "main",
-      username: "",
-      password: "",
-    });
+  const form = useForm({
+    defaultValues: defaultFormValues as SyncRepoFormData,
+    validators: {
+      onChangeAsync: syncRepoFormSchema,
+      onChangeAsyncDebounceMs: 500,
+    },
+    onSubmit: async ({ value }) => {
+      if (!value.name?.trim() || !value.remoteUrl?.trim()) {
+        toast.error("Repository Name and Remote URL are required.");
+        return;
+      }
+      try {
+        const dataToSave = {
+          name: value.name.trim(),
+          remoteUrl: value.remoteUrl.trim(),
+          branch: value.branch?.trim() || "main",
+          username: value.username?.trim() || null,
+          password: value.password || null,
+        };
+
+        if (editingId) {
+          await updateSyncRepo(editingId, dataToSave);
+        } else {
+          await addSyncRepo(dataToSave);
+        }
+        resetFormAndState();
+      } catch (_error) {
+        console.error("Failed to save sync repo:", _error);
+      }
+    },
+  });
+
+  const resetFormAndState = useCallback(() => {
+    form.reset(defaultFormValues);
     setIsAdding(false);
     setEditingId(null);
-    setIsSaving(false);
-  }, []);
+  }, [form]);
 
-  const handleInputChange = useCallback(
-    (field: keyof typeof formData, value: string) => {
-      setFormData((prev) => ({ ...prev, [field]: value }));
-    },
-    []
-  );
-
-  const handleSave = useCallback(async () => {
-    if (!formData.name?.trim() || !formData.remoteUrl?.trim()) {
-      toast.error("Repository Name and Remote URL are required.");
-      return;
-    }
-    setIsSaving(true);
-    try {
-      const dataToSave: Omit<SyncRepo, "id" | "createdAt" | "updatedAt"> = {
-        name: formData.name.trim(),
-        remoteUrl: formData.remoteUrl.trim(),
-        branch: formData.branch?.trim() || "main",
-        username: formData.username?.trim() || null,
-        password: formData.password || null,
-      };
-
-      if (editingId) {
-        await updateSyncRepo(editingId, dataToSave);
+  useEffect(() => {
+    if (editingId) {
+      const repoToEdit = syncRepos.find((r) => r.id === editingId);
+      if (repoToEdit) {
+        form.reset({
+          name: repoToEdit.name,
+          remoteUrl: repoToEdit.remoteUrl,
+          branch: repoToEdit.branch || "main",
+          username: repoToEdit.username ?? null,
+          password: repoToEdit.password ?? null,
+        });
+        setIsAdding(false);
       } else {
-        await addSyncRepo(dataToSave);
+        resetFormAndState();
       }
-      resetForm();
-    } catch (_error) {
-      console.error("Failed to save sync repo:", _error);
-    } finally {
-      setIsSaving(false);
+    } else if (!isAdding) {
+      form.reset(defaultFormValues);
     }
-  }, [formData, editingId, addSyncRepo, updateSyncRepo, resetForm]);
+  }, [editingId, syncRepos, form, isAdding, resetFormAndState]);
 
   const handleEdit = (repo: SyncRepo) => {
     setEditingId(repo.id);
-    setFormData({
-      name: repo.name,
-      remoteUrl: repo.remoteUrl,
-      branch: repo.branch || "main",
-      username: repo.username ?? "",
-      password: repo.password ?? "",
-    });
     setIsAdding(false);
   };
 
@@ -139,7 +156,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
         try {
           await deleteSyncRepo(id);
           if (editingId === id) {
-            resetForm();
+            resetFormAndState();
           }
         } catch (error) {
           console.error("Failed to delete sync repo:", error);
@@ -148,7 +165,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
         }
       }
     },
-    [deleteSyncRepo, editingId, resetForm]
+    [deleteSyncRepo, editingId, resetFormAndState]
   );
 
   const handleInitializeOrSync = useCallback(
@@ -157,50 +174,78 @@ const SettingsGitSyncReposComponent: React.FC = () => {
     },
     [initializeOrSyncRepo]
   );
+  
+  const handleAddNewClick = () => {
+    setEditingId(null);
+    form.reset(defaultFormValues);
+    setIsAdding(true);
+  };
 
   const renderForm = () => (
-    <div className="border rounded-md p-4 space-y-3 bg-card shadow-md mb-4">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        form.handleSubmit();
+      }}
+      className="border rounded-md p-4 space-y-3 bg-card shadow-md mb-4"
+    >
       <h4 className="font-semibold text-card-foreground">
         {editingId ? "Edit Sync Repository" : "Add New Sync Repository"}
       </h4>
-      {/* Use responsive grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="sm:col-span-1">
-          <Label htmlFor="repo-name">Name</Label>
-          <Input
-            id="repo-name"
-            value={formData.name || ""}
-            onChange={(e) => handleInputChange("name", e.target.value)}
-            placeholder="e.g., My Backup"
-            required
-            className="mt-1"
-            disabled={isSaving}
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <Label htmlFor="repo-url">Remote URL (HTTPS)</Label>
-          <Input
-            id="repo-url"
-            type="url"
-            value={formData.remoteUrl || ""}
-            onChange={(e) => handleInputChange("remoteUrl", e.target.value)}
-            placeholder="https://github.com/user/repo.git"
-            required
-            className="mt-1"
-            disabled={isSaving}
-          />
-        </div>
-        <div className="sm:col-span-1">
-          <Label htmlFor="repo-branch">Branch</Label>
-          <Input
-            id="repo-branch"
-            value={formData.branch || ""}
-            onChange={(e) => handleInputChange("branch", e.target.value)}
-            placeholder="main"
-            className="mt-1"
-            disabled={isSaving}
-          />
-        </div>
+        <form.Field
+          name="name"
+          children={(field: AnyFieldApi) => (
+            <div className="sm:col-span-1 space-y-1.5">
+              <Label htmlFor={field.name}>Name</Label>
+              <Input
+                id={field.name}
+                value={field.state.value ?? ""}
+                onChange={(e) => field.handleChange(e.target.value)}
+                onBlur={field.handleBlur}
+                placeholder="e.g., My Backup"
+                disabled={form.state.isSubmitting}
+              />
+              <FieldMetaMessages field={field} />
+            </div>
+          )}
+        />
+        <form.Field
+          name="remoteUrl"
+          children={(field: AnyFieldApi) => (
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label htmlFor={field.name}>Remote URL (HTTPS)</Label>
+              <Input
+                id={field.name}
+                type="url"
+                value={field.state.value ?? ""}
+                onChange={(e) => field.handleChange(e.target.value)}
+                onBlur={field.handleBlur}
+                placeholder="https://github.com/user/repo.git"
+                disabled={form.state.isSubmitting}
+              />
+              <FieldMetaMessages field={field} />
+            </div>
+          )}
+        />
+        <form.Field
+          name="branch"
+          children={(field: AnyFieldApi) => (
+            <div className="sm:col-span-1 space-y-1.5">
+              <Label htmlFor={field.name}>Branch</Label>
+              <Input
+                id={field.name}
+                value={field.state.value ?? ""}
+                onChange={(e) => field.handleChange(e.target.value)}
+                onBlur={field.handleBlur}
+                placeholder="main"
+                disabled={form.state.isSubmitting}
+              />
+              <FieldMetaMessages field={field} />
+            </div>
+          )}
+        />
       </div>
       <div className="pt-2">
         <Label className="text-sm font-medium">
@@ -215,60 +260,84 @@ const SettingsGitSyncReposComponent: React.FC = () => {
             only for private repositories.
           </AlertDescription>
         </Alert>
-        {/* Use responsive grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="repo-username">Username</Label>
-            <Input
-              id="repo-username"
-              value={formData.username || ""}
-              onChange={(e) => handleInputChange("username", e.target.value)}
-              placeholder="Git Username (Optional)"
-              className="mt-1"
-              disabled={isSaving}
-              autoComplete="off"
-            />
-          </div>
-          <div>
-            <Label htmlFor="repo-password">Password / Token</Label>
-            <Input
-              id="repo-password"
-              type="password"
-              value={formData.password || ""}
-              onChange={(e) => handleInputChange("password", e.target.value)}
-              placeholder="Password or PAT (Optional)"
-              className="mt-1"
-              disabled={isSaving}
-              autoComplete="new-password"
-            />
-          </div>
+          <form.Field
+            name="username"
+            children={(field: AnyFieldApi) => (
+              <div className="space-y-1.5">
+                <Label htmlFor={field.name}>Username</Label>
+                <Input
+                  id={field.name}
+                  value={field.state.value ?? ""}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  onBlur={field.handleBlur}
+                  placeholder="Git Username (Optional)"
+                  disabled={form.state.isSubmitting}
+                  autoComplete="off"
+                />
+                <FieldMetaMessages field={field} />
+              </div>
+            )}
+          />
+          <form.Field
+            name="password"
+            children={(field: AnyFieldApi) => (
+              <div className="space-y-1.5">
+                <Label htmlFor={field.name}>Password / Token</Label>
+                <Input
+                  id={field.name}
+                  type="password"
+                  value={field.state.value ?? ""}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  onBlur={field.handleBlur}
+                  placeholder="Password or PAT (Optional)"
+                  disabled={form.state.isSubmitting}
+                  autoComplete="new-password"
+                />
+                <FieldMetaMessages field={field} />
+              </div>
+            )}
+          />
         </div>
       </div>
       <div className="flex justify-end space-x-2 pt-2">
         <Button
           variant="ghost"
           size="sm"
-          onClick={resetForm}
-          disabled={isSaving}
+          onClick={resetFormAndState}
+          disabled={form.state.isSubmitting}
           type="button"
         >
           <XIcon className="h-4 w-4 mr-1" /> Cancel
         </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={handleSave}
-          disabled={
-            isSaving || !formData.name?.trim() || !formData.remoteUrl?.trim()
+        <form.Subscribe
+           selector={(state) =>
+            [
+              state.canSubmit,
+              state.isSubmitting,
+              state.isValidating,
+              state.isValid,
+            ] as const
           }
-          type="button"
-        >
-          {isSaving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-          <SaveIcon className="h-4 w-4 mr-1" />{" "}
-          {isSaving ? "Saving..." : "Save Repository"}
-        </Button>
+          children={([canSubmit, isSubmitting, isValidating, isValid]) => (
+            <Button
+              variant="secondary"
+              size="sm"
+              type="submit"
+              disabled={isSubmitting || !canSubmit || !isValid || isValidating}
+            >
+              {(isSubmitting || isValidating) && (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              )}
+              <SaveIcon className="h-4 w-4 mr-1" />{" "}
+              {isSubmitting || isValidating
+                ? "Saving..."
+                : "Save Repository"}
+            </Button>
+          )}
+        />
       </div>
-    </div>
+    </form>
   );
 
   return (
@@ -285,10 +354,10 @@ const SettingsGitSyncReposComponent: React.FC = () => {
 
       {!isAdding && !editingId && (
         <Button
-          onClick={() => setIsAdding(true)}
+          onClick={handleAddNewClick}
           variant="outline"
           className="w-full mb-4"
-          disabled={isLoading}
+          disabled={isLoadingStore}
         >
           <PlusIcon className="h-4 w-4 mr-1" /> Add Sync Repository
         </Button>
@@ -298,7 +367,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
 
       <div>
         <h4 className="text-md font-medium mb-2">Configured Repositories</h4>
-        {isLoading && !isAdding && !editingId ? (
+        {isLoadingStore && !isAdding && !editingId ? (
           <div className="space-y-2">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
@@ -310,24 +379,19 @@ const SettingsGitSyncReposComponent: React.FC = () => {
           </p>
         ) : (
           <div className="border rounded-md overflow-x-auto">
-            {" "}
-            {/* Added overflow-x-auto */}
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead className="hidden md:table-cell">
                     Remote URL
-                  </TableHead>{" "}
-                  {/* Hide on mobile */}
+                  </TableHead>
                   <TableHead className="hidden lg:table-cell">
                     Branch
-                  </TableHead>{" "}
-                  {/* Hide on small/medium */}
+                  </TableHead>
                   <TableHead className="hidden lg:table-cell">
                     Auth
-                  </TableHead>{" "}
-                  {/* Hide on small/medium */}
+                  </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -340,7 +404,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
                     repoInitializationStatus[repo.id] || "idle";
                   const isInitializing = initStatus === "syncing";
                   const isDisabled =
-                    isRepoDeleting || isSaving || !!editingId || isInitializing;
+                    isRepoDeleting || form.state.isSubmitting || !!editingId || isInitializing;
 
                   let statusIcon = null;
                   let statusTooltip = "Initialize/Sync Repository";

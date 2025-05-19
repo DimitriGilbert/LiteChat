@@ -422,10 +422,6 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
       );
     }
 
-    if (showSetupState) {
-      return <EmptyStateSetup />;
-    }
-
     if (!conversationId) {
       return <EmptyStateReady />;
     }
@@ -450,28 +446,38 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
 
   return (
     <div className={cn("flex-grow relative", className)}>
-      <ScrollArea className="h-full w-full" ref={scrollAreaRef}>
-        <div className={cn("chat-canvas-container mx-auto", maxWidthClass)}>
-          {renderContent()}
-        </div>
-      </ScrollArea>
-      {showJumpToBottom && (
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="absolute bottom-4 right-4 z-20 h-8 w-8 rounded-full shadow-md bg-background/80 backdrop-blur-sm hover:bg-muted"
-                onClick={() => scrollToBottom()}
-                aria-label="Scroll to bottom"
-              >
-                <ArrowDownIcon className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left">Scroll to Bottom</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+      {showSetupState ? (
+        <ScrollArea className="h-full w-full">
+          <div className={cn("chat-canvas-container mx-auto", maxWidthClass)}>
+            <EmptyStateSetup />
+          </div>
+        </ScrollArea>
+      ) : (
+        <>
+          <ScrollArea className="h-full w-full" ref={scrollAreaRef}>
+            <div className={cn("chat-canvas-container mx-auto", maxWidthClass)}>
+              {renderContent()}
+            </div>
+          </ScrollArea>
+          {showJumpToBottom && (
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="absolute bottom-4 right-4 z-20 h-8 w-8 rounded-full shadow-md bg-background/80 backdrop-blur-sm hover:bg-muted"
+                    onClick={() => scrollToBottom()}
+                    aria-label="Scroll to bottom"
+                  >
+                    <ArrowDownIcon className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left">Scroll to Bottom</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </>
       )}
     </div>
   );

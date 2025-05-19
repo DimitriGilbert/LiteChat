@@ -1,124 +1,139 @@
 // src/components/LiteChat/settings/rules/RuleForm.tsx
 // FULL FILE
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useEffect } from "react";
+import { useForm } from "@tanstack/react-form";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { SaveIcon, XIcon, Loader2 } from "lucide-react";
 import type { DbRule, RuleType } from "@/types/litechat/rules";
-import { toast } from "sonner";
+
+import { TextField } from "@/components/LiteChat/common/form-fields/TextField";
+import { TextareaField } from "@/components/LiteChat/common/form-fields/TextareaField";
+import { SelectField, type SelectFieldOption } from "@/components/LiteChat/common/form-fields/SelectField";
 
 interface RuleFormProps {
   initialData?: Partial<DbRule>;
-  isSaving: boolean;
+  isSavingExt: boolean;
   onSave: (
     data: Omit<DbRule, "id" | "createdAt" | "updatedAt">,
   ) => Promise<string | void>;
   onCancel: () => void;
 }
 
+const ruleSchema = z.object({
+  name: z.string().min(1, "Rule Name is required."),
+  content: z.string().min(1, "Rule Content is required."),
+  type: z.enum(["system", "before", "after"], {
+    errorMap: () => ({ message: "Rule Type is required." }),
+  }),
+});
+
+const ruleTypes: SelectFieldOption[] = [
+  { value: "system", label: "System Prompt" },
+  { value: "before", label: "Before User Prompt" },
+  { value: "after", label: "After User Prompt" },
+];
+
 export const RuleForm: React.FC<RuleFormProps> = ({
   initialData,
-  isSaving,
+  isSavingExt,
   onSave,
   onCancel,
 }) => {
-  const [name, setName] = useState(initialData?.name || "");
-  const [content, setContent] = useState(initialData?.content || "");
-  const [type, setType] = useState<RuleType>(initialData?.type || "before");
+  const form = useForm({
+    defaultValues: {
+      name: initialData?.name || "",
+      content: initialData?.content || "",
+      type: initialData?.type || ("before" as RuleType),
+    },
+    validators: {
+      onChangeAsync: ruleSchema,
+      onChangeAsyncDebounceMs: 500,
+    },
+    onSubmit: async ({ value }) => {
+      await onSave({
+        name: value.name.trim(),
+        content: value.content.trim(),
+        type: value.type as RuleType,
+      });
+    },
+  });
 
   useEffect(() => {
-    setName(initialData?.name || "");
-    setContent(initialData?.content || "");
-    setType(initialData?.type || "before");
-  }, [initialData]);
-
-  const handleSaveClick = useCallback(async () => {
-    if (!name.trim() || !content.trim()) {
-      toast.error("Rule Name and Content are required.");
-      return;
-    }
-    await onSave({ name: name.trim(), content: content.trim(), type });
-  }, [name, content, type, onSave]);
+    form.reset({
+      name: initialData?.name || "",
+      content: initialData?.content || "",
+      type: initialData?.type || ("before" as RuleType),
+    });
+  }, [initialData, form]);
 
   return (
-    <div className="space-y-4 border rounded-md p-4 bg-card shadow-md">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        form.handleSubmit();
+      }}
+      className="space-y-4 border rounded-md p-4 bg-card shadow-md"
+    >
       <h4 className="font-semibold text-card-foreground">
         {initialData?.id ? "Edit Rule" : "Add New Rule"}
       </h4>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="space-y-1.5 md:col-span-2">
-          <Label htmlFor="rule-name">Rule Name</Label>
-          <Input
-            id="rule-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g., Always respond in JSON"
-            required
-            disabled={isSaving}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="rule-type">Rule Type</Label>
-          <Select
-            value={type}
-            onValueChange={(value) => setType(value as RuleType)}
-            disabled={isSaving}
-          >
-            <SelectTrigger id="rule-type">
-              <SelectValue placeholder="Select Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="system">System Prompt</SelectItem>
-              <SelectItem value="before">Before User Prompt</SelectItem>
-              <SelectItem value="after">After User Prompt</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="rule-content">Rule Content</Label>
-        <Textarea
-          id="rule-content"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Enter the rule text to be injected..."
+        <TextField
+          form={form}
+          name="name"
+          label="Rule Name"
+          placeholder="e.g., Always respond in JSON"
           required
-          rows={4}
-          disabled={isSaving}
-          className="font-mono text-xs"
+          disabled={isSavingExt}
+          wrapperClassName="md:col-span-2"
+        />
+        <SelectField
+          form={form}
+          name="type"
+          label="Rule Type"
+          options={ruleTypes}
+          placeholder="Select Type"
+          disabled={isSavingExt}
         />
       </div>
+      <TextareaField
+        form={form}
+        name="content"
+        label="Rule Content"
+        placeholder="Enter the rule text to be injected..."
+        required
+        rows={4}
+        disabled={isSavingExt}
+        className="font-mono text-xs"
+      />
       <div className="flex justify-end space-x-2 pt-2">
         <Button
           variant="ghost"
           size="sm"
           onClick={onCancel}
-          disabled={isSaving}
+          disabled={isSavingExt}
           type="button"
         >
           <XIcon className="h-4 w-4 mr-1" /> Cancel
         </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={handleSaveClick}
-          disabled={isSaving || !name.trim() || !content.trim()}
-          type="button"
-        >
-          {isSaving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-          <SaveIcon className="h-4 w-4 mr-1" />{" "}
-          {isSaving ? "Saving..." : "Save Rule"}
-        </Button>
+        <form.Subscribe
+          selector={(state) => [state.canSubmit, state.isSubmitting, state.isValidating, state.isValid] as const}
+          children={([canSubmit, isSubmitting, isValidating, isValid]) => (
+            <Button
+              variant="secondary"
+              size="sm"
+              type="submit"
+              disabled={isSavingExt || !canSubmit || isSubmitting || !isValid || isValidating}
+            >
+              {(isSavingExt || isSubmitting || isValidating) && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              <SaveIcon className="h-4 w-4 mr-1" />{" "}
+              {(isSavingExt || isSubmitting || isValidating) ? "Saving..." : "Save Rule"}
+            </Button>
+          )}
+        />
       </div>
-    </div>
+    </form>
   );
 };

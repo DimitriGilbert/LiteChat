@@ -101,7 +101,7 @@ const SettingsApiKeysComponent: React.FC = () => {
           <ApiKeyForm
             onSave={handleSaveNewKey}
             onCancel={() => setIsAdding(false)}
-            isSaving={isSavingNew}
+            disabled={isSavingNew || isLoading}
           />
         </div>
       )}

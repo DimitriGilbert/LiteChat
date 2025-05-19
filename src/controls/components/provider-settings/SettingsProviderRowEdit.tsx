@@ -3,9 +3,9 @@
 import React, { useCallback, useMemo } from "react";
 // Import OpenRouterModel for the allAvailableModels prop
 import type { DbApiKey, OpenRouterModel } from "@/types/litechat/provider";
-import { Button } from "@/components/ui/button";
-import { SaveIcon, XIcon, Loader2 } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
+// import { Button } from "@/components/ui/button";
+// import { SaveIcon, XIcon, Loader2 } from "lucide-react";
+// import { Separator } from "@/components/ui/separator";
 import { ModelEnablementList } from "./ModelEnablementList";
 import { ProviderConfigForm, ProviderFormData } from "./ProviderConfigForm";
 
@@ -20,7 +20,7 @@ interface ProviderRowEditModeProps {
   onSave: () => Promise<void>;
   onChange: (
     field: keyof ProviderFormData | "enabledModels",
-    value: string | boolean | string[] | null,
+    value: string | boolean | string[] | null
   ) => void;
 }
 
@@ -36,7 +36,7 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
 }) => {
   const enabledModelsSet = useMemo(
     () => new Set(editData.enabledModels ?? []),
-    [editData.enabledModels],
+    [editData.enabledModels]
   );
 
   const handleModelToggle = useCallback(
@@ -51,17 +51,20 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
       const newEnabledModels = Array.from(currentEnabledSet);
       onChange("enabledModels", newEnabledModels);
     },
-    [editData.enabledModels, onChange],
+    [editData.enabledModels, onChange]
   );
 
   const handleFormChange = useCallback(
     (
       field: keyof ProviderFormData,
-      value: string | boolean | string[] | null,
+      value: string | boolean | string[] | null
     ) => {
-      onChange(field, value);
+      return new Promise<void>((resolve) => {
+        onChange(field, value);
+        resolve(void 0);
+      });
     },
-    [onChange],
+    [onChange]
   );
 
   return (
@@ -72,8 +75,10 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
             Basic Configuration
           </h4>
           <ProviderConfigForm
-            formData={editData}
+            initialData={editData}
             onChange={handleFormChange}
+            onSubmit={onSave}
+            onCancel={onCancel}
             apiKeys={apiKeys}
             disabled={isSaving}
           />
@@ -98,7 +103,7 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
           />
         </div>
       </div>
-
+      {/* 
       <Separator className="my-4" />
 
       <div className="flex justify-end space-x-2 pt-2">
@@ -122,7 +127,7 @@ const ProviderRowEditModeComponent: React.FC<ProviderRowEditModeProps> = ({
           <SaveIcon className="h-4 w-4 mr-1" />{" "}
           {isSaving ? "Saving..." : "Save Changes"}
         </Button>
-      </div>
+      </div> */}
     </div>
   );
 };

@@ -30,20 +30,32 @@ import {
   TabDefinition,
 } from "@/components/LiteChat/common/TabbedLayout";
 import { cn } from "@/lib/utils";
-import type { ProjectSettingsControlModule } from "@/controls/modules/ProjectSettingsControlModule"; // Import module type
+import type { ProjectSettingsControlModule } from "@/controls/modules/ProjectSettingsControlModule";
+
+import { useForm } from "@tanstack/react-form";
+import { z } from "zod";
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   projectId: string | null;
-  module: ProjectSettingsControlModule; // Add module prop
+  module: ProjectSettingsControlModule;
 }
+
+const projectParamsSchema = z.object({
+  temperature: z.number().min(0).max(1),
+  topP: z.number().min(0).max(1),
+  maxTokens: z.number().min(1).nullable(),
+  topK: z.number().min(1).nullable(),
+  presencePenalty: z.number().min(-2).max(2),
+  frequencyPenalty: z.number().min(-2).max(2),
+});
 
 export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   isOpen,
   onClose,
   projectId,
-  module, // Destructure module
+  module,
 }) => {
   const { getProjectById, updateProject } = useProjectStore(
     useShallow((state) => ({
@@ -71,20 +83,9 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
 
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
   const [modelId, setModelId] = useState<string | null>(null);
-  const [temperature, setTemperature] = useState<number | null>(null);
-  const [maxTokens, setMaxTokens] = useState<number | null>(null);
-  const [topP, setTopP] = useState<number | null>(null);
-  const [topK, setTopK] = useState<number | null>(null);
-  const [presencePenalty, setPresencePenalty] = useState<number | null>(null);
-  const [frequencyPenalty, setFrequencyPenalty] = useState<number | null>(null);
   const [syncRepoId, setSyncRepoId] = useState<string | null>(null);
   const [defaultTagIds, setDefaultTagIds] = useState<string[] | null>(null);
   const [defaultRuleIds, setDefaultRuleIds] = useState<string[] | null>(null);
-
-  const [localTemp, setLocalTemp] = useState(0.7);
-  const [localTopP, setLocalTopP] = useState(1.0);
-  const [localPresence, setLocalPresence] = useState(0.0);
-  const [localFrequency, setLocalFrequency] = useState(0.0);
 
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("prompt");
@@ -96,6 +97,22 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
       : null;
     return { project: proj, effectiveSettings: effSettings };
   }, [projectId, getProjectById, getEffectiveProjectSettings]);
+
+  const paramsForm = useForm({
+    defaultValues: {
+      temperature: project?.temperature ?? 0.7,
+      topP: project?.topP ?? 1.0,
+      maxTokens: project?.maxTokens ?? null,
+      topK: project?.topK ?? null,
+      presencePenalty: project?.presencePenalty ?? 0.0,
+      frequencyPenalty: project?.presencePenalty ?? 0.0,
+      // todo: topK: project.topK,
+    },
+    validators: {
+      onChangeAsync: projectParamsSchema,
+      onChangeAsyncDebounceMs: 500,
+    },
+  });
 
   const getEffectiveSyncRepoId = useCallback(
     (projId: string | null): string | null => {
@@ -118,87 +135,36 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
       setVfsKey(projectId);
       setSystemPrompt(project.systemPrompt ?? null);
       setModelId(project.modelId ?? null);
-      setTemperature(project.temperature ?? null);
-      setMaxTokens(project.maxTokens ?? null);
-      setTopP(project.topP ?? null);
-      setTopK(project.topK ?? null);
-      setPresencePenalty(project.presencePenalty ?? null);
-      setFrequencyPenalty(project.frequencyPenalty ?? null);
       setSyncRepoId(project.metadata?.syncRepoId ?? null);
       setDefaultTagIds(project.defaultTagIds ?? null);
       setDefaultRuleIds(project.defaultRuleIds ?? null);
-      setLocalTemp(effectiveSettings.temperature ?? globalDefaults.temperature);
-      setLocalTopP(effectiveSettings.topP ?? globalDefaults.topP ?? 1.0);
-      setLocalPresence(
-        effectiveSettings.presencePenalty ??
-          globalDefaults.presencePenalty ??
-          0.0
-      );
-      setLocalFrequency(
-        effectiveSettings.frequencyPenalty ??
-          globalDefaults.frequencyPenalty ??
-          0.0
-      );
+
+      paramsForm.reset({
+        temperature: project.temperature ?? 0.7,
+        topP: project.topP ?? 1.0,
+        maxTokens: project.maxTokens ?? null,
+        topK: project.topK ?? null,
+        presencePenalty: project.presencePenalty ?? 0.0,
+        frequencyPenalty: project.frequencyPenalty ?? 0.0,
+      });
       setActiveTab("prompt");
     } else if (!isOpen) {
       setVfsKey(null);
       setSystemPrompt(null);
       setModelId(null);
-      setTemperature(null);
-      setMaxTokens(null);
-      setTopP(null);
-      setTopK(null);
-      setPresencePenalty(null);
-      setFrequencyPenalty(null);
       setSyncRepoId(null);
       setDefaultTagIds(null);
       setDefaultRuleIds(null);
+      paramsForm.reset({
+        temperature: 0.7,
+        topP: 1.0,
+        maxTokens: null,
+        topK: null,
+        presencePenalty: 0.0,
+        frequencyPenalty: 0.0,
+      });
     }
-  }, [
-    isOpen,
-    projectId,
-    project,
-    effectiveSettings,
-    globalDefaults,
-    setVfsKey,
-  ]);
-
-  useEffect(
-    () =>
-      setLocalTemp(
-        temperature ??
-          effectiveSettings?.temperature ??
-          globalDefaults.temperature
-      ),
-    [temperature, effectiveSettings, globalDefaults.temperature]
-  );
-  useEffect(
-    () =>
-      setLocalTopP(
-        topP ?? effectiveSettings?.topP ?? globalDefaults.topP ?? 1.0
-      ),
-    [topP, effectiveSettings, globalDefaults.topP]
-  );
-  useEffect(
-    () =>
-      setLocalPresence(
-        presencePenalty ??
-          effectiveSettings?.presencePenalty ??
-          globalDefaults.presencePenalty ??
-          0.0
-      ),
-    [presencePenalty, effectiveSettings, globalDefaults.presencePenalty]
-  );
-  useEffect(
-    () =>
-      setLocalFrequency(
-        frequencyPenalty ??
-          effectiveSettings?.frequencyPenalty ??
-          globalDefaults.frequencyPenalty ??
-          0.0
-      ),
-    [frequencyPenalty, effectiveSettings, globalDefaults.frequencyPenalty]
-  );
+  }, [isOpen, projectId, project, effectiveSettings, setVfsKey, paramsForm]);
 
   const handleSave = async () => {
     if (!projectId || !project) return;
@@ -227,6 +193,8 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
         ...(project.metadata ?? {}),
       };
 
+      const formParamValues = paramsForm.state.values;
+
       if (systemPrompt !== parentSettings.systemPrompt)
         updates.systemPrompt = systemPrompt;
       else updates.systemPrompt = undefined;
@@ -234,25 +202,23 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
       if (modelId !== parentSettings.modelId) updates.modelId = modelId;
       else updates.modelId = undefined;
 
-      if (temperature !== parentSettings.temperature)
-        updates.temperature = temperature;
+      if (formParamValues.temperature !== parentSettings.temperature)
+        updates.temperature = formParamValues.temperature;
       else updates.temperature = undefined;
-
-      if (maxTokens !== parentSettings.maxTokens) updates.maxTokens = maxTokens;
+      if (formParamValues.maxTokens !== parentSettings.maxTokens)
+        updates.maxTokens = formParamValues.maxTokens;
       else updates.maxTokens = undefined;
-
-      if (topP !== parentSettings.topP) updates.topP = topP;
+      if (formParamValues.topP !== parentSettings.topP)
+        updates.topP = formParamValues.topP;
       else updates.topP = undefined;
-
-      if (topK !== parentSettings.topK) updates.topK = topK;
+      if (formParamValues.topK !== parentSettings.topK)
+        updates.topK = formParamValues.topK;
       else updates.topK = undefined;
-
-      if (presencePenalty !== parentSettings.presencePenalty)
-        updates.presencePenalty = presencePenalty;
+      if (formParamValues.presencePenalty !== parentSettings.presencePenalty)
+        updates.presencePenalty = formParamValues.presencePenalty;
       else updates.presencePenalty = undefined;
-
-      if (frequencyPenalty !== parentSettings.frequencyPenalty)
-        updates.frequencyPenalty = frequencyPenalty;
+      if (formParamValues.frequencyPenalty !== parentSettings.frequencyPenalty)
+        updates.frequencyPenalty = formParamValues.frequencyPenalty;
       else updates.frequencyPenalty = undefined;
 
       if (syncRepoId !== parentSyncRepoId)
@@ -293,16 +259,18 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
         label: "Prompt & Model",
         content: (
           <ProjectSettingsPrompt
-            systemPrompt={systemPrompt}
-            setSystemPrompt={setSystemPrompt}
-            modelId={modelId}
-            setModelId={setModelId}
+            initialSystemPrompt={systemPrompt}
+            initialModelId={modelId}
+            onSave={({ systemPrompt: sp, modelId: mi }) => {
+              setSystemPrompt(sp);
+              setModelId(mi);
+            }}
             effectiveSystemPrompt={
               effectiveSettings?.systemPrompt ??
               globalDefaults.globalSystemPrompt
             }
             effectiveModelId={effectiveSettings?.modelId ?? globalModelId}
-            isSaving={isSaving}
+            isParentSaving={isSaving}
           />
         ),
       },
@@ -311,41 +279,26 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
         label: "Parameters",
         content: (
           <ProjectSettingsParams
-            temperature={temperature}
-            setTemperature={setTemperature}
-            maxTokens={maxTokens}
-            setMaxTokens={setMaxTokens}
-            topP={topP}
-            setTopP={setTopP}
-            topK={topK}
-            setTopK={setTopK}
-            presencePenalty={presencePenalty}
-            setPresencePenalty={setPresencePenalty}
-            frequencyPenalty={frequencyPenalty}
-            setFrequencyPenalty={setFrequencyPenalty}
-            localTemp={localTemp}
-            setLocalTemp={setLocalTemp}
-            localTopP={localTopP}
-            setLocalTopP={setLocalTopP}
-            localPresence={localPresence}
-            setLocalPresence={setLocalPresence}
-            localFrequency={localFrequency}
-            setLocalFrequency={setLocalFrequency}
+            form={paramsForm}
             effectiveTemperature={
               effectiveSettings?.temperature ?? globalDefaults.temperature
             }
             effectiveMaxTokens={
               effectiveSettings?.maxTokens ?? globalDefaults.maxTokens
             }
-            effectiveTopP={effectiveSettings?.topP ?? globalDefaults.topP}
+            effectiveTopP={
+              effectiveSettings?.topP ?? globalDefaults.topP ?? 1.0
+            }
             effectiveTopK={effectiveSettings?.topK ?? globalDefaults.topK}
             effectivePresencePenalty={
               effectiveSettings?.presencePenalty ??
-              globalDefaults.presencePenalty
+              globalDefaults.presencePenalty ??
+              0.0
             }
             effectiveFrequencyPenalty={
               effectiveSettings?.frequencyPenalty ??
-              globalDefaults.frequencyPenalty
+              globalDefaults.frequencyPenalty ??
+              0.0
             }
             isSaving={isSaving}
           />
@@ -360,14 +313,14 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
               defaultRuleIds={defaultRuleIds}
               setDefaultRuleIds={setDefaultRuleIds}
               isSaving={isSaving}
-              allRules={module.getAllRules()} // Pass from module
+              allRules={module.getAllRules()}
             />
             <ProjectSettingsTags
               defaultTagIds={defaultTagIds}
               setDefaultTagIds={setDefaultTagIds}
               isSaving={isSaving}
-              allTags={module.getAllTags()} // Pass from module
-              getRulesForTag={module.getRulesForTag} // Pass from module
+              allTags={module.getAllTags()}
+              getRulesForTag={module.getRulesForTag}
             />
           </div>
         ),
@@ -377,11 +330,13 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
         label: "Sync",
         content: (
           <ProjectSettingsSync
-            syncRepoId={syncRepoId}
-            setSyncRepoId={setSyncRepoId}
+            initialSyncRepoId={syncRepoId}
+            onSave={({ syncRepoId: sri }) => {
+              setSyncRepoId(sri);
+            }}
             effectiveSyncRepoId={effectiveSyncRepoId}
             syncRepos={syncRepos}
-            isSaving={isSaving}
+            isParentSaving={isSaving}
           />
         ),
       },
@@ -400,28 +355,19 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
     [
       systemPrompt,
       modelId,
-      temperature,
-      maxTokens,
-      topP,
-      topK,
-      presencePenalty,
-      frequencyPenalty,
       syncRepoId,
       defaultTagIds,
       defaultRuleIds,
+      paramsForm,
       effectiveSettings,
       globalDefaults,
       globalModelId,
       isSaving,
-      localTemp,
-      localTopP,
-      localPresence,
-      localFrequency,
       effectiveSyncRepoId,
       syncRepos,
       projectId,
       project?.name,
-      module, // Add module as dependency
+      module,
     ]
   );
 

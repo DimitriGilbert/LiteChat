@@ -18,7 +18,7 @@ export const CopyActionControl: React.FC<CopyActionControlProps> = ({
   contentToCopy,
   disabled,
 }) => {
-  const [isCopied, setIsCopied] = useState(false);
+  const [isCopied] = useState(false);
 
   const handleCopy = useCallback(
     async (e: React.MouseEvent) => {

@@ -1,8 +1,6 @@
 // src/components/LiteChat/settings/AddProviderForm.tsx
 // FULL FILE
 import React, { useState, useCallback, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { SaveIcon, XIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type {
   DbProviderConfig,
@@ -19,7 +17,7 @@ import { ProviderConfigForm, ProviderFormData } from "./ProviderConfigForm"; // 
 interface AddProviderFormProps {
   apiKeys: DbApiKey[];
   onAddProvider: (
-    config: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">,
+    config: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">
   ) => Promise<string>;
   onCancel: () => void;
   initialType?: DbProviderType;
@@ -53,58 +51,59 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
       name: initialName || prev.name || "",
       type: initialType || prev.type || null,
       apiKeyId: initialApiKeyId || prev.apiKeyId || null,
-      autoFetchModels: initialType
-        ? supportsModelFetching(initialType)
-        : prev.autoFetchModels,
+      autoFetchModels: false,
     }));
   }, [initialName, initialType, initialApiKeyId]);
 
   const handleNewChange = useCallback(
     (
       field: keyof ProviderFormData,
-      value: string | boolean | string[] | null,
+      value: string | boolean | string[] | null
     ) => {
-      setNewProviderData((prev) => {
-        const updated = { ...prev, [field]: value };
-        const currentName = prev.name || "";
+      return new Promise<void>((resolve) => {
+        setNewProviderData((prev) => {
+          const updated = { ...prev, [field]: value };
+          const currentName = prev.name || "";
 
-        // Keep the logic for auto-filling name and resetting dependent fields
-        if (field === "type") {
-          const newType = value as DbProviderType | null;
-          const oldProviderLabel = PROVIDER_TYPES.find(
-            (p) => p.value === prev.type,
-          )?.label;
+          // Keep the logic for auto-filling name and resetting dependent fields
+          if (field === "type") {
+            const newType = value as DbProviderType | null;
+            const oldProviderLabel = PROVIDER_TYPES.find(
+              (p) => p.value === prev.type
+            )?.label;
 
-          updated.apiKeyId = null;
-          updated.baseURL = null;
-          updated.autoFetchModels = newType
-            ? supportsModelFetching(newType)
-            : false;
+            updated.apiKeyId = null;
+            updated.baseURL = null;
+            updated.autoFetchModels = newType
+              ? supportsModelFetching(newType)
+              : false;
 
-          const providerLabel = PROVIDER_TYPES.find(
-            (p) => p.value === newType,
-          )?.label;
-          if (
-            providerLabel &&
-            (!currentName.trim() || currentName === oldProviderLabel)
-          ) {
-            updated.name = providerLabel;
-          }
+            const providerLabel = PROVIDER_TYPES.find(
+              (p) => p.value === newType
+            )?.label;
+            if (
+              providerLabel &&
+              (!currentName.trim() || currentName === oldProviderLabel)
+            ) {
+              updated.name = providerLabel;
+            }
 
-          // Auto-select first relevant API key if available
-          if (newType && requiresApiKey(newType)) {
-            const relevantKeys = (apiKeys || []).filter(
-              (k) => k.providerId === newType,
-            );
-            if (relevantKeys.length > 0) {
-              updated.apiKeyId = relevantKeys[0].id;
+            // Auto-select first relevant API key if available
+            if (newType && requiresApiKey(newType)) {
+              const relevantKeys = (apiKeys || []).filter(
+                (k) => k.providerId === newType
+              );
+              if (relevantKeys.length > 0) {
+                updated.apiKeyId = relevantKeys[0].id;
+              }
             }
           }
-        }
-        return updated;
+          return updated;
+        });
+        resolve(void 0);
       });
     },
-    [apiKeys],
+    [apiKeys]
   );
 
   const handleSaveNew = useCallback(async () => {
@@ -149,38 +148,13 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
 
       {/* Use the shared form component */}
       <ProviderConfigForm
-        formData={newProviderData}
+        initialData={newProviderData}
+        onSubmit={handleSaveNew}
+        onCancel={onCancel}
         onChange={handleNewChange}
         apiKeys={apiKeys}
         disabled={isSavingNew}
       />
-
-      <div className="flex justify-end space-x-2 pt-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onCancel}
-          disabled={isSavingNew}
-          type="button"
-        >
-          <XIcon className="h-4 w-4 mr-1" /> Cancel
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={handleSaveNew}
-          disabled={
-            isSavingNew ||
-            !newProviderData.name?.trim() ||
-            !newProviderData.type
-          }
-          type="button"
-        >
-          {isSavingNew && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-          <SaveIcon className="h-4 w-4 mr-1" />{" "}
-          {isSavingNew ? "Adding..." : "Add Provider"}
-        </Button>
-      </div>
     </div>
   );
 };

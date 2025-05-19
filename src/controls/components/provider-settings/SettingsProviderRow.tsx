@@ -35,10 +35,12 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [editData, setEditData] = useState<Partial<DbProviderConfig>>({});
+  const [editData, setEditData] = useState<Partial<DbProviderConfig>>({
+    name: "placeholder",
+  });
 
   const getAllAvailableModelDefsForProvider = useProviderStore(
-    (state) => state.getAllAvailableModelDefsForProvider,
+    (state) => state.getAllAvailableModelDefsForProvider
   );
 
   // State to hold OpenRouterModel[] for the edit mode
@@ -50,7 +52,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   const allAvailableModelsForView = useMemo(() => {
     const models = getAllAvailableModelDefsForProvider(provider.id);
     return [...models].sort((a, b) =>
-      (a.name || a.id).localeCompare(b.name || b.id),
+      (a.name || a.id).localeCompare(b.name || b.id)
     );
   }, [provider.id, getAllAvailableModelDefsForProvider]);
 
@@ -60,8 +62,8 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
       const models = getAllAvailableModelDefsForProvider(provider.id);
       setAllAvailableModelsForEdit(
         [...models].sort((a, b) =>
-          (a.name || a.id).localeCompare(b.name || b.id),
-        ),
+          (a.name || a.id).localeCompare(b.name || b.id)
+        )
       );
       setEditData({
         name: provider.name,
@@ -123,7 +125,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
       setIsEditing(false);
       setEditData({});
       toast.success(
-        `Provider "${finalChanges.name || provider.name}" updated.`,
+        `Provider "${finalChanges.name || provider.name}" updated.`
       );
     } catch (_error) {
       console.error("Failed to save provider update:", _error);
@@ -136,14 +138,14 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
   const handleChange = useCallback(
     (
       field: keyof DbProviderConfig,
-      value: string | boolean | string[] | null,
+      value: string | boolean | string[] | null
     ) => {
       setEditData((prev: Partial<DbProviderConfig>) => ({
         ...prev,
         [field]: value,
       }));
     },
-    [],
+    []
   );
 
   const handleDelete = useCallback(async () => {
@@ -165,8 +167,8 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
       const models = getAllAvailableModelDefsForProvider(provider.id);
       setAllAvailableModelsForEdit(
         [...models].sort((a, b) =>
-          (a.name || a.id).localeCompare(b.name || b.id),
-        ),
+          (a.name || a.id).localeCompare(b.name || b.id)
+        )
       );
     }
   }, [
@@ -181,6 +183,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
       {isEditing ? (
         <ProviderRowEditMode
           providerId={provider.id}
+          // @ts-expect-error oh yes you are compatible -_-
           editData={editData}
           apiKeys={apiKeys}
           allAvailableModels={allAvailableModelsForEdit} // Pass OpenRouterModel[]

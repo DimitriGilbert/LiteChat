@@ -273,21 +273,37 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       return;
     const modApi = coreModApiRef.current;
 
-    let targetVfsKey: string | null = null;
+    let calculatedKey: any = null; // Allow any type initially for calculation
     const isVfsModalOpen = isChatControlPanelOpen["core-vfs-modal-panel"];
 
     if (isVfsModalOpen || selectedItemType === "project") {
       if (selectedItemType === "project") {
-        targetVfsKey = selectedItemId;
+        calculatedKey = selectedItemId;
       } else if (selectedItemType === "conversation") {
         const convo = getConversationByIdFromStore(selectedItemId);
-        targetVfsKey = convo?.projectId ?? "orphan";
+        calculatedKey = convo?.projectId ?? "orphan";
       } else {
-        targetVfsKey = "orphan";
+        calculatedKey = "orphan";
       }
     } else if (selectedItemType === "conversation") {
       const convo = getConversationByIdFromStore(selectedItemId);
-      targetVfsKey = convo?.projectId ?? "orphan";
+      calculatedKey = convo?.projectId ?? "orphan";
+    }
+    // Ensure targetVfsKey is strictly string or null before emitting.
+    let targetVfsKey: string | null = null;
+    if (typeof calculatedKey === 'string') {
+      targetVfsKey = calculatedKey;
+    } else if (calculatedKey === null) {
+      targetVfsKey = null;
+    } else {
+      // This case should ideally not happen if types are correct upstream.
+      // Logging helps identify if projectId or selectedItemId is not a string/null.
+      console.warn(
+        `[LiteChatVFS] Calculated VFS key was not a string or null. Type: ${typeof calculatedKey}, Value:`,
+        calculatedKey,
+        `Defaulting to 'orphan'.`
+      );
+      targetVfsKey = "orphan";
     }
 
     if (useVfsStore.getState().vfsKey !== targetVfsKey) {

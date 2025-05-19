@@ -1,6 +1,8 @@
 // src/components/LiteChat/settings/SettingsDataManagement.tsx
 // FULL FILE
 import React, { useRef, useState, useCallback } from "react";
+import { useForm, type AnyFieldApi } from "@tanstack/react-form";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
   UploadIcon,
@@ -31,6 +33,29 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
+// Define Zod schemas for import and export options
+const fullImportOptionsSchema = z.object({
+  importSettings: z.boolean(),
+  importApiKeys: z.boolean(),
+  importProviderConfigs: z.boolean(),
+  importProjects: z.boolean(),
+  importConversations: z.boolean(),
+  importRulesAndTags: z.boolean(),
+  importMods: z.boolean(),
+  importSyncRepos: z.boolean(),
+});
+
+const fullExportOptionsSchema = z.object({
+  importSettings: z.boolean(), // Note: Key names match FullImportOptions for simplicity in FullExportOptions type
+  importApiKeys: z.boolean(),
+  importProviderConfigs: z.boolean(),
+  importProjects: z.boolean(),
+  importConversations: z.boolean(),
+  importRulesAndTags: z.boolean(),
+  importMods: z.boolean(),
+  importSyncRepos: z.boolean(),
+});
+
 const SettingsDataManagementComponent: React.FC = () => {
   // --- Fetch actions from stores ---
   const { importConversation, exportAllConversations } = useConversationStore(
@@ -48,27 +73,39 @@ const SettingsDataManagementComponent: React.FC = () => {
   const [isClearing, setIsClearing] = useState(false);
   const [isFullExporting, setIsFullExporting] = useState(false);
   const [isFullImporting, setIsFullImporting] = useState(false);
-  // State for import options checkboxes
-  const [importOptions, setImportOptions] = useState<FullImportOptions>({
-    importSettings: true,
-    importApiKeys: true,
-    importProviderConfigs: true,
-    importProjects: true,
-    importConversations: true,
-    importRulesAndTags: true,
-    importMods: true,
-    importSyncRepos: true,
+
+  // TanStack Form for Import Options
+  const importOptionsForm = useForm({
+    defaultValues: {
+      importSettings: true,
+      importApiKeys: true,
+      importProviderConfigs: true,
+      importProjects: true,
+      importConversations: true,
+      importRulesAndTags: true,
+      importMods: true,
+      importSyncRepos: true,
+    } as FullImportOptions,
+    validators: {
+      onChange: fullImportOptionsSchema, // Validate on change
+    },
   });
-  // State for export options checkboxes
-  const [exportOptions, setExportOptions] = useState<FullExportOptions>({
-    importSettings: true,
-    importApiKeys: true,
-    importProviderConfigs: true,
-    importProjects: true,
-    importConversations: true,
-    importRulesAndTags: true,
-    importMods: true,
-    importSyncRepos: true,
+
+  // TanStack Form for Export Options
+  const exportOptionsForm = useForm({
+    defaultValues: {
+      importSettings: true,
+      importApiKeys: true,
+      importProviderConfigs: true,
+      importProjects: true,
+      importConversations: true,
+      importRulesAndTags: true,
+      importMods: true,
+      importSyncRepos: true,
+    } as FullExportOptions,
+    validators: {
+      onChange: fullExportOptionsSchema, // Validate on change
+    },
   });
 
   const handleImportClick = () => {
@@ -116,15 +153,12 @@ const SettingsDataManagementComponent: React.FC = () => {
 
         setIsFullImporting(true);
         try {
-          // Call service action with selected options
           await ImportExportService.importFullConfiguration(
             file,
-            importOptions,
+            importOptionsForm.state.values, // Use form state values
           );
-          // Success toast and reload handled by service
         } catch (error) {
           console.error("Full import failed (from component):", error);
-          // Error toast handled by service
         } finally {
           if (fullImportInputRef.current) {
             fullImportInputRef.current.value = "";
@@ -133,7 +167,7 @@ const SettingsDataManagementComponent: React.FC = () => {
         }
       }
     },
-    [importOptions],
+    [importOptionsForm], // Depend on form instance
   );
 
   const handleExportAllClick = useCallback(async () => {
@@ -150,29 +184,25 @@ const SettingsDataManagementComponent: React.FC = () => {
   const handleFullExportClick = useCallback(async () => {
     setIsFullExporting(true);
     try {
-      // Call service action with selected export options
-      await ImportExportService.exportFullConfiguration(exportOptions);
+      await ImportExportService.exportFullConfiguration(
+        exportOptionsForm.state.values, // Use form state values
+      );
     } catch (error) {
       console.error("Full export failed (from component):", error);
-      // Error toast handled by service
     } finally {
       setIsFullExporting(false);
     }
-  }, [exportOptions]);
+  }, [exportOptionsForm]); // Depend on form instance
 
   const handleClearAllDataClick = useCallback(async () => {
     if (
       window.confirm(
-        `🚨 ARE YOU ABSOLUTELY SURE? 🚨
-
-This will permanently delete ALL conversations, messages, mods, settings, providers, and stored API keys from your browser. This action cannot be undone.`,
+        `🚨 ARE YOU ABSOLUTELY SURE? 🚨\n\nThis will permanently delete ALL conversations, messages, mods, settings, providers, and stored API keys from your browser. This action cannot be undone.`,
       )
     ) {
       if (
         window.confirm(
-          `SECOND CONFIRMATION:
-
-Really delete everything? Consider exporting first.`,
+          `SECOND CONFIRMATION:\n\nReally delete everything? Consider exporting first.`,
         )
       ) {
         setIsClearing(true);
@@ -192,46 +222,37 @@ Really delete everything? Consider exporting first.`,
     }
   }, []);
 
-  const handleImportOptionChange = (
-    option: keyof FullImportOptions,
-    checked: boolean,
-  ) => {
-    setImportOptions((prev) => ({ ...prev, [option]: checked }));
-  };
-
-  const handleExportOptionChange = (
-    option: keyof FullExportOptions,
-    checked: boolean,
-  ) => {
-    setExportOptions((prev) => ({ ...prev, [option]: checked }));
-  };
-
+  // Updated to use TanStack Form Field
   const renderOptionCheckbox = (
-    type: "import" | "export",
-    id: keyof FullImportOptions,
+    formInstance: typeof importOptionsForm | typeof exportOptionsForm, // Pass form instance
+    optionKey: keyof FullImportOptions, // Assuming keys are same for FullExportOptions
     label: string,
     Icon: React.ElementType,
+    isDisabledFlag: boolean,
+    typePrefix: 'import' | 'export' // Added to differentiate IDs
   ) => {
-    const state = type === "import" ? importOptions : exportOptions;
-    const handler =
-      type === "import" ? handleImportOptionChange : handleExportOptionChange;
-    const isDisabled = type === "import" ? isFullImporting : isFullExporting;
-
+    const fieldId = `${typePrefix}-${optionKey}-checkbox`; // Made ID unique
     return (
-      <div key={`${type}-${id}`} className="flex items-center space-x-2">
-        <Checkbox
-          id={`${type}-${id}`}
-          checked={state[id]}
-          onCheckedChange={(checked) => handler(id, !!checked)}
-          disabled={isDisabled}
-        />
-        <Label
-          htmlFor={`${type}-${id}`}
-          className="text-sm font-normal flex items-center gap-1.5"
-        >
-          <Icon className="h-4 w-4 text-muted-foreground" /> {label}
-        </Label>
-      </div>
+      <formInstance.Field
+        key={optionKey}
+        name={optionKey}
+        children={(field: AnyFieldApi) => (
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={fieldId}
+              checked={field.state.value}
+              onCheckedChange={(checked) => field.handleChange(!!checked)}
+              disabled={isDisabledFlag} 
+            />
+            <Label
+              htmlFor={fieldId}
+              className="text-sm font-normal flex items-center gap-1.5"
+            >
+              <Icon className="h-4 w-4 text-muted-foreground" /> {label}
+            </Label>
+          </div>
+        )}
+      />
     );
   };
 
@@ -309,51 +330,15 @@ Really delete everything? Consider exporting first.`,
                 This will overwrite existing data for selected types.
               </strong>
             </p>
-            {/* Checkboxes for import options */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2">
-              {renderOptionCheckbox(
-                "import",
-                "importSettings",
-                "Settings",
-                SettingsIcon,
-              )}
-              {renderOptionCheckbox(
-                "import",
-                "importApiKeys",
-                "API Keys",
-                KeyIcon,
-              )}
-              {renderOptionCheckbox(
-                "import",
-                "importProviderConfigs",
-                "Providers",
-                ServerIcon,
-              )}
-              {renderOptionCheckbox(
-                "import",
-                "importProjects",
-                "Projects",
-                FolderTreeIcon,
-              )}
-              {renderOptionCheckbox(
-                "import",
-                "importConversations",
-                "Conversations",
-                MessageSquareIcon,
-              )}
-              {renderOptionCheckbox(
-                "import",
-                "importRulesAndTags",
-                "Rules & Tags",
-                TagsIcon,
-              )}
-              {renderOptionCheckbox("import", "importMods", "Mods", PuzzleIcon)}
-              {renderOptionCheckbox(
-                "import",
-                "importSyncRepos",
-                "Sync Repos",
-                GitBranchIcon,
-              )}
+              {renderOptionCheckbox(importOptionsForm, "importSettings", "Settings", SettingsIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, "importApiKeys", "API Keys", KeyIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, "importProviderConfigs", "Providers", ServerIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, "importProjects", "Projects", FolderTreeIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, "importConversations", "Conversations", MessageSquareIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, "importRulesAndTags", "Rules & Tags", TagsIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, "importMods", "Mods", PuzzleIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, "importSyncRepos", "Sync Repos", GitBranchIcon, isFullImporting, 'import')}
             </div>
             <input
               type="file"
@@ -387,51 +372,15 @@ Really delete everything? Consider exporting first.`,
               rules, tags, mods, etc., into a single backup file. Select which
               data types to include.
             </p>
-            {/* Checkboxes for export options */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2">
-              {renderOptionCheckbox(
-                "export",
-                "importSettings",
-                "Settings",
-                SettingsIcon,
-              )}
-              {renderOptionCheckbox(
-                "export",
-                "importApiKeys",
-                "API Keys",
-                KeyIcon,
-              )}
-              {renderOptionCheckbox(
-                "export",
-                "importProviderConfigs",
-                "Providers",
-                ServerIcon,
-              )}
-              {renderOptionCheckbox(
-                "export",
-                "importProjects",
-                "Projects",
-                FolderTreeIcon,
-              )}
-              {renderOptionCheckbox(
-                "export",
-                "importConversations",
-                "Conversations",
-                MessageSquareIcon,
-              )}
-              {renderOptionCheckbox(
-                "export",
-                "importRulesAndTags",
-                "Rules & Tags",
-                TagsIcon,
-              )}
-              {renderOptionCheckbox("export", "importMods", "Mods", PuzzleIcon)}
-              {renderOptionCheckbox(
-                "export",
-                "importSyncRepos",
-                "Sync Repos",
-                GitBranchIcon,
-              )}
+              {renderOptionCheckbox(exportOptionsForm, "importSettings", "Settings", SettingsIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importApiKeys", "API Keys", KeyIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importProviderConfigs", "Providers", ServerIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importProjects", "Projects", FolderTreeIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importConversations", "Conversations", MessageSquareIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importRulesAndTags", "Rules & Tags", TagsIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importMods", "Mods", PuzzleIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importSyncRepos", "Sync Repos", GitBranchIcon, isFullExporting, 'export')}
             </div>
             <Button
               onClick={handleFullExportClick}

@@ -308,26 +308,60 @@ export const useVfsStore = create(
       }
     },
 
-    initializeVFS: async (vfsKey, options) => {
-      if (!vfsKey) {
-        console.warn("[VfsStore] initializeVFS called without a valid vfsKey.");
-        throw new Error("VFS key cannot be empty.");
+    initializeVFS: async (vfsKeyParam: any, optionsParam?: { force?: boolean }) => {
+      console.log('[VfsStore DEBUG] initializeVFS called with:', 
+        {
+          vfsKeyParam: typeof vfsKeyParam === 'object' ? JSON.parse(JSON.stringify(vfsKeyParam)) : vfsKeyParam, 
+          optionsParam: typeof optionsParam === 'object' ? JSON.parse(JSON.stringify(optionsParam)) : optionsParam
+        }
+      );
+
+      let vfsKey: string;
+      let options: { force?: boolean } | undefined;
+
+      // Argument grooming: Handle various ways initializeVFS might be called.
+      if (typeof vfsKeyParam === 'object' && vfsKeyParam !== null && 'vfsKey' in vfsKeyParam) {
+        // Case 1: Called with a single object argument like { vfsKey: 'key', options: { force: true } }
+        // This is likely from an incorrectly wired event handler.
+        console.warn(
+          `[VfsStore] initializeVFS called with a single object payload. Correcting. Input:`, 
+          JSON.parse(JSON.stringify(vfsKeyParam)) // Deep clone for logging complex objects
+        );
+        vfsKey = String(vfsKeyParam.vfsKey);
+        options = vfsKeyParam.options as { force?: boolean } | undefined;
+      } else if (typeof vfsKeyParam === 'string') {
+        // Case 2: Called correctly as initializeVFS('key', { force: true })
+        vfsKey = vfsKeyParam;
+        options = optionsParam;
+      } else {
+        // Case 3: Invalid first argument type
+        const errorMessage = `[VfsStore] initializeVFS called with invalid vfsKey type. Type: ${typeof vfsKeyParam}, Value: "${String(vfsKeyParam)}". Aborting.`;
+        console.error(errorMessage, vfsKeyParam);
+        throw new Error("VFS key must be a string and cannot be empty.");
+      }
+
+      if (!vfsKey || vfsKey.trim() === "") {
+         const errorMessage = `[VfsStore] initializeVFS: Derived vfsKey is empty or invalid. Original param: ${String(vfsKeyParam)}, Derived key: "${vfsKey}". Aborting.`;
+         console.error(errorMessage, {originalVfsKeyParam: vfsKeyParam, originalOptionsParam: optionsParam});
+         throw new Error("VFS key cannot be empty after processing.");
       }
 
       const isForced = options?.force === true;
+      console.log(`[VfsStore DEBUG] initializeVFS derived: vfsKey="${vfsKey}", isForced=${isForced}`);
 
       if (!isForced) {
         if (get().vfsKey !== vfsKey) {
-          const message = `UI Initialization aborted for "${vfsKey}". Desired key is now "${
-            get().vfsKey
-          }".`;
+          const message = `UI Initialization aborted for "${vfsKey}". Desired key is now "${get().vfsKey}".`;
           console.warn(`[VfsStore] ${message}`);
           throw new Error(message);
         }
-        if (get().initializingKey !== null) {
-          const message = `UI Initialization skipped for "${vfsKey}". Already initializing key "${
-            get().initializingKey
-          }".`;
+        if (get().initializingKey === vfsKey) { // Check if already initializing THIS key
+          const message = `UI Initialization skipped for "${vfsKey}". Already actively initializing this exact key.`;
+          console.warn(`[VfsStore] ${message}`);
+          throw new Error(message);
+        } 
+        if (get().initializingKey !== null && get().initializingKey !== vfsKey) { // Check if initializing a DIFFERENT key
+          const message = `UI Initialization skipped for "${vfsKey}". Already initializing a different key "${get().initializingKey}".`;
           console.warn(`[VfsStore] ${message}`);
           throw new Error(message);
         }
@@ -335,7 +369,7 @@ export const useVfsStore = create(
           console.log(
             `[VfsStore] UI Initialization skipped for key "${vfsKey}" (already configured).`
           );
-          set({ loading: false });
+          set({ loading: false }); // Ensure loading is false if skipped
           return get().fs!;
         }
       }
@@ -358,7 +392,10 @@ export const useVfsStore = create(
       }
 
       try {
+        console.log(`[VfsStore DEBUG] About to call VfsOps.initializeFsOp with key: "${vfsKey}"`);
         const fsInstance = await VfsOps.initializeFsOp(vfsKey);
+        console.log(`[VfsStore DEBUG] VfsOps.initializeFsOp returned. Instance valid: ${!!fsInstance}`);
+
         if (!fsInstance) {
           throw new Error("Filesystem backend initialization failed.");
         }
@@ -431,7 +468,7 @@ export const useVfsStore = create(
         const errorMessage = `Failed to initialize VFS (${vfsKey}): ${
           err instanceof Error ? err.message : String(err)
         }`;
-        console.error(`[VfsStore] ${errorMessage}`, err);
+        console.error(`[VfsStore DEBUG] Error in initializeVFS catch block: ${errorMessage}`, err);
         if (get().initializingKey === vfsKey) {
           _setError(errorMessage);
           if (!isForced) {
@@ -441,6 +478,7 @@ export const useVfsStore = create(
         }
         throw new Error(errorMessage);
       } finally {
+        console.log(`[VfsStore DEBUG] initializeVFS finally block for key: "${vfsKey}". InitializingKey: ${get().initializingKey}`);
         if (get().initializingKey === vfsKey) {
           set({ initializingKey: null });
           if (!isForced) {
@@ -817,11 +855,6 @@ export const useVfsStore = create(
     getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
       const storeId = "vfsStore";
       const actions = get();
-      const wrapPromiseFs =
-        <P>(fn: (payload: P) => Promise<typeof fs>): ActionHandler<P> =>
-        async (payload: P) => {
-          await fn(payload);
-        };
       const wrapPromiseBlob =
         <P>(
           fn: (payload: P) => Promise<{ name: string; blob: Blob } | null>
@@ -839,7 +872,9 @@ export const useVfsStore = create(
         },
         {
           eventName: vfsEvent.initializeVFSRequest,
-          handler: wrapPromiseFs(actions.initializeVFS),
+          handler: async (payload: VfsEventPayloads[typeof vfsEvent.initializeVFSRequest]) => {
+            await actions.initializeVFS(payload.vfsKey, payload.options);
+          },
           storeId,
         },
         {

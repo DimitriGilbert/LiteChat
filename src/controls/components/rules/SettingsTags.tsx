@@ -1,6 +1,6 @@
 // src/controls/components/rules/SettingsTags.tsx
 // FULL FILE
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { TagForm } from "./TagForm";
@@ -15,6 +15,8 @@ interface SettingsTagsProps {
 }
 
 export const SettingsTags: React.FC<SettingsTagsProps> = ({ module }) => {
+  const [, setLastUpdated] = useState(Date.now());
+
   const tags = module.getAllTags();
   const rules = module.getAllRules();
   const tagRuleLinks = module.getTagRuleLinks();
@@ -25,6 +27,14 @@ export const SettingsTags: React.FC<SettingsTagsProps> = ({ module }) => {
   const [editingTag, setEditingTag] = useState<DbTag | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    module.setNotifySettingsCallback(() => setLastUpdated(Date.now()));
+
+    return () => {
+      module.setNotifySettingsCallback(null);
+    };
+  }, [module]);
 
   const handleAddNew = () => {
     setEditingTag(null);
@@ -140,7 +150,7 @@ export const SettingsTags: React.FC<SettingsTagsProps> = ({ module }) => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <TagForm
             initialData={editingTag ?? undefined}
-            isSaving={isSaving}
+            isParentSaving={isSaving}
             onSave={handleSave}
             onCancel={handleCancel}
           />

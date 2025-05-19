@@ -1,29 +1,33 @@
 // src/controls/components/assitant/SettingsAssistantParameters.tsx
 // FULL FILE
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useEffect } from "react";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
-import { Input } from "@/components/ui/input";
+// import { Label } from "@/components/ui/label"; // No longer directly used
+// import { Slider } from "@/components/ui/slider"; // No longer directly used
+// import { Input } from "@/components/ui/input"; // No longer directly used
+import { Button } from "@/components/ui/button";
+import { useForm } from "@tanstack/react-form";
+import { z } from "zod";
+import { toast } from "sonner";
+import { NumberField } from "@/components/LiteChat/common/form-fields/NumberField";
+import { SliderField } from "@/components/LiteChat/common/form-fields/SliderField";
 // ParameterControlComponent is for prompt-time overrides, not global settings.
 // We will replicate its relevant UI parts here for global settings.
 
+const assistantParamsSchema = z.object({
+  temperature: z.number().min(0).max(1),
+  topP: z.number().min(0).max(1),
+  maxTokens: z.number().min(1).nullable(),
+  topK: z.number().min(1).nullable(),
+  presencePenalty: z.number().min(-2).max(2),
+  frequencyPenalty: z.number().min(-2).max(2),
+});
+
+// Local FieldMetaMessages removed as it's part of primitives
+
 export const SettingsAssistantParameters: React.FC = () => {
-  const {
-    temperature,
-    setTemperature,
-    topP,
-    setTopP,
-    maxTokens,
-    setMaxTokens,
-    topK,
-    setTopK,
-    presencePenalty,
-    setPresencePenalty,
-    frequencyPenalty,
-    setFrequencyPenalty,
-  } = useSettingsStore(
+  const store = useSettingsStore(
     useShallow((state) => ({
       temperature: state.temperature,
       setTemperature: state.setTemperature,
@@ -40,137 +44,153 @@ export const SettingsAssistantParameters: React.FC = () => {
     }))
   );
 
-  // Local states for sliders to provide smooth UX
-  const [localTemp, setLocalTemp] = useState(temperature);
-  const [localTopP, setLocalTopP] = useState(topP ?? 1.0); // Default to 1.0 if null
-  const [localPresence, setLocalPresence] = useState(presencePenalty ?? 0.0);
-  const [localFrequency, setLocalFrequency] = useState(frequencyPenalty ?? 0.0);
-
-  useEffect(() => setLocalTemp(temperature), [temperature]);
-  useEffect(() => setLocalTopP(topP ?? 1.0), [topP]);
-  useEffect(() => setLocalPresence(presencePenalty ?? 0.0), [presencePenalty]);
-  useEffect(
-    () => setLocalFrequency(frequencyPenalty ?? 0.0),
-    [frequencyPenalty]
-  );
-
-  const handleNumberInputChange = useCallback(
-    (
-      setter: (value: number | null) => void,
-      e: React.ChangeEvent<HTMLInputElement>
-    ) => {
-      const value = e.target.value;
-      const numValue = value === "" ? null : parseInt(value, 10);
-      if (value === "" || (!isNaN(numValue!) && numValue !== null)) {
-        setter(numValue);
+  const form = useForm({
+    defaultValues: {
+      temperature: store.temperature ?? 0.7,
+      topP: store.topP ?? 1.0,
+      maxTokens: store.maxTokens ?? null,
+      topK: store.topK ?? null,
+      presencePenalty: store.presencePenalty ?? 0.0,
+      frequencyPenalty: store.frequencyPenalty ?? 0.0,
+    },
+    validators: {
+      onChangeAsync: assistantParamsSchema,
+      onChangeAsyncDebounceMs: 500,
+    },
+    onSubmit: async ({ value }) => {
+      try {
+        store.setTemperature(value.temperature);
+        store.setTopP(value.topP);
+        store.setMaxTokens(value.maxTokens ?? null);
+        store.setTopK(value.topK ?? null);
+        store.setPresencePenalty(value.presencePenalty);
+        store.setFrequencyPenalty(value.frequencyPenalty);
+        toast.success("Assistant parameters updated!");
+      } catch (error) {
+        toast.error("Failed to update parameters.");
+        console.error("Error submitting parameters form:", error);
       }
     },
-    []
-  );
+  });
 
-  const handleSliderCommit = useCallback(
-    (setter: (value: number) => void, value: number[]) => {
-      setter(value[0]);
-    },
-    []
-  );
+  useEffect(() => {
+    form.reset({
+      temperature: store.temperature ?? 0.7,
+      topP: store.topP ?? 1.0,
+      maxTokens: store.maxTokens ?? null,
+      topK: store.topK ?? null,
+      presencePenalty: store.presencePenalty ?? 0.0,
+      frequencyPenalty: store.frequencyPenalty ?? 0.0,
+    });
+  }, [
+    store.temperature,
+    store.topP,
+    store.maxTokens,
+    store.topK,
+    store.presencePenalty,
+    store.frequencyPenalty,
+    form,
+  ]);
 
   return (
-    <div className="space-y-6">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        form.handleSubmit();
+      }}
+      className="space-y-6"
+    >
       <p className="text-xs text-muted-foreground mb-3">
         Set the default global values for AI parameters. These can be overridden
         per-project or per-prompt turn.
       </p>
-      <div className="space-y-1.5">
-        <Label htmlFor="global-temperature" className="text-sm">
-          Temperature ({localTemp.toFixed(2)})
-        </Label>
-        <Slider
-          id="global-temperature"
-          min={0}
-          max={1}
-          step={0.01}
-          value={[localTemp]}
-          onValueChange={(v) => setLocalTemp(v[0])}
-          onValueCommit={(v) => handleSliderCommit(setTemperature, v)}
-        />
-      </div>
+      
+      <SliderField
+        form={form}
+        name="temperature"
+        label="Temperature"
+        min={0}
+        max={1}
+        step={0.01}
+        valueDisplayPrecision={2}
+        wrapperClassName="space-y-1.5"
+      />
 
-      <div className="space-y-1.5">
-        <Label htmlFor="global-top-p" className="text-sm">
-          Top P ({localTopP.toFixed(2)})
-        </Label>
-        <Slider
-          id="global-top-p"
-          min={0}
-          max={1}
-          step={0.01}
-          value={[localTopP]}
-          onValueChange={(v) => setLocalTopP(v[0])}
-          onValueCommit={(v) => handleSliderCommit(setTopP, v)}
-        />
-      </div>
+      <SliderField
+        form={form}
+        name="topP"
+        label="Top P"
+        min={0}
+        max={1}
+        step={0.01}
+        valueDisplayPrecision={2}
+        wrapperClassName="space-y-1.5"
+      />
 
       <div className="grid grid-cols-2 gap-4 items-end">
-        <div className="space-y-1.5">
-          <Label htmlFor="global-max-tokens" className="text-sm">
-            Max Tokens
-          </Label>
-          <Input
-            id="global-max-tokens"
-            type="number"
-            placeholder="Default (None)"
-            value={maxTokens ?? ""}
-            onChange={(e) => handleNumberInputChange(setMaxTokens, e)}
-            min="1"
-            className="h-9 text-sm"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="global-top-k" className="text-sm">
-            Top K
-          </Label>
-          <Input
-            id="global-top-k"
-            type="number"
-            placeholder="Default (None)"
-            value={topK ?? ""}
-            onChange={(e) => handleNumberInputChange(setTopK, e)}
-            min="1"
-            className="h-9 text-sm"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="global-presence-penalty" className="text-sm">
-          Presence Penalty ({localPresence.toFixed(2)})
-        </Label>
-        <Slider
-          id="global-presence-penalty"
-          min={-2}
-          max={2}
-          step={0.01}
-          value={[localPresence]}
-          onValueChange={(v) => setLocalPresence(v[0])}
-          onValueCommit={(v) => handleSliderCommit(setPresencePenalty, v)}
+        <NumberField
+          form={form}
+          name="maxTokens"
+          label="Max Tokens"
+          placeholder="Default (None)"
+          min={1}
+          className="h-9 text-sm"
+          allowNull={true}
+          wrapperClassName="space-y-1.5"
+        />
+        <NumberField
+          form={form}
+          name="topK"
+          label="Top K"
+          placeholder="Default (None)"
+          min={1}
+          className="h-9 text-sm"
+          allowNull={true}
+          wrapperClassName="space-y-1.5"
         />
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="global-frequency-penalty" className="text-sm">
-          Frequency Penalty ({localFrequency.toFixed(2)})
-        </Label>
-        <Slider
-          id="global-frequency-penalty"
-          min={-2}
-          max={2}
-          step={0.01}
-          value={[localFrequency]}
-          onValueChange={(v) => setLocalFrequency(v[0])}
-          onValueCommit={(v) => handleSliderCommit(setFrequencyPenalty, v)}
+      <SliderField
+        form={form}
+        name="presencePenalty"
+        label="Presence Penalty"
+        min={-2}
+        max={2}
+        step={0.01}
+        valueDisplayPrecision={2}
+        wrapperClassName="space-y-1.5"
+      />
+
+      <SliderField
+        form={form}
+        name="frequencyPenalty"
+        label="Frequency Penalty"
+        min={-2}
+        max={2}
+        step={0.01}
+        valueDisplayPrecision={2}
+        wrapperClassName="space-y-1.5"
+      />
+
+      <div className="flex justify-end space-x-2">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => form.reset()}
+          disabled={!form.state.isDirty}
+        >
+          Reset
+        </Button>
+        <form.Subscribe
+          selector={(state) => [state.canSubmit, state.isSubmitting]}
+          children={([canSubmit, isSubmitting]) => (
+            <Button type="submit" disabled={!canSubmit || isSubmitting}>
+              {isSubmitting ? "Saving..." : "Save Changes"}
+            </Button>
+          )}
         />
       </div>
-    </div>
+    </form>
   );
 };

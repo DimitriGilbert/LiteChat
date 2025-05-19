@@ -1,23 +1,20 @@
 // src/components/LiteChat/settings/SettingsTheme.tsx
 // FULL FILE
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useEffect, useState } from "react";
+import { useForm } from "@tanstack/react-form";
+import { z } from "zod";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { RotateCcwIcon } from "lucide-react";
+import { SliderField } from "@/components/LiteChat/common/form-fields/SliderField";
+import { TextField } from "@/components/LiteChat/common/form-fields/TextField";
+import { SelectField } from "@/components/LiteChat/common/form-fields/SelectField";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
 import { Separator } from "@/components/ui/separator";
 import { SettingsSection } from "@/components/LiteChat/common/SettingsSection";
-import type { CustomThemeColors, SettingsState } from "@/store/settings.store";
+import type { CustomThemeColors } from "@/store/settings.store";
 
 const ColorInput: React.FC<{
   label: string;
@@ -70,213 +67,244 @@ const ColorInput: React.FC<{
 // List of Prism themes (remains the same)
 const PRISM_THEMES = [
   {
-    name: "Default Light",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-material-light.min.css",
+    label: "Default Light",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-material-light.min.css",
   },
   // {
   //   name: "Default Dark",
   //   url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-vsc-dark-plus.min.css",
   // },
   {
-    name: "A11y Dark",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-a11y-dark.min.css",
+    label: "A11y Dark",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-a11y-dark.min.css",
   },
   {
-    name: "Atom Dark",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-atom-dark.min.css",
+    label: "Atom Dark",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-atom-dark.min.css",
   },
   {
-    name: "Atelier Sulphurpool Light",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-base16-ateliersulphurpool.light.min.css",
+    label: "Atelier Sulphurpool Light",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-base16-ateliersulphurpool.light.min.css",
   },
   {
-    name: "CB",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-cb.min.css",
+    label: "CB",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-cb.min.css",
   },
   {
-    name: "Coldark Cold",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-coldark-cold.min.css",
+    label: "Coldark Cold",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-coldark-cold.min.css",
   },
   {
-    name: "Coldark Dark",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-coldark-dark.min.css",
+    label: "Coldark Dark",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-coldark-dark.min.css",
   },
   {
-    name: "Coy (No Shadow)",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-coy-without-shadows.min.css",
+    label: "Coy (No Shadow)",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-coy-without-shadows.min.css",
   },
   {
-    name: "Darcula",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-darcula.min.css",
+    label: "Darcula",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-darcula.min.css",
   },
   {
-    name: "Dracula",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-dracula.min.css",
+    label: "Dracula",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-dracula.min.css",
   },
   {
-    name: "Duotone Dark",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-duotone-dark.min.css",
+    label: "Duotone Dark",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-duotone-dark.min.css",
   },
   {
-    name: "Duotone Earth",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-duotone-earth.min.css",
+    label: "Duotone Earth",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-duotone-earth.min.css",
   },
   {
-    name: "Duotone Forest",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-duotone-forest.min.css",
+    label: "Duotone Forest",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-duotone-forest.min.css",
   },
   {
-    name: "Duotone Light",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-duotone-light.min.css",
+    label: "Duotone Light",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-duotone-light.min.css",
   },
   {
-    name: "Duotone Sea",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-duotone-sea.min.css",
+    label: "Duotone Sea",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-duotone-sea.min.css",
   },
   {
-    name: "Duotone Space",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-duotone-space.min.css",
+    label: "Duotone Space",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-duotone-space.min.css",
   },
   {
-    name: "GH Colors",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-ghcolors.min.css",
+    label: "GH Colors",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-ghcolors.min.css",
   },
   {
-    name: "Gruvbox Dark",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-gruvbox-dark.min.css",
+    label: "Gruvbox Dark",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-gruvbox-dark.min.css",
   },
   {
-    name: "Gruvbox Light",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-gruvbox-light.min.css",
+    label: "Gruvbox Light",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-gruvbox-light.min.css",
   },
   {
-    name: "Holi",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-holi-theme.min.css",
+    label: "Holi",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-holi-theme.min.css",
   },
   {
-    name: "Hopscotch",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-hopscotch.min.css",
+    label: "Hopscotch",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-hopscotch.min.css",
   },
   {
-    name: "Lucario",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-lucario.min.css",
+    label: "Lucario",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-lucario.min.css",
   },
   {
-    name: "Material Dark",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-material-dark.min.css",
+    label: "Material Dark",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-material-dark.min.css",
   },
   {
-    name: "Material Oceanic",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-material-oceanic.min.css",
+    label: "Material Oceanic",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-material-oceanic.min.css",
   },
   {
-    name: "Night Owl",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-night-owl.min.css",
+    label: "Night Owl",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-night-owl.min.css",
   },
   {
-    name: "Nord",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-nord.min.css",
+    label: "Nord",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-nord.min.css",
   },
   {
-    name: "One Dark",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-one-dark.min.css",
+    label: "One Dark",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-one-dark.min.css",
   },
   {
-    name: "One Light",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-one-light.min.css",
+    label: "One Light",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-one-light.min.css",
   },
   {
-    name: "Pojoaque",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-pojoaque.min.css",
+    label: "Pojoaque",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-pojoaque.min.css",
   },
   {
-    name: "Shades of Purple",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-shades-of-purple.min.css",
+    label: "Shades of Purple",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-shades-of-purple.min.css",
   },
   {
-    name: "Solarized Dark Atom",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-solarized-dark-atom.min.css",
+    label: "Solarized Dark Atom",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-solarized-dark-atom.min.css",
   },
   {
-    name: "Synthwave '84",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-synthwave84.min.css",
+    label: "Synthwave '84",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-synthwave84.min.css",
   },
   {
-    name: "VS",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-vs.min.css",
+    label: "VS",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-vs.min.css",
   },
   {
-    name: "VSC Dark Plus",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-vsc-dark-plus.min.css",
+    label: "VSC Dark Plus",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-vsc-dark-plus.min.css",
   },
   {
-    name: "Xonokai",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-xonokai.min.css",
+    label: "Xonokai",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-xonokai.min.css",
   },
   {
-    name: "Z-Touch",
-    url: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-z-touch.min.css",
+    label: "Z-Touch",
+    value: "https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-z-touch.min.css",
   },
 ];
 
+const themeEnum = z.enum([
+  "system",
+  "light",
+  "dark",
+  "TijuLight",
+  "TijuDark",
+  "custom",
+]);
+const themeSettingsSchema = z.object({
+  theme: themeEnum,
+  prismThemeUrl: z.string(),
+  customFontFamily: z.string(),
+  customFontSize: z.number().min(12).max(20),
+  chatMaxWidth: z.string(),
+  customThemeColors: z.record(z.string(), z.string().nullable()),
+});
+
 const SettingsThemeComponent: React.FC = () => {
-  const {
-    theme,
-    setTheme,
-    prismThemeUrl,
-    setPrismThemeUrl,
-    customFontFamily,
-    setCustomFontFamily,
-    customFontSize,
-    setCustomFontSize,
-    chatMaxWidth,
-    setChatMaxWidth,
-    customThemeColors,
-    setCustomThemeColor,
-    resetThemeSettings,
-  } = useSettingsStore(
+  const storeSetters = useSettingsStore(
     useShallow((state) => ({
-      theme: state.theme,
       setTheme: state.setTheme,
-      prismThemeUrl: state.prismThemeUrl,
       setPrismThemeUrl: state.setPrismThemeUrl,
-      customFontFamily: state.customFontFamily,
       setCustomFontFamily: state.setCustomFontFamily,
-      customFontSize: state.customFontSize,
       setCustomFontSize: state.setCustomFontSize,
-      chatMaxWidth: state.chatMaxWidth,
       setChatMaxWidth: state.setChatMaxWidth,
-      customThemeColors: state.customThemeColors,
       setCustomThemeColor: state.setCustomThemeColor,
       resetThemeSettings: state.resetThemeSettings,
     }))
   );
-
-  const [localFontSize, setLocalFontSize] = useState(customFontSize ?? 16);
-  // Popover state removed
-  const [customUrl, setCustomUrl] = useState(
-    PRISM_THEMES.some((t) => t.url === prismThemeUrl) ? "" : prismThemeUrl ?? ""
+  const storeValues = useSettingsStore(
+    useShallow((state) => ({
+      theme: state.theme,
+      prismThemeUrl: state.prismThemeUrl,
+      customFontFamily: state.customFontFamily,
+      customFontSize: state.customFontSize,
+      chatMaxWidth: state.chatMaxWidth,
+      _rawCustomThemeColors: state.customThemeColors,
+    }))
   );
 
-  useEffect(() => {
-    setLocalFontSize(customFontSize ?? 16);
-  }, [customFontSize]);
-
-  // Update customUrl input if prismThemeUrl changes externally and isn't a preset
-  useEffect(() => {
-    if (!PRISM_THEMES.some((t) => t.url === prismThemeUrl)) {
-      setCustomUrl(prismThemeUrl ?? "");
-    } else {
-      setCustomUrl(""); // Clear if a preset is selected
-    }
-  }, [prismThemeUrl]);
-
-  const handleFontSizeCommit = useCallback(
-    (value: number[]) => {
-      setCustomFontSize(value[0]);
+  const form = useForm({
+    defaultValues: {
+      theme: storeValues.theme ?? "system",
+      prismThemeUrl: storeValues.prismThemeUrl ?? "",
+      customFontFamily: storeValues.customFontFamily ?? "",
+      customFontSize: storeValues.customFontSize ?? 16,
+      chatMaxWidth: storeValues.chatMaxWidth ?? "max-w-7xl",
+      customThemeColors: storeValues._rawCustomThemeColors ?? {},
     },
-    [setCustomFontSize]
-  );
+    onSubmit: async ({ value }) => {
+      storeSetters.setTheme(value.theme);
+      storeSetters.setPrismThemeUrl(value.prismThemeUrl || null);
+      storeSetters.setCustomFontFamily(value.customFontFamily);
+      storeSetters.setCustomFontSize(value.customFontSize);
+      storeSetters.setChatMaxWidth(value.chatMaxWidth);
+      // Update all customThemeColors keys
+      if (value.customThemeColors) {
+        Object.entries(value.customThemeColors).forEach(([k, v]) => {
+          storeSetters.setCustomThemeColor(
+            k as keyof typeof value.customThemeColors,
+            v
+          );
+        });
+      }
+    },
+    validators: {
+      onChangeAsync: themeSettingsSchema,
+      onChangeAsyncDebounceMs: 300,
+    },
+  });
+
+  useEffect(() => {
+    form.reset({
+      theme: storeValues.theme ?? "system",
+      prismThemeUrl: storeValues.prismThemeUrl ?? "",
+      customFontFamily: storeValues.customFontFamily ?? "",
+      customFontSize: storeValues.customFontSize ?? 16,
+      chatMaxWidth: storeValues.chatMaxWidth ?? "max-w-7xl",
+      customThemeColors: storeValues._rawCustomThemeColors ?? {},
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    storeValues.theme,
+    storeValues.prismThemeUrl,
+    storeValues.customFontFamily,
+    storeValues.customFontSize,
+    storeValues.chatMaxWidth,
+    storeValues._rawCustomThemeColors,
+  ]);
 
   const handleResetClick = () => {
     if (
@@ -284,35 +312,16 @@ const SettingsThemeComponent: React.FC = () => {
         "Are you sure you want to reset all Theme settings to their defaults?"
       )
     ) {
-      resetThemeSettings();
+      storeSetters.resetThemeSettings();
     }
-  };
-
-  // Updated handler for Select component
-  const handlePrismThemeSelect = (value: string) => {
-    const selectedUrl = value === "default" ? null : value;
-    setPrismThemeUrl(selectedUrl);
-    // Update customUrl input only if a custom URL was effectively selected (or cleared)
-    if (value === "default" || !PRISM_THEMES.some((t) => t.url === value)) {
-      setCustomUrl(value === "default" ? "" : value);
-    } else {
-      setCustomUrl(""); // Clear custom URL if a preset is chosen
-    }
-  };
-
-  const handleCustomUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const url = e.target.value.trim();
-    setCustomUrl(url);
-    // Apply immediately if user types a custom URL
-    setPrismThemeUrl(url || null);
   };
 
   const maxWidthOptions: { value: string; label: string }[] = [
-    { value: "max-w-3xl", label: "Very Small (3xl)" },
-    { value: "max-w-4xl", label: "Small (4xl)" },
-    { value: "max-w-5xl", label: "Medium (5xl)" },
-    { value: "max-w-6xl", label: "Large (6xl)" },
-    { value: "max-w-7xl", label: "Very Large (7xl)" },
+    { value: "max-w-3xl", label: "Very Small" },
+    { value: "max-w-4xl", label: "Small" },
+    { value: "max-w-5xl", label: "Medium" },
+    { value: "max-w-6xl", label: "Large" },
+    { value: "max-w-7xl", label: "Very Large" },
     { value: "max-w-full", label: "Full Width" },
   ];
 
@@ -351,9 +360,6 @@ const SettingsThemeComponent: React.FC = () => {
     { key: "chart5", label: "Chart 5" },
   ];
 
-  // Determine the value for the Select component
-  const selectValue = prismThemeUrl === null ? "default" : prismThemeUrl;
-
   return (
     <div className="space-y-6 p-1">
       {/* Base Theme Selection */}
@@ -366,22 +372,20 @@ const SettingsThemeComponent: React.FC = () => {
           <Label htmlFor="theme-select" className="font-medium">
             Theme
           </Label>
-          <Select
-            value={theme ?? "system"}
-            onValueChange={(value) => setTheme(value as SettingsState["theme"])}
-          >
-            <SelectTrigger id="theme-select" className="w-[180px]">
-              <SelectValue placeholder="Select theme" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="light">Default Light</SelectItem>
-              <SelectItem value="dark">Default Dark</SelectItem>
-              <SelectItem value="system">System</SelectItem>
-              <SelectItem value="TijuLight">Tiju Light</SelectItem>
-              <SelectItem value="TijuDark">Tiju Dark</SelectItem>
-              <SelectItem value="custom">User Custom</SelectItem>
-            </SelectContent>
-          </Select>
+          <SelectField
+            form={form}
+            name="theme"
+            label="Theme"
+            options={[
+              { value: "light", label: "Default Light" },
+              { value: "dark", label: "Default Dark" },
+              { value: "system", label: "System" },
+              { value: "TijuLight", label: "Tiju Light" },
+              { value: "TijuDark", label: "Tiju Dark" },
+              { value: "custom", label: "User Custom" },
+            ]}
+            triggerClassName="w-[180px]"
+          />
         </div>
       </SettingsSection>
 
@@ -392,11 +396,10 @@ const SettingsThemeComponent: React.FC = () => {
         contentClassName="rounded-lg border p-4 shadow-sm bg-card space-y-4"
       >
         <div>
-          <Label htmlFor="custom-font-family">Custom Font Family</Label>
-          <Input
-            id="custom-font-family"
-            value={customFontFamily ?? ""}
-            onChange={(e) => setCustomFontFamily(e.target.value || null)}
+          <TextField
+            form={form}
+            name="customFontFamily"
+            label="Custom Font Family"
             placeholder="e.g., 'Inter', sans-serif (Leave blank for default)"
             className="mt-1"
           />
@@ -406,17 +409,14 @@ const SettingsThemeComponent: React.FC = () => {
           </p>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="custom-font-size">
-            Base Font Size ({localFontSize}px)
-          </Label>
-          <Slider
-            id="custom-font-size"
+          <SliderField
+            form={form}
+            name="customFontSize"
+            label={`Base Font Size (${form.getFieldValue("customFontSize")}px)`}
             min={12}
             max={20}
             step={1}
-            value={[localFontSize]}
-            onValueChange={(v) => setLocalFontSize(v[0])}
-            onValueCommit={handleFontSizeCommit}
+            className="mt-1"
           />
           <p className="text-xs text-muted-foreground">
             Applies only when 'User Custom' theme is selected. Affects base text
@@ -424,22 +424,13 @@ const SettingsThemeComponent: React.FC = () => {
           </p>
         </div>
         <div>
-          <Label htmlFor="chat-max-width">Chat Content Max Width</Label>
-          <Select
-            value={chatMaxWidth ?? "max-w-7xl"}
-            onValueChange={(value) => setChatMaxWidth(value || null)}
-          >
-            <SelectTrigger id="chat-max-width" className="w-full mt-1">
-              <SelectValue placeholder="Select max width" />
-            </SelectTrigger>
-            <SelectContent>
-              {maxWidthOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SelectField
+            form={form}
+            name="chatMaxWidth"
+            label="Chat Content Max Width"
+            options={maxWidthOptions}
+            triggerClassName="w-full mt-1"
+          />
           <p className="text-xs text-muted-foreground mt-1">
             Controls the maximum width of the main chat message area.
           </p>
@@ -452,27 +443,19 @@ const SettingsThemeComponent: React.FC = () => {
         description="Customize syntax highlighting appearance."
         contentClassName="rounded-lg border p-4 shadow-sm bg-card space-y-3"
       >
-        <Label htmlFor="prism-theme-select">Select Theme or Enter URL</Label>
-        {/* Replace Popover+Command with Select */}
-        <Select value={selectValue} onValueChange={handlePrismThemeSelect}>
-          <SelectTrigger id="prism-theme-select" className="w-full">
-            <SelectValue placeholder="Select code theme..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="default">Default (Matches Theme)</SelectItem>
-            {PRISM_THEMES.map((themeOption) => (
-              <SelectItem key={themeOption.url} value={themeOption.url}>
-                {themeOption.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input
-          id="prism-theme-url-custom"
-          type="url"
+        <SelectField
+          form={form}
+          name="prismThemeUrl"
+          label="Code Block Theme"
+          options={PRISM_THEMES}
+          triggerClassName="w-full"
+        />
+        <TextField
+          form={form}
+          name="prismThemeUrl"
+          label="Or paste custom theme URL here..."
           placeholder="Or paste custom theme URL here..."
-          value={customUrl}
-          onChange={handleCustomUrlChange}
+          type="url"
           className="mt-1"
         />
         <p className="text-xs text-muted-foreground mt-1">
@@ -482,7 +465,7 @@ const SettingsThemeComponent: React.FC = () => {
       </SettingsSection>
 
       {/* Custom Theme Colors, only display if selected theme is custom */}
-      {theme === "custom" && (
+      {form.getFieldValue("theme") === "custom" && (
         <SettingsSection
           title="Custom Theme Colors"
           description="Define custom colors. Use valid CSS color values (hex, rgb, oklch, etc.). Leave blank to use default light/dark theme colors."
@@ -494,8 +477,13 @@ const SettingsThemeComponent: React.FC = () => {
                 key={key}
                 label={label}
                 colorKey={key}
-                value={customThemeColors?.[key]}
-                onChange={setCustomThemeColor}
+                value={form.getFieldValue("customThemeColors")?.[key]}
+                onChange={(k, v) =>
+                  form.setFieldValue(
+                    `customThemeColors.${k}`,
+                    v === null ? "" : v
+                  )
+                }
               />
             ))}
           </div>

@@ -434,7 +434,7 @@ export const EmptyStateSetup: React.FC = () => {
               <ApiKeyForm
                 onSave={handleSaveKey}
                 onCancel={() => {}}
-                isSaving={isSavingKey}
+                disabled={isSavingKey}
                 className="border-none shadow-none p-0"
                 initialProviderType={initialProviderTypeForForm}
               />
@@ -573,13 +573,10 @@ export const EmptyStateSetup: React.FC = () => {
   }
 
   return (
-    <motion.div
-      className="flex h-full flex-col items-center justify-center p-4 bg-gradient-to-b from-background to-background/80"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
+    <div
+      className="flex h-full flex-col items-center justify-start p-4 bg-gradient-to-b from-background to-background/80"
     >
-      <div className="w-full max-w-4xl space-y-6">
+      <div className="w-full max-w-4xl space-y-6 pt-8">
         <div className="text-center mb-8">
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -593,49 +590,47 @@ export const EmptyStateSetup: React.FC = () => {
               </div>
             </div>
           </motion.div>
-
           <h2 className="text-3xl font-bold mb-3 bg-gradient-to-r from-primary to-indigo-500 bg-clip-text text-transparent">
             Welcome to LiteChat
           </h2>
 
-          <div className="relative">
-            <OnBoardingRant />
-          </div>
+          <OnBoardingRant />
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="mt-6 bg-card/40 backdrop-blur-sm border border-border/30 rounded-xl p-3 w-3/4 mx-auto">
-                  <Progress value={progressPercentage} className="h-1.5" />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Setup Progress: {Math.round(progressPercentage)}%
-                  </p>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>
-                  Steps completed: {completedSteps} of {totalSteps}
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
         </div>
 
         <motion.div
           className="space-y-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
         >
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="mt-6 bg-card/40 backdrop-blur-sm border border-border/30 rounded-xl p-3 w-3/4 mx-auto">
+                <Progress value={progressPercentage} className="h-1.5" />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Setup Progress: {Math.round(progressPercentage)}%
+                </p>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>
+                Steps completed: {completedSteps} of {totalSteps}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
           {steps.map((step, index) => {
             const isActive = index === activeStepIndex;
 
             return (
               <motion.div
                 key={step.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
+                transition={{ delay: index * 0.1, duration: 0.3 }}
               >
                 <SetupStep
                   stepNumber={index + 1}
@@ -682,6 +677,6 @@ export const EmptyStateSetup: React.FC = () => {
             </motion.div>
           )}
       </div>
-    </motion.div>
+    </div>
   );
 };

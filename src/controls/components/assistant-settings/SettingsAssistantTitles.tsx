@@ -1,26 +1,40 @@
 // src/controls/components/assistant-settings/SettingsAssistantTitles.tsx
 // FULL FILE
-import React from "react";
+import React, { useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { GlobalModelSelector } from "@/controls/components/global-model-selector/GlobalModelSelector";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
+import { useForm, type AnyFieldApi } from "@tanstack/react-form";
+import { z } from "zod";
+import { toast } from "sonner";
+
+const assistantTitlesSchema = z.object({
+  autoTitleEnabled: z.boolean(),
+  autoTitleModelId: z.string().nullable(), // Changed from .optional()
+  autoTitlePromptMaxLength: z.number().min(100).max(4000),
+  autoTitleIncludeFiles: z.boolean(),
+  autoTitleIncludeRules: z.boolean(),
+});
+
+// Utility component for field meta messages
+function FieldMetaMessages({ field }: { field: AnyFieldApi }) {
+  return (
+    <>
+      {field.state.meta.isTouched && field.state.meta.errors.length > 0 ? (
+        <em className="text-xs text-destructive mt-1 block">
+          {field.state.meta.errors.join(", ")}
+        </em>
+      ) : null}
+    </>
+  );
+}
 
 export const SettingsAssistantTitles: React.FC = () => {
-  const {
-    autoTitleEnabled,
-    setAutoTitleEnabled,
-    autoTitleModelId,
-    setAutoTitleModelId,
-    autoTitlePromptMaxLength,
-    setAutoTitlePromptMaxLength,
-    autoTitleIncludeFiles,
-    setAutoTitleIncludeFiles,
-    autoTitleIncludeRules,
-    setAutoTitleIncludeRules,
-  } = useSettingsStore(
+  const storeAccess = useSettingsStore(
     useShallow((state) => ({
       autoTitleEnabled: state.autoTitleEnabled,
       setAutoTitleEnabled: state.setAutoTitleEnabled,
@@ -35,93 +49,184 @@ export const SettingsAssistantTitles: React.FC = () => {
     }))
   );
 
-  const handleAutoTitleMaxLengthChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const value = e.target.value;
-    const numValue = value === "" ? 768 : parseInt(value, 10);
-    if (!isNaN(numValue)) {
-      setAutoTitlePromptMaxLength(numValue);
-    }
-  };
+  const form = useForm({
+    defaultValues: {
+      autoTitleEnabled: storeAccess.autoTitleEnabled ?? false,
+      autoTitleModelId: storeAccess.autoTitleModelId ?? null, // Ensures it's string or null
+      autoTitlePromptMaxLength: storeAccess.autoTitlePromptMaxLength ?? 768,
+      autoTitleIncludeFiles: storeAccess.autoTitleIncludeFiles ?? false,
+      autoTitleIncludeRules: storeAccess.autoTitleIncludeRules ?? false,
+    },
+    validators: {
+      onChangeAsync: assistantTitlesSchema,
+      onChangeAsyncDebounceMs: 500,
+    },
+    onSubmit: async ({ value }) => {
+      try {
+        storeAccess.setAutoTitleEnabled(value.autoTitleEnabled);
+        // Ensure null is passed if value.autoTitleModelId is null/undefined
+        storeAccess.setAutoTitleModelId(value.autoTitleModelId ?? null);
+        storeAccess.setAutoTitlePromptMaxLength(value.autoTitlePromptMaxLength);
+        storeAccess.setAutoTitleIncludeFiles(value.autoTitleIncludeFiles);
+        storeAccess.setAutoTitleIncludeRules(value.autoTitleIncludeRules);
+        toast.success("Auto-title settings updated!");
+      } catch (error) {
+        toast.error("Failed to update auto-title settings.");
+        console.error("Error submitting auto-title settings form:", error);
+      }
+    },
+  });
+
+  useEffect(() => {
+    form.reset({
+      autoTitleEnabled: storeAccess.autoTitleEnabled ?? false,
+      autoTitleModelId: storeAccess.autoTitleModelId ?? null,
+      autoTitlePromptMaxLength: storeAccess.autoTitlePromptMaxLength ?? 768,
+      autoTitleIncludeFiles: storeAccess.autoTitleIncludeFiles ?? false,
+      autoTitleIncludeRules: storeAccess.autoTitleIncludeRules ?? false,
+    });
+  }, [
+    storeAccess.autoTitleEnabled,
+    storeAccess.autoTitleModelId,
+    storeAccess.autoTitlePromptMaxLength,
+    storeAccess.autoTitleIncludeFiles,
+    storeAccess.autoTitleIncludeRules,
+    form,
+  ]);
+
+  // Directly access form state for conditional rendering
+  const autoTitleEnabledValue = form.state.values.autoTitleEnabled;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center space-x-2 mb-3">
-        <Switch
-          id="auto-title-enabled"
-          checked={autoTitleEnabled}
-          onCheckedChange={setAutoTitleEnabled}
-          aria-labelledby="auto-title-enabled-label"
-        />
-        <Label id="auto-title-enabled-label" htmlFor="auto-title-enabled">
-          Enable Auto-Title for New Chats
-        </Label>
-      </div>
-      {autoTitleEnabled && (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        form.handleSubmit();
+      }}
+      className="space-y-4"
+    >
+      <form.Field
+        name="autoTitleEnabled"
+        children={(field) => (
+          <div className="flex items-center space-x-2 mb-3">
+            <Switch
+              id={field.name}
+              checked={field.state.value}
+              onCheckedChange={field.handleChange}
+              onBlur={field.handleBlur}
+              aria-labelledby={`${field.name}-label`}
+            />
+            <Label id={`${field.name}-label`} htmlFor={field.name}>
+              Enable Auto-Title for New Chats
+            </Label>
+            <FieldMetaMessages field={field} />
+          </div>
+        )}
+      />
+
+      {autoTitleEnabledValue && (
         <div className="space-y-4 pl-6 border-l-2 border-muted ml-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="auto-title-model-selector">
-              Model for Title Generation
-            </Label>
-            <GlobalModelSelector
-              value={autoTitleModelId}
-              onChange={setAutoTitleModelId}
-              className="w-full"
-            />
-            <p className="text-xs text-muted-foreground">
-              Select a fast and capable model for generating concise titles.
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="auto-title-max-length">
-              Max Prompt Length for Title Generation (Chars)
-            </Label>
-            <Input
-              id="auto-title-max-length"
-              type="number"
-              min="100"
-              max="4000"
-              step="10"
-              value={autoTitlePromptMaxLength}
-              onChange={handleAutoTitleMaxLengthChange}
-              className="w-24"
-            />
-            <p className="text-xs text-muted-foreground">
-              Limits the initial prompt length sent for title generation
-              (100-4000).
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="auto-title-include-files"
-              checked={autoTitleIncludeFiles}
-              onCheckedChange={setAutoTitleIncludeFiles}
-              aria-labelledby="auto-title-include-files-label"
-            />
-            <Label
-              id="auto-title-include-files-label"
-              htmlFor="auto-title-include-files"
-            >
-              Include file names/types in title prompt
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="auto-title-include-rules"
-              checked={autoTitleIncludeRules}
-              onCheckedChange={setAutoTitleIncludeRules}
-              aria-labelledby="auto-title-include-rules-label"
-            />
-            <Label
-              id="auto-title-include-rules-label"
-              htmlFor="auto-title-include-rules"
-            >
-              Include active rules in title prompt
-            </Label>
-          </div>
+          <form.Field
+            name="autoTitleModelId"
+            children={(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor={field.name}>
+                  Model for Title Generation
+                </Label>
+                <GlobalModelSelector
+                  value={field.state.value}
+                  onChange={field.handleChange}
+                  className={`w-full ${field.state.meta.errors.length ? "border-destructive" : ""}`}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Select a fast and capable model for generating concise titles.
+                </p>
+                <FieldMetaMessages field={field} />
+              </div>
+            )}
+          />
+          <form.Field
+            name="autoTitlePromptMaxLength"
+            children={(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor={field.name}>
+                  Max Prompt Length for Title Generation (Chars)
+                </Label>
+                <Input
+                  id={field.name}
+                  type="number"
+                  min={100}
+                  max={4000}
+                  step={10}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => {
+                    const numValue = e.target.valueAsNumber;
+                    if (!isNaN(numValue)) field.handleChange(numValue);
+                    else if (e.target.value === "") field.handleChange(undefined as any); // allow empty for Zod to validate
+                  }}
+                  className={`w-24 ${field.state.meta.errors.length ? "border-destructive" : ""}`}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Limits the initial prompt length sent for title generation (100-4000).
+                </p>
+                <FieldMetaMessages field={field} />
+              </div>
+            )}
+          />
+          <form.Field
+            name="autoTitleIncludeFiles"
+            children={(field) => (
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id={field.name}
+                  checked={field.state.value}
+                  onCheckedChange={field.handleChange}
+                  onBlur={field.handleBlur}
+                  aria-labelledby={`${field.name}-label`}
+                />
+                <Label id={`${field.name}-label`} htmlFor={field.name}>
+                  Include file names/types in title prompt
+                </Label>
+                <FieldMetaMessages field={field} />
+              </div>
+            )}
+          />
+          <form.Field
+            name="autoTitleIncludeRules"
+            children={(field) => (
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id={field.name}
+                  checked={field.state.value}
+                  onCheckedChange={field.handleChange}
+                  onBlur={field.handleBlur}
+                  aria-labelledby={`${field.name}-label`}
+                />
+                <Label id={`${field.name}-label`} htmlFor={field.name}>
+                  Include active rules in title prompt
+                </Label>
+                <FieldMetaMessages field={field} />
+              </div>
+            )}
+          />
         </div>
       )}
-    </div>
+      <div className="flex justify-end pt-2">
+        <form.Subscribe
+          selector={(state) => [state.canSubmit, state.isSubmitting, state.isValidating, state.isValid] as const}
+          children={([canSubmit, isSubmitting, isValidating, isValid]) => (
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!canSubmit || isSubmitting || isValidating || !isValid}
+            >
+              {isSubmitting ? "Saving..." : isValidating ? "Validating..." : "Save Title Settings"}
+            </Button>
+          )}
+        />
+      </div>
+    </form>
   );
 };

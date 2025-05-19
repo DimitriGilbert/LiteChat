@@ -1,6 +1,6 @@
 // src/controls/components/rules/SettingsRules.tsx
 // FULL FILE
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { RuleForm } from "./RuleForm";
@@ -13,6 +13,8 @@ interface SettingsRulesProps {
 }
 
 export const SettingsRules: React.FC<SettingsRulesProps> = ({ module }) => {
+  const [, setLastUpdated] = useState(Date.now());
+
   const rules = module.getAllRules();
   const isLoading = module.getIsLoadingRules();
 
@@ -20,6 +22,14 @@ export const SettingsRules: React.FC<SettingsRulesProps> = ({ module }) => {
   const [editingRule, setEditingRule] = useState<DbRule | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    module.setNotifySettingsCallback(() => setLastUpdated(Date.now()));
+
+    return () => {
+      module.setNotifySettingsCallback(null);
+    };
+  }, [module]);
 
   const handleAddNew = () => {
     setEditingRule(null);
@@ -101,7 +111,7 @@ export const SettingsRules: React.FC<SettingsRulesProps> = ({ module }) => {
       {showForm && (
         <RuleForm
           initialData={editingRule ?? undefined}
-          isSaving={isSaving}
+          isSavingExt={isSaving}
           onSave={handleSave}
           onCancel={handleCancel}
         />

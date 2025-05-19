@@ -107,6 +107,13 @@ export const useRulesStore = create(
         await PersistenceService.saveRule(newRule);
         toast.success(`Rule "${newRule.name}" added.`);
         emitter.emit(rulesEvent.ruleSaved, { rule: newRule });
+        
+        const { rules, tags, tagRuleLinks } = get();
+        emitter.emit(rulesEvent.dataLoaded, { 
+          rules: [...rules],
+          tags: [...tags],
+          links: [...tagRuleLinks]
+        });
         return newId;
       } catch (e) {
         console.error("RulesStore: Error adding rule", e);
@@ -121,9 +128,12 @@ export const useRulesStore = create(
 
     updateRule: async (id, updates) => {
       const originalRule = get().rules.find((r) => r.id === id);
-      if (!originalRule) return;
+      if (!originalRule) {
+        toast.error("Rule not found for update.");
+        throw new Error("Rule not found");
+      }
 
-      const updatedRuleData = {
+      const updatedRuleData: DbRule = {
         ...originalRule,
         ...updates,
         updatedAt: new Date(),
@@ -141,6 +151,13 @@ export const useRulesStore = create(
         await PersistenceService.saveRule(updatedRuleData);
         toast.success(`Rule "${updatedRuleData.name}" updated.`);
         emitter.emit(rulesEvent.ruleSaved, { rule: updatedRuleData });
+        
+        const { rules, tags, tagRuleLinks } = get();
+        emitter.emit(rulesEvent.dataLoaded, { 
+          rules: [...rules],
+          tags: [...tags],
+          links: [...tagRuleLinks]
+        });
       } catch (e) {
         console.error("RulesStore: Error updating rule", e);
         set((state) => {
@@ -158,26 +175,41 @@ export const useRulesStore = create(
 
     deleteRule: async (id) => {
       const ruleToDelete = get().rules.find((r) => r.id === id);
-      if (!ruleToDelete) return;
-      const originalLinks = get().tagRuleLinks.filter(
-        (link) => link.ruleId === id
-      );
+      if (!ruleToDelete) {
+        toast.error("Rule not found for deletion.");
+        throw new Error("Rule not found");
+      }
+      const originalLinks = [...get().tagRuleLinks.filter((link) => link.ruleId === id)];
+      const originalRuleCopy = {...ruleToDelete};
 
-      set((state) => ({
-        rules: state.rules.filter((r) => r.id !== id),
-        tagRuleLinks: state.tagRuleLinks.filter((link) => link.ruleId !== id),
-      }));
+      set((state) => {
+        state.rules = state.rules.filter((r) => r.id !== id);
+        state.tagRuleLinks = state.tagRuleLinks.filter((link) => link.ruleId !== id);
+      });
 
       try {
         await PersistenceService.deleteRule(id);
         toast.success(`Rule "${ruleToDelete.name}" deleted.`);
         emitter.emit(rulesEvent.ruleDeleted, { ruleId: id });
+        
+        const { rules, tags, tagRuleLinks } = get();
+        emitter.emit(rulesEvent.dataLoaded, { 
+          rules: [...rules],
+          tags: [...tags],
+          links: [...tagRuleLinks]
+        });
       } catch (e) {
         console.error("RulesStore: Error deleting rule", e);
         set((state) => {
-          state.rules.push(ruleToDelete);
-          state.rules.sort((a, b) => a.name.localeCompare(b.name));
-          state.tagRuleLinks.push(...originalLinks);
+          if (!state.rules.find(r => r.id === originalRuleCopy.id)) {
+            state.rules.push(originalRuleCopy);
+            state.rules.sort((a, b) => a.name.localeCompare(b.name));
+          }
+          originalLinks.forEach(ol => {
+            if (!state.tagRuleLinks.find(sl => sl.tagId === ol.tagId && sl.ruleId === ol.ruleId)) {
+              state.tagRuleLinks.push(ol);
+            }
+          });
           state.error = "Failed to delete rule";
         });
         toast.error("Failed to delete rule.");
@@ -202,6 +234,13 @@ export const useRulesStore = create(
         await PersistenceService.saveTag(newTag);
         toast.success(`Tag "${newTag.name}" added.`);
         emitter.emit(rulesEvent.tagSaved, { tag: newTag });
+        
+        const { rules, tags, tagRuleLinks } = get();
+        emitter.emit(rulesEvent.dataLoaded, { 
+          rules: [...rules],
+          tags: [...tags],
+          links: [...tagRuleLinks]
+        });
         return newId;
       } catch (e) {
         console.error("RulesStore: Error adding tag", e);
@@ -216,14 +255,16 @@ export const useRulesStore = create(
 
     updateTag: async (id, updates) => {
       const originalTag = get().tags.find((t) => t.id === id);
-      if (!originalTag) return;
+      if (!originalTag) {
+        toast.error("Tag not found for update.");
+        throw new Error("Tag not found");
+      }
 
-      const updatedTagData = {
+      const updatedTagData: DbTag = {
         ...originalTag,
         ...updates,
         updatedAt: new Date(),
       };
-
       set((state) => {
         const index = state.tags.findIndex((t) => t.id === id);
         if (index !== -1) {
@@ -236,6 +277,13 @@ export const useRulesStore = create(
         await PersistenceService.saveTag(updatedTagData);
         toast.success(`Tag "${updatedTagData.name}" updated.`);
         emitter.emit(rulesEvent.tagSaved, { tag: updatedTagData });
+        
+        const { rules, tags, tagRuleLinks } = get();
+        emitter.emit(rulesEvent.dataLoaded, { 
+          rules: [...rules],
+          tags: [...tags],
+          links: [...tagRuleLinks]
+        });
       } catch (e) {
         console.error("RulesStore: Error updating tag", e);
         set((state) => {
@@ -253,26 +301,41 @@ export const useRulesStore = create(
 
     deleteTag: async (id) => {
       const tagToDelete = get().tags.find((t) => t.id === id);
-      if (!tagToDelete) return;
-      const originalLinks = get().tagRuleLinks.filter(
-        (link) => link.tagId === id
-      );
+      if (!tagToDelete) {
+        toast.error("Tag not found for deletion.");
+        throw new Error("Tag not found");
+      }
+      const originalTagCopy = { ...tagToDelete };
+      const originalLinks = [...get().tagRuleLinks.filter(link => link.tagId === id)];
 
-      set((state) => ({
-        tags: state.tags.filter((t) => t.id !== id),
-        tagRuleLinks: state.tagRuleLinks.filter((link) => link.tagId !== id),
-      }));
+      set((state) => {
+        state.tags = state.tags.filter((t) => t.id !== id);
+        state.tagRuleLinks = state.tagRuleLinks.filter((link) => link.tagId !== id);
+      });
 
       try {
         await PersistenceService.deleteTag(id);
         toast.success(`Tag "${tagToDelete.name}" deleted.`);
         emitter.emit(rulesEvent.tagDeleted, { tagId: id });
+        
+        const { rules, tags, tagRuleLinks } = get();
+        emitter.emit(rulesEvent.dataLoaded, { 
+          rules: [...rules],
+          tags: [...tags],
+          links: [...tagRuleLinks]
+        });
       } catch (e) {
         console.error("RulesStore: Error deleting tag", e);
         set((state) => {
-          state.tags.push(tagToDelete);
-          state.tags.sort((a, b) => a.name.localeCompare(b.name));
-          state.tagRuleLinks.push(...originalLinks);
+          if (!state.tags.find(t => t.id === originalTagCopy.id)) {
+            state.tags.push(originalTagCopy);
+            state.tags.sort((a, b) => a.name.localeCompare(b.name));
+          }
+          originalLinks.forEach(ol => {
+            if (!state.tagRuleLinks.find(sl => sl.tagId === ol.tagId && sl.ruleId === ol.ruleId)) {
+              state.tagRuleLinks.push(ol);
+            }
+          });
           state.error = "Failed to delete tag";
         });
         toast.error("Failed to delete tag.");
@@ -282,23 +345,40 @@ export const useRulesStore = create(
 
     linkTagToRule: async (tagId, ruleId) => {
       const linkId = `${tagId}-${ruleId}`;
-      const existingLink = get().tagRuleLinks.find((l) => l.id === linkId);
-      if (existingLink) return;
+      
+      if (get().tagRuleLinks.some(link => link.id === linkId)) {
+        toast.info("Link already exists.");
+        return;
+      }
+      
+      const newLink: DbTagRuleLink = { id: linkId, tagId, ruleId }; 
 
-      const newLink: DbTagRuleLink = { id: linkId, tagId, ruleId };
       set((state) => {
         state.tagRuleLinks.push(newLink);
       });
+
       try {
         await PersistenceService.saveTagRuleLink(newLink);
-        emitter.emit(rulesEvent.linkSaved, { link: newLink });
+        toast.success("Tag linked to rule.");
+        if (rulesEvent.linkSaved) {
+            emitter.emit(rulesEvent.linkSaved, { link: newLink }); 
+        }
+        
+        const { rules, tags, tagRuleLinks } = get();
+        emitter.emit(rulesEvent.dataLoaded, { 
+          rules: [...rules],
+          tags: [...tags],
+          links: [...tagRuleLinks]
+        });
       } catch (e) {
         console.error("RulesStore: Error linking tag to rule", e);
-        set((state) => ({
-          error: "Failed to link tag and rule",
-          tagRuleLinks: state.tagRuleLinks.filter((l) => l.id !== linkId),
-        }));
-        toast.error("Failed to link tag and rule.");
+        set((state) => {
+          state.tagRuleLinks = state.tagRuleLinks.filter(
+            (link) => link.id !== linkId
+          );
+          state.error = "Failed to link tag to rule";
+        });
+        toast.error("Failed to link tag to rule.");
         throw e;
       }
     },
@@ -306,21 +386,41 @@ export const useRulesStore = create(
     unlinkTagFromRule: async (tagId, ruleId) => {
       const linkId = `${tagId}-${ruleId}`;
       const linkToDelete = get().tagRuleLinks.find((l) => l.id === linkId);
-      if (!linkToDelete) return;
+      
+      if (!linkToDelete) {
+        toast.info("Link not found for unlinking.");
+      }
+      
+      set((state) => {
+        state.tagRuleLinks = state.tagRuleLinks.filter(
+          (link) => link.id !== linkId
+        );
+      });
 
-      set((state) => ({
-        tagRuleLinks: state.tagRuleLinks.filter((l) => l.id !== linkId),
-      }));
       try {
         await PersistenceService.deleteTagRuleLink(linkId);
-        emitter.emit(rulesEvent.linkDeleted, { linkId });
+        toast.success("Tag unlinked from rule.");
+        if (rulesEvent.linkDeleted) {
+            emitter.emit(rulesEvent.linkDeleted, { linkId }); 
+        }
+
+        const { rules, tags, tagRuleLinks } = get();
+        emitter.emit(rulesEvent.dataLoaded, { 
+          rules: [...rules],
+          tags: [...tags],
+          links: [...tagRuleLinks]
+        });
       } catch (e) {
         console.error("RulesStore: Error unlinking tag from rule", e);
-        set((state) => {
-          state.tagRuleLinks.push(linkToDelete);
-          state.error = "Failed to unlink tag and rule";
-        });
-        toast.error("Failed to unlink tag and rule.");
+        if (linkToDelete) {
+          set((state) => {
+            if (!state.tagRuleLinks.some(link => link.id === linkToDelete.id)) {
+               state.tagRuleLinks.push(linkToDelete);
+            }
+            state.error = "Failed to unlink tag from rule";
+          });
+        }
+        toast.error("Failed to unlink tag from rule.");
         throw e;
       }
     },

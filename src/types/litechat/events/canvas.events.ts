@@ -1,11 +1,9 @@
 // src/types/litechat/events/canvas.events.ts
 // FULL FILE
-import type { Interaction } from "@/types/litechat/interaction";
 
 export const canvasEvent = {
   // Interaction Action Request Events
-  copyInteractionResponseRequest:
-    "canvas.interaction.copy.response.request",
+  copyInteractionResponseRequest: "canvas.interaction.copy.response.request",
   regenerateInteractionRequest: "canvas.interaction.regenerate.request",
   // rateInteractionRequest: "canvas.interaction.rate.request", // Removed
   // TODO: Add more interaction action requests as needed (e.g., edit, delete)
@@ -62,4 +60,4 @@ export interface CanvasEventPayloads {
 export interface CanvasEvents extends CanvasEventPayloads {
   // This allows using canvasEvent.eventName directly with typed payloads
   // Example: emitter.emit(canvasEvent.copyInteractionResponseRequest, payload);
-} 
+}
