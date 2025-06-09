@@ -81,7 +81,11 @@ export const DEFAULT_MODELS: Record<
   DbProviderType,
   { id: string; name: string }[] // Store only basic info here
 > = {
-  openai: [{ id: "gpt-4o", name: "GPT-4o" }],
+  openai: [
+    { id: "gpt-4o", name: "GPT-4o" },
+    { id: "dall-e-3", name: "DALL-E 3" },
+    { id: "dall-e-2", name: "DALL-E 2" },
+  ],
   google: [
     { id: "gemini-1.5-flash-latest", name: "Gemini 1.5 Flash" },
     { id: "gemini-1.5-pro-latest", name: "Gemini 1.5 Pro" },

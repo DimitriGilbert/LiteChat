@@ -51,6 +51,7 @@ export interface ModelListItem {
     context_length?: number | null;
     supported_parameters?: string[] | null;
     input_modalities?: string[] | null;
+    output_modalities?: string[] | null;
     pricing?: OpenRouterModelPricing | null;
     description?: string | null;
   };

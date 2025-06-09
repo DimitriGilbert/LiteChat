@@ -28,6 +28,7 @@ import { WebSearchControlModule } from "@/controls/modules/WebSearchControlModul
 import { RulesControlModule } from "@/controls/modules/RulesControlModule";
 import { AutoTitleControlModule } from "@/controls/modules/AutoTitleControlModule";
 import { UrlParameterControlModule } from "@/controls/modules/UrlParameterControlModule";
+import { ImageGenerationControlModule } from "@/controls/modules/ImageGenerationControlModule";
 
 // Import new/updated Settings Modules
 import { GeneralSettingsModule } from "@/controls/modules/GeneralSettingsModule";
@@ -65,6 +66,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   UsageDisplayControlModule,
   ReasoningControlModule,
   WebSearchControlModule,
+  ImageGenerationControlModule,
   FileControlModule,
   VfsControlModule,
   RulesControlModule,

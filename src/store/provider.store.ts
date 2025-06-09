@@ -560,19 +560,33 @@ export const useProviderStore = create(
       }
       const providerTypeKey = config.type as keyof typeof DEFAULT_MODELS;
       const defaultDefs = DEFAULT_MODELS[providerTypeKey] || [];
-      return defaultDefs.map((m) => ({
-        id: m.id,
-        name: m.name,
-        context_length: 4096, // Default placeholder
-        architecture: {
-          modality: "text->text",
-          input_modalities: ["text"],
-          output_modalities: ["text"],
-        },
-        pricing: { prompt: "0", completion: "0" }, // Default placeholder
-        top_provider: { context_length: 4096 }, // Default placeholder
-        supported_parameters: DEFAULT_SUPPORTED_PARAMS[config.type] ?? [],
-      }));
+      return defaultDefs.map((m) => {
+        // Determine modalities based on model type
+        let modality = "text->text";
+        let input_modalities = ["text"];
+        let output_modalities = ["text"];
+        
+        // Check if this is an image generation model
+        if (m.id.includes("dall-e") || m.id.includes("imagen") || m.id.includes("flux") || m.id.includes("stable-diffusion")) {
+          modality = "text->image";
+          input_modalities = ["text"];
+          output_modalities = ["image"];
+        }
+        
+        return {
+          id: m.id,
+          name: m.name,
+          context_length: 4096, // Default placeholder
+          architecture: {
+            modality,
+            input_modalities,
+            output_modalities,
+          },
+          pricing: { prompt: "0", completion: "0" }, // Default placeholder
+          top_provider: { context_length: 4096 }, // Default placeholder
+          supported_parameters: DEFAULT_SUPPORTED_PARAMS[config.type] ?? [],
+        };
+      });
     },
 
     getAvailableModelListItems: (): ModelListItem[] => {
@@ -594,6 +608,7 @@ export const useProviderStore = create(
                 modelDef.context_length,
               supported_parameters: modelDef.supported_parameters,
               input_modalities: modelDef.architecture?.input_modalities,
+              output_modalities: modelDef.architecture?.output_modalities,
               pricing: modelDef.pricing,
               description: modelDef.description,
             },

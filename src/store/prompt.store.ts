@@ -20,6 +20,7 @@ export interface PromptState {
   frequencyPenalty: number | null;
   reasoningEnabled: boolean | null;
   webSearchEnabled: boolean | null;
+  imageGenerationEnabled: boolean | null;
   structuredOutputJson: string | null;
 }
 
@@ -33,6 +34,7 @@ interface PromptActions {
   setFrequencyPenalty: (value: number | null) => void;
   setReasoningEnabled: (enabled: boolean | null) => void;
   setWebSearchEnabled: (enabled: boolean | null) => void;
+  setImageGenerationEnabled: (enabled: boolean | null) => void;
   setStructuredOutputJson: (json: string | null) => void;
   initializePromptState: (effectiveSettings: {
     modelId: string | null;
@@ -66,6 +68,7 @@ export const usePromptStateStore = create(
     frequencyPenalty: null,
     reasoningEnabled: null,
     webSearchEnabled: null,
+    imageGenerationEnabled: null,
     structuredOutputJson: null,
 
     // Actions
@@ -121,6 +124,12 @@ export const usePromptStateStore = create(
       if (get().webSearchEnabled !== enabled) {
         set({ webSearchEnabled: enabled });
         emitParamChange("webSearchEnabled", enabled);
+      }
+    },
+    setImageGenerationEnabled: (enabled) => {
+      if (get().imageGenerationEnabled !== enabled) {
+        set({ imageGenerationEnabled: enabled });
+        emitParamChange("imageGenerationEnabled", enabled);
       }
     },
     setStructuredOutputJson: (json) => {
@@ -210,6 +219,10 @@ export const usePromptStateStore = create(
         changes.webSearchEnabled = null;
         changed = true;
       }
+      if (currentState.imageGenerationEnabled !== null) {
+        changes.imageGenerationEnabled = null;
+        changed = true;
+      }
       if (currentState.structuredOutputJson !== null) {
         changes.structuredOutputJson = null;
         changed = true;
@@ -286,6 +299,13 @@ export const usePromptStateStore = create(
           handler: (
             p: PromptEventPayloads[typeof promptEvent.setWebSearchEnabledRequest]
           ) => actions.setWebSearchEnabled(p.enabled),
+          storeId,
+        },
+        {
+          eventName: promptEvent.setImageGenerationEnabledRequest,
+          handler: (
+            p: PromptEventPayloads[typeof promptEvent.setImageGenerationEnabledRequest]
+          ) => actions.setImageGenerationEnabled(p.enabled),
           storeId,
         },
         {

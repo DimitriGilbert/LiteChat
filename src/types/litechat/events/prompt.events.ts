@@ -21,6 +21,7 @@ export const promptEvent = {
   setFrequencyPenaltyRequest: "prompt.state.set.frequency.penalty.request",
   setReasoningEnabledRequest: "prompt.state.set.reasoning.enabled.request",
   setWebSearchEnabledRequest: "prompt.state.set.web.search.enabled.request",
+  setImageGenerationEnabledRequest: "prompt.state.set.image.generation.enabled.request",
   setStructuredOutputJsonRequest:
     "prompt.state.set.structured.output.json.request",
   initializePromptStateRequest: "prompt.state.initialize.prompt.state.request",
@@ -47,6 +48,7 @@ export interface PromptEventPayloads {
   [promptEvent.setFrequencyPenaltyRequest]: { value: number | null };
   [promptEvent.setReasoningEnabledRequest]: { enabled: boolean | null };
   [promptEvent.setWebSearchEnabledRequest]: { enabled: boolean | null };
+  [promptEvent.setImageGenerationEnabledRequest]: { enabled: boolean | null };
   [promptEvent.setStructuredOutputJsonRequest]: { json: string | null };
   [promptEvent.initializePromptStateRequest]: {
     effectiveSettings: {

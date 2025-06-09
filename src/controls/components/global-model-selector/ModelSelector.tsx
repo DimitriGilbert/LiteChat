@@ -22,6 +22,7 @@ import {
   Brain,
   Globe,
   Wrench,
+  Palette,
 } from "lucide-react";
 import type { ModelListItem } from "@/types/litechat/provider";
 
@@ -34,7 +35,7 @@ interface ModelSelectorProps {
   isLoading?: boolean;
 }
 
-type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
+type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal" | "imageGeneration";
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({
   models: modelsFromSource,
@@ -53,6 +54,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     webSearch: false,
     tools: false,
     multimodal: false,
+    imageGeneration: false,
   });
 
   const filteredModels = useMemo(() => {
@@ -79,6 +81,9 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       const inputModalities = new Set(
         model.metadataSummary?.input_modalities ?? []
       );
+      const outputModalities = new Set(
+        model.metadataSummary?.output_modalities ?? []
+      );
       return activeCapabilityFilters.every((filter) => {
         switch (filter) {
           case "reasoning":
@@ -92,6 +97,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
             return supportedParams.has("tools");
           case "multimodal":
             return Array.from(inputModalities).some((mod) => mod !== "text");
+          case "imageGeneration":
+            return outputModalities.has("image");
           default:
             return true;
         }
@@ -224,6 +231,19 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               >
                 <ImageIcon className="h-4 w-4" />
               </Button>
+              <Button
+                variant={capabilityFilters.imageGeneration ? "secondary" : "ghost"}
+                size="sm"
+                className={cn(
+                  "h-7 w-7 p-0",
+                  capabilityFilters.imageGeneration && "text-primary"
+                )}
+                onClick={() => toggleCapabilityFilter("imageGeneration")}
+                title="Filter: Image Generation"
+                aria-label="Filter by image generation capability"
+              >
+                <Palette className="h-4 w-4" />
+              </Button>
             </div>
           </div>
           <CommandList className="max-h-[calc(min(40vh,400px)-70px)] overflow-y-auto">
@@ -265,6 +285,9 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                       {model.metadataSummary?.input_modalities?.some(
                         (mod) => mod !== "text"
                       ) && <ImageIcon className="h-3.5 w-3.5 text-green-500" />}
+                      {model.metadataSummary?.output_modalities?.includes(
+                        "image"
+                      ) && <Palette className="h-3.5 w-3.5 text-pink-500" />}
                     </div>
                   </div>
                 </CommandItem>
