@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -30,6 +31,10 @@ import { toast } from "sonner";
 import type { SyncRepo } from "@/types/litechat/sync";
 import { useShallow } from "zustand/react/shallow";
 import { useConversationStore } from "@/store/conversation.store";
+import { useSettingsStore } from "@/store/settings.store";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { conversationEvent } from "@/types/litechat/events/conversation.events";
+import { syncEvent } from "@/types/litechat/events/sync.events";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
@@ -62,8 +67,6 @@ const SettingsGitSyncReposComponent: React.FC = () => {
     syncRepos,
     addSyncRepo,
     updateSyncRepo,
-    deleteSyncRepo,
-    initializeOrSyncRepo,
     repoInitializationStatus,
     isLoading: isLoadingStore,
   } = useConversationStore(
@@ -71,16 +74,33 @@ const SettingsGitSyncReposComponent: React.FC = () => {
       syncRepos: state.syncRepos,
       addSyncRepo: state.addSyncRepo,
       updateSyncRepo: state.updateSyncRepo,
-      deleteSyncRepo: state.deleteSyncRepo,
-      initializeOrSyncRepo: state.initializeOrSyncRepo,
       repoInitializationStatus: state.repoInitializationStatus,
       isLoading: state.isLoading,
+    }))
+  );
+
+  const { autoSyncOnStreamComplete, setAutoSyncOnStreamComplete } = useSettingsStore(
+    useShallow((state) => ({
+      autoSyncOnStreamComplete: state.autoSyncOnStreamComplete,
+      setAutoSyncOnStreamComplete: state.setAutoSyncOnStreamComplete,
     }))
   );
 
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
+
+  // Listen for sync repo changes to reset deleting state
+  useEffect(() => {
+    const handleRepoChanged = (payload: any) => {
+      if (payload && payload.action === "deleted" && payload.repoId) {
+        setIsDeleting((prev) => ({ ...prev, [payload.repoId]: false }));
+      }
+    };
+
+    emitter.on(syncEvent.repoChanged, handleRepoChanged);
+    return () => emitter.off(syncEvent.repoChanged, handleRepoChanged);
+  }, []);
 
   const form = useForm({
     defaultValues: defaultFormValues as SyncRepoFormData,
@@ -146,7 +166,7 @@ const SettingsGitSyncReposComponent: React.FC = () => {
   };
 
   const handleDelete = useCallback(
-    async (id: string, name: string) => {
+    (id: string, name: string) => {
       if (
         window.confirm(
           `Are you sure you want to delete the sync repository "${name}"? This will unlink it from any conversations and remove the local copy.`
@@ -154,25 +174,24 @@ const SettingsGitSyncReposComponent: React.FC = () => {
       ) {
         setIsDeleting((prev) => ({ ...prev, [id]: true }));
         try {
-          await deleteSyncRepo(id);
+          emitter.emit(conversationEvent.deleteSyncRepoRequest, { id });
           if (editingId === id) {
             resetFormAndState();
           }
         } catch (error) {
           console.error("Failed to delete sync repo:", error);
-        } finally {
           setIsDeleting((prev) => ({ ...prev, [id]: false }));
         }
       }
     },
-    [deleteSyncRepo, editingId, resetFormAndState]
+    [editingId, resetFormAndState]
   );
 
   const handleInitializeOrSync = useCallback(
-    async (repoId: string) => {
-      await initializeOrSyncRepo(repoId);
+    (repoId: string) => {
+      emitter.emit(conversationEvent.initializeOrSyncRepoRequest, { repoId });
     },
-    [initializeOrSyncRepo]
+    []
   );
   
   const handleAddNewClick = () => {
@@ -350,6 +369,23 @@ const SettingsGitSyncReposComponent: React.FC = () => {
           Use the 'Sync/Clone' button to initialize the local copy or pull
           updates.
         </p>
+        
+        {/* Auto-sync setting */}
+        <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
+          <div className="space-y-1">
+            <Label htmlFor="auto-sync-toggle" className="text-sm font-medium">
+              Auto-sync after stream completion
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Automatically sync conversations with linked repositories when a message stream completes
+            </p>
+          </div>
+          <Switch
+            id="auto-sync-toggle"
+            checked={autoSyncOnStreamComplete}
+            onCheckedChange={setAutoSyncOnStreamComplete}
+          />
+        </div>
       </div>
 
       {!isAdding && !editingId && (

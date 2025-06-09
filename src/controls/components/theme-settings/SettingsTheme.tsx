@@ -287,6 +287,8 @@ const SettingsThemeComponent: React.FC = () => {
     },
   });
 
+
+
   useEffect(() => {
     form.reset({
       theme: storeValues.theme ?? "system",
@@ -361,12 +363,19 @@ const SettingsThemeComponent: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6 p-1">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        form.handleSubmit();
+      }}
+      className="space-y-4 p-1"
+    >
       {/* Base Theme Selection */}
       <SettingsSection
         title="Base Theme"
         description="Select the overall look and feel."
-        contentClassName="rounded-lg border p-4 shadow-sm bg-card"
+        contentClassName="rounded-lg border p-3 shadow-sm bg-card"
       >
         <div className="flex items-center justify-between">
           <Label htmlFor="theme-select" className="font-medium">
@@ -393,7 +402,7 @@ const SettingsThemeComponent: React.FC = () => {
       <SettingsSection
         title="Font & Layout"
         description="Customize typography and content width."
-        contentClassName="rounded-lg border p-4 shadow-sm bg-card space-y-4"
+        contentClassName="rounded-lg border p-3 shadow-sm bg-card space-y-3"
       >
         <div>
           <TextField
@@ -441,7 +450,7 @@ const SettingsThemeComponent: React.FC = () => {
       <SettingsSection
         title="Code Block Theme"
         description="Customize syntax highlighting appearance."
-        contentClassName="rounded-lg border p-4 shadow-sm bg-card space-y-3"
+        contentClassName="rounded-lg border p-3 shadow-sm bg-card space-y-3"
       >
         <SelectField
           form={form}
@@ -469,7 +478,7 @@ const SettingsThemeComponent: React.FC = () => {
         <SettingsSection
           title="Custom Theme Colors"
           description="Define custom colors. Use valid CSS color values (hex, rgb, oklch, etc.). Leave blank to use default light/dark theme colors."
-          contentClassName="rounded-lg border p-4 shadow-sm bg-card"
+          contentClassName="rounded-lg border p-3 shadow-sm bg-card"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
             {colorKeys.map(({ key, label }) => (
@@ -490,15 +499,22 @@ const SettingsThemeComponent: React.FC = () => {
         </SettingsSection>
       )}
 
-      {/* Reset Button */}
+      {/* Submit and Reset Buttons */}
       <Separator />
-      <div className="flex justify-end pt-4">
-        <Button variant="outline" size="sm" onClick={handleResetClick}>
+      <div className="flex justify-between pt-3">
+        <Button variant="outline" size="sm" onClick={handleResetClick} type="button">
           <RotateCcwIcon className="mr-2 h-4 w-4" />
           Reset Theme Settings
         </Button>
+        <Button
+          type="submit"
+          size="sm"
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          Apply Theme Settings
+        </Button>
       </div>
-    </div>
+    </form>
   );
 };
 

@@ -99,7 +99,7 @@ export const SettingsAssistantParameters: React.FC = () => {
         e.stopPropagation();
         form.handleSubmit();
       }}
-      className="space-y-6"
+      className="space-y-4"
     >
       <p className="text-xs text-muted-foreground mb-3">
         Set the default global values for AI parameters. These can be overridden

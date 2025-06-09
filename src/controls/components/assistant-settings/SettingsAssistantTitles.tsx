@@ -94,9 +94,6 @@ export const SettingsAssistantTitles: React.FC = () => {
     form,
   ]);
 
-  // Directly access form state for conditional rendering
-  const autoTitleEnabledValue = form.state.values.autoTitleEnabled;
-
   return (
     <form
       onSubmit={(e) => {
@@ -104,12 +101,12 @@ export const SettingsAssistantTitles: React.FC = () => {
         e.stopPropagation();
         form.handleSubmit();
       }}
-      className="space-y-4"
+      className="space-y-3"
     >
       <form.Field
         name="autoTitleEnabled"
         children={(field) => (
-          <div className="flex items-center space-x-2 mb-3">
+          <div className="flex items-center space-x-2">
             <Switch
               id={field.name}
               checked={field.state.value}
@@ -118,30 +115,28 @@ export const SettingsAssistantTitles: React.FC = () => {
               aria-labelledby={`${field.name}-label`}
             />
             <Label id={`${field.name}-label`} htmlFor={field.name}>
-              Enable Auto-Title for New Chats
+              Enable Auto-Title Generation
             </Label>
             <FieldMetaMessages field={field} />
           </div>
         )}
       />
-
-      {autoTitleEnabledValue && (
-        <div className="space-y-4 pl-6 border-l-2 border-muted ml-2">
+      {form.state.values.autoTitleEnabled && (
+        <div className="space-y-3 pl-6 border-l-2 border-muted">
           <form.Field
             name="autoTitleModelId"
             children={(field) => (
               <div className="space-y-1.5">
-                <Label htmlFor={field.name}>
-                  Model for Title Generation
-                </Label>
+                <Label htmlFor={field.name}>Model for Title Generation</Label>
+                <p className="text-xs text-muted-foreground">
+                  Choose which model to use for generating conversation titles.
+                  Uses global default model if not specified.
+                </p>
                 <GlobalModelSelector
                   value={field.state.value}
-                  onChange={field.handleChange}
-                  className={`w-full ${field.state.meta.errors.length ? "border-destructive" : ""}`}
+                  onChange={(modelId: string | null) => field.handleChange(modelId)}
+                  className="w-full"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Select a fast and capable model for generating concise titles.
-                </p>
                 <FieldMetaMessages field={field} />
               </div>
             )}
@@ -151,26 +146,28 @@ export const SettingsAssistantTitles: React.FC = () => {
             children={(field) => (
               <div className="space-y-1.5">
                 <Label htmlFor={field.name}>
-                  Max Prompt Length for Title Generation (Chars)
+                  Conversation Content Length Limit
                 </Label>
+                <p className="text-xs text-muted-foreground">
+                  Maximum characters from conversation to include in title
+                  generation prompt (100-4000).
+                </p>
                 <Input
                   id={field.name}
                   type="number"
                   min={100}
                   max={4000}
-                  step={10}
+                  step={1}
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => {
                     const numValue = e.target.valueAsNumber;
-                    if (!isNaN(numValue)) field.handleChange(numValue);
-                    else if (e.target.value === "") field.handleChange(undefined as any); // allow empty for Zod to validate
+                    if (!isNaN(numValue)) {
+                      field.handleChange(numValue);
+                    }
                   }}
-                  className={`w-24 ${field.state.meta.errors.length ? "border-destructive" : ""}`}
+                  className={`w-32 ${field.state.meta.errors.length ? "border-destructive" : ""}`}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Limits the initial prompt length sent for title generation (100-4000).
-                </p>
                 <FieldMetaMessages field={field} />
               </div>
             )}
@@ -187,7 +184,7 @@ export const SettingsAssistantTitles: React.FC = () => {
                   aria-labelledby={`${field.name}-label`}
                 />
                 <Label id={`${field.name}-label`} htmlFor={field.name}>
-                  Include file names/types in title prompt
+                  Include file context in title prompt
                 </Label>
                 <FieldMetaMessages field={field} />
               </div>

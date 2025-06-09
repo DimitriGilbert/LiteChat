@@ -22,7 +22,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   contentClassName,
 }) => {
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("space-y-2", className)}>
       <div>
         <h3 className={cn("text-lg font-medium", titleClassName)}>{title}</h3>
         {description && (

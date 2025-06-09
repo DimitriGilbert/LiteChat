@@ -59,18 +59,18 @@ const SettingsAssistantComponent: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6 p-1 h-full flex flex-col">
+    <div className="space-y-4 p-1 h-full flex flex-col">
       <TabbedLayout
         tabs={tabs}
         defaultValue="prompt"
         className="flex-grow" // Ensure TabbedLayout itself can grow
         listClassName="bg-muted/50 rounded-md"
-        contentContainerClassName="mt-4 flex-grow overflow-y-auto" // Make content area grow and scroll
+        contentContainerClassName="mt-3 flex-grow overflow-y-auto" // Make content area grow and scroll
         scrollable={true} // Explicitly enable ScrollArea for content
       />
       {/* Reset Button Section */}
       <Separator className="mt-auto" />
-      <div className="flex justify-end pt-4 flex-shrink-0">
+      <div className="flex justify-end pt-3 flex-shrink-0">
         <Button variant="outline" size="sm" onClick={handleResetClick}>
           <RotateCcwIcon className="mr-2 h-4 w-4" />
           Reset All Assistant Settings

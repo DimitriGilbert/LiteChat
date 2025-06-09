@@ -69,7 +69,7 @@ export const SettingsAssistantPrompt: React.FC = () => {
         e.stopPropagation();
         form.handleSubmit();
       }}
-      className="space-y-4"
+      className="space-y-3"
     >
       <div>
         <form.Field

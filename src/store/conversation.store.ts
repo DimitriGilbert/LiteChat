@@ -119,10 +119,24 @@ export const useConversationStore = create(
 
     _ensureSyncVfsReady: async () => {
       console.log("[ConversationStore] Ensuring Sync VFS is ready...");
+      
+      // Check if VFS is stuck in initializing state and reset if needed
+      const vfsState = useVfsStore.getState();
+      if (vfsState.initializingKey === SYNC_VFS_KEY) {
+        console.warn("[ConversationStore] VFS appears stuck in initializing state, resetting...");
+        useVfsStore.getState().resetStuckInitialization();
+      }
+      
       return new Promise<typeof fs>((resolve, reject) => {
+        let timeoutId: NodeJS.Timeout | null = null;
+        
         const cleanupSubscriptions = () => {
           emitter.off(vfsEvent.fsInstanceChanged, handleFsInstanceChanged);
           emitter.off(vfsEvent.loadingStateChanged, handleLoadingStateChanged);
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
         };
 
         const handleFsInstanceChanged = (
@@ -185,6 +199,14 @@ export const useConversationStore = create(
           resolve(currentVfsState.fs);
           return;
         }
+
+        // Set up timeout
+        timeoutId = setTimeout(() => {
+          const errorMsg = `Timeout waiting for Sync VFS (${SYNC_VFS_KEY}) to become ready.`;
+          console.error(`[ConversationStore] ${errorMsg}`);
+          cleanupSubscriptions();
+          reject(new Error(errorMsg));
+        }, 30000); // 30 second timeout
 
         emitter.emit(vfsEvent.initializeVFSRequest, {
           vfsKey: SYNC_VFS_KEY,
@@ -588,6 +610,16 @@ export const useConversationStore = create(
           throw new Error("Failed to retrieve newly added sync repo state");
         }
         toast.success(`Sync repository "${newRepo.name}" added.`);
+        
+        // Automatically initialize/clone the repository after adding it
+        try {
+          await get().initializeOrSyncRepo(newId);
+        } catch (initError) {
+          console.warn(`Failed to automatically initialize repository "${newRepo.name}":`, initError);
+          toast.warning(`Repository "${newRepo.name}" added but initialization failed. You can manually sync it later.`);
+          // Don't fail the entire operation if initialization fails
+        }
+        
         return newId;
       } catch (e) {
         console.error("ConversationStore: Error adding sync repo", e);
@@ -653,62 +685,63 @@ export const useConversationStore = create(
       }
     },
 
-    deleteSyncRepo: async (id) => {
+        deleteSyncRepo: async (id) => {
       const repoToDelete = get().syncRepos.find((r) => r.id === id);
       if (!repoToDelete) return;
 
-      const repoDir = normalizePath(`${SYNC_REPO_BASE_DIR}/${id}`);
-
-      let fsInstance: typeof fs | undefined;
       try {
-        fsInstance = await get()._ensureSyncVfsReady();
-      } catch (fsError) {
-        return;
-      }
+        // First ensure sync VFS is ready (same pattern as sync operations)
+        let fsInstance: typeof fs;
+        try {
+          fsInstance = await get()._ensureSyncVfsReady();
+        } catch (fsError) {
+          console.error("ConversationStore: Failed to initialize sync VFS for deletion", fsError);
+          toast.error("Failed to initialize filesystem for deletion. Repository not deleted.");
+          throw fsError;
+        }
 
-      set((state) => ({
-        syncRepos: state.syncRepos.filter((r) => r.id !== id),
-        repoInitializationStatus: Object.fromEntries(
-          Object.entries(state.repoInitializationStatus).filter(
-            ([repoId]) => repoId !== id
-          )
-        ),
-      }));
-
-      try {
+        // Delete from database
         await PersistenceService.deleteSyncRepo(id);
+        
+        // Delete VFS files (now we have proper VFS instance)
+        const repoDir = normalizePath(`${SYNC_REPO_BASE_DIR}/${id}`);
+        try {
+          await VfsOps.deleteItemOp(repoDir, true, { fsInstance });
+          console.log(`[ConversationStore] Successfully deleted VFS directory: ${repoDir}`);
+        } catch (vfsError: any) {
+          console.error(`[ConversationStore] Failed to delete VFS directory ${repoDir}:`, vfsError);
+          if (vfsError.code !== "ENOENT") {
+            console.warn(`Could not remove local sync folder for "${repoToDelete.name}": ${vfsError.message}`);
+            // Don't fail the entire operation if VFS cleanup fails
+          }
+        }
+        
+        // Remove from state after successful operations
+        set((state) => ({
+          syncRepos: state.syncRepos.filter((r) => r.id !== id),
+          repoInitializationStatus: Object.fromEntries(
+            Object.entries(state.repoInitializationStatus).filter(
+              ([repoId]) => repoId !== id
+            )
+          ),
+        }));
+
         emitter.emit(syncEvent.repoChanged, {
           repoId: id,
           action: "deleted",
         });
         toast.success(`Sync repository "${repoToDelete.name}" deleted.`);
-
-        try {
-          console.log(`[ConversationStore] Deleting VFS directory: ${repoDir}`);
-          await VfsOps.deleteItemOp(repoDir, true, { fsInstance });
-          toast.info(`Removed local sync folder for "${repoToDelete.name}".`);
-        } catch (vfsError: any) {
-          console.error(
-            `[ConversationStore] Failed to delete VFS directory ${repoDir}:`,
-            vfsError
-          );
-          if (vfsError.code !== "ENOENT") {
-            toast.warning(
-              `Failed to remove local sync folder: ${vfsError.message}`
-            );
-          }
-        }
+        
       } catch (e) {
         console.error("ConversationStore: Error deleting sync repo", e);
         set((state) => {
-          if (repoToDelete) {
-            state.syncRepos.push(repoToDelete);
-          }
           state.error = "Failed to delete sync repository";
         });
         throw e;
       }
     },
+
+
 
     linkConversationToRepo: async (conversationId, repoId) => {
       await get().updateConversation(conversationId, {

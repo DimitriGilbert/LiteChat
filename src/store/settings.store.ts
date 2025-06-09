@@ -76,6 +76,7 @@ export interface SettingsState {
   customThemeColors: CustomThemeColors | null;
   autoScrollInterval: number;
   enableAutoScrollOnStream: boolean;
+  autoSyncOnStreamComplete: boolean;
 }
 
 interface SettingsActions {
@@ -112,6 +113,7 @@ interface SettingsActions {
   ) => void;
   setAutoScrollInterval: (interval: number) => void;
   setEnableAutoScrollOnStream: (enabled: boolean) => void;
+  setAutoSyncOnStreamComplete: (enabled: boolean) => void;
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>;
   resetAssistantSettings: () => Promise<void>;
@@ -130,7 +132,7 @@ const DEFAULT_PRESENCE_PENALTY = 0.0;
 const DEFAULT_FREQUENCY_PENALTY = 0.0;
 const DEFAULT_ENABLE_ADVANCED_SETTINGS = true;
 const DEFAULT_ENABLE_STREAMING_MARKDOWN = true;
-const DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING = false;
+const DEFAULT_ENABLE_STREAMING_CODE_BLOCK_PARSING = true;
 const DEFAULT_FOLD_STREAMING_CODE_BLOCKS = false;
 const DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION = false;
 const DEFAULT_STREAMING_FPS = 15;
@@ -149,6 +151,7 @@ const DEFAULT_CHAT_MAX_WIDTH = "max-w-7xl";
 const DEFAULT_CUSTOM_THEME_COLORS = null;
 const DEFAULT_AUTO_SCROLL_INTERVAL = 1000;
 const DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM = true;
+const DEFAULT_AUTO_SYNC_ON_STREAM_COMPLETE = false;
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set, get) => ({
@@ -182,6 +185,7 @@ export const useSettingsStore = create(
     customThemeColors: DEFAULT_CUSTOM_THEME_COLORS,
     autoScrollInterval: DEFAULT_AUTO_SCROLL_INTERVAL,
     enableAutoScrollOnStream: DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM,
+    autoSyncOnStreamComplete: DEFAULT_AUTO_SYNC_ON_STREAM_COMPLETE,
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -397,6 +401,13 @@ export const useSettingsStore = create(
         enabled,
       });
     },
+    setAutoSyncOnStreamComplete: (enabled) => {
+      set({ autoSyncOnStreamComplete: enabled });
+      PersistenceService.saveSetting("autoSyncOnStreamComplete", enabled);
+      emitter.emit(settingsEvent.autoSyncOnStreamCompleteChanged, {
+        enabled,
+      });
+    },
 
     loadSettings: async () => {
       try {
@@ -430,6 +441,7 @@ export const useSettingsStore = create(
           customThemeColors,
           autoScrollInterval,
           enableAutoScrollOnStream,
+          autoSyncOnStreamComplete,
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -541,6 +553,10 @@ export const useSettingsStore = create(
             "enableAutoScrollOnStream",
             DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM
           ),
+          PersistenceService.loadSetting<boolean>(
+            "autoSyncOnStreamComplete",
+            DEFAULT_AUTO_SYNC_ON_STREAM_COMPLETE
+          ),
         ]);
 
         const loadedSettings = {
@@ -573,6 +589,7 @@ export const useSettingsStore = create(
           customThemeColors,
           autoScrollInterval,
           enableAutoScrollOnStream,
+          autoSyncOnStreamComplete,
         };
         set(loadedSettings);
         emitter.emit(settingsEvent.loaded, { settings: loadedSettings });
@@ -851,6 +868,13 @@ export const useSettingsStore = create(
           handler: (
             p: SettingsEventPayloads[typeof settingsEvent.setEnableAutoScrollOnStreamRequest]
           ) => actions.setEnableAutoScrollOnStream(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoSyncOnStreamCompleteRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setAutoSyncOnStreamCompleteRequest]
+          ) => actions.setAutoSyncOnStreamComplete(p.enabled),
           storeId,
         },
         {

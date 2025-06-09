@@ -56,7 +56,7 @@ const SettingsGeneralComponent: React.FC = () => {
     defaultValues: {
       enableStreamingMarkdown: storeValues.enableStreamingMarkdown ?? true,
       enableStreamingCodeBlockParsing:
-        storeValues.enableStreamingCodeBlockParsing ?? false,
+        storeValues.enableStreamingCodeBlockParsing ?? true,
       foldStreamingCodeBlocks: storeValues.foldStreamingCodeBlocks ?? false,
       foldUserMessagesOnCompletion:
         storeValues.foldUserMessagesOnCompletion ?? false,
@@ -87,7 +87,7 @@ const SettingsGeneralComponent: React.FC = () => {
     form.reset({
       enableStreamingMarkdown: storeValues.enableStreamingMarkdown ?? true,
       enableStreamingCodeBlockParsing:
-        storeValues.enableStreamingCodeBlockParsing ?? false,
+        storeValues.enableStreamingCodeBlockParsing ?? true,
       foldStreamingCodeBlocks: storeValues.foldStreamingCodeBlocks ?? false,
       foldUserMessagesOnCompletion:
         storeValues.foldUserMessagesOnCompletion ?? false,
@@ -123,9 +123,9 @@ const SettingsGeneralComponent: React.FC = () => {
         e.stopPropagation();
         form.handleSubmit();
       }}
-      className="p-1 space-y-6"
+      className="p-1 space-y-4"
     >
-      <div className="space-y-2">
+      <div className="space-y-3">
         <h3 className="text-lg font-medium">Streaming & Display</h3>
 
         <SwitchField
@@ -218,7 +218,7 @@ const SettingsGeneralComponent: React.FC = () => {
       </div>
 
       <Separator />
-      <div className="flex items-center justify-between pt-4">
+      <div className="flex items-center justify-between pt-3">
         <form.Subscribe
           children={(state) => {
             const canSubmit = state.canSubmit;

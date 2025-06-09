@@ -38,6 +38,8 @@ export const settingsEvent = {
   autoScrollIntervalChanged: "settings.auto.scroll.interval.changed",
   enableAutoScrollOnStreamChanged:
     "settings.enable.auto.scroll.on.stream.changed",
+  autoSyncOnStreamCompleteChanged:
+    "settings.auto.sync.on.stream.complete.changed",
 
   // Action Request Events
   setThemeRequest: "settings.set.theme.request",
@@ -79,6 +81,8 @@ export const settingsEvent = {
   setAutoScrollIntervalRequest: "settings.set.auto.scroll.interval.request",
   setEnableAutoScrollOnStreamRequest:
     "settings.set.enable.auto.scroll.on.stream.request",
+  setAutoSyncOnStreamCompleteRequest:
+    "settings.set.auto.sync.on.stream.complete.request",
   loadSettingsRequest: "settings.load.settings.request",
   resetGeneralSettingsRequest: "settings.reset.general.settings.request",
   resetAssistantSettingsRequest: "settings.reset.assistant.settings.request",
@@ -155,6 +159,9 @@ export interface SettingsEventPayloads {
   };
   [settingsEvent.enableAutoScrollOnStreamChanged]: {
     enabled: SettingsState["enableAutoScrollOnStream"];
+  };
+  [settingsEvent.autoSyncOnStreamCompleteChanged]: {
+    enabled: SettingsState["autoSyncOnStreamComplete"];
   };
 
   [settingsEvent.setThemeRequest]: { theme: SettingsState["theme"] };
@@ -237,6 +244,9 @@ export interface SettingsEventPayloads {
   };
   [settingsEvent.setEnableAutoScrollOnStreamRequest]: {
     enabled: SettingsState["enableAutoScrollOnStream"];
+  };
+  [settingsEvent.setAutoSyncOnStreamCompleteRequest]: {
+    enabled: SettingsState["autoSyncOnStreamComplete"];
   };
   [settingsEvent.loadSettingsRequest]: undefined;
   [settingsEvent.resetGeneralSettingsRequest]: undefined;

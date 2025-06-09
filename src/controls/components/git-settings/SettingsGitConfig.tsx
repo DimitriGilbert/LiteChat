@@ -79,11 +79,11 @@ const SettingsGitConfigComponent: React.FC = () => {
   }, [gitUserName, gitUserEmail, form]);
 
   return (
-    <div className="space-y-6 p-1">
+    <div className="space-y-4 p-1">
       <SettingsSection
         title="Git User Configuration"
         description="Set your user name and email for Git commits made within the VFS. This is required for committing changes."
-        contentClassName="rounded-lg border p-4 shadow-sm bg-card" // Apply card styling to content
+        contentClassName="rounded-lg border p-3 shadow-sm bg-card" // Apply card styling to content
       >
         <form
           onSubmit={(e) => {
@@ -91,7 +91,7 @@ const SettingsGitConfigComponent: React.FC = () => {
             e.stopPropagation();
             form.handleSubmit();
           }}
-          className="space-y-4"
+          className="space-y-3"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <form.Field

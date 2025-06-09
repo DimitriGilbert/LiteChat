@@ -7,10 +7,12 @@ import { conversationEvent } from "@/types/litechat/events/conversation.events";
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import { syncEvent } from "@/types/litechat/events/sync.events";
+import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { GitSyncControlTrigger } from "@/controls/components/git-sync/GitSyncControlTrigger";
 import { SettingsGit } from "@/controls/components/git-settings/SettingsGit";
 import { useConversationStore } from "@/store/conversation.store";
 import { useInteractionStore } from "@/store/interaction.store";
+import { useSettingsStore } from "@/store/settings.store";
 import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
 import type { SidebarItemType } from "@/types/litechat/chat";
 
@@ -26,6 +28,7 @@ export class GitSyncControlModule implements ControlModule {
   public syncRepos: SyncRepo[] = [];
   public conversationSyncStatus: Record<string, SyncStatus> = {};
   public isStreaming = false;
+  public autoSyncEnabled = false;
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
@@ -60,6 +63,7 @@ export class GitSyncControlModule implements ControlModule {
         }
       }
     );
+    
     const unsubInteractionStatus = modApi.on(
       interactionEvent.statusChanged,
       (payload) => {
@@ -69,6 +73,35 @@ export class GitSyncControlModule implements ControlModule {
         }
       }
     );
+
+    // Listen for interaction completion to trigger auto-sync
+    const unsubInteractionCompleted = modApi.on(
+      interactionEvent.completed,
+      async (payload) => {
+        if (
+          typeof payload === "object" &&
+          payload &&
+          "interactionId" in payload &&
+          "status" in payload &&
+          payload.status === "COMPLETED" &&
+          this.autoSyncEnabled
+        ) {
+          await this.handleAutoSync();
+        }
+      }
+    );
+
+    // Listen for auto-sync setting changes
+    const unsubAutoSyncSetting = modApi.on(
+      settingsEvent.autoSyncOnStreamCompleteChanged,
+      (payload) => {
+        if (typeof payload === "object" && payload && "enabled" in payload) {
+          this.autoSyncEnabled = payload.enabled;
+          this.notifyComponentUpdate?.();
+        }
+      }
+    );
+
     const unsubConvUpdated = modApi.on(
       conversationEvent.conversationUpdated,
       (payload) => {
@@ -91,6 +124,8 @@ export class GitSyncControlModule implements ControlModule {
       unsubRepoChanged,
       unsubConvSync,
       unsubInteractionStatus,
+      unsubInteractionCompleted,
+      unsubAutoSyncSetting,
       unsubConvUpdated
     );
   }
@@ -102,6 +137,32 @@ export class GitSyncControlModule implements ControlModule {
     this.syncRepos = convState.syncRepos;
     this.conversationSyncStatus = convState.conversationSyncStatus;
     this.isStreaming = useInteractionStore.getState().status === "streaming";
+    this.autoSyncEnabled = useSettingsStore.getState().autoSyncOnStreamComplete;
+  }
+
+  private async handleAutoSync(): Promise<void> {
+    // Only auto-sync the current conversation if it has a sync repo configured
+    if (!this.selectedItemId || this.selectedItemType !== "conversation") {
+      return;
+    }
+
+    const conversation = this.getConversationById(this.selectedItemId);
+    if (!conversation?.syncRepoId) {
+      return;
+    }
+
+    // Check if the conversation needs sync
+    const currentStatus = this.conversationSyncStatus[this.selectedItemId];
+    if (currentStatus === "syncing" || currentStatus === "idle") {
+      return; // Already syncing or already up to date
+    }
+
+    console.log(`[GitSyncControlModule] Auto-syncing conversation ${this.selectedItemId}`);
+    try {
+      await this.syncConversation(this.selectedItemId);
+    } catch (error) {
+      console.error(`[GitSyncControlModule] Auto-sync failed:`, error);
+    }
   }
 
   public linkConversationToRepo = (

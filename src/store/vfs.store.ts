@@ -68,6 +68,7 @@ interface VfsActions {
     options?: { force?: boolean }
   ) => Promise<typeof fs>;
   getRegisteredActionHandlers: () => RegisteredActionHandler[];
+  resetStuckInitialization: () => void;
 }
 
 export const useVfsStore = create(
@@ -349,28 +350,51 @@ export const useVfsStore = create(
       const isForced = options?.force === true;
       console.log(`[VfsStore DEBUG] initializeVFS derived: vfsKey="${vfsKey}", isForced=${isForced}`);
 
+      // Check if already initializing THIS key (applies to both forced and non-forced)
+      if (get().initializingKey === vfsKey) {
+        const message = `Initialization skipped for "${vfsKey}". Already actively initializing this exact key.`;
+        console.warn(`[VfsStore] ${message}`);
+        // Instead of throwing an error, wait for the current initialization to complete
+        return new Promise((resolve, reject) => {
+          const checkInterval = setInterval(() => {
+            const currentState = get();
+            if (currentState.initializingKey !== vfsKey) {
+              clearInterval(checkInterval);
+              if (currentState.configuredVfsKey === vfsKey && currentState.fs) {
+                resolve(currentState.fs);
+              } else {
+                reject(new Error(`VFS initialization for "${vfsKey}" failed or was interrupted`));
+              }
+            }
+          }, 100);
+          
+          // Timeout after 10 seconds
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            reject(new Error(`Timeout waiting for VFS "${vfsKey}" initialization to complete`));
+          }, 10000);
+        });
+      }
+
+      // Check if already configured and ready (applies to both forced and non-forced)
+      if (get().configuredVfsKey === vfsKey && get().fs) {
+        console.log(`[VfsStore] Initialization skipped for key "${vfsKey}" (already configured).`);
+        if (!isForced) {
+          set({ loading: false }); // Ensure loading is false if skipped
+        }
+        return get().fs!;
+      }
+
       if (!isForced) {
         if (get().vfsKey !== vfsKey) {
           const message = `UI Initialization aborted for "${vfsKey}". Desired key is now "${get().vfsKey}".`;
           console.warn(`[VfsStore] ${message}`);
           throw new Error(message);
         }
-        if (get().initializingKey === vfsKey) { // Check if already initializing THIS key
-          const message = `UI Initialization skipped for "${vfsKey}". Already actively initializing this exact key.`;
-          console.warn(`[VfsStore] ${message}`);
-          throw new Error(message);
-        } 
         if (get().initializingKey !== null && get().initializingKey !== vfsKey) { // Check if initializing a DIFFERENT key
           const message = `UI Initialization skipped for "${vfsKey}". Already initializing a different key "${get().initializingKey}".`;
           console.warn(`[VfsStore] ${message}`);
           throw new Error(message);
-        }
-        if (get().configuredVfsKey === vfsKey && get().fs) {
-          console.log(
-            `[VfsStore] UI Initialization skipped for key "${vfsKey}" (already configured).`
-          );
-          set({ loading: false }); // Ensure loading is false if skipped
-          return get().fs!;
         }
       }
 
@@ -413,9 +437,18 @@ export const useVfsStore = create(
 
         if (isForced) {
           console.log(
-            `[VfsStore] Forced initialization complete for key: ${vfsKey}. Returning instance.`
+            `[VfsStore] Forced initialization complete for key: ${vfsKey}. Updating state and returning instance.`
           );
+          // Still update the VFS state even with force=true so events fire properly
+          _setFsInstance(fsInstance);
+          _setConfiguredVfsKey(vfsKey);
           set({ initializingKey: null });
+          // Emit loading state changed event for forced initialization
+          emitter.emit(vfsEvent.loadingStateChanged, {
+            isLoading: false,
+            operationLoading: false,
+            error: null,
+          });
           return fsInstance;
         }
 
@@ -852,6 +885,16 @@ export const useVfsStore = create(
         selectedFileIds: [],
       });
     },
+    resetStuckInitialization: () => {
+      console.log("[VfsStore] Force resetting stuck initialization state");
+      set({ 
+        initializingKey: null, 
+        loading: false, 
+        operationLoading: false,
+        error: null 
+      });
+    },
+
     getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
       const storeId = "vfsStore";
       const actions = get();

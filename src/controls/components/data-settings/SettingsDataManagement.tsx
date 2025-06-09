@@ -257,13 +257,13 @@ const SettingsDataManagementComponent: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 p-1">
+    <div className="space-y-4 p-1">
       {/* Single Conversation Import/Export */}
       <div>
         <h3 className="text-lg font-medium mb-2">Single Conversation</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Import */}
-          <div className="border p-4 rounded-md space-y-2">
+          <div className="border p-3 rounded-md space-y-2">
             <Label className="font-semibold">Import Conversation</Label>
             <p className="text-xs text-muted-foreground">
               Import a previously exported single conversation (.json file).
@@ -292,7 +292,7 @@ const SettingsDataManagementComponent: React.FC = () => {
             </Button>
           </div>
           {/* Export */}
-          <div className="border p-4 rounded-md space-y-2">
+          <div className="border p-3 rounded-md space-y-2">
             <Label className="font-semibold">Export All Conversations</Label>
             <p className="text-xs text-muted-foreground">
               Export all conversations and messages into a single JSON file.
@@ -318,17 +318,14 @@ const SettingsDataManagementComponent: React.FC = () => {
 
       {/* Full Configuration Import/Export */}
       <div>
-        <h3 className="text-lg font-medium mb-2">Full Configuration</h3>
+        <h3 className="text-lg font-medium mb-2">Full Configuration Backup</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Import */}
-          <div className="border p-4 rounded-md space-y-3">
+          <div className="border p-3 rounded-md space-y-3">
             <Label className="font-semibold">Import Full Configuration</Label>
             <p className="text-xs text-muted-foreground">
-              Import a full configuration backup (.json). Select which data
-              types to import below.{" "}
-              <strong className="text-destructive">
-                This will overwrite existing data for selected types.
-              </strong>
+              Import settings, providers, keys, projects, conversations, etc.,
+              from a backup file. Select which data types to restore.
             </p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2">
               {renderOptionCheckbox(importOptionsForm, "importSettings", "Settings", SettingsIcon, isFullImporting, 'import')}
@@ -354,18 +351,17 @@ const SettingsDataManagementComponent: React.FC = () => {
               variant="outline"
               size="sm"
               disabled={isFullImporting}
-              className="mt-2"
             >
               {isFullImporting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <FileUpIcon className="mr-2 h-4 w-4" />
               )}
-              {isFullImporting ? "Importing..." : "Select Full Backup File..."}
+              {isFullImporting ? "Importing..." : "Select Backup File..."}
             </Button>
           </div>
           {/* Export */}
-          <div className="border p-4 rounded-md space-y-3">
+          <div className="border p-3 rounded-md space-y-3">
             <Label className="font-semibold">Export Full Configuration</Label>
             <p className="text-xs text-muted-foreground">
               Export all settings, providers, keys, projects, conversations,
@@ -384,17 +380,16 @@ const SettingsDataManagementComponent: React.FC = () => {
             </div>
             <Button
               onClick={handleFullExportClick}
-              variant="outline"
+              variant="secondary"
               size="sm"
               disabled={isFullExporting}
-              className="mt-2"
             >
               {isFullExporting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <FileDownIcon className="mr-2 h-4 w-4" />
               )}
-              {isFullExporting ? "Exporting..." : "Export Full Backup"}
+              {isFullExporting ? "Exporting..." : "Export Configuration"}
             </Button>
           </div>
         </div>

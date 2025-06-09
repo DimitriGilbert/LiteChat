@@ -14,6 +14,7 @@ import { ParameterControlModule } from "@/controls/modules/ParameterControlModul
 import { FileControlModule } from "@/controls/modules/FileControlModule";
 import { VfsControlModule } from "@/controls/modules/VfsControlModule";
 import { GitSyncControlModule } from "@/controls/modules/GitSyncControlModule";
+import { ManualSyncSidebarControlModule } from "@/controls/modules/ManualSyncSidebarControlModule";
 import { VfsToolsModule } from "@/controls/modules/VfsToolsModule";
 import { GitToolsModule } from "@/controls/modules/GitToolsModule";
 import { ToolSelectorControlModule } from "@/controls/modules/ToolSelectorControlModule";
@@ -72,6 +73,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   ParameterControlModule,
   StructuredOutputControlModule,
   GitSyncControlModule,
+  ManualSyncSidebarControlModule,
   VfsToolsModule,
   GitToolsModule,
   // Canvas Action Controls

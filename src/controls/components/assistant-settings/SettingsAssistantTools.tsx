@@ -73,7 +73,7 @@ export const SettingsAssistantTools: React.FC = () => {
         e.stopPropagation();
         form.handleSubmit();
       }}
-      className="space-y-4"
+      className="space-y-3"
     >
       <form.Field
         name="toolMaxSteps"

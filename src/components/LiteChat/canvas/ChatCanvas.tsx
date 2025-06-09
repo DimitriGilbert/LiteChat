@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { useInteractionStore } from "@/store/interaction.store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ArrowDownIcon } from "lucide-react";
+import { ArrowDownIcon, PlayIcon, PauseIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -69,6 +69,8 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
         enableAutoScrollOnStream: state.enableAutoScrollOnStream,
       }))
     );
+
+  const setEnableAutoScrollOnStream = useSettingsStore((state) => state.setEnableAutoScrollOnStream);
 
   const selectProviderState = useMemo(
     () => (state: ReturnType<typeof useProviderStore.getState>) => ({
@@ -448,14 +450,14 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
     <div className={cn("flex-grow relative", className)}>
       {showSetupState ? (
         <ScrollArea className="h-full w-full">
-          <div className={cn("chat-canvas-container mx-auto", maxWidthClass)}>
+          <div className={cn("mx-auto w-full", maxWidthClass)}>
             <EmptyStateSetup />
           </div>
         </ScrollArea>
       ) : (
         <>
           <ScrollArea className="h-full w-full" ref={scrollAreaRef}>
-            <div className={cn("chat-canvas-container mx-auto", maxWidthClass)}>
+            <div className={cn("mx-auto w-full", maxWidthClass)}>
               {renderContent()}
             </div>
           </ScrollArea>
@@ -474,6 +476,31 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="left">Scroll to Bottom</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {/* Follow Stream Toggle Button - only show when streaming */}
+          {status === "streaming" && (
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="absolute bottom-4 right-14 z-20 h-8 w-8 rounded-full shadow-md bg-background/80 backdrop-blur-sm hover:bg-muted"
+                    onClick={() => setEnableAutoScrollOnStream(!enableAutoScrollOnStream)}
+                    aria-label={enableAutoScrollOnStream ? "Disable follow stream" : "Enable follow stream"}
+                  >
+                    {enableAutoScrollOnStream ? (
+                      <PauseIcon className="h-4 w-4" />
+                    ) : (
+                      <PlayIcon className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  {enableAutoScrollOnStream ? "Stop Following Stream" : "Follow Stream"}
+                </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           )}

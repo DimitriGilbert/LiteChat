@@ -395,8 +395,8 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
           onValueChange={setActiveTab}
           className="flex-grow overflow-hidden px-4 md:px-6"
           listClassName="-mx-4 md:-mx-6 px-2 md:px-6 py-1 md:py-0"
-          contentContainerClassName="pb-4 md:pb-6 pr-1 md:pr-2 -mr-1 md:-mr-2"
-          scrollable={true}
+          contentContainerClassName="pb-4 md:pb-6 overflow-y-auto"
+          scrollable={false}
         />
 
         <DialogFooter className="flex-shrink-0 border-t p-4 md:p-6 pt-3 md:pt-4 mt-auto">
