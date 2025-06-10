@@ -98,11 +98,28 @@ npx http-server -p 8080 .
 
 #### Other Languages (Ruby, Go, PHP, Perl)
 
-Refer to the `README.md` in the repository for one-liners for other languages.
+[One liner http server](https://gist.github.com/willurd/5720255) in a variety of languages.
 
 Now open [http://localhost:8080](http://localhost:8080) in your browser.
 
 ---
+
+## Development
+
+If you want to give a shot at working in a local first hair pulling nightmare, well, you can always do the following:
+
+```bash
+# dependencies
+npm install
+# dev
+npm run dev
+# build
+npm run build
+```
+
+It has been created using npm, but i don't see why it'd not work with other package managers/runtimes.
+
+AI assistance **highly** recommended. 
 
 ## Docker & CORS
 
