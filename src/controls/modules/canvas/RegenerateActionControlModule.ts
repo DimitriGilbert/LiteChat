@@ -28,18 +28,22 @@ export class RegenerateActionControlModule implements ControlModule {
         const currentInteraction = context.interaction;
         const interactionStoreState = useInteractionStore.getState();
         const globalStreamingStatus = interactionStoreState.status;
+        
+        // Find interactions that are on the main spine (parentId === null)
+        // and are either user_assistant or assistant_regen types
         const conversationInteractions = interactionStoreState.interactions.filter(
           (i) => i.conversationId === currentInteraction.conversationId && 
-                 i.type === "message.user_assistant" // Only consider actual conversational turns
+                 i.parentId === null && // Only main spine interactions
+                 (i.type === "message.user_assistant" || i.type === "message.assistant_regen")
         );
         
         // Sort by index to find the last one
         conversationInteractions.sort((a, b) => a.index - b.index);
-        const lastUserAssistantInteraction = conversationInteractions.length > 0 
+        const lastInteractionOnSpine = conversationInteractions.length > 0 
           ? conversationInteractions[conversationInteractions.length - 1] 
           : null;
 
-        const isLastTurn = lastUserAssistantInteraction?.id === currentInteraction.id;
+        const isLastTurn = lastInteractionOnSpine?.id === currentInteraction.id;
         
         const canRegenerate = 
           isLastTurn &&

@@ -13,6 +13,7 @@ import { useProviderStore } from "@/store/provider.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { useVfsStore } from "@/store/vfs.store";
 import { useSettingsStore } from "@/store/settings.store";
+import { usePromptStateStore } from "@/store/prompt.store";
 import { PersistenceService } from "./persistence.service";
 import { runMiddleware, getContextSnapshot } from "@/lib/litechat/ai-helpers";
 import {
@@ -146,17 +147,18 @@ export const InteractionService = {
           return;
         }
 
-        // Check if it's the last user_assistant message
+        // Check if it's the last interaction on the main spine
         const conversationInteractions = interactionStoreState.interactions.filter(
           (i) => i.conversationId === interaction.conversationId && 
-                 i.type === "message.user_assistant"
+                 i.parentId === null && // Only main spine interactions
+                 (i.type === "message.user_assistant" || i.type === "message.assistant_regen")
         ).sort((a, b) => a.index - b.index);
         
-        const lastUserAssistantInteraction = conversationInteractions.length > 0 
+        const lastInteractionOnSpine = conversationInteractions.length > 0 
           ? conversationInteractions[conversationInteractions.length - 1] 
           : null;
 
-        if (lastUserAssistantInteraction?.id !== interactionId) {
+        if (lastInteractionOnSpine?.id !== interactionId) {
           toast.info("Can only regenerate the last response in the conversation.");
           return;
         }
@@ -167,6 +169,89 @@ export const InteractionService = {
           await ConversationService.regenerateInteraction(interactionId);
           console.log(`[InteractionService] Finished ConversationService.regenerateInteraction for ${interactionId}`);
           // Feedback for starting regeneration might be good, or handled by UI changes
+        } catch (error) {
+          toast.error(`Failed to regenerate response: ${String(error)}`);
+          console.error(
+            `[InteractionService] Error regenerating interaction ${interactionId}:`,
+            error
+          );
+        } finally {
+          this._pendingRegenerations.delete(interactionId);
+        }
+      }
+    );
+
+    emitter.on(
+      canvasEvent.regenerateInteractionWithModelRequest,
+      async (payload) => {
+        const { interactionId, modelId } = payload;
+        console.log(`[InteractionService] Received regenerateInteractionWithModelRequest for ${interactionId} with model ${modelId}`);
+
+        if (this._pendingRegenerations.has(interactionId)) {
+          console.warn(`[InteractionService] Regeneration already pending for ${interactionId}. Ignoring request.`);
+          return;
+        }
+
+        const interaction = useInteractionStore
+          .getState()
+          .interactions.find((i) => i.id === interactionId);
+
+        if (!interaction) {
+          toast.error(
+            `Regeneration failed: Interaction ${interactionId} not found.`
+          );
+          console.warn(
+            `[InteractionService] Regeneration request for unknown interaction ${interactionId}`
+          );
+          return;
+        }
+
+        // Add safety checks: is it the last one? Is global streaming off?
+        const interactionStoreState = useInteractionStore.getState();
+        const globalStreamingStatus = interactionStoreState.status;
+        if (globalStreamingStatus === "streaming") {
+          toast.info("Cannot regenerate while another response is streaming.");
+          return;
+        }
+
+        // Check if it's the last interaction on the main spine
+        const conversationInteractions = interactionStoreState.interactions.filter(
+          (i) => i.conversationId === interaction.conversationId && 
+                 i.parentId === null && // Only main spine interactions
+                 (i.type === "message.user_assistant" || i.type === "message.assistant_regen")
+        ).sort((a, b) => a.index - b.index);
+        
+        const lastInteractionOnSpine = conversationInteractions.length > 0 
+          ? conversationInteractions[conversationInteractions.length - 1] 
+          : null;
+
+        if (lastInteractionOnSpine?.id !== interactionId) {
+          toast.info("Can only regenerate the last response in the conversation.");
+          return;
+        }
+
+        try {
+          this._pendingRegenerations.add(interactionId);
+          
+          // Store the current model ID to restore later
+          const promptState = usePromptStateStore.getState();
+          const originalModelId = promptState.modelId;
+          
+          console.log(`[InteractionService] Temporarily setting model to ${modelId} for regeneration`);
+          
+          // Temporarily set the selected model for regeneration
+          promptState.setModelId(modelId);
+          
+          try {
+            console.log(`[InteractionService] Starting ConversationService.regenerateInteraction for ${interactionId} with model ${modelId}`);
+            await ConversationService.regenerateInteraction(interactionId);
+            console.log(`[InteractionService] Finished ConversationService.regenerateInteraction for ${interactionId}`);
+          } finally {
+            // Always restore the original model ID, whether success or failure
+            console.log(`[InteractionService] Restoring original model ${originalModelId}`);
+            promptState.setModelId(originalModelId);
+          }
+          
         } catch (error) {
           toast.error(`Failed to regenerate response: ${String(error)}`);
           console.error(

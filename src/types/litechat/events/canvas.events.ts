@@ -5,6 +5,7 @@ export const canvasEvent = {
   // Interaction Action Request Events
   copyInteractionResponseRequest: "canvas.interaction.copy.response.request",
   regenerateInteractionRequest: "canvas.interaction.regenerate.request",
+  regenerateInteractionWithModelRequest: "canvas.interaction.regenerate.with.model.request",
   // rateInteractionRequest: "canvas.interaction.rate.request", // Removed
   // TODO: Add more interaction action requests as needed (e.g., edit, delete)
 
@@ -30,6 +31,10 @@ export interface CanvasEventPayloads {
   };
   [canvasEvent.regenerateInteractionRequest]: {
     interactionId: string;
+  };
+  [canvasEvent.regenerateInteractionWithModelRequest]: {
+    interactionId: string;
+    modelId: string;
   };
   // [canvasEvent.rateInteractionRequest]: { // Removed
   //   interactionId: string;
