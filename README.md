@@ -52,7 +52,6 @@
 - **Auto-Title Generation:** Automatically generate conversation titles using a dedicated model and prompt.
 - **Interaction Rating:** Rate assistant responses from -5 to +5 for feedback.
 - **Robust Error Handling:** User-friendly error boundaries and reporting.
-- **Extensive Keyboard Navigation and Accessibility.**
 - **Event-Driven Architecture:** Core interactions and state changes managed via an event bus for decoupling and extensibility.
 - **Modular Control System:** UI features are built as `ControlModule`s, ensuring a clean separation of concerns and allowing for easy extension.
 
@@ -66,18 +65,14 @@ You can download the latest release directly:
 
 ```bash
 # Using curl and bsdtar (recommended for preserving structure)
-curl -L https://github.com/DimitriGilbert/LiteChat/releases/latest/download/litechat-nightly.zip | bsdtar -xf- -C ./litechat
+curl -L https://litechat.dbuild.dev/release/latest.zip -o litechat.zip
+unzip litechat.zip -d litechat
 cd litechat
-
-# Or using curl and unzip (ensure your unzip handles nested directories correctly)
-# curl -L -o litechat.zip https://github.com/DimitriGilbert/LiteChat/releases/latest/download/litechat-nightly.zip
-# unzip litechat.zip -d litechat
-# cd litechat
 ```
 
 ### Start a Local HTTP Server
 
-LiteChat is a static web application. Serve the `dist` (or `public` if running from source after build) directory with any simple HTTP server.
+LiteChat is a static web application. At the root of the unzip folder above, run a local HTTP server.
 
 #### Python
 
@@ -92,9 +87,7 @@ python3 -m http.server 8080
 
 ```bash
 # From the directory containing index.html
-npx serve -l 8080 .
-# or
-# npx http-server -p 8080 .
+npx http-server -p 8080 .
 ```
 
 #### Other Languages (Ruby, Go, PHP, Perl)
@@ -129,16 +122,19 @@ docker run -d -p 8080:80 litechat
 
 If using local models (Ollama, LMStudio, etc.) or custom API endpoints, you might need to configure CORS on your AI backend server. LiteChat makes direct requests from the browser.
 
+
 - **Ollama:** Start Ollama with `OLLAMA_ORIGIN='*'` (or a more specific origin like `http://localhost:8080`) environment variable. Example: `OLLAMA_ORIGIN='*' ollama serve`.
 - **OpenAI-Compatible APIs (e.g., LMStudio):** Check your server's documentation for enabling CORS headers.
 
 **No server-side CORS is needed for LiteChat's internal VFS operations** as they happen entirely in the browser via IndexedDB.
 
+Gemini says no, for now. And if you are trying [from the web](https://litechat.dbuild.dev) on https, well, you can't talk to http endpoints... (so probably no local providers...)
+
 ---
 
 ## Project Structure
 
-The project structure is designed for modularity and clarity:
+The project structure is designed for modularity and "clarity":
 
 ```
 .
