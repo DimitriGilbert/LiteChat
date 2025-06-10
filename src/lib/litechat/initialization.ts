@@ -23,6 +23,7 @@ import { modEvent } from "@/types/litechat/events/mod.events";
 import { promptEvent as promptStateEvent } from "@/types/litechat/events/prompt.events";
 import { projectEvent } from "@/types/litechat/events/project.events";
 import { InteractionService } from "@/services/interaction.service";
+import { BundledConfigService } from "@/services/bundled-config.service";
 
 interface CoreStores {
   requestLoadSettings: () => void;
@@ -96,6 +97,11 @@ export async function loadCoreData(
   _stores: CoreStores,
   modApi: LiteChatModApi
 ): Promise<void> {
+  console.log("[Init] Core Data: Applying bundled configuration...");
+  
+  // Apply bundled user configuration first, before loading data
+  await BundledConfigService.applyBundledConfig();
+
   console.log("[Init] Core Data: Requesting loads...");
   modApi.emit(settingsEvent.loadSettingsRequest, undefined);
   modApi.emit(providerEvent.loadInitialDataRequest, undefined);

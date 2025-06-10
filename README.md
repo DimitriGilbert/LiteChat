@@ -38,6 +38,7 @@
 
 - **Multi-provider support:** OpenAI, Google Gemini, OpenRouter, Ollama, OpenAI-compatible APIs.
 - **100% Client-Side:** All data (API keys, conversations, settings) stored locally in your browser using IndexedDB. No server-side components for core chat functionality.
+- **Build-Time Configuration:** Load custom system prompts and complete user configurations from files at build time for personalized setups.
 - **Project-based organization:** Organize conversations into projects, with a hierarchical project tree.
 - **Advanced prompt controls:** Per-turn system prompt overrides, rules/tags, tool selection, structured output (JSON schema), web search toggles, reasoning toggles, and file attachments.
 - **Virtual File System (VFS):** Per-project and shared "orphan" filesystems. Manage files directly in the browser (upload, download, create folders, rename, delete, ZIP export/import). Attach VFS files to prompts.

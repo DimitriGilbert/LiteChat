@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "exportedAt": "2024-01-01T00:00:00.000Z",
+  "settings": {
+    "theme": "dark",
+    "temperature": 0.8,
+    "enableStreamingMarkdown": true,
+    "autoTitleEnabled": true,
+    "customFontFamily": "Inter, sans-serif",
+    "chatMaxWidth": "max-w-6xl"
+  },
+  "providerConfigs": [
+    {
+      "id": "openai-main",
+      "type": "openai",
+      "label": "OpenAI",
+      "baseUrl": "https://api.openai.com",
+      "enabled": true,
+      "enabledModels": ["gpt-4", "gpt-3.5-turbo"],
+      "globalModelOrder": ["gpt-4", "gpt-3.5-turbo"],
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "modelsLastFetchedAt": null
+    }
+  ],
+  "rules": [
+    {
+      "id": "helpful-assistant",
+      "name": "Helpful Assistant",
+      "content": "You are a helpful, harmless, and honest AI assistant.",
+      "type": "system",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "be-concise",
+      "name": "Be Concise",
+      "content": "Please be concise in your response.",
+      "type": "beforeUser",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "tags": [
+    {
+      "id": "default-behavior",
+      "name": "Default Behavior",
+      "color": "#3b82f6",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "tagRuleLinks": [
+    {
+      "id": "link-1",
+      "tagId": "default-behavior",
+      "ruleId": "helpful-assistant"
+    },
+    {
+      "id": "link-2",
+      "tagId": "default-behavior",
+      "ruleId": "be-concise"
+    }
+  ],
+  "projects": [
+    {
+      "id": "default-project",
+      "name": "My Project",
+      "description": "Default project setup",
+      "parentId": null,
+      "settings": {
+        "defaultTags": ["default-behavior"]
+      },
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    }
+  ]
+} 

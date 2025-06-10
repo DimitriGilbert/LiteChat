@@ -10,6 +10,7 @@ import {
   SettingsEventPayloads,
 } from "@/types/litechat/events/settings.events";
 import type { RegisteredActionHandler } from "@/types/litechat/control";
+import { BUNDLED_SYSTEM_PROMPT } from "virtual:system-prompt";
 
 export interface CustomThemeColors {
   background?: string;
@@ -123,7 +124,7 @@ interface SettingsActions {
 
 // Define default constants
 const DEFAULT_THEME = "system";
-const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant.`;
+const DEFAULT_SYSTEM_PROMPT = BUNDLED_SYSTEM_PROMPT;
 const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_MAX_TOKENS = null;
 const DEFAULT_TOP_P = null;
