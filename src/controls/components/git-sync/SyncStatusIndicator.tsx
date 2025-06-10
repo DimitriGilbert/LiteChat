@@ -77,7 +77,7 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
     };
   }, [syncRepos, conversations, conversationSyncStatus, repoInitializationStatus]);
 
-  const { status, variant, icon, label, tooltipText } = useMemo(() => {
+  const {  variant, icon, label, tooltipText } = useMemo(() => {
     if (syncStatus.totalRepos === 0) {
       return {
         status: 'none',
