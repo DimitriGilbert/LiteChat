@@ -4,7 +4,7 @@ import { InteractionCard } from './InteractionCard';
 import { StreamingInteractionCard } from './StreamingInteractionCard';
 import { CanvasControl, CanvasControlRenderContext } from '@/types/litechat/canvas/control';
 import { Button } from '@/components/ui/button';
-import { SparkleIcon, HistoryIcon } from 'lucide-react'; // Import icons
+import { SparkleIcon, HistoryIcon, LandPlot } from 'lucide-react'; // Import icons and LandPlot icon
 
 interface ResponseTabsContainerProps {
   interactionGroup: Interaction[]; // Original interaction + its regenerations/edits, sorted chronologically
@@ -60,25 +60,37 @@ export const ResponseTabsContainer: React.FC<ResponseTabsContainerProps> = ({
   return (
     <div className="response-tabs-container flex flex-col">
       <div className="tabs-header flex border-b mb-1"> {/* Reduced mb */}
-        {interactionGroup.map((interaction, index) => (
-          <Button
-            key={interaction.id}
-            variant="ghost"
-            size="sm" // keep sm, but padding will make it smaller
-            onClick={() => setActiveTabIndex(index)}
-            className={`mr-0.5 rounded-b-none flex items-center px-2 py-1 text-xs font-medium hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0 transition-colors duration-150 ease-in-out \
-              ${activeTabIndex === index 
-                ? 'border-b-2 border-primary text-primary' 
-                : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground'}`}
-          >
-            {index === 0 ? (
-              <SparkleIcon className="h-3.5 w-3.5 mr-1 flex-shrink-0" /> // Smaller icon and margin
-            ) : (
-              <HistoryIcon className="h-3.5 w-3.5 mr-1 flex-shrink-0" /> // Smaller icon and margin
-            )}
-            {index + 1} {/* Just the number */}
-          </Button>
-        ))}
+        {interactionGroup.map((interaction, index) => {
+          // Determine the appropriate icon for this tab
+          const getTabIcon = () => {
+            if (index === 0) {
+              // Main tab (original response)
+              return <SparkleIcon className="h-3.5 w-3.5 mr-1 flex-shrink-0" />;
+            } else if (interaction.metadata?.raceTab) {
+              // Race tab
+              return <LandPlot className="h-3.5 w-3.5 mr-1 flex-shrink-0" />;
+            } else {
+              // Regular regeneration tab
+              return <HistoryIcon className="h-3.5 w-3.5 mr-1 flex-shrink-0" />;
+            }
+          };
+
+          return (
+            <Button
+              key={interaction.id}
+              variant="ghost"
+              size="sm" // keep sm, but padding will make it smaller
+              onClick={() => setActiveTabIndex(index)}
+              className={`mr-0.5 rounded-b-none flex items-center px-2 py-1 text-xs font-medium hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0 transition-colors duration-150 ease-in-out \
+                ${activeTabIndex === index 
+                  ? 'border-b-2 border-primary text-primary' 
+                  : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground'}`}
+            >
+              {getTabIcon()}
+              {index + 1} {/* Just the number */}
+            </Button>
+          );
+        })}
       </div>
       <div className="tab-content pt-1"> {/* Reduced padding */}
         {activeInteraction && (

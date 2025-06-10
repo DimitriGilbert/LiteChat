@@ -264,6 +264,105 @@ export const InteractionService = {
       }
     );
 
+    emitter.on(
+      canvasEvent.raceInteractionRequest,
+      async (payload) => {
+        const { interactionId, modelIds, staggerMs } = payload;
+        console.log(`[InteractionService] Received raceInteractionRequest for ${interactionId} with ${modelIds.length} models`);
+
+        const interaction = useInteractionStore
+          .getState()
+          .interactions.find((i) => i.id === interactionId);
+
+        if (!interaction) {
+          toast.error(
+            `Race failed: Interaction ${interactionId} not found.`
+          );
+          console.warn(
+            `[InteractionService] Race request for unknown interaction ${interactionId}`
+          );
+          return;
+        }
+
+        // Add safety checks
+        const interactionStoreState = useInteractionStore.getState();
+        const globalStreamingStatus = interactionStoreState.status;
+        if (globalStreamingStatus === "streaming") {
+          toast.info("Cannot start race while another response is streaming.");
+          return;
+        }
+
+        // Check if it's the last interaction on the main spine
+        const conversationInteractions = interactionStoreState.interactions.filter(
+          (i) => i.conversationId === interaction.conversationId && 
+                 i.parentId === null && // Only main spine interactions
+                 (i.type === "message.user_assistant" || i.type === "message.assistant_regen")
+        ).sort((a, b) => a.index - b.index);
+        
+        const lastInteractionOnSpine = conversationInteractions.length > 0 
+          ? conversationInteractions[conversationInteractions.length - 1] 
+          : null;
+
+        if (lastInteractionOnSpine?.id !== interactionId) {
+          toast.info("Can only race from the last response in the conversation.");
+          return;
+        }
+
+        if (modelIds.length < 2) {
+          toast.error("Need at least 2 models to race");
+          return;
+        }
+
+        try {
+          // Store the current model ID to restore later
+          const promptState = usePromptStateStore.getState();
+          const originalModelId = promptState.modelId;
+          
+          console.log(`[InteractionService] Starting race with ${modelIds.length} models`);
+          toast.info(`Starting race with ${modelIds.length} models...`);
+
+          // Create multiple regenerations with staggered timing
+          const racePromises = modelIds.map((modelId: string, index: number) => {
+            return new Promise((resolve) => {
+              setTimeout(async () => {
+                try {
+                  // Set the model for this specific race
+                  promptState.setModelId(modelId);
+                  
+                  console.log(`[InteractionService] Starting race participant ${index + 1}/${modelIds.length} with model ${modelId}`);
+                  await ConversationService.regenerateInteraction(interactionId);
+                  console.log(`[InteractionService] Race participant ${index + 1} finished`);
+                  resolve({ success: true, modelId, index });
+                } catch (error) {
+                  console.error(`[InteractionService] Race participant ${index + 1} failed:`, error);
+                  resolve({ success: false, modelId, index, error });
+                }
+              }, index * staggerMs);
+            });
+          });
+
+          // Wait for all race participants to complete
+          const results = await Promise.all(racePromises);
+          
+          // Restore original model
+          promptState.setModelId(originalModelId);
+          
+          const successCount = results.filter(r => (r as any).success).length;
+          const failCount = results.length - successCount;
+          
+          if (successCount > 0) {
+            toast.success(`Race completed! ${successCount} models responded${failCount > 0 ? `, ${failCount} failed` : ''}`);
+          } else {
+            toast.error(`Race failed: All ${modelIds.length} models failed to respond`);
+          }
+          
+        } catch (error) {
+          toast.error(`Race failed: ${String(error)}`);
+          console.error(`[InteractionService] Error during race:`, error);
+        }
+      }
+    );
+
     // Handler for copyCodeBlockRequest
     emitter.on(
       canvasEvent.copyCodeBlockRequest,

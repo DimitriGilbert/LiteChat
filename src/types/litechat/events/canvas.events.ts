@@ -6,6 +6,7 @@ export const canvasEvent = {
   copyInteractionResponseRequest: "canvas.interaction.copy.response.request",
   regenerateInteractionRequest: "canvas.interaction.regenerate.request",
   regenerateInteractionWithModelRequest: "canvas.interaction.regenerate.with.model.request",
+  raceInteractionRequest: "canvas.interaction.race.request",
   // rateInteractionRequest: "canvas.interaction.rate.request", // Removed
   // TODO: Add more interaction action requests as needed (e.g., edit, delete)
 
@@ -14,7 +15,7 @@ export const canvasEvent = {
   // foldCodeBlockRequest: "canvas.codeblock.fold.request", // Keep folding local for now
   // TODO: Add more codeblock action requests (e.g., run, save to file)
 
-  // General Canvas Events (if any specific ones are needed beyond control registration)
+  // General Canvas Events (if any specific to canvas emerge)
   // e.g., canvas.view.changed, canvas.element.focused
 
   // Action Outcome Events (optional, could also be handled by generic UI notifications)
