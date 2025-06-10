@@ -5,7 +5,6 @@ import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control
 import { EditResponseControl } from "@/controls/components/canvas/EditResponseControl";
 import { useInteractionStore } from "@/store/interaction.store";
 import { canvasEvent } from "@/types/litechat/events/canvas.events";
-import { InteractionService } from "@/services/interaction.service";
 import { PersistenceService } from "@/services/persistence.service";
 import type { Interaction } from "@/types/litechat/interaction";
 import { nanoid } from "nanoid";
