@@ -49,7 +49,7 @@ export const ZipDownloadControl: React.FC<ZipDownloadControlProps> = ({
       const createdDirs = new Set<string>();
       
       // Add each code block to the ZIP
-      codeBlocksWithFilepaths.forEach(({ filepath, code }, index) => {
+      codeBlocksWithFilepaths.forEach(({ filepath, code }) => {
         // Normalize the filepath (remove leading slashes, handle Windows paths)
         const normalizedPath = filepath.replace(/^[\/\\]+/, '').replace(/\\/g, '/');
         
