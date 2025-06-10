@@ -14,7 +14,7 @@ import {
 import { useProjectStore } from "@/store/project.store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusIcon, FolderPlusIcon, SearchIcon } from "lucide-react";
+import { PlusIcon, FolderPlusIcon, SearchIcon, DownloadIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { SidebarItemType } from "@/types/litechat/chat";
 import {
@@ -31,6 +31,8 @@ import { useItemEditing } from "@/hooks/litechat/useItemEditing";
 import type { ConversationListControlModule } from "@/controls/modules/ConversationListControlModule";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Lnk } from "@/components/ui/lnk";
+import { GithubIcon } from "lucide-react";
 
 export interface VirtualListItem {
   id: string; // Unique ID for the virtual list item (e.g., `project-${projectId}` or `conversation-${conversationId}`)
@@ -473,7 +475,28 @@ export const ConversationListControlComponent: React.FC<
   return (
     <div className="p-2 border-r border-[--border] bg-card text-card-foreground h-full flex flex-col">
       <div className="flex justify-between items-center mb-2 flex-shrink-0 px-1">
-        <h3 className="text-sm font-semibold">Workspace</h3>
+        <div className="flex items-center space-x-2">
+          <h3 className="text-sm font-semibold">LiteChat</h3>
+          <Lnk
+            href="https://github.com/DimitriGilbert/LiteChat"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub Repository"
+          >
+            <Button size="sm" variant="ghost" className="h-4 w-4 p-0">
+              <GithubIcon className="h-4 w-4" />
+            </Button>
+          </Lnk>
+          <Lnk
+            href="release/latest.zip"
+            download="LiteChat.zip"
+            aria-label="Download LiteChat"
+          >
+            <Button size="sm" variant="ghost" className="h-4 w-4 p-0">
+              <DownloadIcon className="h-4 w-4" />
+            </Button>
+          </Lnk>
+        </div>
         <div className="flex items-center">
           <TooltipProvider delayDuration={100}>
             <Tooltip>

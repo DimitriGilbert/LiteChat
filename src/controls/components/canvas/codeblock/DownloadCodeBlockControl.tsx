@@ -62,7 +62,9 @@ export const DownloadCodeBlockControl: React.FC<DownloadCodeBlockControlProps> =
   );
 
   // Only show download button if there's a filepath or if the code is substantial
-  const shouldShow = filepath || (codeToDownload && codeToDownload.trim().length > 10);
+  const shouldShow = filepath || (codeToDownload && codeToDownload.trim().length > 5000);
+  console.log('shouldShow', shouldShow, codeToDownload.trim().length);
+
   
   if (!shouldShow) {
     return null;
