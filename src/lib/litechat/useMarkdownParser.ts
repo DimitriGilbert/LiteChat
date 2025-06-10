@@ -6,9 +6,15 @@ export interface CodeBlockData {
   type: "code";
   lang: string | undefined;
   code: string;
+  filepath?: string;
 }
 
-export type ParsedContent = (string | CodeBlockData)[];
+export interface MermaidBlockData {
+  type: "mermaid";
+  code: string;
+}
+
+export type ParsedContent = (string | CodeBlockData | MermaidBlockData)[];
 
 // Create a MarkdownIt parser instance with desired options
 const md = new MarkdownIt({
@@ -40,14 +46,36 @@ export function useMarkdownParser(
             result.push(currentHtmlBuffer);
             currentHtmlBuffer = "";
           }
-          // Extract language from the fence info
-          const lang = token.info?.split(" ")[0] || undefined;
-          // Push the code block content as a CodeBlockData object
-          result.push({
-            type: "code",
-            lang: lang,
-            code: token.content,
-          });
+          // Extract language and filepath from the fence info
+          const fenceInfo = token.info?.trim() || "";
+          let lang: string | undefined;
+          let filepath: string | undefined;
+          
+          if (fenceInfo.includes(":")) {
+            // Handle language:filepath syntax
+            const [langPart, ...pathParts] = fenceInfo.split(":");
+            lang = langPart || undefined;
+            filepath = pathParts.join(":") || undefined; // Rejoin in case filepath contains colons
+          } else {
+            // Standard language-only syntax
+            lang = fenceInfo.split(" ")[0] || undefined;
+          }
+          
+          // Check if this is a Mermaid block
+          if (lang === "mermaid") {
+            result.push({
+              type: "mermaid",
+              code: token.content,
+            });
+          } else {
+            // Push the code block content as a CodeBlockData object
+            result.push({
+              type: "code",
+              lang: lang,
+              code: token.content,
+              filepath: filepath,
+            });
+          }
           index++;
         } else {
           // Accumulate non-code tokens

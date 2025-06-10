@@ -19,8 +19,10 @@ import { useSettingsStore } from "@/store/settings.store";
 import {
   useMarkdownParser,
   CodeBlockData,
+  MermaidBlockData,
 } from "@/lib/litechat/useMarkdownParser";
 import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
+import { MermaidBlockRenderer } from "@/components/LiteChat/common/MermaidBlockRenderer";
 
 interface UserPromptDisplayProps {
   turnData: Readonly<PromptTurnObject>;
@@ -60,6 +62,15 @@ const UserContentView: React.FC<{ markdownContent: string | null }> = ({
               key={`code-${index}`}
               lang={codeData.lang}
               code={codeData.code}
+              filepath={codeData.filepath}
+            />
+          );
+        } else if (item.type === "mermaid") {
+          const mermaidData = item as MermaidBlockData;
+          return (
+            <MermaidBlockRenderer
+              key={`mermaid-${index}`}
+              code={mermaidData.code}
             />
           );
         }

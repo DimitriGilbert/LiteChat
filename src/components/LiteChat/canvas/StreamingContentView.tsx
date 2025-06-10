@@ -4,9 +4,11 @@ import React, {useMemo, useCallback } from "react";
 import {
   useMarkdownParser,
   CodeBlockData,
+  MermaidBlockData,
   ParsedContent,
 } from "@/lib/litechat/useMarkdownParser";
 import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
+import { MermaidBlockRenderer } from "@/components/LiteChat/common/MermaidBlockRenderer";
 import { useSettingsStore } from "@/store/settings.store";
 import { cn } from "@/lib/utils";
 import { useShallow } from "zustand/react/shallow";
@@ -25,7 +27,7 @@ interface StreamingContentViewProps {
 
 // Helper to render a single parsed block (memoized internally if CodeBlockRenderer)
 const renderBlock = (
-  item: string | CodeBlockData,
+  item: string | CodeBlockData | MermaidBlockData,
   index: number,
   useFullCodeBlock: boolean,
   isStreamingBlock: boolean,
@@ -53,6 +55,7 @@ const renderBlock = (
           key={`code-${index}`}
           lang={codeData.lang}
           code={codeData.code}
+          filepath={codeData.filepath}
           isStreaming={isStreamingBlock}
         />
       );
@@ -78,6 +81,15 @@ const renderBlock = (
         </pre>
       );
     }
+  } else if (item.type === "mermaid") {
+    const mermaidData = item as MermaidBlockData;
+    return (
+      <MermaidBlockRenderer
+        key={`mermaid-${index}`}
+        code={mermaidData.code}
+        isStreaming={isStreamingBlock}
+      />
+    );
   }
   return null;
 };

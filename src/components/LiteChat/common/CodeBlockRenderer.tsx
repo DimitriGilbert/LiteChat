@@ -29,12 +29,14 @@ import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control
 interface CodeBlockRendererProps {
   lang: string | undefined;
   code: string;
+  filepath?: string;
   isStreaming?: boolean;
 }
 
 const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
   lang,
   code,
+  filepath,
   isStreaming = false,
 }) => {
   const { foldStreamingCodeBlocks } = useSettingsStore(
@@ -57,6 +59,7 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
       targetSlotName: CanvasControl["targetSlot"],
       currentCode: string,
       currentLang?: string,
+      currentFilepath?: string,
       currentIsFolded?: boolean,
       currentToggleFold?: () => void
     ): React.ReactNode[] => {
@@ -72,6 +75,7 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
             const context: CanvasControlRenderContext = {
               codeBlockContent: currentCode,
               codeBlockLang: currentLang,
+              codeBlockFilepath: currentFilepath,
               isFolded: currentIsFolded,
               toggleFold: currentToggleFold,
               canvasContextType: "codeblock",
@@ -137,6 +141,7 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
     "codeblock-header-actions",
     code,
     lang,
+    filepath,
     isFolded,
     toggleFold
   );
@@ -148,6 +153,11 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
           <div className="text-sm font-medium">
             {lang ? lang.toUpperCase() : "CODE"}
           </div>
+          {filepath && (
+            <div className="text-xs text-muted-foreground font-mono">
+              {filepath}
+            </div>
+          )}
           <div className="flex items-center gap-0.5 opacity-0 group-hover/codeblock:opacity-100 focus-within:opacity-100 transition-opacity">
             {codeBlockHeaderActions}
           </div>

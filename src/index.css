@@ -368,6 +368,36 @@
     overflow-wrap: anywhere;
     word-break: break-word;
   }
+
+  /* Mermaid diagram styles */
+  .mermaid-container {
+    @apply flex justify-center items-center min-h-[100px];
+  }
+
+  .mermaid-container svg {
+    @apply max-w-full h-auto;
+  }
+
+  /* Ensure Mermaid diagrams are readable in both light and dark themes */
+  .mermaid-container svg text {
+    fill: hsl(var(--foreground));
+  }
+
+  .mermaid-container svg .node rect,
+  .mermaid-container svg .node circle,
+  .mermaid-container svg .node ellipse,
+  .mermaid-container svg .node polygon {
+    fill: hsl(var(--card));
+    stroke: hsl(var(--border));
+  }
+
+  .mermaid-container svg .edgePath path {
+    stroke: hsl(var(--muted-foreground));
+  }
+
+  .mermaid-container svg .arrowheadPath {
+    fill: hsl(var(--muted-foreground));
+  }
 } /* End @layer utilities */
 
 /* Custom scrollbar styles */

@@ -11,6 +11,7 @@ export interface CanvasControlRenderContext {
   codeBlockLang?: string;
   codeBlockContent?: string;
   codeBlockId?: string;
+  codeBlockFilepath?: string;
   isFolded?: boolean;
   toggleFold?: () => void;
   toolCall?: ToolCallPart;

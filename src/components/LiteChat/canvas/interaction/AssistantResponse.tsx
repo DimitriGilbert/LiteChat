@@ -12,8 +12,10 @@ import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipB
 import {
   useMarkdownParser,
   CodeBlockData,
+  MermaidBlockData,
 } from "@/lib/litechat/useMarkdownParser";
 import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
+import { MermaidBlockRenderer } from "@/components/LiteChat/common/MermaidBlockRenderer";
 import { type ToolCallPart, type ToolResultPart } from "ai";
 import { toast } from "sonner";
 import { useControlRegistryStore } from "@/store/control.store";
@@ -48,6 +50,15 @@ const StaticContentView: React.FC<{ markdownContent: string | null, interactionI
               key={`code-${index}`}
               lang={codeData.lang}
               code={codeData.code}
+              filepath={codeData.filepath}
+            />
+          );
+        } else if (item.type === "mermaid") {
+          const mermaidData = item as MermaidBlockData;
+          return (
+            <MermaidBlockRenderer
+              key={`mermaid-${index}`}
+              code={mermaidData.code}
             />
           );
         }

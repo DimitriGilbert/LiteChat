@@ -44,8 +44,10 @@ import { RegenerateActionControlModule } from "@/controls/modules/canvas/Regener
 import { RatingActionControlModule } from "@/controls/modules/canvas/RatingActionControlModule";
 import { ExampleCanvasControlModule } from "@/controls/modules/example";
 import { FoldInteractionControlModule } from "@/controls/modules/canvas/interaction/FoldInteractionControlModule";
+import { ZipDownloadControlModule } from "@/controls/modules/canvas/interaction/ZipDownloadControlModule";
 import { CopyCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/CopyCodeBlockControlModule";
 import { FoldCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/FoldCodeBlockControlModule";
+import { DownloadCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/DownloadCodeBlockControlModule";
 import { ToolCallStepControlModule } from "@/controls/modules/canvas/tool/ToolCallStepControlModule";
 
 // Define the application's specific control module registration order HERE
@@ -81,10 +83,12 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   // Canvas Action Controls
   CopyActionControlModule, // For InteractionCard header
   FoldInteractionControlModule, // For InteractionCard header
+  ZipDownloadControlModule, // For InteractionCard header
   RegenerateActionControlModule, // For InteractionCard footer
   RatingActionControlModule, // For InteractionCard footer
   CopyCodeBlockControlModule, // For CodeBlockRenderer header
   FoldCodeBlockControlModule, // For CodeBlockRenderer header
+  DownloadCodeBlockControlModule, // For CodeBlockRenderer header
   ExampleCanvasControlModule,
   ToolCallStepControlModule,
 ];
