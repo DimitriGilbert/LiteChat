@@ -44,6 +44,7 @@ import type { fs } from "@zenfs/core";
 import { conversationEvent } from "@/types/litechat/events/conversation.events";
 import { vfsEvent } from "@/types/litechat/events/vfs.events";
 import { canvasEvent,} from "@/types/litechat/events/canvas.events";
+import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { ConversationService } from "@/services/conversation.service";
 
 interface AIServiceCallOptions {
@@ -79,6 +80,14 @@ export const InteractionService = {
   _pendingRegenerations: new Set<string>(),
 
   initializeCanvasEventHandlers(): void {
+    // Listen for streaming FPS changes to update active interactions
+    emitter.on(settingsEvent.streamingRenderFpsChanged, (payload) => {
+      const activeInteractionIds = useInteractionStore.getState().streamingInteractionIds;
+      activeInteractionIds.forEach(interactionId => {
+        AIService.updateStreamingFPS(interactionId, payload.fps);
+      });
+    });
+
     emitter.on(
       canvasEvent.copyInteractionResponseRequest,
       async (payload) => {
@@ -647,6 +656,7 @@ export const InteractionService = {
       presencePenalty: finalPrompt.parameters?.presence_penalty,
       frequencyPenalty: finalPrompt.parameters?.frequency_penalty,
       maxSteps: maxSteps,
+      streamingRenderFPS: useSettingsStore.getState().streamingRenderFPS, // Pass streaming FPS
       ...(toolsWithExecute &&
         Object.keys(toolsWithExecute).length > 0 && {
           tools: toolsWithExecute,

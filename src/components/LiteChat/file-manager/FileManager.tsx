@@ -20,7 +20,7 @@ import { FileManagerTable } from "./FileManagerTable";
 import { FileManagerToolbar } from "./FileManagerToolbar";
 import { CloneDialog } from "./CloneDialog";
 import { CommitDialog } from "./CommitDialog";
-import * as VfsOps from "@/lib/litechat/vfs-operations";
+import { VfsService } from "@/services/vfs.service";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -152,25 +152,39 @@ export const FileManager = memo(() => {
     const checkGitStatus = async () => {
       if (isVfsLoading || currentFolderPaths.length === 0) return;
 
-      const statusUpdates: Record<string, boolean> = {};
-      let changed = false;
-      for (const path of currentFolderPaths) {
-        try {
-          const isRepo = await VfsOps.isGitRepoOp(path);
+      try {
+        // BATCH operation - ONE call for ALL paths!
+        const batchResults = await VfsService.batchCheckGitReposOp(vfsKey || "", currentFolderPaths);
+        
+        // Check if any status changed
+        let changed = false;
+        const statusUpdates: Record<string, boolean> = {};
+        
+        for (const path of currentFolderPaths) {
+          const isRepo = batchResults[path] ?? false;
           if (gitRepoStatus[path] !== isRepo) {
             statusUpdates[path] = isRepo;
             changed = true;
           }
-        } catch (e) {
-          console.error(`Error checking git status for ${path}:`, e);
+        }
+        
+        if (changed) {
+          setGitRepoStatus((prev) => ({ ...prev, ...statusUpdates }));
+        }
+      } catch (e) {
+        console.error("Error batch checking git status:", e);
+        // Fallback: mark all as non-repos if batch fails
+        const statusUpdates: Record<string, boolean> = {};
+        let changed = false;
+        for (const path of currentFolderPaths) {
           if (gitRepoStatus[path] !== false) {
             statusUpdates[path] = false;
             changed = true;
           }
         }
-      }
-      if (changed) {
-        setGitRepoStatus((prev) => ({ ...prev, ...statusUpdates }));
+        if (changed) {
+          setGitRepoStatus((prev) => ({ ...prev, ...statusUpdates }));
+        }
       }
     };
     checkGitStatus();
@@ -343,7 +357,7 @@ export const FileManager = memo(() => {
           error: null,
         });
         try {
-          await VfsOps.uploadAndExtractZipOp(file, currentPath);
+          await VfsService.uploadAndExtractZipOp(vfsKey || "", file, currentPath);
           emitter.emit(vfsEvent.fetchNodesRequest, {
             parentId: currentParentId,
           });
@@ -389,9 +403,9 @@ WARNING: This will delete all contents inside`
       });
       try {
         if (entry.type === "file") {
-          await VfsOps.downloadFileOp(entry.path);
+          await VfsService.downloadFileOp(vfsKey || "", entry.path);
         } else {
-          await VfsOps.downloadAllAsZipOp(`${entry.name}.zip`, entry.path);
+                      await VfsService.downloadAllAsZipOp(vfsKey || "", `${entry.name}.zip`, entry.path);
         }
       } catch (err) {
         console.error("Download error:", err);
@@ -415,7 +429,7 @@ WARNING: This will delete all contents inside`
     });
     try {
       const dirName = basename(currentPath) || "root";
-      await VfsOps.downloadAllAsZipOp(`${dirName}_export.zip`, currentPath);
+              await VfsService.downloadAllAsZipOp(vfsKey || "", `${dirName}_export.zip`, currentPath);
     } catch (err) {
       console.error("Download all error:", err);
     } finally {
@@ -450,7 +464,7 @@ WARNING: This will delete all contents inside`
   const handleGitInit = useCallback(
     (path: string) => {
       runGitOperation(path, async () => {
-        await VfsOps.gitInitOp(path);
+        await VfsService.gitInitOp(vfsKey || "", path);
         setGitRepoStatus((prev) => ({ ...prev, [path]: true }));
       });
     },
@@ -460,7 +474,7 @@ WARNING: This will delete all contents inside`
   const handleGitPull = useCallback(
     (path: string) => {
       toast.info("Pulling default branch (auth not implemented yet)...");
-      runGitOperation(path, () => VfsOps.gitPullOp(path, "main"));
+      runGitOperation(path, () => VfsService.gitPullOp(vfsKey || "", path, "main"));
     },
     [runGitOperation]
   );
@@ -474,14 +488,14 @@ WARNING: This will delete all contents inside`
   const handleGitPush = useCallback(
     (path: string) => {
       toast.info("Pushing default branch (auth not implemented yet)...");
-      runGitOperation(path, () => VfsOps.gitPushOp(path, "main"));
+      runGitOperation(path, () => VfsService.gitPushOp(vfsKey || "", path, "main"));
     },
     [runGitOperation]
   );
 
   const handleGitStatus = useCallback(
     (path: string) => {
-      runGitOperation(path, () => VfsOps.gitStatusOp(path));
+      runGitOperation(path, () => VfsService.gitStatusOp(vfsKey || "", path));
     },
     [runGitOperation]
   );
@@ -508,7 +522,8 @@ WARNING: This will delete all contents inside`
         basename(cloneRepoUrl.trim().replace(/\.git$/, "")) || "cloned_repo";
       const cloneTargetPath = buildPath(currentPath, repoName);
 
-      await VfsOps.gitCloneOp(
+      await VfsService.gitCloneOp(
+        vfsKey || "",
         cloneTargetPath,
         cloneRepoUrl.trim(),
         cloneBranch.trim() || undefined
@@ -541,7 +556,7 @@ WARNING: This will delete all contents inside`
       error: null,
     });
     try {
-      await VfsOps.gitCommitOp(commitPath, commitMessage.trim());
+      await VfsService.gitCommitOp(vfsKey || "", commitPath, commitMessage.trim());
       setIsCommitDialogOpen(false);
     } catch (_err) {
       // Error handled by gitCommitOp

@@ -25,7 +25,8 @@ import {
 } from "@/components/ui/tooltip";
 import { CodeBlockRenderer } from "./CodeBlockRenderer";
 import type { AttachedFileMetadata } from "@/store/input.store";
-import * as VfsOps from "@/lib/litechat/vfs-operations";
+import { VfsService } from "@/services/vfs.service";
+import { useVfsStore } from "@/store/vfs.store";
 import { formatBytes } from "@/lib/litechat/file-manager-utils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -90,6 +91,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   onRemove,
   isReadOnly = false,
 }) => {
+  const vfsKey = useVfsStore((state) => state.vfsKey);
   const [previewContentUrl, setPreviewContentUrl] = useState<string | null>(
     null,
   );
@@ -173,7 +175,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
     setIsAddingToVfs(true);
     try {
       const targetPath = "/";
-      await VfsOps.uploadFilesOp([fileToAdd], targetPath);
+      await VfsService.uploadFilesOp(vfsKey || "", [fileToAdd], targetPath);
       toast.success(`"${fileMeta.name}" added to VFS root.`);
     } catch (err) {
       console.error("Failed to add file to VFS:", err);
@@ -188,7 +190,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
     try {
       let blob: Blob;
       if (fileMeta.source === "vfs" && fileMeta.path) {
-        const content = await VfsOps.readFileOp(fileMeta.path);
+        const content = await VfsService.readFileOp(vfsKey || "", fileMeta.path);
         blob = new Blob([content], { type: mimeType });
       } else {
         const file = metadataToFile(fileMeta);

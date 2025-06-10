@@ -3,24 +3,22 @@
 import type { Conversation } from "@/types/litechat/chat";
 import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
 import type { Interaction } from "@/types/litechat/interaction";
-import * as VfsOps from "@/lib/litechat/vfs-operations";
+import { VfsService } from "@/services/vfs.service";
 import { PersistenceService } from "@/services/persistence.service";
 import { normalizePath, joinPath } from "@/lib/litechat/file-manager-utils";
 import { toast } from "sonner";
 import { useInteractionStore } from "@/store/interaction.store";
-import type { fs as FsType } from "@zenfs/core";
+import { SYNC_VFS_KEY } from "@/lib/litechat/constants";
 
 const CONVERSATION_DIR = ".litechat/conversations";
 const SYNC_REPO_BASE_DIR = "/synced_repos";
 
 /**
  * Logic to initialize a local sync repository (clone if needed) or pull updates.
- * @param fsInstance The initialized ZenFS instance for sync operations.
  * @param repo The SyncRepo configuration object.
  * @param setRepoStatus Function to update the initialization status in the store.
  */
 export async function initializeOrSyncRepoLogic(
-  fsInstance: typeof FsType,
   repo: SyncRepo,
   setRepoStatus: (repoId: string, status: SyncStatus) => void,
   silent = false,
@@ -31,37 +29,22 @@ export async function initializeOrSyncRepoLogic(
   const branchToUse = repo.branch || "main";
 
   try {
-    let isRepoCloned = false;
-    try {
-      // Use the passed fsInstance
-      await fsInstance.promises.stat(joinPath(repoDir, ".git"));
-      isRepoCloned = true;
-    } catch (e: any) {
-      if (e.code === "ENOENT") {
-        isRepoCloned = false;
-      } else {
-        throw e;
-      }
-    }
+    const isRepoCloned = await VfsService.isGitRepoOp(SYNC_VFS_KEY, repoDir);
 
     if (!isRepoCloned) {
       if (!silent) toast.info(`Cloning repository "${repo.name}"...`);
-      // Pass the fsInstance
-      await VfsOps.gitCloneOp(
+      await VfsService.gitCloneOp(
+        SYNC_VFS_KEY,
         repoDir,
         repo.remoteUrl,
         branchToUse,
         credentials,
-        { fsInstance },
       );
       if (!silent) toast.success(`Repository "${repo.name}" cloned successfully.`);
       setRepoStatus(repo.id, "idle");
     } else {
       if (!silent) toast.info(`Pulling latest changes for "${repo.name}"...`);
-      // Pass the fsInstance
-      await VfsOps.gitPullOp(repoDir, branchToUse, credentials, {
-        fsInstance,
-      });
+      await VfsService.gitPullOp(SYNC_VFS_KEY, repoDir, branchToUse, credentials);
       if (!silent) toast.success(`Repository "${repo.name}" synced successfully.`);
       setRepoStatus(repo.id, "idle");
     }
@@ -74,7 +57,6 @@ export async function initializeOrSyncRepoLogic(
 /**
  * Logic to synchronize a single conversation with its linked Git repository.
  * Handles pulling, comparing timestamps, and pushing/pulling updates.
- * @param fsInstance The initialized ZenFS instance for sync operations.
  * @param conversation The conversation object to sync.
  * @param repo The linked SyncRepo configuration object.
  * @param setConversationStatus Function to update the conversation's sync status.
@@ -83,7 +65,6 @@ export async function initializeOrSyncRepoLogic(
  * @param getSelectedItemType Function to get the currently selected item type.
  */
 export async function syncConversationLogic(
-  fsInstance: typeof FsType,
   conversation: Conversation,
   repo: SyncRepo,
   setConversationStatus: (
@@ -110,23 +91,17 @@ export async function syncConversationLogic(
   const branchToUse = repo.branch || "main";
 
   try {
-    try {
-      // Use the passed fsInstance
-      await fsInstance.promises.stat(joinPath(repoDir, ".git"));
-    } catch (e: any) {
-      if (e.code === "ENOENT") {
-        toast.error(
-          `Repository "${repo.name}" not found locally. Please clone/sync it from Settings first.`,
-        );
-        setConversationStatus(conversation.id, "error", "Repo not cloned");
-        return;
-      }
-      throw e;
+    const isRepoCloned = await VfsService.isGitRepoOp(SYNC_VFS_KEY, repoDir);
+    if (!isRepoCloned) {
+      toast.error(
+        `Repository "${repo.name}" not found locally. Please clone/sync it from Settings first.`,
+      );
+      setConversationStatus(conversation.id, "error", "Repo not cloned");
+      return;
     }
 
     if (!silent) toast.info(`Pulling latest changes for "${repo.name}"...`);
-    // Pass the fsInstance
-    await VfsOps.gitPullOp(repoDir, branchToUse, credentials, { fsInstance });
+    await VfsService.gitPullOp(SYNC_VFS_KEY, repoDir, branchToUse, credentials);
 
     let remoteConvoData: {
       conversation: Conversation;
@@ -134,10 +109,7 @@ export async function syncConversationLogic(
     } | null = null;
     let remoteTimestamp: number | null = null;
     try {
-      // Pass the fsInstance
-      const fileContent = await VfsOps.readFileOp(convoFilePath, {
-        fsInstance,
-      });
+      const fileContent = await VfsService.readFileOp(SYNC_VFS_KEY, convoFilePath);
       const jsonString = new TextDecoder().decode(fileContent);
       remoteConvoData = JSON.parse(jsonString);
       remoteTimestamp = remoteConvoData?.conversation?.updatedAt
@@ -145,7 +117,7 @@ export async function syncConversationLogic(
         : null;
       if (isNaN(remoteTimestamp ?? NaN)) remoteTimestamp = null;
     } catch (e: any) {
-      if (e.code === "ENOENT") {
+      if (e.message?.includes("ENOENT") || e.message?.includes("not found")) {
         console.log(
           `Conversation file ${convoFilePath} not found in repo. Will push local version.`,
         );
@@ -180,18 +152,13 @@ export async function syncConversationLogic(
         null,
         2,
       );
-      // Pass the fsInstance
-      await VfsOps.writeFileOp(convoFilePath, localData, { fsInstance });
-      // Pass the fsInstance
-      await VfsOps.gitCommitOp(
+      await VfsService.writeFileOp(SYNC_VFS_KEY, convoFilePath, localData);
+      await VfsService.gitCommitOp(
+        SYNC_VFS_KEY,
         repoDir,
         `Sync conversation: ${conversation.title} (${conversation.id})`,
-        { fsInstance },
       );
-      // Pass the fsInstance
-      await VfsOps.gitPushOp(repoDir, branchToUse, credentials, {
-        fsInstance,
-      });
+      await VfsService.gitPushOp(SYNC_VFS_KEY, repoDir, branchToUse, credentials);
       await updateConversation(conversation.id, { lastSyncedAt: new Date() });
       setConversationStatus(conversation.id, "idle");
       if (!silent) toast.success("Conversation synced successfully (pushed).");
@@ -226,7 +193,7 @@ export async function syncConversationLogic(
       setConversationStatus(conversation.id, "idle");
       if (!silent) toast.success("Conversation synced successfully (pulled).");
     } else {
-              if (!silent) toast.info("Conversation already up-to-date.");
+      if (!silent) toast.info("Conversation already up-to-date.");
       await updateConversation(conversation.id, { lastSyncedAt: new Date() });
       setConversationStatus(conversation.id, "idle");
     }

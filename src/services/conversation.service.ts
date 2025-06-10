@@ -22,7 +22,7 @@ import { useConversationStore } from "@/store/conversation.store";
 import type { DbRule } from "@/types/litechat/rules";
 import { useSettingsStore } from "@/store/settings.store";
 import { nanoid } from "nanoid";
-import * as VfsOps from "@/lib/litechat/vfs-operations";
+import { VfsService } from "@/services/vfs.service";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { vfsEvent, VfsEventPayloads } from "@/types/litechat/events/vfs.events";
 import { PersistenceService } from "@/services/persistence.service";
@@ -611,9 +611,11 @@ ${userContent}`;
           console.log(
             `[ConversationService] Fetching VFS file: ${fileMeta.path}`
           );
-          const contentBytes = await VfsOps.readFileOp(fileMeta.path, {
-            fsInstance: vfsInstance,
-          });
+          const currentConversation = useConversationStore
+            .getState()
+            .getConversationById(conversationId);
+          const targetVfsKey = currentConversation?.projectId ?? "orphan";
+          const contentBytes = await VfsService.readFileOp(targetVfsKey, fileMeta.path);
           contentPart = processFileMetaToUserContent({
             ...fileMeta,
             contentBytes: contentBytes,

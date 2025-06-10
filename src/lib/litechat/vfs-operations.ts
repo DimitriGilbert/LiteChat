@@ -1,6 +1,6 @@
 // src/lib/litechat/vfs-operations.ts
 // FULL FILE
-import { fs, configureSingle, type Stats } from "@zenfs/core";
+import { fs, configureSingle } from "@zenfs/core";
 import { IndexedDB } from "@zenfs/dom";
 import { toast } from "sonner";
 import type { FileSystemEntry } from "@/types/litechat/vfs";
@@ -81,54 +81,12 @@ export const initializeFsOp = async (
 };
 
 export const listFilesOp = async (
-  path: string,
-  options?: { fsInstance?: typeof fs }
+  _path: string,
+  _options?: { fsInstance?: typeof fs }
 ): Promise<FileSystemEntry[]> => {
-  const fsToUse = options?.fsInstance ?? fs;
-  const normalized = normalizePath(path);
-  try {
-    try {
-      await fsToUse.promises.stat(normalized);
-    } catch (statErr: any) {
-      if (statErr.code === "ENOENT") {
-        console.warn(
-          `[VFS Op] Directory not found for listing, attempting creation: ${normalized}`
-        );
-        await createDirectoryRecursive(normalized, { fsInstance: fsToUse });
-        return [];
-      }
-      throw statErr;
-    }
-
-    const entries = await fsToUse.promises.readdir(normalized);
-    const statsPromises = entries.map(
-      async (name: string): Promise<FileSystemEntry | null> => {
-        const fullPath = joinPath(normalized, name);
-        try {
-          const fileStat: Stats = await fsToUse.promises.stat(fullPath);
-          return {
-            name,
-            path: fullPath,
-            isDirectory: fileStat.isDirectory(),
-            size: fileStat.size,
-            lastModified: fileStat.mtime,
-          };
-        } catch (statErr: unknown) {
-          console.error(`[VFS Op] Failed to stat ${fullPath}:`, statErr);
-          return null;
-        }
-      }
-    );
-    const stats = await Promise.all(statsPromises);
-    const filteredStats = stats.filter((s): s is FileSystemEntry => s !== null);
-    return filteredStats;
-  } catch (err: unknown) {
-    console.error(`[VFS Op] Failed to list directory ${normalized}:`, err);
-    toast.error(
-      `Error listing files: ${err instanceof Error ? err.message : String(err)}`
-    );
-    throw err;
-  }
+  // This operation should ALWAYS go through the VFS worker for consistency and performance
+  // The worker has the optimized batch operation that avoids multiple round trips
+  throw new Error("listFilesOp should not be called directly. Use VfsService.listFilesOp instead.");
 };
 
 export const readFileOp = async (

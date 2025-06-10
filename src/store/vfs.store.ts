@@ -11,7 +11,7 @@ import {
 import { normalizePath, buildPath } from "@/lib/litechat/file-manager-utils";
 import { toast } from "sonner";
 import { fs } from "@zenfs/core";
-import * as VfsOps from "@/lib/litechat/vfs-operations";
+import { VfsService } from "@/services/vfs.service";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { vfsEvent, VfsEventPayloads } from "@/types/litechat/events/vfs.events";
@@ -416,11 +416,11 @@ export const useVfsStore = create(
       }
 
       try {
-        // console.log(`[VfsStore DEBUG] About to call VfsOps.initializeFsOp with key: "${vfsKey}"`);
-        const fsInstance = await VfsOps.initializeFsOp(vfsKey);
-        // console.log(`[VfsStore DEBUG] VfsOps.initializeFsOp returned. Instance valid: ${!!fsInstance}`);
+        // console.log(`[VfsStore DEBUG] About to call VfsService.initializeFsOp with key: "${vfsKey}"`);
+        const initSuccess = await VfsService.initializeFsOp(vfsKey);
+        // console.log(`[VfsStore DEBUG] VfsService.initializeFsOp returned. Success: ${initSuccess}`);
 
-        if (!fsInstance) {
+        if (!initSuccess) {
           throw new Error("Filesystem backend initialization failed.");
         }
 
@@ -440,7 +440,8 @@ export const useVfsStore = create(
           //   `[VfsStore] Forced initialization complete for key: ${vfsKey}. Updating state and returning instance.`
           // );
           // Still update the VFS state even with force=true so events fire properly
-          _setFsInstance(fsInstance);
+          // Set a dummy filesystem instance since some code expects it
+          _setFsInstance({} as any);
           _setConfiguredVfsKey(vfsKey);
           set({ initializingKey: null });
           // Emit loading state changed event for forced initialization
@@ -449,21 +450,24 @@ export const useVfsStore = create(
             operationLoading: false,
             error: null,
           });
-          return fsInstance;
+          return {} as any;
         }
 
-        _setFsInstance(fsInstance);
+        // Set a dummy filesystem instance since some code expects it, but all operations go through VfsService
+        _setFsInstance({} as any);
         _setConfiguredVfsKey(vfsKey);
         console.log(`[VfsStore] UI VFS instance configured for key: ${vfsKey}`);
 
         const stableRootId = "vfs-root";
         let rootNode = get().nodes[stableRootId];
 
+        // Check if root directory exists using VFS service instead of direct filesystem
         try {
-          await fsInstance.promises.stat("/");
-          // console.log("[VfsStore] Root directory '/' exists.");
+          // Try to list the root directory to verify it exists and is accessible
+          await VfsService.listFilesOp(vfsKey, "/");
+          // console.log("[VfsStore] Root directory '/' exists and accessible.");
         } catch (statErr: any) {
-          if (statErr.code === "ENOENT") {
+          if (statErr.message && statErr.message.includes("ENOENT")) {
             console.warn(
               "[VfsStore] Root directory '/' not found, will be created implicitly."
             );
@@ -496,7 +500,7 @@ export const useVfsStore = create(
         // );
 
         await get().fetchNodes(rootNode.id);
-        return fsInstance;
+        return {} as any;
       } catch (err) {
         const errorMessage = `Failed to initialize VFS (${vfsKey}): ${
           err instanceof Error ? err.message : String(err)
@@ -550,9 +554,8 @@ export const useVfsStore = create(
         // console.log(
         //   `[VfsStore] Fetching nodes for path: ${pathToFetch} (Key: ${configuredVfsKey})`
         // );
-        const fetchedEntries = await VfsOps.listFilesOp(pathToFetch, {
-          fsInstance,
-        });
+        // Use the optimized batch operation from VFS worker - ONE call gets everything!
+        const fetchedEntries = await VfsService.listFilesOp(configuredVfsKey!, pathToFetch);
         // console.log(
         //   `[VfsStore] Fetched ${fetchedEntries.length} entries for ${pathToFetch}`
         // );
@@ -691,7 +694,7 @@ export const useVfsStore = create(
           if (statErr.code !== "ENOENT") throw statErr;
         }
 
-        await VfsOps.createDirectoryOp(newPath, { fsInstance });
+        await VfsService.createDirectoryOp(configuredVfsKey!, newPath);
 
         const now = Date.now();
         const newNodeId = nanoid();
@@ -731,9 +734,8 @@ export const useVfsStore = create(
       try {
         const parentNode = parentId ? nodes[parentId] : nodes[rootId || ""];
         const parentPath = parentNode ? parentNode.path : "/";
-        await VfsOps.uploadFilesOp(Array.from(files), parentPath, {
-          fsInstance,
-        });
+        // Upload files through VfsService to use worker
+        await VfsService.uploadFilesOp(configuredVfsKey!, Array.from(files), parentPath);
         await get().fetchNodes(parentId);
       } catch (err) {
         console.error("Failed to upload files:", err);
@@ -760,9 +762,7 @@ export const useVfsStore = create(
       try {
         const nodesToDelete = ids.map((id) => get().nodes[id]).filter(Boolean);
         for (const node of nodesToDelete) {
-          await VfsOps.deleteItemOp(node.path, node.type === "folder", {
-            fsInstance,
-          });
+          await VfsService.deleteItemOp(configuredVfsKey!, node.path, node.type === "folder");
         }
         _removeNodes(ids);
       } catch (err) {
@@ -814,7 +814,7 @@ export const useVfsStore = create(
           if (statErr.code !== "ENOENT") throw statErr;
         }
 
-        await VfsOps.renameOp(node.path, newPath, { fsInstance });
+        await VfsService.renameOp(configuredVfsKey!, node.path, newPath);
 
         const changes = {
           name: newName.trim(),
@@ -849,7 +849,7 @@ export const useVfsStore = create(
       }
 
       try {
-        const content = await VfsOps.readFileOp(node.path, { fsInstance });
+        const content = await VfsService.readFileOp(configuredVfsKey!, node.path);
         const mimeType =
           (node as VfsFile).mimeType || "application/octet-stream";
         const blob = new Blob([content], { type: mimeType });

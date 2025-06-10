@@ -5,7 +5,8 @@ import {
   type LiteChatModApi,
   type ReadonlyChatContextSnapshot,
 } from "@/types/litechat/modding";
-import * as VfsOps from "@/lib/litechat/vfs-operations";
+import { VfsService } from "@/services/vfs.service";
+import { VfsWorkerManager } from "@/services/vfs.worker.manager";
 import { z } from "zod";
 import { Tool } from "ai";
 import { normalizePath, joinPath } from "@/lib/litechat/file-manager-utils";
@@ -54,16 +55,61 @@ const renameSchema = z.object({
 });
 
 type ToolContext = ReadonlyChatContextSnapshot & {
-  fsInstance?: typeof VfsOps.VFS;
+  vfsKey?: string;
 };
 
 export class VfsToolsModule implements ControlModule {
   readonly id = "core-vfs-tools";
   private unregisterCallbacks: (() => void)[] = [];
+  private isInWorker = typeof (globalThis as any).importScripts === 'function';
+  private vfsWorkerManager: VfsWorkerManager | null = null;
 
   async initialize(_modApi: LiteChatModApi): Promise<void> {
     // modApi parameter is available here if needed for initialization logic
-    console.log(`[${this.id}] Initialized.`);
+    console.log(`[${this.id}] Initialized. Worker context: ${this.isInWorker}`);
+    if (this.isInWorker) {
+      this.vfsWorkerManager = VfsWorkerManager.getInstance();
+    }
+  }
+
+  private async performVfsOperation(vfsKey: string, operation: string, ...args: any[]): Promise<any> {
+    if (this.isInWorker && this.vfsWorkerManager) {
+      // Direct worker operations for AI tools running in worker
+      switch (operation) {
+        case 'listFiles':
+          return await this.vfsWorkerManager.listFilesWithStats(vfsKey, args[0]);
+        case 'readFile':
+          return await this.vfsWorkerManager.readFile(vfsKey, args[0]);
+        case 'writeFile':
+          return await this.vfsWorkerManager.writeFile(vfsKey, args[0], args[1]);
+        case 'deleteItem':
+          return await this.vfsWorkerManager.deleteItem(vfsKey, args[0], args[1]);
+        case 'createDirectory':
+          return await this.vfsWorkerManager.createDirectory(vfsKey, args[0]);
+        case 'rename':
+          return await this.vfsWorkerManager.rename(vfsKey, args[0], args[1]);
+        default:
+          throw new Error(`Unknown VFS operation: ${operation}`);
+      }
+    } else {
+      // Use VfsService for UI context operations
+      switch (operation) {
+        case 'listFiles':
+          return await VfsService.listFilesOp(vfsKey, args[0]);
+        case 'readFile':
+          return await VfsService.readFileOp(vfsKey, args[0]);
+        case 'writeFile':
+          return await VfsService.writeFileOp(vfsKey, args[0], args[1]);
+        case 'deleteItem':
+          return await VfsService.deleteItemOp(vfsKey, args[0], args[1]);
+        case 'createDirectory':
+          return await VfsService.createDirectoryOp(vfsKey, args[0]);
+        case 'rename':
+          return await VfsService.renameOp(vfsKey, args[0], args[1]);
+        default:
+          throw new Error(`Unknown VFS operation: ${operation}`);
+      }
+    }
   }
 
   register(modApi: LiteChatModApi): void {
@@ -86,22 +132,20 @@ export class VfsToolsModule implements ControlModule {
           { path }: z.infer<typeof listFilesSchema>,
           context: ToolContext
         ) => {
-          const fsInstance = context?.fsInstance;
-          if (!fsInstance) {
+          const vfsKey = context?.vfsKey;
+          if (!vfsKey) {
             return {
               success: false,
-              error: "Filesystem instance not available in context.",
+              error: "VFS key not available in context.",
             };
           }
           const targetPath = normalizePath(path || "/");
           try {
-            const entries = await VfsOps.listFilesOp(targetPath, {
-              fsInstance,
-            });
+            const entries = await this.performVfsOperation(vfsKey, 'listFiles', targetPath);
             return {
               success: true,
               path: targetPath,
-              entries: entries.map((e) => ({
+              entries: entries.map((e: any) => ({
                 name: e.name,
                 type: e.isDirectory ? "folder" : "file",
                 size: e.size,
@@ -127,18 +171,16 @@ export class VfsToolsModule implements ControlModule {
           { path, encoding }: z.infer<typeof readFileSchema>,
           context: ToolContext
         ) => {
-          const fsInstance = context?.fsInstance;
-          if (!fsInstance) {
+          const vfsKey = context?.vfsKey;
+          if (!vfsKey) {
             return {
               success: false,
-              error: "Filesystem instance not available in context.",
+              error: "VFS key not available in context.",
             };
           }
           const normalizedPath = normalizePath(path);
           try {
-            const contentBytes = await VfsOps.readFileOp(normalizedPath, {
-              fsInstance,
-            });
+            const contentBytes = await this.performVfsOperation(vfsKey, 'readFile', normalizedPath);
             let content: string;
             if (encoding === "base64") {
               content = btoa(String.fromCharCode(...contentBytes));
@@ -165,11 +207,11 @@ export class VfsToolsModule implements ControlModule {
           { path, content, encoding }: z.infer<typeof writeFileSchema>,
           context: ToolContext
         ) => {
-          const fsInstance = context?.fsInstance;
-          if (!fsInstance) {
+          const vfsKey = context?.vfsKey;
+          if (!vfsKey) {
             return {
               success: false,
-              error: "Filesystem instance not available in context.",
+              error: "VFS key not available in context.",
             };
           }
           const normalizedPath = normalizePath(path);
@@ -186,9 +228,7 @@ export class VfsToolsModule implements ControlModule {
             } else {
               dataToWrite = content;
             }
-            await VfsOps.writeFileOp(normalizedPath, dataToWrite, {
-              fsInstance,
-            });
+            await this.performVfsOperation(vfsKey, 'writeFile', normalizedPath, dataToWrite);
             return { success: true, path: normalizedPath };
           } catch (e: any) {
             return { success: false, path: normalizedPath, error: e.message };
@@ -209,18 +249,16 @@ export class VfsToolsModule implements ControlModule {
           { path, recursive }: z.infer<typeof deleteFileSchema>,
           context: ToolContext
         ) => {
-          const fsInstance = context?.fsInstance;
-          if (!fsInstance) {
+          const vfsKey = context?.vfsKey;
+          if (!vfsKey) {
             return {
               success: false,
-              error: "Filesystem instance not available in context.",
+              error: "VFS key not available in context.",
             };
           }
           const normalizedPath = normalizePath(path);
           try {
-            await VfsOps.deleteItemOp(normalizedPath, recursive, {
-              fsInstance,
-            });
+            await this.performVfsOperation(vfsKey, 'deleteItem', normalizedPath, recursive);
             return { success: true, path: normalizedPath };
           } catch (e: any) {
             return { success: false, path: normalizedPath, error: e.message };
@@ -241,16 +279,16 @@ export class VfsToolsModule implements ControlModule {
           { path }: z.infer<typeof createDirectorySchema>,
           context: ToolContext
         ) => {
-          const fsInstance = context?.fsInstance;
-          if (!fsInstance) {
+          const vfsKey = context?.vfsKey;
+          if (!vfsKey) {
             return {
               success: false,
-              error: "Filesystem instance not available in context.",
+              error: "VFS key not available in context.",
             };
           }
           const normalizedPath = normalizePath(path);
           try {
-            await VfsOps.createDirectoryOp(normalizedPath, { fsInstance });
+            await this.performVfsOperation(vfsKey, 'createDirectory', normalizedPath);
             return { success: true, path: normalizedPath };
           } catch (e: any) {
             return { success: false, path: normalizedPath, error: e.message };
@@ -271,11 +309,11 @@ export class VfsToolsModule implements ControlModule {
           { oldPath, newName }: z.infer<typeof renameSchema>,
           context: ToolContext
         ) => {
-          const fsInstance = context?.fsInstance;
-          if (!fsInstance) {
+          const vfsKey = context?.vfsKey;
+          if (!vfsKey) {
             return {
               success: false,
-              error: "Filesystem instance not available in context.",
+              error: "VFS key not available in context.",
             };
           }
           const normalizedOldPath = normalizePath(oldPath);
@@ -287,9 +325,7 @@ export class VfsToolsModule implements ControlModule {
           );
           const normalizedNewPath = joinPath(parentPath, newName);
           try {
-            await VfsOps.renameOp(normalizedOldPath, normalizedNewPath, {
-              fsInstance,
-            });
+            await this.performVfsOperation(vfsKey, 'rename', normalizedOldPath, normalizedNewPath);
             return {
               success: true,
               oldPath: normalizedOldPath,

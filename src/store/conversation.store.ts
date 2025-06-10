@@ -791,15 +791,14 @@ export const useConversationStore = create(
         if (!silent) toast.error("Sync repsitory configuration not found.");
         return;
       }
-      let fsInstance: typeof fs;
-      try {
-        fsInstance = await get()._ensureSyncVfsReady();
+              // fsInstance no longer needed - operations use worker
+        try {
+          await get()._ensureSyncVfsReady();
       } catch (fsError) {
         get()._setRepoInitializationStatus(repoId, "error");
         return;
       }
       await initializeOrSyncRepoLogic(
-        fsInstance,
         repo,
         get()._setRepoInitializationStatus,
         silent
@@ -829,9 +828,8 @@ export const useConversationStore = create(
         return;
       }
 
-      let fsInstance: typeof fs | undefined;
       try {
-        fsInstance = await get()._ensureSyncVfsReady();
+        await get()._ensureSyncVfsReady();
       } catch (fsError) {
         get()._setConversationSyncStatus(
           conversationId,
@@ -842,7 +840,6 @@ export const useConversationStore = create(
       }
 
       await syncConversationLogic(
-        fsInstance,
         conversation,
         repo,
         get()._setConversationSyncStatus,

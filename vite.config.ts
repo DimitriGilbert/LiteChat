@@ -83,6 +83,19 @@ export default defineConfig({
       protocolImports: true,
     }),
   ],
+  worker: {
+    format: 'es',
+    plugins: () => [
+      nodePolyfills({
+        globals: {
+          Buffer: true,
+          global: true,
+          process: true,
+        },
+        protocolImports: true,
+      }),
+    ],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

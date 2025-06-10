@@ -40,6 +40,9 @@ import { uiEvent } from "@/types/litechat/events/ui.events";
 import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { projectEvent } from "@/types/litechat/events/project.events";
 import type { LiteChatModApi } from "@/types/litechat/modding";
+import { AIService } from "@/services/ai.service";
+import { PersistenceService } from "@/services/persistence.service";
+import { VfsService } from "@/services/vfs.service";
 
 let initializedControlModules: ControlModule[] = [];
 let appInitializationPromise: Promise<ControlModule[]> | null = null;
@@ -122,6 +125,15 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       setIsMobileSidebarOpen(false);
     }
   }, [selectedItemId, selectedItemType, isMobileSidebarOpen]);
+
+  // Cleanup workers on unmount
+  useEffect(() => {
+    return () => {
+      AIService.terminate();
+      PersistenceService.terminate();
+      VfsService.terminate();
+    };
+  }, []);
 
   useEffect(() => {
     if (!coreModApiRef.current) {

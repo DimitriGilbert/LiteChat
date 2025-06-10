@@ -6,10 +6,10 @@ import {
   type ReadonlyChatContextSnapshot,
 } from "@/types/litechat/modding";
 import { useSettingsStore } from "@/store/settings.store";
-import * as VfsOps from "@/lib/litechat/vfs-operations";
+import { VfsService } from "@/services/vfs.service";
+import { VfsWorkerManager } from "@/services/vfs.worker.manager";
 import { z } from "zod";
 import { Tool } from "ai";
-import type { fs as FsType } from "@zenfs/core"; // Corrected import
 
 const gitInitSchema = z.object({
   path: z
@@ -50,17 +50,58 @@ const gitStatusSchema = z.object({
     ),
 });
 
-// Corrected ToolContext to use FsType from @zenfs/core
+// Git tools context uses vfsKey to route through VfsService
 type ToolContext = ReadonlyChatContextSnapshot & {
-  fsInstance?: typeof FsType;
+  vfsKey?: string;
 };
 
 export class GitToolsModule implements ControlModule {
   readonly id = "core-git-tools";
   private unregisterCallbacks: (() => void)[] = [];
+  private isInWorker = typeof (globalThis as any).importScripts === 'function';
+  private vfsWorkerManager: VfsWorkerManager | null = null;
 
   async initialize(_modApi: LiteChatModApi): Promise<void> {
-    // console.log(`[${this.id}] Initialized.`);
+    // console.log(`[${this.id}] Initialized. Worker context: ${this.isInWorker}`);
+    if (this.isInWorker) {
+      this.vfsWorkerManager = VfsWorkerManager.getInstance();
+    }
+  }
+
+  private async performGitOperation(vfsKey: string, operation: string, ...args: any[]): Promise<any> {
+    if (this.isInWorker && this.vfsWorkerManager) {
+      // Direct worker operations for AI tools running in worker
+      switch (operation) {
+        case 'gitInit':
+          return await this.vfsWorkerManager.gitInit(vfsKey, args[0]);
+        case 'gitCommit':
+          return await this.vfsWorkerManager.gitCommit(vfsKey, args[0], args[1], args[2]);
+        case 'gitPull':
+          return await this.vfsWorkerManager.gitPull(vfsKey, args[0], args[1], args[2]);
+        case 'gitPush':
+          return await this.vfsWorkerManager.gitPush(vfsKey, args[0], args[1]);
+        case 'gitStatus':
+          return await this.vfsWorkerManager.gitStatus(vfsKey, args[0]);
+        default:
+          throw new Error(`Unknown Git operation: ${operation}`);
+      }
+    } else {
+      // Use VfsService for UI context operations
+      switch (operation) {
+        case 'gitInit':
+          return await VfsService.gitInitOp(vfsKey, args[0]);
+        case 'gitCommit':
+          return await VfsService.gitCommitOp(vfsKey, args[0], args[1]);
+        case 'gitPull':
+          return await VfsService.gitPullOp(vfsKey, args[0], args[1]);
+        case 'gitPush':
+          return await VfsService.gitPushOp(vfsKey, args[0], args[1]);
+        case 'gitStatus':
+          return await VfsService.gitStatusOp(vfsKey, args[0]);
+        default:
+          throw new Error(`Unknown Git operation: ${operation}`);
+      }
+    }
   }
 
   register(modApi: LiteChatModApi): void {
@@ -82,15 +123,15 @@ export class GitToolsModule implements ControlModule {
           { path }: z.infer<typeof gitInitSchema>,
           context: ToolContext
         ) => {
-          const fsInstance = context?.fsInstance;
-          if (!fsInstance) {
+          const vfsKey = context?.vfsKey;
+          if (!vfsKey) {
             return {
               success: false,
-              error: "Filesystem instance not available in context.",
+              error: "VFS key not available in context.",
             };
           }
           try {
-            await VfsOps.gitInitOp(path, { fsInstance });
+            await this.performGitOperation(vfsKey, 'gitInit', path);
             return {
               success: true,
               message: `Repository initialized at ${path}`,
@@ -114,11 +155,11 @@ export class GitToolsModule implements ControlModule {
           { path, message }: z.infer<typeof gitCommitSchema>,
           context: ToolContext
         ) => {
-          const fsInstance = context?.fsInstance;
-          if (!fsInstance) {
+          const vfsKey = context?.vfsKey;
+          if (!vfsKey) {
             return {
               success: false,
-              error: "Filesystem instance not available in context.",
+              error: "VFS key not available in context.",
             };
           }
           const currentSettings = useSettingsStore.getState();
@@ -130,7 +171,8 @@ export class GitToolsModule implements ControlModule {
             };
           }
           try {
-            await VfsOps.gitCommitOp(path, message, { fsInstance });
+            const gitUser = { name: currentSettings.gitUserName, email: currentSettings.gitUserEmail };
+            await this.performGitOperation(vfsKey, 'gitCommit', path, message, gitUser);
             return { success: true, message: `Changes committed in ${path}` };
           } catch (e: any) {
             return { success: false, error: e.message };
@@ -152,17 +194,17 @@ export class GitToolsModule implements ControlModule {
           { path, branch }: z.infer<typeof gitPullSchema>,
           context: ToolContext
         ) => {
-          const fsInstance = context?.fsInstance;
-          if (!fsInstance) {
+          const vfsKey = context?.vfsKey;
+          if (!vfsKey) {
             return {
               success: false,
-              error: "Filesystem instance not available in context.",
+              error: "VFS key not available in context.",
             };
           }
           try {
-            await VfsOps.gitPullOp(path, branch || "main", undefined, {
-              fsInstance,
-            });
+            const currentSettings = useSettingsStore.getState();
+            const gitUser = { name: currentSettings.gitUserName || 'User', email: currentSettings.gitUserEmail || 'user@example.com' };
+            await this.performGitOperation(vfsKey, 'gitPull', path, branch || "main", gitUser);
             return { success: true, message: `Pulled changes for ${path}` };
           } catch (e: any) {
             return { success: false, error: e.message };
@@ -184,17 +226,15 @@ export class GitToolsModule implements ControlModule {
           { path, branch }: z.infer<typeof gitPushSchema>,
           context: ToolContext
         ) => {
-          const fsInstance = context?.fsInstance;
-          if (!fsInstance) {
+          const vfsKey = context?.vfsKey;
+          if (!vfsKey) {
             return {
               success: false,
-              error: "Filesystem instance not available in context.",
+              error: "VFS key not available in context.",
             };
           }
           try {
-            await VfsOps.gitPushOp(path, branch || "main", undefined, {
-              fsInstance,
-            });
+            await this.performGitOperation(vfsKey, 'gitPush', path, branch || "main");
             return { success: true, message: `Pushed changes for ${path}` };
           } catch (e: any) {
             return { success: false, error: e.message };
@@ -215,15 +255,15 @@ export class GitToolsModule implements ControlModule {
           { path }: z.infer<typeof gitStatusSchema>,
           context: ToolContext
         ) => {
-          const fsInstance = context?.fsInstance;
-          if (!fsInstance) {
+          const vfsKey = context?.vfsKey;
+          if (!vfsKey) {
             return {
               success: false,
-              error: "Filesystem instance not available in context.",
+              error: "VFS key not available in context.",
             };
           }
           try {
-            await VfsOps.gitStatusOp(path, { fsInstance });
+            await this.performGitOperation(vfsKey, 'gitStatus', path);
             return { success: true, message: `Status checked for ${path}` };
           } catch (e: any) {
             return { success: false, error: e.message };
