@@ -44,6 +44,7 @@ import { CopyActionControlModule } from "@/controls/modules/canvas/CopyActionCon
 import { RegenerateActionControlModule } from "@/controls/modules/canvas/RegenerateActionControlModule";
 import { RegenerateWithModelActionControlModule } from "@/controls/modules/canvas/RegenerateWithModelActionControlModule";
 import { RatingActionControlModule } from "@/controls/modules/canvas/RatingActionControlModule";
+import { EditResponseControlModule } from "@/controls/modules/canvas/EditResponseControlModule";
 import { ExampleCanvasControlModule } from "@/controls/modules/example";
 import { FoldInteractionControlModule } from "@/controls/modules/canvas/interaction/FoldInteractionControlModule";
 import { ZipDownloadControlModule } from "@/controls/modules/canvas/interaction/ZipDownloadControlModule";
@@ -89,6 +90,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   ZipDownloadControlModule, // For InteractionCard header
   RegenerateActionControlModule, // For InteractionCard footer
   RegenerateWithModelActionControlModule, // For InteractionCard footer
+  EditResponseControlModule, // For InteractionCard footer
   RatingActionControlModule, // For InteractionCard footer
   CopyCodeBlockControlModule, // For CodeBlockRenderer header
   FoldCodeBlockControlModule, // For CodeBlockRenderer header
