@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ModelListItem } from "@/types/litechat/provider";
-import { useConversationStore } from "@/store/conversation.store";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useShallow } from "zustand/react/shallow";
 

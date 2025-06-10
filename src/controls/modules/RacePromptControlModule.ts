@@ -9,7 +9,6 @@ import { useInteractionStore } from "@/store/interaction.store";
 import { useProjectStore } from "@/store/project.store";
 import { providerEvent } from "@/types/litechat/events/provider.events";
 import type { ModelListItem } from "@/types/litechat/provider";
-import { emitter } from "@/lib/litechat/event-emitter";
 import { InteractionService } from "@/services/interaction.service";
 import { PersistenceService } from "@/services/persistence.service";
 import { toast } from "sonner";
@@ -18,11 +17,11 @@ import { ModMiddlewareHook } from "@/types/litechat/middleware.types";
 import type { Interaction } from "@/types/litechat/interaction";
 import { buildHistoryMessages } from "@/lib/litechat/ai-helpers";
 import type { CoreMessage, TextPart, ImagePart } from "ai";
-import { nanoid } from "nanoid";
 
 export class RacePromptControlModule implements ControlModule {
   public readonly id = "race-prompt-control";
   private eventUnsubscribers: (() => void)[] = [];
+  // @ts-expect-error meh, do not care laaah
   private modApi: LiteChatModApi | null = null;
   private notifyComponentUpdate: (() => void) | null = null;
 
@@ -81,7 +80,7 @@ export class RacePromptControlModule implements ControlModule {
     );
   }
 
-  destroy(modApi: LiteChatModApi): void {
+  destroy(): void {
     this.eventUnsubscribers.forEach((unsub) => unsub());
     this.eventUnsubscribers = [];
     this.notifyComponentUpdate = null;
@@ -116,7 +115,7 @@ export class RacePromptControlModule implements ControlModule {
       console.log(`[RacePromptControlModule] Starting race submission with ${this.raceModelIds.length} models:`, this.raceModelIds);
       
       const interactionStore = useInteractionStore.getState();
-      const conversationStore = useConversationStore.getState();
+      // const conversationStore = useConversationStore.getState();
       
       // Get current conversation
       const currentConversationId = interactionStore.currentConversationId;
