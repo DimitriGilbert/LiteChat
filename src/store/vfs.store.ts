@@ -232,10 +232,10 @@ export const useVfsStore = create(
           vfsKey: null,
           configuredVfsKey: null,
         });
-      } else if (!get().vfsKey && !get().configuredVfsKey) {
-        console.log(
-          "[VfsStore] VFS globally enabled, waiting for vfsKey to be set."
-        );
+      // } else if (!get().vfsKey && !get().configuredVfsKey) {
+      //   console.log(
+      //     "[VfsStore] VFS globally enabled, waiting for vfsKey to be set."
+      //   );
       }
     },
     _setConfiguredVfsKey: (key) => {
@@ -252,11 +252,11 @@ export const useVfsStore = create(
         const currentConfiguredKey = get().configuredVfsKey;
 
         if (key === currentDesiredKey) {
-          console.log(`[VfsStore] setVfsKey: Key ${key} is already desired.`);
+          // console.log(`[VfsStore] setVfsKey: Key ${key} is already desired.`);
           if (key && key !== currentConfiguredKey && !get().initializingKey) {
-            console.log(
-              `[VfsStore] setVfsKey: Re-triggering initialization for desired key ${key} as it's not configured.`
-            );
+            // console.log(
+            //   `[VfsStore] setVfsKey: Re-triggering initialization for desired key ${key} as it's not configured.`
+            // );
             get()
               .initializeVFS(key)
               .catch((err) => {
@@ -301,21 +301,21 @@ export const useVfsStore = create(
                 err
               );
             });
-        } else {
-          console.log(
-            "[VfsStore] setVfsKey: Desired key is null. State cleared."
-          );
+        // } else {
+        //   console.log(
+        //     "[VfsStore] setVfsKey: Desired key is null. State cleared."
+        //   );
         }
       }
     },
 
     initializeVFS: async (vfsKeyParam: any, optionsParam?: { force?: boolean }) => {
-      console.log('[VfsStore DEBUG] initializeVFS called with:', 
-        {
-          vfsKeyParam: typeof vfsKeyParam === 'object' ? JSON.parse(JSON.stringify(vfsKeyParam)) : vfsKeyParam, 
-          optionsParam: typeof optionsParam === 'object' ? JSON.parse(JSON.stringify(optionsParam)) : optionsParam
-        }
-      );
+      // console.log('[VfsStore DEBUG] initializeVFS called with:', 
+      //   {
+      //     vfsKeyParam: typeof vfsKeyParam === 'object' ? JSON.parse(JSON.stringify(vfsKeyParam)) : vfsKeyParam, 
+      //     optionsParam: typeof optionsParam === 'object' ? JSON.parse(JSON.stringify(optionsParam)) : optionsParam
+      //   }
+      // );
 
       let vfsKey: string;
       let options: { force?: boolean } | undefined;
@@ -348,7 +348,7 @@ export const useVfsStore = create(
       }
 
       const isForced = options?.force === true;
-      console.log(`[VfsStore DEBUG] initializeVFS derived: vfsKey="${vfsKey}", isForced=${isForced}`);
+      // console.log(`[VfsStore DEBUG] initializeVFS derived: vfsKey="${vfsKey}", isForced=${isForced}`);
 
       // Check if already initializing THIS key (applies to both forced and non-forced)
       if (get().initializingKey === vfsKey) {
@@ -378,7 +378,7 @@ export const useVfsStore = create(
 
       // Check if already configured and ready (applies to both forced and non-forced)
       if (get().configuredVfsKey === vfsKey && get().fs) {
-        console.log(`[VfsStore] Initialization skipped for key "${vfsKey}" (already configured).`);
+        // console.log(`[VfsStore] Initialization skipped for key "${vfsKey}" (already configured).`);
         if (!isForced) {
           set({ loading: false }); // Ensure loading is false if skipped
         }
@@ -416,9 +416,9 @@ export const useVfsStore = create(
       }
 
       try {
-        console.log(`[VfsStore DEBUG] About to call VfsOps.initializeFsOp with key: "${vfsKey}"`);
+        // console.log(`[VfsStore DEBUG] About to call VfsOps.initializeFsOp with key: "${vfsKey}"`);
         const fsInstance = await VfsOps.initializeFsOp(vfsKey);
-        console.log(`[VfsStore DEBUG] VfsOps.initializeFsOp returned. Instance valid: ${!!fsInstance}`);
+        // console.log(`[VfsStore DEBUG] VfsOps.initializeFsOp returned. Instance valid: ${!!fsInstance}`);
 
         if (!fsInstance) {
           throw new Error("Filesystem backend initialization failed.");
@@ -436,9 +436,9 @@ export const useVfsStore = create(
         }
 
         if (isForced) {
-          console.log(
-            `[VfsStore] Forced initialization complete for key: ${vfsKey}. Updating state and returning instance.`
-          );
+          // console.log(
+          //   `[VfsStore] Forced initialization complete for key: ${vfsKey}. Updating state and returning instance.`
+          // );
           // Still update the VFS state even with force=true so events fire properly
           _setFsInstance(fsInstance);
           _setConfiguredVfsKey(vfsKey);
@@ -461,10 +461,10 @@ export const useVfsStore = create(
 
         try {
           await fsInstance.promises.stat("/");
-          console.log("[VfsStore] Root directory '/' exists.");
+          // console.log("[VfsStore] Root directory '/' exists.");
         } catch (statErr: any) {
           if (statErr.code === "ENOENT") {
-            console.log(
+            console.warn(
               "[VfsStore] Root directory '/' not found, will be created implicitly."
             );
           } else {
@@ -484,16 +484,16 @@ export const useVfsStore = create(
             lastModified: now,
           };
           _addNodes([rootNode]);
-          console.log("[VfsStore] Root node added/updated in state.");
+          // console.log("[VfsStore] Root node added/updated in state.");
         }
 
         set((s) => {
           s.rootId = rootNode!.id;
           s.currentParentId = rootNode!.id;
         });
-        console.log(
-          `[VfsStore] Set rootId and currentParentId to: ${rootNode!.id}`
-        );
+        // console.log(
+        //   `[VfsStore] Set rootId and currentParentId to: ${rootNode!.id}`
+        // );
 
         await get().fetchNodes(rootNode.id);
         return fsInstance;
@@ -511,7 +511,7 @@ export const useVfsStore = create(
         }
         throw new Error(errorMessage);
       } finally {
-        console.log(`[VfsStore DEBUG] initializeVFS finally block for key: "${vfsKey}". InitializingKey: ${get().initializingKey}`);
+        // console.log(`[VfsStore DEBUG] initializeVFS finally block for key: "${vfsKey}". InitializingKey: ${get().initializingKey}`);
         if (get().initializingKey === vfsKey) {
           set({ initializingKey: null });
           if (!isForced) {
@@ -547,15 +547,15 @@ export const useVfsStore = create(
       try {
         const parentNode = parentId ? nodes[parentId] : nodes[rootId || ""];
         const pathToFetch = parentNode ? parentNode.path : "/";
-        console.log(
-          `[VfsStore] Fetching nodes for path: ${pathToFetch} (Key: ${configuredVfsKey})`
-        );
+        // console.log(
+        //   `[VfsStore] Fetching nodes for path: ${pathToFetch} (Key: ${configuredVfsKey})`
+        // );
         const fetchedEntries = await VfsOps.listFilesOp(pathToFetch, {
           fsInstance,
         });
-        console.log(
-          `[VfsStore] Fetched ${fetchedEntries.length} entries for ${pathToFetch}`
-        );
+        // console.log(
+        //   `[VfsStore] Fetched ${fetchedEntries.length} entries for ${pathToFetch}`
+        // );
 
         const parentKey = parentId ?? rootId ?? "";
         const fetchedPaths = new Set(fetchedEntries.map((e) => e.path));
@@ -570,7 +570,7 @@ export const useVfsStore = create(
           .map((n) => n.id);
 
         if (idsToRemove.length > 0) {
-          console.log(`[VfsStore] Removing ${idsToRemove.length} nodes.`);
+          // console.log(`[VfsStore] Removing ${idsToRemove.length} nodes.`);
           get()._removeNodes(idsToRemove);
         }
 
@@ -595,9 +595,9 @@ export const useVfsStore = create(
         );
 
         if (nodesToAddOrUpdate.length > 0) {
-          console.log(
-            `[VfsStore] Adding/Updating ${nodesToAddOrUpdate.length} nodes.`
-          );
+          // console.log(
+          //   `[VfsStore] Adding/Updating ${nodesToAddOrUpdate.length} nodes.`
+          // );
           _addNodes(nodesToAddOrUpdate);
         }
 
@@ -609,9 +609,9 @@ export const useVfsStore = create(
               JSON.stringify(finalChildIds.sort())
           ) {
             state.childrenMap[parentKey] = finalChildIds;
-            console.log(
-              `[VfsStore] Updated childrenMap for parent: ${parentKey}`
-            );
+            // console.log(
+            //   `[VfsStore] Updated childrenMap for parent: ${parentKey}`
+            // );
           }
         });
       } catch (err) {
@@ -886,7 +886,7 @@ export const useVfsStore = create(
       });
     },
     resetStuckInitialization: () => {
-      console.log("[VfsStore] Force resetting stuck initialization state");
+      console.warn("[VfsStore] Force resetting stuck initialization state");
       set({ 
         initializingKey: null, 
         loading: false, 
