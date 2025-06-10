@@ -24,6 +24,7 @@ import { promptEvent as promptStateEvent } from "@/types/litechat/events/prompt.
 import { projectEvent } from "@/types/litechat/events/project.events";
 import { InteractionService } from "@/services/interaction.service";
 import { BundledConfigService } from "@/services/bundled-config.service";
+import { StartupSyncService } from "@/services/startup-sync.service";
 
 interface CoreStores {
   requestLoadSettings: () => void;
@@ -159,6 +160,13 @@ export async function loadCoreData(
   });
   emitter.emit(appEvent.initializationPhaseCompleted, { phase: "coreData" });
   console.log("[Init] Core Data: Loaded (or load requested).");
+
+  // Start background sync operations after core data is loaded
+  setTimeout(() => {
+    StartupSyncService.runStartupSync().catch(error => {
+      console.warn("[Init] Startup sync failed:", error);
+    });
+  }, 1000);
 }
 
 export async function initializeControlModules(

@@ -23,6 +23,7 @@ export async function initializeOrSyncRepoLogic(
   fsInstance: typeof FsType,
   repo: SyncRepo,
   setRepoStatus: (repoId: string, status: SyncStatus) => void,
+  silent = false,
 ): Promise<void> {
   setRepoStatus(repo.id, "syncing");
   const repoDir = normalizePath(`${SYNC_REPO_BASE_DIR}/${repo.id}`);
@@ -44,7 +45,7 @@ export async function initializeOrSyncRepoLogic(
     }
 
     if (!isRepoCloned) {
-      toast.info(`Cloning repository "${repo.name}"...`);
+      if (!silent) toast.info(`Cloning repository "${repo.name}"...`);
       // Pass the fsInstance
       await VfsOps.gitCloneOp(
         repoDir,
@@ -53,15 +54,15 @@ export async function initializeOrSyncRepoLogic(
         credentials,
         { fsInstance },
       );
-      toast.success(`Repository "${repo.name}" cloned successfully.`);
+      if (!silent) toast.success(`Repository "${repo.name}" cloned successfully.`);
       setRepoStatus(repo.id, "idle");
     } else {
-      toast.info(`Pulling latest changes for "${repo.name}"...`);
+      if (!silent) toast.info(`Pulling latest changes for "${repo.name}"...`);
       // Pass the fsInstance
       await VfsOps.gitPullOp(repoDir, branchToUse, credentials, {
         fsInstance,
       });
-      toast.success(`Repository "${repo.name}" synced successfully.`);
+      if (!silent) toast.success(`Repository "${repo.name}" synced successfully.`);
       setRepoStatus(repo.id, "idle");
     }
   } catch (error: any) {
@@ -96,6 +97,7 @@ export async function syncConversationLogic(
   ) => Promise<void>,
   getSelectedItemId: () => string | null,
   getSelectedItemType: () => string | null,
+  silent = false,
 ): Promise<void> {
   setConversationStatus(conversation.id, "syncing");
   const repoDir = normalizePath(`${SYNC_REPO_BASE_DIR}/${repo.id}`);
@@ -122,7 +124,7 @@ export async function syncConversationLogic(
       throw e;
     }
 
-    toast.info(`Pulling latest changes for "${repo.name}"...`);
+    if (!silent) toast.info(`Pulling latest changes for "${repo.name}"...`);
     // Pass the fsInstance
     await VfsOps.gitPullOp(repoDir, branchToUse, credentials, { fsInstance });
 
@@ -166,7 +168,7 @@ export async function syncConversationLogic(
       (localTimestamp > lastSyncTimestamp &&
         localTimestamp >= (remoteTimestamp ?? 0))
     ) {
-      toast.info("Local changes detected. Pushing to remote...");
+      if (!silent) toast.info("Local changes detected. Pushing to remote...");
       const interactions =
         await PersistenceService.loadInteractionsForConversation(
           conversation.id,
@@ -192,9 +194,9 @@ export async function syncConversationLogic(
       });
       await updateConversation(conversation.id, { lastSyncedAt: new Date() });
       setConversationStatus(conversation.id, "idle");
-      toast.success("Conversation synced successfully (pushed).");
+      if (!silent) toast.success("Conversation synced successfully (pushed).");
     } else if (remoteTimestamp && remoteTimestamp > localTimestamp) {
-      toast.info("Remote changes detected. Updating local conversation...");
+      if (!silent) toast.info("Remote changes detected. Updating local conversation...");
       const syncedConversationData = {
         ...remoteConvoData!.conversation,
         createdAt: new Date(remoteConvoData!.conversation.createdAt),
@@ -222,9 +224,9 @@ export async function syncConversationLogic(
         await useInteractionStore.getState().loadInteractions(conversation.id);
       }
       setConversationStatus(conversation.id, "idle");
-      toast.success("Conversation synced successfully (pulled).");
+      if (!silent) toast.success("Conversation synced successfully (pulled).");
     } else {
-      toast.info("Conversation already up-to-date.");
+              if (!silent) toast.info("Conversation already up-to-date.");
       await updateConversation(conversation.id, { lastSyncedAt: new Date() });
       setConversationStatus(conversation.id, "idle");
     }

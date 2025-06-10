@@ -40,6 +40,8 @@ export const settingsEvent = {
     "settings.enable.auto.scroll.on.stream.changed",
   autoSyncOnStreamCompleteChanged:
     "settings.auto.sync.on.stream.complete.changed",
+  autoInitializeReposOnStartupChanged:
+    "settings.auto.initialize.repos.on.startup.changed",
 
   // Action Request Events
   setThemeRequest: "settings.set.theme.request",
@@ -83,6 +85,8 @@ export const settingsEvent = {
     "settings.set.enable.auto.scroll.on.stream.request",
   setAutoSyncOnStreamCompleteRequest:
     "settings.set.auto.sync.on.stream.complete.request",
+  setAutoInitializeReposOnStartupRequest:
+    "settings.set.auto.initialize.repos.on.startup.request",
   loadSettingsRequest: "settings.load.settings.request",
   resetGeneralSettingsRequest: "settings.reset.general.settings.request",
   resetAssistantSettingsRequest: "settings.reset.assistant.settings.request",
@@ -162,6 +166,9 @@ export interface SettingsEventPayloads {
   };
   [settingsEvent.autoSyncOnStreamCompleteChanged]: {
     enabled: SettingsState["autoSyncOnStreamComplete"];
+  };
+  [settingsEvent.autoInitializeReposOnStartupChanged]: {
+    enabled: SettingsState["autoInitializeReposOnStartup"];
   };
 
   [settingsEvent.setThemeRequest]: { theme: SettingsState["theme"] };
@@ -247,6 +254,9 @@ export interface SettingsEventPayloads {
   };
   [settingsEvent.setAutoSyncOnStreamCompleteRequest]: {
     enabled: SettingsState["autoSyncOnStreamComplete"];
+  };
+  [settingsEvent.setAutoInitializeReposOnStartupRequest]: {
+    enabled: SettingsState["autoInitializeReposOnStartup"];
   };
   [settingsEvent.loadSettingsRequest]: undefined;
   [settingsEvent.resetGeneralSettingsRequest]: undefined;

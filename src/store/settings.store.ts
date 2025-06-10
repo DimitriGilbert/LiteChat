@@ -78,6 +78,7 @@ export interface SettingsState {
   autoScrollInterval: number;
   enableAutoScrollOnStream: boolean;
   autoSyncOnStreamComplete: boolean;
+  autoInitializeReposOnStartup: boolean;
 }
 
 interface SettingsActions {
@@ -115,6 +116,7 @@ interface SettingsActions {
   setAutoScrollInterval: (interval: number) => void;
   setEnableAutoScrollOnStream: (enabled: boolean) => void;
   setAutoSyncOnStreamComplete: (enabled: boolean) => void;
+  setAutoInitializeReposOnStartup: (enabled: boolean) => void;
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>;
   resetAssistantSettings: () => Promise<void>;
@@ -153,6 +155,7 @@ const DEFAULT_CUSTOM_THEME_COLORS = null;
 const DEFAULT_AUTO_SCROLL_INTERVAL = 1000;
 const DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM = true;
 const DEFAULT_AUTO_SYNC_ON_STREAM_COMPLETE = false;
+const DEFAULT_AUTO_INITIALIZE_REPOS_ON_STARTUP = false;
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set, get) => ({
@@ -187,6 +190,7 @@ export const useSettingsStore = create(
     autoScrollInterval: DEFAULT_AUTO_SCROLL_INTERVAL,
     enableAutoScrollOnStream: DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM,
     autoSyncOnStreamComplete: DEFAULT_AUTO_SYNC_ON_STREAM_COMPLETE,
+    autoInitializeReposOnStartup: DEFAULT_AUTO_INITIALIZE_REPOS_ON_STARTUP,
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -409,6 +413,13 @@ export const useSettingsStore = create(
         enabled,
       });
     },
+    setAutoInitializeReposOnStartup: (enabled) => {
+      set({ autoInitializeReposOnStartup: enabled });
+      PersistenceService.saveSetting("autoInitializeReposOnStartup", enabled);
+      emitter.emit(settingsEvent.autoInitializeReposOnStartupChanged, {
+        enabled,
+      });
+    },
 
     loadSettings: async () => {
       try {
@@ -443,6 +454,7 @@ export const useSettingsStore = create(
           autoScrollInterval,
           enableAutoScrollOnStream,
           autoSyncOnStreamComplete,
+          autoInitializeReposOnStartup,
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -558,6 +570,10 @@ export const useSettingsStore = create(
             "autoSyncOnStreamComplete",
             DEFAULT_AUTO_SYNC_ON_STREAM_COMPLETE
           ),
+          PersistenceService.loadSetting<boolean>(
+            "autoInitializeReposOnStartup",
+            DEFAULT_AUTO_INITIALIZE_REPOS_ON_STARTUP
+          ),
         ]);
 
         const loadedSettings = {
@@ -591,6 +607,7 @@ export const useSettingsStore = create(
           autoScrollInterval,
           enableAutoScrollOnStream,
           autoSyncOnStreamComplete,
+          autoInitializeReposOnStartup,
         };
         set(loadedSettings);
         emitter.emit(settingsEvent.loaded, { settings: loadedSettings });
@@ -876,6 +893,13 @@ export const useSettingsStore = create(
           handler: (
             p: SettingsEventPayloads[typeof settingsEvent.setAutoSyncOnStreamCompleteRequest]
           ) => actions.setAutoSyncOnStreamComplete(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoInitializeReposOnStartupRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setAutoInitializeReposOnStartupRequest]
+          ) => actions.setAutoInitializeReposOnStartup(p.enabled),
           storeId,
         },
         {

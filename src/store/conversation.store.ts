@@ -84,8 +84,11 @@ interface ConversationActions {
     conversationId: string,
     repoId: string | null
   ) => Promise<void>;
-  syncConversation: (conversationId: string) => Promise<void>;
-  initializeOrSyncRepo: (repoId: string) => Promise<void>;
+  syncConversation: (conversationId: string, silent?: boolean) => Promise<void>;
+  initializeOrSyncRepo: (repoId: string, silent?: boolean) => Promise<void>;
+  syncAllConversations: () => Promise<void>;
+  syncPendingConversations: () => Promise<void>;
+  initializeAllRepositories: () => Promise<void>;
   getConversationById: (id: string | null) => Conversation | undefined;
   updateCurrentConversationToolSettings: (settings: {
     enabledTools?: string[];
@@ -782,10 +785,10 @@ export const useConversationStore = create(
       emitter.emit(syncEvent.repoInitStatusChanged, { repoId, status });
     },
 
-    initializeOrSyncRepo: async (repoId) => {
+    initializeOrSyncRepo: async (repoId, silent = false) => {
       const repo = get().syncRepos.find((r) => r.id === repoId);
       if (!repo) {
-        toast.error("Sync repsitory configuration not found.");
+        if (!silent) toast.error("Sync repsitory configuration not found.");
         return;
       }
       let fsInstance: typeof fs;
@@ -798,25 +801,26 @@ export const useConversationStore = create(
       await initializeOrSyncRepoLogic(
         fsInstance,
         repo,
-        get()._setRepoInitializationStatus
+        get()._setRepoInitializationStatus,
+        silent
       );
     },
 
-    syncConversation: async (conversationId) => {
+    syncConversation: async (conversationId, silent = false) => {
       const conversation = get().getConversationById(conversationId);
       if (!conversation) {
-        toast.error("Conversation not found for syncing.");
+        if (!silent) toast.error("Conversation not found for syncing.");
         return;
       }
       if (!conversation.syncRepoId) {
-        toast.info("Conversation not linked to a sync repository.");
+        if (!silent) toast.info("Conversation not linked to a sync repository.");
         return;
       }
       const repo = get().syncRepos.find(
         (r) => r.id === conversation.syncRepoId
       );
       if (!repo) {
-        toast.error("Sync repository configuration not found.");
+        if (!silent) toast.error("Sync repository configuration not found.");
         get()._setConversationSyncStatus(
           conversationId,
           "error",
@@ -844,7 +848,8 @@ export const useConversationStore = create(
         get()._setConversationSyncStatus,
         get().updateConversation,
         () => get().selectedItemId,
-        () => get().selectedItemType
+        () => get().selectedItemType,
+        silent
       );
 
       const potentiallyUpdatedConvo = get().getConversationById(conversationId);
@@ -863,6 +868,26 @@ export const useConversationStore = create(
     getConversationById: (id) => {
       if (!id) return undefined;
       return get().conversations.find((c) => c.id === id);
+    },
+
+    syncAllConversations: async () => {
+      const { BulkSyncService } = await import("@/services/bulk-sync.service");
+      await BulkSyncService.syncAll({
+        syncRepos: false,
+        syncConversations: true,
+        continueOnError: true,
+        maxConcurrent: 3
+      });
+    },
+
+    syncPendingConversations: async () => {
+      const { BulkSyncService } = await import("@/services/bulk-sync.service");
+      await BulkSyncService.syncPendingConversations();
+    },
+
+    initializeAllRepositories: async () => {
+      const { BulkSyncService } = await import("@/services/bulk-sync.service");
+      await BulkSyncService.initializeAllRepositories();
     },
 
     updateCurrentConversationToolSettings: async (settings) => {

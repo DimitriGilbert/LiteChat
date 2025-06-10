@@ -29,6 +29,8 @@ export class GitSyncControlModule implements ControlModule {
   public conversationSyncStatus: Record<string, SyncStatus> = {};
   public isStreaming = false;
   public autoSyncEnabled = false;
+  public isBulkSyncing = false;
+  public bulkSyncProgress: any = null;
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
@@ -102,6 +104,50 @@ export class GitSyncControlModule implements ControlModule {
       }
     );
 
+    // Listen for bulk sync events
+    const unsubBulkSyncStarted = modApi.on(
+      syncEvent.bulkSyncStarted,
+      (payload) => {
+        if (typeof payload === "object" && payload && "progress" in payload) {
+          this.isBulkSyncing = true;
+          this.bulkSyncProgress = payload.progress;
+          this.notifyComponentUpdate?.();
+        }
+      }
+    );
+
+    const unsubBulkSyncProgress = modApi.on(
+      syncEvent.bulkSyncProgress,
+      (payload) => {
+        if (typeof payload === "object" && payload && "progress" in payload) {
+          this.bulkSyncProgress = payload.progress;
+          this.notifyComponentUpdate?.();
+        }
+      }
+    );
+
+    const unsubBulkSyncCompleted = modApi.on(
+      syncEvent.bulkSyncCompleted,
+      (payload) => {
+        if (typeof payload === "object" && payload && "progress" in payload) {
+          this.isBulkSyncing = false;
+          this.bulkSyncProgress = null;
+          this.notifyComponentUpdate?.();
+        }
+      }
+    );
+
+    const unsubBulkSyncFailed = modApi.on(
+      syncEvent.bulkSyncFailed,
+      (payload) => {
+        if (typeof payload === "object" && payload && "progress" in payload) {
+          this.isBulkSyncing = false;
+          this.bulkSyncProgress = null;
+          this.notifyComponentUpdate?.();
+        }
+      }
+    );
+
     const unsubConvUpdated = modApi.on(
       conversationEvent.conversationUpdated,
       (payload) => {
@@ -126,6 +172,10 @@ export class GitSyncControlModule implements ControlModule {
       unsubInteractionStatus,
       unsubInteractionCompleted,
       unsubAutoSyncSetting,
+      unsubBulkSyncStarted,
+      unsubBulkSyncProgress,
+      unsubBulkSyncCompleted,
+      unsubBulkSyncFailed,
       unsubConvUpdated
     );
   }
@@ -181,6 +231,26 @@ export class GitSyncControlModule implements ControlModule {
   };
   public getConversationById = (id: string | null) => {
     return useConversationStore.getState().getConversationById(id);
+  };
+
+  public syncAllConversations = async () => {
+    const conversationStore = useConversationStore.getState();
+    await conversationStore.syncAllConversations();
+  };
+
+  public syncPendingConversations = async () => {
+    const conversationStore = useConversationStore.getState();
+    await conversationStore.syncPendingConversations();
+  };
+
+  public initializeAllRepositories = async () => {
+    const conversationStore = useConversationStore.getState();
+    await conversationStore.initializeAllRepositories();
+  };
+
+  public abortBulkSync = async () => {
+    const { BulkSyncService } = await import("@/services/bulk-sync.service");
+    BulkSyncService.abort();
   };
 
   public setNotifyCallback = (cb: (() => void) | null) => {

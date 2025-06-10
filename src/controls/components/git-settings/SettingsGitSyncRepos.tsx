@@ -40,6 +40,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { FieldMetaMessages } from "@/components/LiteChat/common/form-fields/FieldMetaMessages";
+import { BulkSyncControl } from "@/controls/components/git-sync/BulkSyncControl";
 
 const syncRepoFormSchema = z.object({
   name: z.string().min(1, "Repository Name is required."),
@@ -370,22 +371,68 @@ const SettingsGitSyncReposComponent: React.FC = () => {
           updates.
         </p>
         
-        {/* Auto-sync setting */}
-        <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
-          <div className="space-y-1">
-            <Label htmlFor="auto-sync-toggle" className="text-sm font-medium">
-              Auto-sync after stream completion
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Automatically sync conversations with linked repositories when a message stream completes
-            </p>
+        {/* Auto-sync settings */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
+            <div className="space-y-1">
+              <Label htmlFor="auto-sync-toggle" className="text-sm font-medium">
+                Auto-sync after stream completion
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Automatically sync conversations with linked repositories when a message stream completes
+              </p>
+            </div>
+            <Switch
+              id="auto-sync-toggle"
+              checked={autoSyncOnStreamComplete}
+              onCheckedChange={setAutoSyncOnStreamComplete}
+            />
           </div>
-          <Switch
-            id="auto-sync-toggle"
-            checked={autoSyncOnStreamComplete}
-            onCheckedChange={setAutoSyncOnStreamComplete}
-          />
+          
+          <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
+            <div className="space-y-1">
+              <Label htmlFor="auto-init-repos-toggle" className="text-sm font-medium">
+                Auto-initialize repositories on startup
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Automatically clone/initialize configured repositories when the app starts (off by default)
+              </p>
+            </div>
+            <Switch
+              id="auto-init-repos-toggle"
+              checked={useSettingsStore(state => state.autoInitializeReposOnStartup)}
+              onCheckedChange={useSettingsStore.getState().setAutoInitializeReposOnStartup}
+            />
+          </div>
         </div>
+
+        {/* Bulk Sync Control */}
+        {syncRepos.length > 0 && (
+          <BulkSyncControl
+            onSyncAll={async () => {
+              const conversationStore = useConversationStore.getState();
+              await conversationStore.syncAllConversations();
+            }}
+            onSyncPending={async () => {
+              const conversationStore = useConversationStore.getState();
+              await conversationStore.syncPendingConversations();
+            }}
+            onInitializeRepos={async () => {
+              const conversationStore = useConversationStore.getState();
+              await conversationStore.initializeAllRepositories();
+            }}
+            onAbortSync={async () => {
+              const { BulkSyncService } = await import("@/services/bulk-sync.service");
+              BulkSyncService.abort();
+            }}
+            totalRepos={syncRepos.length}
+            totalConversations={useConversationStore.getState().conversations.filter(c => c.syncRepoId).length}
+            pendingConversations={useConversationStore.getState().conversations.filter(c => {
+              const status = useConversationStore.getState().conversationSyncStatus[c.id];
+              return c.syncRepoId && status === 'needs-sync';
+            }).length}
+          />
+        )}
       </div>
 
       {!isAdding && !editingId && (

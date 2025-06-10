@@ -75,19 +75,20 @@ export class ManualSyncSidebarControlModule implements ControlModule {
     this.notifyComponentUpdate?.();
 
     try {
-      console.log("[ManualSyncSidebarControlModule] Starting sync for all repositories");
+      console.log("[ManualSyncSidebarControlModule] Starting bulk sync for all repositories and conversations");
       
-      // Sync all repos in parallel
-      const syncPromises = this.syncRepos.map((repo) => 
-        this.modApiRef?.emit(conversationEvent.initializeOrSyncRepoRequest, {
-          repoId: repo.id,
-        })
-      );
-
-      await Promise.allSettled(syncPromises);
-      console.log("[ManualSyncSidebarControlModule] Completed sync for all repositories");
+      // Use the bulk sync service for comprehensive sync (repos + conversations)
+      const { BulkSyncService } = await import("@/services/bulk-sync.service");
+      await BulkSyncService.syncAll({
+        syncRepos: true,
+        syncConversations: true,
+        continueOnError: true,
+        maxConcurrent: 3
+      });
+      
+      console.log("[ManualSyncSidebarControlModule] Completed bulk sync");
     } catch (error) {
-      console.error("[ManualSyncSidebarControlModule] Error syncing all repos:", error);
+      console.error("[ManualSyncSidebarControlModule] Error in bulk sync:", error);
     } finally {
       this.isSyncing = false;
       this.notifyComponentUpdate?.();

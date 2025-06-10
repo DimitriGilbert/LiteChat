@@ -5,6 +5,7 @@ import {
   HardDriveIcon,
   ServerIcon,
   KeyIcon,
+  GitBranchIcon,
   ArrowRightIcon,
 } from "lucide-react";
 import { emitter } from "@/lib/litechat/event-emitter";
@@ -86,6 +87,12 @@ export const ActionCards: React.FC = () => {
       description: "Store API keys securely in your browser.",
       icon: <KeyIcon className="h-4 w-4 text-amber-500" />,
       onClick: () => openSettings("providers", "api-keys"),
+    },
+    {
+      title: "Setup Git Sync",
+      description: "Configure repositories to sync conversations with Git.",
+      icon: <GitBranchIcon className="h-4 w-4 text-orange-500" />,
+      onClick: () => openSettings("git"),
     },
   ];
   return (

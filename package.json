@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "tsc -b && vite build",
+    "build": "export VITE_SYSTEM_PROMPT_FILE=system-prompt.txt && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "DEBUG_PRINT_LIMIT=10000 vitest",
