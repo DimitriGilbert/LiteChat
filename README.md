@@ -56,6 +56,7 @@
 - **Modular Control System:** UI features are built as `ControlModule`s, ensuring a clean separation of concerns and allowing for easy extension.
 
 ---
+
 ## Online version
 
 [https://litechat.dbuild.dev](https://litechat.dbuild.dev)
