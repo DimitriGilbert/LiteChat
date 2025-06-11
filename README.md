@@ -162,6 +162,23 @@ LiteChat follows a modular, event-driven architecture designed for extensibility
 
 For detailed development setup, contribution guidelines, and architectural information, see the [documentation](./docs/).
 
+## WHY.... ???
+
+If you have made it through the whole AI slope (but still relevant) part, first of all, congratulation, you are deserveful (I am sure that is a word !) of these human written words ! And you might be asking yourself that question: `WHY ?`
+
+I am a happy (https://t3.chat) user but I was (and well, after adding them to my chat, I AM) missing a few features. So I did what every sane person on the internet nowdays does, whine at length to the support in an (Oh so thoughtfully crafted) email.
+
+I already toyed a bit before with (https://ai-gents.dbuild.dev/)[my Bash AI chat] (yes, Bash, because, I mean, why not ?) and these features I asked were what I was missing from it (plus a UI, but how hard can UI be, I have done that before !) and after receiving a very fast (like within the hour for the real support problem and 2 more for a complete feedback on my lengthy boat of an email/wishlist) and insightful (and detailled, and thoughtful, and ... ! best support exchange with a company when it comes to a fat) "nope", my hubris took over ! 
+
+How hard can it be? Right? You've created this [Bash AI chat](https://ai-gents.dbuild.dev/) (did I tell you it was in bash? Oh right, sorry...) in less than a week, you've done a big fat frontend project before, you just have to, you know... 🤝 ! easy ! 
+
+SUUURE budd, sure ! (spoiler alert, no !) So sure in fact that I am going to through fat rocks at myself, I wanted it local "only" (no server what so ever) AND, I am only going to use (https://t3.chat) to ENTIRELY "vibecode" the thing, because why not ? tis supposed to be the Future, right ?
+
+I caved in after a few weeks and reused Cursor when the complete project was around 250k tokens in total (giving it all to gemini was possible but the results where crap) and targeted file feeding was becoming a real chore... plus at some point, things are so interdependant that you end up with significant portions of your code base anyway... (Sorry (https://t3.chat) team ^^' )
+
+It was fun though ! And now I have my own chat app ! And so can you :D !
+
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) file for details.
