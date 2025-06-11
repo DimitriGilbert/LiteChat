@@ -54,7 +54,7 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
   };
 
   const tabTriggerClass = cn(
-    "px-3 py-1.5 text-sm font-medium rounded-md",
+    "px-1 py-0.25 text-xs sm:px-3 sm:py-1.5 sm:text-sm font-medium rounded-md",
     "text-muted-foreground",
     "border border-transparent",
     "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
@@ -67,7 +67,7 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
 
   const CntWrap: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const clnm = cn(
-      "flex-grow overflow-y-auto pb-6 pr-2 -mr-2",
+      "flex-grow overflow-y-auto pb-2 sm:pb-6 pr-1 sm:pr-2 -mr-1 sm:-mr-2",
       contentContainerClassName
     );
     if (scrollable) {
@@ -86,7 +86,7 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
     >
       <TabsList
         className={cn(
-          "flex-shrink-0 sticky top-0 bg-background z-10 mb-4 flex-wrap h-auto justify-start border-b gap-1 p-1 -mx-6 px-6",
+          "flex-shrink-0 sticky top-0 bg-background z-10 mb-2 sm:mb-4 flex-wrap h-auto justify-start border-b gap-0.5 sm:gap-1 p-0.5 sm:p-1 -mx-2 sm:-mx-6 px-2 sm:px-6",
           listClassName
         )}
       >

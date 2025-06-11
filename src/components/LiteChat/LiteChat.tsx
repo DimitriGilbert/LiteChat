@@ -118,10 +118,12 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
   }, []);
 
   useEffect(() => {
-    if (isMobileSidebarOpen) {
+    // Close the mobile sidebar when a conversation or project is selected
+    // Don't close for settings or other modal interactions
+    if (isMobileSidebarOpen && selectedItemId && (selectedItemType === "conversation" || selectedItemType === "project")) {
       setIsMobileSidebarOpen(false);
     }
-  }, [selectedItemId, selectedItemType, isMobileSidebarOpen]);
+  }, [selectedItemId, selectedItemType]);
 
   useEffect(() => {
     if (!coreModApiRef.current) {
@@ -453,37 +455,53 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         </div>
 
         {isMobileSidebarOpen && (
-          <div className="md:hidden fixed inset-0 z-50 flex">
+          <div className="md:hidden fixed inset-0 z-40 flex">
             <div
-              className="fixed inset-0 bg-background/80 backdrop-blur-sm animate-fadeIn"
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-fadeIn"
               onClick={toggleMobileSidebar}
             ></div>
-            <div className="relative w-4/5 max-w-xs bg-card border-r border-border h-full flex flex-col animate-slideInFromLeft">
-              <div className="flex justify-between items-center p-4 border-b border-border">
-                <h2 className="font-semibold">LiteChat Menu</h2>
+            <div className="relative w-4/5 max-w-sm bg-card border-r border-border h-full flex flex-col animate-slideInFromLeft shadow-2xl">
+              <div className="sticky top-0 z-10 flex justify-between items-center p-4 border-b border-border bg-card">
+                <h2 className="font-semibold text-card-foreground">LiteChat Menu</h2>
                 <button
                   onClick={toggleMobileSidebar}
-                  className="p-1 rounded-md hover:bg-muted"
+                  className="p-2 rounded-md hover:bg-muted text-card-foreground touch-manipulation"
                   aria-label="Close menu"
+                  style={{ minHeight: '44px', minWidth: '44px' }}
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <div className="flex-grow overflow-y-auto overflow-x-hidden">
-                <ChatControlWrapper
-                  controls={sidebarControls}
-                  panelId="sidebar"
-                  renderMode="full"
-                  className="h-full"
-                />
+              <div className="flex-grow overflow-y-auto overflow-x-hidden bg-card">
+                {sidebarControls.length > 0 ? (
+                  <ChatControlWrapper
+                    controls={sidebarControls}
+                    panelId="sidebar"
+                    renderMode="full"
+                    className="h-full"
+                  />
+                ) : (
+                  <div className="p-4 text-center text-muted-foreground">
+                    <p className="text-sm">Loading menu...</p>
+                    <p className="text-xs mt-2">
+                      Please wait while the application initializes.
+                    </p>
+                  </div>
+                )}
               </div>
-              <div className="flex-shrink-0 border-t border-border p-4">
-                <ChatControlWrapper
-                  controls={sidebarFooterControls}
-                  panelId="sidebar-footer"
-                  renderMode="full"
-                  className="flex items-center justify-between"
-                />
+              <div className="flex-shrink-0 border-t border-border p-4 bg-card">
+                {sidebarFooterControls.length > 0 ? (
+                  <ChatControlWrapper
+                    controls={sidebarFooterControls}
+                    panelId="sidebar-footer"
+                    renderMode="full"
+                    className="flex items-center justify-between"
+                  />
+                ) : (
+                  <div className="text-center text-muted-foreground text-xs">
+                    Footer controls loading...
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -492,11 +510,15 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         <div className="flex flex-col flex-grow min-w-0">
           <div className="flex items-center justify-between p-2 border-b border-border bg-card flex-shrink-0">
             <button
-              className="md:hidden p-2 rounded-md hover:bg-muted"
+              className={cn(
+                "md:hidden p-3 rounded-md hover:bg-muted active:bg-muted/80 transition-colors touch-manipulation",
+                isMobileSidebarOpen && "bg-muted"
+              )}
               onClick={toggleMobileSidebar}
-              aria-label="Open menu"
+              aria-label={isMobileSidebarOpen ? "Close menu" : "Open menu"}
+              style={{ minHeight: '44px', minWidth: '44px' }}
             >
-              <Menu className="h-5 w-5" />
+              {isMobileSidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
             <ChatControlWrapper
               controls={headerControls}
