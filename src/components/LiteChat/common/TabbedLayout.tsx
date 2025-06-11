@@ -66,10 +66,12 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
   );
 
   const CntWrap: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const clnm = cn(
-      "flex-grow overflow-y-auto pb-2 sm:pb-6 pr-1 sm:pr-2 -mr-1 sm:-mr-2",
-      contentContainerClassName
-    );
+    const baseClasses = scrollable 
+      ? "flex-grow overflow-y-auto pb-2 sm:pb-6 pr-1 sm:pr-2 -mr-1 sm:-mr-2"
+      : "flex-grow pb-2 sm:pb-6 pr-1 sm:pr-2 -mr-1 sm:-mr-2";
+    
+    const clnm = cn(baseClasses, contentContainerClassName);
+    
     if (scrollable) {
       return <ScrollArea className={clnm}>{children}</ScrollArea>;
     }
@@ -86,7 +88,7 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
     >
       <TabsList
         className={cn(
-          "flex-shrink-0 sticky top-0 bg-background z-10 mb-2 sm:mb-4 flex-wrap h-auto justify-start border-b gap-0.5 sm:gap-1 p-0.5 sm:p-1 -mx-2 sm:-mx-6 px-2 sm:px-6",
+          "flex-shrink-0 sticky top-0 bg-background z-10 flex-wrap h-auto justify-start border-b gap-0.5 sm:gap-1 p-0.5 sm:p-1 px-2 sm:px-6",
           listClassName
         )}
       >

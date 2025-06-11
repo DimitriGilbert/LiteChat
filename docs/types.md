@@ -155,6 +155,65 @@ interface DbTagRuleLink {
 }
 ```
 
+### 6. Prompt Template Types
+
+#### Template Definition
+```typescript
+interface PromptTemplate {
+  id: string
+  name: string
+  description: string
+  prompt: string                    // Template content with {{ variable }} syntax
+  variables: PromptVariable[]       // Dynamic variable definitions
+  tags: string[]                    // Organization and filtering tags
+  tools?: string[]                  // Auto-selected tools when template is applied
+  rules?: string[]                  // Auto-selected rules when template is applied
+  isPublic: boolean                 // Whether template is available to all users
+  createdAt: Date
+  updatedAt: Date
+}
+
+interface PromptVariable {
+  name: string                      // Variable name used in template (e.g., "projectName")
+  type: "string" | "number" | "boolean" | "array"
+  description?: string              // Human-readable description
+  required: boolean                 // Whether variable must be provided
+  default?: string                  // Default value if not provided
+  instructions?: string             // Instructions for filling the variable
+}
+```
+
+#### Template Processing
+```typescript
+interface PromptFormData {
+  [variableName: string]: string | number | boolean | string[]
+}
+
+interface CompiledPrompt {
+  content: string                   // Template with variables replaced
+  selectedTools?: string[]          // Tools to auto-select
+  selectedRules?: string[]          // Rules to auto-select
+}
+```
+
+**Template Syntax**:
+Templates use double curly braces for variable interpolation:
+```
+Create a {{ language }} application called "{{ projectName }}" with the following features:
+{{#each features}}
+- {{ this }}
+{{/each}}
+
+Target audience: {{ audience }}
+Timeline: {{ timeline }} weeks
+```
+
+**Variable Types**:
+- `string`: Text input (rendered as text input or textarea)
+- `number`: Numeric input (rendered as number input)
+- `boolean`: True/false choice (rendered as switch/checkbox)
+- `array`: Multiple values (rendered as textarea with line-separated values)
+
 ### 5. Virtual File System Types
 
 #### VFS Nodes

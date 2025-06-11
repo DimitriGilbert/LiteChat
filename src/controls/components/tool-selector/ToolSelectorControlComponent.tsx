@@ -101,7 +101,7 @@ export const ToolSelectorControlComponent: React.FC<
   const isDisabled = selectedItemType !== "conversation" || !selectedItemId;
 
   return (
-    <div className={cn("p-4 h-[28rem] max-w-2xl space-y-3", className)}>
+    <div className={cn("p-4 max-w-2xl space-y-3", className)}>
       <h4 className="text-sm font-medium">Available Tools</h4>
       <div className="relative">
         <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -141,7 +141,7 @@ export const ToolSelectorControlComponent: React.FC<
           </Button>
         </div>
       </div>
-      <ScrollArea className="h-56 border rounded-md p-2 bg-background/50">
+      <div className="border rounded-md p-2 bg-background/50">
         {isDisabled ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             Select a conversation to manage tools.
@@ -187,7 +187,7 @@ export const ToolSelectorControlComponent: React.FC<
             ))}
           </div>
         )}
-      </ScrollArea>
+      </div>
       <div className="pt-2">
         <Label htmlFor="local-max-steps" className="text-xs font-medium">
           Max Tool Steps (This Turn)

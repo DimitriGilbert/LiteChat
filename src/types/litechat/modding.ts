@@ -14,6 +14,7 @@ import { type InteractionEventPayloads } from "./events/interaction.events";
 import { type ControlRegistryEventPayloads } from "./events/control.registry.events";
 import { type InputEventPayloads } from "./events/input.events";
 import { type PromptEventPayloads } from "./events/prompt.events";
+import { type PromptTemplateEventPayloads } from "./events/prompt-template.events";
 import { type SettingsState } from "@/store/settings.store";
 import { type ModEventPayloads as ModSpecificEventPayloads } from "./events/mod.events";
 import { type SyncEventPayloads } from "./events/sync.events";
@@ -158,6 +159,7 @@ export type ModEventPayloadMap = AppEventPayloads &
   InteractionEventPayloads &
   InputEventPayloads &
   PromptEventPayloads &
+  PromptTemplateEventPayloads &
   ModSpecificEventPayloads &
   UiEventPayloads &
   VfsEventPayloads &

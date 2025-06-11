@@ -8,6 +8,7 @@ import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import type { SyncRepo } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project";
 import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
+import type { DbPromptTemplate, PromptTemplate } from "@/types/litechat/prompt-template";
 import type { DbAppState } from "@/lib/litechat/db";
 import type { FullExportOptions } from "./import-export.service";
 
@@ -638,6 +639,35 @@ export class PersistenceService {
   }
   // --- End Full Config Export/Import ---
 
+  // Prompt Templates
+  static async loadPromptTemplates(): Promise<PromptTemplate[]> {
+    try {
+      const templates = await db.promptTemplates.orderBy("name").toArray();
+      return templates.map((t) => ensureDateFields(t, ["createdAt", "updatedAt"])) as PromptTemplate[];
+    } catch (error) {
+      console.error("PersistenceService: Error loading prompt templates:", error);
+      throw error;
+    }
+  }
+
+  static async savePromptTemplate(template: PromptTemplate): Promise<string> {
+    try {
+      return await db.promptTemplates.put(template as DbPromptTemplate);
+    } catch (error) {
+      console.error("PersistenceService: Error saving prompt template:", error);
+      throw error;
+    }
+  }
+
+  static async deletePromptTemplate(id: string): Promise<void> {
+    try {
+      await db.promptTemplates.delete(id);
+    } catch (error) {
+      console.error("PersistenceService: Error deleting prompt template:", error);
+      throw error;
+    }
+  }
+
   // --- Clear All Data ---
   static async clearAllData(): Promise<void> {
     try {
@@ -655,6 +685,7 @@ export class PersistenceService {
           db.rules,
           db.tags,
           db.tagRuleLinks,
+          db.promptTemplates,
         ],
         async () => {
           await db.interactions.clear();
@@ -668,6 +699,7 @@ export class PersistenceService {
           await db.rules.clear();
           await db.tags.clear();
           await db.tagRuleLinks.clear();
+          await db.promptTemplates.clear();
         }
       );
       console.log("PersistenceService: All data cleared.");

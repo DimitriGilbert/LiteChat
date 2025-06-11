@@ -143,6 +143,80 @@ export class AutoTitleControlModule implements ControlModule {
 }
 ```
 
+### Prompt Library Module
+
+The Prompt Library Control Module allows users to create, manage, and apply reusable prompt templates with dynamic variables.
+
+**Implementation**: [`src/controls/modules/PromptLibraryControlModule.ts`](../src/controls/modules/PromptLibraryControlModule.ts)
+
+```typescript
+export class PromptLibraryControlModule implements ControlModule {
+  readonly id = "core-prompt-library";
+  private modApiRef: LiteChatModApi | null = null;
+
+  public compileTemplate = async (templateId: string, formData: PromptFormData): Promise<CompiledPrompt> => {
+    const { compilePromptTemplate } = usePromptTemplateStore.getState();
+    return await compilePromptTemplate(templateId, formData);
+  };
+
+  public applyTemplate = async (templateId: string, formData: PromptFormData): Promise<void> => {
+    const compiled = await this.compileTemplate(templateId, formData);
+    
+    // Emit event to set the input text
+    this.modApiRef?.emit(promptEvent.setInputTextRequest, { text: compiled.content });
+  };
+
+  register(modApi: LiteChatModApi): void {
+    this.modApiRef = modApi;
+    this.unregisterCallback = modApi.registerPromptControl({
+      id: this.id,
+      status: () => "ready",
+      triggerRenderer: () => React.createElement(PromptLibraryControl, { module: this }),
+    });
+  }
+}
+```
+
+**Key Features**:
+- **Template Management**: Create, edit, and organize prompt templates
+- **Dynamic Variables**: Support for string, number, boolean, and array variables with validation
+- **Template Compilation**: Process templates with user-provided variable values
+- **Auto-Application**: Templates can auto-select specific tools and rules
+- **Event-Driven Integration**: Uses the event system to fill the input area
+
+**UI Components**:
+- **PromptLibraryControl**: Main dialog for template selection and variable input
+- **PromptTemplateSelector**: Browse and search available templates
+- **PromptTemplateForm**: Dynamic form generation based on template variables
+- **Template Preview**: Shows template structure and variables before application
+
+**Template Structure**:
+```typescript
+interface PromptTemplate {
+  id: string;
+  name: string;
+  description: string;
+  prompt: string;                    // Template with {{ variable }} syntax
+  variables: PromptVariable[];       // Dynamic variable definitions
+  tags: string[];                    // Organization tags
+  tools?: string[];                  // Auto-selected tools
+  rules?: string[];                  // Auto-selected rules
+  isPublic: boolean;
+}
+
+interface PromptVariable {
+  name: string;
+  type: "string" | "number" | "boolean" | "array";
+  description?: string;
+  required: boolean;
+  default?: string;
+  instructions?: string;
+}
+```
+
+**Event Integration**:
+The module demonstrates the event-driven architecture by using `promptEvent.setInputTextRequest` to fill the input area, showing how control modules can interact with the UI through the event system rather than direct manipulation.
+
 ### Chat Control Modules
 Add UI elements to chat areas (sidebar, header, modals).
 

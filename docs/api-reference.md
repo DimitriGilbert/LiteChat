@@ -148,6 +148,81 @@ interface ProviderStore {
 }
 ```
 
+### Prompt Template Store
+
+The prompt template store manages reusable prompt templates with dynamic variables.
+
+```typescript
+interface PromptTemplateStore {
+  // State
+  promptTemplates: PromptTemplate[]
+  isLoading: boolean
+  error: string | null
+
+  // Actions
+  loadPromptTemplates(): Promise<void>
+  addPromptTemplate(template: Omit<PromptTemplate, 'id' | 'createdAt' | 'updatedAt'>): Promise<string>
+  updatePromptTemplate(id: string, updates: Partial<PromptTemplate>): Promise<void>
+  deletePromptTemplate(id: string): Promise<void>
+  compilePromptTemplate(templateId: string, formData: PromptFormData): Promise<CompiledPrompt>
+  
+  // Utility methods
+  getTemplateById(id: string): PromptTemplate | undefined
+  getTemplatesByTag(tag: string): PromptTemplate[]
+  searchTemplates(query: string): PromptTemplate[]
+}
+
+// Template types
+interface PromptTemplate {
+  id: string
+  name: string
+  description: string
+  prompt: string                    // Template with {{ variable }} syntax
+  variables: PromptVariable[]       // Dynamic variable definitions
+  tags: string[]                    // Organization tags
+  tools?: string[]                  // Auto-selected tools
+  rules?: string[]                  // Auto-selected rules
+  isPublic: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+interface PromptVariable {
+  name: string
+  type: "string" | "number" | "boolean" | "array"
+  description?: string
+  required: boolean
+  default?: string
+  instructions?: string
+}
+
+interface CompiledPrompt {
+  content: string
+  selectedTools?: string[]
+  selectedRules?: string[]
+}
+
+interface PromptFormData {
+  [variableName: string]: string | number | boolean | string[]
+}
+```
+
+**Usage Example**:
+```typescript
+// Load and compile a template
+const { promptTemplates, compilePromptTemplate } = usePromptTemplateStore(
+  useShallow(state => ({
+    promptTemplates: state.promptTemplates,
+    compilePromptTemplate: state.compilePromptTemplate
+  }))
+)
+
+// Compile template with user input
+const formData = { projectName: "MyApp", language: "TypeScript" }
+const compiled = await compilePromptTemplate("code-review-template", formData)
+console.log(compiled.content) // Template with variables replaced
+```
+
 ## Event Emitter API
 
 ### Core Event System
@@ -239,6 +314,30 @@ eventEmitter.on('provider.loadingStateChanged', ({ isLoading, error }) => {
 'vfs.createDirectoryRequest' // Create directory request
 'vfs.uploadFilesRequest' // Upload files request
 'vfs.fileWritten' // File written to VFS
+```
+
+#### Prompt Events
+```typescript
+'prompt.inputChanged' // Input text changed
+'prompt.input.set.text.request' // Request to set input text (used by template application)
+'prompt.state.submitted' // Prompt submitted for processing
+'prompt.state.parameter.changed' // Prompt parameters updated
+'prompt.state.set.model.id.request' // Request to set model ID
+'prompt.state.set.temperature.request' // Request to set temperature
+'prompt.state.set.structured.output.json.request' // Request to set structured output
+```
+
+**Prompt Input Text Setting**:
+```typescript
+// Apply template content to input area
+eventEmitter.emit('prompt.input.set.text.request', { 
+  text: 'Compiled template content here...' 
+})
+
+// Listen for input changes
+eventEmitter.on('prompt.inputChanged', ({ value }) => {
+  console.log('Input text updated:', value)
+})
 ```
 
 ## Service APIs

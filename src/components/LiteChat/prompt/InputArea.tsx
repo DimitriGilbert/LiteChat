@@ -123,6 +123,32 @@ export const InputArea = memo(
         }
       }, [initialValue, onValueChange]);
 
+      // Listen for setInputTextRequest events
+      useEffect(() => {
+        const handleSetInputText = (payload: { text: string }) => {
+          setInternalValue(payload.text);
+          if (onValueChange) {
+            onValueChange(payload.text);
+          }
+          emitter.emit(promptEvent.inputChanged, { value: payload.text });
+          requestAnimationFrame(() => {
+            const textarea = internalTextareaRef.current;
+            if (textarea) {
+              textarea.style.height = "auto";
+              textarea.style.height = `${textarea.scrollHeight}px`;
+              textarea.style.overflowY =
+                textarea.scrollHeight > 250 ? "auto" : "hidden";
+            }
+          });
+        };
+
+        emitter.on(promptEvent.setInputTextRequest, handleSetInputText);
+        
+        return () => {
+          emitter.off(promptEvent.setInputTextRequest, handleSetInputText);
+        };
+      }, [onValueChange]);
+
       return (
         <Textarea
           ref={internalTextareaRef}

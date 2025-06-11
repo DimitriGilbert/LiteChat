@@ -156,6 +156,65 @@ export const vfsEvent = {
 } as const;
 ```
 
+### Prompt Events
+[`src/types/litechat/events/prompt.events.ts`](../src/types/litechat/events/prompt.events.ts)
+
+```typescript
+export const promptEvent = {
+  // State Change Events
+  initialized: "prompt.state.initialized",
+  inputTextStateChanged: "prompt.state.input.text.changed", 
+  parameterChanged: "prompt.state.parameter.changed",
+  submitted: "prompt.state.submitted",
+  
+  // Action Request Events
+  setInputTextRequest: "prompt.input.set.text.request",
+  setModelIdRequest: "prompt.state.set.model.id.request",
+  setTemperatureRequest: "prompt.state.set.temperature.request",
+  setMaxTokensRequest: "prompt.state.set.max.tokens.request",
+  
+  // Input Events (for direct input area interaction)
+  inputChanged: "prompt.inputChanged",
+} as const;
+
+export interface PromptEventPayloads {
+  [promptEvent.inputChanged]: { value: string };
+  [promptEvent.setInputTextRequest]: { text: string };
+  [promptEvent.setModelIdRequest]: { modelId: string | null };
+  [promptEvent.setTemperatureRequest]: { temperature: number | null };
+  // ... all prompt event payloads
+}
+```
+
+**Special Use Case - Template Application**:
+The `setInputTextRequest` event demonstrates a powerful pattern for control modules to interact with the UI:
+
+```typescript
+// From PromptLibraryControlModule
+public applyTemplate = async (templateId: string, formData: PromptFormData): Promise<void> => {
+  const compiled = await this.compileTemplate(templateId, formData);
+  
+  // Emit event to set the input text - demonstrates event-driven UI interaction
+  this.modApiRef?.emit(promptEvent.setInputTextRequest, { text: compiled.content });
+};
+
+// InputArea component listens for this event
+useEffect(() => {
+  const handleSetInputText = (payload: { text: string }) => {
+    setInternalValue(payload.text);
+    if (onValueChange) {
+      onValueChange(payload.text);
+    }
+    emitter.emit(promptEvent.inputChanged, { value: payload.text });
+  };
+
+  const unsubscribe = emitter.on(promptEvent.setInputTextRequest, handleSetInputText);
+  return unsubscribe;
+}, []);
+```
+
+This pattern allows control modules to programmatically fill the input area without direct DOM manipulation or component references.
+
 ## Event Action Coordinator
 
 The [`EventActionCoordinatorService`](../src/services/event-action-coordinator.service.ts) bridges events to store actions:

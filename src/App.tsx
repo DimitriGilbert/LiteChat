@@ -30,6 +30,7 @@ import { AutoTitleControlModule } from "@/controls/modules/AutoTitleControlModul
 import { UrlParameterControlModule } from "@/controls/modules/UrlParameterControlModule";
 import { ImageGenerationControlModule } from "@/controls/modules/ImageGenerationControlModule";
 import { RacePromptControlModule } from "@/controls/modules/RacePromptControlModule";
+import { PromptLibraryControlModule } from "@/controls/modules/PromptLibraryControlModule";
 
 // Import new/updated Settings Modules
 import { GeneralSettingsModule } from "@/controls/modules/GeneralSettingsModule";
@@ -80,6 +81,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   ParameterControlModule,
   StructuredOutputControlModule,
   RacePromptControlModule,
+  PromptLibraryControlModule,
   GitSyncControlModule,
   ManualSyncSidebarControlModule,
   VfsToolsModule,

@@ -16,6 +16,7 @@ import { useModStore } from "@/store/mod.store";
 import { useUIStateStore } from "@/store/ui.store";
 import { useVfsStore } from "@/store/vfs.store";
 import { useControlRegistryStore } from "@/store/control.store";
+import { usePromptTemplateStore } from "@/store/prompt-template.store";
 
 // Array of all store hooks that have the getRegisteredActionHandlers method
 const storesWithActionHandlers = [
@@ -31,6 +32,7 @@ const storesWithActionHandlers = [
   useUIStateStore,
   useVfsStore,
   useControlRegistryStore,
+  usePromptTemplateStore,
 ];
 
 export class EventActionCoordinatorService {

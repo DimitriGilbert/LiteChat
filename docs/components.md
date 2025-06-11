@@ -60,6 +60,9 @@ src/components/
     ├── assistant-settings/
     ├── conversation-list/
     ├── provider-settings/
+    ├── prompt/                 # Prompt-related components
+    │   ├── PromptLibraryControl.tsx    # Main prompt library dialog
+    │   └── ...
     └── ...
 ```
 
@@ -550,5 +553,150 @@ function ConversationList() {
   )
 }
 ```
+
+### Prompt Library Components
+
+The prompt library system provides components for managing and applying reusable prompt templates:
+
+#### PromptLibraryControl
+Main component that renders the prompt library interface.
+
+```typescript
+interface PromptLibraryControlProps {
+  module: PromptLibraryControlModule;
+}
+
+export const PromptLibraryControl: React.FC<PromptLibraryControlProps> = ({ module }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<PromptTemplate | null>(null);
+
+  const handleFormSubmit = async (formData: PromptFormData) => {
+    if (!selectedTemplate) return;
+    
+    try {
+      await module.applyTemplate(selectedTemplate.id, formData);
+      setIsModalOpen(false);
+      toast.success("Template applied to input area!");
+    } catch (error) {
+      toast.error("Failed to apply template");
+    }
+  };
+
+  return (
+    <>
+      <Button variant="ghost" size="sm" onClick={() => setIsModalOpen(true)}>
+        <BookOpenText className="h-4 w-4" />
+      </Button>
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        {/* Template selection and form UI */}
+      </Dialog>
+    </>
+  );
+};
+```
+
+#### PromptTemplateSelector
+Browse and filter available templates.
+
+```typescript
+function PromptTemplateSelector({ 
+  templates, 
+  onSelect 
+}: { 
+  templates: PromptTemplate[]; 
+  onSelect: (template: PromptTemplate) => void; 
+}) {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredTemplates = templates.filter(template =>
+    template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    template.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    template.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  return (
+    <div className="space-y-4">
+      <Input
+        placeholder="Search by name, description, or tags..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
+      <div className="grid gap-3">
+        {filteredTemplates.map((template) => (
+          <Card key={template.id} onClick={() => onSelect(template)}>
+            <CardHeader>
+              <CardTitle className="text-sm">{template.name}</CardTitle>
+              <CardDescription className="text-xs">{template.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-1">
+                {template.tags.map(tag => (
+                  <Badge key={tag} variant="outline">{tag}</Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+#### PromptTemplateForm
+Dynamic form generation based on template variables.
+
+```typescript
+function PromptTemplateForm({ 
+  template, 
+  onSubmit, 
+  onBack 
+}: { 
+  template: PromptTemplate; 
+  onSubmit: (data: PromptFormData) => void; 
+  onBack: () => void; 
+}) {
+  // Create field configs from template variables
+  const fieldConfigs = template.variables.map(variable => ({
+    name: variable.name,
+    type: variable.type === "boolean" ? "switch" : 
+          variable.type === "number" ? "number" : 
+          variable.type === "array" ? "textarea" : "text",
+    label: variable.name,
+    placeholder: variable.default || `Enter ${variable.name}`,
+    description: variable.description || variable.instructions,
+    required: variable.required,
+  }));
+
+  const { Form } = useFormedible({
+    fields: fieldConfigs,
+    formOptions: {
+      defaultValues: getDefaultValues(template),
+      onSubmit: async ({ value }) => onSubmit(value)
+    }
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="border rounded-lg p-4">
+        <Label className="text-sm font-medium">Template Preview</Label>
+        <div className="mt-2 p-3 bg-muted rounded text-sm font-mono whitespace-pre-wrap">
+          {template.prompt}
+        </div>
+      </div>
+      <Form className="space-y-4">
+        <Button type="submit" className="w-full">Apply Template</Button>
+      </Form>
+    </div>
+  );
+}
+```
+
+**Key Features**:
+- **Modal Interface**: Uses Dialog component for template selection
+- **Search and Filter**: Real-time filtering by name, description, and tags
+- **Dynamic Forms**: Auto-generated forms based on template variable definitions
+- **Template Preview**: Shows the template structure before variable input
+- **Responsive Design**: Adapts to different screen sizes with appropriate modal sizing
 
 This component development guide ensures consistency, maintainability, and integration with LiteChat's broader architecture while leveraging modern React and TypeScript patterns. 

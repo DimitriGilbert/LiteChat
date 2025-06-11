@@ -14,6 +14,7 @@ import { SettingsAssistantPrompt } from "./SettingsAssistantPrompt";
 import { SettingsAssistantParameters } from "./SettingsAssistantParameters";
 import { SettingsAssistantTools } from "./SettingsAssistantTools";
 import { SettingsAssistantTitles } from "./SettingsAssistantTitles";
+import { SettingsAssistantPrompts } from "./SettingsAssistantPrompts";
 
 const SettingsAssistantComponent: React.FC = () => {
   const { resetAssistantSettings } = useSettingsStore(
@@ -54,6 +55,11 @@ const SettingsAssistantComponent: React.FC = () => {
         label: "Auto-Titles",
         content: <SettingsAssistantTitles />,
       },
+      {
+        value: "prompts",
+        label: "Prompts",
+        content: <SettingsAssistantPrompts />,
+      },
     ],
     []
   );
@@ -65,8 +71,8 @@ const SettingsAssistantComponent: React.FC = () => {
         defaultValue="prompt"
         className="flex-grow" // Ensure TabbedLayout itself can grow
         listClassName="bg-muted/50 rounded-md"
-        contentContainerClassName="mt-3 flex-grow overflow-y-auto" // Make content area grow and scroll
-        scrollable={true} // Explicitly enable ScrollArea for content
+        contentContainerClassName="mt-3" // No flex-grow, no overflow
+        scrollable={false} // Explicitly enable ScrollArea for content
       />
       {/* Reset Button Section */}
       <Separator className="mt-auto" />

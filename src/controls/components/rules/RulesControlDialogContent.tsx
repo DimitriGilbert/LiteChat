@@ -83,7 +83,7 @@ export const RulesControlDialogContent: React.FC<
           className="pl-8 h-9"
         />
       </div>
-      <ScrollArea className="h-64 border rounded-md p-2 bg-background/50">
+      <div className="border rounded-md p-2 bg-background/50">
         {filteredTags.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             {allTags.length === 0
@@ -130,7 +130,7 @@ export const RulesControlDialogContent: React.FC<
             })}
           </div>
         )}
-      </ScrollArea>
+      </div>
     </div>
   );
 
@@ -146,7 +146,7 @@ export const RulesControlDialogContent: React.FC<
           className="pl-8 h-9"
         />
       </div>
-      <ScrollArea className="h-64 border rounded-md p-2 bg-background/50">
+      <div className="border rounded-md p-2 bg-background/50">
         {filteredRules.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             {allRules.length === 0
@@ -186,7 +186,7 @@ export const RulesControlDialogContent: React.FC<
             ))}
           </div>
         )}
-      </ScrollArea>
+      </div>
     </div>
   );
 
@@ -196,8 +196,8 @@ export const RulesControlDialogContent: React.FC<
   ];
 
   return (
-    <div className="p-0 h-[28rem] max-w-lg">
-      <TabbedLayout tabs={tabs} defaultValue="tags" />
+    <div className="p-0 max-w-lg">
+      <TabbedLayout tabs={tabs} defaultValue="tags" scrollable={false} />
     </div>
   );
 };

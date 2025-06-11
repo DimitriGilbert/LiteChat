@@ -27,6 +27,9 @@ export const promptEvent = {
   initializePromptStateRequest: "prompt.state.initialize.prompt.state.request",
   resetTransientParametersRequest:
     "prompt.state.reset.transient.parameters.request",
+  
+  // Input Area Action Events
+  setInputTextRequest: "prompt.input.set.text.request",
 
   // Original events (can be re-emitted by PromptWrapper if needed by mods)
   inputChanged: "prompt.inputChanged",
@@ -62,4 +65,5 @@ export interface PromptEventPayloads {
     };
   };
   [promptEvent.resetTransientParametersRequest]: undefined;
+  [promptEvent.setInputTextRequest]: { text: string };
 }

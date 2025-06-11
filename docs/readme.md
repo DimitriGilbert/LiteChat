@@ -27,6 +27,7 @@ LiteChat follows a modular, event-driven architecture designed for extensibility
 - [AI Integration](./ai-integration.md) - Provider management, streaming, and tool execution
 - [Git Integration](./git.md) - Version control features and conversation sync
 - [Canvas Features](./canvas-features.md) - Code blocks, Mermaid diagrams, ZIP downloads, and interaction controls
+- [Prompt Library](./control-modules.md#prompt-library-module) - Reusable prompt templates with dynamic variables
 
 ### Implementation Guides
 - [Build & Deployment](./build-deployment.md) - Development setup, build-time configuration, and deployment strategies

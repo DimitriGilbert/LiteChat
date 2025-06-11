@@ -311,6 +311,59 @@ openModal: (modalId: string, props?: any) => void;
 closeModal: (modalId: string) => void;
 ```
 
+### PromptTemplateStore
+[`src/store/prompt-template.store.ts`](../src/store/prompt-template.store.ts)
+
+**Purpose**: Manages reusable prompt templates with dynamic variables for template-based prompt generation.
+
+**State**:
+```typescript
+interface PromptTemplateState {
+  promptTemplates: PromptTemplate[];
+  isLoading: boolean;
+  error: string | null;
+}
+```
+
+**Key Actions**:
+```typescript
+// Template CRUD operations
+loadPromptTemplates: () => Promise<void>;
+addPromptTemplate: (template: Omit<PromptTemplate, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+updatePromptTemplate: (id: string, updates: Partial<PromptTemplate>) => Promise<void>;
+deletePromptTemplate: (id: string) => Promise<void>;
+
+// Template compilation and processing
+compilePromptTemplate: (templateId: string, formData: PromptFormData) => Promise<CompiledPrompt>;
+
+// Utility methods
+getTemplateById: (id: string) => PromptTemplate | undefined;
+getTemplatesByTag: (tag: string) => PromptTemplate[];
+searchTemplates: (query: string) => PromptTemplate[];
+```
+
+**Template System Features**:
+- **Variable Interpolation**: Templates use `{{ variableName }}` syntax for dynamic content
+- **Type-Safe Variables**: Support for string, number, boolean, and array variable types
+- **Auto-Selection**: Templates can specify tools and rules to auto-select
+- **Organization**: Tag-based categorization and search functionality
+
+**Integration with Control Module**:
+```typescript
+// PromptLibraryControlModule uses the store for template operations
+const { compilePromptTemplate } = usePromptTemplateStore.getState();
+const compiled = await compilePromptTemplate(templateId, formData);
+
+// Apply compiled template to input area via events
+this.modApiRef?.emit(promptEvent.setInputTextRequest, { text: compiled.content });
+```
+
+**Template Compilation Process**:
+1. Load template by ID from store
+2. Process template variables with user-provided form data
+3. Replace `{{ variable }}` placeholders with actual values
+4. Return compiled content with optional tool/rule selections
+
 ## Event-Driven Actions
 
 ### Action Registration Pattern

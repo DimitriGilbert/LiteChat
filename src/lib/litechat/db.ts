@@ -8,6 +8,7 @@ import type { DbProviderConfig, DbApiKey } from "@/types/litechat/provider";
 import type { SyncRepo } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project";
 import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
+import type { DbPromptTemplate } from "@/types/litechat/prompt-template";
 
 export interface DbAppState {
   key: string;
@@ -26,10 +27,29 @@ export class LiteChatDatabase extends Dexie {
   rules!: Table<DbRule, string>;
   tags!: Table<DbTag, string>;
   tagRuleLinks!: Table<DbTagRuleLink, string>;
+  promptTemplates!: Table<DbPromptTemplate, string>;
 
   constructor() {
     super("LiteChatDatabase_Rewrite_v1");
-    // Bump version for rating field
+    // Bump version for prompt templates
+    this.version(9).stores({
+      conversations:
+        "++id, title, createdAt, updatedAt, syncRepoId, lastSyncedAt, projectId",
+      // Add rating index to interactions
+      interactions:
+        "++id, conversationId, index, type, status, startedAt, parentId, rating",
+      mods: "++id, &name, enabled, loadOrder",
+      appState: "&key",
+      providerConfigs: "++id, &name, type, isEnabled, apiKeyId",
+      apiKeys: "++id, &name",
+      syncRepos: "++id, &name, remoteUrl, username",
+      projects: "++id, &path, parentId, createdAt, updatedAt, name",
+      rules: "++id, &name, type, createdAt, updatedAt",
+      tags: "++id, &name, createdAt, updatedAt",
+      tagRuleLinks: "++id, tagId, ruleId, &[tagId+ruleId]",
+      promptTemplates: "++id, &name, createdAt, updatedAt, isPublic",
+    });
+    // Previous version for migration
     this.version(8).stores({
       conversations:
         "++id, title, createdAt, updatedAt, syncRepoId, lastSyncedAt, projectId",
