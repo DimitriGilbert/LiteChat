@@ -53,7 +53,7 @@
 
 ## 🌐 Try LiteChat
 
-**Online Demo**: [https://litechat.dbuild.dev](https://litechat.dbuild.dev) (hosted on GitHub Pages)
+**Public Version**: [https://litechat.dbuild.dev](https://litechat.dbuild.dev) (hosted on GitHub Pages)
 
 ## 📚 Documentation
 
