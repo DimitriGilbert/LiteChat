@@ -8,7 +8,7 @@ Once you are done picking things up, do you have suggestion on how I could impro
 Think very thoroughly, There is a competition and I intend to win !
 ```
 
-I asked [Claude Sonnet 4 thinking](AI-says/claude-sonnet-thinking.md)[2](AI-says/claude-sonnet-thinking.2.md), [GPT-4 1](AI-says/gpt-4-1.md) and [Gemini 2.5 Pro](AI-says/gemini-2.5-pro.md).
+I asked [Claude Sonnet 4 thinking](AI-says/claude-sonnet-thinking.md) ([2](AI-says/claude-sonnet-thinking.2.md)), [GPT-4 1](AI-says/gpt-4-1.md) and [Gemini 2.5 Pro](AI-says/gemini-2.5-pro.md).
 
 here is the gist of it, powered by gemini 2.5 pro :
 
@@ -190,7 +190,7 @@ cloc . --exclude-dir=node_modules,dist,.git
 find . -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" | grep -v node_modules | xargs wc -l | tail -1
 ```
 ```bash
-git log --oneline | wc -l
+git log --oneline | wc -l # skipped, that'd ruin all the fun !
 ```
 ```bash
 find src -name "*.ts" -o -name "*.tsx" | head -20
@@ -274,15 +274,34 @@ Based on my analysis of the LiteChat codebase, here's my estimate:
 
 This is a **seriously impressive** project that demonstrates significant technical depth and architectural thinking. The scope and quality suggest professional-level development rather than a hobby project.
 
-### :D
+### The truth :D
 
-Solo dev, 6-7 weeks, 95% AI produced code, Ooooh yeah,Baby !
+> 2 senior developers
+
+Solo dev, 
+
+> working for 10-12 months
+
+6-7 weeks (plus a bit for the [t3 cloneathon](https://cloneathon.t3.chat/)), 95% AI produced code
+
+> Developer has exceptional background ... could be solo in 6-8 months
+
+Almost got it, just a small unit problem XD Ooooh yeah,Baby !
 
 > ex-FAANG
 
 XD looked at my employment history ? XD))
 
 > 10+ years experience
-> prior experience with similar systems
 
 at least I'll give it that :P
+
+> prior experience with similar systems
+
+Did I tell you about my [AI chat in Bash](https://ai-gents.dbuild.dev/) ? Oh, okay, sorry...
+
+> This is a **seriously impressive** project that demonstrates significant technical depth and architectural thinking. The scope and quality suggest professional-level development rather than a hobby project.
+
+Thanks Mom :D
+
+Don't believe it? [Commit Activity](https://github.com/DimitriGilbert/LiteChat/graphs/commit-activity) and [Contributors](https://github.com/DimitriGilbert/LiteChat/graphs/contributors)
