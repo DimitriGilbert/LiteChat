@@ -2,7 +2,6 @@
 // FULL FILE
 import React, { useState, useMemo, useCallback } from "react";
 import { useControlRegistryStore } from "@/store/control.store";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";

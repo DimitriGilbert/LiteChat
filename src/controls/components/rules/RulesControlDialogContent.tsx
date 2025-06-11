@@ -5,7 +5,6 @@ import {
   TabbedLayout,
   TabDefinition,
 } from "@/components/LiteChat/common/TabbedLayout";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
