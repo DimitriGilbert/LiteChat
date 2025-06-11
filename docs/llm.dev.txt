@@ -1,0 +1,837 @@
+# LiteChat Developer Guide - LLM Context
+
+## Architecture Overview
+
+LiteChat is a modular, event-driven React application built with TypeScript, featuring a sophisticated plugin system and 100% client-side architecture. The core principle is modularity through Control Modules with event-driven communication.
+
+### Core Technologies
+- **Frontend**: React 19, TypeScript, Tailwind CSS, shadcn/ui
+- **State Management**: Zustand with Immer middleware
+- **Database**: Dexie.js (IndexedDB wrapper)
+- **Virtual File System**: ZenFS with IndexedDB backend
+- **Git Operations**: isomorphic-git for browser-based Git
+- **AI Integration**: Vercel AI SDK with multiple providers
+- **Event System**: mitt event emitter for decoupled communication
+- **Build System**: Vite with TypeScript
+
+### Key Architectural Principles
+1. **100% Client-Side**: No server dependencies, all data in IndexedDB
+2. **Control Module System**: UI features as pluggable modules
+3. **Event-Driven Communication**: Decoupled via mitt event emitter
+4. **Immutable State**: Zustand + Immer for safe mutations
+5. **Type Safety**: Comprehensive TypeScript coverage
+6. **Controlled Extensibility**: Safe modding API for extensions
+
+## Project Structure
+
+```
+src/
+├── components/              # React components
+│   ├── LiteChat/           # Main application components
+│   │   ├── canvas/         # Chat canvas and interaction display
+│   │   ├── chat/           # Chat controls and UI
+│   │   ├── common/         # Shared components
+│   │   ├── file-manager/   # VFS file management
+│   │   └── prompt/         # Prompt input area
+│   └── ui/                 # shadcn/ui components
+├── controls/               # Control Module system
+│   ├── modules/            # Control Module implementations
+│   │   ├── canvas/         # Canvas interaction modules
+│   │   └── example/        # Example modules
+│   └── components/         # Module-specific components
+├── hooks/                  # React hooks
+├── lib/                    # Core libraries and utilities
+│   └── litechat/          # Core LiteChat functionality
+├── modding/               # Modding system implementation
+├── services/              # Business logic services
+├── store/                 # Zustand state stores
+├── types/                 # TypeScript type definitions
+│   └── litechat/         # LiteChat-specific types
+│       ├── events/        # Event definitions
+│       ├── canvas/        # Canvas types
+│       └── middleware/    # Middleware types
+├── App.tsx               # Module registration and app setup
+└── main.tsx              # Application entry point
+```
+
+## Control Module System
+
+The Control Module System is LiteChat's core architectural pattern. Each UI feature is implemented as a `ControlModule` that manages its own state and components.
+
+### ControlModule Interface
+
+```typescript
+interface ControlModule {
+  readonly id: string;
+  readonly dependencies?: string[];
+  initialize(modApi: LiteChatModApi): Promise<void>;
+  register(modApi: LiteChatModApi): void;
+  destroy(modApi: LiteChatModApi): void;
+}
+```
+
+### Module Lifecycle
+1. **Instantiation**: Modules instantiated from constructors in `App.tsx`
+2. **Dependency Resolution**: Topological sort based on dependencies
+3. **Initialization**: `initialize()` called for setup and event subscriptions
+4. **Registration**: `register()` called to register UI components/tools
+5. **Destruction**: `destroy()` called for cleanup
+
+### Module Types
+
+#### Settings Modules
+Register settings tabs in the main settings interface:
+
+```typescript
+export class GeneralSettingsModule implements ControlModule {
+  readonly id = "core-settings-general";
+  
+  register(modApi: LiteChatModApi): void {
+    this.unregisterCallback = modApi.registerSettingsTab({
+      id: "general",
+      title: "General",
+      component: SettingsGeneral,
+      order: 10,
+    });
+  }
+}
+```
+
+#### Prompt Control Modules
+Add UI elements to the prompt input area:
+
+```typescript
+export class ParameterControlModule implements ControlModule {
+  private turnEnabled = false;
+  private temperature: number | null = null;
+  
+  register(modApi: LiteChatModApi): void {
+    this.unregisterCallback = modApi.registerPromptControl({
+      id: this.id,
+      component: ParameterControlTrigger,
+      moduleInstance: this,
+      order: 30,
+    });
+  }
+  
+  // Modules can contribute metadata to prompts
+  getMetadata(): Record<string, any> {
+    return {
+      temperature: this.temperature,
+      parametersEnabled: this.turnEnabled,
+    };
+  }
+}
+```
+
+#### Chat Control Modules
+Add UI to chat areas (sidebar, header, modals):
+
+```typescript
+export class ConversationListControlModule implements ControlModule {
+  register(modApi: LiteChatModApi): void {
+    this.unregisterCallback = modApi.registerChatControl({
+      id: this.id,
+      panel: "sidebar",
+      component: ConversationListComponent,
+      moduleInstance: this,
+    });
+  }
+}
+```
+
+#### Tool Modules
+Register AI tools available during conversations:
+
+```typescript
+export class VfsToolsModule implements ControlModule {
+  register(modApi: LiteChatModApi): void {
+    this.unregisterCallbacks.push(
+      modApi.registerTool("vfs_read_file", readFileToolDefinition, readFileImplementation),
+      modApi.registerTool("vfs_write_file", writeFileToolDefinition, writeFileImplementation),
+      modApi.registerTool("vfs_create_directory", createDirectoryToolDefinition, createDirectoryImplementation),
+      // ... more tools
+    );
+  }
+}
+```
+
+#### Canvas Control Modules
+Handle interactions within chat canvas:
+
+```typescript
+export class CopyActionControlModule implements ControlModule {
+  register(modApi: LiteChatModApi): void {
+    this.unregisterCallback = modApi.registerCanvasControl({
+      id: this.id,
+      type: "interaction",
+      placement: "header",
+      component: CopyActionComponent,
+      moduleInstance: this,
+    });
+  }
+}
+```
+
+### Module Registration in App.tsx
+
+All modules must be registered in the `controlModulesToRegister` array:
+
+```typescript
+const controlModulesToRegister: ControlModuleConstructor[] = [
+  UrlParameterControlModule,
+  GeneralSettingsModule,
+  ThemeSettingsControlModule,
+  // ... order matters for dependencies
+];
+```
+
+## Event System Architecture
+
+LiteChat uses a sophisticated event-driven architecture for component communication.
+
+### Event Emitter
+Central event bus using mitt:
+
+```typescript
+import mitt, { type Emitter, type EventType } from "mitt";
+import type { ModEventPayloadMap } from "@/types/litechat/modding";
+
+export const emitter: Emitter<ModEventPayloadMap & Record<EventType, any>> = 
+  mitt<ModEventPayloadMap & Record<EventType, any>>();
+```
+
+### Event Patterns
+
+#### Request/Response Pattern
+1. Component emits request event
+2. Store processes request and updates state
+3. Store emits change notification event
+
+```typescript
+// 1. Request theme change
+emitter.emit(settingsEvent.setThemeRequest, { theme: "dark" });
+
+// 2. SettingsStore processes and updates state
+// (handled automatically by EventActionCoordinatorService)
+
+// 3. Store emits change notification
+emitter.emit(settingsEvent.themeChanged, { theme: "dark" });
+```
+
+### Event Categories
+
+#### State Change Events
+Notify that state has changed:
+
+```typescript
+export const settingsEvent = {
+  themeChanged: "settings.theme.changed",
+  temperatureChanged: "settings.temperature.changed",
+  // ...
+};
+```
+
+#### Action Request Events
+Request that an action be performed:
+
+```typescript
+export const settingsEvent = {
+  setThemeRequest: "settings.set.theme.request",
+  setTemperatureRequest: "settings.set.temperature.request",
+  loadSettingsRequest: "settings.load.settings.request",
+  // ...
+};
+```
+
+### Event Type Safety
+
+All events are strongly typed through `ModEventPayloadMap`:
+
+```typescript
+export interface ModEventPayloadMap extends 
+  SettingsEventPayloads,
+  ProviderEventPayloads,
+  ConversationEventPayloads,
+  InteractionEventPayloads,
+  ProjectEventPayloads,
+  VfsEventPayloads,
+  UiEventPayloads,
+  GitEventPayloads,
+  PromptEventPayloads
+{}
+
+interface SettingsEventPayloads {
+  [settingsEvent.themeChanged]: { theme: string };
+  [settingsEvent.setThemeRequest]: { theme: string };
+  [settingsEvent.temperatureChanged]: { temperature: number };
+  // ... all event payloads
+}
+```
+
+## State Management with Zustand
+
+LiteChat uses Zustand for state management with domain-specific stores.
+
+### Store Structure Pattern
+
+```typescript
+export const useExampleStore = create(
+  immer<ExampleState & ExampleActions>((set, get) => ({
+    // State properties
+    data: [],
+    loading: false,
+    error: null,
+    
+    // Action methods
+    loadData: async () => {
+      set((state) => {
+        state.loading = true;
+        state.error = null;
+      });
+      
+      try {
+        const data = await SomeService.loadData();
+        set((state) => {
+          state.data = data;
+          state.loading = false;
+        });
+        
+        // Emit change event
+        emitter.emit(exampleEvent.dataLoaded, { data });
+      } catch (error) {
+        set((state) => {
+          state.error = error.message;
+          state.loading = false;
+        });
+        
+        emitter.emit(exampleEvent.loadFailed, { error: error.message });
+      }
+    },
+    
+    // Event integration
+    getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
+      const actions = get();
+      return [
+        {
+          eventName: exampleEvent.loadDataRequest,
+          handler: () => actions.loadData(),
+          storeId: "exampleStore",
+        },
+      ];
+    },
+  }))
+);
+```
+
+### Key Stores
+
+#### ConversationStore (`src/store/conversation.store.ts`)
+- Manages conversations, projects, selection state
+- Handles Git sync repositories and conversation linking
+- Coordinates with InteractionStore for message loading
+
+#### InteractionStore (`src/store/interaction.store.ts`)
+- Manages messages/interactions for current conversation
+- Handles streaming state and response buffers
+- Coordinates with AI services for real-time updates
+
+#### ProviderStore (`src/store/provider.store.ts`)
+- Manages AI provider configurations and API keys
+- Handles model fetching and selection
+- Provides enabled models across all providers
+
+#### SettingsStore (`src/store/settings.store.ts`)
+- Global application settings (theme, AI parameters, Git config)
+- Per-project setting overrides
+- Persistence through PersistenceService
+
+#### VfsStore (`src/store/vfs.store.ts`)
+- Virtual File System state for current context
+- File/folder tree management
+- Context switching between projects
+
+#### ProjectStore (`src/store/project.store.ts`)
+- Project hierarchy and settings inheritance
+- Effective settings calculation with cascading
+- Path-based project organization
+
+### Event Action Coordinator
+
+The `EventActionCoordinatorService` automatically connects events to store actions:
+
+```typescript
+export class EventActionCoordinatorService {
+  public static initialize(): void {
+    const storesWithActionHandlers = [
+      useSettingsStore,
+      useProviderStore,
+      useConversationStore,
+      // ... all stores
+    ];
+
+    storesWithActionHandlers.forEach((storeHook) => {
+      const handlers = storeHook.getState().getRegisteredActionHandlers();
+      handlers.forEach((handler) => {
+        emitter.on(handler.eventName, handler.handler);
+      });
+    });
+  }
+}
+```
+
+## Virtual File System Architecture
+
+LiteChat implements a browser-based Virtual File System using ZenFS with IndexedDB backend.
+
+### VFS Context Switching
+
+VFS operates with different contexts:
+- **Project VFS**: `vfsKey = projectId` - Project-specific filesystem
+- **Orphan VFS**: `vfsKey = "orphan"` - For conversations without projects
+- **Sync VFS**: `vfsKey = "sync_repos"` - For Git repositories
+
+### VFS Operations (`src/lib/litechat/vfs-operations.ts`)
+
+Core filesystem operations:
+
+```typescript
+// Initialize VFS for specific context
+export const initializeFsOp = async (vfsKey: string): Promise<typeof fs | null> => {
+  const vfsConf = {
+    backend: IndexedDB,
+    name: `litechat_vfs_${vfsKey}`,
+  };
+  await configureSingle(vfsConf);
+  return fs;
+};
+
+// File operations
+export const writeFileOp = async (path: string, content: ArrayBuffer): Promise<void>;
+export const readFileOp = async (path: string): Promise<ArrayBuffer>;
+export const deleteItemOp = async (path: string, recursive?: boolean): Promise<void>;
+export const createDirectoryOp = async (path: string): Promise<void>;
+export const listFilesOp = async (path: string): Promise<FileSystemEntry[]>;
+```
+
+### VFS Store Integration
+
+The VfsStore manages VFS state and coordinates operations:
+
+```typescript
+interface VfsState {
+  nodes: Record<string, VfsNode>;           // File/folder tree
+  childrenMap: Record<string, string[]>;    // Parent-child relationships
+  rootId: string | null;                    // Root directory node ID
+  currentParentId: string | null;           // Current directory
+  selectedFileIds: Set<string>;             // Selected files
+  fs: typeof fs | null;                     // ZenFS instance
+  vfsKey: string | null;                    // Current VFS context
+  configuredVfsKey: string | null;          // Active VFS context
+}
+```
+
+## AI Integration Architecture
+
+LiteChat provides comprehensive AI integration through the Vercel AI SDK.
+
+### Provider Support
+
+Supported AI providers:
+- **OpenAI**: GPT models with function calling, vision, reasoning
+- **Google Gemini**: Gemini Pro with multimodal capabilities
+- **Anthropic Claude**: Via OpenAI-compatible interface
+- **OpenRouter**: Access to 100+ models
+- **Local Providers**: Ollama, LMStudio, OpenAI-compatible APIs
+
+### AI Service Layer (`src/services/ai.service.ts`)
+
+```typescript
+export class AIService {
+  static async executeInteraction(
+    interactionId: string,
+    payload: StreamingInteractionPayload,
+    callbacks: StreamingCallbacks
+  ): Promise<void> {
+    const model = await createModelFromConfig(payload.modelConfig);
+    
+    const result = await streamText({
+      model,
+      messages: payload.messages,
+      tools: payload.tools,
+      maxTokens: payload.maxTokens,
+      temperature: payload.temperature,
+      // ... other parameters
+    });
+
+    // Process stream parts
+    for await (const part of result.fullStream) {
+      switch (part.type) {
+        case "text-delta":
+          callbacks.onChunk(part.textDelta);
+          break;
+        case "tool-call":
+          callbacks.onToolCall(part);
+          break;
+        case "tool-result":
+          callbacks.onToolResult(part);
+          break;
+        case "finish":
+          callbacks.onFinish({
+            finishReason: part.finishReason,
+            usage: part.usage,
+          });
+          break;
+      }
+    }
+  }
+}
+```
+
+### Tool System
+
+AI tools are registered by Control Modules:
+
+```typescript
+// Tool definition with Zod schema
+const readFileToolDefinition = {
+  description: "Read contents of a file from the virtual file system",
+  parameters: z.object({
+    path: z.string().describe("The path to the file to read"),
+  }),
+};
+
+// Tool implementation
+const readFileImplementation = async (
+  { path }: { path: string },
+  context: ToolExecutionContext
+): Promise<ToolResult> => {
+  try {
+    const content = await readFileOp(path);
+    const textContent = new TextDecoder().decode(content);
+    return {
+      success: true,
+      content: textContent,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+```
+
+### Streaming Management
+
+Real-time response streaming with buffer management:
+
+```typescript
+interface InteractionState {
+  activeStreamBuffers: Record<string, string>;     // Main response content
+  activeReasoningBuffers: Record<string, string>;  // Reasoning content
+  streamingInteractionIds: string[];               // Active streams
+}
+
+// Stream processing
+appendInteractionResponseChunk: (id: string, chunk: string) => {
+  set((state) => {
+    if (!state.activeStreamBuffers[id]) {
+      state.activeStreamBuffers[id] = "";
+    }
+    state.activeStreamBuffers[id] += chunk;
+  });
+};
+```
+
+## Git Integration
+
+LiteChat provides browser-based Git operations using isomorphic-git.
+
+### Git Operations (`src/lib/litechat/vfs-git-operations.ts`)
+
+```typescript
+// Clone repository
+export const cloneRepoOp = async (
+  url: string,
+  dir: string,
+  auth?: GitAuth,
+  options?: { fsInstance?: typeof fs }
+): Promise<void> => {
+  await git.clone({
+    fs: options?.fsInstance ?? fs,
+    http,
+    dir: normalizePath(dir),
+    url,
+    ...getAuthConfig(auth),
+  });
+};
+
+// Commit changes
+export const commitOp = async (
+  message: string,
+  options?: GitOperationOptions
+): Promise<string> => {
+  return await git.commit({
+    fs: options?.fsInstance ?? fs,
+    dir: "/",
+    message,
+    author: {
+      name: options?.author?.name ?? "LiteChat User",
+      email: options?.author?.email ?? "user@litechat.local",
+    },
+  });
+};
+```
+
+### Conversation Sync
+
+Conversations are synced as JSON files in repositories:
+
+```
+repository/
+├── .litechat/
+│   └── conversations/
+│       ├── conv-123.json
+│       ├── conv-456.json
+│       └── metadata.json
+```
+
+### Git Tools for AI
+
+Git operations available as AI tools:
+
+```typescript
+export class GitToolsModule implements ControlModule {
+  register(modApi: LiteChatModApi): void {
+    this.unregisterCallbacks.push(
+      modApi.registerTool("git_status", gitStatusTool, gitStatusImplementation),
+      modApi.registerTool("git_add", gitAddTool, gitAddImplementation),
+      modApi.registerTool("git_commit", gitCommitTool, gitCommitImplementation),
+      modApi.registerTool("git_push", gitPushTool, gitPushImplementation),
+      modApi.registerTool("git_pull", gitPullTool, gitPullImplementation),
+    );
+  }
+}
+```
+
+## Modding System
+
+LiteChat provides a secure modding system allowing external extensions.
+
+### LiteChatModApi Interface
+
+Controlled API for mod interactions:
+
+```typescript
+interface LiteChatModApi {
+  readonly modId: string;
+  readonly modName: string;
+  
+  // Component Registration
+  registerPromptControl(control: ModPromptControl): () => void;
+  registerChatControl(control: ModChatControl): () => void;
+  registerCanvasControl(control: ModCanvasControl): () => void;
+  registerSettingsTab(tab: CustomSettingTab): () => void;
+  
+  // Tool Registration
+  registerTool<T extends z.ZodSchema>(
+    name: string,
+    tool: Tool<T>,
+    implementation: ToolImplementation<T>
+  ): () => void;
+  
+  // Event System
+  on<K extends keyof ModEventPayloadMap>(
+    eventName: K,
+    handler: (payload: ModEventPayloadMap[K]) => void
+  ): () => void;
+  
+  emit<K extends keyof ModEventPayloadMap>(
+    eventName: K,
+    payload: ModEventPayloadMap[K]
+  ): void;
+  
+  // Utilities
+  getContext(): ModApiContext;
+  log(level: 'info' | 'warn' | 'error', message: string, ...args: any[]): void;
+  toast(message: string, options?: ToastOptions): void;
+}
+```
+
+### Mod Creation Pattern
+
+```typescript
+function createMyMod(modApi: LiteChatModApi) {
+  let internalState = { enabled: true };
+
+  // Register components
+  const unregisterControl = modApi.registerPromptControl({
+    id: 'my-control',
+    status: () => internalState.enabled ? 'ready' : 'disabled',
+    triggerRenderer: () => React.createElement(MyControlComponent),
+    getMetadata: () => ({ customFlag: internalState.enabled }),
+  });
+
+  // Subscribe to events
+  const unregisterEvent = modApi.on('conversation.selected.item.changed', (payload) => {
+    modApi.log('info', 'Conversation changed:', payload.itemId);
+  });
+
+  // Cleanup function
+  return () => {
+    unregisterControl();
+    unregisterEvent();
+  };
+}
+```
+
+## Development Patterns
+
+### Adding New Control Modules
+
+1. **Create Module Class**:
+```typescript
+export class MyControlModule implements ControlModule {
+  readonly id = "my-module";
+  readonly dependencies = ["some-dependency"];
+  
+  async initialize(modApi: LiteChatModApi): Promise<void> {
+    // Setup and event subscriptions
+  }
+  
+  register(modApi: LiteChatModApi): void {
+    // Register UI components, tools, etc.
+  }
+  
+  destroy(): void {
+    // Cleanup
+  }
+}
+```
+
+2. **Add to App.tsx**:
+```typescript
+const controlModulesToRegister: ControlModuleConstructor[] = [
+  // ... existing modules
+  MyControlModule,
+];
+```
+
+### Adding New Events
+
+1. **Define Event Names**:
+```typescript
+// src/types/litechat/events/my-domain.events.ts
+export const myDomainEvent = {
+  dataChanged: "my-domain.data.changed",
+  loadDataRequest: "my-domain.load.data.request",
+} as const;
+```
+
+2. **Add Payload Types**:
+```typescript
+export interface MyDomainEventPayloads {
+  [myDomainEvent.dataChanged]: { data: MyData[] };
+  [myDomainEvent.loadDataRequest]: { force?: boolean };
+}
+```
+
+3. **Update ModEventPayloadMap**:
+```typescript
+// src/types/litechat/modding.ts
+export interface ModEventPayloadMap extends 
+  // ... existing payloads
+  MyDomainEventPayloads
+{}
+```
+
+### Adding New Stores
+
+1. **Create Store**:
+```typescript
+export const useMyStore = create(
+  immer<MyState & MyActions>((set, get) => ({
+    // State and actions
+    getRegisteredActionHandlers: () => [
+      // Event handlers
+    ],
+  }))
+);
+```
+
+2. **Register with Event Coordinator**:
+```typescript
+// src/services/event-action-coordinator.service.ts
+const storesWithActionHandlers = [
+  // ... existing stores
+  useMyStore,
+];
+```
+
+### Code Organization Principles
+
+1. **Separation of Concerns**: Each module/service handles one domain
+2. **Event-Driven**: Use events for communication, not direct calls
+3. **Type Safety**: All interfaces and events strongly typed
+4. **Immutable Updates**: Use Immer for safe state mutations
+5. **Error Boundaries**: Graceful error handling and recovery
+6. **Clean Dependencies**: Explicit dependencies, avoid circular imports
+
+### Testing Approach
+
+- **Unit Tests**: Test individual functions and components
+- **Integration Tests**: Test module interactions through events
+- **End-to-End**: Test complete user workflows
+- **Type Checking**: Comprehensive TypeScript coverage
+
+### Performance Considerations
+
+1. **Lazy Loading**: Modules loaded on demand
+2. **Event Batching**: Batch state updates when possible
+3. **Memoization**: Use React.memo and useMemo for expensive operations
+4. **VFS Optimization**: Efficient file tree operations
+5. **Stream Management**: Proper cleanup of streaming responses
+
+## Build and Deployment
+
+### Development Setup
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Run tests
+npm test
+
+# Type checking
+npx tsc --noEmit
+```
+
+### Build Process
+
+```bash
+# Build for production
+npm run build
+
+# Preview build
+npm run preview
+```
+
+### Build Configuration
+
+Key build-time environment variables:
+- `VITE_SYSTEM_PROMPT_FILE`: System prompt file path
+- Custom configuration injection for deployments
+
+### Deployment Options
+
+1. **Static Hosting**: Deploy `dist/` folder to any static host
+2. **GitHub Pages**: Automated deployment via `npm run deploy`
+3. **Docker**: Nginx-based container deployment
+4. **Local Hosting**: Simple HTTP server for local use
+
+This comprehensive developer guide covers LiteChat's architecture, codebase organization, and development patterns. Use this context to understand how to work with and extend LiteChat effectively. 

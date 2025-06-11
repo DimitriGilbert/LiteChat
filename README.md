@@ -15,7 +15,7 @@
 - **Anthropic Claude**: Via OpenAI-compatible interface
 - **OpenRouter**: Access to 100+ models through unified API
 - **Local Providers**: Ollama, LMStudio, and other OpenAI-compatible APIs
-- **Advanced Features**: Streaming, reasoning, tool execution, image generation
+- **Advanced Features**: Streaming, reasoning, tool execution, ...
 
 ### 🌐 **Everyone's Favorite Features**
 - **Send text files to any LLM**: Even those who say they do not support file uploads
@@ -30,11 +30,13 @@
 - **Race**: you can send the same prompt to multiple models at once and see the results
 - **Regen with**: regenerate the message with a different model
 - **Response editor**: edit the response after it has been generated to remove the fluff and save on tokens
+- **Rules**: you can add rules to the AI to guide its behavior, **tags** are here to bundle rules together
 
 ### 🛠️ **Developer-Focused Features**
 - **Git Integration**: Clone, commit, push, pull directly in the browser
 - **Code Block Enhancements**: Filepath syntax, individual downloads, ZIP exports
 - **Tool System**: AI can read/write files, execute Git commands, and more
+- **Structured Output**: you can ask the AI to return a structured output, like a JSON, a table, a list, etc. (untested ^^')
 
 ### 📁 **Project Organization**
 - **Hierarchical Projects**: Organize conversations in nested project structures
@@ -102,6 +104,7 @@ npm run build
 ```
 
 > **Note**: AI assistance is highly recommended for development. See the [development documentation](./docs/index.md) for detailed setup instructions. 
+> You have access to an [llm.txt](./docs/llm.dev.txt) file to help you with your development.
 
 ## Docker & CORS
 
@@ -174,12 +177,11 @@ How hard can it be? Right? You've created this [Bash AI chat](https://ai-gents.d
 
 SUUURE budd, sure ! (spoiler alert, no !) So sure in fact that I am going to through fat rocks at myself, I wanted it local "only" (no server what so ever) AND, I am only going to use [t3.chat](https://t3.chat) to ENTIRELY "vibecode" the thing, because why not ? tis supposed to be the Future, right ?
 
-I caved in after a few weeks and reused Cursor when the complete project was around 250k tokens in total (giving it all to gemini was possible but the results where crap) and targeted file feeding was becoming a real chore... plus at some point, things are so interdependant that you end up with significant portions of your code base anyway... (Sorry [t3.chat](https://t3.chat) team ^^' )
+I caved in after a few weeks and reused Cursor when the complete project was around 250k tokens in total (giving it all to gemini was possible but the results were crap) and targeted file feeding was becoming a real chore... plus at some point, things are so interdependant that you end up with significant portions of your code base anyway... (Sorry [t3.chat](https://t3.chat) team ^^' )
 
 It was fun though ! And now I have my own chat app ! And so can you :D !
 
-If you would like to know what "the AI" has top say about this project, checkout the [AI-says](./docs/ai-says.md).
-
+If you would like to know what "the AI" has top say about this project (and what I have to say about that :P), checkout the [AI-says](./docs/ai-says.md).
 
 ## License
 

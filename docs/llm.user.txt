@@ -1,0 +1,214 @@
+# LiteChat User Guide - LLM Context
+
+## What is LiteChat?
+
+LiteChat is a modular, extensible, privacy-focused AI chat application designed for power users, developers, and teams. It runs 100% client-side in your browser with all data stored locally using IndexedDB - no server dependencies required.
+
+## Key Features & Capabilities
+
+### 🔒 Privacy-First Architecture
+- **100% Client-Side**: All data stored locally in browser using IndexedDB
+- **No Server Dependencies**: Core functionality requires no backend services
+- **Full Data Control**: Export/import data at any time
+- **Local File System**: Virtual file system stored entirely in browser
+
+### 🤖 Multi-Provider AI Support
+- **OpenAI**: GPT-4, GPT-3.5, with reasoning and tool support
+- **Google Gemini**: Gemini Pro models with multimodal capabilities
+- **Anthropic Claude**: Via OpenAI-compatible interface
+- **OpenRouter**: Access to 100+ models through unified API
+- **Local Providers**: Ollama, LMStudio, and other OpenAI-compatible APIs
+
+### 💻 Power User Features
+- **Send Files to Any LLM**: Even models that don't officially support file uploads
+- **Multimodal Support**: Send images, documents, code files to compatible models
+- **Auto Title Generation**: AI automatically generates conversation titles
+- **Message Regeneration**: Regenerate responses when AI fails or you want alternatives
+- **Response Editor**: Edit AI responses to remove fluff and save tokens
+- **Race Mode**: Send same prompt to multiple models simultaneously
+- **Regen With**: Regenerate messages using different models
+
+### 🛠️ Advanced Features
+- **Mermaid Diagrams**: Real-time diagram rendering
+- **Virtual File System**: Full browser-based filesystem with CRUD operations
+- **Git Integration**: Clone, commit, push, pull directly in browser
+- **Code Block Enhancements**: Download individual code blocks or ZIP exports
+- **Tool System**: AI can read/write files, execute Git commands
+- **Structured Output**: Request specific formats (JSON, tables, lists)
+
+## Basic Usage
+
+### Getting Started
+1. **Access LiteChat**: Visit https://litechat.dbuild.dev or host locally
+2. **Configure Providers**: Go to Settings → Providers to add API keys
+3. **Select Model**: Choose from available models in the dropdown
+4. **Start Chatting**: Type messages in the prompt area
+
+### Provider Setup
+Navigate to Settings → Providers to configure AI providers:
+
+1. **Add Provider**: Click "Add Provider" and select type (OpenAI, Claude, etc.)
+2. **Enter Credentials**: Add API key (and base URL for local providers)
+3. **Fetch Models**: Click "Fetch Models" to load available models
+4. **Enable Models**: Toggle which models appear in the model selector
+
+### Local Provider Setup (Ollama)
+1. Install and run Ollama locally
+2. Start with CORS enabled: `OLLAMA_ORIGIN='*' ollama serve`
+3. Add Ollama provider with base URL: `http://localhost:11434`
+4. Fetch models to see your local models
+
+## Organization & Structure
+
+### Projects & Conversations
+- **Projects**: Hierarchical organization of conversations
+- **Conversations**: Individual chat sessions within projects
+- **Inheritance**: Child projects inherit settings from parents
+- **Selection**: Click projects/conversations in sidebar to switch context
+
+### Project Settings
+Each project can override global settings:
+- **System Prompt**: Custom instructions for this project
+- **Default Model**: Preferred model for new conversations
+- **AI Parameters**: Temperature, max tokens, etc.
+- **Rules & Tags**: Default prompt engineering rules
+
+## Advanced Features
+
+### Rules & Tags System
+**Rules**: Reusable prompt engineering snippets
+- **System Rules**: Added to system prompt
+- **User Rules**: Prepended to user messages
+- **Assistant Rules**: Guide assistant behavior
+- **Prefix/Suffix Rules**: Add before/after main content
+
+**Tags**: Bundle multiple rules together
+- Create tags to group related rules
+- Apply tags to projects for automatic rule application
+- Mix and match rules and tags per conversation
+
+### Virtual File System (VFS)
+- **Project-Specific**: Each project has its own filesystem
+- **File Operations**: Create, upload, edit, delete files and folders
+- **AI Integration**: AI can read/write files using tools
+- **Context Switching**: VFS automatically switches with project selection
+
+### Git Integration
+1. **Setup Repositories**: Settings → Git → Sync Repositories
+2. **Add Repository**: Provide Git URL and credentials (use personal access tokens)
+3. **Link Conversations**: Associate conversations with repositories
+4. **Sync**: Conversations saved as JSON files in `.litechat/conversations/`
+
+### Code Block Features
+- **Filepath Headers**: Code blocks show file paths when specified
+- **Individual Downloads**: Download single code blocks
+- **ZIP Exports**: Download multiple code blocks as ZIP
+- **Copy Functionality**: One-click copying of code
+
+### Mermaid Diagrams
+- AI can create diagrams using Mermaid syntax
+- Renders in real-time within chat canvas
+- Supports flowcharts, sequence diagrams, and more
+
+## Settings & Customization
+
+### General Settings
+- **Theme**: Light, dark, or system preference
+- **Chat Max Width**: Adjust conversation width
+- **Auto Title**: Enable automatic conversation titles
+
+### AI Settings
+- **Global System Prompt**: Default instructions for all conversations
+- **Temperature**: Creativity level (0.0 to 2.0)
+- **Max Tokens**: Maximum response length
+- **Top-P, Top-K**: Advanced sampling parameters
+
+### Git Settings
+- **User Name/Email**: Git commit identity
+- **Auto Title Prompt**: Custom prompt for generating titles
+
+### Data Management
+- **Export Data**: Download all conversations, projects, settings
+- **Import Data**: Upload previous exports
+- **Clear All Data**: Reset application state
+
+## Tips & Best Practices
+
+### Effective Prompting
+1. **Use Rules**: Create reusable rules for common instructions
+2. **Project Organization**: Group related conversations in projects
+3. **File Context**: Upload relevant files to provide context
+4. **Multiple Models**: Use race mode to compare model outputs
+
+### File Management
+1. **Upload Files**: Drag and drop or use upload button in VFS
+2. **Organize Structure**: Create logical folder hierarchies
+3. **AI File Operations**: Let AI read/write files for code projects
+
+### Git Workflow
+1. **Link Early**: Associate conversations with repositories from start
+2. **Regular Sync**: Sync conversations periodically for backup
+3. **Personal Access Tokens**: Use tokens instead of passwords for private repos
+
+### Performance
+1. **Model Selection**: Choose appropriate models for task complexity
+2. **Response Editing**: Edit verbose responses to save tokens
+3. **File Size**: Be mindful of large file uploads affecting context
+
+## Troubleshooting
+
+### Common Issues
+
+**CORS Errors with Local Providers**
+- Ensure CORS is enabled on your local provider
+- For Ollama: `OLLAMA_ORIGIN='*' ollama serve`
+- For HTTPS sites: Can't connect to HTTP local endpoints
+
+**Models Not Loading**
+- Check API key is correct
+- Verify network connectivity
+- Try refreshing/fetching models again
+
+**VFS Issues**
+- VFS data stored in browser IndexedDB
+- Clearing browser data will delete VFS contents
+- Export data regularly for backup
+
+**Git Sync Failures**
+- Use personal access tokens, not passwords
+- Verify repository URL and permissions
+- Check network connectivity
+
+### Data Recovery
+- Export data regularly through Settings → Data
+- Browser data clearing removes all local data
+- No server-side backup - local-only storage
+
+## Security Considerations
+
+### API Keys
+- Stored locally in browser IndexedDB
+- Never transmitted to LiteChat servers (no servers exist)
+- Clear browser data to remove keys
+
+### Private Repositories
+- Use personal access tokens for authentication
+- Tokens stored locally only
+- Revoke tokens if browser security compromised
+
+### Local Data
+- All conversations stored locally
+- Export sensitive data before sharing devices
+- Use browser private/incognito mode for temporary sessions
+
+## Getting Help
+
+### Resources
+- Documentation: Available in `/docs` folder
+- GitHub Issues: Report bugs and feature requests
+- Source Code: Fully open source under MIT license
+
+### Community
+- Project is open source and welcomes contributions
+- Feature requests and bug reports appreciated
+- Check existing documentation before asking questions 
