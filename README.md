@@ -10,10 +10,10 @@
 - **Full Data Control**: Export/import your data at any time
 
 ### 🤖 **Multi-Provider AI Support**
-- **OpenAI**: GPT-4, GPT-3.5, with reasoning and tool support
+- **OpenRouter**: Access to 300+ models through unified API
+- **OpenAI**: GPT-4x, o3-mini, o4-mini, o3, o3-pro, with reasoning and tool support
 - **Google Gemini**: Gemini Pro models with multimodal capabilities
-- **Anthropic Claude**: Via OpenAI-compatible interface
-- **OpenRouter**: Access to 100+ models through unified API
+- **Anthropic Claude**: Sonnet, Opus, ...
 - **Local Providers**: Ollama, LMStudio, and other OpenAI-compatible APIs
 - **Advanced Features**: Streaming, reasoning, tool execution, ...
 
