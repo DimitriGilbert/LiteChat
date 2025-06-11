@@ -40,6 +40,9 @@ export interface AIServiceCallbacks {
   onToolResult: (toolResult: ToolResultPart) => void;
   // Add a callback specifically for reasoning chunks
   onReasoningChunk: (chunk: string) => void;
+  // Add callbacks for step events
+  onStepStart?: (stepInfo: { messageId: string; request: any; warnings: any[] }) => void;
+  onStepFinish?: (stepInfo: { finishReason: FinishReason; usage?: LanguageModelUsage; isContinued: boolean; warnings: any[] }) => void;
   // Update onFinish to potentially include reasoning
   onFinish: (details: {
     finishReason: FinishReason;
@@ -92,6 +95,29 @@ export class AIService {
           case "tool-result":
             callbacks.onToolResult(part);
             break;
+          case "step-start":
+            // Handle step-start events - these indicate the start of a processing step
+            if (callbacks.onStepStart) {
+              callbacks.onStepStart({
+                messageId: (part as any).messageId,
+                request: (part as any).request,
+                warnings: (part as any).warnings || []
+              });
+            }
+            console.log(`[AIService] Step started for ${interactionId} - Message ID: ${(part as any).messageId}`);
+            break;
+          case "step-finish":
+            // Handle step-finish events - these indicate completion of a processing step
+            if (callbacks.onStepFinish) {
+              callbacks.onStepFinish({
+                finishReason: (part as any).finishReason,
+                usage: (part as any).usage,
+                isContinued: (part as any).isContinued || false,
+                warnings: (part as any).warnings || []
+              });
+            }
+            console.log(`[AIService] Step finished for ${interactionId} - Reason: ${(part as any).finishReason}, Continued: ${(part as any).isContinued}`);
+            break;
           case "finish":
             // Store finish details but don't call onFinish yet
             receivedFinishPart = true;
@@ -110,9 +136,9 @@ export class AIService {
             return;
           // Ignore other part types for now
           default:
-            // Log unexpected part types
+            // Log unexpected part types with more context
             console.warn(
-              `[AIService] Received unexpected stream part type: ${(part as any).type}`,
+              `[AIService] Received unexpected stream part type: ${(part as any).type} for ${interactionId}`,
               part,
             );
             break;
