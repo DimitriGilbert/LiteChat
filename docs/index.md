@@ -26,11 +26,12 @@ LiteChat follows a modular, event-driven architecture designed for extensibility
 - [Modding System](./modding.md) - Plugin architecture and API for extensions
 - [AI Integration](./ai-integration.md) - Provider management, streaming, and tool execution
 - [Git Integration](./git.md) - Version control features and conversation sync
+- [Canvas Features](./canvas-features.md) - Code blocks, Mermaid diagrams, ZIP downloads, and interaction controls
 
 ### Implementation Guides
+- [Build & Deployment](./build-deployment.md) - Development setup, build-time configuration, and deployment strategies
 - [Component Development](./components.md) - UI component patterns and best practices
 - [Service Layer](./services.md) - Business logic organization and patterns
-- [Build & Deployment](./build-deployment.md) - Development setup and deployment strategies
 
 ### Reference
 - [File Structure](./file-structure.md) - Complete project organization reference
