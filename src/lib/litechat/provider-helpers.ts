@@ -62,11 +62,11 @@ export const supportsModelFetching = (type: DbProviderType | null): boolean => {
 };
 
 export const PROVIDER_TYPES: { value: DbProviderType; label: string }[] = [
-  { value: "openai", label: "OpenAI" },
-  { value: "google", label: "Google Gemini" },
   { value: "openrouter", label: "OpenRouter" },
+  { value: "openai", label: "OpenAI" },
   { value: "ollama", label: "Ollama" },
   { value: "openai-compatible", label: "OpenAI-Compatible (LMStudio, etc.)" },
+  { value: "google", label: "Google Gemini" },
 ];
 
 export const REQUIRES_API_KEY_TYPES: DbProviderType[] = [
