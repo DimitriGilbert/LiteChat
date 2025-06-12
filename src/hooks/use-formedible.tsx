@@ -84,15 +84,29 @@ interface UseFormedibleOptions<TFormValues> {
     defaultValues: TFormValues;
     onSubmit: (props: { value: TFormValues; formApi: any }) => any | Promise<any>;
     onSubmitInvalid: (props: { value: TFormValues; formApi: any }) => void;
+    onChange?: (props: { value: TFormValues; formApi: any }) => void;
+    onBlur?: (props: { value: TFormValues; formApi: any }) => void;
+    onFocus?: (props: { value: TFormValues; formApi: any }) => void;
+    onReset?: (props: { value: TFormValues; formApi: any }) => void;
     asyncDebounceMs: number;
     canSubmitWhenInvalid: boolean;
     validators: {
       onChange?: z.ZodSchema<any>;
+      onChangeAsync?: z.ZodSchema<any>;
+      onChangeAsyncDebounceMs?: number;
       onBlur?: z.ZodSchema<any>;
+      onBlurAsync?: z.ZodSchema<any>;
+      onBlurAsyncDebounceMs?: number;
       onSubmit?: z.ZodSchema<any>;
+      onSubmitAsync?: z.ZodSchema<any>;
     };
   }>;
   onPageChange?: (page: number, direction: 'next' | 'previous') => void;
+  autoSubmitOnChange?: boolean;
+  autoSubmitDebounceMs?: number;
+  disabled?: boolean;
+  loading?: boolean;
+  resetOnSubmitSuccess?: boolean;
 }
 
 const defaultFieldComponents: Record<string, React.ComponentType<any>> = {
@@ -162,6 +176,11 @@ export function useFormedible<TFormValues extends Record<string, any>>(
     globalWrapper,
     formOptions,
     onPageChange,
+    autoSubmitOnChange = false,
+    autoSubmitDebounceMs = 1000,
+    disabled = false,
+    loading = false,
+    resetOnSubmitSuccess = false,
   } = options;
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -196,10 +215,65 @@ export function useFormedible<TFormValues extends Record<string, any>>(
         onChange: schema,
         ...formOptions?.validators,
       }
+    }),
+    ...(resetOnSubmitSuccess && formOptions?.onSubmit && {
+      onSubmit: async (props: any) => {
+        try {
+          const result = await formOptions.onSubmit!(props);
+          // Reset form on successful submit if option is enabled
+          form.reset();
+          return result;
+        } catch (error) {
+          throw error;
+        }
+      }
     })
   };
 
   const form = useForm(formConfig as any);
+
+  // Set up form event listeners if provided
+  React.useEffect(() => {
+    const unsubscribers: (() => void)[] = [];
+    let autoSubmitTimeout: NodeJS.Timeout;
+    let onChangeTimeout: NodeJS.Timeout;
+
+    if (formOptions?.onChange || autoSubmitOnChange) {
+      const unsubscribe = form.store.subscribe(() => {
+        const formApi = form;
+        const values = formApi.state.values;
+        
+        // Call user's onChange handler only if form is valid (debounced)
+        if (formOptions?.onChange && formApi.state.isValid) {
+          clearTimeout(onChangeTimeout);
+          onChangeTimeout = setTimeout(() => {
+            formOptions.onChange!({ value: values as TFormValues, formApi });
+          }, 300); // 300ms debounce
+        }
+
+        // Handle auto-submit on change
+        if (autoSubmitOnChange && !disabled && !loading) {
+          clearTimeout(autoSubmitTimeout);
+          autoSubmitTimeout = setTimeout(() => {
+            if (form.state.canSubmit) {
+              form.handleSubmit();
+            }
+          }, autoSubmitDebounceMs);
+        }
+      });
+      unsubscribers.push(unsubscribe);
+    }
+
+    // Clean up timeouts on unmount
+    unsubscribers.push(() => {
+      clearTimeout(autoSubmitTimeout);
+      clearTimeout(onChangeTimeout);
+    });
+
+    return () => {
+      unsubscribers.forEach(unsub => unsub());
+    };
+  }, [form, autoSubmitOnChange, autoSubmitDebounceMs, disabled, loading]);
 
   const getCurrentPageFields = () => fieldsByPage[currentPage] || [];
 
@@ -285,6 +359,7 @@ export function useFormedible<TFormValues extends Record<string, any>>(
               step,
               accept,
               multiple,
+              disabled: disabled || loading || field.form.state.isSubmitting,
             };
 
             // Select the component to use
@@ -313,27 +388,21 @@ export function useFormedible<TFormValues extends Record<string, any>>(
       const currentFields = getCurrentPageFields();
       const pageConfig = getCurrentPageConfig();
       
+      const fieldsToRender = currentFields.map(field => 
+        renderField(field)
+      ).filter(Boolean);
+
+      const PageComponent = pageConfig?.component || DefaultPageComponent;
+
       return (
-        <form.Subscribe selector={(state) => state.values}>
-          {() => {
-            const fieldsToRender = currentFields.map(field => 
-              renderField(field)
-            ).filter(Boolean);
-
-            const PageComponent = pageConfig?.component || DefaultPageComponent;
-
-            return (
-              <PageComponent
-                title={pageConfig?.title}
-                description={pageConfig?.description}
-                page={currentPage}
-                totalPages={totalPages}
-              >
-                {fieldsToRender}
-              </PageComponent>
-            );
-          }}
-        </form.Subscribe>
+        <PageComponent
+          title={pageConfig?.title}
+          description={pageConfig?.description}
+          page={currentPage}
+          totalPages={totalPages}
+        >
+          {fieldsToRender}
+        </PageComponent>
       );
     };
 
@@ -366,10 +435,10 @@ export function useFormedible<TFormValues extends Record<string, any>>(
               return (
                 <Button
                   type="submit"
-                  disabled={!canSubmit || isSubmitting}
+                  disabled={!canSubmit || isSubmitting || disabled || loading}
                   className="w-full"
                 >
-                  {isSubmitting ? "Submitting..." : submitLabel}
+                  {loading ? "Loading..." : isSubmitting ? "Submitting..." : submitLabel}
                 </Button>
               );
             }}
@@ -392,7 +461,7 @@ export function useFormedible<TFormValues extends Record<string, any>>(
                   type="button"
                   variant="outline"
                   onClick={goToPreviousPage}
-                  disabled={isFirstPage}
+                  disabled={isFirstPage || disabled || loading}
                   className={isFirstPage ? "invisible" : ""}
                 >
                   {previousLabel}
@@ -400,10 +469,12 @@ export function useFormedible<TFormValues extends Record<string, any>>(
                 
                 <Button
                   type="submit"
-                  disabled={(!canSubmit || isSubmitting) && isLastPage}
+                  disabled={(!canSubmit || isSubmitting || disabled || loading) && isLastPage}
                   className="flex-1 max-w-xs"
                 >
-                  {isSubmitting && isLastPage
+                  {loading && isLastPage
+                    ? "Loading..."
+                    : isSubmitting && isLastPage
                     ? "Submitting..."
                     : isLastPage
                     ? submitLabel

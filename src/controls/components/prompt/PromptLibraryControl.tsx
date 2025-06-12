@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { BookOpenText } from "lucide-react";
 import { usePromptTemplateStore } from "@/store/prompt-template.store";
@@ -115,16 +115,17 @@ function PromptTemplateSelector({
 function PromptTemplateForm({ 
   template, 
   onSubmit, 
-  onBack 
+  onBack,
+  previewElementRef,
+  onCompile,
 }: { 
   template: PromptTemplate; 
   onSubmit: (data: PromptFormData) => void; 
   onBack: () => void; 
-}) {
-  // Debug: Log template variables
-  console.log('PromptTemplateForm - template.variables:', template.variables);
-  console.log('PromptTemplateForm - template.prompt:', template.prompt);
-  
+  module: PromptLibraryControlModule;
+  previewElementRef: React.RefObject<HTMLDivElement | null>;
+  onCompile: (formData: Record<string, any>) => Promise<void>;
+}) {  
   // Create field configs from template variables
   const fieldConfigs = template.variables.map(variable => ({
     name: variable.name,
@@ -136,8 +137,6 @@ function PromptTemplateForm({
     description: variable.description || variable.instructions,
     required: variable.required,
   }));
-
-  console.log('PromptTemplateForm - fieldConfigs:', fieldConfigs);
 
   const defaultValues = template.variables.reduce((acc, variable) => {
     if (variable.default) {
@@ -160,17 +159,18 @@ function PromptTemplateForm({
 
   const { Form } = useFormedible({
     fields: fieldConfigs,
-    submitLabel: "Apply Template",
+    submitLabel: "Proompt !",
     formOptions: {
       defaultValues,
       onSubmit: async ({ value }) => {
-        console.log('Form submitted with value:', value);
         onSubmit(value);
+      },
+      onChange: async ({ value }) => {
+        // This now only updates a ref, not state - no re-renders
+        await onCompile(value);
       }
     }
   });
-
-  console.log('useFormedible result:', { Form });
 
   return (
     <div className="space-y-4">
@@ -184,28 +184,35 @@ function PromptTemplateForm({
         </div>
       </div>
 
-      <div className="border rounded-lg p-4">
-        <Label className="text-sm font-medium">Template Preview</Label>
-        <div className="mt-2 p-3 bg-muted rounded text-sm font-mono whitespace-pre-wrap">
-          {template.prompt}
+      <div className="md:flex md:space-x-4">
+        <div className="md:w-1/2 border rounded-lg p-4">
+          {template.variables.length === 0 ? (
+            <div className="text-center">
+              <p className="text-muted-foreground">
+                This template has no variables defined. The template will be applied as-is.
+              </p>
+              <Button onClick={() => onSubmit({})} className="mt-3">
+                Proompt !
+              </Button>
+            </div>
+          ) : (
+            <>
+              <Label className="text-sm font-medium mb-4 block">Template Variables</Label>
+              <Form />
+            </>
+          )}
+        </div>
+
+        <div className="md:w-1/2 border rounded-lg p-4">
+          <Label className="text-sm font-medium">Live Preview</Label>
+          <div 
+            ref={previewElementRef}
+            className="mt-2 p-3 bg-muted rounded text-sm font-mono whitespace-pre-wrap max-h-64 overflow-y-auto"
+          >
+            {template.prompt}
+          </div>
         </div>
       </div>
-
-      {template.variables.length === 0 ? (
-        <div className="border rounded-lg p-4 text-center">
-          <p className="text-muted-foreground">
-            This template has no variables defined. The template will be applied as-is.
-          </p>
-          <Button onClick={() => onSubmit({})} className="mt-3">
-            Apply Template
-          </Button>
-        </div>
-      ) : (
-        <div className="border rounded-lg p-4">
-          <Label className="text-sm font-medium mb-4 block">Template Variables</Label>
-          <Form />
-        </div>
-      )}
     </div>
   );
 }
@@ -213,6 +220,9 @@ function PromptTemplateForm({
 export const PromptLibraryControl: React.FC<PromptLibraryControlProps> = ({ module }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<PromptTemplate | null>(null);
+  
+  // Use ref for preview DOM element - direct manipulation, no re-renders
+  const previewElementRef = useRef<HTMLDivElement | null>(null);
 
   const { promptTemplates, loadPromptTemplates } = usePromptTemplateStore(
     useShallow((state) => ({
@@ -220,8 +230,6 @@ export const PromptLibraryControl: React.FC<PromptLibraryControlProps> = ({ modu
       loadPromptTemplates: state.loadPromptTemplates,
     }))
   );
-
-  // We'll need to access the inputAreaRef from the parent to set the value
 
   useEffect(() => {
     if (isModalOpen) {
@@ -231,31 +239,42 @@ export const PromptLibraryControl: React.FC<PromptLibraryControlProps> = ({ modu
 
   const handleTemplateSelect = (template: PromptTemplate) => {
     setSelectedTemplate(template);
+    // Initialize preview directly in DOM
+    if (previewElementRef.current) {
+      previewElementRef.current.textContent = template.prompt;
+    }
   };
 
   const handleFormSubmit = async (formData: PromptFormData) => {
     if (!selectedTemplate) return;
 
-    console.log('handleFormSubmit called with:', formData);
-    console.log('selectedTemplate:', selectedTemplate);
-
     try {
       // Apply the template to the input area
-      console.log('Calling module.applyTemplate...');
       await module.applyTemplate(selectedTemplate.id, formData);
       
-      console.log('Template applied successfully, closing modal...');
       setIsModalOpen(false);
       setSelectedTemplate(null);
       toast.success("Template applied to input area!");
     } catch (error) {
-      console.error("Failed to apply template:", error);
-      toast.error("Failed to apply template");
+      console.error("Failed to Proompt :", error);
+      toast.error("Failed to Proompt !");
     }
   };
 
   const handleBack = () => {
     setSelectedTemplate(null);
+  };
+
+  // Update preview directly in DOM - NO REACT RE-RENDERS
+  const updatePreview = async (formData: Record<string, any>) => {
+    if (!selectedTemplate || !previewElementRef.current) return;
+    
+    try {
+      const compiled = await module.compileTemplate(selectedTemplate.id, formData);
+      previewElementRef.current.textContent = compiled.content;
+    } catch (error) {
+      previewElementRef.current.textContent = `Error: ${error instanceof Error ? error.message : 'Compilation failed'}`;
+    }
   };
 
   return (
@@ -290,6 +309,9 @@ export const PromptLibraryControl: React.FC<PromptLibraryControlProps> = ({ modu
                 template={selectedTemplate}
                 onSubmit={handleFormSubmit}
                 onBack={handleBack}
+                module={module}
+                previewElementRef={previewElementRef}
+                onCompile={updatePreview}
               />
             ) : (
               <PromptTemplateSelector
