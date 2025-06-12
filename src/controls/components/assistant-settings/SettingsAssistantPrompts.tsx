@@ -140,6 +140,34 @@ function PromptTemplateForm({
     },
   });
 
+  // Reset newVariable state when template changes
+  useEffect(() => {
+    setNewVariable({
+      name: "",
+      description: "",
+      type: "string",
+      required: false,
+      default: "",
+      instructions: "",
+    });
+  }, [template?.id]);
+
+  // Cleanup effect to ensure state is reset on unmount
+  useEffect(() => {
+    return () => {
+      // Reset state to prevent any stale references
+      setNewVariable({
+        name: "",
+        description: "",
+        type: "string",
+        required: false,
+        default: "",
+        instructions: "",
+      });
+      setMaxSteps(null);
+    };
+  }, []);
+
   const addVariable = () => {
     if (newVariable.name) {
       form.setFieldValue("variables", [
@@ -267,7 +295,7 @@ function PromptTemplateForm({
             <Label className="text-base font-medium">Variables</Label>
             <div className="space-y-3 mt-2">
               {form.getFieldValue("variables").map((variable, index) => (
-                <div key={index} className="p-3 border rounded-lg space-y-2">
+                <div key={`${variable.name}-${index}`} className="p-3 border rounded-lg space-y-2">
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium">{variable.name}</h4>
                     <Button
@@ -317,6 +345,7 @@ function PromptTemplateForm({
                   <div>
                     <Label>Type</Label>
                     <Select
+                      key={`new-variable-type-${template?.id || 'new'}`}
                       value={newVariable.type}
                       onValueChange={(
                         value: "string" | "number" | "boolean" | "array"
@@ -620,6 +649,7 @@ export const SettingsAssistantPrompts: React.FC = () => {
       label: "New Template",
       content: (
         <PromptTemplateForm
+          key="new-template-form"
           onSubmit={handleCreateTemplate}
           onSuccess={handleFormSuccess}
         />
@@ -634,6 +664,7 @@ export const SettingsAssistantPrompts: React.FC = () => {
       label: `Edit: ${editingTemplate.name}`,
       content: (
         <PromptTemplateForm
+          key={`edit-template-form-${editingTemplate.id}`}
           template={editingTemplate}
           onSubmit={handleUpdateTemplate}
           onSuccess={handleFormSuccess}
