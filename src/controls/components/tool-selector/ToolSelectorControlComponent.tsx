@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { SearchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ToolSelectorControlModule } from "@/controls/modules/ToolSelectorControlModule";
@@ -16,6 +18,12 @@ interface ToolSelectorControlComponentProps {
   setPopoverMaxSteps: (steps: number | null) => void;
   className?: string;
 }
+
+// Utility function to truncate text
+const truncateText = (text: string, maxLength: number = 80): string => {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength).trim() + '...';
+};
 
 export const ToolSelectorControlComponent: React.FC<
   ToolSelectorControlComponentProps
@@ -140,7 +148,7 @@ export const ToolSelectorControlComponent: React.FC<
           </Button>
         </div>
       </div>
-      <div className="border rounded-md p-2 bg-background/50">
+      <div className="border rounded-md bg-background/50">
         {isDisabled ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             Select a conversation to manage tools.
@@ -154,37 +162,51 @@ export const ToolSelectorControlComponent: React.FC<
             No tools match filter.
           </p>
         ) : (
-          <div className="space-y-1">
-            {filteredTools.map((tool) => (
-              <div
-                key={tool.name}
-                className="flex items-center justify-between p-1.5 rounded hover:bg-muted"
-              >
-                <Switch
-                  id={`tool-switch-${tool.name}`}
-                  checked={enabledTools.has(tool.name)}
-                  onCheckedChange={(checked) =>
-                    handleToggle(tool.name, checked)
-                  }
-                  className="flex-shrink-0"
-                  disabled={isDisabled}
-                />
-                <Label
-                  htmlFor={`tool-switch-${tool.name}`}
-                  className={cn(
-                    "text-sm font-normal flex-grow pl-2 space-y-0.5",
-                    isDisabled ? "cursor-not-allowed" : "cursor-pointer"
-                  )}
-                  title={`${tool.name} (from ${tool.modId})`}
+          <ScrollArea className="h-96 w-full">
+            <div className="p-2 space-y-1">
+              {filteredTools.map((tool) => (
+                <div
+                  key={tool.name}
+                  className="flex items-center justify-between p-1.5 rounded hover:bg-muted"
                 >
-                  <span className="block font-medium">{tool.name}</span>
-                  <span className="block text-xs text-muted-foreground break-words">
-                    {tool.description}
-                  </span>
-                </Label>
-              </div>
-            ))}
-          </div>
+                  <Switch
+                    id={`tool-switch-${tool.name}`}
+                    checked={enabledTools.has(tool.name)}
+                    onCheckedChange={(checked) =>
+                      handleToggle(tool.name, checked)
+                    }
+                    className="flex-shrink-0"
+                    disabled={isDisabled}
+                  />
+                  <div className="flex-grow pl-2 space-y-0.5">
+                    <Label
+                      htmlFor={`tool-switch-${tool.name}`}
+                      className={cn(
+                        "block text-sm font-medium",
+                        isDisabled ? "cursor-not-allowed" : "cursor-pointer"
+                      )}
+                    >
+                      {tool.name}
+                    </Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="block text-xs text-muted-foreground break-words cursor-help">
+                          {truncateText(tool.description)}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-sm">
+                        <div className="space-y-1">
+                          <div className="font-medium">{tool.name}</div>
+                          <div className="text-xs opacity-90">From: {tool.modId}</div>
+                          <div className="text-xs">{tool.description}</div>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
         )}
       </div>
       <div className="pt-2">

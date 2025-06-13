@@ -1,5 +1,4 @@
-import type { McpState, McpServerConfig } from "@/store/mcp.store";
-import type { ToolCallPart, ToolResultPart } from "ai";
+import type { McpState, McpServerConfig, McpBridgeConfig } from "@/store/mcp.store";
 
 export const mcpEvent = {
   // State Change Events
@@ -14,6 +13,7 @@ export const mcpEvent = {
   retryAttemptsChanged: "mcp.retry.attempts.changed",
   retryDelayChanged: "mcp.retry.delay.changed",
   connectionTimeoutChanged: "mcp.connection.timeout.changed",
+  bridgeConfigChanged: "mcp.bridge.config.changed",
 
   // Tool Lifecycle Events for Modding API
   beforeToolCall: "mcp.tool.before.call",
@@ -61,6 +61,7 @@ export interface McpEventPayloads {
   [mcpEvent.retryAttemptsChanged]: { attempts: number };
   [mcpEvent.retryDelayChanged]: { delay: number };
   [mcpEvent.connectionTimeoutChanged]: { timeout: number };
+  [mcpEvent.bridgeConfigChanged]: { config: McpBridgeConfig };
 
   // Tool Lifecycle Events for Modding API
   [mcpEvent.beforeToolCall]: {

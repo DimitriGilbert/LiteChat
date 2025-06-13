@@ -14,6 +14,12 @@ export interface McpServerConfig {
   description?: string;
 }
 
+export interface McpBridgeConfig {
+  url?: string;        // Full URL: http://192.168.1.100:3001
+  host?: string;       // Host only: 192.168.1.100
+  port?: number;       // Port only: 3001
+}
+
 export interface McpServerStatus {
   serverId: string;
   connected: boolean;
@@ -32,6 +38,8 @@ export interface McpState {
   retryAttempts: number;
   retryDelay: number;
   connectionTimeout: number;
+  // Bridge configuration for stdio servers
+  bridgeConfig: McpBridgeConfig;
 }
 
 export interface McpActions {
@@ -49,6 +57,9 @@ export interface McpActions {
   setRetryAttempts: (attempts: number) => void;
   setRetryDelay: (delay: number) => void;
   setConnectionTimeout: (timeout: number) => void;
+  
+  // Bridge Configuration
+  setBridgeConfig: (config: McpBridgeConfig) => void;
   
   // State Management
   setLoading: (loading: boolean) => void;
@@ -73,6 +84,7 @@ const defaultMcpState: McpState = {
   retryAttempts: DEFAULT_MCP_RETRY_ATTEMPTS,
   retryDelay: DEFAULT_MCP_RETRY_DELAY,
   connectionTimeout: DEFAULT_MCP_CONNECTION_TIMEOUT,
+  bridgeConfig: {},
 };
 
 export const useMcpStore = create(
@@ -235,6 +247,19 @@ export const useMcpStore = create(
       emitter.emit(mcpEvent.connectionTimeoutChanged, { timeout: clampedTimeout });
     },
 
+    // Bridge Configuration Actions
+    setBridgeConfig: (config: McpBridgeConfig) => {
+      set((state) => {
+        state.bridgeConfig = { ...config };
+      });
+      
+      PersistenceService.saveSetting("mcpBridgeConfig", config).catch((error: any) => {
+        console.error("Failed to persist MCP bridge config:", error);
+      });
+      
+      emitter.emit(mcpEvent.bridgeConfigChanged, { config });
+    },
+
     // State Management Actions
     setLoading: (loading: boolean) => {
       set((state) => {
@@ -261,11 +286,13 @@ export const useMcpStore = create(
           retryAttempts,
           retryDelay,
           connectionTimeout,
+          bridgeConfig,
         ] = await Promise.all([
           PersistenceService.loadSetting<McpServerConfig[]>("mcpServers", []),
           PersistenceService.loadSetting<number>("mcpRetryAttempts", DEFAULT_MCP_RETRY_ATTEMPTS),
           PersistenceService.loadSetting<number>("mcpRetryDelay", DEFAULT_MCP_RETRY_DELAY),
           PersistenceService.loadSetting<number>("mcpConnectionTimeout", DEFAULT_MCP_CONNECTION_TIMEOUT),
+          PersistenceService.loadSetting<McpBridgeConfig>("mcpBridgeConfig", {}),
         ]);
         
         set((state) => {
@@ -273,6 +300,7 @@ export const useMcpStore = create(
           state.retryAttempts = retryAttempts;
           state.retryDelay = retryDelay;
           state.connectionTimeout = connectionTimeout;
+          state.bridgeConfig = bridgeConfig || {};
           state.loading = false;
         });
 
@@ -281,6 +309,7 @@ export const useMcpStore = create(
         emitter.emit(mcpEvent.retryAttemptsChanged, { attempts: retryAttempts });
         emitter.emit(mcpEvent.retryDelayChanged, { delay: retryDelay });
         emitter.emit(mcpEvent.connectionTimeoutChanged, { timeout: connectionTimeout });
+        emitter.emit(mcpEvent.bridgeConfigChanged, { config: bridgeConfig || {} });
         
       } catch (error: any) {
         console.error("Failed to load MCP state:", error);
@@ -298,6 +327,7 @@ export const useMcpStore = create(
         state.retryAttempts = DEFAULT_MCP_RETRY_ATTEMPTS;
         state.retryDelay = DEFAULT_MCP_RETRY_DELAY;
         state.connectionTimeout = DEFAULT_MCP_CONNECTION_TIMEOUT;
+        state.bridgeConfig = {};
         state.loading = false;
         state.error = null;
       });
