@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { toast } from "sonner";
 import { PersistenceService } from "@/services/persistence.service";
-import type { PromptTemplate, CompiledPrompt, PromptFormData } from "@/types/litechat/prompt-template";
+import type { PromptTemplate, CompiledPrompt, PromptFormData, PromptTemplateType } from "@/types/litechat/prompt-template";
 import type { RegisteredActionHandler } from "@/types/litechat/control";
 import { promptTemplateEvent } from "@/types/litechat/events/prompt-template.events";
 
@@ -20,6 +20,11 @@ interface PromptTemplateActions {
   updatePromptTemplate: (id: string, updates: Partial<Omit<PromptTemplate, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<void>;
   deletePromptTemplate: (id: string) => Promise<void>;
   compilePromptTemplate: (templateId: string, formData: PromptFormData) => Promise<CompiledPrompt>;
+  // Helper methods for new functionality
+  getTemplatesByType: (type: PromptTemplateType) => PromptTemplate[];
+  getAgents: () => PromptTemplate[];
+  getTasksForAgent: (agentId: string) => PromptTemplate[];
+  getAvailableFollowUps: (templateId: string, type: PromptTemplateType) => PromptTemplate[];
   getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
@@ -211,6 +216,38 @@ export const usePromptTemplateStore = create(
         const errorMessage = error instanceof Error ? error.message : "Failed to compile prompt template";
         toast.error(errorMessage);
         throw error;
+      }
+    },
+
+    // Helper methods for new functionality
+    getTemplatesByType: (type: PromptTemplateType) => {
+      return get().promptTemplates.filter(template => template.type === type);
+    },
+
+    getAgents: () => {
+      return get().promptTemplates.filter(template => template.type === "agent");
+    },
+
+    getTasksForAgent: (agentId: string) => {
+      return get().promptTemplates.filter(template => 
+        template.type === "task" && template.parentId === agentId
+      );
+    },
+
+    getAvailableFollowUps: (templateId: string, type: PromptTemplateType) => {
+      const templates = get().promptTemplates;
+      const currentTemplate = templates.find(t => t.id === templateId);
+      
+      if (type === "task" && currentTemplate?.parentId) {
+        // For tasks, only show other tasks with the same parentId
+        return templates.filter(t => 
+          t.type === "task" && 
+          t.parentId === currentTemplate.parentId && 
+          t.id !== templateId
+        );
+      } else {
+        // For prompts and agents, show all prompts
+        return templates.filter(t => t.type === "prompt" && t.id !== templateId);
       }
     },
 

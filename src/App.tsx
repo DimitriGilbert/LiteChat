@@ -32,6 +32,7 @@ import { UrlParameterControlModule } from "@/controls/modules/UrlParameterContro
 import { ImageGenerationControlModule } from "@/controls/modules/ImageGenerationControlModule";
 import { RacePromptControlModule } from "@/controls/modules/RacePromptControlModule";
 import { PromptLibraryControlModule } from "@/controls/modules/PromptLibraryControlModule";
+import { AgentControlModule } from "@/controls/modules/AgentControlModule";
 
 // Import new/updated Settings Modules
 import { GeneralSettingsModule } from "@/controls/modules/GeneralSettingsModule";
@@ -83,6 +84,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   StructuredOutputControlModule,
   RacePromptControlModule,
   PromptLibraryControlModule,
+  AgentControlModule,
   GitSyncControlModule,
   ManualSyncSidebarControlModule,
   VfsToolsModule,

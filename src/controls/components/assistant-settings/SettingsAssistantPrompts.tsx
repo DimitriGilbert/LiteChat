@@ -45,6 +45,9 @@ interface PromptTemplateFormData {
   tags: string[];
   tools: string[];
   rules: string[];
+  type: "prompt" | "task" | "agent";
+  parentId?: string | null;
+  followUps?: string[];
 }
 
 const promptTemplateSchema = z.object({
@@ -64,6 +67,9 @@ const promptTemplateSchema = z.object({
   tags: z.array(z.string()),
   tools: z.array(z.string()),
   rules: z.array(z.string()),
+  type: z.enum(["prompt", "task", "agent"]),
+  parentId: z.string().nullable(),
+  followUps: z.array(z.string()),
 });
 
 // Mock tool selector module for the form
@@ -129,6 +135,9 @@ function PromptTemplateForm({
       tags: template?.tags || [],
       tools: template?.tools || [],
       rules: template?.rules || [],
+      type: template?.type || "prompt" as const,
+      parentId: template?.parentId || null,
+      followUps: template?.followUps || [],
     },
     validators: {
       onChangeAsync: promptTemplateSchema,
@@ -585,20 +594,23 @@ export const SettingsAssistantPrompts: React.FC = () => {
   >();
 
   const {
-    promptTemplates,
     loadPromptTemplates,
     addPromptTemplate,
     updatePromptTemplate,
     deletePromptTemplate,
+    getTemplatesByType,
   } = usePromptTemplateStore(
     useShallow((state) => ({
-      promptTemplates: state.promptTemplates,
       loadPromptTemplates: state.loadPromptTemplates,
       addPromptTemplate: state.addPromptTemplate,
       updatePromptTemplate: state.updatePromptTemplate,
       deletePromptTemplate: state.deletePromptTemplate,
+      getTemplatesByType: state.getTemplatesByType,
     }))
   );
+
+  // Filter to only show prompt type templates
+  const promptTypeTemplates = getTemplatesByType("prompt");
 
   useEffect(() => {
     loadPromptTemplates();
@@ -607,6 +619,7 @@ export const SettingsAssistantPrompts: React.FC = () => {
   const handleCreateTemplate = async (data: PromptTemplateFormData) => {
     await addPromptTemplate({
       ...data,
+      type: "prompt", // Always prompt type for this interface
       isPublic: false, // Always private for now
     });
   };
@@ -638,7 +651,7 @@ export const SettingsAssistantPrompts: React.FC = () => {
       label: "Templates",
       content: (
         <PromptTemplateList
-          templates={promptTemplates}
+          templates={promptTypeTemplates}
           onEdit={handleEdit}
           onDelete={handleDeleteTemplate}
         />

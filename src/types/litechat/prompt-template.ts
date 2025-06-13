@@ -7,6 +7,8 @@ export interface PromptVariable {
   instructions?: string;
 }
 
+export type PromptTemplateType = "prompt" | "task" | "agent";
+
 export interface PromptTemplate {
   id: string;
   name: string;
@@ -16,6 +18,9 @@ export interface PromptTemplate {
   tags: string[];
   tools?: string[]; // Tool names to auto-select
   rules?: string[]; // Rule names to auto-select
+  type: PromptTemplateType; // New field: prompt | task | agent
+  parentId?: string | null; // New field: for tasks, references the agent ID
+  followUps?: string[]; // New field: references to other prompt IDs
   isPublic: boolean;
   createdAt: Date;
   updatedAt: Date;
