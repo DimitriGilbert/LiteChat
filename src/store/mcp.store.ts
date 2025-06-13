@@ -452,6 +452,7 @@ export const useMcpStore = create(
         url: server.url,
         enabled: server.enabled,
       }));
+      return servers;
     },
   }))
 ); 

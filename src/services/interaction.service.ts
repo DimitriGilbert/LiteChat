@@ -14,7 +14,6 @@ import { useConversationStore } from "@/store/conversation.store";
 import { useVfsStore } from "@/store/vfs.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { usePromptStateStore } from "@/store/prompt.store";
-import { useMcpStore } from "@/store/mcp.store";
 import { PersistenceService } from "./persistence.service";
 import { runMiddleware, getContextSnapshot } from "@/lib/litechat/ai-helpers";
 import {
@@ -662,7 +661,7 @@ export const InteractionService = {
                   };
                   return await implementation(parsedArgs, contextWithFs);
                 } catch (e) {
-                  const toolError = e instanceof Error ? e.message : String(e);
+                  // const toolError = e instanceof Error ? e.message : String(e);
                   if (e instanceof z.ZodError) {
                     throw new Error(`Invalid arguments: ${e.errors
                       .map((err) => `${err.path.join(".")} (${err.message})`)
