@@ -38,6 +38,8 @@ export interface McpState {
   retryAttempts: number;
   retryDelay: number;
   connectionTimeout: number;
+  // Tool response settings
+  maxResponseSize: number;
   // Bridge configuration for stdio servers
   bridgeConfig: McpBridgeConfig;
 }
@@ -58,6 +60,9 @@ export interface McpActions {
   setRetryDelay: (delay: number) => void;
   setConnectionTimeout: (timeout: number) => void;
   
+  // Tool Response Settings
+  setMaxResponseSize: (size: number) => void;
+  
   // Bridge Configuration
   setBridgeConfig: (config: McpBridgeConfig) => void;
   
@@ -69,12 +74,16 @@ export interface McpActions {
   
   // Event Integration
   getRegisteredActionHandlers: () => RegisteredActionHandler[];
+  
+  // Proxy Configuration Export
+  exportProxyConfig: () => void;
 }
 
 // Default constants
 const DEFAULT_MCP_RETRY_ATTEMPTS = 3;
 const DEFAULT_MCP_RETRY_DELAY = 2000; // 2 seconds
 const DEFAULT_MCP_CONNECTION_TIMEOUT = 10000; // 10 seconds
+const DEFAULT_MCP_MAX_RESPONSE_SIZE = 128000; // 128KB - much more generous default
 
 const defaultMcpState: McpState = {
   servers: [],
@@ -84,6 +93,7 @@ const defaultMcpState: McpState = {
   retryAttempts: DEFAULT_MCP_RETRY_ATTEMPTS,
   retryDelay: DEFAULT_MCP_RETRY_DELAY,
   connectionTimeout: DEFAULT_MCP_CONNECTION_TIMEOUT,
+  maxResponseSize: DEFAULT_MCP_MAX_RESPONSE_SIZE,
   bridgeConfig: {},
 };
 
@@ -247,6 +257,19 @@ export const useMcpStore = create(
       emitter.emit(mcpEvent.connectionTimeoutChanged, { timeout: clampedTimeout });
     },
 
+    setMaxResponseSize: (size: number) => {
+      const clampedSize = Math.max(1000, Math.min(10000000, size)); // 1KB to 10MB range
+      set((state) => {
+        state.maxResponseSize = clampedSize;
+      });
+      
+      PersistenceService.saveSetting("mcpMaxResponseSize", clampedSize).catch((error: any) => {
+        console.error("Failed to persist MCP max response size:", error);
+      });
+      
+      emitter.emit(mcpEvent.maxResponseSizeChanged, { size: clampedSize });
+    },
+
     // Bridge Configuration Actions
     setBridgeConfig: (config: McpBridgeConfig) => {
       set((state) => {
@@ -286,12 +309,14 @@ export const useMcpStore = create(
           retryAttempts,
           retryDelay,
           connectionTimeout,
+          maxResponseSize,
           bridgeConfig,
         ] = await Promise.all([
           PersistenceService.loadSetting<McpServerConfig[]>("mcpServers", []),
           PersistenceService.loadSetting<number>("mcpRetryAttempts", DEFAULT_MCP_RETRY_ATTEMPTS),
           PersistenceService.loadSetting<number>("mcpRetryDelay", DEFAULT_MCP_RETRY_DELAY),
           PersistenceService.loadSetting<number>("mcpConnectionTimeout", DEFAULT_MCP_CONNECTION_TIMEOUT),
+          PersistenceService.loadSetting<number>("mcpMaxResponseSize", DEFAULT_MCP_MAX_RESPONSE_SIZE),
           PersistenceService.loadSetting<McpBridgeConfig>("mcpBridgeConfig", {}),
         ]);
         
@@ -300,6 +325,7 @@ export const useMcpStore = create(
           state.retryAttempts = retryAttempts;
           state.retryDelay = retryDelay;
           state.connectionTimeout = connectionTimeout;
+          state.maxResponseSize = maxResponseSize;
           state.bridgeConfig = bridgeConfig || {};
           state.loading = false;
         });
@@ -309,6 +335,7 @@ export const useMcpStore = create(
         emitter.emit(mcpEvent.retryAttemptsChanged, { attempts: retryAttempts });
         emitter.emit(mcpEvent.retryDelayChanged, { delay: retryDelay });
         emitter.emit(mcpEvent.connectionTimeoutChanged, { timeout: connectionTimeout });
+        emitter.emit(mcpEvent.maxResponseSizeChanged, { size: maxResponseSize });
         emitter.emit(mcpEvent.bridgeConfigChanged, { config: bridgeConfig || {} });
         
       } catch (error: any) {
@@ -327,6 +354,7 @@ export const useMcpStore = create(
         state.retryAttempts = DEFAULT_MCP_RETRY_ATTEMPTS;
         state.retryDelay = DEFAULT_MCP_RETRY_DELAY;
         state.connectionTimeout = DEFAULT_MCP_CONNECTION_TIMEOUT;
+        state.maxResponseSize = DEFAULT_MCP_MAX_RESPONSE_SIZE;
         state.bridgeConfig = {};
         state.loading = false;
         state.error = null;
@@ -338,6 +366,7 @@ export const useMcpStore = create(
         PersistenceService.saveSetting("mcpRetryAttempts", DEFAULT_MCP_RETRY_ATTEMPTS),
         PersistenceService.saveSetting("mcpRetryDelay", DEFAULT_MCP_RETRY_DELAY),
         PersistenceService.saveSetting("mcpConnectionTimeout", DEFAULT_MCP_CONNECTION_TIMEOUT),
+        PersistenceService.saveSetting("mcpMaxResponseSize", DEFAULT_MCP_MAX_RESPONSE_SIZE),
       ]).catch((error: any) => {
         console.error("Failed to clear MCP settings from storage:", error);
       });
@@ -347,6 +376,7 @@ export const useMcpStore = create(
       emitter.emit(mcpEvent.retryAttemptsChanged, { attempts: DEFAULT_MCP_RETRY_ATTEMPTS });
       emitter.emit(mcpEvent.retryDelayChanged, { delay: DEFAULT_MCP_RETRY_DELAY });
       emitter.emit(mcpEvent.connectionTimeoutChanged, { timeout: DEFAULT_MCP_CONNECTION_TIMEOUT });
+      emitter.emit(mcpEvent.maxResponseSizeChanged, { size: DEFAULT_MCP_MAX_RESPONSE_SIZE });
     },
 
     // Event Integration
@@ -396,6 +426,12 @@ export const useMcpStore = create(
           storeId: "mcpStore",
         },
         {
+          eventName: mcpEvent.setMaxResponseSizeRequest,
+          handler: (payload: { size: number }) => 
+            actions.setMaxResponseSize(payload.size),
+          storeId: "mcpStore",
+        },
+        {
           eventName: mcpEvent.loadMcpStateRequest,
           handler: () => actions.loadMcpState(),
           storeId: "mcpStore",
@@ -406,6 +442,16 @@ export const useMcpStore = create(
           storeId: "mcpStore",
         },
       ];
+    },
+
+    // Proxy Configuration Export
+    exportProxyConfig: () => {
+      const servers = get().servers.map(server => ({
+        id: server.id,
+        name: server.name,
+        url: server.url,
+        enabled: server.enabled,
+      }));
     },
   }))
 ); 

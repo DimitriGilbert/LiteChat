@@ -13,6 +13,7 @@ export const mcpEvent = {
   retryAttemptsChanged: "mcp.retry.attempts.changed",
   retryDelayChanged: "mcp.retry.delay.changed",
   connectionTimeoutChanged: "mcp.connection.timeout.changed",
+  maxResponseSizeChanged: "mcp.max.response.size.changed",
   bridgeConfigChanged: "mcp.bridge.config.changed",
 
   // Tool Lifecycle Events for Modding API
@@ -39,6 +40,7 @@ export const mcpEvent = {
   setRetryAttemptsRequest: "mcp.set.retry.attempts.request",
   setRetryDelayRequest: "mcp.set.retry.delay.request",
   setConnectionTimeoutRequest: "mcp.set.connection.timeout.request",
+  setMaxResponseSizeRequest: "mcp.set.max.response.size.request",
 } as const;
 
 export interface McpEventPayloads {
@@ -61,6 +63,7 @@ export interface McpEventPayloads {
   [mcpEvent.retryAttemptsChanged]: { attempts: number };
   [mcpEvent.retryDelayChanged]: { delay: number };
   [mcpEvent.connectionTimeoutChanged]: { timeout: number };
+  [mcpEvent.maxResponseSizeChanged]: { size: number };
   [mcpEvent.bridgeConfigChanged]: { config: McpBridgeConfig };
 
   // Tool Lifecycle Events for Modding API
@@ -136,4 +139,5 @@ export interface McpEventPayloads {
   [mcpEvent.setRetryAttemptsRequest]: { attempts: number };
   [mcpEvent.setRetryDelayRequest]: { delay: number };
   [mcpEvent.setConnectionTimeoutRequest]: { timeout: number };
+  [mcpEvent.setMaxResponseSizeRequest]: { size: number };
 } 

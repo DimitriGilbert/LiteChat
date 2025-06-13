@@ -8,10 +8,10 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PlusIcon, EditIcon, TrashIcon, ServerIcon, CheckCircleIcon, XCircleIcon, SaveIcon, XIcon, SettingsIcon, RotateCcwIcon } from "lucide-react";
+import { PlusIcon, EditIcon, TrashIcon, ServerIcon, CheckCircleIcon, XCircleIcon, SettingsIcon, RotateCcwIcon } from "lucide-react";
 import { useForm, type AnyFieldApi } from "@tanstack/react-form";
 import { z } from "zod";
-import { cn } from "@/lib/utils";
+
 import {
   TabbedLayout,
   TabDefinition,
@@ -35,22 +35,16 @@ const mcpServerFormSchema = z.object({
   enabled: z.boolean(),
 });
 
-const bridgeConfigFormSchema = z.object({
-  url: z.string(),
-  host: z.string(),
-  port: z.number().min(1, "Port must be > 0").max(65535, "Port must be < 65535").optional(),
-});
+// Bridge configuration uses inline validation
 
 const connectionConfigFormSchema = z.object({
   retryAttempts: z.number().min(0, "Min 0 attempts").max(10, "Max 10 attempts"),
   retryDelay: z.number().min(500, "Min 500ms").max(30000, "Max 30000ms"),
   connectionTimeout: z.number().min(1000, "Min 1000ms").max(60000, "Max 60000ms"),
+  maxResponseSize: z.number().min(1000, "Min 1KB").max(10000000, "Max 10MB"),
 });
 
 // Type inference from schemas
-type BridgeConfigFormData = z.infer<typeof bridgeConfigFormSchema>;
-type ConnectionConfigFormData = z.infer<typeof connectionConfigFormSchema>;
-
 type McpServerFormData = z.infer<typeof mcpServerFormSchema>;
 
 // Utility component for field validation messages
@@ -115,9 +109,10 @@ function BridgeConfigurationTab() {
       className="space-y-6"
     >
       <div>
-        <h3 className="font-medium">Stdio Bridge Configuration</h3>
+        <h3 className="font-medium">Dynamic MCP Bridge Configuration</h3>
         <p className="text-sm text-muted-foreground">
-          Configure where LiteChat looks for the MCP bridge service (required for stdio:// servers)
+          Configure where LiteChat looks for the dynamic MCP bridge service (required for stdio:// servers). 
+          Start the bridge with: <code className="bg-muted px-1 rounded">npm run mcp-proxy</code>
         </p>
       </div>
 
@@ -128,7 +123,7 @@ function BridgeConfigurationTab() {
             Bridge Location
           </CardTitle>
           <CardDescription>
-            Specify where your MCP bridge service is running
+            Specify where your dynamic MCP bridge is running (default: localhost:3001)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -145,7 +140,7 @@ function BridgeConfigurationTab() {
                     placeholder="http://192.168.1.100:3001"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Complete URL with protocol and port
+                    Complete URL where the dynamic MCP bridge is running
                   </p>
                   <FieldMetaMessages field={field} />
                 </div>
@@ -197,7 +192,7 @@ function BridgeConfigurationTab() {
               <li>Auto-detection fallback: localhost:3001</li>
             </ol>
             <p className="mt-2 text-xs">
-              Leave empty for auto-detection. For remote bridges, use full URL or configure host binding.
+              Leave empty for auto-detection. For remote bridge, use full URL or configure host binding.
             </p>
           </div>
         </CardContent>
@@ -259,17 +254,21 @@ function ConnectionSettingsTab() {
     retryAttempts,
     retryDelay,
     connectionTimeout,
+    maxResponseSize,
     setRetryAttempts,
     setRetryDelay,
     setConnectionTimeout,
+    setMaxResponseSize,
   } = useMcpStore(
     useShallow((state) => ({
       retryAttempts: state.retryAttempts,
       retryDelay: state.retryDelay,
       connectionTimeout: state.connectionTimeout,
+      maxResponseSize: state.maxResponseSize,
       setRetryAttempts: state.setRetryAttempts,
       setRetryDelay: state.setRetryDelay,
       setConnectionTimeout: state.setConnectionTimeout,
+      setMaxResponseSize: state.setMaxResponseSize,
     }))
   );
 
@@ -278,6 +277,7 @@ function ConnectionSettingsTab() {
       retryAttempts: retryAttempts,
       retryDelay: retryDelay,
       connectionTimeout: connectionTimeout,
+      maxResponseSize: maxResponseSize,
     },
     validators: {
       onChangeAsync: connectionConfigFormSchema,
@@ -287,6 +287,7 @@ function ConnectionSettingsTab() {
       setRetryAttempts(value.retryAttempts);
       setRetryDelay(value.retryDelay);
       setConnectionTimeout(value.connectionTimeout);
+      setMaxResponseSize(value.maxResponseSize);
     },
   });
 
@@ -296,14 +297,16 @@ function ConnectionSettingsTab() {
       retryAttempts: retryAttempts,
       retryDelay: retryDelay,
       connectionTimeout: connectionTimeout,
+      maxResponseSize: maxResponseSize,
     });
-  }, [retryAttempts, retryDelay, connectionTimeout, form]);
+  }, [retryAttempts, retryDelay, connectionTimeout, maxResponseSize, form]);
 
   const handleReset = () => {
     if (window.confirm("Reset connection settings to defaults?")) {
       setRetryAttempts(3);
       setRetryDelay(2000);
       setConnectionTimeout(10000);
+      setMaxResponseSize(128000); // 128KB default
     }
   };
 
@@ -331,7 +334,7 @@ function ConnectionSettingsTab() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <form.Field name="retryAttempts">
               {(field) => (
                 <div className="space-y-2">
@@ -399,6 +402,29 @@ function ConnectionSettingsTab() {
                 </div>
               )}
             </form.Field>
+            
+            <form.Field name="maxResponseSize">
+              {(field) => (
+                <div className="space-y-2">
+                  <Label htmlFor={field.name}>Max Response Size (bytes)</Label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    min="1000"
+                    max="10000000"
+                    step="1000"
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(parseInt(e.target.value) || 128000)}
+                    onBlur={field.handleBlur}
+                    placeholder="128000"
+                  />
+                  <FieldMetaMessages field={field} />
+                  <p className="text-xs text-muted-foreground">
+                    Max tool response size (1KB-10MB)
+                  </p>
+                </div>
+              )}
+            </form.Field>
           </div>
         </CardContent>
       </Card>
@@ -414,6 +440,7 @@ function ConnectionSettingsTab() {
               <li>Toast notifications will show connection status and retry progress</li>
               <li>Servers that fail all retry attempts will be marked as disconnected</li>
               <li>You can manually retry connections from the server cards in the Servers tab</li>
+              <li><strong>Max Response Size:</strong> Tool responses larger than this limit will be automatically truncated to prevent API errors</li>
             </ul>
           </div>
         </CardContent>
@@ -541,11 +568,11 @@ function ServerForm({
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   onBlur={field.handleBlur}
-                  placeholder="https://api.example.com/mcp or stdio://npx?args=-y,@modelcontextprotocol/server-filesystem,/path"
+                  placeholder="https://api.example.com/mcp or stdio://npx?args=-y,@modelcontextprotocol/server-filesystem,."
                 />
                 <FieldMetaMessages field={field} />
                 <p className="text-xs text-muted-foreground">
-                  HTTP/HTTPS URLs for remote servers, or stdio:// URLs for local servers via bridge
+                  HTTP/HTTPS URLs for remote servers, or stdio://command?args=arg1,arg2 for dynamic bridge servers
                 </p>
               </div>
             )}

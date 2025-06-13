@@ -14,6 +14,7 @@ import { useConversationStore } from "@/store/conversation.store";
 import { useVfsStore } from "@/store/vfs.store";
 import { useSettingsStore } from "@/store/settings.store";
 import { usePromptStateStore } from "@/store/prompt.store";
+import { useMcpStore } from "@/store/mcp.store";
 import { PersistenceService } from "./persistence.service";
 import { runMiddleware, getContextSnapshot } from "@/lib/litechat/ai-helpers";
 import {
@@ -549,16 +550,73 @@ export const InteractionService = {
       `[InteractionService] Using model instance for ${targetModelId}`
     );
 
-    const toolsWithExecute =
-      interactionType !== "conversation.title_generation"
-        ? (finalPrompt.metadata?.enabledTools ?? []).reduce((acc, name) => {
+    // Gather enabled tools (both regular and MCP)
+    const toolsWithExecute = interactionType !== "conversation.title_generation"
+      ? (finalPrompt.metadata?.enabledTools ?? []).reduce((acc, name) => {
+          // Check if this is an MCP tool
+          if (name.startsWith('mcp_')) {
+            // For MCP tools, get the actual tool from MCP clients
+            // Access MCP clients through the global module registry
+            const mcpToolsModule = (globalThis as any).mcpToolsModuleInstance as { mcpClients: Map<string, any> } | undefined;
+            
+            if (mcpToolsModule && mcpToolsModule.mcpClients) {
+              // Parse the MCP tool name: mcp_{serverName}_{toolName}
+              const parts = name.substring(4).split('_'); // Remove 'mcp_' prefix
+              if (parts.length >= 2) {
+                const serverName = parts[0];
+                const toolName = parts.slice(1).join('_'); // Handle tool names with underscores
+                
+                // Find the MCP client for this server
+                for (const [, clientInfo] of mcpToolsModule.mcpClients) {
+                  if (clientInfo.name === serverName && clientInfo.tools[toolName]) {
+                    // Get the properly registered tool from the control registry instead of raw MCP tool
+                    const allRegisteredTools = useControlRegistryStore.getState().getRegisteredTools();
+                    const registeredMcpToolName = `mcp_${serverName}_${toolName}`;
+                    const registeredToolInfo = allRegisteredTools[registeredMcpToolName];
+                    
+                    if (registeredToolInfo && registeredToolInfo.definition) {
+                      // Create a clean tool object for AI SDK - don't spread existing tool
+                      const toolDefinition: Tool<any> = {
+                        description: registeredToolInfo.definition.description,
+                        parameters: registeredToolInfo.definition.parameters,
+                        execute: async (args: any) => {
+                          if (registeredToolInfo.implementation) {
+                            // Use the registered implementation which already handles MCP calls properly
+                            return await registeredToolInfo.implementation(args, getContextSnapshot());
+                          } else {
+                            console.error(`[InteractionService] MCP tool ${toolName} has no implementation`);
+                            return {
+                              _isError: true,
+                              error: `MCP tool ${toolName} has no implementation`,
+                            };
+                          }
+                        }
+                      };
+                      
+                      acc[name] = toolDefinition;
+                      console.log(`[InteractionService] Adding enabled MCP tool: ${toolName} from server ${serverName} (via control registry)`);
+                      console.log(`[InteractionService] Tool ${toolName} has parameters type:`, typeof toolDefinition.parameters, toolDefinition.parameters?.constructor?.name);
+                    } else {
+                      console.warn(`[InteractionService] MCP tool ${registeredMcpToolName} not found in control registry`);
+                    }
+                    break;
+                  }
+                }
+              }
+            }
+          } else {
+            // Handle regular tools as before
             const allRegisteredTools = useControlRegistryStore
               .getState()
               .getRegisteredTools();
             const toolInfo = allRegisteredTools[name];
-            if (toolInfo?.implementation) {
-              const toolDefinition: Tool<any> = { ...toolInfo.definition };
-              toolDefinition.execute = async (args: any) => {
+            
+            if (toolInfo && toolInfo.implementation) {
+              // Create a clean tool object for AI SDK - don't spread existing tool
+              const toolDefinition: Tool<any> = {
+                description: toolInfo.definition.description,
+                parameters: toolInfo.definition.parameters,
+                execute: async (args: any) => {
                 const currentConvId =
                   useInteractionStore.getState().currentConversationId;
                 const conversation = currentConvId
@@ -623,12 +681,28 @@ export const InteractionService = {
                   }
                   return { _isError: true, error: toolError };
                 }
+                }
               };
               acc[name] = toolDefinition;
             }
-            return acc;
-          }, {} as Record<string, Tool<any>>)
-        : undefined;
+          }
+          return acc;
+        }, {} as Record<string, Tool<any>>)
+      : undefined;
+
+    // Check if the selected model supports tools
+    const { getSelectedModel } = useProviderStore.getState();
+    const selectedModel = getSelectedModel();
+    const modelSupportsTools = selectedModel?.metadata?.supported_parameters?.includes("tools") ?? false;
+
+    const enabledMcpTools = (finalPrompt.metadata?.enabledTools ?? []).filter(name => name.startsWith('mcp_')).length;
+    const enabledRegularTools = (finalPrompt.metadata?.enabledTools ?? []).filter(name => !name.startsWith('mcp_')).length;
+    
+    if (!modelSupportsTools && (enabledMcpTools > 0 || enabledRegularTools > 0)) {
+      console.warn(`[InteractionService] Model ${selectedModel?.name || 'unknown'} does not support tools. Ignoring ${enabledMcpTools + enabledRegularTools} enabled tools.`);
+    }
+    
+    console.log(`[InteractionService] Model supports tools: ${modelSupportsTools}. Using ${modelSupportsTools ? enabledRegularTools : 0} regular tools and ${modelSupportsTools ? enabledMcpTools : 0} MCP tools from ${(finalPrompt.metadata?.enabledTools ?? []).length} total enabled`);
 
     const maxSteps =
       finalPrompt.parameters?.maxSteps ??
@@ -647,14 +721,19 @@ export const InteractionService = {
       presencePenalty: finalPrompt.parameters?.presence_penalty,
       frequencyPenalty: finalPrompt.parameters?.frequency_penalty,
       maxSteps: maxSteps,
-      ...(toolsWithExecute &&
+      // Only include tools if the model supports them
+      ...(modelSupportsTools &&
+        toolsWithExecute &&
         Object.keys(toolsWithExecute).length > 0 && {
           tools: toolsWithExecute,
         }),
       ...(finalPrompt.parameters?.providerOptions && {
         providerOptions: finalPrompt.parameters.providerOptions,
       }),
-      toolChoice: finalPrompt.toolChoice
+      // Only set toolChoice if the model supports tools
+      ...(modelSupportsTools && finalPrompt.toolChoice && {
+        toolChoice: finalPrompt.toolChoice,
+      }),
     };
 
     // Define callbacks within startInteraction to capture interactionId and interactionType in scope
