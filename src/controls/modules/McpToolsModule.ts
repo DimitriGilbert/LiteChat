@@ -36,7 +36,7 @@ export class McpToolsModule implements ControlModule {
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApi = modApi;
-    console.log(`[${this.id}] Initializing MCP Tools Module...`);
+
     
     // Store global reference for AI service access
     (globalThis as any).mcpToolsModuleInstance = this;
@@ -53,11 +53,11 @@ export class McpToolsModule implements ControlModule {
 
   register(_modApi: LiteChatModApi): void {
     // Tools are registered dynamically when MCP clients connect
-    console.log(`[${this.id}] MCP Tools Module registered`);
+
   }
 
   destroy(): void {
-    console.log(`[${this.id}] Destroying MCP Tools Module...`);
+    
     
     // Clear all retry timeouts
     this.retryTimeouts.forEach((timeout) => {
@@ -90,7 +90,7 @@ export class McpToolsModule implements ControlModule {
   private setupEventListeners(): void {
     // Listen for MCP server changes
     const handleServersChanged = (_payload: any) => {
-      console.log(`[${this.id}] MCP servers configuration changed, reinitializing clients...`);
+  
       this.initializeMcpClients().catch(error => {
         console.error(`[${this.id}] Error reinitializing MCP clients:`, error);
       });
@@ -118,7 +118,7 @@ export class McpToolsModule implements ControlModule {
       const mcpState = useMcpStore.getState();
       const enabledServers = mcpState.servers.filter(server => server.enabled);
       
-      console.log(`[${this.id}] Initializing ${enabledServers.length} enabled MCP servers...`);
+  
       
       // Clear existing retry attempts and timeouts
       this.connectionAttempts.clear();
@@ -160,7 +160,7 @@ export class McpToolsModule implements ControlModule {
     const retryConfig = this.getRetryConfig();
     const currentAttempt = this.connectionAttempts.get(server.id) || 0;
     
-    console.log(`[${this.id}] Connecting to MCP server: ${server.name} (attempt ${currentAttempt + 1}/${retryConfig.maxAttempts + 1})`);
+    
     
     try {
       await this.connectToMcpServer(server);
@@ -200,7 +200,7 @@ export class McpToolsModule implements ControlModule {
         const nextAttempt = currentAttempt + 1;
         const delay = retryConfig.baseDelay * Math.pow(1.5, currentAttempt); // Exponential backoff
         
-        console.log(`[${this.id}] Scheduling retry for ${server.name} in ${delay}ms (attempt ${nextAttempt + 1}/${retryConfig.maxAttempts + 1})`);
+        
         
         const timeout = setTimeout(() => {
           this.retryTimeouts.delete(server.id);
@@ -229,7 +229,7 @@ export class McpToolsModule implements ControlModule {
   }
 
   private async connectToMcpServer(server: McpServerConfig): Promise<void> {
-    console.log(`[${this.id}] Attempting connection to MCP server: ${server.name} (${server.url})`);
+    
     
     const retryConfig = this.getRetryConfig();
     
@@ -241,7 +241,7 @@ export class McpToolsModule implements ControlModule {
       if (server.url.startsWith('stdio://')) {
         // Try stdio transport via multi-server bridge 
         // No timeout for stdio as it needs time to spawn the npx process
-        console.log(`[${this.id}] Using stdio transport for ${server.name} (no timeout - allows time for process startup)`);
+
         mcpClient = await this.connectWithStdioTransport(server);
         transportType = 'stdio';
       } else {
@@ -261,7 +261,7 @@ export class McpToolsModule implements ControlModule {
           ]);
           transportType = 'streamable-http';
         } catch (streamableError) {
-          console.log(`[${this.id}] Streamable HTTP failed for ${server.name}, falling back to SSE transport:`, streamableError);
+
           
           // Fallback to deprecated SSE transport for backwards compatibility
           mcpClient = await Promise.race([
@@ -272,12 +272,11 @@ export class McpToolsModule implements ControlModule {
         }
       }
       
-      console.log(`[${this.id}] About to handle successful connection for ${server.name} with transport ${transportType}`);
-      console.log(`[${this.id}] MCP client object for ${server.name}:`, mcpClient);
+      
       
       await this.handleSuccessfulConnection(server, mcpClient, transportType);
       
-      console.log(`[${this.id}] Successfully handled connection for ${server.name}`);
+      
       
     } catch (error) {
       // Enhance error messages for common issues
@@ -308,7 +307,7 @@ export class McpToolsModule implements ControlModule {
    * Attempt connection using the new Streamable HTTP transport (MCP 2025-03-26)
    */
   private async connectWithStreamableHttp(server: McpServerConfig): Promise<any> {
-    console.log(`[${this.id}] Trying Streamable HTTP transport for ${server.name}`);
+    
     
     // For Streamable HTTP, we need to implement a custom transport that follows the new spec
     // Since the Vercel AI SDK doesn't yet support Streamable HTTP natively, 
@@ -350,7 +349,7 @@ export class McpToolsModule implements ControlModule {
    * Connect directly to bridge and get tools - NO AI SDK BULLSHIT!
    */
   private async connectWithStdioTransport(server: McpServerConfig): Promise<any> {
-    console.log(`[${this.id}] Connecting directly to bridge for ${server.name}`);
+    
     
     // Check if this is a stdio server configuration
     if (!server.url.startsWith('stdio://')) {
@@ -383,7 +382,7 @@ export class McpToolsModule implements ControlModule {
       
       const serverEndpoint = `${bridgeUrl}/servers/${serverName}/mcp?${params.toString()}`;
       
-      console.log(`[${this.id}] Starting bridge server: ${serverEndpoint}`);
+      
       
       // Get the tools list by making a POST request with tools/list method
       // The bridge will create the server automatically on the first request
@@ -406,7 +405,7 @@ export class McpToolsModule implements ControlModule {
       }
       
       const toolsResult = await toolsResponse.json();
-      console.log(`[${this.id}] Raw tools response:`, toolsResult);
+      
       
       if (toolsResult.error) {
         throw new Error(`Tools request failed: ${toolsResult.error.message}`);
@@ -462,7 +461,7 @@ export class McpToolsModule implements ControlModule {
    * Fallback to the deprecated SSE transport for backwards compatibility
    */
   private async connectWithSseTransport(server: McpServerConfig): Promise<any> {
-    console.log(`[${this.id}] Using SSE transport (deprecated) for ${server.name}`);
+    
     
     return experimental_createMCPClient({
       transport: {
@@ -482,7 +481,7 @@ export class McpToolsModule implements ControlModule {
     
     return {
       async start(): Promise<void> {
-        console.log(`[${this.id}] Starting Streamable HTTP transport for ${server.name}`);
+  
         
         // Send InitializeRequest to establish session
         const initResponse = await fetch(server.url, {
@@ -544,9 +543,7 @@ export class McpToolsModule implements ControlModule {
           throw new Error(`Failed to send initialized notification: ${initializedResponse.status}`);
         }
         
-        isConnected = true;
-        console.log(`[${this.id}] Successfully initialized Streamable HTTP connection for ${server.name}`, 
-                   sessionId ? `with session ID: ${sessionId}` : 'without session management');
+                  isConnected = true;
       },
       
       async send(message: any): Promise<void> {
@@ -585,7 +582,7 @@ export class McpToolsModule implements ControlModule {
           if (reader) {
             // Process SSE events
             // This would need full SSE parsing implementation
-            console.log(`[${this.id}] Received SSE stream response`);
+    
           }
         } else if (contentType.includes('application/json')) {
           // Handle single JSON response
@@ -607,7 +604,7 @@ export class McpToolsModule implements ControlModule {
               },
             });
           } catch (error) {
-            console.log(`[${this.id}] Session termination not supported or failed:`, error);
+
           }
         }
         isConnected = false;
@@ -630,13 +627,12 @@ export class McpToolsModule implements ControlModule {
     mcpClient: any, 
     transportType: 'streamable-http' | 'sse' | 'stdio'
   ): Promise<void> {
-    console.log(`[${this.id}] Getting tools from MCP server ${server.name}...`);
+    
     
     // Get available tools from our simple bridge client
     let tools;
     try {
-      console.log(`[${this.id}] Getting tools from bridge client for ${server.name}...`);
-      console.log(`[${this.id}] Bridge Client object:`, mcpClient);
+      
       
       // Our simple client already has the tools from the bridge
       if (mcpClient.tools && Array.isArray(mcpClient.tools)) {
@@ -649,21 +645,20 @@ export class McpToolsModule implements ControlModule {
           };
         });
         
-        console.log(`[${this.id}] Converted ${mcpClient.tools.length} tools from bridge format`);
-        console.log(`[${this.id}] Tools:`, Object.keys(tools));
+
       } else {
         console.error(`[${this.id}] Bridge client missing tools array:`, mcpClient);
         throw new Error('Bridge client missing tools array');
       }
       
-      console.log(`[${this.id}] Successfully retrieved tools from ${server.name}:`, Object.keys(tools));
+      
     } catch (error) {
       console.error(`[${this.id}] Failed to retrieve tools from ${server.name}:`, error);
       console.error(`[${this.id}] Error stack:`, error instanceof Error ? error.stack : 'No stack trace available');
       throw error;
     }
     
-    console.log(`[${this.id}] Connected to MCP server ${server.name} via ${transportType}, found ${Object.keys(tools).length} tools`);
+    
     
     // Store the client with transport info
     const clientInfo: McpClient = {
@@ -677,11 +672,7 @@ export class McpToolsModule implements ControlModule {
     this.mcpClients.set(server.id, clientInfo);
     
     // Register MCP tools for individual control (but mark them as MCP tools)
-    console.log(`[${this.id}] MCP server ${server.name} provides ${Object.keys(tools).length} tools: ${Object.keys(tools).join(', ')}`);
-    
     // Store tools for later registration when user enables them
-    console.log(`[${this.id}] Storing ${Object.keys(tools).length} discovered tools for ${server.name}`);
-    console.log(`[${this.id}] Available tools:`, Object.keys(tools));
     
     // Update the existing clientInfo with the tools
     clientInfo.tools = tools;
@@ -691,18 +682,56 @@ export class McpToolsModule implements ControlModule {
       Object.entries(tools).forEach(([toolName, tool]) => {
         const prefixedToolName = `mcp_${server.name}_${toolName}`;
         
-        console.log(`[${this.id}] Registering MCP tool with LiteChat: ${prefixedToolName}`);
+
         
         // Tool definition for LiteChat registry
         const mcpTool = tool as any; // MCP tool from bridge
         
         // Convert JSON schema to Zod schema
         let parametersSchema: z.ZodSchema<any>;
-        if (mcpTool.parameters && typeof mcpTool.parameters === 'object') {
-          // The MCP tool has a JSON schema - we need to create a Zod schema that accepts any object
-          // The actual validation will be done by the MCP server
-          console.log(`[${this.id}] Converting JSON schema to Zod for tool ${toolName}:`, mcpTool.parameters);
-          parametersSchema = z.record(z.any()).describe(`Parameters for MCP tool ${toolName}`);
+        if (mcpTool.parameters && typeof mcpTool.parameters === 'object' && mcpTool.parameters.properties) {
+          // Convert JSON schema properties to Zod object
+          const zodObject: Record<string, z.ZodSchema<any>> = {};
+          const required = mcpTool.parameters.required || [];
+          
+          for (const [propName, propSchema] of Object.entries(mcpTool.parameters.properties as Record<string, any>)) {
+            let zodProp: z.ZodSchema<any>;
+            
+            // Basic type conversion from JSON schema to Zod
+            switch (propSchema.type) {
+              case 'string':
+                zodProp = z.string();
+                break;
+              case 'number':
+                zodProp = z.number();
+                break;
+              case 'boolean':
+                zodProp = z.boolean();
+                break;
+              case 'array':
+                zodProp = z.array(z.any());
+                break;
+              case 'object':
+                zodProp = z.object({}).passthrough();
+                break;
+              default:
+                zodProp = z.any();
+            }
+            
+            // Add description if available
+            if (propSchema.description) {
+              zodProp = zodProp.describe(propSchema.description);
+            }
+            
+            // Make optional if not in required array
+            if (!required.includes(propName)) {
+              zodProp = zodProp.optional();
+            }
+            
+            zodObject[propName] = zodProp;
+          }
+          
+          parametersSchema = z.object(zodObject);
         } else {
           // No parameters or invalid parameters
           parametersSchema = z.object({});
@@ -715,43 +744,34 @@ export class McpToolsModule implements ControlModule {
         
         // Tool implementation that calls the MCP bridge
         const toolImplementation = async (args: any) => {
-          try {
-            console.log(`[McpToolsModule] Executing MCP tool ${toolName} from server ${server.name} with args:`, args);
-            
-            const result = await clientInfo.client.callTool({
-              name: toolName,
-              arguments: args
-            });
-            
-            console.log(`[McpToolsModule] MCP bridge returned for ${toolName}:`, JSON.stringify(result, null, 2));
-            
-            // Extract the actual content from MCP result format
-            if (result && result.content) {
-              if (Array.isArray(result.content)) {
-                // Handle array of content items
-                const textContent = result.content
-                  .map((item: any) => {
-                    if (item.type === 'text') {
-                      return item.text;
-                    } else if (item.type === 'image') {
-                      return `[Image: ${item.mimeType || 'unknown format'}]`;
-                    }
-                    return JSON.stringify(item);
-                  })
-                  .join('\n');
-                return textContent;
-              } else if (typeof result.content === 'string') {
-                return result.content;
-              } else {
-                return JSON.stringify(result.content);
-              }
+          const result = await clientInfo.client.callTool({
+            name: toolName,
+            arguments: args
+          });
+          
+          // Extract the actual content from MCP result format
+          if (result && result.content) {
+            if (Array.isArray(result.content)) {
+              // Handle array of content items
+              const textContent = result.content
+                .map((item: any) => {
+                  if (item.type === 'text') {
+                    return item.text;
+                  } else if (item.type === 'image') {
+                    return `[Image: ${item.mimeType || 'unknown format'}]`;
+                  }
+                  return JSON.stringify(item);
+                })
+                .join('\n');
+              return textContent;
+            } else if (typeof result.content === 'string') {
+              return result.content;
             } else {
-              // Fallback to stringifying the whole result
-              return JSON.stringify(result);
+              return JSON.stringify(result.content);
             }
-          } catch (error) {
-            console.error(`[McpToolsModule] Error executing MCP tool ${toolName}:`, error);
-            throw error;
+          } else {
+            // Fallback to stringifying the whole result
+            return JSON.stringify(result);
           }
         };
         
@@ -772,12 +792,11 @@ export class McpToolsModule implements ControlModule {
           toolDefinition: mcpTool,
         });
         
-        console.log(`[${this.id}] MCP tool registered with LiteChat: ${prefixedToolName}`);
+
       });
     }
     
     // Update server status to indicate successful connection
-    console.log(`[${this.id}] Updating server status for ${server.name} with ${Object.keys(tools).length} tools`);
     const mcpState = useMcpStore.getState();
     mcpState.setServerStatus({
       serverId: server.id,
@@ -787,7 +806,6 @@ export class McpToolsModule implements ControlModule {
       toolCount: Object.keys(tools).length,
       tools: Object.keys(tools),
     });
-    console.log(`[${this.id}] Server status updated for ${server.name}`);
     
     // DON'T emit serversChanged - that would trigger infinite reconnection loop!
     // The UI will be updated by the server status changes through the MCP store
@@ -815,7 +833,7 @@ export class McpToolsModule implements ControlModule {
     }
     
     if (!server.enabled) {
-      console.log(`[${this.id}] Server ${server.name} is disabled, skipping retry`);
+
       return;
     }
     
@@ -884,7 +902,7 @@ export class McpToolsModule implements ControlModule {
     
     const prefixedToolName = `mcp_${clientInfo.name}_${toolName}`;
     
-    console.log(`[${this.id}] Registering MCP tool with AI SDK: ${prefixedToolName}`);
+    
     
     try {
       // Tool definition (without execute function)
@@ -895,53 +913,42 @@ export class McpToolsModule implements ControlModule {
       
       // Tool implementation (separate from definition)
       const toolImplementation = async (args: any) => {
-        try {
-          console.log(`[McpToolsModule] Executing MCP tool ${toolName} from server ${clientInfo.name} with args:`, args);
-          
-          // Use our bridge client to call the tool
-          const result = await clientInfo.client.callTool({
-            name: toolName,
-            arguments: args
-          });
-          
-          console.log(`[McpToolsModule] Bridge tool result for ${toolName}:`, result);
-          
-          // Handle MCP tool response format
-          let content = "";
-          if (result && result.content) {
-            if (Array.isArray(result.content)) {
-              content = result.content
-                .map((item: any) => {
-                  if (item.type === 'text') {
-                    return item.text;
-                  } else if (item.type === 'image') {
-                    return `[Image: ${item.mimeType || 'unknown format'}]`;
-                  }
-                  return JSON.stringify(item);
-                })
-                .join('\n');
-            } else if (typeof result.content === 'string') {
-              content = result.content;
-            } else {
-              content = JSON.stringify(result.content);
-            }
+        // Use our bridge client to call the tool
+        const result = await clientInfo.client.callTool({
+          name: toolName,
+          arguments: args
+        });
+        
+        // Handle MCP tool response format
+        let content = "";
+        if (result && result.content) {
+          if (Array.isArray(result.content)) {
+            content = result.content
+              .map((item: any) => {
+                if (item.type === 'text') {
+                  return item.text;
+                } else if (item.type === 'image') {
+                  return `[Image: ${item.mimeType || 'unknown format'}]`;
+                }
+                return JSON.stringify(item);
+              })
+              .join('\n');
+          } else if (typeof result.content === 'string') {
+            content = result.content;
           } else {
-            content = JSON.stringify(result);
+            content = JSON.stringify(result.content);
           }
-          
-          // Truncate very large responses to prevent API errors
-          const { maxResponseSize } = useMcpStore.getState();
-          if (content.length > maxResponseSize) {
-            console.warn(`[McpToolsModule] MCP tool ${toolName} response too large (${content.length} chars), truncating to ${maxResponseSize} chars`);
-            content = content.substring(0, maxResponseSize) + '\n\n[... response truncated due to size ...]';
-          }
-          
-          console.log(`[McpToolsModule] Returning content for ${toolName}:`, content.substring(0, 200) + '...');
-          return content;
-        } catch (error) {
-          console.error(`[McpToolsModule] Error executing MCP tool ${toolName}:`, error);
-          throw error;
+        } else {
+          content = JSON.stringify(result);
         }
+        
+        // Truncate very large responses to prevent API errors
+        const { maxResponseSize } = useMcpStore.getState();
+        if (content.length > maxResponseSize) {
+          content = content.substring(0, maxResponseSize) + '\n\n[... response truncated due to size ...]';
+        }
+        
+        return content;
       };
       
       // Register the MCP tool with proper 3-parameter format
@@ -951,7 +958,7 @@ export class McpToolsModule implements ControlModule {
         toolImplementation
       );
       
-      console.log(`[${this.id}] MCP tool registered with AI SDK: ${prefixedToolName}`);
+      
       
       // Track for cleanup
       this.mcpToolUnregisterCallbacks.push(unregisterTool);
@@ -983,7 +990,7 @@ export class McpToolsModule implements ControlModule {
     }
     
     const prefixedToolName = `mcp_${clientInfo.name}_${toolName}`;
-    console.log(`[${this.id}] Unregistering MCP tool from AI SDK: ${prefixedToolName}`);
+
     
          // Find and call the unregister callback for this specific tool
      // Note: This is a limitation - we don't track individual tool unregister callbacks

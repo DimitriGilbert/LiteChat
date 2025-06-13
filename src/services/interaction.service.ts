@@ -585,17 +585,12 @@ export const InteractionService = {
                             return await registeredToolInfo.implementation(args, getContextSnapshot());
                           } else {
                             console.error(`[InteractionService] MCP tool ${toolName} has no implementation`);
-                            return {
-                              _isError: true,
-                              error: `MCP tool ${toolName} has no implementation`,
-                            };
+                            throw new Error(`MCP tool ${toolName} has no implementation`);
                           }
                         }
                       };
                       
                       acc[name] = toolDefinition;
-                      console.log(`[InteractionService] Adding enabled MCP tool: ${toolName} from server ${serverName} (via control registry)`);
-                      console.log(`[InteractionService] Tool ${toolName} has parameters type:`, typeof toolDefinition.parameters, toolDefinition.parameters?.constructor?.name);
                     } else {
                       console.warn(`[InteractionService] MCP tool ${registeredMcpToolName} not found in control registry`);
                     }
@@ -654,10 +649,7 @@ export const InteractionService = {
                     );
                   }
                 } catch (initError: any) {
-                  return {
-                    _isError: true,
-                    error: `Filesystem error: ${initError.message}`,
-                  };
+                  throw new Error(`Filesystem error: ${initError.message}`);
                 }
                 try {
                   const contextSnapshot = getContextSnapshot();
@@ -672,14 +664,11 @@ export const InteractionService = {
                 } catch (e) {
                   const toolError = e instanceof Error ? e.message : String(e);
                   if (e instanceof z.ZodError) {
-                    return {
-                      _isError: true,
-                      error: `Invalid arguments: ${e.errors
-                        .map((err) => `${err.path.join(".")} (${err.message})`)
-                        .join(", ")}`,
-                    };
+                    throw new Error(`Invalid arguments: ${e.errors
+                      .map((err) => `${err.path.join(".")} (${err.message})`)
+                      .join(", ")}`);
                   }
-                  return { _isError: true, error: toolError };
+                  throw new Error(e instanceof Error ? e.message : String(e));
                 }
                 }
               };
@@ -702,7 +691,7 @@ export const InteractionService = {
       console.warn(`[InteractionService] Model ${selectedModel?.name || 'unknown'} does not support tools. Ignoring ${enabledMcpTools + enabledRegularTools} enabled tools.`);
     }
     
-    console.log(`[InteractionService] Model supports tools: ${modelSupportsTools}. Using ${modelSupportsTools ? enabledRegularTools : 0} regular tools and ${modelSupportsTools ? enabledMcpTools : 0} MCP tools from ${(finalPrompt.metadata?.enabledTools ?? []).length} total enabled`);
+
 
     const maxSteps =
       finalPrompt.parameters?.maxSteps ??
