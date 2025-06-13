@@ -112,16 +112,24 @@ const createMockToolSelectorModule = (
   getSelectedItemId: () => "mock-id",
   getSelectedItemType: () => "conversation" as const,
   getGlobalDefaultMaxSteps: () => 5,
+  getMaxStepsOverride: () => null,
+  setMaxStepsOverride: () => {},
+  getIsStreaming: () => false,
+  getIsVisible: () => true,
+  getAllToolsCount: () => 0,
+  setNotifyCallback: () => {},
 });
 
 function AgentForm({
   agent,
   onSubmit,
   onSuccess,
+  onManageTasks,
 }: {
   agent?: PromptTemplate;
   onSubmit: (data: AgentFormData) => void;
   onSuccess: () => void;
+  onManageTasks?: (agent: PromptTemplate) => void;
 }) {
   const [newVariable, setNewVariable] = useState<PromptVariable>({
     name: "",
@@ -149,14 +157,18 @@ function AgentForm({
     }))
   );
 
-  const { getTemplatesByType } = usePromptTemplateStore(
+  const { getTemplatesByType, getTasksForAgent } = usePromptTemplateStore(
     useShallow((state) => ({
       getTemplatesByType: state.getTemplatesByType,
+      getTasksForAgent: state.getTasksForAgent,
     }))
   );
 
   // Get only prompt type templates for follow-ups
   const promptTemplates = getTemplatesByType("prompt");
+  
+  // Get tasks for this agent (if editing)
+  const agentTasks = agent ? getTasksForAgent(agent.id) : [];
 
   useEffect(() => {
     loadRulesAndTags();
@@ -570,6 +582,17 @@ function AgentForm({
             <Save className="h-4 w-4 mr-2" />
             {agent ? "Update Agent" : "Create Agent"}
           </Button>
+          {agent && onManageTasks && (
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onManageTasks(agent)}
+              className="flex items-center gap-2"
+            >
+              <Edit className="h-4 w-4" />
+              Tasks ({agentTasks.length})
+            </Button>
+          )}
         </div>
       </form>
     </div>
@@ -1420,6 +1443,7 @@ export const SettingsAssistantAgent: React.FC = () => {
           agent={editingAgent}
           onSubmit={handleUpdateAgent}
           onSuccess={handleFormSuccess}
+          onManageTasks={handleManageTasks}
         />
       ),
     });

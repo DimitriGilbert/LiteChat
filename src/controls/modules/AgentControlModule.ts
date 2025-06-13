@@ -19,6 +19,13 @@ export class AgentControlModule implements ControlModule {
   private isLoadingTemplates = true;
   private notifyComponentUpdate: (() => void) | null = null;
 
+  // Agent state for the current turn
+  private currentAgentId: string | null = null;
+  private currentAgentSystemPrompt: string | null = null;
+  
+  // Auto-clear setting
+  private autoClearEnabled = false;
+
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApiRef = modApi;
 
@@ -36,7 +43,7 @@ export class AgentControlModule implements ControlModule {
 
     const unsubTemplateAdded = modApi.on(promptTemplateEvent.promptTemplateAdded, (payload) => {
       if (payload?.promptTemplate) {
-        this.allTemplates.push(payload.promptTemplate);
+        this.allTemplates = [...this.allTemplates, payload.promptTemplate];
         this.notifyComponentUpdate?.();
       }
     });
@@ -86,13 +93,89 @@ export class AgentControlModule implements ControlModule {
     return await compilePromptTemplate(templateId, formData);
   };
 
+  public compileTaskTemplate = async (taskId: string, formData: PromptFormData): Promise<CompiledPrompt> => {
+    const { compilePromptTemplate } = usePromptTemplateStore.getState();
+    return await compilePromptTemplate(taskId, formData);
+  };
+
   public applyTemplate = async (templateId: string, formData: PromptFormData): Promise<void> => {
     const compiled = await this.compileTemplate(templateId, formData);
     this.modApiRef?.emit(promptEvent.setInputTextRequest, { text: compiled.content });
+    
+    // Apply tools and rules if available
+    if (compiled.selectedTools && compiled.selectedTools.length > 0) {
+      // TODO: Apply tools - need to emit tool selection events
+    }
+    if (compiled.selectedRules && compiled.selectedRules.length > 0) {
+      // TODO: Apply rules - need to emit rule selection events  
+    }
+  };
+
+  public applyAgent = async (agentId: string, formData: PromptFormData): Promise<void> => {
+    const compiled = await this.compileTemplate(agentId, formData);
+    
+    // Store agent state for the current turn
+    this.currentAgentId = agentId;
+    this.currentAgentSystemPrompt = compiled.content;
+    
+    // Notify component to update UI
+    this.notifyComponentUpdate?.();
+    
+    // Apply tools and rules if available
+    if (compiled.selectedTools && compiled.selectedTools.length > 0) {
+      // TODO: Apply tools - need to emit tool selection events
+    }
+    if (compiled.selectedRules && compiled.selectedRules.length > 0) {
+      // TODO: Apply rules - need to emit rule selection events  
+    }
+  };
+
+  public applyAgentWithTask = async (
+    agentId: string, 
+    taskId: string, 
+    agentFormData: PromptFormData, 
+    taskFormData: PromptFormData
+  ): Promise<void> => {
+    // First apply the agent (system prompt + tools/rules)
+    await this.applyAgent(agentId, agentFormData);
+    
+    // Then apply the task content to input
+    const taskCompiled = await this.compileTemplate(taskId, taskFormData);
+    this.modApiRef?.emit(promptEvent.setInputTextRequest, { text: taskCompiled.content });
+    
+    // Apply additional task tools and rules
+    if (taskCompiled.selectedTools && taskCompiled.selectedTools.length > 0) {
+      // TODO: Apply additional tools
+    }
+    if (taskCompiled.selectedRules && taskCompiled.selectedRules.length > 0) {
+      // TODO: Apply additional rules
+    }
+  };
+
+  // Getters for current agent state
+  public getCurrentAgentId = (): string | null => this.currentAgentId;
+  public getCurrentAgentSystemPrompt = (): string | null => this.currentAgentSystemPrompt;
+  public hasActiveAgent = (): boolean => this.currentAgentId !== null;
+
+  // Auto-clear methods
+  public getAutoClearEnabled = (): boolean => this.autoClearEnabled;
+  public setAutoClearEnabled = (enabled: boolean): void => {
+    this.autoClearEnabled = enabled;
+  };
+
+  // Clear agent state manually
+  public clearOnSubmit = (): void => {
+    this.currentAgentId = null;
+    this.currentAgentSystemPrompt = null;
+    this.notifyComponentUpdate?.();
   };
 
   public setNotifyCallback = (cb: (() => void) | null) => {
     this.notifyComponentUpdate = cb;
+  };
+
+  public loadPromptTemplates = (): void => {
+    this.modApiRef?.emit(promptTemplateEvent.loadPromptTemplatesRequest, {});
   };
 
   register(modApi: LiteChatModApi): void {
@@ -105,6 +188,19 @@ export class AgentControlModule implements ControlModule {
       id: this.id,
       status: () => "ready",
       triggerRenderer: () => React.createElement(AgentControl, { module: this }),
+      getMetadata: () => {
+        // Provide agent system prompt if an agent is active
+        if (this.currentAgentSystemPrompt) {
+          return { turnSystemPrompt: this.currentAgentSystemPrompt };
+        }
+        return undefined;
+      },
+      clearOnSubmit: () => {
+        // Clear agent state after submission
+        this.currentAgentId = null;
+        this.currentAgentSystemPrompt = null;
+        this.notifyComponentUpdate?.();
+      },
     });
 
     this.unregisterCallback = modApi.registerSettingsTab({

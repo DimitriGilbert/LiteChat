@@ -224,12 +224,15 @@ export const PromptLibraryControl: React.FC<PromptLibraryControlProps> = ({ modu
   // Use ref for preview DOM element - direct manipulation, no re-renders
   const previewElementRef = useRef<HTMLDivElement | null>(null);
 
-  const { promptTemplates, loadPromptTemplates } = usePromptTemplateStore(
+  const { loadPromptTemplates, getTemplatesByType } = usePromptTemplateStore(
     useShallow((state) => ({
-      promptTemplates: state.promptTemplates,
       loadPromptTemplates: state.loadPromptTemplates,
+      getTemplatesByType: state.getTemplatesByType,
     }))
   );
+
+  // Filter to only show prompt type templates (not agents or tasks)
+  const promptTypeTemplates = getTemplatesByType("prompt");
 
   useEffect(() => {
     if (isModalOpen) {
@@ -315,7 +318,7 @@ export const PromptLibraryControl: React.FC<PromptLibraryControlProps> = ({ modu
               />
             ) : (
               <PromptTemplateSelector
-                templates={promptTemplates}
+                templates={promptTypeTemplates}
                 onSelect={handleTemplateSelect}
               />
             )}

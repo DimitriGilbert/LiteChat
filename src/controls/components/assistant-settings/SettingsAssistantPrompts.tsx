@@ -85,6 +85,12 @@ const createMockToolSelectorModule = (
   getSelectedItemId: () => "mock-id",
   getSelectedItemType: () => "conversation" as const,
   getGlobalDefaultMaxSteps: () => 5,
+  getMaxStepsOverride: () => null,
+  setMaxStepsOverride: () => {},
+  getIsStreaming: () => false,
+  getIsVisible: () => true,
+  getAllToolsCount: () => 0,
+  setNotifyCallback: () => {},
 });
 
 function PromptTemplateForm({
