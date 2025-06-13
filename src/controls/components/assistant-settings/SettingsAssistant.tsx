@@ -15,6 +15,7 @@ import { SettingsAssistantParameters } from "./SettingsAssistantParameters";
 import { SettingsAssistantTools } from "./SettingsAssistantTools";
 import { SettingsAssistantTitles } from "./SettingsAssistantTitles";
 import { SettingsAssistantPrompts } from "./SettingsAssistantPrompts";
+import { SettingsAssistantMcp } from "./SettingsAssistantMcp";
 
 const SettingsAssistantComponent: React.FC = () => {
   const { resetAssistantSettings } = useSettingsStore(
@@ -49,6 +50,11 @@ const SettingsAssistantComponent: React.FC = () => {
         value: "tools",
         label: "Tools",
         content: <SettingsAssistantTools />,
+      },
+      {
+        value: "mcp",
+        label: "MCP",
+        content: <SettingsAssistantMcp />,
       },
       {
         value: "titles",

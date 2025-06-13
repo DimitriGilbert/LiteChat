@@ -47,6 +47,8 @@ export interface CustomThemeColors {
   chart5?: string;
 }
 
+
+
 export interface SettingsState {
   theme: "light" | "dark" | "system" | "TijuLight" | "TijuDark" | "custom";
   globalSystemPrompt: string | null;
@@ -616,7 +618,6 @@ export const useSettingsStore = create(
         emitter.emit(settingsEvent.loaded, { settings: get() });
       }
     },
-
     resetGeneralSettings: async () => {
       try {
         get().setEnableStreamingMarkdown(DEFAULT_ENABLE_STREAMING_MARKDOWN);

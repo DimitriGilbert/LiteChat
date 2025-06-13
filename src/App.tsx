@@ -17,6 +17,7 @@ import { GitSyncControlModule } from "@/controls/modules/GitSyncControlModule";
 import { ManualSyncSidebarControlModule } from "@/controls/modules/ManualSyncSidebarControlModule";
 import { VfsToolsModule } from "@/controls/modules/VfsToolsModule";
 import { GitToolsModule } from "@/controls/modules/GitToolsModule";
+import { McpToolsModule } from "@/controls/modules/McpToolsModule";
 import { ToolSelectorControlModule } from "@/controls/modules/ToolSelectorControlModule";
 import { ProjectSettingsControlModule } from "@/controls/modules/ProjectSettingsControlModule";
 import { GlobalModelSelectorModule } from "@/controls/modules/GlobalModelSelectorModule";
@@ -86,6 +87,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   ManualSyncSidebarControlModule,
   VfsToolsModule,
   GitToolsModule,
+  McpToolsModule,
   // Canvas Action Controls
   CopyActionControlModule, // For InteractionCard header
   FoldInteractionControlModule, // For InteractionCard header

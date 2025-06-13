@@ -36,6 +36,7 @@
 - **Git Integration**: Clone, commit, push, pull directly in the browser
 - **Code Block Enhancements**: Filepath syntax, individual downloads, ZIP exports
 - **Tool System**: AI can read/write files, execute Git commands, and more
+- **MCP Integration**: Connect to HTTP-based Model Context Protocol servers for external tools and capabilities
 - **Structured Output**: you can ask the AI to return a structured output, like a JSON, a table, a list, etc. (untested ^^')
 
 ### 📁 **Project Organization**
@@ -43,6 +44,13 @@
 - **Per-Project Settings**: Custom models, prompts, and configurations
 - **Rules & Tags**: Reusable prompt engineering with organization
 - **Conversation Sync**: Link conversations to Git repositories for version control
+
+### 🔌 **MCP (Model Context Protocol) Integration**
+- **HTTP-based MCP Servers**: Connect to external MCP servers via Server-Sent Events
+- **Automatic Tool Discovery**: Tools from MCP servers are automatically available to the AI
+- **Graceful Error Handling**: Configurable retry logic with exponential backoff
+- **Connection Management**: Real-time status monitoring and manual retry capabilities
+- **Secure Authentication**: Support for custom headers and API key authentication
 
 ### ⚙️ **Extensibility & Customization**
 - **Modding System**: Safe, sandboxed extension API for custom functionality
@@ -61,6 +69,7 @@ For comprehensive documentation, see the [`docs/`](./docs/) directory:
 
 - **[Getting Started Guide](./docs/index.md)** - Architecture overview and development setup
 - **[AI Integration](./docs/ai-integration.md)** - Provider setup, streaming, and tool execution
+- **[MCP Integration](./docs/mcp-integration.md)** - Model Context Protocol server integration and external tools
 - **[Virtual File System](./docs/vfs.md)** - Browser-based filesystem and file operations
 - **[Git Integration](./docs/git.md)** - Repository management and conversation sync
 - **[Canvas Features](./docs/canvas-features.md)** - Code blocks, diagrams, and interaction controls

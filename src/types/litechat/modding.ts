@@ -20,6 +20,7 @@ import { type ModEventPayloads as ModSpecificEventPayloads } from "./events/mod.
 import { type SyncEventPayloads } from "./events/sync.events";
 import { type UiEventPayloads } from "./events/ui.events";
 import { type VfsEventPayloads } from "./events/vfs.events";
+import { type McpEventPayloads } from "./events/mcp.events";
 import type { CanvasControl as CoreCanvasControlFromTypes } from "./canvas/control";
 
 import {
@@ -165,6 +166,7 @@ export type ModEventPayloadMap = AppEventPayloads &
   VfsEventPayloads &
   SyncEventPayloads &
   ControlRegistryEventPayloads &
+  McpEventPayloads &
   Record<string, any>;
 
 interface BaseControl {
