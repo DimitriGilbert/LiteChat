@@ -15,6 +15,7 @@ import { SettingsAssistantParameters } from "./SettingsAssistantParameters";
 import { SettingsAssistantTools } from "./SettingsAssistantTools";
 import { SettingsAssistantTitles } from "./SettingsAssistantTitles";
 import { SettingsAssistantPrompts } from "./SettingsAssistantPrompts";
+import { SettingsAssistantAgent } from "./SettingsAssistantAgent";
 import { SettingsAssistantMcp } from "./SettingsAssistantMcp";
 
 const SettingsAssistantComponent: React.FC = () => {
@@ -65,6 +66,11 @@ const SettingsAssistantComponent: React.FC = () => {
         value: "prompts",
         label: "Prompts",
         content: <SettingsAssistantPrompts />,
+      },
+      {
+        value: "agents",
+        label: "Agents",
+        content: <SettingsAssistantAgent />,
       },
     ],
     []

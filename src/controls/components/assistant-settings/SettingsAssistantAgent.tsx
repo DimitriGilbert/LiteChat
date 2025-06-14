@@ -2,1273 +2,14 @@ import React, { useEffect, useState } from "react";
 import { usePromptTemplateStore } from "@/store/prompt-template.store";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, X, Save, Edit, Trash2 } from "lucide-react";
-import { useForm } from "@tanstack/react-form";
-import { z } from "zod";
-import type {
-  PromptTemplate,
-  PromptVariable,
-} from "@/types/litechat/prompt-template";
+import { Edit, Plus } from "lucide-react";
+import type { PromptTemplate } from "@/types/litechat/prompt-template";
 import {
   TabbedLayout,
   TabDefinition,
 } from "@/components/LiteChat/common/TabbedLayout";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ToolSelectorForm } from "@/controls/components/tool-selector/ToolSelectorForm";
-import { RulesControlDialogContent } from "@/controls/components/rules/RulesControlDialogContent";
-import { useRulesStore } from "@/store/rules.store";
-
-interface AgentFormData {
-  name: string;
-  description: string;
-  variables: PromptVariable[];
-  prompt: string;
-  tags: string[];
-  tools: string[];
-  rules: string[];
-  followUps: string[];
-}
-
-interface TaskFormData {
-  name: string;
-  description: string;
-  variables: PromptVariable[];
-  prompt: string;
-  tags: string[];
-  tools: string[];
-  rules: string[];
-  followUps: string[];
-}
-
-const agentSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string(),
-  variables: z.array(
-    z.object({
-      name: z.string().min(1, "Variable name is required"),
-      description: z.string(),
-      type: z.enum(["string", "number", "boolean", "array"]),
-      required: z.boolean(),
-      default: z.string().optional(),
-      instructions: z.string().optional(),
-    })
-  ),
-  prompt: z.string().min(1, "Prompt content is required"),
-  tags: z.array(z.string()),
-  tools: z.array(z.string()),
-  rules: z.array(z.string()),
-  followUps: z.array(z.string()),
-});
-
-const taskSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string(),
-  variables: z.array(
-    z.object({
-      name: z.string().min(1, "Variable name is required"),
-      description: z.string(),
-      type: z.enum(["string", "number", "boolean", "array"]),
-      required: z.boolean(),
-      default: z.string().optional(),
-      instructions: z.string().optional(),
-    })
-  ),
-  prompt: z.string().min(1, "Prompt content is required"),
-  tags: z.array(z.string()),
-  tools: z.array(z.string()),
-  rules: z.array(z.string()),
-  followUps: z.array(z.string()),
-});
-
-// No longer needed - using ToolSelectorForm with proper base component
-
-function AgentForm({
-  agent,
-  onSubmit,
-  onSuccess,
-  onManageTasks,
-}: {
-  agent?: PromptTemplate;
-  onSubmit: (data: AgentFormData) => void;
-  onSuccess: () => void;
-  onManageTasks?: (agent: PromptTemplate) => void;
-}) {
-  const [newVariable, setNewVariable] = useState<PromptVariable>({
-    name: "",
-    description: "",
-    type: "string",
-    required: false,
-    default: "",
-    instructions: "",
-  });
-
-  const [maxSteps, setMaxSteps] = useState<number | null>(null);
-
-  // Get rules and tags data
-  const {
-    rules: allRules,
-    tags: allTags,
-    tagRuleLinks,
-    loadRulesAndTags,
-  } = useRulesStore(
-    useShallow((state) => ({
-      rules: state.rules,
-      tags: state.tags,
-      tagRuleLinks: state.tagRuleLinks,
-      loadRulesAndTags: state.loadRulesAndTags,
-    }))
-  );
-
-  const { getTemplatesByType, getTasksForAgent } = usePromptTemplateStore(
-    useShallow((state) => ({
-      getTemplatesByType: state.getTemplatesByType,
-      getTasksForAgent: state.getTasksForAgent,
-    }))
-  );
-
-  // Get only prompt type templates for follow-ups
-  const promptTemplates = getTemplatesByType("prompt");
-  
-  // Get tasks for this agent (if editing)
-  const agentTasks = agent ? getTasksForAgent(agent.id) : [];
-
-  useEffect(() => {
-    loadRulesAndTags();
-  }, [loadRulesAndTags]);
-
-  const form = useForm({
-    defaultValues: {
-      name: agent?.name || "",
-      description: agent?.description || "",
-      variables: agent?.variables || [],
-      prompt: agent?.prompt || "",
-      tags: agent?.tags || [],
-      tools: agent?.tools || [],
-      rules: agent?.rules || [],
-      followUps: agent?.followUps || [],
-    },
-    validators: {
-      onChangeAsync: agentSchema,
-      onChangeAsyncDebounceMs: 500,
-    },
-    onSubmit: async ({ value }) => {
-      onSubmit(value);
-      onSuccess();
-    },
-  });
-
-  // Reset newVariable state when agent changes
-  useEffect(() => {
-    setNewVariable({
-      name: "",
-      description: "",
-      type: "string",
-      required: false,
-      default: "",
-      instructions: "",
-    });
-  }, [agent?.id]);
-
-  // Cleanup effect to ensure state is reset on unmount
-  useEffect(() => {
-    return () => {
-      setNewVariable({
-        name: "",
-        description: "",
-        type: "string",
-        required: false,
-        default: "",
-        instructions: "",
-      });
-    };
-  }, []);
-
-  const addVariable = () => {
-    if (newVariable.name) {
-      form.setFieldValue("variables", [
-        ...form.getFieldValue("variables"),
-        { ...newVariable },
-      ]);
-      setNewVariable({
-        name: "",
-        description: "",
-        type: "string",
-        required: false,
-        default: "",
-        instructions: "",
-      });
-    }
-  };
-
-  const removeVariable = (index: number) => {
-    const variables = form.getFieldValue("variables");
-    form.setFieldValue(
-      "variables",
-      variables.filter((_, i) => i !== index)
-    );
-  };
-
-  const getRulesForTag = (tagId: string) => {
-    const linkIds = tagRuleLinks
-      .filter((link) => link.tagId === tagId)
-      .map((link) => link.ruleId);
-    return allRules.filter((rule) => linkIds.includes(rule.id));
-  };
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="font-medium">
-          {agent ? "Edit Agent" : "New Agent"}
-        </h3>
-        <p className="text-sm text-muted-foreground">
-          {agent
-            ? "Update your AI agent"
-            : "Create a new AI agent with tasks"}
-        </p>
-      </div>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          form.handleSubmit();
-        }}
-        className="space-y-6"
-      >
-        {/* Basic Info */}
-        <div className="space-y-4">
-          <form.Field
-            name="name"
-            children={(field) => (
-              <div>
-                <Label htmlFor={field.name}>Agent Name</Label>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  placeholder="Enter agent name"
-                />
-                {field.state.meta.errors.length > 0 && (
-                  <p className="text-xs text-destructive mt-1">
-                    {field.state.meta.errors[0]?.message || "Invalid input"}
-                  </p>
-                )}
-              </div>
-            )}
-          />
-
-          <form.Field
-            name="description"
-            children={(field) => (
-              <div>
-                <Label htmlFor={field.name}>Description</Label>
-                <Textarea
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  placeholder="Describe what this agent does"
-                  rows={3}
-                />
-              </div>
-            )}
-          />
-
-          <form.Field
-            name="prompt"
-            children={(field) => (
-              <div>
-                <Label htmlFor={field.name}>Agent Prompt</Label>
-                <Textarea
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  placeholder="Enter your agent prompt using {{ variable_name }} syntax"
-                  rows={6}
-                  className="font-mono"
-                />
-                <p className="text-xs text-muted-foreground mt-2">
-                  Use double curly braces to reference variables:{" "}
-                  {`{{ variable_name }}`}
-                </p>
-                {field.state.meta.errors.length > 0 && (
-                  <p className="text-xs text-destructive mt-1">
-                    {field.state.meta.errors[0]?.message || "Invalid input"}
-                  </p>
-                )}
-              </div>
-            )}
-          />
-        </div>
-
-        {/* Variables */}
-        <div className="space-y-4">
-          <div>
-            <Label className="text-base font-medium">Variables</Label>
-            <div className="space-y-3 mt-2">
-              {form.getFieldValue("variables").map((variable, index) => (
-                <div key={`${variable.name}-${index}`} className="p-3 border rounded-lg space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">{variable.name}</h4>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeVariable(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {variable.description}
-                  </p>
-                  <div className="flex gap-2 text-xs">
-                    <Badge
-                      variant={variable.required ? "default" : "secondary"}
-                    >
-                      {variable.required ? "Required" : "Optional"}
-                    </Badge>
-                    <Badge variant="outline">{variable.type}</Badge>
-                    {variable.default && (
-                      <Badge variant="outline">
-                        Default: {variable.default}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {/* Add Variable Form */}
-              <div className="p-3 border-2 border-dashed rounded-lg space-y-3">
-                <Label>Add New Variable</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Name</Label>
-                    <Input
-                      value={newVariable.name}
-                      onChange={(e) =>
-                        setNewVariable((prev) => ({
-                          ...prev,
-                          name: e.target.value,
-                        }))
-                      }
-                      placeholder="Variable name"
-                    />
-                  </div>
-                  <div>
-                    <Label>Type</Label>
-                    <Select
-                      key={`new-variable-type-${agent?.id || 'new'}`}
-                      value={newVariable.type}
-                      onValueChange={(
-                        value: "string" | "number" | "boolean" | "array"
-                      ) => setNewVariable((prev) => ({ ...prev, type: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="string">String</SelectItem>
-                        <SelectItem value="number">Number</SelectItem>
-                        <SelectItem value="boolean">Boolean</SelectItem>
-                        <SelectItem value="array">Array</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div>
-                  <Label>Description</Label>
-                  <Input
-                    value={newVariable.description}
-                    onChange={(e) =>
-                      setNewVariable((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
-                    placeholder="Describe this variable"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Default Value</Label>
-                    <Input
-                      value={newVariable.default}
-                      onChange={(e) =>
-                        setNewVariable((prev) => ({
-                          ...prev,
-                          default: e.target.value,
-                        }))
-                      }
-                      placeholder="Default value (optional)"
-                    />
-                  </div>
-                  <div className="flex items-center space-x-2 pt-6">
-                    <Checkbox
-                      checked={newVariable.required}
-                      onCheckedChange={(checked) =>
-                        setNewVariable((prev) => ({
-                          ...prev,
-                          required: !!checked,
-                        }))
-                      }
-                    />
-                    <Label>Required</Label>
-                  </div>
-                </div>
-                <Button type="button" onClick={addVariable} className="w-full">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Variable
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Follow-ups */}
-        <div className="space-y-4">
-          <div>
-            <Label className="text-base font-medium">Follow-up Prompts</Label>
-            <p className="text-sm text-muted-foreground mb-4">
-              Select prompts that can be used as follow-ups for this agent.
-            </p>
-            <form.Field
-              name="followUps"
-              children={(field) => (
-                <div className="space-y-2">
-                  {promptTemplates.map((template) => (
-                    <div key={template.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        checked={field.state.value.includes(template.id)}
-                        onCheckedChange={(checked) => {
-                          const currentFollowUps = field.state.value;
-                          if (checked) {
-                            field.handleChange([...currentFollowUps, template.id]);
-                          } else {
-                            field.handleChange(
-                              currentFollowUps.filter((id) => id !== template.id)
-                            );
-                          }
-                        }}
-                      />
-                      <Label className="text-sm font-normal">
-                        {template.name}
-                      </Label>
-                      {template.description && (
-                        <span className="text-xs text-muted-foreground">
-                          - {template.description}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                  {promptTemplates.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      No prompt templates available. Create some prompts first.
-                    </p>
-                  )}
-                </div>
-              )}
-            />
-          </div>
-        </div>
-
-        {/* Auto Tools */}
-        <div className="space-y-4">
-          <div>
-            <Label className="text-base font-medium">Auto-select Tools</Label>
-            <p className="text-sm text-muted-foreground mb-4">
-              Choose tools that will be automatically enabled when this agent
-              is applied.
-            </p>
-            <form.Field
-              name="tools"
-              children={(field) => (
-                <ToolSelectorForm
-                  selectedTools={field.state.value}
-                  onToolsChange={(tools: string[]) => field.handleChange(tools)}
-                  className="p-0 max-w-none"
-                  maxSteps={maxSteps}
-                  onMaxStepsChange={setMaxSteps}
-                  showMaxSteps={true}
-                />
-              )}
-            />
-          </div>
-        </div>
-
-        {/* Auto Rules & Tags */}
-        <div className="space-y-4">
-          <div>
-            <Label className="text-base font-medium">
-              Auto-select Rules & Tags
-            </Label>
-            <p className="text-sm text-muted-foreground mb-4">
-              Choose rules and tags that will be automatically enabled when this
-              agent is applied.
-            </p>
-            <RulesControlDialogContent
-              activeTagIds={new Set(form.getFieldValue("tags"))}
-              activeRuleIds={new Set(form.getFieldValue("rules"))}
-              onToggleTag={(tagId, isActive) => {
-                const currentTags = form.getFieldValue("tags");
-                if (isActive) {
-                  form.setFieldValue("tags", [...currentTags, tagId]);
-                } else {
-                  form.setFieldValue(
-                    "tags",
-                    currentTags.filter((id) => id !== tagId)
-                  );
-                }
-              }}
-              onToggleRule={(ruleId, isActive) => {
-                const currentRules = form.getFieldValue("rules");
-                if (isActive) {
-                  form.setFieldValue("rules", [...currentRules, ruleId]);
-                } else {
-                  form.setFieldValue(
-                    "rules",
-                    currentRules.filter((id) => id !== ruleId)
-                  );
-                }
-              }}
-              allRules={allRules}
-              allTags={allTags}
-              getRulesForTag={getRulesForTag}
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-3 pt-4 border-t">
-          <Button type="submit" className="flex-1">
-            <Save className="h-4 w-4 mr-2" />
-            {agent ? "Update Agent" : "Create Agent"}
-          </Button>
-          {agent && onManageTasks && (
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => onManageTasks(agent)}
-              className="flex items-center gap-2"
-            >
-              <Edit className="h-4 w-4" />
-              Tasks ({agentTasks.length})
-            </Button>
-          )}
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function TaskForm({
-  task,
-  agentId,
-  onSubmit,
-  onSuccess,
-}: {
-  task?: PromptTemplate;
-  agentId: string;
-  onSubmit: (data: TaskFormData) => void;
-  onSuccess: () => void;
-}) {
-  const [newVariable, setNewVariable] = useState<PromptVariable>({
-    name: "",
-    description: "",
-    type: "string",
-    required: false,
-    default: "",
-    instructions: "",
-  });
-
-  const [maxSteps, setMaxSteps] = useState<number | null>(null);
-
-  // Get rules and tags data
-  const {
-    rules: allRules,
-    tags: allTags,
-    tagRuleLinks,
-    loadRulesAndTags,
-  } = useRulesStore(
-    useShallow((state) => ({
-      rules: state.rules,
-      tags: state.tags,
-      tagRuleLinks: state.tagRuleLinks,
-      loadRulesAndTags: state.loadRulesAndTags,
-    }))
-  );
-
-  const { getTasksForAgent } = usePromptTemplateStore(
-    useShallow((state) => ({
-      getTasksForAgent: state.getTasksForAgent,
-    }))
-  );
-
-  // Get other tasks for the same agent for follow-ups
-  const siblingTasks = getTasksForAgent(agentId).filter(t => t.id !== task?.id);
-
-  useEffect(() => {
-    loadRulesAndTags();
-  }, [loadRulesAndTags]);
-
-  const form = useForm({
-    defaultValues: {
-      name: task?.name || "",
-      description: task?.description || "",
-      variables: task?.variables || [],
-      prompt: task?.prompt || "",
-      tags: task?.tags || [],
-      tools: task?.tools || [],
-      rules: task?.rules || [],
-      followUps: task?.followUps || [],
-    },
-    validators: {
-      onChangeAsync: taskSchema,
-      onChangeAsyncDebounceMs: 500,
-    },
-    onSubmit: async ({ value }) => {
-      onSubmit(value);
-      onSuccess();
-    },
-  });
-
-  // Reset newVariable state when task changes
-  useEffect(() => {
-    setNewVariable({
-      name: "",
-      description: "",
-      type: "string",
-      required: false,
-      default: "",
-      instructions: "",
-    });
-  }, [task?.id]);
-
-  // Cleanup effect to ensure state is reset on unmount
-  useEffect(() => {
-    return () => {
-      setNewVariable({
-        name: "",
-        description: "",
-        type: "string",
-        required: false,
-        default: "",
-        instructions: "",
-      });
-    };
-  }, []);
-
-  const addVariable = () => {
-    if (newVariable.name) {
-      form.setFieldValue("variables", [
-        ...form.getFieldValue("variables"),
-        { ...newVariable },
-      ]);
-      setNewVariable({
-        name: "",
-        description: "",
-        type: "string",
-        required: false,
-        default: "",
-        instructions: "",
-      });
-    }
-  };
-
-  const removeVariable = (index: number) => {
-    const variables = form.getFieldValue("variables");
-    form.setFieldValue(
-      "variables",
-      variables.filter((_, i) => i !== index)
-    );
-  };
-
-  const getRulesForTag = (tagId: string) => {
-    const linkIds = tagRuleLinks
-      .filter((link) => link.tagId === tagId)
-      .map((link) => link.ruleId);
-    return allRules.filter((rule) => linkIds.includes(rule.id));
-  };
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="font-medium">
-          {task ? "Edit Task" : "New Task"}
-        </h3>
-        <p className="text-sm text-muted-foreground">
-          {task
-            ? "Update this agent task"
-            : "Create a new task for this agent"}
-        </p>
-      </div>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          form.handleSubmit();
-        }}
-        className="space-y-6"
-      >
-        {/* Basic Info */}
-        <div className="space-y-4">
-          <form.Field
-            name="name"
-            children={(field) => (
-              <div>
-                <Label htmlFor={field.name}>Task Name</Label>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  placeholder="Enter task name"
-                />
-                {field.state.meta.errors.length > 0 && (
-                  <p className="text-xs text-destructive mt-1">
-                    {field.state.meta.errors[0]?.message || "Invalid input"}
-                  </p>
-                )}
-              </div>
-            )}
-          />
-
-          <form.Field
-            name="description"
-            children={(field) => (
-              <div>
-                <Label htmlFor={field.name}>Description</Label>
-                <Textarea
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  placeholder="Describe what this task does"
-                  rows={3}
-                />
-              </div>
-            )}
-          />
-
-          <form.Field
-            name="prompt"
-            children={(field) => (
-              <div>
-                <Label htmlFor={field.name}>Task Prompt</Label>
-                <Textarea
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  placeholder="Enter your task prompt using {{ variable_name }} syntax"
-                  rows={6}
-                  className="font-mono"
-                />
-                <p className="text-xs text-muted-foreground mt-2">
-                  Use double curly braces to reference variables:{" "}
-                  {`{{ variable_name }}`}
-                </p>
-                {field.state.meta.errors.length > 0 && (
-                  <p className="text-xs text-destructive mt-1">
-                    {field.state.meta.errors[0]?.message || "Invalid input"}
-                  </p>
-                )}
-              </div>
-            )}
-          />
-        </div>
-
-        {/* Variables */}
-        <div className="space-y-4">
-          <div>
-            <Label className="text-base font-medium">Variables</Label>
-            <div className="space-y-3 mt-2">
-              {form.getFieldValue("variables").map((variable, index) => (
-                <div key={`${variable.name}-${index}`} className="p-3 border rounded-lg space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">{variable.name}</h4>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeVariable(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {variable.description}
-                  </p>
-                  <div className="flex gap-2 text-xs">
-                    <Badge
-                      variant={variable.required ? "default" : "secondary"}
-                    >
-                      {variable.required ? "Required" : "Optional"}
-                    </Badge>
-                    <Badge variant="outline">{variable.type}</Badge>
-                    {variable.default && (
-                      <Badge variant="outline">
-                        Default: {variable.default}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {/* Add Variable Form */}
-              <div className="p-3 border-2 border-dashed rounded-lg space-y-3">
-                <Label>Add New Variable</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Name</Label>
-                    <Input
-                      value={newVariable.name}
-                      onChange={(e) =>
-                        setNewVariable((prev) => ({
-                          ...prev,
-                          name: e.target.value,
-                        }))
-                      }
-                      placeholder="Variable name"
-                    />
-                  </div>
-                  <div>
-                    <Label>Type</Label>
-                    <Select
-                      key={`new-variable-type-${task?.id || 'new'}`}
-                      value={newVariable.type}
-                      onValueChange={(
-                        value: "string" | "number" | "boolean" | "array"
-                      ) => setNewVariable((prev) => ({ ...prev, type: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="string">String</SelectItem>
-                        <SelectItem value="number">Number</SelectItem>
-                        <SelectItem value="boolean">Boolean</SelectItem>
-                        <SelectItem value="array">Array</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div>
-                  <Label>Description</Label>
-                  <Input
-                    value={newVariable.description}
-                    onChange={(e) =>
-                      setNewVariable((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
-                    placeholder="Describe this variable"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Default Value</Label>
-                    <Input
-                      value={newVariable.default}
-                      onChange={(e) =>
-                        setNewVariable((prev) => ({
-                          ...prev,
-                          default: e.target.value,
-                        }))
-                      }
-                      placeholder="Default value (optional)"
-                    />
-                  </div>
-                  <div className="flex items-center space-x-2 pt-6">
-                    <Checkbox
-                      checked={newVariable.required}
-                      onCheckedChange={(checked) =>
-                        setNewVariable((prev) => ({
-                          ...prev,
-                          required: !!checked,
-                        }))
-                      }
-                    />
-                    <Label>Required</Label>
-                  </div>
-                </div>
-                <Button type="button" onClick={addVariable} className="w-full">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Variable
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Follow-ups (only other tasks with same parentId) */}
-        <div className="space-y-4">
-          <div>
-            <Label className="text-base font-medium">Follow-up Tasks</Label>
-            <p className="text-sm text-muted-foreground mb-4">
-              Select other tasks from this agent that can be used as follow-ups.
-            </p>
-            <form.Field
-              name="followUps"
-              children={(field) => (
-                <div className="space-y-2">
-                  {siblingTasks.map((siblingTask) => (
-                    <div key={siblingTask.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        checked={field.state.value.includes(siblingTask.id)}
-                        onCheckedChange={(checked) => {
-                          const currentFollowUps = field.state.value;
-                          if (checked) {
-                            field.handleChange([...currentFollowUps, siblingTask.id]);
-                          } else {
-                            field.handleChange(
-                              currentFollowUps.filter((id) => id !== siblingTask.id)
-                            );
-                          }
-                        }}
-                      />
-                      <Label className="text-sm font-normal">
-                        {siblingTask.name}
-                      </Label>
-                      {siblingTask.description && (
-                        <span className="text-xs text-muted-foreground">
-                          - {siblingTask.description}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                  {siblingTasks.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      No other tasks available for this agent.
-                    </p>
-                  )}
-                </div>
-              )}
-            />
-          </div>
-        </div>
-
-        {/* Auto Tools */}
-        <div className="space-y-4">
-          <div>
-            <Label className="text-base font-medium">Auto-select Tools</Label>
-            <p className="text-sm text-muted-foreground mb-4">
-              Choose tools that will be automatically enabled when this task
-              is applied.
-            </p>
-            <form.Field
-              name="tools"
-              children={(field) => (
-                <ToolSelectorForm
-                  selectedTools={field.state.value}
-                  onToolsChange={(tools: string[]) => field.handleChange(tools)}
-                  className="p-0 max-w-none"
-                  maxSteps={maxSteps}
-                  onMaxStepsChange={setMaxSteps}
-                  showMaxSteps={true}
-                />
-              )}
-            />
-          </div>
-        </div>
-
-        {/* Auto Rules & Tags */}
-        <div className="space-y-4">
-          <div>
-            <Label className="text-base font-medium">
-              Auto-select Rules & Tags
-            </Label>
-            <p className="text-sm text-muted-foreground mb-4">
-              Choose rules and tags that will be automatically enabled when this
-              task is applied.
-            </p>
-            <RulesControlDialogContent
-              activeTagIds={new Set(form.getFieldValue("tags"))}
-              activeRuleIds={new Set(form.getFieldValue("rules"))}
-              onToggleTag={(tagId, isActive) => {
-                const currentTags = form.getFieldValue("tags");
-                if (isActive) {
-                  form.setFieldValue("tags", [...currentTags, tagId]);
-                } else {
-                  form.setFieldValue(
-                    "tags",
-                    currentTags.filter((id) => id !== tagId)
-                  );
-                }
-              }}
-              onToggleRule={(ruleId, isActive) => {
-                const currentRules = form.getFieldValue("rules");
-                if (isActive) {
-                  form.setFieldValue("rules", [...currentRules, ruleId]);
-                } else {
-                  form.setFieldValue(
-                    "rules",
-                    currentRules.filter((id) => id !== ruleId)
-                  );
-                }
-              }}
-              allRules={allRules}
-              allTags={allTags}
-              getRulesForTag={getRulesForTag}
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-3 pt-4 border-t">
-          <Button type="submit" className="flex-1">
-            <Save className="h-4 w-4 mr-2" />
-            {task ? "Update Task" : "Create Task"}
-          </Button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function AgentList({
-  agents,
-  onEdit,
-  onDelete,
-  onManageTasks,
-}: {
-  agents: PromptTemplate[];
-  onEdit: (agent: PromptTemplate) => void;
-  onDelete: (id: string) => void;
-  onManageTasks: (agent: PromptTemplate) => void;
-}) {
-  const { getTasksForAgent } = usePromptTemplateStore(
-    useShallow((state) => ({
-      getTasksForAgent: state.getTasksForAgent,
-    }))
-  );
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="font-medium">AI Agents</h3>
-        <p className="text-sm text-muted-foreground">
-          Manage your AI agents and their associated tasks
-        </p>
-      </div>
-
-      {agents.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed rounded-lg">
-          <h4 className="font-medium text-muted-foreground">
-            No Agents Yet
-          </h4>
-          <p className="text-sm text-muted-foreground mt-1">
-            Use the "New Agent" tab to create your first agent
-          </p>
-        </div>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Variables</TableHead>
-              <TableHead>Tasks</TableHead>
-              <TableHead>Tools</TableHead>
-              <TableHead>Rules/Tags</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {agents.map((agent) => {
-              const tasks = getTasksForAgent(agent.id);
-              return (
-                <TableRow key={agent.id}>
-                  <TableCell className="font-medium">{agent.name}</TableCell>
-                  <TableCell className="max-w-xs truncate">
-                    {agent.description}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{agent.variables.length}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{tasks.length}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {agent.tools?.length || 0}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Badge variant="secondary">
-                        {agent.tags?.length || 0} tags
-                      </Badge>
-                      <Badge variant="secondary">
-                        {agent.rules?.length || 0} rules
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex gap-2 justify-end">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onManageTasks(agent)}
-                        title="Manage Tasks"
-                      >
-                        <Edit className="h-4 w-4" />
-                        Tasks
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onEdit(agent)}
-                        title="Edit Agent"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onDelete(agent.id)}
-                        title="Delete Agent"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      )}
-    </div>
-  );
-}
-
-function TaskList({
-  agent,
-  tasks,
-  onEdit,
-  onDelete,
-  onNewTask,
-}: {
-  agent: PromptTemplate;
-  tasks: PromptTemplate[];
-  onEdit: (task: PromptTemplate) => void;
-  onDelete: (id: string) => void;
-  onNewTask: () => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-medium">Tasks for {agent.name}</h3>
-          <p className="text-sm text-muted-foreground">
-            Manage tasks for this agent
-          </p>
-        </div>
-        <Button onClick={onNewTask}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Task
-        </Button>
-      </div>
-
-      {tasks.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed rounded-lg">
-          <h4 className="font-medium text-muted-foreground">
-            No Tasks Yet
-          </h4>
-          <p className="text-sm text-muted-foreground mt-1">
-            Create tasks to define what this agent can do
-          </p>
-        </div>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Variables</TableHead>
-              <TableHead>Follow-ups</TableHead>
-              <TableHead>Tools</TableHead>
-              <TableHead>Rules/Tags</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tasks.map((task) => (
-              <TableRow key={task.id}>
-                <TableCell className="font-medium">{task.name}</TableCell>
-                <TableCell className="max-w-xs truncate">
-                  {task.description}
-                </TableCell>
-                <TableCell>
-                  <Badge variant="secondary">{task.variables.length}</Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="secondary">
-                    {task.followUps?.length || 0}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="secondary">
-                    {task.tools?.length || 0}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Badge variant="secondary">
-                      {task.tags?.length || 0} tags
-                    </Badge>
-                    <Badge variant="secondary">
-                      {task.rules?.length || 0} rules
-                    </Badge>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex gap-2 justify-end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onEdit(task)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onDelete(task.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </div>
-  );
-}
+import { TemplateFormBase, BaseTemplateFormData } from "./common/TemplateFormBase";
+import { TemplateList } from "./common/TemplateList";
 
 export const SettingsAssistantAgent: React.FC = () => {
   const [activeTab, setActiveTab] = useState("agents");
@@ -1302,7 +43,7 @@ export const SettingsAssistantAgent: React.FC = () => {
   const agents = getAgents();
   const managingAgentTasks = managingAgent ? getTasksForAgent(managingAgent.id) : [];
 
-  const handleCreateAgent = async (data: AgentFormData) => {
+  const handleCreateAgent = async (data: BaseTemplateFormData) => {
     await addPromptTemplate({
       ...data,
       type: "agent",
@@ -1310,7 +51,7 @@ export const SettingsAssistantAgent: React.FC = () => {
     });
   };
 
-  const handleUpdateAgent = async (data: AgentFormData) => {
+  const handleUpdateAgent = async (data: BaseTemplateFormData) => {
     if (!editingAgent) return;
     await updatePromptTemplate(editingAgent.id, data);
   };
@@ -1327,7 +68,7 @@ export const SettingsAssistantAgent: React.FC = () => {
     }
   };
 
-  const handleCreateTask = async (data: TaskFormData) => {
+  const handleCreateTask = async (data: BaseTemplateFormData) => {
     if (!managingAgent) return;
     await addPromptTemplate({
       ...data,
@@ -1337,7 +78,7 @@ export const SettingsAssistantAgent: React.FC = () => {
     });
   };
 
-  const handleUpdateTask = async (data: TaskFormData) => {
+  const handleUpdateTask = async (data: BaseTemplateFormData) => {
     if (!editingTask || !managingAgent) return;
     await updatePromptTemplate(editingTask.id, {
       ...data,
@@ -1394,11 +135,23 @@ export const SettingsAssistantAgent: React.FC = () => {
       value: "agents",
       label: "Agents",
       content: (
-        <AgentList
-          agents={agents}
+        <TemplateList
+          templates={agents}
           onEdit={handleEditAgent}
           onDelete={handleDeleteAgent}
-          onManageTasks={handleManageTasks}
+          type="agent"
+          getTaskCount={(agentId) => getTasksForAgent(agentId).length}
+          additionalActions={(agent) => (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleManageTasks(agent)}
+              title="Manage Tasks"
+            >
+              <Edit className="h-4 w-4" />
+              Tasks
+            </Button>
+          )}
         />
       ),
     },
@@ -1406,10 +159,13 @@ export const SettingsAssistantAgent: React.FC = () => {
       value: "new-agent",
       label: "New Agent",
       content: (
-        <AgentForm
+        <TemplateFormBase
           key="new-agent-form"
           onSubmit={handleCreateAgent}
           onSuccess={handleFormSuccess}
+          type="agent"
+          showFollowUps={false} // Agents don't have follow-ups
+          showMaxSteps={true}
         />
       ),
     },
@@ -1421,12 +177,25 @@ export const SettingsAssistantAgent: React.FC = () => {
       value: "edit-agent",
       label: `Edit: ${editingAgent.name}`,
       content: (
-        <AgentForm
+        <TemplateFormBase
           key={`edit-agent-form-${editingAgent.id}`}
-          agent={editingAgent}
+          template={editingAgent}
           onSubmit={handleUpdateAgent}
           onSuccess={handleFormSuccess}
-          onManageTasks={handleManageTasks}
+          type="agent"
+          showFollowUps={false} // Agents don't have follow-ups
+          showMaxSteps={true}
+          additionalActions={
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => handleManageTasks(editingAgent)}
+              className="flex items-center gap-2"
+            >
+              <Edit className="h-4 w-4" />
+              Tasks ({getTasksForAgent(editingAgent.id).length})
+            </Button>
+          }
         />
       ),
     });
@@ -1444,12 +213,24 @@ export const SettingsAssistantAgent: React.FC = () => {
               ← Back to Agents
             </Button>
           </div>
-          <TaskList
-            agent={managingAgent}
-            tasks={managingAgentTasks}
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-medium">Tasks for {managingAgent.name}</h3>
+              <p className="text-sm text-muted-foreground">
+                Manage tasks for this agent
+              </p>
+            </div>
+            <Button onClick={handleNewTask}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Task
+            </Button>
+          </div>
+          <TemplateList
+            templates={managingAgentTasks}
             onEdit={handleEditTask}
             onDelete={handleDeleteTask}
-            onNewTask={handleNewTask}
+            type="task"
+            emptyMessage="No Tasks Yet"
           />
         </div>
       ),
@@ -1468,11 +249,14 @@ export const SettingsAssistantAgent: React.FC = () => {
               ← Back to Tasks
             </Button>
           </div>
-          <TaskForm
+          <TemplateFormBase
             key={`new-task-form-${managingAgent.id}`}
-            agentId={managingAgent.id}
             onSubmit={handleCreateTask}
             onSuccess={handleBackToTasks}
+            type="task"
+            showFollowUps={true} // Tasks can have follow-ups to other tasks
+            followUpOptions={managingAgentTasks} // Only other tasks from same agent
+            showMaxSteps={true}
           />
         </div>
       ),
@@ -1491,12 +275,15 @@ export const SettingsAssistantAgent: React.FC = () => {
               ← Back to Tasks
             </Button>
           </div>
-          <TaskForm
+          <TemplateFormBase
             key={`edit-task-form-${editingTask.id}`}
-            task={editingTask}
-            agentId={managingAgent.id}
+            template={editingTask}
             onSubmit={handleUpdateTask}
             onSuccess={handleBackToTasks}
+            type="task"
+            showFollowUps={true} // Tasks can have follow-ups to other tasks
+            followUpOptions={managingAgentTasks.filter(t => t.id !== editingTask.id)} // Exclude self
+            showMaxSteps={true}
           />
         </div>
       ),

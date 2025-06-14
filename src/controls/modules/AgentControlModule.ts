@@ -4,7 +4,6 @@ import { type LiteChatModApi } from "@/types/litechat/modding";
 import { promptTemplateEvent } from "@/types/litechat/events/prompt-template.events";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
 import type { PromptTemplate, PromptFormData, CompiledPrompt } from "@/types/litechat/prompt-template";
-import { SettingsAssistantAgent } from "@/controls/components/assistant-settings/SettingsAssistantAgent";
 import { AgentControl } from "@/controls/components/prompt/AgentControl";
 import { usePromptTemplateStore } from "@/store/prompt-template.store";
 
@@ -205,15 +204,8 @@ export class AgentControlModule implements ControlModule {
       });
     }
 
-    // Register settings tab if not already registered
-    if (!this.unregisterCallback) {
-      this.unregisterCallback = modApi.registerSettingsTab({
-        id: "agent",
-        title: "Agents",
-        component: SettingsAssistantAgent,
-        order: 25, // After prompts (20) but before other tabs
-      });
-    }
+    // Agent settings are now part of the Assistant settings tab
+    // No longer registering as a separate main settings tab
   }
 
   destroy(_modApi: LiteChatModApi): void {
