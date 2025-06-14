@@ -608,12 +608,28 @@ export class PersistenceService {
           await db.appState.where("key").equals("settings:mcpServers").delete();
         }
         if (options.importPromptTemplates) {
-          // Clear ONLY regular prompt templates (type is "prompt" or undefined), keep agents and tasks
-          await db.promptTemplates.where("type").noneOf(["agent", "task"]).delete();
+          // Clear ONLY the exact templates that will be imported (type is "prompt" or undefined)
+          // This preserves custom-typed templates that are not being imported
+          const allTemplates = await db.promptTemplates.toArray();
+          const templatesToDelete = allTemplates.filter(t => !(t as any).type || (t as any).type === "prompt");
+          const idsToDelete = templatesToDelete.map(t => t.id);
+          if (idsToDelete.length > 0) {
+            await db.promptTemplates.where("id").anyOf(idsToDelete).delete();
+          }
         }
         if (options.importAgents) {
-          // Clear agents and tasks
-          await db.promptTemplates.where("type").anyOf(["agent", "task"]).delete();
+          // Clear ONLY the exact agents and their linked tasks that will be imported
+          // This preserves orphaned tasks and non-exported agents
+          if (data.agents) {
+            const agentsToImport = data.agents.filter((a: any) => a.type === "agent");
+            const agentIds = agentsToImport.map((a: any) => a.id);
+            const tasksToImport = data.agents.filter((a: any) => a.type === "task");
+            const taskIds = tasksToImport.map((t: any) => t.id);
+            const idsToDelete = [...agentIds, ...taskIds];
+            if (idsToDelete.length > 0) {
+              await db.promptTemplates.where("id").anyOf(idsToDelete).delete();
+            }
+          }
         }
 
         if (options.importSettings && data.settings) {
