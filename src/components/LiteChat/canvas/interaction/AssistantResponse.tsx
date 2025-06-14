@@ -11,11 +11,8 @@ import {
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import {
   useMarkdownParser,
-  CodeBlockData,
-  MermaidBlockData,
 } from "@/lib/litechat/useMarkdownParser";
-import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
-import { MermaidBlockRenderer } from "@/components/LiteChat/common/MermaidBlockRenderer";
+import { UniversalBlockRenderer } from "@/components/LiteChat/common/UniversalBlockRenderer";
 import { type ToolCallPart, type ToolResultPart } from "ai";
 import { toast } from "sonner";
 import { useControlRegistryStore } from "@/store/control.store";
@@ -43,22 +40,14 @@ const StaticContentView: React.FC<{ markdownContent: string | null, interactionI
               dangerouslySetInnerHTML={{ __html: item }}
             />
           );
-        } else if (item.type === "code") {
-          const codeData = item as CodeBlockData;
+        } else if (item.type === "block") {
+          // Always use UniversalBlockRenderer for all code blocks
           return (
-            <CodeBlockRenderer
-              key={`code-${index}`}
-              lang={codeData.lang}
-              code={codeData.code}
-              filepath={codeData.filepath}
-            />
-          );
-        } else if (item.type === "mermaid") {
-          const mermaidData = item as MermaidBlockData;
-          return (
-            <MermaidBlockRenderer
-              key={`mermaid-${index}`}
-              code={mermaidData.code}
+            <UniversalBlockRenderer
+              key={`block-${index}`}
+              lang={item.lang}
+              code={item.code}
+              filepath={item.filepath}
             />
           );
         }

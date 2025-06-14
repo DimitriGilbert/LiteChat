@@ -56,6 +56,10 @@ import { FoldCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/
 import { DownloadCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/DownloadCodeBlockControlModule";
 import { ToolCallStepControlModule } from "@/controls/modules/canvas/tool/ToolCallStepControlModule";
 
+// Import block renderer modules
+import { CodeBlockRendererModule } from "@/controls/modules/CodeBlockRendererModule";
+import { MermaidBlockRendererModule } from "@/controls/modules/MermaidBlockRendererModule";
+
 // Define the application's specific control module registration order HERE
 const controlModulesToRegister: ControlModuleConstructor[] = [
   UrlParameterControlModule,
@@ -90,6 +94,9 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   VfsToolsModule,
   GitToolsModule,
   McpToolsModule,
+  // Block Renderers (should be registered early)
+  CodeBlockRendererModule,
+  MermaidBlockRendererModule,
   // Canvas Action Controls
   CopyActionControlModule, // For InteractionCard header
   FoldInteractionControlModule, // For InteractionCard header

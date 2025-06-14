@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
-import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
+import { UniversalBlockRenderer } from "@/components/LiteChat/common/UniversalBlockRenderer";
 import { ToolCallPart } from "ai"
 
 export const ToolCallDisplay: React.FC<{ toolCall: ToolCallPart }> = ({
@@ -32,7 +32,7 @@ export const ToolCallDisplay: React.FC<{ toolCall: ToolCallPart }> = ({
           className="h-5 w-5 text-muted-foreground"
         />
       </div>
-      {!isArgsFolded && <CodeBlockRenderer lang="json" code={argsString} />}
+      {!isArgsFolded && <UniversalBlockRenderer lang="json" code={argsString} />}
     </div>
   );
 };

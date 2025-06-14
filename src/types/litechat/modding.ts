@@ -21,7 +21,9 @@ import { type SyncEventPayloads } from "./events/sync.events";
 import { type UiEventPayloads } from "./events/ui.events";
 import { type VfsEventPayloads } from "./events/vfs.events";
 import { type McpEventPayloads } from "./events/mcp.events";
+import { type BlockRendererEventPayloads } from "./events/block-renderer.events";
 import type { CanvasControl as CoreCanvasControlFromTypes } from "./canvas/control";
+import type { BlockRenderer } from "./canvas/block-renderer";
 
 import {
   type ModMiddlewareHookName,
@@ -93,6 +95,7 @@ export interface LiteChatModApi {
   registerPromptControl: (control: ModPromptControl) => () => void;
   registerChatControl: (control: ModChatControl) => () => void;
   registerCanvasControl: (control: CoreCanvasControlFromTypes) => () => void; // Added
+  registerBlockRenderer: (renderer: BlockRenderer) => () => void;
   registerTool: <P extends z.ZodSchema<any>>(
     toolName: string,
     definition: Tool<P>,
@@ -166,6 +169,7 @@ export type ModEventPayloadMap = AppEventPayloads &
   VfsEventPayloads &
   SyncEventPayloads &
   ControlRegistryEventPayloads &
+  BlockRendererEventPayloads &
   McpEventPayloads &
   Record<string, any>;
 

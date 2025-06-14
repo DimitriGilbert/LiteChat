@@ -7,6 +7,10 @@ import {
   controlRegistryEvent,
   ControlRegistryEventPayloads,
 } from "@/types/litechat/events/control.registry.events";
+import {
+  blockRendererEvent,
+  BlockRendererEventPayloads,
+} from "@/types/litechat/events/block-renderer.events";
 import type {
   ControlState as ControlStateInterface,
   ControlActions as ControlActionsInterface,
@@ -26,6 +30,7 @@ export const useControlRegistryStore = create(
     promptControls: {},
     chatControls: {},
     canvasControls: {}, // Added
+    blockRenderers: {},
     middlewareRegistry: {},
     tools: {},
     modalProviders: {},
@@ -120,6 +125,36 @@ export const useControlRegistryStore = create(
       });
       emitter.emit(controlRegistryEvent.canvasControlsChanged, {
         controls: get().canvasControls,
+      });
+    },
+
+    registerBlockRenderer: (renderer) => {
+      set((state) => {
+        if (state.blockRenderers[renderer.id]) {
+          console.warn(
+            `ControlRegistryStore: BlockRenderer with ID "${renderer.id}" already registered. Overwriting.`
+          );
+        }
+        state.blockRenderers[renderer.id] = renderer;
+      });
+      emitter.emit(blockRendererEvent.blockRenderersChanged, {
+        renderers: get().blockRenderers,
+      });
+      return () => get().unregisterBlockRenderer(renderer.id);
+    },
+
+    unregisterBlockRenderer: (id) => {
+      set((state) => {
+        if (state.blockRenderers[id]) {
+          delete state.blockRenderers[id];
+        } else {
+          console.warn(
+            `ControlRegistryStore: BlockRenderer with ID "${id}" not found for unregistration.`
+          );
+        }
+      });
+      emitter.emit(blockRendererEvent.blockRenderersChanged, {
+        renderers: get().blockRenderers,
       });
     },
 
@@ -297,6 +332,24 @@ export const useControlRegistryStore = create(
             payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.unregisterCanvasControlRequest]
           ) => {
             actions.unregisterCanvasControl(payload.id);
+          },
+          storeId,
+        },
+        {
+          eventName: blockRendererEvent.registerBlockRendererRequest,
+          handler: (
+            payload: BlockRendererEventPayloads[typeof blockRendererEvent.registerBlockRendererRequest]
+          ) => {
+            actions.registerBlockRenderer(payload.renderer);
+          },
+          storeId,
+        },
+        {
+          eventName: blockRendererEvent.unregisterBlockRendererRequest,
+          handler: (
+            payload: BlockRendererEventPayloads[typeof blockRendererEvent.unregisterBlockRendererRequest]
+          ) => {
+            actions.unregisterBlockRenderer(payload.id);
           },
           storeId,
         },

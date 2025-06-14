@@ -15,6 +15,7 @@ import type {
 import type { ChatControl as CoreChatControlFromTypes } from "@/types/litechat/chat";
 import type { PromptControl as CorePromptControlFromTypes } from "@/types/litechat/prompt";
 import type { CanvasControl as CoreCanvasControlFromTypes } from "@/types/litechat/canvas/control";
+import type { BlockRenderer } from "@/types/litechat/canvas/block-renderer";
 
 import { Tool } from "ai";
 import { useInteractionStore } from "@/store/interaction.store";
@@ -29,6 +30,7 @@ import { splitModelId } from "@/lib/litechat/provider-helpers";
 import { useVfsStore } from "@/store/vfs.store";
 import type { fs } from "@zenfs/core";
 import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
+import { blockRendererEvent } from "@/types/litechat/events/block-renderer.events";
 
 export function createModApi(mod: DbMod): LiteChatModApi {
   const modId = mod.id;
@@ -71,6 +73,17 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       const u = () =>
         emitter.emit(controlRegistryEvent.unregisterCanvasControlRequest, {
           id: control.id,
+        });
+      unsubscribers.push(u);
+      return u;
+    },
+    registerBlockRenderer: (renderer: BlockRenderer) => {
+      emitter.emit(blockRendererEvent.registerBlockRendererRequest, {
+        renderer,
+      });
+      const u = () =>
+        emitter.emit(blockRendererEvent.unregisterBlockRendererRequest, {
+          id: renderer.id,
         });
       unsubscribers.push(u);
       return u;

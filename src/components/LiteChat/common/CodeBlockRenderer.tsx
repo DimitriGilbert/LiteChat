@@ -148,7 +148,7 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
 
   return (
     <div className="code-block-container group/codeblock my-4 max-w-full">
-      <div className="code-block-header sticky top-0 z-10 flex items-center justify-between">
+      <div className="code-block-header sticky top-0 z-10 flex items-center justify-between px-3 py-2 border border-b-0 border-border bg-muted/50 rounded-t-lg">
         <div className="flex items-center gap-1">
           <div className="text-sm font-medium">
             {lang ? lang.toUpperCase() : "CODE"}
@@ -167,14 +167,14 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
 
       {!isFolded && (
         <div className="overflow-hidden w-full">
-          <pre className="overflow-x-auto w-full relative overflow-wrap-anywhere">
-            <code ref={codeRef} className={languageClass + " block"}></code>
+          <pre className="overflow-x-auto w-full relative overflow-wrap-anywhere border border-border rounded-b-lg bg-muted/20">
+            <code ref={codeRef} className={languageClass + " block p-4 font-mono text-sm leading-relaxed"}></code>
           </pre>
         </div>
       )}
       {isFolded && (
         <div
-          className="folded-content-preview p-4 cursor-pointer w-full box-border"
+          className="folded-content-preview p-4 cursor-pointer w-full box-border border border-t-0 border-border rounded-b-lg bg-muted/10 hover:bg-muted/20 transition-colors"
           onClick={toggleFold}
         >
           <pre className="whitespace-pre-wrap break-words text-muted-foreground font-mono text-sm">
