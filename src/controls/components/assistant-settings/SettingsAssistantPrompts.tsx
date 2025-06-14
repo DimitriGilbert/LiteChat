@@ -46,31 +46,42 @@ interface PromptTemplateFormData {
   tools: string[];
   rules: string[];
   type: "prompt" | "task" | "agent";
-  parentId?: string | null;
-  followUps?: string[];
+  parentId: string | null;
+  followUps: string[];
 }
 
-const promptTemplateSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string(),
-  variables: z.array(
-    z.object({
-      name: z.string().min(1, "Variable name is required"),
-      description: z.string(),
-      type: z.enum(["string", "number", "boolean", "array"]),
-      required: z.boolean(),
-      default: z.string().optional(),
-      instructions: z.string().optional(),
-    })
-  ),
-  prompt: z.string().min(1, "Prompt content is required"),
-  tags: z.array(z.string()),
-  tools: z.array(z.string()),
-  rules: z.array(z.string()),
-  type: z.enum(["prompt", "task", "agent"]),
-  parentId: z.string().nullable(),
-  followUps: z.array(z.string()),
-});
+const validatePromptTemplate = async ({ value }: { value: PromptTemplateFormData }) => {
+  const schema = z.object({
+    name: z.string().min(1, "Name is required"),
+    description: z.string(),
+    variables: z.array(
+      z.object({
+        name: z.string().min(1, "Variable name is required"),
+        description: z.string(),
+        type: z.enum(["string", "number", "boolean", "array"]),
+        required: z.boolean(),
+        default: z.string().optional(),
+        instructions: z.string().optional(),
+      })
+    ),
+    prompt: z.string().min(1, "Prompt content is required"),
+    tags: z.array(z.string()),
+    tools: z.array(z.string()),
+    rules: z.array(z.string()),
+    type: z.enum(["prompt", "task", "agent"]),
+    parentId: z.string().nullable().optional(),
+    followUps: z.array(z.string()).optional(),
+  });
+  
+  try {
+    await schema.parseAsync(value);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return error.formErrors.fieldErrors;
+    }
+    return { root: "Validation failed" };
+  }
+};
 
 // No longer needed - using ToolSelectorForm with proper base component
 
@@ -92,8 +103,6 @@ function PromptTemplateForm({
     instructions: "",
   });
 
-
-
   // Get rules and tags data
   const {
     rules: allRules,
@@ -106,6 +115,13 @@ function PromptTemplateForm({
       tags: state.tags,
       tagRuleLinks: state.tagRuleLinks,
       loadRulesAndTags: state.loadRulesAndTags,
+    }))
+  );
+
+  // Get all templates for follow-up selection
+  const { promptTemplates: allTemplates } = usePromptTemplateStore(
+    useShallow((state) => ({
+      promptTemplates: state.promptTemplates,
     }))
   );
 
@@ -127,7 +143,7 @@ function PromptTemplateForm({
       followUps: template?.followUps || [],
     },
     validators: {
-      onChangeAsync: promptTemplateSchema,
+      onChangeAsync: validatePromptTemplate,
       onChangeAsyncDebounceMs: 500,
     },
     onSubmit: async ({ value }) => {
@@ -231,9 +247,9 @@ function PromptTemplateForm({
                   onBlur={field.handleBlur}
                   placeholder="Enter template name"
                 />
-                {field.state.meta.errors.length > 0 && (
+                {field.state.meta.errors && field.state.meta.errors.length > 0 && (
                   <p className="text-xs text-destructive mt-1">
-                    {field.state.meta.errors[0]?.message || "Invalid input"}
+                    {field.state.meta.errors[0] || "Invalid input"}
                   </p>
                 )}
               </div>
@@ -275,9 +291,9 @@ function PromptTemplateForm({
                   Use double curly braces to reference variables:{" "}
                   {`{{ variable_name }}`}
                 </p>
-                {field.state.meta.errors.length > 0 && (
+                {field.state.meta.errors && field.state.meta.errors.length > 0 && (
                   <p className="text-xs text-destructive mt-1">
-                    {field.state.meta.errors[0]?.message || "Invalid input"}
+                    {field.state.meta.errors[0] || "Invalid input"}
                   </p>
                 )}
               </div>
@@ -468,6 +484,81 @@ function PromptTemplateForm({
               allRules={allRules}
               allTags={allTags}
               getRulesForTag={getRulesForTag}
+            />
+          </div>
+        </div>
+
+        {/* Follow-up Templates */}
+        <div className="space-y-4">
+          <div>
+            <Label className="text-base font-medium">Follow-up Templates</Label>
+            <p className="text-sm text-muted-foreground mb-4">
+              Select templates that can be suggested as follow-ups after this template is used.
+            </p>
+            <form.Field
+              name="followUps"
+              children={(field) => (
+                <div className="space-y-3">
+                  {/* Selected Follow-ups */}
+                  {field.state.value.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Selected Follow-ups:</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {field.state.value.map((followUpId) => {
+                          const followUpTemplate = allTemplates.find(t => t.id === followUpId);
+                          return followUpTemplate ? (
+                            <Badge key={followUpId} variant="secondary" className="flex items-center gap-1">
+                              {followUpTemplate.name}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                                onClick={() => {
+                                  const newFollowUps = field.state.value.filter(id => id !== followUpId);
+                                  field.handleChange(newFollowUps);
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </Badge>
+                          ) : null;
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add Follow-up Selector */}
+                  <div>
+                    <Label className="text-sm">Add Follow-up Template:</Label>
+                    <Select
+                      key={`followup-selector-${template?.id || 'new'}`}
+                      value=""
+                      onValueChange={(templateId) => {
+                        if (templateId && !field.state.value.includes(templateId)) {
+                          field.handleChange([...field.state.value, templateId]);
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a template to add as follow-up" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allTemplates
+                          .filter(t => 
+                            t.id !== template?.id && // Don't include self
+                            !field.state.value.includes(t.id) && // Don't include already selected
+                            (t.type || "prompt") === "prompt" // Only show prompt type templates
+                          )
+                          .map((t) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.name} - {t.description}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             />
           </div>
         </div>
