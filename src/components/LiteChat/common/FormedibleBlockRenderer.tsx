@@ -15,6 +15,11 @@ import { CodeBlockRenderer } from "./CodeBlockRenderer";
 import { toast } from "sonner";
 import { useFormedible } from "@/hooks/use-formedible";
 import { z } from "zod";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
+import { ConversationService } from "@/services/conversation.service";
+import { nanoid } from "nanoid";
+import type { PromptTurnObject } from "@/types/litechat/prompt";
 
 interface FormedibleBlockRendererProps {
   code: string;
@@ -409,6 +414,7 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCode, setShowCode] = useState(false);
+  const [sendOnSubmit, setSendOnSubmit] = useState(false);
 
   const canvasControls = useControlRegistryStore(
     useShallow((state) => Object.values(state.canvasControls))
@@ -558,7 +564,7 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
           defaults[field.name] = false;
           break;
         case 'date':
-          defaults[field.name] = new Date();
+          defaults[field.name] = new Date().toISOString().split('T')[0];
           break;
         case 'select':
           if (field.options && field.options.length > 0) {
@@ -579,6 +585,45 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
     return defaults;
   }, []);
 
+  // Handle form submission
+  const handleFormSubmit = useCallback(async (formData: Record<string, any>) => {
+    try {
+      // Create JSON block with form results
+      const formResultsJson = JSON.stringify(formData, null, 2);
+      const promptText = `These are the form values:\n\`\`\`json\n${formResultsJson}\n\`\`\``;
+      
+      // Add to prompt input
+      emitter.emit(promptEvent.setInputTextRequest, { text: promptText });
+      
+      // If send on submit is enabled, submit the prompt
+      if (sendOnSubmit) {
+        // Use requestAnimationFrame to ensure the input text is set before submission
+        // This is more reliable than setTimeout for DOM updates
+        requestAnimationFrame(async () => {
+          try {
+            const turnData: PromptTurnObject = {
+              id: nanoid(),
+              content: promptText,
+              parameters: {},
+              metadata: {},
+            };
+            
+            await ConversationService.submitPrompt(turnData);
+            toast.success("Form submitted and prompt sent!");
+          } catch (error) {
+            console.error("Failed to submit prompt:", error);
+            toast.error("Form data added to input, but failed to send prompt");
+          }
+        });
+      } else {
+        toast.success("Form data added to prompt input");
+      }
+    } catch (error) {
+      console.error("Form submission error:", error);
+      toast.error("Failed to process form submission");
+    }
+  }, [sendOnSubmit]);
+
   // Prepare form configuration
   const formConfig = useMemo(() => {
     if (!formDefinition || !formDefinition.fields) {
@@ -589,31 +634,55 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
       const schema = createSchemaFromFields(formDefinition.fields);
       const defaultValues = formDefinition.formOptions?.defaultValues || createDefaultValues(formDefinition.fields);
 
+      // Add the "send on submit" switch to the fields
+      const fieldsWithSendSwitch = [
+        ...formDefinition.fields,
+        {
+          name: "_sendOnSubmit",
+          type: "switch",
+          label: "Send on submit",
+          description: "Automatically send the prompt after form submission",
+        }
+      ];
+
+      // Update schema to include the send switch
+      const schemaWithSendSwitch = schema.extend({
+        _sendOnSubmit: z.boolean(),
+      });
+
+      // Update default values to include the send switch
+      const defaultValuesWithSendSwitch = {
+        ...defaultValues,
+        _sendOnSubmit: false,
+      };
+
       return {
-        schema,
-        fields: formDefinition.fields,
+        schema: schemaWithSendSwitch,
+        fields: fieldsWithSendSwitch,
         pages: formDefinition.pages,
         progress: formDefinition.progress,
-        submitLabel: formDefinition.submitLabel || "Submit (Preview Only)",
+        submitLabel: formDefinition.submitLabel || "Submit",
         nextLabel: formDefinition.nextLabel || "Next",
         previousLabel: formDefinition.previousLabel || "Previous",
         formClassName: formDefinition.formClassName,
         fieldClassName: formDefinition.fieldClassName,
         formOptions: {
           ...formDefinition.formOptions,
-          defaultValues,
-          // Remove any callback functions for security
-          onSubmit: () => {
-            toast.info("This is a preview form - submission is disabled");
+          defaultValues: defaultValuesWithSendSwitch,
+          onSubmit: async ({ value }: { value: Record<string, any> }) => {
+            // Extract the send on submit value and remove it from form data
+            const { _sendOnSubmit, ...actualFormData } = value;
+            setSendOnSubmit(_sendOnSubmit);
+            await handleFormSubmit(actualFormData);
           },
         },
-        disabled: true, // Disable the form since it's just a preview
+        disabled: false, // Enable the form for actual use
       };
     } catch (err) {
       console.error("Form configuration error:", err);
       return { error: err instanceof Error ? err.message : "Unknown error" };
     }
-  }, [formDefinition, createSchemaFromFields, createDefaultValues]);
+  }, [formDefinition, createSchemaFromFields, createDefaultValues, handleFormSubmit]);
 
   // Use the hook at the top level, but conditionally
   const formedibleResult = useFormedible(formConfig && !('error' in formConfig) ? formConfig : {
@@ -710,7 +779,7 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
               {renderedForm && !isLoading && !error && (
                 <div className="p-4 bg-background border rounded-md">
                   <div className="mb-4 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
-                    📋 Form Preview (Read-only) - This form is disabled for security reasons
+                    📋 Interactive Form - Fill out and submit to add data to prompt input
                   </div>
                   {renderedForm}
                 </div>
