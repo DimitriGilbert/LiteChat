@@ -8,13 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  SearchIcon,
-  FilterIcon,
-  BrainCircuitIcon,
-  WrenchIcon,
-  ImageIcon,
-} from "lucide-react";
+import { SearchIcon } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -31,20 +25,9 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { SortableModelItem } from "@/components/LiteChat/common/SortableModelItem";
-import type {
-  ModelListItem,
-  DbProviderConfig,
-} from "@/types/litechat/provider";
+import type { ModelListItem } from "@/types/litechat/provider";
 import { combineModelId } from "@/lib/litechat/provider-helpers";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
-import { cn } from "@/lib/utils";
+import { ModelFilterControls } from "@/controls/components/common/ModelFilterControls";
 
 interface GlobalModelOrganizerProps {
   // Props passed by ProviderSettingsModule
@@ -73,9 +56,8 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
   );
 
   const [filterText, setFilterText] = useState("");
-  const [providerFilterOpen, setProviderFilterOpen] = useState(false);
   const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
-    () => new Set(dbProviderConfigs.map((p) => p.id))
+    () => new Set()
   );
   const [capabilityFilters, setCapabilityFilters] = useState<
     Record<CapabilityFilter, boolean>
@@ -178,10 +160,11 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
     capabilityFilters,
   ]);
 
-  const isAnyFilterActive =
+  const isAnyFilterActive = useMemo(() => (
     filterText.trim().length > 0 ||
     selectedProviders.size !== dbProviderConfigs.length ||
-    Object.values(capabilityFilters).some(Boolean);
+    Object.values(capabilityFilters).some(Boolean)
+  ), [filterText, selectedProviders, dbProviderConfigs.length, capabilityFilters]);
 
   const sortableItemIdsForDisplay = useMemo(
     () => filteredAndOrderedModelsForDisplay.map((m: ModelListItem) => m.id),
@@ -266,29 +249,6 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
     })
   );
 
-  const handleProviderFilterChange = useCallback(
-    (providerId: string, checked: boolean) => {
-      setSelectedProviders((prev) => {
-        const next = new Set(prev);
-        if (checked) next.add(providerId);
-        else next.delete(providerId);
-        return next;
-      });
-    },
-    []
-  );
-
-  const toggleCapabilityFilter = (filter: CapabilityFilter) => {
-    setCapabilityFilters((prev) => ({ ...prev, [filter]: !prev[filter] }));
-  };
-
-  const activeProviderFilterCount =
-    selectedProviders.size !== dbProviderConfigs.length ? 1 : 0;
-  const activeCapabilityFilterCount =
-    Object.values(capabilityFilters).filter(Boolean).length;
-  const totalActiveFilters =
-    activeProviderFilterCount + activeCapabilityFilterCount;
-
   if (isLoading) {
     return (
       <div className="space-y-4 border border-border rounded-lg p-4 bg-card shadow-sm">
@@ -327,121 +287,17 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
               disabled={isLoading}
             />
           </div>
-          <Popover
-            open={providerFilterOpen}
-            onOpenChange={setProviderFilterOpen}
-          >
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 px-3 relative"
-                disabled={isLoading || dbProviderConfigs.length === 0}
-              >
-                <FilterIcon className="h-4 w-4 mr-1" />
-                Filters
-                {totalActiveFilters > 0 && (
-                  <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-primary rounded-full">
-                    {totalActiveFilters}
-                  </span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-0">
-              <div className="p-2 space-y-3">
-                <div>
-                  <Label className="text-xs px-2 font-semibold block mb-1">
-                    Providers
-                  </Label>
-                  <ScrollArea className="h-32 border rounded-md p-1">
-                    {dbProviderConfigs.map((provider: DbProviderConfig) => (
-                      <div
-                        key={provider.id}
-                        className="flex items-center space-x-2 p-1.5 rounded hover:bg-muted"
-                      >
-                        <Checkbox
-                          id={`organizer-provider-filter-${provider.id}`}
-                          checked={selectedProviders.has(provider.id)}
-                          onCheckedChange={(checked) =>
-                            handleProviderFilterChange(provider.id, !!checked)
-                          }
-                        />
-                        <Label
-                          htmlFor={`organizer-provider-filter-${provider.id}`}
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          {provider.name} ({provider.type})
-                        </Label>
-                      </div>
-                    ))}
-                  </ScrollArea>
-                </div>
-                <div>
-                  <Label className="text-xs px-2 font-semibold block mb-1">
-                    Capabilities
-                  </Label>
-                  <div className="flex flex-wrap gap-1 p-1 border rounded-md">
-                    <ActionTooltipButton
-                      tooltipText="Reasoning"
-                      icon={<BrainCircuitIcon />}
-                      onClick={() => toggleCapabilityFilter("reasoning")}
-                      variant={
-                        capabilityFilters.reasoning ? "secondary" : "outline"
-                      }
-                      className={cn(
-                        "h-7 w-auto px-2 text-xs",
-                        capabilityFilters.reasoning && "text-primary"
-                      )}
-                    >
-                      Reasoning
-                    </ActionTooltipButton>
-                    <ActionTooltipButton
-                      tooltipText="Web Search"
-                      icon={<SearchIcon />}
-                      onClick={() => toggleCapabilityFilter("webSearch")}
-                      variant={
-                        capabilityFilters.webSearch ? "secondary" : "outline"
-                      }
-                      className={cn(
-                        "h-7 w-auto px-2 text-xs",
-                        capabilityFilters.webSearch && "text-primary"
-                      )}
-                    >
-                      Web
-                    </ActionTooltipButton>
-                    <ActionTooltipButton
-                      tooltipText="Tools"
-                      icon={<WrenchIcon />}
-                      onClick={() => toggleCapabilityFilter("tools")}
-                      variant={
-                        capabilityFilters.tools ? "secondary" : "outline"
-                      }
-                      className={cn(
-                        "h-7 w-auto px-2 text-xs",
-                        capabilityFilters.tools && "text-primary"
-                      )}
-                    >
-                      Tools
-                    </ActionTooltipButton>
-                    <ActionTooltipButton
-                      tooltipText="Multimodal"
-                      icon={<ImageIcon />}
-                      onClick={() => toggleCapabilityFilter("multimodal")}
-                      variant={
-                        capabilityFilters.multimodal ? "secondary" : "outline"
-                      }
-                      className={cn(
-                        "h-7 w-auto px-2 text-xs",
-                        capabilityFilters.multimodal && "text-primary"
-                      )}
-                    >
-                      Multimodal
-                    </ActionTooltipButton>
-                  </div>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+          <ModelFilterControls
+            currentCapabilityFilters={capabilityFilters}
+            onCapabilityFilterChange={setCapabilityFilters}
+            currentSelectedProviders={selectedProviders}
+            onProviderFilterChange={setSelectedProviders}
+            allProviders={dbProviderConfigs}
+            showProviderFilter={true}
+            showCapabilityFilters={true}
+            disabled={isLoading || dbProviderConfigs.length === 0}
+            totalActiveFilters={isAnyFilterActive ? 1 : 0}
+          />
         </div>
 
         <ScrollArea className="h-[calc(20*2.75rem+2px)] w-full rounded-md border border-border p-3 bg-background/50">
@@ -452,7 +308,7 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
               onDragEnd={handleDragEnd}
             >
               <SortableContext
-                items={sortableItemIdsForDisplay} // Use IDs of filtered items for SortableContext
+                items={sortableItemIdsForDisplay}
                 strategy={verticalListSortingStrategy}
               >
                 {filteredAndOrderedModelsForDisplay.map(
@@ -466,13 +322,11 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
                       onMoveDown={() => handleMove(model.id, "down")}
                       isFirst={
                         enabledAndOrderedModels.findIndex(
-                          // Check against full list for button state
                           (m: ModelListItem) => m.id === model.id
                         ) === 0
                       }
                       isLast={
                         enabledAndOrderedModels.findIndex(
-                          // Check against full list for button state
                           (m: ModelListItem) => m.id === model.id
                         ) ===
                         enabledAndOrderedModels.length - 1

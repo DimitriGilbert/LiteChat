@@ -44,13 +44,6 @@ export const SystemPromptControlTrigger: React.FC<
     }
   }, [popoverOpen, module]);
 
-  useEffect(() => {
-    const currentModulePrompt = module.getTurnSystemPrompt();
-    if (localPrompt !== currentModulePrompt) {
-      setLocalPrompt(currentModulePrompt);
-    }
-  }, [module.getTurnSystemPrompt(), localPrompt]);
-
   const handleSave = useCallback(() => {
     module.setTurnSystemPrompt(localPrompt.trim());
     setPopoverOpen(false);
