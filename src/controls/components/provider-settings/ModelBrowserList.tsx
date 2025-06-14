@@ -6,30 +6,15 @@ import { useShallow } from "zustand/react/shallow";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  SearchIcon,
-  FilterIcon,
-  BrainCircuitIcon,
-  WrenchIcon,
-  ImageIcon,
-} from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { SearchIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { ModelFilterControls } from "@/controls/components/common/ModelFilterControls";
 
 interface ModelBrowserListProps {
   onSelectModelForDetails: (combinedModelId: string | null) => void;
@@ -83,7 +68,6 @@ export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
     );
 
   const [filterText, setFilterText] = useState("");
-  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
   const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
     () => new Set(dbProviderConfigs.map((p) => p.id))
   );
@@ -172,32 +156,18 @@ export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
     overscan: 10,
   });
 
-  const handleProviderFilterChange = useCallback(
-    (providerId: string, checked: boolean) => {
-      setSelectedProviders((prev) => {
-        const next = new Set(prev);
-        if (checked) next.add(providerId);
-        else next.delete(providerId);
-        return next;
-      });
-    },
-    []
-  );
-
-  const toggleCapabilityFilter = (filter: CapabilityFilter) => {
-    setCapabilityFilters((prev) => ({ ...prev, [filter]: !prev[filter] }));
-  };
-
-  const handleRowClick = (modelId: string) => {
+  const handleRowClick = useCallback((modelId: string) => {
     onSelectModelForDetails(modelId);
-  };
+  }, [onSelectModelForDetails]);
 
-  const activeProviderFilterCount =
-    selectedProviders.size !== dbProviderConfigs.length ? 1 : 0;
-  const activeCapabilityFilterCount =
-    Object.values(capabilityFilters).filter(Boolean).length;
-  const totalActiveFilters =
-    activeProviderFilterCount + activeCapabilityFilterCount;
+  const setCapabilityFiltersCallback = useCallback((filters: Record<CapabilityFilter, boolean>) => {
+    setCapabilityFilters(filters);
+  }, []);
+
+  const totalActiveFilters = useMemo(() => (
+    (selectedProviders.size !== dbProviderConfigs.length ? 1 : 0) +
+    Object.values(capabilityFilters).filter(Boolean).length
+  ), [selectedProviders, dbProviderConfigs.length, capabilityFilters]);
 
   if (isLoading) {
     return (
@@ -222,116 +192,17 @@ export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
             disabled={isLoading}
           />
         </div>
-        <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 px-3 relative"
-              disabled={isLoading || dbProviderConfigs.length === 0}
-            >
-              <FilterIcon className="h-4 w-4 mr-1" />
-              Filters
-              {totalActiveFilters > 0 && (
-                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-primary rounded-full">
-                  {totalActiveFilters}
-                </span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64 p-0">
-            <div className="p-2 space-y-3">
-              <div>
-                <Label className="text-xs px-2 font-semibold block mb-1">
-                  Providers
-                </Label>
-                <ScrollArea className="h-32 border rounded-md p-1">
-                  {dbProviderConfigs.map((provider) => (
-                    <div
-                      key={provider.id}
-                      className="flex items-center space-x-2 p-1.5 rounded hover:bg-muted"
-                    >
-                      <Checkbox
-                        id={`model-browser-provider-filter-${provider.id}`}
-                        checked={selectedProviders.has(provider.id)}
-                        onCheckedChange={(checked) =>
-                          handleProviderFilterChange(provider.id, !!checked)
-                        }
-                      />
-                      <Label
-                        htmlFor={`model-browser-provider-filter-${provider.id}`}
-                        className="text-sm font-normal cursor-pointer"
-                      >
-                        {provider.name} ({provider.type})
-                      </Label>
-                    </div>
-                  ))}
-                </ScrollArea>
-              </div>
-              <div>
-                <Label className="text-xs px-2 font-semibold block mb-1">
-                  Capabilities
-                </Label>
-                <div className="flex flex-wrap gap-1 p-1 border rounded-md">
-                  <ActionTooltipButton
-                    tooltipText="Reasoning"
-                    icon={<BrainCircuitIcon />}
-                    onClick={() => toggleCapabilityFilter("reasoning")}
-                    variant={
-                      capabilityFilters.reasoning ? "secondary" : "outline"
-                    }
-                    className={cn(
-                      "h-7 w-auto px-2 text-xs",
-                      capabilityFilters.reasoning && "text-primary"
-                    )}
-                  >
-                    Reasoning
-                  </ActionTooltipButton>
-                  <ActionTooltipButton
-                    tooltipText="Web Search"
-                    icon={<SearchIcon />}
-                    onClick={() => toggleCapabilityFilter("webSearch")}
-                    variant={
-                      capabilityFilters.webSearch ? "secondary" : "outline"
-                    }
-                    className={cn(
-                      "h-7 w-auto px-2 text-xs",
-                      capabilityFilters.webSearch && "text-primary"
-                    )}
-                  >
-                    Web
-                  </ActionTooltipButton>
-                  <ActionTooltipButton
-                    tooltipText="Tools"
-                    icon={<WrenchIcon />}
-                    onClick={() => toggleCapabilityFilter("tools")}
-                    variant={capabilityFilters.tools ? "secondary" : "outline"}
-                    className={cn(
-                      "h-7 w-auto px-2 text-xs",
-                      capabilityFilters.tools && "text-primary"
-                    )}
-                  >
-                    Tools
-                  </ActionTooltipButton>
-                  <ActionTooltipButton
-                    tooltipText="Multimodal"
-                    icon={<ImageIcon />}
-                    onClick={() => toggleCapabilityFilter("multimodal")}
-                    variant={
-                      capabilityFilters.multimodal ? "secondary" : "outline"
-                    }
-                    className={cn(
-                      "h-7 w-auto px-2 text-xs",
-                      capabilityFilters.multimodal && "text-primary"
-                    )}
-                  >
-                    Multimodal
-                  </ActionTooltipButton>
-                </div>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+        <ModelFilterControls
+          currentCapabilityFilters={capabilityFilters}
+          onCapabilityFilterChange={setCapabilityFiltersCallback}
+          currentSelectedProviders={selectedProviders}
+          onProviderFilterChange={setSelectedProviders}
+          allProviders={dbProviderConfigs}
+          showProviderFilter={true}
+          showCapabilityFilters={true}
+          disabled={isLoading || dbProviderConfigs.length === 0}
+          totalActiveFilters={totalActiveFilters}
+        />
       </div>
       <ScrollArea
         className="flex-grow border rounded-md bg-background/50 h-[calc(15*2.5rem+2px)]"

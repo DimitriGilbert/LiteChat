@@ -5,28 +5,14 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-  SearchIcon,
-  BrainCircuitIcon,
-  WrenchIcon,
-  ImageIcon,
-  FilterIcon,
-  CheckIcon,
-  BanIcon,
-  DollarSignIcon,
-} from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
+import { SearchIcon } from "lucide-react";
 import type { OpenRouterModel } from "@/types/litechat/provider";
 import { cn } from "@/lib/utils";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { ModelFilterControls } from "@/controls/components/common/ModelFilterControls";
 
 type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
+type EnabledFilterStatus = "all" | "enabled" | "disabled";
 
 interface ModelEnablementListProps {
   providerId: string;
@@ -85,7 +71,6 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   }, []);
 
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
   const [enabledFilter, setEnabledFilter] = useState<
     "all" | "enabled" | "disabled"
   >("all");
@@ -198,16 +183,26 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
     overscan: 10,
   });
 
-  const toggleCapabilityFilter = (filter: CapabilityFilter) => {
-    setCapabilityFilters((prev) => ({ ...prev, [filter]: !prev[filter] }));
-  };
+  const setCapabilityFiltersCallback = useCallback((filters: Record<CapabilityFilter, boolean>) => {
+    setCapabilityFilters(filters);
+  }, []);
 
-  const activeFilterCount =
+  const handleEnabledFilterChange = useCallback((status: EnabledFilterStatus) => {
+    setEnabledFilter(status);
+  }, []);
+
+  const handlePriceFilterChange = useCallback((minIn: string, maxIn: string, minOut: string, maxOut: string) => {
+    setMinInputPrice(minIn);
+    setMaxInputPrice(maxIn);
+    setMinOutputPrice(minOut);
+    setMaxOutputPrice(maxOut);
+  }, []);
+
+  const activeFilterCount = useMemo(() => (
     (enabledFilter !== "all" ? 1 : 0) +
     Object.values(capabilityFilters).filter(Boolean).length +
-    (minInputPrice || maxInputPrice || minOutputPrice || maxOutputPrice
-      ? 1
-      : 0);
+    (minInputPrice || maxInputPrice || minOutputPrice || maxOutputPrice ? 1 : 0)
+  ), [enabledFilter, capabilityFilters, minInputPrice, maxInputPrice, minOutputPrice, maxOutputPrice]);
 
   if (isLoading) {
     return (
@@ -241,143 +236,22 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
             disabled={disabled}
           />
         </div>
-        <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 px-3 relative"
-              disabled={disabled}
-            >
-              <FilterIcon className="h-4 w-4 mr-1" />
-              Filters
-              {activeFilterCount > 0 && (
-                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-primary rounded-full">
-                  {activeFilterCount}
-                </span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-72 p-4 space-y-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold">Status</Label>
-              <div className="flex gap-1">
-                <Button
-                  variant={enabledFilter === "all" ? "secondary" : "outline"}
-                  size="sm"
-                  onClick={() => setEnabledFilter("all")}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={
-                    enabledFilter === "enabled" ? "secondary" : "outline"
-                  }
-                  size="sm"
-                  onClick={() => setEnabledFilter("enabled")}
-                >
-                  <CheckIcon className="h-3 w-3 mr-1" /> Enabled
-                </Button>
-                <Button
-                  variant={
-                    enabledFilter === "disabled" ? "secondary" : "outline"
-                  }
-                  size="sm"
-                  onClick={() => setEnabledFilter("disabled")}
-                >
-                  <BanIcon className="h-3 w-3 mr-1" /> Disabled
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold">Capabilities</Label>
-              <div className="flex flex-wrap gap-1">
-                <ActionTooltipButton
-                  tooltipText="Reasoning"
-                  aria-label="Reasoning"
-                  icon={<BrainCircuitIcon />}
-                  onClick={() => toggleCapabilityFilter("reasoning")}
-                  variant={
-                    capabilityFilters.reasoning ? "secondary" : "outline"
-                  }
-                  className={cn(capabilityFilters.reasoning && "text-primary")}
-                />
-                <ActionTooltipButton
-                  tooltipText="Web Search"
-                  aria-label="Web Search"
-                  icon={<SearchIcon />}
-                  onClick={() => toggleCapabilityFilter("webSearch")}
-                  variant={
-                    capabilityFilters.webSearch ? "secondary" : "outline"
-                  }
-                  className={cn(capabilityFilters.webSearch && "text-primary")}
-                />
-                <ActionTooltipButton
-                  tooltipText="Tools"
-                  aria-label="Tools"
-                  icon={<WrenchIcon />}
-                  onClick={() => toggleCapabilityFilter("tools")}
-                  variant={capabilityFilters.tools ? "secondary" : "outline"}
-                  className={cn(capabilityFilters.tools && "text-primary")}
-                />
-                <ActionTooltipButton
-                  tooltipText="Multimodal"
-                  aria-label="Multimodal"
-                  icon={<ImageIcon />}
-                  onClick={() => toggleCapabilityFilter("multimodal")}
-                  variant={
-                    capabilityFilters.multimodal ? "secondary" : "outline"
-                  }
-                  className={cn(capabilityFilters.multimodal && "text-primary")}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold flex items-center gap-1">
-                <DollarSignIcon className="h-3 w-3" /> Price Range ($ / 1M
-                Tokens)
-              </Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Min Input"
-                  value={minInputPrice}
-                  onChange={(e) => setMinInputPrice(e.target.value)}
-                  className="h-8 text-xs"
-                />
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Max Input"
-                  value={maxInputPrice}
-                  onChange={(e) => setMaxInputPrice(e.target.value)}
-                  className="h-8 text-xs"
-                />
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Min Output"
-                  value={minOutputPrice}
-                  onChange={(e) => setMinOutputPrice(e.target.value)}
-                  className="h-8 text-xs"
-                />
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Max Output"
-                  value={maxOutputPrice}
-                  onChange={(e) => setMaxOutputPrice(e.target.value)}
-                  className="h-8 text-xs"
-                />
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+        <ModelFilterControls
+          currentCapabilityFilters={capabilityFilters}
+          onCapabilityFilterChange={setCapabilityFiltersCallback}
+          currentEnabledFilter={enabledFilter}
+          onEnabledFilterChange={handleEnabledFilterChange}
+          currentMinInputPrice={minInputPrice}
+          currentMaxInputPrice={maxInputPrice}
+          currentMinOutputPrice={minOutputPrice}
+          currentMaxOutputPrice={maxOutputPrice}
+          onPriceFilterChange={handlePriceFilterChange}
+          showStatusFilter={true}
+          showCapabilityFilters={true}
+          showPriceFilters={true}
+          disabled={disabled}
+          totalActiveFilters={activeFilterCount}
+        />
       </div>
       <ScrollArea
         className={cn(

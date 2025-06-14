@@ -198,6 +198,7 @@ const SettingsProvidersComponent: React.FC<SettingsProvidersProps> = ({
             onSelectModelForDetails={handleSelectModelAndSwitchTab}
           />
         ),
+        scrollable: false,
       },
     ],
     [
