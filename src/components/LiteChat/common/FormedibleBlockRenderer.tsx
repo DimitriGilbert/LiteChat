@@ -79,28 +79,102 @@ class FormedibleParser {
     return sanitized;
   }
 
-  private static parseObjectLiteral(code: string): any {
-    // Simple object literal parser - more secure than eval
+    private static parseObjectLiteral(code: string): any {
     try {
-      // Wrap in parentheses and use JSON.parse with some preprocessing
-      let processedCode = code.trim();
-      
-      // Handle unquoted keys by adding quotes
-      processedCode = processedCode.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
-      
-      // Handle trailing commas
-      processedCode = processedCode.replace(/,(\s*[}\]])/g, '$1');
-      
-      // Handle single quotes
-      processedCode = processedCode.replace(/'/g, '"');
-      
-      // Handle z.object() and other Zod expressions by converting to strings
-      processedCode = processedCode.replace(/z\.[a-zA-Z]+\([^)]*\)(?:\.[a-zA-Z]+\([^)]*\))*/g, '"__ZOD_SCHEMA__"');
-      
-      return JSON.parse(processedCode);
-    } catch (error) {
-      throw new Error(`Invalid object syntax: ${error instanceof Error ? error.message : String(error)}`);
+      // First try direct JSON parsing
+      return JSON.parse(code);
+    } catch (jsonError) {
+      // If that fails, try to convert JS object literal to JSON
+      try {
+        let processedCode = code.trim();
+        
+        // Replace Zod expressions with placeholder strings - handle nested structures
+        processedCode = this.replaceZodExpressions(processedCode);
+        
+        // Convert unquoted keys to quoted keys
+        processedCode = processedCode.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
+        
+        // Remove trailing commas
+        processedCode = processedCode.replace(/,(\s*[}\]])/g, '$1');
+        
+        // Convert single quotes to double quotes
+        processedCode = processedCode.replace(/'/g, '"');
+        
+        return JSON.parse(processedCode);
+      } catch (conversionError) {
+        throw new Error(`Invalid syntax. Please use valid JSON format or JavaScript object literal syntax. Error: ${conversionError instanceof Error ? conversionError.message : String(conversionError)}`);
+      }
     }
+  }
+
+  private static replaceZodExpressions(code: string): string {
+    // Handle nested Zod expressions by finding balanced parentheses
+    let result = code;
+    let changed = true;
+    
+    while (changed) {
+      changed = false;
+      // Match z.method( and find the matching closing parenthesis
+      const zodMatch = result.match(/z\.[a-zA-Z]+\(/);
+      if (zodMatch) {
+        const startIndex = zodMatch.index!;
+        const openParenIndex = startIndex + zodMatch[0].length - 1;
+        
+        // Find the matching closing parenthesis
+        let depth = 1;
+        let endIndex = openParenIndex + 1;
+        
+        while (endIndex < result.length && depth > 0) {
+          if (result[endIndex] === '(') {
+            depth++;
+          } else if (result[endIndex] === ')') {
+            depth--;
+          }
+          endIndex++;
+        }
+        
+        if (depth === 0) {
+          // Check for chained methods like .min().max()
+          let chainEnd = endIndex;
+          while (chainEnd < result.length) {
+            const chainMatch = result.slice(chainEnd).match(/^\.[a-zA-Z]+\(/);
+            if (chainMatch) {
+              // Find the closing parenthesis for this chained method
+              let chainDepth = 1;
+              let chainParenIndex = chainEnd + chainMatch[0].length - 1;
+              let chainEndIndex = chainParenIndex + 1;
+              
+              while (chainEndIndex < result.length && chainDepth > 0) {
+                if (result[chainEndIndex] === '(') {
+                  chainDepth++;
+                } else if (result[chainEndIndex] === ')') {
+                  chainDepth--;
+                }
+                chainEndIndex++;
+              }
+              
+              if (chainDepth === 0) {
+                chainEnd = chainEndIndex;
+              } else {
+                break;
+              }
+            } else {
+              break;
+            }
+          }
+          
+          // Replace the entire Zod expression with a placeholder
+          result = result.slice(0, startIndex) + '"__ZOD_SCHEMA__"' + result.slice(chainEnd);
+          changed = true;
+        } else {
+          // If we can't find matching parentheses, just replace the method name
+          result = result.replace(/z\.[a-zA-Z]+/, '"__ZOD_SCHEMA__"');
+          changed = true;
+        }
+      }
+    }
+    
+    return result;
   }
 
   private static validateAndSanitize(obj: any): any {
@@ -505,7 +579,8 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
     return defaults;
   }, []);
 
-  const renderedForm = useMemo(() => {
+  // Prepare form configuration
+  const formConfig = useMemo(() => {
     if (!formDefinition || !formDefinition.fields) {
       return null;
     }
@@ -514,7 +589,7 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
       const schema = createSchemaFromFields(formDefinition.fields);
       const defaultValues = formDefinition.formOptions?.defaultValues || createDefaultValues(formDefinition.fields);
 
-      const { Form } = useFormedible({
+      return {
         schema,
         fields: formDefinition.fields,
         pages: formDefinition.pages,
@@ -533,20 +608,40 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
           },
         },
         disabled: true, // Disable the form since it's just a preview
-      });
-
-      return <Form />;
+      };
     } catch (err) {
-      console.error("Form rendering error:", err);
+      console.error("Form configuration error:", err);
+      return { error: err instanceof Error ? err.message : "Unknown error" };
+    }
+  }, [formDefinition, createSchemaFromFields, createDefaultValues]);
+
+  // Use the hook at the top level, but conditionally
+  const formedibleResult = useFormedible(formConfig && !('error' in formConfig) ? formConfig : {
+    fields: [],
+    formOptions: { defaultValues: {} }
+  });
+
+  const renderedForm = useMemo(() => {
+    if (!formConfig) {
+      return null;
+    }
+
+    if ('error' in formConfig) {
       return (
         <div className="p-4 border border-destructive/20 bg-destructive/10 rounded-md">
           <div className="text-sm text-destructive">
-            Failed to render form: {err instanceof Error ? err.message : "Unknown error"}
+            Failed to render form: {formConfig.error}
           </div>
         </div>
       );
     }
-  }, [formDefinition, createSchemaFromFields, createDefaultValues]);
+
+    if (!formDefinition || !formDefinition.fields) {
+      return null;
+    }
+
+    return <formedibleResult.Form />;
+  }, [formConfig, formDefinition, formedibleResult.Form]);
 
   const codeBlockHeaderActions = renderSlotForCodeBlock(
     "codeblock-header-actions",
