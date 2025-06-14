@@ -356,6 +356,16 @@ export const useExampleStore = create(
 - Effective settings calculation with cascading
 - Path-based project organization
 
+#### PromptTemplateStore (`src/store/prompt-template.store.ts`)
+- Manages prompt templates, including regular prompts, agents (`type: "agent"`), and tasks (`type: "task"`)
+- Handles compilation of templates with form data
+- Persistence through PersistenceService
+
+#### McpStore (`src/store/mcp.store.ts`)
+- Manages MCP server configurations (stored as settings in `appState`)
+- Tracks connection status and retries for MCP servers
+- Persistence through PersistenceService (via `appState`)
+
 ### Event Action Coordinator
 
 The `EventActionCoordinatorService` automatically connects events to store actions:
@@ -367,6 +377,8 @@ export class EventActionCoordinatorService {
       useSettingsStore,
       useProviderStore,
       useConversationStore,
+      usePromptTemplateStore,
+      useMcpStore,
       // ... all stores
     ];
 
@@ -423,7 +435,7 @@ interface VfsState {
   nodes: Record<string, VfsNode>;           // File/folder tree
   childrenMap: Record<string, string[]>;    // Parent-child relationships
   rootId: string | null;                    // Root directory node ID
-  currentParentId: string | null;           // Current directory
+  currentParentId: string | null;
   selectedFileIds: Set<string>;             // Selected files
   fs: typeof fs | null;                     // ZenFS instance
   vfsKey: string | null;                    // Current VFS context
@@ -768,6 +780,10 @@ const storesWithActionHandlers = [
   useMyStore,
 ];
 ```
+
+### Persistence (Import/Export) Services
+
+When adding new data types for persistence, ensure they are integrated into the `PersistenceService` for database operations and the `ImportExportService` for backup/restore functionalities. This includes defining appropriate interfaces in `FullExportData` and `FullImportOptions`, and implementing the logic for saving/loading and clearing the data.
 
 ### Code Organization Principles
 

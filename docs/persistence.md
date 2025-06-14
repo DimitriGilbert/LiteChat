@@ -20,14 +20,36 @@ class LiteChatDatabase extends Dexie {
   rules!: Table<DbRule>;
   tags!: Table<DbTag>;
   tagRuleLinks!: Table<DbTagRuleLink>;
+  promptTemplates!: Table<DbPromptTemplate>;
 
   constructor() {
     super('LiteChatDB');
-    this.version(1).stores({
+    this.version(9).stores({
       conversations: '++id, title, projectId, syncRepoId, createdAt, updatedAt',
-      interactions: '++id, conversationId, index, createdAt, startedAt, endedAt',
+      interactions: '++id, conversationId, index, createdAt, startedAt, endedAt, rating',
       projects: '++id, name, parentId, createdAt, updatedAt',
-      // ... other table definitions
+      mods: '&name, enabled, loadOrder',
+      appState: '&key',
+      providerConfigs: '++id, &name, type, isEnabled, apiKeyId',
+      apiKeys: '++id, &name',
+      syncRepos: '++id, &name, remoteUrl, username',
+      rules: '++id, &name, type, createdAt, updatedAt',
+      tags: '++id, &name, createdAt, updatedAt',
+      tagRuleLinks: '++id, tagId, ruleId, &[tagId+ruleId]',
+      promptTemplates: '++id, &name, createdAt, updatedAt, isPublic, type, parentId',
+    });
+    this.version(8).stores({
+      conversations: '++id, title, projectId, syncRepoId, createdAt, updatedAt',
+      interactions: '++id, conversationId, index, createdAt, startedAt, endedAt, rating',
+      mods: '&name, enabled, loadOrder',
+      appState: '&key',
+      providerConfigs: '++id, &name, type, isEnabled, apiKeyId',
+      apiKeys: '++id, &name',
+      syncRepos: '++id, &name, remoteUrl, username',
+      projects: '++id, name, parentId, createdAt, updatedAt',
+      rules: '++id, &name, type, createdAt, updatedAt',
+      tags: '++id, &name, createdAt, updatedAt',
+      tagRuleLinks: '++id, tagId, ruleId, &[tagId+ruleId]',
     });
   }
 }
@@ -97,8 +119,20 @@ static async saveProject(project: Project): Promise<string>
 static async deleteProject(id: string): Promise<void>
 ```
 
+#### Prompt Templates (including Agents and Tasks)
+```typescript
+// Load all prompt templates
+static async loadPromptTemplates(): Promise<PromptTemplate[]>
+
+// Save or update a prompt template
+static async savePromptTemplate(template: PromptTemplate): Promise<string>
+
+// Delete a prompt template
+static async deletePromptTemplate(id: string): Promise<void>
+```
+
 ### Settings Management
-Application settings are stored in the `appState` table with key-value pairs:
+Application settings are stored in the `appState` table with key-value pairs. This includes MCP server configurations:
 
 ```typescript
 // Save any setting with automatic persistence
@@ -110,6 +144,9 @@ static async loadSetting<T>(key: string, defaultValue: T): Promise<T>
 // Example usage
 await PersistenceService.saveSetting('theme', 'dark');
 const theme = await PersistenceService.loadSetting('theme', 'light');
+
+// MCP Server configuration example
+const mcpServers = await PersistenceService.loadSetting('mcpServers', []);
 ```
 
 ### Provider Configuration
@@ -204,37 +241,110 @@ getRegisteredActionHandlers: (): RegisteredActionHandler[] => [
 
 ## Data Import/Export
 
-### Full Application Export
+LiteChat provides robust data import and export capabilities via the `ImportExportService`, accessible through the **Settings → Data Management** tab. This allows you to backup and restore your entire LiteChat configuration or specific data categories.
+
+### Full Application Configuration Backup
+
+This option allows you to export all supported data types into a single JSON file. When importing, you can selectively choose which categories to restore.
+
 ```typescript
 interface FullExportData {
   version: number;
   exportedAt: string;
-  settings: Record<string, any>;
-  apiKeys: DbApiKey[];
-  providerConfigs: DbProviderConfig[];
-  projects: Project[];
-  conversations: Conversation[];
-  interactions: Interaction[];
-  rules: DbRule[];
-  tags: DbTag[];
-  tagRuleLinks: DbTagRuleLink[];
-  mods: DbMod[];
-  syncRepos: SyncRepo[];
+  settings?: Record<string, any>;
+  apiKeys?: DbApiKey[];
+  providerConfigs?: DbProviderConfig[];
+  projects?: Project[];
+  conversations?: Conversation[];
+  interactions?: Interaction[];
+  rules?: DbRule[];
+  tags?: DbTag[];
+  tagRuleLinks?: DbTagRuleLink[];
+  mods?: DbMod[];
+  syncRepos?: SyncRepo[];
+  mcpServers?: any[];
+  promptTemplates?: DbPromptTemplate[];
+  agents?: DbPromptTemplate[];
 }
 
 // Export entire application state
-static async exportAllData(): Promise<FullExportData>
+static async exportFullConfiguration(options: FullExportOptions): Promise<void>
 
 // Import with selective options
-static async importAllData(data: FullExportData, options: {
-  importSettings?: boolean;
-  importApiKeys?: boolean;
-  importProviderConfigs?: boolean;
-  // ... other selective import flags
-}): Promise<void>
+static async importFullConfiguration(file: File, options: FullImportOptions): Promise<void>
+
+interface FullImportOptions {
+  importSettings: boolean;
+  importApiKeys: boolean;
+  importProviderConfigs: boolean;
+  importProjects: boolean;
+  importConversations: boolean;
+  importRulesAndTags: boolean;
+  importMods: boolean;
+  importSyncRepos: boolean;
+  importMcpServers: boolean;
+  importPromptTemplates: boolean;
+  importAgents: boolean;
+}
+
+type FullExportOptions = FullImportOptions;
 ```
 
+**Usage:**
+- Navigate to `Settings` -> `Data Management`.
+- Under `Full Configuration Backup`, select the data types you wish to include or restore.
+- Click `Export Configuration` to save a backup file, or `Select Backup File...` to import.
+
+### Individual Category Export/Import
+
+For more granular control, you can export and import specific data categories independently. This is useful for sharing a subset of your configurations or for managing specific components of your LiteChat environment.
+
+#### MCP Servers
+
+Export or import your configured Model Context Protocol (MCP) server connections. This includes their names, URLs, and authentication headers.
+
+```typescript
+static async exportMcpServers(): Promise<void>
+static async importMcpServers(file: File): Promise<void>
+```
+
+**Usage:**
+- Go to `Settings` -> `Data Management`.
+- In the `Individual Categories` section, find `MCP Servers`.
+- Click `Export` to save your MCP server configurations, or `Import` to load them from a file.
+
+#### Prompt Templates
+
+Export or import your standard prompt templates. This includes templates of type "prompt" and their associated variables, descriptions, tags, and content. Agents and tasks are handled separately.
+
+```typescript
+static async exportPromptTemplates(): Promise<void>
+static async importPromptTemplates(file: File): Promise<void>
+```
+
+**Usage:**
+- Go to `Settings` -> `Data Management`.
+- In the `Individual Categories` section, find `Prompt Templates`.
+- Click `Export` to save your prompt templates, or `Import` to load them from a file.
+
+#### Agents
+
+Export or import your AI agents along with all their associated tasks. This ensures that your agents are fully functional when imported into another LiteChat instance.
+
+```typescript
+static async exportAgents(): Promise<void>
+static async importAgents(file: File): Promise<void>
+```
+
+**Usage:**
+- Go to `Settings` -> `Data Management`.
+- In the `Individual Categories` section, find `Agents`.
+- Click `Export` to save your agents (and their tasks), or `Import` to load them from a file.
+
 ### Individual Entity Export
+
+These functions are used internally by the `ImportExportService` for specific scenarios and are not directly exposed in the UI for general import/export operations.
+
 ```typescript
 // Export single conversation with interactions
 static async exportConversationData(conversationId: string): Promise<{
@@ -250,247 +360,19 @@ static async exportProjectData(projectId: string): Promise<{
 }>
 ```
 
-## Transaction Management
+## Data Cleaning
 
-### Atomic Operations
-Critical operations use Dexie transactions for data consistency:
+### Clear All Local Data
 
-```typescript
-// Example: Deleting API key and unlinking from provider configs
-static async deleteApiKey(id: string): Promise<void> {
-  try {
-    await db.transaction("rw", [db.apiKeys, db.providerConfigs], async () => {
-      // 1. Find affected provider configs
-      const configsToUpdate = await db.providerConfigs
-        .where("apiKeyId")
-        .equals(id)
-        .toArray();
-
-      // 2. Unlink API key from configs
-      if (configsToUpdate.length > 0) {
-        const updates = configsToUpdate.map((config) =>
-          db.providerConfigs.update(config.id, { apiKeyId: null })
-        );
-        await Promise.all(updates);
-      }
-
-      // 3. Delete the API key
-      await db.apiKeys.delete(id);
-    });
-  } catch (error) {
-    console.error("PersistenceService: Error deleting API key:", error);
-    throw error;
-  }
-}
-```
-
-### Cascading Deletes
-Related data is automatically cleaned up:
+This action will permanently delete ALL conversations, messages, mods, settings, providers, API keys, projects, rules, tags, sync repositories, and all prompt templates (including agents and tasks) from your browser's local storage. This action cannot be undone.
 
 ```typescript
-// Deleting a project recursively removes child projects
-static async deleteProject(id: string): Promise<void> {
-  const deleteRecursive = async (projectId: string) => {
-    // Find child projects
-    const childProjects = await db.projects
-      .where("parentId")
-      .equals(projectId)
-      .toArray();
-    
-    // Recursively delete children first
-    for (const child of childProjects) {
-      await deleteRecursive(child.id);
-    }
-    
-    // Delete the project itself
-    await db.projects.delete(projectId);
-  };
-
-  await db.transaction("rw", [db.projects], async () => {
-    await deleteRecursive(id);
-  });
-}
+static async clearAllData(): Promise<void>
 ```
 
-## Data Validation and Migration
-
-### Type Enforcement
-```typescript
-// Helper function ensures proper date field handling
-function ensureDateFields<T extends Record<string, any>>(
-  obj: T,
-  dateFields: string[] = ['createdAt', 'updatedAt']
-): T {
-  const result = { ...obj };
-  for (const field of dateFields) {
-    if (result[field] && typeof result[field] === 'string') {
-      result[field] = new Date(result[field]);
-    }
-  }
-  return result;
-}
-
-// Applied automatically when loading data
-const conversations = await db.conversations.toArray();
-return conversations.map(c => ensureDateFields(c, ['lastSyncedAt']));
-```
-
-### Schema Evolution
-Future schema changes are handled through versioning:
-
-```typescript
-// Example migration for version 2
-this.version(2)
-  .stores({
-    conversations: '++id, title, projectId, syncRepoId, createdAt, updatedAt, archivedAt',
-    // Added archivedAt field
-  })
-  .upgrade(trans => {
-    // Add default archivedAt value for existing conversations
-    return trans.conversations.toCollection().modify(conversation => {
-      conversation.archivedAt = null;
-    });
-  });
-```
-
-## Performance Considerations
-
-### Indexing Strategy
-Database indices are carefully chosen for common query patterns:
-
-```typescript
-// Conversations indexed by project and sync repo for fast filtering
-conversations: '++id, title, projectId, syncRepoId, createdAt, updatedAt'
-
-// Interactions indexed by conversation and creation order
-interactions: '++id, conversationId, index, createdAt, startedAt, endedAt'
-
-// Projects indexed by parent for hierarchy traversal
-projects: '++id, name, parentId, createdAt, updatedAt'
-```
-
-### Batch Operations
-Large operations are batched for performance:
-
-```typescript
-// Example: Bulk saving interactions
-const interactions = generateManyInteractions();
-await db.interactions.bulkAdd(interactions);
-
-// Transaction batching for related operations
-await db.transaction("rw", [db.conversations, db.interactions], async () => {
-  await db.conversations.bulkAdd(conversations);
-  await db.interactions.bulkAdd(interactions);
-});
-```
-
-### Memory Management
-Large query results are streamed when possible:
-
-```typescript
-// For very large datasets, use Dexie's streaming
-await db.interactions
-  .where('conversationId')
-  .equals(id)
-  .each(interaction => {
-    // Process one at a time instead of loading all into memory
-    processInteraction(interaction);
-  });
-```
-
-## Error Handling
-
-### Robust Error Recovery
-```typescript
-static async saveConversation(conversation: Conversation): Promise<string> {
-  try {
-    return await db.conversations.put(conversation);
-  } catch (error) {
-    // Log detailed error information
-    console.error("PersistenceService: Error saving conversation:", error);
-    
-    // Provide user-friendly error messages
-    if (error.name === 'QuotaExceededError') {
-      toast.error("Storage quota exceeded. Please free up space.");
-    } else {
-      toast.error("Failed to save conversation. Please try again.");
-    }
-    
-    // Re-throw for calling code to handle
-    throw error;
-  }
-}
-```
-
-### Connection State Management
-```typescript
-// Handle database connection issues
-db.on('ready', () => {
-  console.log("Database initialized successfully");
-});
-
-db.on('error', (error) => {
-  console.error("Database error:", error);
-  // Emit global error for UI handling
-  emitter.emit(uiEvent.globalErrorChanged, { 
-    error: "Database connection failed" 
-  });
-});
-```
-
-## Best Practices
-
-### 1. Always Use Transactions for Related Operations
-```typescript
-// Good: Atomic operation
-await db.transaction("rw", [db.conversations, db.interactions], async () => {
-  await db.conversations.delete(conversationId);
-  await db.interactions.where({ conversationId }).delete();
-});
-
-// Avoid: Separate operations that could leave inconsistent state
-await db.conversations.delete(conversationId);
-await db.interactions.where({ conversationId }).delete(); // Could fail
-```
-
-### 2. Handle Date Fields Consistently
-```typescript
-// Always use the helper for date field conversion
-return conversations.map(c => ensureDateFields(c, ['lastSyncedAt']));
-
-// Be explicit about which fields contain dates
-static async loadSyncRepos(): Promise<SyncRepo[]> {
-  const repos = await db.syncRepos.toArray();
-  return repos.map(r => ensureDateFields(r, ['lastPulledAt', 'lastPushedAt']));
-}
-```
-
-### 3. Provide Meaningful Error Messages
-```typescript
-try {
-  await PersistenceService.saveProject(project);
-} catch (error) {
-  if (error.message.includes('unique constraint')) {
-    toast.error("A project with this name already exists");
-  } else {
-    toast.error("Failed to save project");
-  }
-  throw error;
-}
-```
-
-### 4. Use Indices Effectively
-```typescript
-// Good: Uses index for fast lookup
-const projectConversations = await db.conversations
-  .where('projectId')
-  .equals(projectId)
-  .toArray();
-
-// Avoid: Full table scan
-const projectConversations = await db.conversations
-  .filter(c => c.projectId === projectId)
-  .toArray();
-```
+**Usage:**
+- Navigate to `Settings` -> `Data Management`.
+- In the `Danger Zone` section, click `Clear All Local Data`.
+- Confirm the action twice to proceed. Use with extreme caution.
 
 The persistence layer provides a robust foundation for LiteChat's data management, ensuring reliability, performance, and data integrity while maintaining the privacy-first, client-side architecture. 

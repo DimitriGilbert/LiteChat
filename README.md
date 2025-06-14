@@ -7,7 +7,7 @@
 ### 🔒 **Privacy-First Architecture**
 - **100% Client-Side**: All data stored locally in your browser using IndexedDB
 - **No Server Dependencies**: Core functionality requires no backend services
-- **Full Data Control**: Export/import your data at any time
+- **Full Data Control**: Export/import your entire configuration or specific data types (conversations, projects, settings, API keys, providers, rules, tags, mods, sync repos, MCP servers, prompt templates, and agents).
 
 ### 🤖 **Multi-Provider AI Support**
 - **OpenRouter**: Access to 300+ models through unified API
@@ -31,12 +31,12 @@
 - **Regen with**: regenerate the message with a different model
 - **Response editor**: edit the response after it has been generated to remove the fluff and save on tokens
 - **Rules**: you can add rules to the AI to guide its behavior, **tags** are here to bundle rules together
+- **Prompt Templates & Agents**: Create, manage, and use reusable prompt templates, including powerful AI agents and their associated tasks.
 
 ### 🛠️ **Developer-Focused Features**
 - **Git Integration**: Clone, commit, push, pull directly in the browser
 - **Code Block Enhancements**: Filepath syntax, individual downloads, ZIP exports
-- **Tool System**: AI can read/write files, execute Git commands, and more
-- **MCP Integration**: Connect to HTTP-based Model Context Protocol servers for external tools and capabilities
+- **Tool System**: AI can read/write files, execute Git commands, and more, including tools from MCP servers.
 - **Structured Output**: you can ask the AI to return a structured output, like a JSON, a table, a list, etc. (untested ^^')
 
 ### 📁 **Project Organization**
@@ -46,7 +46,8 @@
 - **Conversation Sync**: Link conversations to Git repositories for version control
 
 ### 🔌 **MCP (Model Context Protocol) Integration**
-- **HTTP-based MCP Servers**: Connect to external MCP servers via Server-Sent Events
+- **HTTP MCP Servers**: Connect to external MCP servers via Server-Sent Events
+- **Stdio MCP Servers**: Connect to external MCP servers via Stdio (via [node ./bin/mcp-bridge.js](./bin/mcp-bridge.js))
 - **Automatic Tool Discovery**: Tools from MCP servers are automatically available to the AI
 - **Graceful Error Handling**: Configurable retry logic with exponential backoff
 - **Connection Management**: Real-time status monitoring and manual retry capabilities

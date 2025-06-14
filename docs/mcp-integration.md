@@ -70,6 +70,8 @@ This allows connection to:
 
 > **Bridge Location**: Configure bridge location in MCP settings to use remote bridges on VMs, containers, or other hosts.
 
+> **Backup & Restore**: MCP server configurations are included in [Full Configuration Backups](./persistence.md#full-application-configuration-backup) and can be managed individually via [Data Management Settings](./persistence.md#individual-category-exportimport).
+
 #### Stdio URL Format
 For stdio servers, use the format: `stdio://command?args=arg1,arg2&cwd=/working/directory`
 

@@ -9,7 +9,7 @@ LiteChat is a modular, extensible, privacy-focused AI chat application designed 
 ### 🔒 Privacy-First Architecture
 - **100% Client-Side**: All data stored locally in browser using IndexedDB
 - **No Server Dependencies**: Core functionality requires no backend services
-- **Full Data Control**: Export/import data at any time
+- **Full Data Control**: Export/import your entire configuration or specific data types (conversations, projects, settings, API keys, providers, rules, tags, mods, sync repos, MCP servers, prompt templates, and agents).
 - **Local File System**: Virtual file system stored entirely in browser
 
 ### 🤖 Multi-Provider AI Support
@@ -27,6 +27,7 @@ LiteChat is a modular, extensible, privacy-focused AI chat application designed 
 - **Response Editor**: Edit AI responses to remove fluff and save tokens
 - **Race Mode**: Send same prompt to multiple models simultaneously
 - **Regen With**: Regenerate messages using different models
+- **Prompt Templates & Agents**: Create, manage, and use reusable prompt templates, including powerful AI agents and their associated tasks.
 
 ### 🛠️ Advanced Features
 - **Mermaid Diagrams**: Real-time diagram rendering
@@ -128,9 +129,9 @@ Each project can override global settings:
 - **Auto Title Prompt**: Custom prompt for generating titles
 
 ### Data Management
-- **Export Data**: Download all conversations, projects, settings
-- **Import Data**: Upload previous exports
-- **Clear All Data**: Reset application state
+- **Export Data**: Download all or selected conversations, projects, settings, API keys, providers, rules, tags, mods, sync repos, MCP servers, prompt templates, and agents.
+- **Import Data**: Upload previous exports, with options to selectively restore specific data types.
+- **Clear All Data**: Reset application state, permanently deleting all local data.
 
 ## Tips & Best Practices
 

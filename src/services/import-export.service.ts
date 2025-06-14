@@ -5,6 +5,7 @@ import type { Interaction } from "@/types/litechat/interaction";
 import type { Project } from "@/types/litechat/project";
 import {
   PersistenceService,
+  type FullExportData,
 } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
@@ -459,21 +460,30 @@ export class ImportExportService {
   ): Promise<void> {
     try {
       const text = await file.text();
-      const data = JSON.parse(text);
-      if (!data || typeof data !== "object" || data.version !== 1) {
+      const data = JSON.parse(text) as FullExportData;
+
+      if (!data || typeof data !== "object" || !data.version) {
         throw new Error(
-          "Invalid import file format or unsupported version.",
+          "Invalid import file format. Missing version or basic structure.",
         );
       }
+
+      // Add more validation as needed based on FullExportData structure
+
       await PersistenceService.importAllData(data, options);
-      toast.success("Configuration imported successfully.");
+
+      toast.success(
+        "Configuration imported successfully. Reloading application...",
+      );
+      // Reload the application to apply changes
+      setTimeout(() => window.location.reload(), 1500);
     } catch (error) {
       console.error(
         "ImportExportService: Error importing full configuration",
         error,
       );
       toast.error(
-        `Import failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Full import failed: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw error;
     }
