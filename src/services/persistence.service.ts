@@ -11,6 +11,7 @@ import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
 import type { DbPromptTemplate, PromptTemplate } from "@/types/litechat/prompt-template";
 import type { DbAppState } from "@/lib/litechat/db";
 import type { FullExportOptions } from "./import-export.service";
+import { nanoid } from "nanoid";
 
 // Helper function to ensure date fields are Date objects
 const ensureDateFields = <
@@ -498,7 +499,10 @@ export class PersistenceService {
       exportData.settings = {};
       appState.forEach((item) => {
         if (item.key.startsWith("settings:")) {
-          exportData.settings![item.key.substring(9)] = item.value;
+          // Exclude mcpServers from settings export - they have their own export option
+          if (item.key !== "settings:mcpServers") {
+            exportData.settings![item.key.substring(9)] = item.value;
+          }
         }
       });
     }
@@ -612,7 +616,7 @@ export class PersistenceService {
           // This preserves custom-typed templates that are not being imported
           const allTemplates = await db.promptTemplates.toArray();
           const templatesToDelete = allTemplates.filter(t => !(t as any).type || (t as any).type === "prompt");
-          const idsToDelete = templatesToDelete.map(t => t.id);
+          const idsToDelete = templatesToDelete.map(t => t.id || nanoid()); // Generate ID if missing
           if (idsToDelete.length > 0) {
             await db.promptTemplates.where("id").anyOf(idsToDelete).delete();
           }
@@ -622,9 +626,9 @@ export class PersistenceService {
           // This preserves orphaned tasks and non-exported agents
           if (data.agents) {
             const agentsToImport = data.agents.filter((a: any) => a.type === "agent");
-            const agentIds = agentsToImport.map((a: any) => a.id);
+            const agentIds = agentsToImport.map((a: any) => a.id || nanoid()); // Generate ID if missing
             const tasksToImport = data.agents.filter((a: any) => a.type === "task");
-            const taskIds = tasksToImport.map((t: any) => t.id);
+            const taskIds = tasksToImport.map((t: any) => t.id || nanoid()); // Generate ID if missing
             const idsToDelete = [...agentIds, ...taskIds];
             if (idsToDelete.length > 0) {
               await db.promptTemplates.where("id").anyOf(idsToDelete).delete();
@@ -697,13 +701,19 @@ export class PersistenceService {
         }
         if (options.importPromptTemplates && data.promptTemplates) {
           await db.promptTemplates.bulkPut(
-            data.promptTemplates.map((t) => ensureDateFields(t, ["createdAt", "updatedAt"]))
+            data.promptTemplates.map((t) => ensureDateFields({
+              ...t,
+              id: t.id || nanoid(), // Generate ID if missing
+            }, ["createdAt", "updatedAt"]))
           );
         }
         if (options.importAgents && data.agents) {
           // Import agents and tasks (they are never included in promptTemplates export)
           await db.promptTemplates.bulkPut(
-            data.agents.map((a) => ensureDateFields(a, ["createdAt", "updatedAt"]))
+            data.agents.map((a) => ensureDateFields({
+              ...a,
+              id: a.id || nanoid(), // Generate ID if missing
+            }, ["createdAt", "updatedAt"]))
           );
         }
       }
