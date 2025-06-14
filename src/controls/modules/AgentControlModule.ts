@@ -77,12 +77,12 @@ export class AgentControlModule implements ControlModule {
   public getAllTemplates = (): PromptTemplate[] => this.allTemplates;
 
   public getAgents = (): PromptTemplate[] => {
-    return this.allTemplates.filter(template => template.type === "agent");
+    return this.allTemplates.filter(template => (template.type || "prompt") === "agent");
   };
 
   public getTasksForAgent = (agentId: string): PromptTemplate[] => {
     return this.allTemplates.filter(template => 
-      template.type === "task" && template.parentId === agentId
+      (template.type || "prompt") === "task" && template.parentId === agentId
     );
   };
 
@@ -180,35 +180,40 @@ export class AgentControlModule implements ControlModule {
 
   register(modApi: LiteChatModApi): void {
     this.modApiRef = modApi;
-    if (this.unregisterPromptControlCallback) {
-      console.warn(`[${this.id}] Already registered. Skipping.`);
-      return;
+    
+    // Register prompt control if not already registered
+    if (!this.unregisterPromptControlCallback) {
+      this.unregisterPromptControlCallback = modApi.registerPromptControl({
+        id: this.id,
+        status: () => "ready",
+        triggerRenderer: () => React.createElement(AgentControl, { module: this }),
+        getMetadata: () => {
+          // Provide agent system prompt if an agent is active
+          if (this.currentAgentSystemPrompt) {
+            return { turnSystemPrompt: this.currentAgentSystemPrompt };
+          }
+          return undefined;
+        },
+        clearOnSubmit: () => {
+          // Only clear agent state if auto-clear is enabled
+          if (this.autoClearEnabled) {
+            this.currentAgentId = null;
+            this.currentAgentSystemPrompt = null;
+            this.notifyComponentUpdate?.();
+          }
+        },
+      });
     }
-    this.unregisterPromptControlCallback = modApi.registerPromptControl({
-      id: this.id,
-      status: () => "ready",
-      triggerRenderer: () => React.createElement(AgentControl, { module: this }),
-      getMetadata: () => {
-        // Provide agent system prompt if an agent is active
-        if (this.currentAgentSystemPrompt) {
-          return { turnSystemPrompt: this.currentAgentSystemPrompt };
-        }
-        return undefined;
-      },
-      clearOnSubmit: () => {
-        // Clear agent state after submission
-        this.currentAgentId = null;
-        this.currentAgentSystemPrompt = null;
-        this.notifyComponentUpdate?.();
-      },
-    });
 
-    this.unregisterCallback = modApi.registerSettingsTab({
-      id: "agent",
-      title: "Agents",
-      component: SettingsAssistantAgent,
-      order: 25, // After prompts (20) but before other tabs
-    });
+    // Register settings tab if not already registered
+    if (!this.unregisterCallback) {
+      this.unregisterCallback = modApi.registerSettingsTab({
+        id: "agent",
+        title: "Agents",
+        component: SettingsAssistantAgent,
+        order: 25, // After prompts (20) but before other tabs
+      });
+    }
   }
 
   destroy(_modApi: LiteChatModApi): void {

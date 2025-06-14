@@ -18,7 +18,7 @@ export interface PromptTemplate {
   tags: string[];
   tools?: string[]; // Tool names to auto-select
   rules?: string[]; // Rule names to auto-select
-  type: PromptTemplateType; // New field: prompt | task | agent
+  type?: PromptTemplateType; // Optional field: prompt | task | agent (defaults to "prompt")
   parentId?: string | null; // New field: for tasks, references the agent ID
   followUps?: string[]; // New field: references to other prompt IDs
   isPublic: boolean;

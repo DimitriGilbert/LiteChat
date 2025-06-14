@@ -221,16 +221,16 @@ export const usePromptTemplateStore = create(
 
     // Helper methods for new functionality
     getTemplatesByType: (type: PromptTemplateType) => {
-      return get().promptTemplates.filter(template => template.type === type);
+      return get().promptTemplates.filter(template => (template.type || "prompt") === type);
     },
 
     getAgents: () => {
-      return get().promptTemplates.filter(template => template.type === "agent");
+      return get().promptTemplates.filter(template => (template.type || "prompt") === "agent");
     },
 
     getTasksForAgent: (agentId: string) => {
       return get().promptTemplates.filter(template => 
-        template.type === "task" && template.parentId === agentId
+        (template.type || "prompt") === "task" && template.parentId === agentId
       );
     },
 
@@ -241,13 +241,13 @@ export const usePromptTemplateStore = create(
       if (type === "task" && currentTemplate?.parentId) {
         // For tasks, only show other tasks with the same parentId
         return templates.filter(t => 
-          t.type === "task" && 
+          (t.type || "prompt") === "task" && 
           t.parentId === currentTemplate.parentId && 
           t.id !== templateId
         );
       } else {
         // For prompts and agents, show all prompts
-        return templates.filter(t => t.type === "prompt" && t.id !== templateId);
+        return templates.filter(t => (t.type || "prompt") === "prompt" && t.id !== templateId);
       }
     },
 
