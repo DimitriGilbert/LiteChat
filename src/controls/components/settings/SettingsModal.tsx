@@ -96,11 +96,11 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
         <DialogContent
           className={cn(
-            "w-[95vw] h-[90vh] flex flex-col p-0",
-            "sm:w-[90vw] sm:h-[85vh]",
-            "md:w-[85vw] md:max-w-[1200px] md:h-[80vh]",
-            "lg:w-[75vw]",
-            "min-h-[500px] max-h-[95vh]"
+            "min-w-[95vw] h-[95vh] flex flex-col p-0",
+            // "sm:w-[90vw] sm:h-[85vh]",
+            // "md:w-[85vw] md:max-w-[1200px] md:h-[80vh]",
+            // "lg:w-[75vw]",
+            // "min-h-[500px] max-h-[95vh]"
           )}
         >
           <DialogHeader className="p-4 md:p-6 pb-2 md:pb-4 flex-shrink-0">
