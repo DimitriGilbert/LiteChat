@@ -3,7 +3,7 @@ import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipB
 import { ArchiveIcon } from "lucide-react";
 import { toast } from "sonner";
 import JSZip from "jszip";
-import { useMarkdownParser, CodeBlockData } from "@/lib/litechat/useMarkdownParser";
+import { useMarkdownParser, UniversalBlockData } from "@/lib/litechat/useMarkdownParser";
 import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control";
 
 interface ZipDownloadControlProps {
@@ -21,13 +21,13 @@ export const ZipDownloadControl: React.FC<ZipDownloadControlProps> = ({
     const blocks: Array<{ filepath: string; code: string; lang?: string }> = [];
     
     parsedContent.forEach((item) => {
-      if (typeof item === "object" && item.type === "code") {
-        const codeData = item as CodeBlockData;
-        if (codeData.filepath && codeData.filepath.trim()) {
+      if (typeof item === "object" && item.type === "block") {
+        const blockData = item as UniversalBlockData;
+        if (blockData.filepath && blockData.filepath.trim()) {
           blocks.push({
-            filepath: codeData.filepath,
-            code: codeData.code,
-            lang: codeData.lang,
+            filepath: blockData.filepath,
+            code: blockData.code,
+            lang: blockData.lang,
           });
         }
       }

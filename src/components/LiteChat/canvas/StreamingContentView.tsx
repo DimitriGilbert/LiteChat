@@ -3,8 +3,7 @@
 import React, {useMemo, useCallback } from "react";
 import {
   useMarkdownParser,
-  CodeBlockData,
-  MermaidBlockData,
+  UniversalBlockData,
   ParsedContent,
 } from "@/lib/litechat/useMarkdownParser";
 import { UniversalBlockRenderer } from "@/components/LiteChat/common/UniversalBlockRenderer";
@@ -24,11 +23,10 @@ interface StreamingContentViewProps {
   className?: string;
 }
 
-// Helper to render a single parsed block (memoized internally if CodeBlockRenderer)
+// Helper to render a single parsed block using UniversalBlockRenderer
 const renderBlock = (
-  item: string | CodeBlockData | MermaidBlockData,
+  item: string | UniversalBlockData,
   index: number,
-  useFullCodeBlock: boolean,
   isStreamingBlock: boolean,
   // @ts-expect-error unused, do not feel like fixing type for now
   interactionId: string
@@ -42,51 +40,14 @@ const renderBlock = (
         dangerouslySetInnerHTML={{ __html: item }}
       />
     );
-  } else if (item.type === "code") {
-    const codeData = item as CodeBlockData;
-    const languageClass = codeData.lang
-      ? `language-${codeData.lang}`
-      : "language-plaintext";
-
-    if (useFullCodeBlock) {
-      return (
-        <UniversalBlockRenderer
-          key={`code-${index}`}
-          lang={codeData.lang}
-          code={codeData.code}
-          filepath={codeData.filepath}
-          isStreaming={isStreamingBlock}
-        />
-      );
-    } else {
-      return (
-        <pre
-          key={`pre-${index}`}
-          className="code-block-container my-4 border border-border rounded-lg overflow-x-auto"
-        >
-          <div className="code-block-header flex items-center justify-between px-3 py-2 border-b border-border bg-muted/50">
-            <div className="text-sm font-medium">
-              {codeData.lang ? codeData.lang.toUpperCase() : "CODE"}
-            </div>
-          </div>
-          <code
-            className={cn(
-              languageClass,
-              "block p-4 font-mono text-sm leading-relaxed"
-            )}
-          >
-            {codeData.code}
-          </code>
-        </pre>
-      );
-    }
-  } else if (item.type === "mermaid") {
-    const mermaidData = item as MermaidBlockData;
+  } else if (item.type === "block") {
+    // Always use UniversalBlockRenderer for all code blocks
     return (
       <UniversalBlockRenderer
-        key={`mermaid-${index}`}
-        lang="mermaid"
-        code={mermaidData.code}
+        key={`block-${index}`}
+        lang={item.lang}
+        code={item.code}
+        filepath={item.filepath}
         isStreaming={isStreamingBlock}
       />
     );
@@ -100,11 +61,10 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
   isStreaming = false,
   className,
 }) => {
-  const { enableStreamingMarkdown, enableStreamingCodeBlockParsing } =
+  const { enableStreamingMarkdown } =
     useSettingsStore(
       useShallow((state) => ({
         enableStreamingMarkdown: state.enableStreamingMarkdown,
-        enableStreamingCodeBlockParsing: state.enableStreamingCodeBlockParsing,
       }))
     );
 
@@ -173,11 +133,10 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
     return parsedContent.map((item, index) => renderBlock(
       item,
       index,
-      enableStreamingCodeBlockParsing,
       isStreaming && index === parsedContent.length - 1,
       interactionId
     )).filter(Boolean);
-  }, [enableStreamingMarkdown, parsedContent, enableStreamingCodeBlockParsing, isStreaming, interactionId]);
+  }, [enableStreamingMarkdown, parsedContent, isStreaming, interactionId]);
 
   if (!enableStreamingMarkdown && !markdownContent && parsedToolSteps.length === 0) {
       return isStreaming ? <div className={cn("text-muted-foreground italic", className)}>Generating response...</div> : null;

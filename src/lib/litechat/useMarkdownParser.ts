@@ -2,19 +2,14 @@
 import { useMemo } from "react";
 import MarkdownIt from "markdown-it";
 
-export interface CodeBlockData {
-  type: "code";
+export interface UniversalBlockData {
+  type: "block";
   lang: string | undefined;
   code: string;
   filepath?: string;
 }
 
-export interface MermaidBlockData {
-  type: "mermaid";
-  code: string;
-}
-
-export type ParsedContent = (string | CodeBlockData | MermaidBlockData)[];
+export type ParsedContent = (string | UniversalBlockData)[];
 
 // Create a MarkdownIt parser instance with desired options
 const md = new MarkdownIt({
@@ -61,21 +56,13 @@ export function useMarkdownParser(
             lang = fenceInfo.split(" ")[0] || undefined;
           }
           
-          // Check if this is a Mermaid block
-          if (lang === "mermaid") {
-            result.push({
-              type: "mermaid",
-              code: token.content,
-            });
-          } else {
-            // Push the code block content as a CodeBlockData object
-            result.push({
-              type: "code",
-              lang: lang,
-              code: token.content,
-              filepath: filepath,
-            });
-          }
+          // Push all code blocks as universal blocks - let UniversalBlockRenderer handle the specifics
+          result.push({
+            type: "block",
+            lang: lang,
+            code: token.content,
+            filepath: filepath,
+          });
           index++;
         } else {
           // Accumulate non-code tokens

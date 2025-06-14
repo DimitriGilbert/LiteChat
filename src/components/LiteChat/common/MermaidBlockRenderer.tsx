@@ -12,7 +12,9 @@ import { useShallow } from "zustand/react/shallow";
 import type { CanvasControl } from "@/types/litechat/canvas/control";
 import { useControlRegistryStore } from "@/store/control.store";
 import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control";
-import { AlertCircleIcon, Loader2Icon } from "lucide-react";
+import { AlertCircleIcon, Loader2Icon, DownloadIcon, CodeIcon, ImageIcon } from "lucide-react";
+import { CodeBlockRenderer } from "./CodeBlockRenderer";
+import { toast } from "sonner";
 
 interface MermaidBlockRendererProps {
   code: string;
@@ -35,6 +37,8 @@ const MermaidBlockRendererComponent: React.FC<MermaidBlockRendererProps> = ({
   const [svgContent, setSvgContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCode, setShowCode] = useState(false);
+  // const [isCopied, setIsCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const canvasControls = useControlRegistryStore(
@@ -109,18 +113,57 @@ const MermaidBlockRendererComponent: React.FC<MermaidBlockRendererProps> = ({
   }, [code, isFolded]);
 
   useEffect(() => {
-    if (!isFolded && code.trim()) {
+    if (!isFolded && code.trim() && !showCode) {
       renderMermaid();
     }
-  }, [code, isFolded, renderMermaid]);
+  }, [code, isFolded, showCode, renderMermaid]);
 
   const toggleFold = () => {
     const unfolding = isFolded;
     setIsFolded((prev) => !prev);
-    if (unfolding) {
+    if (unfolding && !showCode) {
       setTimeout(renderMermaid, 0);
     }
   };
+
+  const handleDownloadSvg = useCallback(async () => {
+    if (!svgContent) {
+      toast.error("No SVG content to download");
+      return;
+    }
+
+    try {
+      const blob = new Blob([svgContent], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "mermaid-diagram.svg";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("SVG downloaded successfully!");
+    } catch (err) {
+      console.error("Download error:", err);
+      toast.error("Failed to download SVG");
+    }
+  }, [svgContent]);
+
+  // const handleCopyCode = useCallback(async () => {
+  //   try {
+  //     await navigator.clipboard.writeText(code);
+  //     setIsCopied(true);
+  //     toast.success("Code copied to clipboard!");
+  //     setTimeout(() => setIsCopied(false), 2000);
+  //   } catch (err) {
+  //     console.error("Copy error:", err);
+  //     toast.error("Failed to copy code");
+  //   }
+  // }, [code]);
+
+  const toggleView = useCallback(() => {
+    setShowCode((prev) => !prev);
+  }, []);
 
   const foldedPreviewText = useMemo(() => {
     if (!code) return "";
@@ -147,36 +190,85 @@ const MermaidBlockRendererComponent: React.FC<MermaidBlockRendererProps> = ({
             {codeBlockHeaderActions}
           </div>
         </div>
-        <div></div>
+        <div className="flex items-center gap-1 opacity-0 group-hover/codeblock:opacity-100 focus-within:opacity-100 transition-opacity">
+          {/* Toggle between diagram and code view */}
+          <button
+            onClick={toggleView}
+            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+            title={showCode ? "Show diagram" : "Show code"}
+          >
+            {showCode ? (
+              <ImageIcon className="h-4 w-4" />
+            ) : (
+              <CodeIcon className="h-4 w-4" />
+            )}
+          </button>
+          
+          {/* Copy raw code button */}
+          {/* <button
+            onClick={handleCopyCode}
+            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+            title="Copy raw code"
+          >
+            {isCopied ? (
+              <CheckIcon className="h-4 w-4 text-green-600" />
+            ) : (
+              <ClipboardIcon className="h-4 w-4" />
+            )}
+          </button> */}
+          
+          {/* Download SVG button - only show when diagram is rendered */}
+          {svgContent && !showCode && (
+            <button
+              onClick={handleDownloadSvg}
+              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+              title="Download SVG"
+            >
+              <DownloadIcon className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {!isFolded && (
         <div className="overflow-hidden w-full">
-          {isLoading && (
-            <div className="flex items-center justify-center p-8">
-              <Loader2Icon className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-sm text-muted-foreground">
-                Rendering diagram...
-              </span>
-            </div>
-          )}
-          
-          {error && (
-            <div className="flex items-center gap-2 p-4 border border-destructive/20 bg-destructive/10 rounded-md">
-              <AlertCircleIcon className="h-5 w-5 text-destructive flex-shrink-0" />
-              <div className="text-sm text-destructive">
-                <div className="font-medium">Failed to render Mermaid diagram</div>
-                <div className="text-xs mt-1 opacity-80">{error}</div>
-              </div>
-            </div>
-          )}
-          
-          {svgContent && !isLoading && !error && (
-            <div 
-              ref={containerRef}
-              className="mermaid-container p-4 bg-background border rounded-md overflow-auto"
-              dangerouslySetInnerHTML={{ __html: svgContent }}
+          {showCode ? (
+            // Show raw code using CodeBlockRenderer
+            <CodeBlockRenderer
+              lang="mermaid"
+              code={code}
+              isStreaming={isStreaming}
             />
+          ) : (
+            // Show diagram
+            <>
+              {isLoading && (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2Icon className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-sm text-muted-foreground">
+                    Rendering diagram...
+                  </span>
+                </div>
+              )}
+              
+              {error && (
+                <div className="flex items-center gap-2 p-4 border border-destructive/20 bg-destructive/10 rounded-md">
+                  <AlertCircleIcon className="h-5 w-5 text-destructive flex-shrink-0" />
+                  <div className="text-sm text-destructive">
+                    <div className="font-medium">Failed to render Mermaid diagram</div>
+                    <div className="text-xs mt-1 opacity-80">{error}</div>
+                  </div>
+                </div>
+              )}
+              
+              {svgContent && !isLoading && !error && (
+                <div 
+                  ref={containerRef}
+                  className="mermaid-container p-4 bg-background border rounded-md overflow-auto"
+                  dangerouslySetInnerHTML={{ __html: svgContent }}
+                />
+              )}
+            </>
           )}
         </div>
       )}

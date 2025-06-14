@@ -18,8 +18,6 @@ import { useSettingsStore } from "@/store/settings.store";
 // Import markdown parser and types
 import {
   useMarkdownParser,
-  CodeBlockData,
-  MermaidBlockData,
 } from "@/lib/litechat/useMarkdownParser";
 import { UniversalBlockRenderer } from "@/components/LiteChat/common/UniversalBlockRenderer";
 
@@ -53,24 +51,14 @@ const UserContentView: React.FC<{ markdownContent: string | null }> = ({
               dangerouslySetInnerHTML={{ __html: item }}
             />
           );
-        } else if (item.type === "code") {
-          const codeData = item as CodeBlockData;
-          // Use UniversalBlockRenderer for consistency
+        } else if (item.type === "block") {
+          // Always use UniversalBlockRenderer for all code blocks
           return (
             <UniversalBlockRenderer
-              key={`code-${index}`}
-              lang={codeData.lang}
-              code={codeData.code}
-              filepath={codeData.filepath}
-            />
-          );
-        } else if (item.type === "mermaid") {
-          const mermaidData = item as MermaidBlockData;
-          return (
-            <UniversalBlockRenderer
-              key={`mermaid-${index}`}
-              lang="mermaid"
-              code={mermaidData.code}
+              key={`block-${index}`}
+              lang={item.lang}
+              code={item.code}
+              filepath={item.filepath}
             />
           );
         }
