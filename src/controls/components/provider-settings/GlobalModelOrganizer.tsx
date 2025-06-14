@@ -5,7 +5,6 @@ import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SearchIcon } from "lucide-react";
@@ -57,7 +56,7 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
 
   const [filterText, setFilterText] = useState("");
   const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
-    () => new Set()
+    () => new Set(dbProviderConfigs.map((p) => p.id))
   );
   const [capabilityFilters, setCapabilityFilters] = useState<
     Record<CapabilityFilter, boolean>
@@ -165,6 +164,12 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
     selectedProviders.size !== dbProviderConfigs.length ||
     Object.values(capabilityFilters).some(Boolean)
   ), [filterText, selectedProviders, dbProviderConfigs.length, capabilityFilters]);
+
+  const totalActiveFilters = useMemo(() => {
+    const activeProviderFilterCount = selectedProviders.size !== dbProviderConfigs.length ? 1 : 0;
+    const activeCapabilityFilterCount = Object.values(capabilityFilters).filter(Boolean).length;
+    return activeProviderFilterCount + activeCapabilityFilterCount;
+  }, [selectedProviders, dbProviderConfigs.length, capabilityFilters]);
 
   const sortableItemIdsForDisplay = useMemo(
     () => filteredAndOrderedModelsForDisplay.map((m: ModelListItem) => m.id),
@@ -296,11 +301,11 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
             showProviderFilter={true}
             showCapabilityFilters={true}
             disabled={isLoading || dbProviderConfigs.length === 0}
-            totalActiveFilters={isAnyFilterActive ? 1 : 0}
+            totalActiveFilters={totalActiveFilters}
           />
         </div>
 
-        <ScrollArea className="h-[calc(20*2.75rem+2px)] w-full rounded-md border border-border p-3 bg-background/50">
+        <div className="w-full rounded-md border border-border p-3 bg-background/50">
           {filteredAndOrderedModelsForDisplay.length > 0 ? (
             <DndContext
               sensors={sensors}
@@ -344,7 +349,7 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
                 : "No models enabled globally. Enable models within provider configurations."}
             </div>
           )}
-        </ScrollArea>
+        </div>
       </div>
     </div>
   );
