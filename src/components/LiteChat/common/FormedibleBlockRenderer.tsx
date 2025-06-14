@@ -17,7 +17,6 @@ import { useFormedible } from "@/hooks/use-formedible";
 import { z } from "zod";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
-import { ConversationService } from "@/services/conversation.service";
 import { nanoid } from "nanoid";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
 
@@ -414,7 +413,11 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCode, setShowCode] = useState(false);
+  // @ts-expect-error unused, do not feel like fixing type for now
   const [sendOnSubmit, setSendOnSubmit] = useState(false);
+  
+  // Generate a unique field name for the send on submit switch to prevent ID collisions
+  const sendOnSubmitFieldName = useMemo(() => `_sendOnSubmit_${nanoid()}`, []);
 
   const canvasControls = useControlRegistryStore(
     useShallow((state) => Object.values(state.canvasControls))
@@ -646,11 +649,11 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
         ? Math.max(...formDefinition.pages.map((p: { page: number }) => p.page))
         : 1; // Default to page 1 for single-page forms
 
-      // Add the "send on submit" switch to the fields
+      // Add the "send on submit" switch to the fields with unique name
       const fieldsWithSendSwitch = [
         ...formDefinition.fields,
         {
-          name: "_sendOnSubmit",
+          name: sendOnSubmitFieldName,
           type: "switch",
           label: "Send on submit",
           description: "Automatically send the prompt after form submission",
@@ -658,15 +661,15 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
         }
       ];
 
-      // Update schema to include the send switch
+      // Update schema to include the send switch with unique name
       const schemaWithSendSwitch = schema.extend({
-        _sendOnSubmit: z.boolean().default(false),
+        [sendOnSubmitFieldName]: z.boolean().default(false),
       });
 
-      // Update default values to include the send switch
+      // Update default values to include the send switch with unique name
       const defaultValuesWithSendSwitch = {
         ...defaultValues,
-        _sendOnSubmit: false,
+        [sendOnSubmitFieldName]: false,
       };
 
       return {
@@ -685,11 +688,13 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
           canSubmitWhenInvalid: true,
           onSubmit: async ({ value }: { value: Record<string, any> }) => {
             console.log("Formedible onSubmit received full value:", value);
-            console.log("Formedible onSubmit received _sendOnSubmit:", value._sendOnSubmit);
+            console.log("Formedible onSubmit received sendOnSubmit:", value[sendOnSubmitFieldName]);
             // Extract the send on submit value and remove it from form data
-            const { _sendOnSubmit, ...actualFormData } = value;
-            setSendOnSubmit(_sendOnSubmit); // Still update state for display, but not for handler logic
-            await handleFormSubmit(actualFormData, _sendOnSubmit);
+            const sendOnSubmitValue = value[sendOnSubmitFieldName];
+            const actualFormData = { ...value };
+            delete actualFormData[sendOnSubmitFieldName];
+            setSendOnSubmit(sendOnSubmitValue); // Still update state for display, but not for handler logic
+            await handleFormSubmit(actualFormData, sendOnSubmitValue);
           },
           onSubmitInvalid: ({ value, formApi }: { value: Record<string, any>; formApi: any }) => {
             console.error("Formedible onSubmitInvalid triggered. Values:", value);
@@ -703,7 +708,7 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
       console.error("Form configuration error:", err);
       return { error: err instanceof Error ? err.message : "Unknown error" };
     }
-  }, [formDefinition, createSchemaFromFields, createDefaultValues, handleFormSubmit]);
+  }, [formDefinition, createSchemaFromFields, createDefaultValues, handleFormSubmit, sendOnSubmitFieldName]);
 
   // Use the hook at the top level, but conditionally
   const formedibleResult = useFormedible(formConfig && !('error' in formConfig) ? formConfig : {

@@ -198,37 +198,41 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         inputAreaRef.current?.focus();
       });
     }
+  }, [selectedItemId, selectedItemType, inputAreaRef]);
 
+  useEffect(() => {
     const handleFocusRequest = () => {
       requestAnimationFrame(() => {
         inputAreaRef.current?.focus();
       });
     };
 
-    const handleSubmitRequest = async (payload: { turnData: PromptTurnObject }) => {
-      if (isStreaming || isSubmitting) return;
-
-      // Temporarily set the input value from the payload before submitting
-      if (inputAreaRef.current && payload.turnData.content) {
-        inputAreaRef.current.setValue(payload.turnData.content);
+    const handleSetInputTextRequest = (payload: { text: string }) => {
+      if (inputAreaRef.current) {
+        inputAreaRef.current.setValue(payload.text);
+        setHasInputValue(payload.text.trim().length > 0);
       }
+    };
 
-      // Use the existing handleSubmit to ensure all middleware and lifecycle hooks are respected
+    const handleSubmitRequest = async (payload: { turnData: PromptTurnObject }) => {
+      // Check current state instead of stale closure values
+      const currentInteractionState = useInteractionStore.getState();
+      if (currentInteractionState.status === "streaming" || isSubmitting) return;
+
+      // Use the existing handleSubmit with override content to ensure all middleware and lifecycle hooks are respected
       await handleSubmit(payload.turnData.content);
-
-      // Clear the input after submission, as handleSubmit will do this
-      // and to prevent race conditions where Formedible might also try to set it.
-      inputAreaRef.current?.clearValue();
     };
 
     emitter.on(promptEvent.focusInputRequest, handleFocusRequest);
+    emitter.on(promptEvent.setInputTextRequest, handleSetInputTextRequest);
     emitter.on(promptEvent.submitPromptRequest, handleSubmitRequest);
 
     return () => {
       emitter.off(promptEvent.focusInputRequest, handleFocusRequest);
+      emitter.off(promptEvent.setInputTextRequest, handleSetInputTextRequest);
       emitter.off(promptEvent.submitPromptRequest, handleSubmitRequest);
     };
-  }, [selectedItemId, selectedItemType, inputAreaRef, handleSubmit, isStreaming, isSubmitting]);
+  }, [inputAreaRef, handleSubmit, isSubmitting]);
 
   const handleInputValueChange = useCallback((value: string) => {
     setHasInputValue(value.trim().length > 0);
