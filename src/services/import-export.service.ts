@@ -5,7 +5,6 @@ import type { Interaction } from "@/types/litechat/interaction";
 import type { Project } from "@/types/litechat/project";
 import {
   PersistenceService,
-  type FullExportData,
 } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
@@ -139,6 +138,9 @@ export interface FullImportOptions {
   importRulesAndTags: boolean;
   importMods: boolean;
   importSyncRepos: boolean;
+  importMcpServers: boolean;
+  importPromptTemplates: boolean;
+  importAgents: boolean;
 }
 export type FullExportOptions = FullImportOptions;
 
@@ -350,11 +352,11 @@ export class ImportExportService {
     options: FullExportOptions,
   ): Promise<void> {
     try {
-      // Pass options to persistence service
       const exportData = await PersistenceService.getAllDataForExport(options);
       const jsonString = JSON.stringify(exportData, null, 2);
       const blob = new Blob([jsonString], { type: "application/json" });
-      const filename = `litechat_full_export_${new Date().toISOString().split("T")[0]}.json`;
+      const timestamp = format(new Date(), "yyyy-MM-dd_HH-mm-ss");
+      const filename = `litechat_full_config_${timestamp}.json`;
       triggerDownload(blob, filename);
       toast.success("Full configuration exported successfully.");
     } catch (error) {
@@ -363,7 +365,89 @@ export class ImportExportService {
         error,
       );
       toast.error(
-        `Full export failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Export failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  static async exportPromptTemplates(): Promise<void> {
+    try {
+      const templates = await PersistenceService.loadPromptTemplates();
+      const regularTemplates = templates.filter(t => !t.type || t.type === "prompt");
+      
+      const exportData = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        promptTemplates: regularTemplates,
+      };
+      
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const timestamp = format(new Date(), "yyyy-MM-dd_HH-mm-ss");
+      const filename = `litechat_prompt_templates_${timestamp}.json`;
+      
+      triggerDownload(blob, filename);
+      toast.success(`Exported ${regularTemplates.length} prompt templates.`);
+    } catch (error) {
+      console.error("ImportExportService: Error exporting prompt templates", error);
+      toast.error(
+        `Export failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  static async exportAgents(): Promise<void> {
+    try {
+      const templates = await PersistenceService.loadPromptTemplates();
+      const agents = templates.filter(t => t.type === "agent");
+      const agentIds = agents.map(a => a.id);
+      const tasks = templates.filter(t => t.type === "task" && agentIds.includes(t.parentId || ""));
+      
+      const exportData = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        agents: [...agents, ...tasks],
+      };
+      
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const timestamp = format(new Date(), "yyyy-MM-dd_HH-mm-ss");
+      const filename = `litechat_agents_${timestamp}.json`;
+      
+      triggerDownload(blob, filename);
+      toast.success(`Exported ${agents.length} agents with ${tasks.length} tasks.`);
+    } catch (error) {
+      console.error("ImportExportService: Error exporting agents", error);
+      toast.error(
+        `Export failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  static async exportMcpServers(): Promise<void> {
+    try {
+      const mcpServers = await PersistenceService.loadSetting("mcpServers", []);
+      
+      const exportData = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        mcpServers,
+      };
+      
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const timestamp = format(new Date(), "yyyy-MM-dd_HH-mm-ss");
+      const filename = `litechat_mcp_servers_${timestamp}.json`;
+      
+      triggerDownload(blob, filename);
+      toast.success(`Exported ${mcpServers.length} MCP server configurations.`);
+    } catch (error) {
+      console.error("ImportExportService: Error exporting MCP servers", error);
+      toast.error(
+        `Export failed: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw error;
     }
@@ -375,30 +459,116 @@ export class ImportExportService {
   ): Promise<void> {
     try {
       const text = await file.text();
-      const data = JSON.parse(text) as FullExportData;
-
-      if (!data || typeof data !== "object" || !data.version) {
+      const data = JSON.parse(text);
+      if (!data || typeof data !== "object" || data.version !== 1) {
         throw new Error(
-          "Invalid import file format. Missing version or basic structure.",
+          "Invalid import file format or unsupported version.",
         );
       }
-
-      // Add more validation as needed based on FullExportData structure
-
       await PersistenceService.importAllData(data, options);
-
-      toast.success(
-        "Configuration imported successfully. Reloading application...",
-      );
-      // Reload the application to apply changes
-      setTimeout(() => window.location.reload(), 1500);
+      toast.success("Configuration imported successfully.");
     } catch (error) {
       console.error(
         "ImportExportService: Error importing full configuration",
         error,
       );
       toast.error(
-        `Full import failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Import failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  static async importPromptTemplates(file: File): Promise<void> {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      if (!data || typeof data !== "object" || !data.promptTemplates || !Array.isArray(data.promptTemplates)) {
+        throw new Error("Invalid prompt templates file format.");
+      }
+      
+      let importedCount = 0;
+      for (const template of data.promptTemplates) {
+        try {
+          await PersistenceService.savePromptTemplate({
+            ...template,
+            id: template.id || nanoid(), // Generate new ID if missing
+            createdAt: template.createdAt ? new Date(template.createdAt) : new Date(),
+            updatedAt: new Date(),
+          });
+          importedCount++;
+        } catch (error) {
+          console.warn(`Failed to import template ${template.name}:`, error);
+        }
+      }
+      
+      toast.success(`Imported ${importedCount} prompt templates.`);
+    } catch (error) {
+      console.error("ImportExportService: Error importing prompt templates", error);
+      toast.error(
+        `Import failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  static async importAgents(file: File): Promise<void> {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      if (!data || typeof data !== "object" || !data.agents || !Array.isArray(data.agents)) {
+        throw new Error("Invalid agents file format.");
+      }
+      
+      let importedAgents = 0;
+      let importedTasks = 0;
+      
+      for (const template of data.agents) {
+        try {
+          await PersistenceService.savePromptTemplate({
+            ...template,
+            id: template.id || nanoid(), // Generate new ID if missing
+            createdAt: template.createdAt ? new Date(template.createdAt) : new Date(),
+            updatedAt: new Date(),
+          });
+          
+          if (template.type === "agent") {
+            importedAgents++;
+          } else if (template.type === "task") {
+            importedTasks++;
+          }
+        } catch (error) {
+          console.warn(`Failed to import ${template.type} ${template.name}:`, error);
+        }
+      }
+      
+      toast.success(`Imported ${importedAgents} agents with ${importedTasks} tasks.`);
+    } catch (error) {
+      console.error("ImportExportService: Error importing agents", error);
+      toast.error(
+        `Import failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  static async importMcpServers(file: File): Promise<void> {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      if (!data || typeof data !== "object" || !data.mcpServers || !Array.isArray(data.mcpServers)) {
+        throw new Error("Invalid MCP servers file format.");
+      }
+      
+      await PersistenceService.saveSetting("mcpServers", data.mcpServers);
+      toast.success(`Imported ${data.mcpServers.length} MCP server configurations.`);
+    } catch (error) {
+      console.error("ImportExportService: Error importing MCP servers", error);
+      toast.error(
+        `Import failed: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw error;
     }

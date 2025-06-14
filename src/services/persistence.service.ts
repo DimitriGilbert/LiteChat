@@ -56,6 +56,9 @@ export interface FullExportData {
   tagRuleLinks?: DbTagRuleLink[];
   mods?: DbMod[];
   syncRepos?: SyncRepo[];
+  mcpServers?: any[]; // MCP server configurations
+  promptTemplates?: any[]; // All prompt templates
+  agents?: any[]; // Agents with their tasks
 }
 
 export class PersistenceService {
@@ -523,6 +526,24 @@ export class PersistenceService {
     if (options.importSyncRepos) {
       exportData.syncRepos = await db.syncRepos.toArray();
     }
+    if (options.importMcpServers) {
+      // MCP servers are stored as settings
+      const appState = await db.appState.toArray();
+      const mcpServersItem = appState.find(item => item.key === "settings:mcpServers");
+      exportData.mcpServers = mcpServersItem ? mcpServersItem.value : [];
+    }
+    if (options.importPromptTemplates) {
+      // Export all prompt templates (including regular prompts, tasks, and agents)
+      exportData.promptTemplates = await db.promptTemplates.toArray();
+    }
+    if (options.importAgents) {
+      // Export agents and their associated tasks
+      const allTemplates = await db.promptTemplates.toArray();
+      const agents = allTemplates.filter(t => (t as any).type === "agent");
+      const agentIds = agents.map(a => a.id);
+      const tasks = allTemplates.filter(t => (t as any).type === "task" && agentIds.includes((t as any).parentId));
+      exportData.agents = [...agents, ...tasks];
+    }
 
     return exportData;
   }
@@ -538,6 +559,9 @@ export class PersistenceService {
       importRulesAndTags?: boolean;
       importMods?: boolean;
       importSyncRepos?: boolean;
+      importMcpServers?: boolean;
+      importPromptTemplates?: boolean;
+      importAgents?: boolean;
     }
   ): Promise<void> {
     if (data.version !== 1) {
@@ -560,6 +584,7 @@ export class PersistenceService {
         db.tagRuleLinks,
         db.mods,
         db.syncRepos,
+        db.promptTemplates,
       ],
       async () => {
         if (options.importSettings) await db.appState.clear();
@@ -577,6 +602,15 @@ export class PersistenceService {
         }
         if (options.importMods) await db.mods.clear();
         if (options.importSyncRepos) await db.syncRepos.clear();
+        if (options.importMcpServers) {
+          // Clear MCP servers setting
+          await db.appState.where("key").equals("settings:mcpServers").delete();
+        }
+        if (options.importPromptTemplates) await db.promptTemplates.clear();
+        if (options.importAgents) {
+          // Clear agents and tasks from prompt templates
+          await db.promptTemplates.where("type").anyOf(["agent", "task"]).delete();
+        }
 
         if (options.importSettings && data.settings) {
           const settingsToPut: DbAppState[] = Object.entries(data.settings).map(
@@ -634,6 +668,24 @@ export class PersistenceService {
             )
           );
         }
+        if (options.importMcpServers && data.mcpServers) {
+          // Import MCP servers as a setting
+          await db.appState.put({
+            key: "settings:mcpServers",
+            value: data.mcpServers
+          });
+        }
+        if (options.importPromptTemplates && data.promptTemplates) {
+          await db.promptTemplates.bulkPut(
+            data.promptTemplates.map((t) => ensureDateFields(t, ["createdAt", "updatedAt"]))
+          );
+        }
+        if (options.importAgents && data.agents) {
+          // Import agents and tasks as prompt templates
+          await db.promptTemplates.bulkPut(
+            data.agents.map((a) => ensureDateFields(a, ["createdAt", "updatedAt"]))
+          );
+        }
       }
     );
   }
@@ -688,21 +740,20 @@ export class PersistenceService {
           db.promptTemplates,
         ],
         async () => {
-          await db.interactions.clear();
           await db.conversations.clear();
-          await db.projects.clear();
+          await db.interactions.clear();
           await db.mods.clear();
           await db.appState.clear();
           await db.providerConfigs.clear();
           await db.apiKeys.clear();
           await db.syncRepos.clear();
+          await db.projects.clear();
           await db.rules.clear();
           await db.tags.clear();
           await db.tagRuleLinks.clear();
           await db.promptTemplates.clear();
         }
       );
-      console.log("PersistenceService: All data cleared.");
     } catch (error) {
       console.error("PersistenceService: Error clearing all data:", error);
       throw error;

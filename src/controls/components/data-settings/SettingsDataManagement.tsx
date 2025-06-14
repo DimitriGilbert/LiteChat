@@ -19,6 +19,9 @@ import {
   TagsIcon,
   PuzzleIcon,
   GitBranchIcon,
+  PlugIcon,
+  FileTextIcon,
+  BotIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
@@ -43,6 +46,9 @@ const fullImportOptionsSchema = z.object({
   importRulesAndTags: z.boolean(),
   importMods: z.boolean(),
   importSyncRepos: z.boolean(),
+  importMcpServers: z.boolean(),
+  importPromptTemplates: z.boolean(),
+  importAgents: z.boolean(),
 });
 
 const fullExportOptionsSchema = z.object({
@@ -54,6 +60,9 @@ const fullExportOptionsSchema = z.object({
   importRulesAndTags: z.boolean(),
   importMods: z.boolean(),
   importSyncRepos: z.boolean(),
+  importMcpServers: z.boolean(),
+  importPromptTemplates: z.boolean(),
+  importAgents: z.boolean(),
 });
 
 const SettingsDataManagementComponent: React.FC = () => {
@@ -85,6 +94,9 @@ const SettingsDataManagementComponent: React.FC = () => {
       importRulesAndTags: true,
       importMods: true,
       importSyncRepos: true,
+      importMcpServers: true,
+      importPromptTemplates: true,
+      importAgents: true,
     } as FullImportOptions,
     validators: {
       onChange: fullImportOptionsSchema, // Validate on change
@@ -102,6 +114,9 @@ const SettingsDataManagementComponent: React.FC = () => {
       importRulesAndTags: true,
       importMods: true,
       importSyncRepos: true,
+      importMcpServers: true,
+      importPromptTemplates: true,
+      importAgents: true,
     } as FullExportOptions,
     validators: {
       onChange: fullExportOptionsSchema, // Validate on change
@@ -336,6 +351,9 @@ const SettingsDataManagementComponent: React.FC = () => {
               {renderOptionCheckbox(importOptionsForm, "importRulesAndTags", "Rules & Tags", TagsIcon, isFullImporting, 'import')}
               {renderOptionCheckbox(importOptionsForm, "importMods", "Mods", PuzzleIcon, isFullImporting, 'import')}
               {renderOptionCheckbox(importOptionsForm, "importSyncRepos", "Sync Repos", GitBranchIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, "importMcpServers", "MCP Servers", PlugIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, "importPromptTemplates", "Prompt Templates", FileTextIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, "importAgents", "Agents", BotIcon, isFullImporting, 'import')}
             </div>
             <input
               type="file"
@@ -377,6 +395,9 @@ const SettingsDataManagementComponent: React.FC = () => {
               {renderOptionCheckbox(exportOptionsForm, "importRulesAndTags", "Rules & Tags", TagsIcon, isFullExporting, 'export')}
               {renderOptionCheckbox(exportOptionsForm, "importMods", "Mods", PuzzleIcon, isFullExporting, 'export')}
               {renderOptionCheckbox(exportOptionsForm, "importSyncRepos", "Sync Repos", GitBranchIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importMcpServers", "MCP Servers", PlugIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importPromptTemplates", "Prompt Templates", FileTextIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importAgents", "Agents", BotIcon, isFullExporting, 'export')}
             </div>
             <Button
               onClick={handleFullExportClick}
@@ -391,6 +412,158 @@ const SettingsDataManagementComponent: React.FC = () => {
               )}
               {isFullExporting ? "Exporting..." : "Export Configuration"}
             </Button>
+          </div>
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Individual Category Import/Export */}
+      <div>
+        <h3 className="text-lg font-medium mb-2">Individual Categories</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Import or export specific data categories independently.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* MCP Servers */}
+          <div className="border p-3 rounded-md space-y-2">
+            <Label className="font-semibold flex items-center gap-1.5">
+              <PlugIcon className="h-4 w-4 text-muted-foreground" />
+              MCP Servers
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Export or import MCP server configurations.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => ImportExportService.exportMcpServers()}
+                variant="outline"
+                size="sm"
+              >
+                <DownloadIcon className="mr-1 h-3 w-3" />
+                Export
+              </Button>
+              <input
+                type="file"
+                accept=".json"
+                className="hidden"
+                id="mcp-import-input"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    try {
+                      await ImportExportService.importMcpServers(file);
+                    } catch (error) {
+                      console.error("MCP import failed:", error);
+                    } finally {
+                      e.target.value = "";
+                    }
+                  }
+                }}
+              />
+              <Button
+                onClick={() => document.getElementById("mcp-import-input")?.click()}
+                variant="outline"
+                size="sm"
+              >
+                <UploadIcon className="mr-1 h-3 w-3" />
+                Import
+              </Button>
+            </div>
+          </div>
+
+          {/* Prompt Templates */}
+          <div className="border p-3 rounded-md space-y-2">
+            <Label className="font-semibold flex items-center gap-1.5">
+              <FileTextIcon className="h-4 w-4 text-muted-foreground" />
+              Prompt Templates
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Export or import prompt templates (excludes agents and tasks).
+            </p>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => ImportExportService.exportPromptTemplates()}
+                variant="outline"
+                size="sm"
+              >
+                <DownloadIcon className="mr-1 h-3 w-3" />
+                Export
+              </Button>
+              <input
+                type="file"
+                accept=".json"
+                className="hidden"
+                id="templates-import-input"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    try {
+                      await ImportExportService.importPromptTemplates(file);
+                    } catch (error) {
+                      console.error("Templates import failed:", error);
+                    } finally {
+                      e.target.value = "";
+                    }
+                  }
+                }}
+              />
+              <Button
+                onClick={() => document.getElementById("templates-import-input")?.click()}
+                variant="outline"
+                size="sm"
+              >
+                <UploadIcon className="mr-1 h-3 w-3" />
+                Import
+              </Button>
+            </div>
+          </div>
+
+          {/* Agents */}
+          <div className="border p-3 rounded-md space-y-2">
+            <Label className="font-semibold flex items-center gap-1.5">
+              <BotIcon className="h-4 w-4 text-muted-foreground" />
+              Agents
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Export or import agents with their associated tasks.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => ImportExportService.exportAgents()}
+                variant="outline"
+                size="sm"
+              >
+                <DownloadIcon className="mr-1 h-3 w-3" />
+                Export
+              </Button>
+              <input
+                type="file"
+                accept=".json"
+                className="hidden"
+                id="agents-import-input"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    try {
+                      await ImportExportService.importAgents(file);
+                    } catch (error) {
+                      console.error("Agents import failed:", error);
+                    } finally {
+                      e.target.value = "";
+                    }
+                  }
+                }}
+              />
+              <Button
+                onClick={() => document.getElementById("agents-import-input")?.click()}
+                variant="outline"
+                size="sm"
+              >
+                <UploadIcon className="mr-1 h-3 w-3" />
+                Import
+              </Button>
+            </div>
           </div>
         </div>
       </div>

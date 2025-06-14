@@ -37,6 +37,9 @@ export class BundledConfigService {
         importRulesAndTags: true,
         importMods: true,
         importSyncRepos: true,
+        importMcpServers: true,
+        importPromptTemplates: true,
+        importAgents: true,
         ...options
       };
 
