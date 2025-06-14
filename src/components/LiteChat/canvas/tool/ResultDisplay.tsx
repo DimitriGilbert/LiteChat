@@ -62,7 +62,7 @@ export const ToolResultDisplay: React.FC<{ toolResult: ToolResultPart }> = ({
       </div>
       {!isResultFolded && (
         <UniversalBlockRenderer
-          lang="json"
+          lang={isErrorResult ? "text" : "json"}
           code={resultString}
         />
       )}
