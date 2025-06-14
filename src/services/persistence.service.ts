@@ -533,8 +533,9 @@ export class PersistenceService {
       exportData.mcpServers = mcpServersItem ? mcpServersItem.value : [];
     }
     if (options.importPromptTemplates) {
-      // Export all prompt templates (including regular prompts, tasks, and agents)
-      exportData.promptTemplates = await db.promptTemplates.toArray();
+      // Export ONLY regular prompt templates, never agents or tasks
+      const allTemplates = await db.promptTemplates.toArray();
+      exportData.promptTemplates = allTemplates.filter(t => !(t as any).type || (t as any).type === "prompt");
     }
     if (options.importAgents) {
       // Export agents and their associated tasks
@@ -606,14 +607,12 @@ export class PersistenceService {
           // Clear MCP servers setting
           await db.appState.where("key").equals("settings:mcpServers").delete();
         }
-        if (options.importPromptTemplates && options.importAgents) {
-          // Clear all prompt templates when both are selected (agents will be included in promptTemplates)
-          await db.promptTemplates.clear();
-        } else if (options.importPromptTemplates) {
-          // Clear only regular prompt templates (type is "prompt" or undefined), keep agents and tasks
+        if (options.importPromptTemplates) {
+          // Clear ONLY regular prompt templates (type is "prompt" or undefined), keep agents and tasks
           await db.promptTemplates.where("type").noneOf(["agent", "task"]).delete();
-        } else if (options.importAgents) {
-          // Clear agents and tasks only if not importing prompt templates
+        }
+        if (options.importAgents) {
+          // Clear agents and tasks
           await db.promptTemplates.where("type").anyOf(["agent", "task"]).delete();
         }
 
@@ -685,8 +684,8 @@ export class PersistenceService {
             data.promptTemplates.map((t) => ensureDateFields(t, ["createdAt", "updatedAt"]))
           );
         }
-        if (options.importAgents && data.agents && !options.importPromptTemplates) {
-          // Import agents and tasks only if not already imported via promptTemplates
+        if (options.importAgents && data.agents) {
+          // Import agents and tasks (they are never included in promptTemplates export)
           await db.promptTemplates.bulkPut(
             data.agents.map((a) => ensureDateFields(a, ["createdAt", "updatedAt"]))
           );
