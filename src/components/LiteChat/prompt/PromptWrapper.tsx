@@ -63,14 +63,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     (state) => state.modelId
   );
 
-  useEffect(() => {
-    if (selectedItemType === "conversation" && selectedItemId) {
-      requestAnimationFrame(() => {
-        inputAreaRef.current?.focus();
-      });
-    }
-  }, [selectedItemId, selectedItemType, inputAreaRef]);
-
   const promptControls = useMemo(() => {
     return Object.values(registeredPromptControls);
   }, [registeredPromptControls]);
@@ -84,9 +76,9 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     [promptControls]
   );
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (overrideContent?: string) => {
     const valueFromRef = inputAreaRef?.current?.getValue() ?? "";
-    const trimmedValue = valueFromRef.trim();
+    const trimmedValue = overrideContent !== undefined ? overrideContent.trim() : valueFromRef.trim();
     const currentAttachedFiles = useInputStore.getState().attachedFilesMetadata;
 
     if (!trimmedValue && currentAttachedFiles.length === 0) {
@@ -200,6 +192,48 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     currentModelIdFromPromptStore,
   ]);
 
+  useEffect(() => {
+    if (selectedItemType === "conversation" && selectedItemId) {
+      requestAnimationFrame(() => {
+        inputAreaRef.current?.focus();
+      });
+    }
+  }, [selectedItemId, selectedItemType, inputAreaRef]);
+
+  useEffect(() => {
+    const handleFocusRequest = () => {
+      requestAnimationFrame(() => {
+        inputAreaRef.current?.focus();
+      });
+    };
+
+    const handleSetInputTextRequest = (payload: { text: string }) => {
+      if (inputAreaRef.current) {
+        inputAreaRef.current.setValue(payload.text);
+        setHasInputValue(payload.text.trim().length > 0);
+      }
+    };
+
+    const handleSubmitRequest = async (payload: { turnData: PromptTurnObject }) => {
+      // Check current state instead of stale closure values
+      const currentInteractionState = useInteractionStore.getState();
+      if (currentInteractionState.status === "streaming" || isSubmitting) return;
+
+      // Use the existing handleSubmit with override content to ensure all middleware and lifecycle hooks are respected
+      await handleSubmit(payload.turnData.content);
+    };
+
+    emitter.on(promptEvent.focusInputRequest, handleFocusRequest);
+    emitter.on(promptEvent.setInputTextRequest, handleSetInputTextRequest);
+    emitter.on(promptEvent.submitPromptRequest, handleSubmitRequest);
+
+    return () => {
+      emitter.off(promptEvent.focusInputRequest, handleFocusRequest);
+      emitter.off(promptEvent.setInputTextRequest, handleSetInputTextRequest);
+      emitter.off(promptEvent.submitPromptRequest, handleSubmitRequest);
+    };
+  }, [inputAreaRef, handleSubmit, isSubmitting]);
+
   const handleInputValueChange = useCallback((value: string) => {
     setHasInputValue(value.trim().length > 0);
   }, []);
@@ -225,7 +259,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         <Button
           type="button"
           size="icon"
-          onClick={handleSubmit}
+          onClick={() => handleSubmit(undefined)}
           disabled={
             isStreaming ||
             isSubmitting ||
