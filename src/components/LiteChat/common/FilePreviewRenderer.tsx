@@ -23,7 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { CodeBlockRenderer } from "./CodeBlockRenderer";
+import { UniversalBlockRenderer } from "./UniversalBlockRenderer";
 import type { AttachedFileMetadata } from "@/store/input.store";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { formatBytes } from "@/lib/litechat/file-manager-utils";
@@ -248,9 +248,10 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
     // Render previews for DIRECT uploads based on type and available content
     if (isText && fileMeta.contentText !== undefined) {
       return (
-        <CodeBlockRenderer
+        <UniversalBlockRenderer
           lang={mimeType === "text/markdown" ? "markdown" : "text"}
           code={fileMeta.contentText}
+          filepath={fileMeta.name}
         />
       );
     } else if (isImage && previewContentUrl) {

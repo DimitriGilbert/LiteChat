@@ -7,8 +7,7 @@ import {
   MermaidBlockData,
   ParsedContent,
 } from "@/lib/litechat/useMarkdownParser";
-import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
-import { MermaidBlockRenderer } from "@/components/LiteChat/common/MermaidBlockRenderer";
+import { UniversalBlockRenderer } from "@/components/LiteChat/common/UniversalBlockRenderer";
 import { useSettingsStore } from "@/store/settings.store";
 import { cn } from "@/lib/utils";
 import { useShallow } from "zustand/react/shallow";
@@ -51,7 +50,7 @@ const renderBlock = (
 
     if (useFullCodeBlock) {
       return (
-        <CodeBlockRenderer
+        <UniversalBlockRenderer
           key={`code-${index}`}
           lang={codeData.lang}
           code={codeData.code}
@@ -84,8 +83,9 @@ const renderBlock = (
   } else if (item.type === "mermaid") {
     const mermaidData = item as MermaidBlockData;
     return (
-      <MermaidBlockRenderer
+      <UniversalBlockRenderer
         key={`mermaid-${index}`}
+        lang="mermaid"
         code={mermaidData.code}
         isStreaming={isStreamingBlock}
       />

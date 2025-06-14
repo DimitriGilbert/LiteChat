@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
-import { CodeBlockRenderer } from "@/components/LiteChat/common/CodeBlockRenderer";
+import { UniversalBlockRenderer } from "@/components/LiteChat/common/UniversalBlockRenderer";
 import { ToolResultPart } from "ai"
 
 export const ToolResultDisplay: React.FC<{ toolResult: ToolResultPart }> = ({
@@ -61,8 +61,8 @@ export const ToolResultDisplay: React.FC<{ toolResult: ToolResultPart }> = ({
         />
       </div>
       {!isResultFolded && (
-        <CodeBlockRenderer
-          lang={isErrorResult ? "text" : "json"}
+        <UniversalBlockRenderer
+          lang="json"
           code={resultString}
         />
       )}
