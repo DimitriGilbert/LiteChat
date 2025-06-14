@@ -1,5 +1,4 @@
 // src/components/LiteChat/settings/SettingsGeneral.tsx
-// Following the prout.tsx example pattern
 import React, { useEffect } from "react";
 import { RotateCcwIcon } from "lucide-react";
 import { useSettingsStore } from "@/store/settings.store";

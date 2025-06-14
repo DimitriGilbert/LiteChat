@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useFormedible } from "@/hooks/use-formedible";
 import type { PromptTemplate, PromptFormData } from "@/types/litechat/prompt-template";
+import LiteChatIcon from "@/components/LiteChat/common/icons/LiteChatIcon";
 
 // Forward declare the module type to avoid circular import issues
 interface AgentControlModule {
@@ -633,7 +634,7 @@ export const AgentControl: React.FC<AgentControlProps> = ({ module }) => {
         className="h-8 w-8 p-0"
         title={hasActiveAgent ? `Active Agent: ${currentAgent?.name || 'Unknown'}` : "Select Agent"}
       >
-        <Bot className="h-4 w-4" />
+        <LiteChatIcon className="h-4 w-4" />
       </Button>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

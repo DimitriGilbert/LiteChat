@@ -42,7 +42,6 @@ export function SelectField<TFormValues extends Record<string, any>>({
   contentClassName,
   ...rest
 }: SelectFieldProps<TFormValues>) {
-  console.log("SelectField", name)
   return (
     <form.Field
       name={name}

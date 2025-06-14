@@ -70,8 +70,6 @@ export const PrismThemeLoader: React.FC = () => {
       customLink.href = prismThemeUrl;
       customLink.disabled = false;
     } else {
-      // Use default theme based on current mode
-      console.log(currentThemeMode);
       if (currentThemeMode === "dark") {
         darkLink.disabled = false;
       } else {

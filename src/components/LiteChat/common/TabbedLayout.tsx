@@ -46,7 +46,6 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
   }, [initialValue, internalValue]);
 
   const handleValueChange = (value: string) => {
-    console.log("handleValueChange", value);
     setInternalValue(value);
     if (onValueChange) {
       onValueChange(value);

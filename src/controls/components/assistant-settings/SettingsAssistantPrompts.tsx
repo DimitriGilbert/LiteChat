@@ -33,7 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ToolSelectorControlComponent } from "@/controls/components/tool-selector/ToolSelectorControlComponent";
+import { ToolSelectorForm } from "@/controls/components/tool-selector/ToolSelectorForm";
 import { RulesControlDialogContent } from "@/controls/components/rules/RulesControlDialogContent";
 import { useRulesStore } from "@/store/rules.store";
 
@@ -72,26 +72,7 @@ const promptTemplateSchema = z.object({
   followUps: z.array(z.string()),
 });
 
-// Mock tool selector module for the form
-const createMockToolSelectorModule = (
-  selectedTools: string[],
-  onToolsChange: (tools: string[]) => void
-) => ({
-  getEnabledTools: () => new Set(selectedTools),
-  setEnabledTools: (updater: (prev: Set<string>) => Set<string>) => {
-    const newSet = updater(new Set(selectedTools));
-    onToolsChange(Array.from(newSet));
-  },
-  getSelectedItemId: () => "mock-id",
-  getSelectedItemType: () => "conversation" as const,
-  getGlobalDefaultMaxSteps: () => 5,
-  getMaxStepsOverride: () => null,
-  setMaxStepsOverride: () => {},
-  getIsStreaming: () => false,
-  getIsVisible: () => true,
-  getAllToolsCount: () => 0,
-  setNotifyCallback: () => {},
-});
+// No longer needed - using ToolSelectorForm with proper base component
 
 function PromptTemplateForm({
   template,
@@ -111,7 +92,7 @@ function PromptTemplateForm({
     instructions: "",
   });
 
-  const [maxSteps, setMaxSteps] = useState<number | null>(null);
+
 
   // Get rules and tags data
   const {
@@ -179,7 +160,7 @@ function PromptTemplateForm({
         default: "",
         instructions: "",
       });
-      setMaxSteps(null);
+
     };
   }, []);
 
@@ -435,16 +416,16 @@ function PromptTemplateForm({
               Choose tools that will be automatically enabled when this template
               is applied.
             </p>
-            <ToolSelectorControlComponent
-              module={
-                createMockToolSelectorModule(
-                  form.getFieldValue("tools"),
-                  (tools) => form.setFieldValue("tools", tools)
-                ) as any
-              }
-              popoverMaxSteps={maxSteps}
-              setPopoverMaxSteps={setMaxSteps}
-              className="p-0 max-w-none"
+            <form.Field
+              name="tools"
+              children={(field) => (
+                <ToolSelectorForm
+                  selectedTools={field.state.value}
+                  onToolsChange={(tools: string[]) => field.handleChange(tools)}
+                  className="p-0 max-w-none"
+                  showMaxSteps={false}
+                />
+              )}
             />
           </div>
         </div>

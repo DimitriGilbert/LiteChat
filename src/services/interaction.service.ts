@@ -165,9 +165,9 @@ export const InteractionService = {
 
         try {
           this._pendingRegenerations.add(interactionId);
-          console.log(`[InteractionService] Starting ConversationService.regenerateInteraction for ${interactionId}`);
+          // console.log(`[InteractionService] Starting ConversationService.regenerateInteraction for ${interactionId}`);
           await ConversationService.regenerateInteraction(interactionId);
-          console.log(`[InteractionService] Finished ConversationService.regenerateInteraction for ${interactionId}`);
+          // console.log(`[InteractionService] Finished ConversationService.regenerateInteraction for ${interactionId}`);
           // Feedback for starting regeneration might be good, or handled by UI changes
         } catch (error) {
           toast.error(`Failed to regenerate response: ${String(error)}`);
@@ -185,7 +185,7 @@ export const InteractionService = {
       canvasEvent.regenerateInteractionWithModelRequest,
       async (payload) => {
         const { interactionId, modelId } = payload;
-        console.log(`[InteractionService] Received regenerateInteractionWithModelRequest for ${interactionId} with model ${modelId}`);
+        // console.log(`[InteractionService] Received regenerateInteractionWithModelRequest for ${interactionId} with model ${modelId}`);
 
         if (this._pendingRegenerations.has(interactionId)) {
           console.warn(`[InteractionService] Regeneration already pending for ${interactionId}. Ignoring request.`);
@@ -243,9 +243,9 @@ export const InteractionService = {
           promptState.setModelId(modelId);
           
           try {
-            console.log(`[InteractionService] Starting ConversationService.regenerateInteraction for ${interactionId} with model ${modelId}`);
+            // console.log(`[InteractionService] Starting ConversationService.regenerateInteraction for ${interactionId} with model ${modelId}`);
             await ConversationService.regenerateInteraction(interactionId);
-            console.log(`[InteractionService] Finished ConversationService.regenerateInteraction for ${interactionId}`);
+            // console.log(`[InteractionService] Finished ConversationService.regenerateInteraction for ${interactionId}`);
           } finally {
             // Always restore the original model ID, whether success or failure
             console.log(`[InteractionService] Restoring original model ${originalModelId}`);
@@ -268,7 +268,7 @@ export const InteractionService = {
       canvasEvent.raceInteractionRequest,
       async (payload) => {
         const { interactionId, modelIds, staggerMs } = payload;
-        console.log(`[InteractionService] Received raceInteractionRequest for ${interactionId} with ${modelIds.length} models`);
+        // console.log(`[InteractionService] Received raceInteractionRequest for ${interactionId} with ${modelIds.length} models`);
 
         const interaction = useInteractionStore
           .getState()
@@ -329,9 +329,9 @@ export const InteractionService = {
                   // Set the model for this specific race
                   promptState.setModelId(modelId);
                   
-                  console.log(`[InteractionService] Starting race participant ${index + 1}/${modelIds.length} with model ${modelId}`);
+                  // console.log(`[InteractionService] Starting race participant ${index + 1}/${modelIds.length} with model ${modelId}`);
                   await ConversationService.regenerateInteraction(interactionId);
-                  console.log(`[InteractionService] Race participant ${index + 1} finished`);
+                  // console.log(`[InteractionService] Race participant ${index + 1} finished`);
                   resolve({ success: true, modelId, index });
                 } catch (error) {
                   console.error(`[InteractionService] Race participant ${index + 1} failed:`, error);
