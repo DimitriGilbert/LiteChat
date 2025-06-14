@@ -477,10 +477,11 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
   }, [code, isFolded]);
 
   useEffect(() => {
-    if (!isFolded && code.trim() && !showCode) {
+    // Only parse if not folded, code is present, not showing raw code, AND NOT STREAMING
+    if (!isFolded && code.trim() && !showCode && !isStreaming) {
       parseFormDefinition();
     }
-  }, [code, isFolded, showCode, parseFormDefinition]);
+  }, [code, isFolded, showCode, isStreaming, parseFormDefinition]);
 
   const toggleFold = () => {
     const unfolding = isFolded;
@@ -586,29 +587,35 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
   }, []);
 
   // Handle form submission
-  const handleFormSubmit = useCallback(async (formData: Record<string, any>) => {
+  const handleFormSubmit = useCallback(async (formData: Record<string, any>, sendOnSubmitValue: boolean) => {
     try {
       // Create JSON block with form results
       const formResultsJson = JSON.stringify(formData, null, 2);
-      const promptText = `These are the form values:\n\`\`\`json\n${formResultsJson}\n\`\`\``;
+      const promptText = `These are the form values:\n\`\`\`json\n${formResultsJson}\n\`\`\`\n`;
       
-      // Add to prompt input
+      // Add to prompt input and focus
       emitter.emit(promptEvent.setInputTextRequest, { text: promptText });
+      emitter.emit(promptEvent.focusInputRequest, undefined);
       
+      console.log("Formedible: sendOnSubmit value before conditional: ", sendOnSubmitValue);
+
       // If send on submit is enabled, submit the prompt
-      if (sendOnSubmit) {
+      if (sendOnSubmitValue) {
+        console.log("Sending form data to prompt");
         // Use requestAnimationFrame to ensure the input text is set before submission
         // This is more reliable than setTimeout for DOM updates
-        requestAnimationFrame(async () => {
+        requestAnimationFrame(() => {
+          console.log("Setting input text");
           try {
+            console.log("Creating turn data");
             const turnData: PromptTurnObject = {
               id: nanoid(),
-              content: promptText,
+              content: promptText, // Use the promptText that was just set
               parameters: {},
               metadata: {},
             };
             
-            await ConversationService.submitPrompt(turnData);
+            emitter.emit(promptEvent.submitPromptRequest, { turnData });
             toast.success("Form submitted and prompt sent!");
           } catch (error) {
             console.error("Failed to submit prompt:", error);
@@ -622,7 +629,7 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
       console.error("Form submission error:", error);
       toast.error("Failed to process form submission");
     }
-  }, [sendOnSubmit]);
+  }, []); // Removed sendOnSubmit from dependencies
 
   // Prepare form configuration
   const formConfig = useMemo(() => {
@@ -634,6 +641,11 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
       const schema = createSchemaFromFields(formDefinition.fields);
       const defaultValues = formDefinition.formOptions?.defaultValues || createDefaultValues(formDefinition.fields);
 
+      // Determine the last page for multi-page forms
+      const lastPage = formDefinition.pages && formDefinition.pages.length > 0
+        ? Math.max(...formDefinition.pages.map((p: { page: number }) => p.page))
+        : 1; // Default to page 1 for single-page forms
+
       // Add the "send on submit" switch to the fields
       const fieldsWithSendSwitch = [
         ...formDefinition.fields,
@@ -642,12 +654,13 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
           type: "switch",
           label: "Send on submit",
           description: "Automatically send the prompt after form submission",
+          page: lastPage, // Assign to the last page
         }
       ];
 
       // Update schema to include the send switch
       const schemaWithSendSwitch = schema.extend({
-        _sendOnSubmit: z.boolean(),
+        _sendOnSubmit: z.boolean().default(false),
       });
 
       // Update default values to include the send switch
@@ -669,11 +682,19 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
         formOptions: {
           ...formDefinition.formOptions,
           defaultValues: defaultValuesWithSendSwitch,
+          canSubmitWhenInvalid: true,
           onSubmit: async ({ value }: { value: Record<string, any> }) => {
+            console.log("Formedible onSubmit received full value:", value);
+            console.log("Formedible onSubmit received _sendOnSubmit:", value._sendOnSubmit);
             // Extract the send on submit value and remove it from form data
             const { _sendOnSubmit, ...actualFormData } = value;
-            setSendOnSubmit(_sendOnSubmit);
-            await handleFormSubmit(actualFormData);
+            setSendOnSubmit(_sendOnSubmit); // Still update state for display, but not for handler logic
+            await handleFormSubmit(actualFormData, _sendOnSubmit);
+          },
+          onSubmitInvalid: ({ value, formApi }: { value: Record<string, any>; formApi: any }) => {
+            console.error("Formedible onSubmitInvalid triggered. Values:", value);
+            console.error("Formedible onSubmitInvalid triggered. Form API errors:", formApi.formState.errors);
+            toast.error("Form has validation errors. Please check your input.");
           },
         },
         disabled: false, // Enable the form for actual use

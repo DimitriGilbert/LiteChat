@@ -30,6 +30,8 @@ export const promptEvent = {
   
   // Input Area Action Events
   setInputTextRequest: "prompt.input.set.text.request",
+  focusInputRequest: "prompt.input.focus.request",
+  submitPromptRequest: "prompt.submit.request",
 
   // Original events (can be re-emitted by PromptWrapper if needed by mods)
   inputChanged: "prompt.inputChanged",
@@ -66,4 +68,6 @@ export interface PromptEventPayloads {
   };
   [promptEvent.resetTransientParametersRequest]: undefined;
   [promptEvent.setInputTextRequest]: { text: string };
+  [promptEvent.focusInputRequest]: undefined;
+  [promptEvent.submitPromptRequest]: { turnData: PromptTurnObject };
 }
