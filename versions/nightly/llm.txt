@@ -1,0 +1,33 @@
+name: LiteChat
+version: 1.0.0 (Assumed - update as needed)
+description: LiteChat is a privacy-focused, highly customizable AI chat interface that runs entirely in the user's browser. It allows users to connect to various AI models (like OpenAI, Google Gemini, Ollama, OpenRouter, and other compatible APIs) directly, keeping conversations and API keys stored locally. Key features include a modular component system, event-driven architecture for extensibility via mods, integrated file management (VFS) with Git support, conversation synchronization via Git, and detailed control over AI parameters. The core philosophy emphasizes user control, privacy, performance, and flexibility.
+authoritative_source_url: (Add URL if applicable, e.g., GitHub repo)
+capabilities:
+  - Conversational AI Interaction: Send prompts, receive streaming text responses.
+  - Multi-Provider Support: Connect to OpenAI, Google Gemini, Ollama, OpenRouter, and other OpenAI-compatible APIs. Configure multiple providers simultaneously.
+  - Client-Side Storage: All conversations, interactions, settings, API keys, provider configurations, mods, and VFS data are stored locally in the browser's IndexedDB via Dexie.
+  - Local API Key Management: Securely store API keys locally. Keys are only sent directly to the selected provider during API calls. Option to disable key management if desired.
+  - Conversation History Management: View past conversations in a hierarchical project structure or flat list. Select, rename (inline editing for projects/conversations), delete conversations/projects.
+  - Project-Based Organization: Group conversations into nested projects. Projects can have specific system prompts or default model settings (future enhancement).
+  - Streaming AI Responses: View AI responses as they are generated. Includes a stop button to cancel generation.
+  - Markdown Rendering: Renders Markdown in AI responses, including tables, lists, links, and code blocks with syntax highlighting (Prism.js). Option to enable/disable markdown parsing during streaming.
+  - Parameter Adjustment: Fine-tune AI behavior via controls for Temperature, Top P, Max Tokens, Top K, Presence Penalty, Frequency Penalty (if advanced settings enabled).
+  - Virtual File System (VFS): Manage files and folders directly within the app. Upload files/folders/ZIPs, download files/folders (as ZIP), rename, delete. Useful for managing context files or project assets.
+  - VFS Git Integration: Initialize Git repositories within VFS folders. Clone remote repositories (HTTPS). Stage changes, commit with messages, pull updates from remote, push changes to remote. View basic status. Requires Git user config in settings.
+  - Conversation Git Sync: Link individual conversations to a configured Git Sync Repository. Manually trigger sync to push/pull conversation data (`.json` file) to the remote repo, enabling backup and multi-device synchronization.
+  - File Attachments: Attach files (direct upload or from VFS) to prompts. Text/code files are included as text; images are included directly (if model supports). Provides context to the AI. Previews available for common types.
+  - Modding API: Allows extending functionality via JavaScript mods. Mods can add UI controls, listen to events, modify data via middleware, register AI tools, and add custom settings tabs.
+  - PWA Support: Installable as a Progressive Web App for offline access (core UI) and app-like experience.
+  - UI Customization: Light/Dark/System theme support. Collapsible sidebar. Configurable streaming FPS.
+  - Data Management: Import single conversations (JSON), export single conversations (JSON, Markdown), export all conversations (JSON), clear all local data (with warnings).
+instructions:
+  - **Getting Started:** Launch the app. Explore the initial UI. Go to Settings -> Providers to configure at least one AI provider (e.g., Ollama if running locally, or add an API key for OpenAI/OpenRouter). Select the desired model using the dropdown in the prompt area.
+  - **Basic Chat:** Type a message in the input area and press Enter or click the Send button. Observe the streaming response. Try Shift+Enter for newlines. Use the Stop button during generation.
+  - **Conversation Management:** Create new chats using the '+' button in the sidebar. Create projects using the folder icon. Drag and drop conversations/projects (future enhancement) or use context menus (future enhancement) to organize. Click on items to select them. Use the hover icons or context menu (future enhancement) to rename or delete conversations/projects.
+  - **File Attachments:** Use the paperclip icon to upload files directly. Use the folder icon to open the VFS, manage files there, select files using checkboxes, and click "Attach Selected". Observe attached files below the input area. Send a prompt asking the AI about the attached file content.
+  - **VFS & Git:** Open the VFS via the prompt control. Create folders, upload files. Right-click (or use context menu) on a folder to initialize a Git repo. Clone a public HTTPS Git repository using the "Clone" button in the toolbar. Make changes (e.g., upload a file), then use the context menu to commit (requires Git user config in Settings -> Git). Pull/Push changes.
+  - **Conversation Sync:** Go to Settings -> Git -> Sync Repositories. Add a remote Git repository configuration. In the main chat view, select a conversation. Use the Git Sync prompt control (folder icon with sync arrows) to link the conversation to the configured repo. Make changes to the conversation, then use the sync control again to trigger a sync (push/pull).
+  - **Settings Exploration:** Open Settings (gear icon). Change the theme. Configure API keys and providers. Enable/disable models per provider. Reorder globally enabled models in "Global Model Order". Adjust streaming FPS. Configure Git user name/email. Import/Export data. Enable/disable mods.
+  - **Mod Interaction:** If mods are installed, interact with any UI elements they add (controls, settings tabs). Observe any changes in behavior due to middleware or event listeners.
+  - **Error Handling:** Test scenarios that might cause errors (e.g., invalid API key, incorrect base URL, failed Git operation, failed sync). Observe error messages and toasts.
+  - **QA Focus:** Verify state persistence across reloads. Check UI responsiveness during streaming and VFS operations. Ensure project hierarchy and selection work correctly. Test file content processing for prompts. Validate Git operations and conversation sync logic. Test mod loading and interaction points.
