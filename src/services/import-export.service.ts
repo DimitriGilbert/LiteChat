@@ -404,7 +404,7 @@ export class ImportExportService {
       const templates = await PersistenceService.loadPromptTemplates();
       const agents = templates.filter(t => t.type === "agent");
       const agentIds = agents.map(a => a.id);
-      const tasks = templates.filter(t => t.type === "task" && agentIds.includes(t.parentId || ""));
+      const tasks = templates.filter(t => t.type === "task" && t.parentId && agentIds.includes(t.parentId));
       
       const exportData = {
         version: 1,

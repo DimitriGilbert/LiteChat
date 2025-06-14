@@ -606,9 +606,14 @@ export class PersistenceService {
           // Clear MCP servers setting
           await db.appState.where("key").equals("settings:mcpServers").delete();
         }
-        if (options.importPromptTemplates) await db.promptTemplates.clear();
-        if (options.importAgents) {
-          // Clear agents and tasks from prompt templates
+        if (options.importPromptTemplates && options.importAgents) {
+          // Clear all prompt templates when both are selected (agents will be included in promptTemplates)
+          await db.promptTemplates.clear();
+        } else if (options.importPromptTemplates) {
+          // Clear only regular prompt templates (type is "prompt" or undefined), keep agents and tasks
+          await db.promptTemplates.where("type").noneOf(["agent", "task"]).delete();
+        } else if (options.importAgents) {
+          // Clear agents and tasks only if not importing prompt templates
           await db.promptTemplates.where("type").anyOf(["agent", "task"]).delete();
         }
 
@@ -680,8 +685,8 @@ export class PersistenceService {
             data.promptTemplates.map((t) => ensureDateFields(t, ["createdAt", "updatedAt"]))
           );
         }
-        if (options.importAgents && data.agents) {
-          // Import agents and tasks as prompt templates
+        if (options.importAgents && data.agents && !options.importPromptTemplates) {
+          // Import agents and tasks only if not already imported via promptTemplates
           await db.promptTemplates.bulkPut(
             data.agents.map((a) => ensureDateFields(a, ["createdAt", "updatedAt"]))
           );
