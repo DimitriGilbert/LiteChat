@@ -94,7 +94,7 @@ export class EditCodeBlockControlModule implements ControlModule {
   }
 
   // Store mapping of blockId to content for lookup during editing
-  private blockIdToContentMap = new Map<string, { content: string; lang?: string; filepath?: string }>();
+  // private blockIdToContentMap = new Map<string, { content: string; lang?: string; filepath?: string }>();
 
   private findCodeBlockByContent(markdownString: string, targetContent: string, targetLang?: string, targetFilepath?: string): number {
     const codeBlocks = this.parseMarkdownForCodeBlocks(markdownString);
