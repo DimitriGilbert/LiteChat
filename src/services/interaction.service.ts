@@ -1182,13 +1182,26 @@ export const InteractionService = {
           const conversationStore = useConversationStore.getState();
           await conversationStore.selectItem(targetConversationId, "conversation");
           
-          // Get the current interaction to preserve existing metadata
+          // Ensure interactions are loaded for the target conversation
           const interactionStore = useInteractionStore.getState();
+          if (interactionStore.currentConversationId !== targetConversationId) {
+            console.log(`[InteractionService] Loading interactions for target conversation ${targetConversationId}`);
+            await interactionStore.loadInteractions(targetConversationId);
+          }
+          
+          // Get the current interaction to preserve existing metadata
           const targetInteraction = interactionStore.interactions.find(i => i.id === targetUserInteractionId);
           
           if (!targetInteraction) {
-            throw new Error(`Target interaction ${targetUserInteractionId} not found`);
+            throw new Error(`Target interaction ${targetUserInteractionId} not found after loading conversation ${targetConversationId}`);
           }
+          
+          console.log(`[InteractionService] Found target interaction ${targetUserInteractionId} with current response:`, {
+            response: targetInteraction.response?.substring(0, 50) + '...',
+            status: targetInteraction.status,
+            conversationId: targetInteraction.conversationId,
+            currentConversationId: interactionStore.currentConversationId
+          });
           
           // Merge metadata instead of overwriting to preserve existing data
           const updates = {
@@ -1202,25 +1215,58 @@ export const InteractionService = {
             },
           };
           
-          interactionStore._updateInteractionInState(targetUserInteractionId, updates);
+          console.log(`[InteractionService] Applying updates to ${targetUserInteractionId}:`, {
+            responseLength: compactSummary.length,
+            status: updates.status,
+            targetConversationId,
+            currentConversationId: interactionStore.currentConversationId
+          });
+          
+          // Create the fully updated interaction object with the compact summary
+          const fullyUpdatedInteraction = {
+            ...targetInteraction,
+            response: compactSummary,  // CRITICAL: Set the actual summary
+            status: "COMPLETED" as InteractionStatus,
+            endedAt: new Date(),
+            metadata: {
+              ...targetInteraction.metadata,
+              isCompactingInProgress: false,
+              compactGeneratedAt: new Date().toISOString(),
+            }
+          };
+          
+          console.log(`[InteractionService] DIRECT DATABASE UPDATE for ${targetUserInteractionId}:`, {
+            responseLength: compactSummary.length,
+            status: fullyUpdatedInteraction.status,
+            oldResponse: targetInteraction.response?.substring(0, 50),
+            newResponse: compactSummary.substring(0, 50)
+          });
+          
+          // CRITICAL: Save directly to Dexie database FIRST
+          await PersistenceService.saveInteraction(fullyUpdatedInteraction);
+          console.log(`[InteractionService] ✅ DEXIE DATABASE UPDATED for ${targetUserInteractionId}`);
+          
+          // THEN update Zustand state using the proper method
+          interactionStore._updateInteractionInState(targetUserInteractionId, {
+            response: compactSummary,
+            status: "COMPLETED" as InteractionStatus,
+            endedAt: new Date(),
+            metadata: fullyUpdatedInteraction.metadata
+          });
           
           // Emit event to update UI
           emitter.emit(interactionEvent.updated, {
             interactionId: targetUserInteractionId,
-            updates: updates,
+            updates: {
+              response: compactSummary,
+              status: "COMPLETED" as InteractionStatus,
+              endedAt: new Date(),
+              metadata: fullyUpdatedInteraction.metadata
+            },
           });
           
           // Remove from streaming state
           interactionStore._removeStreamingId(targetUserInteractionId);
-          
-          // Persist the updated interaction
-          const updatedInteraction = interactionStore.interactions.find((i) => i.id === targetUserInteractionId);
-          if (updatedInteraction) {
-            await PersistenceService.saveInteraction(updatedInteraction);
-            console.log(`[InteractionService] Successfully updated and persisted user interaction ${targetUserInteractionId} with compact summary`);
-          } else {
-            console.error(`[InteractionService] Could not find updated interaction ${targetUserInteractionId} after state update`);
-          }
         } catch (error) {
           console.error(`[InteractionService] Error updating user interaction ${targetUserInteractionId} with compact summary:`, error);
           

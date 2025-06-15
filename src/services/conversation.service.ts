@@ -687,20 +687,8 @@ ${userContent}`;
     
     this._pendingCompactForks.add(interactionId);
     
-    // Also prevent multiple calls by checking if there's already a "Compacting..." interaction
-    const interactionStore = useInteractionStore.getState();
-    const existingCompactingInteraction = interactionStore.interactions.find(
-      i => i.response === "Compacting..." && 
-           i.metadata?.compactedFromInteractionId === interactionId &&
-           i.status === "STREAMING"
-    );
-    
-    if (existingCompactingInteraction) {
-      console.warn(`[ConversationService] Found existing compacting interaction ${existingCompactingInteraction.id} for ${interactionId}`);
-      this._pendingCompactForks.delete(interactionId);
-      toast.info("Compact already in progress for this interaction.");
-      return;
-    }
+    // The _pendingCompactForks set above already handles rapid-fire duplicate requests
+    // Users should be able to create multiple compacts of the same conversation if they want
     
     try {
       const interactionStore = useInteractionStore.getState();
