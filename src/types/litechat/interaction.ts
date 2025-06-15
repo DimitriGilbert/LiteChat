@@ -8,6 +8,7 @@ export type InteractionType =
   | "message.assistant_regen"
   | "message.user_edit"
   | "conversation.title_generation"
+  | "conversation.compact"
   | "tool.execution"
   | "system.info"
   | "system.error";

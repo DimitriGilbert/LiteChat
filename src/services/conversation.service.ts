@@ -687,6 +687,21 @@ ${userContent}`;
     
     this._pendingCompactForks.add(interactionId);
     
+    // Also prevent multiple calls by checking if there's already a "Compacting..." interaction
+    const interactionStore = useInteractionStore.getState();
+    const existingCompactingInteraction = interactionStore.interactions.find(
+      i => i.response === "Compacting..." && 
+           i.metadata?.compactedFromInteractionId === interactionId &&
+           i.status === "STREAMING"
+    );
+    
+    if (existingCompactingInteraction) {
+      console.warn(`[ConversationService] Found existing compacting interaction ${existingCompactingInteraction.id} for ${interactionId}`);
+      this._pendingCompactForks.delete(interactionId);
+      toast.info("Compact already in progress for this interaction.");
+      return;
+    }
+    
     try {
       const interactionStore = useInteractionStore.getState();
       const conversationStoreState = useConversationStore.getState();
@@ -763,14 +778,16 @@ ${historyMessages.map(msg => `**${msg.role.toUpperCase()}:** ${typeof msg.conten
         metadata: originalConversation.metadata,
       });
 
-      // Create the initial user message (not sent, just for context)
+      // Create the user message asking for conversation summary
+      const userMessage = `Please provide a comprehensive summary of our previous conversation titled "${originalConversation.title}". Include the main topics, key decisions, and important context needed to continue seamlessly.`;
+      
       const initialUserInteraction: Interaction = {
         id: nanoid(),
         conversationId: newConversationId,
         type: "message.user_assistant",
         prompt: {
           id: nanoid(),
-          content: "Please resume our previous conversation",
+          content: userMessage,
           parameters: {},
           metadata: {
             isResumeMessage: true,
@@ -778,14 +795,15 @@ ${historyMessages.map(msg => `**${msg.role.toUpperCase()}:** ${typeof msg.conten
             compactedFromInteractionId: interactionId,
           },
         },
-        response: null,
-        status: "COMPLETED",
+        response: "Compacting...",
+        status: "STREAMING",
         startedAt: new Date(),
-        endedAt: new Date(),
+        endedAt: null,
         metadata: {
           isResumeMessage: true,
           originalConversationId: targetInteraction.conversationId,
           compactedFromInteractionId: interactionId,
+          isCompactingInProgress: true,
         },
         index: 0,
         parentId: null,
@@ -793,28 +811,35 @@ ${historyMessages.map(msg => `**${msg.role.toUpperCase()}:** ${typeof msg.conten
 
       await PersistenceService.saveInteraction(initialUserInteraction);
 
-      // Create the compact turn data
+      // FIRST: Select the new conversation so the interaction store is in the right context
+      await conversationStoreState.selectItem(newConversationId, "conversation");
+      
+      // Wait for conversation selection to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // THEN: Create the compact turn data for the hidden compact interaction
       const compactTurnData: PromptTurnObject = {
         id: nanoid(),
-        content: `[Compact summary of conversation up to interaction ${interactionId}]`,
+        content: `[Internal compact generation for conversation ${interactionId}]`,
         parameters: compactPromptObject.parameters,
         metadata: {
           ...compactPromptObject.metadata,
           originalConversationId: targetInteraction.conversationId,
           compactedFromInteractionId: interactionId,
+          targetUserInteractionId: initialUserInteraction.id,
+          targetConversationId: newConversationId,
         },
       };
 
-      // Start the compact generation interaction
+      // FINALLY: Start the compact generation interaction (hidden) - now in correct context
       await InteractionService.startInteraction(
         compactPromptObject,
         newConversationId,
         compactTurnData,
-        "message.assistant_regen"
+        "conversation.compact"
       );
 
-      // Select the new conversation and focus input
-      await conversationStoreState.selectItem(newConversationId, "conversation");
+      // Focus input
       emitter.emit(promptEvent.focusInputRequest, undefined);
 
       toast.success(`Conversation compacted and forked: "${newConversationTitle}"`);

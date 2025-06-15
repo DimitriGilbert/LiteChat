@@ -568,7 +568,7 @@ export const InteractionService = {
       (i) => i.conversationId === conversationId
     );
     const newIndex =
-      interactionType === "conversation.title_generation"
+      interactionType === "conversation.title_generation" || interactionType === "conversation.compact"
         ? -1
         : conversationInteractions.reduce(
             (max, i) => Math.max(max, i.index),
@@ -593,25 +593,27 @@ export const InteractionService = {
       endedAt: null,
       metadata: {
         ...(finalPrompt.metadata || {}),
+        ...(initiatingTurnData.metadata || {}),
         toolCalls: [],
         toolResults: [],
         reasoning: undefined,
         timeToFirstToken: undefined,
         generationTime: undefined,
         isTitleGeneration: interactionType === "conversation.title_generation",
+        isCompactGeneration: interactionType === "conversation.compact",
       },
       index: newIndex,
       parentId: defaultParentId,
     };
 
-    if (interactionType !== "conversation.title_generation") {
+    if (interactionType !== "conversation.title_generation" && interactionType !== "conversation.compact") {
       interactionStoreState._addInteractionToState(interactionData);
       interactionStoreState._addStreamingId(interactionId);
     } else {
       interactionStoreState._addInteractionToState(interactionData);
       interactionStoreState._addStreamingId(interactionId);
       console.log(
-        `[InteractionService] Added title generation interaction ${interactionId} to state.`
+        `[InteractionService] Added ${interactionType} interaction ${interactionId} to state.`
       );
     }
     PersistenceService.saveInteraction({ ...interactionData }).catch((e) => {
@@ -629,7 +631,7 @@ export const InteractionService = {
 
     const targetModelId = finalPrompt.metadata?.modelId;
     if (!targetModelId) {
-      this._finalizeInteraction(
+      await this._finalizeInteraction(
         interactionId,
         "ERROR",
         new Error("No model ID specified in prompt metadata."),
@@ -641,7 +643,7 @@ export const InteractionService = {
     const { providerId, modelId: specificModelId } =
       splitModelId(targetModelId);
     if (!providerId || !specificModelId) {
-      this._finalizeInteraction(
+      await this._finalizeInteraction(
         interactionId,
         "ERROR",
         new Error(`Invalid combined model ID format: ${targetModelId}`),
@@ -654,7 +656,7 @@ export const InteractionService = {
       .getState()
       .dbProviderConfigs.find((p) => p.id === providerId);
     if (!providerConfig) {
-      this._finalizeInteraction(
+      await this._finalizeInteraction(
         interactionId,
         "ERROR",
         new Error(`Provider configuration not found for ID: ${providerId}`),
@@ -671,7 +673,7 @@ export const InteractionService = {
     );
 
     if (!modelInstance) {
-      this._finalizeInteraction(
+      await this._finalizeInteraction(
         interactionId,
         "ERROR",
         new Error(
@@ -686,7 +688,7 @@ export const InteractionService = {
     );
 
     // Gather enabled tools (both regular and MCP)
-    const toolsWithExecute = interactionType !== "conversation.title_generation"
+    const toolsWithExecute = interactionType !== "conversation.title_generation" && interactionType !== "conversation.compact"
       ? (finalPrompt.metadata?.enabledTools ?? []).reduce((acc, name) => {
           // Check if this is an MCP tool
           if (name.startsWith('mcp_')) {
@@ -890,7 +892,9 @@ export const InteractionService = {
             "ERROR",
             execError instanceof Error ? execError : new Error(String(execError)),
             interactionType
-          );
+          ).catch(finalizeError => {
+            console.error(`[InteractionService] Error during finalization after execution error:`, finalizeError);
+          });
         }
       }
     );
@@ -923,7 +927,9 @@ export const InteractionService = {
           "CANCELLED",
           new Error("Interaction aborted manually (controller missing)"),
           interaction?.type ?? "message.user_assistant"
-        );
+        ).catch(finalizeError => {
+          console.error(`[InteractionService] Error during forced finalization:`, finalizeError);
+        });
       }
     }
   },
@@ -996,7 +1002,7 @@ export const InteractionService = {
     }
   },
 
-  _handleFinish(
+  async _handleFinish(
     interactionId: string,
     details: {
       finishReason: FinishReason;
@@ -1005,11 +1011,11 @@ export const InteractionService = {
       reasoning?: string;
     },
     interactionType: InteractionType
-  ): void {
+  ): Promise<void> {
     console.log(
       `[InteractionService] Finishing interaction ${interactionId} (Type: ${interactionType}). Reason: ${details.finishReason}`
     );
-    this._finalizeInteraction(
+    await this._finalizeInteraction(
       interactionId,
       "COMPLETED",
       undefined,
@@ -1018,17 +1024,17 @@ export const InteractionService = {
     );
   },
 
-  _handleError(
+  async _handleError(
     interactionId: string,
     error: Error,
     interactionType: InteractionType
-  ): void {
+  ): Promise<void> {
     console.error(
       `[InteractionService] Handling error for interaction ${interactionId} (Type: ${interactionType}):`,
       error
     );
     const isAbort = error.name === "AbortError";
-    this._finalizeInteraction(
+    await this._finalizeInteraction(
       interactionId,
       isAbort ? "CANCELLED" : "ERROR",
       isAbort ? undefined : error,
@@ -1036,7 +1042,7 @@ export const InteractionService = {
     );
   },
 
-  _finalizeInteraction(
+  async _finalizeInteraction(
     interactionId: string,
     status: InteractionStatus,
     error?: Error,
@@ -1047,7 +1053,7 @@ export const InteractionService = {
       providerMetadata?: ProviderMetadata;
       reasoning?: string;
     }
-  ): void {
+  ): Promise<void> {
     const interactionStore = useInteractionStore.getState();
     const currentInteraction = interactionStore.interactions.find(
       (i) => i.id === interactionId
@@ -1056,7 +1062,8 @@ export const InteractionService = {
     if (
       !currentInteraction ||
       (currentInteraction.status !== "STREAMING" &&
-        interactionType !== "conversation.title_generation")
+        interactionType !== "conversation.title_generation" &&
+        interactionType !== "conversation.compact")
     ) {
       console.warn(
         `[InteractionService] Interaction ${interactionId} already finalized or not found. Skipping finalization with status ${status}.`
@@ -1138,6 +1145,114 @@ export const InteractionService = {
           id: currentInteraction.conversationId,
           updates: { title: generatedTitle },
         });
+      }
+    }
+
+        console.log(`[InteractionService] Checking completion handler conditions for ${interactionId}:`, {
+      interactionType,
+      status,
+      hasResponse: !!finalUpdates.response,
+      responseType: typeof finalUpdates.response,
+      currentInteractionMetadata: currentInteraction?.metadata
+    });
+
+        if (
+      interactionType === "conversation.compact" &&
+      status === "COMPLETED" &&
+      finalUpdates.response &&
+      typeof finalUpdates.response === "string"
+    ) {
+      const compactSummary = finalUpdates.response.trim();
+      const targetUserInteractionId = currentInteraction?.metadata?.targetUserInteractionId;
+      const targetConversationId = currentInteraction?.metadata?.targetConversationId;
+      
+      console.log(`[InteractionService] Compact completion handler triggered for ${interactionId}:`, {
+        compactSummaryLength: compactSummary.length,
+        targetUserInteractionId,
+        targetConversationId
+      });
+      
+      if (compactSummary && targetUserInteractionId && targetConversationId) {
+        console.log(
+          `[InteractionService] Updating user interaction ${targetUserInteractionId} in conversation ${targetConversationId} with compact summary`
+        );
+        
+        try {
+          // SWITCH TO THE TARGET CONVERSATION FIRST!
+          const conversationStore = useConversationStore.getState();
+          await conversationStore.selectItem(targetConversationId, "conversation");
+          
+          // Wait for conversation switch to complete
+          await new Promise(resolve => setTimeout(resolve, 50));
+          
+          // Get fresh interaction store state after conversation switch
+          const interactionStore = useInteractionStore.getState();
+          
+          // Now update the interaction in the correct context
+          const updates = {
+            response: compactSummary,
+            status: "COMPLETED" as InteractionStatus,
+            endedAt: new Date(),
+            metadata: {
+              isCompactingInProgress: false,
+              compactGeneratedAt: new Date().toISOString(),
+            },
+          };
+          
+          interactionStore._updateInteractionInState(targetUserInteractionId, updates);
+          
+          // EMIT THE FUCKING EVENT SO THE UI UPDATES!
+          emitter.emit(interactionEvent.updated, {
+            interactionId: targetUserInteractionId,
+            updates: updates,
+          });
+          
+          // Remove from streaming state
+          interactionStore._removeStreamingId(targetUserInteractionId);
+          
+          // Persist the updated interaction
+          const updatedInteraction = interactionStore.interactions.find((i) => i.id === targetUserInteractionId);
+          if (updatedInteraction) {
+            await PersistenceService.saveInteraction(updatedInteraction);
+            console.log(`[InteractionService] Successfully updated and persisted user interaction ${targetUserInteractionId} with compact summary`);
+          } else {
+            console.error(`[InteractionService] Could not find updated interaction ${targetUserInteractionId} after state update`);
+          }
+        } catch (error) {
+          console.error(`[InteractionService] Error updating user interaction ${targetUserInteractionId} with compact summary:`, error);
+          
+          // Fallback: try to update with error message
+          try {
+            const conversationStore = useConversationStore.getState();
+            await conversationStore.selectItem(targetConversationId, "conversation");
+            await new Promise(resolve => setTimeout(resolve, 50));
+            
+            const interactionStore = useInteractionStore.getState();
+            const fallbackUpdates = {
+              response: "Error generating compact summary. Please try again.",
+              status: "ERROR" as InteractionStatus,
+              endedAt: new Date(),
+              metadata: {
+                isCompactingInProgress: false,
+                compactError: error instanceof Error ? error.message : String(error),
+              },
+            };
+            
+            interactionStore._updateInteractionInState(targetUserInteractionId, fallbackUpdates);
+            emitter.emit(interactionEvent.updated, {
+              interactionId: targetUserInteractionId,
+              updates: fallbackUpdates,
+            });
+            interactionStore._removeStreamingId(targetUserInteractionId);
+            
+            const fallbackInteraction = interactionStore.interactions.find((i) => i.id === targetUserInteractionId);
+            if (fallbackInteraction) {
+              await PersistenceService.saveInteraction(fallbackInteraction);
+            }
+          } catch (fallbackError) {
+            console.error(`[InteractionService] Fallback update also failed for ${targetUserInteractionId}:`, fallbackError);
+          }
+        }
       }
     }
 

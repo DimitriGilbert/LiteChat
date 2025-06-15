@@ -37,7 +37,7 @@ import type {
 } from "@/types/litechat/canvas/control";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
 
-const ChatCanvasHiddenInteractions = ["conversation.title_generation"];
+const ChatCanvasHiddenInteractions = ["conversation.title_generation", "conversation.compact"];
 
 export interface ChatCanvasProps {
   conversationId: string | null;
