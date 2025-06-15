@@ -8,6 +8,7 @@ export const canvasEvent = {
   regenerateInteractionWithModelRequest: "canvas.interaction.regenerate.with.model.request",
   forkConversationRequest: "canvas.interaction.fork.conversation.request",
   forkConversationWithModelRequest: "canvas.interaction.fork.conversation.with.model.request",
+  forkConversationCompactRequest: "canvas.interaction.fork.conversation.compact.request",
   raceInteractionRequest: "canvas.interaction.race.request",
   editResponseRequest: "canvas.interaction.edit.response.request",
   // rateInteractionRequest: "canvas.interaction.rate.request", // Removed
@@ -45,6 +46,10 @@ export interface CanvasEventPayloads {
     interactionId: string;
   };
   [canvasEvent.forkConversationWithModelRequest]: {
+    interactionId: string;
+    modelId: string;
+  };
+  [canvasEvent.forkConversationCompactRequest]: {
     interactionId: string;
     modelId: string;
   };

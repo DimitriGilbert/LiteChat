@@ -576,6 +576,7 @@ ${userContent}`;
 
   // Add a set to track ongoing fork operations
   _pendingForks: new Set<string>(),
+  _pendingCompactForks: new Set<string>(),
 
   async forkConversation(interactionId: string): Promise<void> {
     console.log(
@@ -669,6 +670,168 @@ ${userContent}`;
     } finally {
       // Always remove from pending forks
       this._pendingForks.delete(interactionId);
+    }
+  },
+
+  async forkConversationCompact(interactionId: string, compactModelId: string): Promise<void> {
+    console.log(
+      `[ConversationService] forkConversationCompact called for ID: ${interactionId} with model: ${compactModelId}`
+    );
+    
+    // Prevent multiple simultaneous compact forks of the same interaction
+    if (this._pendingCompactForks.has(interactionId)) {
+      console.warn(`[ConversationService] Compact fork already in progress for ${interactionId}`);
+      toast.info("Compact fork already in progress for this interaction.");
+      return;
+    }
+    
+    this._pendingCompactForks.add(interactionId);
+    
+    try {
+      const interactionStore = useInteractionStore.getState();
+      const conversationStoreState = useConversationStore.getState();
+      const settingsStoreState = useSettingsStore.getState();
+
+      const targetInteraction = interactionStore.interactions.find(
+        (i) => i.id === interactionId
+      );
+
+      if (!targetInteraction) {
+        toast.error("Cannot fork compact: Interaction not found.");
+        return;
+      }
+
+      const originalConversation = conversationStoreState.getConversationById(
+        targetInteraction.conversationId
+      );
+      if (!originalConversation) {
+        toast.error("Cannot fork compact: Original conversation not found.");
+        return;
+      }
+
+      // Get all interactions up to and including the target interaction
+      const interactionsToCompact = interactionStore.interactions
+        .filter(
+          (i) =>
+            i.conversationId === targetInteraction.conversationId &&
+            i.index <= targetInteraction.index &&
+            i.parentId === null && // Only main spine interactions
+            (i.type === "message.user_assistant" || i.type === "message.assistant_regen")
+        )
+        .sort((a, b) => a.index - b.index);
+
+      // Build the conversation history for compacting
+      const historyMessages: CoreMessage[] = buildHistoryMessages(interactionsToCompact);
+      
+      // Use custom prompt from settings or default
+      const customPrompt = settingsStoreState.forkCompactPrompt;
+      const compactPrompt = customPrompt || `Please provide a comprehensive but concise summary of our previous conversation. Include:
+1. The main topics discussed
+2. Key decisions or conclusions reached
+3. Important context that would be needed to continue the conversation
+4. Any specific technical details, code, or data that were mentioned
+
+Keep the summary detailed enough that we can seamlessly continue our discussion, but compact enough to be efficient.
+
+Here is our conversation history to summarize:
+
+${historyMessages.map(msg => `**${msg.role.toUpperCase()}:** ${typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}`).join('\n\n')}`;
+
+      // Use custom model from settings if available, otherwise use the provided model
+      const effectiveModelId = settingsStoreState.forkCompactModelId || compactModelId;
+
+      const compactPromptObject: PromptObject = {
+        system: "You are an expert at creating comprehensive conversation summaries. Provide a detailed but concise summary that captures all important context and information needed to continue the conversation seamlessly.",
+        messages: [{ role: "user", content: compactPrompt }],
+        parameters: {
+          temperature: 0.3,
+          max_tokens: 2000,
+        },
+        metadata: {
+          modelId: effectiveModelId,
+          isCompactGeneration: true,
+        },
+        tools: undefined,
+        toolChoice: "none",
+      };
+
+      // Create new conversation with "Compact: " prefix
+      const newConversationTitle = `Compact: ${originalConversation.title}`;
+      const newConversationId = await conversationStoreState.addConversation({
+        title: newConversationTitle,
+        projectId: originalConversation.projectId,
+        metadata: originalConversation.metadata,
+      });
+
+      // Create the initial user message (not sent, just for context)
+      const initialUserInteraction: Interaction = {
+        id: nanoid(),
+        conversationId: newConversationId,
+        type: "message.user_assistant",
+        prompt: {
+          id: nanoid(),
+          content: "Please resume our previous conversation",
+          parameters: {},
+          metadata: {
+            isResumeMessage: true,
+            originalConversationId: targetInteraction.conversationId,
+            compactedFromInteractionId: interactionId,
+          },
+        },
+        response: null,
+        status: "COMPLETED",
+        startedAt: new Date(),
+        endedAt: new Date(),
+        metadata: {
+          isResumeMessage: true,
+          originalConversationId: targetInteraction.conversationId,
+          compactedFromInteractionId: interactionId,
+        },
+        index: 0,
+        parentId: null,
+      };
+
+      await PersistenceService.saveInteraction(initialUserInteraction);
+
+      // Create the compact turn data
+      const compactTurnData: PromptTurnObject = {
+        id: nanoid(),
+        content: `[Compact summary of conversation up to interaction ${interactionId}]`,
+        parameters: compactPromptObject.parameters,
+        metadata: {
+          ...compactPromptObject.metadata,
+          originalConversationId: targetInteraction.conversationId,
+          compactedFromInteractionId: interactionId,
+        },
+      };
+
+      // Start the compact generation interaction
+      await InteractionService.startInteraction(
+        compactPromptObject,
+        newConversationId,
+        compactTurnData,
+        "message.assistant_regen"
+      );
+
+      // Select the new conversation and focus input
+      await conversationStoreState.selectItem(newConversationId, "conversation");
+      emitter.emit(promptEvent.focusInputRequest, undefined);
+
+      toast.success(`Conversation compacted and forked: "${newConversationTitle}"`);
+    } catch (error) {
+      console.error(
+        "[ConversationService] Error during compact fork process:",
+        error
+      );
+      toast.error(
+        `Failed to fork and compact conversation: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      throw error;
+    } finally {
+      // Always remove from pending compact forks
+      this._pendingCompactForks.delete(interactionId);
     }
   },
 

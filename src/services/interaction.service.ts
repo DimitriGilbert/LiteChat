@@ -455,6 +455,50 @@ export const InteractionService = {
       }
     );
 
+    emitter.on(
+      canvasEvent.forkConversationCompactRequest,
+      async (payload) => {
+        const { interactionId, modelId } = payload;
+        console.log(`[InteractionService] Received forkConversationCompactRequest for ${interactionId} with model ${modelId}`);
+
+        const interaction = useInteractionStore
+          .getState()
+          .interactions.find((i) => i.id === interactionId);
+
+        if (!interaction) {
+          toast.error(
+            `Fork compact failed: Interaction ${interactionId} not found.`
+          );
+          console.warn(
+            `[InteractionService] Fork compact request for unknown interaction ${interactionId}`
+          );
+          return;
+        }
+
+        // Add safety checks: is global streaming off?
+        const interactionStoreState = useInteractionStore.getState();
+        const globalStreamingStatus = interactionStoreState.status;
+        if (globalStreamingStatus === "streaming") {
+          toast.info("Cannot fork compact while another response is streaming.");
+          return;
+        }
+
+        try {
+          console.log(`[InteractionService] Creating compact fork conversation with model ${modelId}`);
+          
+          // Create the compact fork conversation
+          await ConversationService.forkConversationCompact(interactionId, modelId);
+          
+        } catch (error) {
+          toast.error(`Failed to fork and compact conversation: ${String(error)}`);
+          console.error(
+            `[InteractionService] Error forking and compacting conversation ${interactionId}:`,
+            error
+          );
+        }
+      }
+    );
+
     // Handler for copyCodeBlockRequest
     emitter.on(
       canvasEvent.copyCodeBlockRequest,

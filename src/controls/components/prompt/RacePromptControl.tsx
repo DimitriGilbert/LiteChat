@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { LandPlot } from "lucide-react";
 import { toast } from "sonner";
@@ -15,9 +15,20 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+import {
+  SearchIcon,
+  Brain,
+  Globe,
+  Wrench,
+  Image as ImageIcon,
+  Palette,
+} from "lucide-react";
 import type { ModelListItem } from "@/types/litechat/provider";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useShallow } from "zustand/react/shallow";
+
+type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal" | "imageGeneration";
 
 interface RacePromptControlProps {
   module: {
@@ -35,6 +46,16 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
   const [open, setOpen] = useState(false);
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const [staggerMs, setStaggerMs] = useState(250);
+  const [filterText, setFilterText] = useState("");
+  const [capabilityFilters, setCapabilityFilters] = useState<
+    Record<CapabilityFilter, boolean>
+  >({
+    reasoning: false,
+    webSearch: false,
+    tools: false,
+    multimodal: false,
+    imageGeneration: false,
+  });
   const [, forceUpdate] = useState({});
 
   const { status: interactionStatus } = useInteractionStore(
@@ -50,6 +71,65 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
       return () => module.setNotifyCallback(null);
     }
   }, [module]);
+
+  const filteredModels = useMemo(() => {
+    let textFiltered = module.globallyEnabledModels;
+    if (filterText.trim()) {
+      const lowerFilter = filterText.toLowerCase();
+      textFiltered = module.globallyEnabledModels.filter(
+        (model) =>
+          model.name.toLowerCase().includes(lowerFilter) ||
+          model.providerName.toLowerCase().includes(lowerFilter) ||
+          model.id.toLowerCase().includes(lowerFilter)
+      );
+    }
+    const activeCapabilityFilters = Object.entries(capabilityFilters)
+      .filter(([, isActive]) => isActive)
+      .map(([key]) => key as CapabilityFilter);
+    if (activeCapabilityFilters.length === 0) {
+      return textFiltered;
+    }
+    return textFiltered.filter((model: ModelListItem) => {
+      const supportedParams = new Set(
+        model.metadataSummary?.supported_parameters ?? []
+      );
+      const inputModalities = new Set(
+        model.metadataSummary?.input_modalities ?? []
+      );
+      const outputModalities = new Set(
+        model.metadataSummary?.output_modalities ?? []
+      );
+      return activeCapabilityFilters.every((filter) => {
+        switch (filter) {
+          case "reasoning":
+            return supportedParams.has("reasoning");
+          case "webSearch":
+            return (
+              supportedParams.has("web_search") ||
+              supportedParams.has("web_search_options")
+            );
+          case "tools":
+            return supportedParams.has("tools");
+          case "multimodal":
+            return Array.from(inputModalities).some((mod) => mod !== "text");
+          case "imageGeneration":
+            return outputModalities.has("image");
+          default:
+            return true;
+        }
+      });
+    });
+  }, [module.globallyEnabledModels, filterText, capabilityFilters]);
+
+  const toggleCapabilityFilter = (filter: CapabilityFilter) => {
+    setCapabilityFilters((prev) => ({
+      ...prev,
+      [filter]: !prev[filter],
+    }));
+  };
+
+  const activeCapabilityFilterCount = Object.values(capabilityFilters).filter(Boolean).length;
+  const totalActiveFilters = activeCapabilityFilterCount;
 
   const handleModelToggle = (modelId: string, checked: boolean) => {
     setSelectedModelIds(prev => 
@@ -75,6 +155,14 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
     // Reset selections for next use
     setSelectedModelIds([]);
     setStaggerMs(250);
+    setFilterText("");
+    setCapabilityFilters({
+      reasoning: false,
+      webSearch: false,
+      tools: false,
+      multimodal: false,
+      imageGeneration: false,
+    });
   };
 
   const handleCancelRace = () => {
@@ -143,41 +231,153 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Search and Filter Controls */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-grow">
+                  <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search models..."
+                    value={filterText}
+                    onChange={(e) => setFilterText(e.target.value)}
+                    className="pl-8 h-9"
+                  />
+                </div>
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant={capabilityFilters.reasoning ? "secondary" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "h-7 w-7 p-0",
+                      capabilityFilters.reasoning && "text-primary"
+                    )}
+                    onClick={() => toggleCapabilityFilter("reasoning")}
+                    title="Filter: Reasoning"
+                    aria-label="Filter by reasoning capability"
+                  >
+                    <Brain className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={capabilityFilters.webSearch ? "secondary" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "h-7 w-7 p-0",
+                      capabilityFilters.webSearch && "text-primary"
+                    )}
+                    onClick={() => toggleCapabilityFilter("webSearch")}
+                    title="Filter: Web Search"
+                    aria-label="Filter by web search capability"
+                  >
+                    <Globe className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={capabilityFilters.tools ? "secondary" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "h-7 w-7 p-0",
+                      capabilityFilters.tools && "text-primary"
+                    )}
+                    onClick={() => toggleCapabilityFilter("tools")}
+                    title="Filter: Tools"
+                    aria-label="Filter by tool usage capability"
+                  >
+                    <Wrench className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={capabilityFilters.multimodal ? "secondary" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "h-7 w-7 p-0",
+                      capabilityFilters.multimodal && "text-primary"
+                    )}
+                    onClick={() => toggleCapabilityFilter("multimodal")}
+                    title="Filter: Multimodal"
+                    aria-label="Filter by multimodal capability"
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={capabilityFilters.imageGeneration ? "secondary" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "h-7 w-7 p-0",
+                      capabilityFilters.imageGeneration && "text-primary"
+                    )}
+                    onClick={() => toggleCapabilityFilter("imageGeneration")}
+                    title="Filter: Image Generation"
+                    aria-label="Filter by image generation capability"
+                  >
+                    <Palette className="h-4 w-4" />
+                  </Button>
+                </div>
+                {totalActiveFilters > 0 && (
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-primary rounded-full">
+                    {totalActiveFilters}
+                  </span>
+                )}
+              </div>
+            </div>
 
             {/* Model Selection */}
             <div className="space-y-2">
               <Label>Select Models to Race ({selectedModelIds.length} selected)</Label>
               <ScrollArea className="h-48 w-full border rounded-md p-3">
                 <div className="space-y-2">
-                  {module.globallyEnabledModels.map((model: ModelListItem) => (
-                    <div key={model.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`model-${model.id}`}
-                        checked={selectedModelIds.includes(model.id)}
-                        onCheckedChange={(checked) => 
-                          handleModelToggle(model.id, checked === true)
-                        }
-                      />
-                      <Label
-                        htmlFor={`model-${model.id}`}
-                        className="text-sm cursor-pointer flex-1 min-w-0"
-                      >
-                        <div className="truncate">
-                          <span className="font-medium">{model.name}</span>
-                          <span className="text-muted-foreground ml-2">
-                            ({model.providerName})
-                          </span>
-                        </div>
-                      </Label>
-                    </div>
-                  ))}
+                  {filteredModels.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      {totalActiveFilters > 0
+                        ? "No models match all active filters."
+                        : module.globallyEnabledModels.length === 0
+                        ? "No models available."
+                        : "No models match search."}
+                    </p>
+                  ) : (
+                    filteredModels.map((model: ModelListItem) => (
+                      <div key={model.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`model-${model.id}`}
+                          checked={selectedModelIds.includes(model.id)}
+                          onCheckedChange={(checked) => 
+                            handleModelToggle(model.id, checked === true)
+                          }
+                        />
+                        <Label
+                          htmlFor={`model-${model.id}`}
+                          className="text-sm cursor-pointer flex-1 min-w-0 flex justify-between items-center"
+                        >
+                          <div className="truncate">
+                            <span className="font-medium">{model.name}</span>
+                            <span className="text-muted-foreground ml-2">
+                              ({model.providerName})
+                            </span>
+                          </div>
+                          <div className="flex gap-1 ml-2">
+                            {model.metadataSummary?.supported_parameters?.includes(
+                              "reasoning"
+                            ) && <Brain className="h-3.5 w-3.5 text-purple-500" />}
+                            {(model.metadataSummary?.supported_parameters?.includes(
+                              "web_search"
+                            ) ||
+                              model.metadataSummary?.supported_parameters?.includes(
+                                "web_search_options"
+                              )) && <Globe className="h-3.5 w-3.5 text-blue-500" />}
+                            {model.metadataSummary?.supported_parameters?.includes(
+                              "tools"
+                            ) && <Wrench className="h-3.5 w-3.5 text-orange-500" />}
+                            {model.metadataSummary?.input_modalities?.some(
+                              (mod) => mod !== "text"
+                            ) && <ImageIcon className="h-3.5 w-3.5 text-green-500" />}
+                            {model.metadataSummary?.output_modalities?.includes(
+                              "image"
+                            ) && <Palette className="h-3.5 w-3.5 text-pink-500" />}
+                          </div>
+                        </Label>
+                      </div>
+                    ))
+                  )}
                 </div>
               </ScrollArea>
-              {module.globallyEnabledModels.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No models available
-                </p>
-              )}
             </div>
 
             {/* Stagger Timing Input */}

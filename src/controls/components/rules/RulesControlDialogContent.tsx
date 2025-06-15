@@ -8,7 +8,10 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { SearchIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { SearchIcon, Settings } from "lucide-react";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { uiEvent } from "@/types/litechat/events/ui.events";
 import type { DbRule, DbTag } from "@/types/litechat/rules"; // Import types
 
 interface RulesControlDialogContentProps {
@@ -70,17 +73,36 @@ export const RulesControlDialogContent: React.FC<
     [onToggleRule]
   );
 
+  const handleOpenRulesSettings = () => {
+    emitter.emit(uiEvent.openModalRequest, {
+      modalId: "settingsModal",
+      initialTab: "rules-tags",
+    });
+  };
+
   const renderTagList = () => (
     <div className="space-y-3">
-      <div className="relative">
-        <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          type="search"
-          placeholder="Filter tags..."
-          value={tagFilter}
-          onChange={(e) => setTagFilter(e.target.value)}
-          className="pl-8 h-9"
-        />
+      <div className="flex items-center gap-2">
+        <div className="relative flex-grow">
+          <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Filter tags..."
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+            className="pl-8 h-9"
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleOpenRulesSettings}
+          className="h-9 px-3"
+          title="Open Rules Settings"
+        >
+          <Settings className="h-4 w-4 mr-1" />
+          Manage
+        </Button>
       </div>
       <div className="border rounded-md p-2 bg-background/50">
         {filteredTags.length === 0 ? (
@@ -135,15 +157,27 @@ export const RulesControlDialogContent: React.FC<
 
   const renderRuleList = () => (
     <div className="space-y-3">
-      <div className="relative">
-        <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          type="search"
-          placeholder="Filter rules..."
-          value={ruleFilter}
-          onChange={(e) => setRuleFilter(e.target.value)}
-          className="pl-8 h-9"
-        />
+      <div className="flex items-center gap-2">
+        <div className="relative flex-grow">
+          <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Filter rules..."
+            value={ruleFilter}
+            onChange={(e) => setRuleFilter(e.target.value)}
+            className="pl-8 h-9"
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleOpenRulesSettings}
+          className="h-9 px-3"
+          title="Open Rules Settings"
+        >
+          <Settings className="h-4 w-4 mr-1" />
+          Manage
+        </Button>
       </div>
       <div className="border rounded-md p-2 bg-background/50">
         {filteredRules.length === 0 ? (

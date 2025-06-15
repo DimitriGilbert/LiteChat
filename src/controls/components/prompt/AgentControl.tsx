@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Bot, ArrowLeft } from "lucide-react";
+import { Bot, ArrowLeft, Settings } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -24,6 +24,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useFormedible } from "@/hooks/use-formedible";
 import type { PromptTemplate, PromptFormData } from "@/types/litechat/prompt-template";
 import LiteChatIcon from "@/components/LiteChat/common/icons/LiteChatIcon";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { uiEvent } from "@/types/litechat/events/ui.events";
 
 // Forward declare the module type to avoid circular import issues
 interface AgentControlModule {
@@ -73,6 +75,14 @@ function AgentSelector({
     agent.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  const handleOpenAgentSettings = () => {
+    emitter.emit(uiEvent.openModalRequest, {
+      modalId: "settingsModal",
+      initialTab: "assistant",
+      initialSubTab: "agents",
+    });
+  };
+
   return (
     <div className="space-y-4">
       {hasActiveAgent && (
@@ -87,14 +97,28 @@ function AgentSelector({
         </div>
       )}
 
-      <div>
-        <Label htmlFor="search">Search Agents</Label>
-        <Input
-          id="search"
-          placeholder="Search by name, description, or tags..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      <div className="flex items-center gap-2">
+        <div className="flex-grow">
+          <Label htmlFor="search">Search Agents</Label>
+          <Input
+            id="search"
+            placeholder="Search by name, description, or tags..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="pt-6">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleOpenAgentSettings}
+            className="h-9 px-3"
+            title="Open Agent Settings"
+          >
+            <Settings className="h-4 w-4 mr-1" />
+            Manage
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3">

@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { BookOpenText } from "lucide-react";
+import { BookOpenText, Settings } from "lucide-react";
 import { usePromptTemplateStore } from "@/store/prompt-template.store";
 import { useShallow } from "zustand/react/shallow";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { uiEvent } from "@/types/litechat/events/ui.events";
 
 import { toast } from "sonner";
 // Forward declare the module type to avoid circular import issues
@@ -49,16 +51,38 @@ function PromptTemplateSelector({
     template.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  const handleOpenTemplateSettings = () => {
+    emitter.emit(uiEvent.openModalRequest, {
+      modalId: "settingsModal",
+      initialTab: "assistant",
+      initialSubTab: "prompts",
+    });
+  };
+
   return (
     <div className="space-y-4">
-      <div>
-        <Label htmlFor="search">Search Templates</Label>
-        <Input
-          id="search"
-          placeholder="Search by name, description, or tags..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      <div className="flex items-center gap-2">
+        <div className="flex-grow">
+          <Label htmlFor="search">Search Templates</Label>
+          <Input
+            id="search"
+            placeholder="Search by name, description, or tags..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="pt-6">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleOpenTemplateSettings}
+            className="h-9 px-3"
+            title="Open Template Settings"
+          >
+            <Settings className="h-4 w-4 mr-1" />
+            Manage
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3">

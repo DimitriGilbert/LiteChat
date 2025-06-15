@@ -17,6 +17,7 @@ import { SettingsAssistantTitles } from "./SettingsAssistantTitles";
 import { SettingsAssistantPrompts } from "./SettingsAssistantPrompts";
 import { SettingsAssistantAgent } from "./SettingsAssistantAgent";
 import { SettingsAssistantMcp } from "./SettingsAssistantMcp";
+import { SettingsAssistantForkCompact } from "./SettingsAssistantForkCompact";
 
 const SettingsAssistantComponent: React.FC = () => {
   // const { resetAssistantSettings } = useSettingsStore(
@@ -61,6 +62,11 @@ const SettingsAssistantComponent: React.FC = () => {
         value: "titles",
         label: "Auto-Titles",
         content: <SettingsAssistantTitles />,
+      },
+      {
+        value: "fork-compact",
+        label: "Fork Compact",
+        content: <SettingsAssistantForkCompact />,
       },
       {
         value: "prompts",

@@ -48,6 +48,7 @@ import { RegenerateActionControlModule } from "@/controls/modules/canvas/Regener
 import { RegenerateWithModelActionControlModule } from "@/controls/modules/canvas/RegenerateWithModelActionControlModule";
 import { ForkActionControlModule } from "@/controls/modules/canvas/ForkActionControlModule";
 import { ForkWithModelActionControlModule } from "@/controls/modules/canvas/ForkWithModelActionControlModule";
+import { ForkCompactActionControlModule } from "@/controls/modules/canvas/ForkCompactActionControlModule";
 import { RatingActionControlModule } from "@/controls/modules/canvas/RatingActionControlModule";
 import { EditResponseControlModule } from "@/controls/modules/canvas/EditResponseControlModule";
 import { EditCodeBlockControlModule } from "@/controls/modules/canvas/EditCodeBlockControlModule";
@@ -110,6 +111,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   RegenerateWithModelActionControlModule, // For InteractionCard footer
   ForkActionControlModule, // For InteractionCard footer
   ForkWithModelActionControlModule, // For InteractionCard footer
+  ForkCompactActionControlModule, // For InteractionCard footer
   EditResponseControlModule, // For InteractionCard footer
   RatingActionControlModule, // For InteractionCard footer
   CopyCodeBlockControlModule, // For CodeBlockRenderer header

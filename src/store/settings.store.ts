@@ -73,6 +73,8 @@ export interface SettingsState {
   autoTitlePromptMaxLength: number;
   autoTitleIncludeFiles: boolean;
   autoTitleIncludeRules: boolean;
+  forkCompactPrompt: string | null;
+  forkCompactModelId: string | null;
   customFontFamily: string | null;
   customFontSize: number | null;
   chatMaxWidth: string | null;
@@ -107,6 +109,8 @@ interface SettingsActions {
   setAutoTitlePromptMaxLength: (length: number) => void;
   setAutoTitleIncludeFiles: (include: boolean) => void;
   setAutoTitleIncludeRules: (include: boolean) => void;
+  setForkCompactPrompt: (prompt: string | null) => void;
+  setForkCompactModelId: (modelId: string | null) => void;
   setCustomFontFamily: (fontFamily: string | null) => void;
   setCustomFontSize: (fontSize: number | null) => void;
   setChatMaxWidth: (maxWidthClass: string | null) => void;
@@ -150,6 +154,8 @@ const DEFAULT_AUTO_TITLE_MODEL_ID = null;
 const DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH = 768;
 const DEFAULT_AUTO_TITLE_INCLUDE_FILES = false;
 const DEFAULT_AUTO_TITLE_INCLUDE_RULES = false;
+const DEFAULT_FORK_COMPACT_PROMPT = null;
+const DEFAULT_FORK_COMPACT_MODEL_ID = null;
 const DEFAULT_CUSTOM_FONT_FAMILY = null;
 const DEFAULT_CUSTOM_FONT_SIZE = 16;
 const DEFAULT_CHAT_MAX_WIDTH = "max-w-7xl";
@@ -185,6 +191,8 @@ export const useSettingsStore = create(
     autoTitlePromptMaxLength: DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH,
     autoTitleIncludeFiles: DEFAULT_AUTO_TITLE_INCLUDE_FILES,
     autoTitleIncludeRules: DEFAULT_AUTO_TITLE_INCLUDE_RULES,
+    forkCompactPrompt: DEFAULT_FORK_COMPACT_PROMPT,
+    forkCompactModelId: DEFAULT_FORK_COMPACT_MODEL_ID,
     customFontFamily: DEFAULT_CUSTOM_FONT_FAMILY,
     customFontSize: DEFAULT_CUSTOM_FONT_SIZE,
     chatMaxWidth: DEFAULT_CHAT_MAX_WIDTH,
@@ -346,6 +354,14 @@ export const useSettingsStore = create(
         include,
       });
     },
+    setForkCompactPrompt: (prompt) => {
+      set({ forkCompactPrompt: prompt });
+      PersistenceService.saveSetting("forkCompactPrompt", prompt);
+    },
+    setForkCompactModelId: (modelId) => {
+      set({ forkCompactModelId: modelId });
+      PersistenceService.saveSetting("forkCompactModelId", modelId);
+    },
     setCustomFontFamily: (fontFamily) => {
       const trimmedFont = fontFamily?.trim() || null;
       set({ customFontFamily: trimmedFont });
@@ -449,6 +465,8 @@ export const useSettingsStore = create(
           autoTitlePromptMaxLength,
           autoTitleIncludeFiles,
           autoTitleIncludeRules,
+          forkCompactPrompt,
+          forkCompactModelId,
           customFontFamily,
           customFontSize,
           chatMaxWidth,
@@ -545,6 +563,14 @@ export const useSettingsStore = create(
             DEFAULT_AUTO_TITLE_INCLUDE_RULES
           ),
           PersistenceService.loadSetting<string | null>(
+            "forkCompactPrompt",
+            DEFAULT_FORK_COMPACT_PROMPT
+          ),
+          PersistenceService.loadSetting<string | null>(
+            "forkCompactModelId",
+            DEFAULT_FORK_COMPACT_MODEL_ID
+          ),
+          PersistenceService.loadSetting<string | null>(
             "customFontFamily",
             DEFAULT_CUSTOM_FONT_FAMILY
           ),
@@ -602,6 +628,8 @@ export const useSettingsStore = create(
           autoTitlePromptMaxLength,
           autoTitleIncludeFiles,
           autoTitleIncludeRules,
+          forkCompactPrompt,
+          forkCompactModelId,
           customFontFamily,
           customFontSize,
           chatMaxWidth,
