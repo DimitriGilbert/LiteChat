@@ -111,16 +111,6 @@ export const EditCodeBlockControl: React.FC<EditCodeBlockControlProps> = ({
     return langMap[lang.toLowerCase()] || Prism.languages.plaintext || Prism.languages.text;
   }, []);
 
-  const highlightCode = useCallback((code: string) => {
-    try {
-      const prismLang = getPrismLanguage(language);
-      return Prism.highlight(code, prismLang, language || 'text');
-    } catch (error) {
-      console.error('Syntax highlighting error:', error);
-      return code;
-    }
-  }, [language, getPrismLanguage]);
-
   // Only show edit button if there's substantial code content
   const shouldShow = originalContent && originalContent.trim().length > 0 && interactionId && codeBlockId;
   
