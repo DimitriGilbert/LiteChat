@@ -84,32 +84,32 @@ export const EditCodeBlockControl: React.FC<EditCodeBlockControlProps> = ({
   }, [onEditModeChange]);
 
   // Get the appropriate Prism language for highlighting
-  const getPrismLanguage = useCallback((lang?: string) => {
-    if (!lang) return Prism.languages.plaintext || Prism.languages.text;
+  // const getPrismLanguage = useCallback((lang?: string) => {
+  //   if (!lang) return Prism.languages.plaintext || Prism.languages.text;
     
-    const langMap: Record<string, any> = {
-      'javascript': Prism.languages.javascript,
-      'js': Prism.languages.javascript,
-      'typescript': Prism.languages.typescript,
-      'ts': Prism.languages.typescript,
-      'python': Prism.languages.python,
-      'py': Prism.languages.python,
-      'bash': Prism.languages.bash,
-      'sh': Prism.languages.bash,
-      'json': Prism.languages.json,
-      'markdown': Prism.languages.markdown,
-      'md': Prism.languages.markdown,
-      'diff': Prism.languages.diff,
-      'go': Prism.languages.go,
-      'yaml': Prism.languages.yaml,
-      'yml': Prism.languages.yaml,
-      'rust': Prism.languages.rust,
-      'rs': Prism.languages.rust,
-      'sql': Prism.languages.sql,
-    };
+  //   const langMap: Record<string, any> = {
+  //     'javascript': Prism.languages.javascript,
+  //     'js': Prism.languages.javascript,
+  //     'typescript': Prism.languages.typescript,
+  //     'ts': Prism.languages.typescript,
+  //     'python': Prism.languages.python,
+  //     'py': Prism.languages.python,
+  //     'bash': Prism.languages.bash,
+  //     'sh': Prism.languages.bash,
+  //     'json': Prism.languages.json,
+  //     'markdown': Prism.languages.markdown,
+  //     'md': Prism.languages.markdown,
+  //     'diff': Prism.languages.diff,
+  //     'go': Prism.languages.go,
+  //     'yaml': Prism.languages.yaml,
+  //     'yml': Prism.languages.yaml,
+  //     'rust': Prism.languages.rust,
+  //     'rs': Prism.languages.rust,
+  //     'sql': Prism.languages.sql,
+  //   };
     
-    return langMap[lang.toLowerCase()] || Prism.languages.plaintext || Prism.languages.text;
-  }, []);
+  //   return langMap[lang.toLowerCase()] || Prism.languages.plaintext || Prism.languages.text;
+  // }, []);
 
   // Only show edit button if there's substantial code content
   const shouldShow = originalContent && originalContent.trim().length > 0 && interactionId && codeBlockId;
