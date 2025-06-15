@@ -871,9 +871,13 @@ export const InteractionService = {
       onToolResult: (toolResult) =>
         this._handleToolResult(interactionId, toolResult),
       onFinish: (details) =>
-        this._handleFinish(interactionId, details, interactionType),
+        this._handleFinish(interactionId, details, interactionType).catch(finishError => {
+          console.error(`[InteractionService] Error in finish handler for ${interactionId}:`, finishError);
+        }),
       onError: (error) =>
-        this._handleError(interactionId, error, interactionType),
+        this._handleError(interactionId, error, interactionType).catch(errorHandlerError => {
+          console.error(`[InteractionService] Error in error handler for ${interactionId}:`, errorHandlerError);
+        }),
     };
 
     console.log(
@@ -1138,9 +1142,9 @@ export const InteractionService = {
     ) {
       const generatedTitle = finalUpdates.response.trim().replace(/^"|"$/g, "");
       if (generatedTitle && currentInteraction) {
-        console.log(
-          `[InteractionService] Updating conversation ${currentInteraction.conversationId} title to: "${generatedTitle}"`
-        );
+        // console.log(
+        //   `[InteractionService] Updating conversation ${currentInteraction.conversationId} title to: "${generatedTitle}"`
+        // );
         emitter.emit(conversationEvent.updateConversationRequest, {
           id: currentInteraction.conversationId,
           updates: { title: generatedTitle },
@@ -1148,13 +1152,13 @@ export const InteractionService = {
       }
     }
 
-        console.log(`[InteractionService] Checking completion handler conditions for ${interactionId}:`, {
-      interactionType,
-      status,
-      hasResponse: !!finalUpdates.response,
-      responseType: typeof finalUpdates.response,
-      currentInteractionMetadata: currentInteraction?.metadata
-    });
+    //     console.log(`[InteractionService] Checking completion handler conditions for ${interactionId}:`, {
+    //   interactionType,
+    //   status,
+    //   hasResponse: !!finalUpdates.response,
+    //   responseType: typeof finalUpdates.response,
+    //   currentInteractionMetadata: currentInteraction?.metadata
+    // });
 
         if (
       interactionType === "conversation.compact" &&
@@ -1166,16 +1170,16 @@ export const InteractionService = {
       const targetUserInteractionId = currentInteraction?.metadata?.targetUserInteractionId;
       const targetConversationId = currentInteraction?.metadata?.targetConversationId;
       
-      console.log(`[InteractionService] Compact completion handler triggered for ${interactionId}:`, {
-        compactSummaryLength: compactSummary.length,
-        targetUserInteractionId,
-        targetConversationId
-      });
+      // console.log(`[InteractionService] Compact completion handler triggered for ${interactionId}:`, {
+      //   compactSummaryLength: compactSummary.length,
+      //   targetUserInteractionId,
+      //   targetConversationId
+      // });
       
       if (compactSummary && targetUserInteractionId && targetConversationId) {
-        console.log(
-          `[InteractionService] Updating user interaction ${targetUserInteractionId} in conversation ${targetConversationId} with compact summary`
-        );
+        // console.log(
+        //   `[InteractionService] Updating user interaction ${targetUserInteractionId} in conversation ${targetConversationId} with compact summary`
+        // );
         
         try {
           // Switch to the target conversation first
@@ -1185,7 +1189,7 @@ export const InteractionService = {
           // Ensure interactions are loaded for the target conversation
           const interactionStore = useInteractionStore.getState();
           if (interactionStore.currentConversationId !== targetConversationId) {
-            console.log(`[InteractionService] Loading interactions for target conversation ${targetConversationId}`);
+            // console.log(`[InteractionService] Loading interactions for target conversation ${targetConversationId}`);
             await interactionStore.loadInteractions(targetConversationId);
           }
           
@@ -1196,12 +1200,12 @@ export const InteractionService = {
             throw new Error(`Target interaction ${targetUserInteractionId} not found after loading conversation ${targetConversationId}`);
           }
           
-          console.log(`[InteractionService] Found target interaction ${targetUserInteractionId} with current response:`, {
-            response: targetInteraction.response?.substring(0, 50) + '...',
-            status: targetInteraction.status,
-            conversationId: targetInteraction.conversationId,
-            currentConversationId: interactionStore.currentConversationId
-          });
+          // console.log(`[InteractionService] Found target interaction ${targetUserInteractionId} with current response:`, {
+          //   response: targetInteraction.response?.substring(0, 50) + '...',
+          //   status: targetInteraction.status,
+          //   conversationId: targetInteraction.conversationId,
+          //   currentConversationId: interactionStore.currentConversationId
+          // });
           
           // Merge metadata instead of overwriting to preserve existing data
           const updates = {
@@ -1215,12 +1219,12 @@ export const InteractionService = {
             },
           };
           
-          console.log(`[InteractionService] Applying updates to ${targetUserInteractionId}:`, {
-            responseLength: compactSummary.length,
-            status: updates.status,
-            targetConversationId,
-            currentConversationId: interactionStore.currentConversationId
-          });
+          // console.log(`[InteractionService] Applying updates to ${targetUserInteractionId}:`, {
+          //   responseLength: compactSummary.length,
+          //   status: updates.status,
+          //   targetConversationId,
+          //   currentConversationId: interactionStore.currentConversationId
+          // });
           
           // Create the fully updated interaction object with the compact summary
           const fullyUpdatedInteraction = {
@@ -1235,16 +1239,16 @@ export const InteractionService = {
             }
           };
           
-          console.log(`[InteractionService] DIRECT DATABASE UPDATE for ${targetUserInteractionId}:`, {
-            responseLength: compactSummary.length,
-            status: fullyUpdatedInteraction.status,
-            oldResponse: targetInteraction.response?.substring(0, 50),
-            newResponse: compactSummary.substring(0, 50)
-          });
+          // console.log(`[InteractionService] DIRECT DATABASE UPDATE for ${targetUserInteractionId}:`, {
+          //   responseLength: compactSummary.length,
+          //   status: fullyUpdatedInteraction.status,
+          //   oldResponse: targetInteraction.response?.substring(0, 50),
+          //   newResponse: compactSummary.substring(0, 50)
+          // });
           
           // CRITICAL: Save directly to Dexie database FIRST
           await PersistenceService.saveInteraction(fullyUpdatedInteraction);
-          console.log(`[InteractionService] ✅ DEXIE DATABASE UPDATED for ${targetUserInteractionId}`);
+          // console.log(`[InteractionService] ✅ DEXIE DATABASE UPDATED for ${targetUserInteractionId}`);
           
           // THEN update Zustand state using the proper method
           interactionStore._updateInteractionInState(targetUserInteractionId, {
@@ -1315,11 +1319,11 @@ export const InteractionService = {
       .interactions.find((i) => i.id === interactionId);
 
     if (finalInteractionState) {
-      console.log(
-        `[InteractionService] Persisting final state for ${interactionId}. Response length: ${
-          finalInteractionState.response?.length ?? 0
-        }`
-      );
+      // console.log(
+      //   `[InteractionService] Persisting final state for ${interactionId}. Response length: ${
+      //     finalInteractionState.response?.length ?? 0
+      //   }`
+      // );
       PersistenceService.saveInteraction({ ...finalInteractionState }).catch(
         (e) => {
           console.error(
@@ -1359,8 +1363,8 @@ export const InteractionService = {
     this._interactionStartTimes.delete(interactionId);
     this._firstChunkTimestamps.delete(interactionId);
 
-    console.log(
-      `[InteractionService] Finalized interaction ${interactionId} with status ${status}.`
-    );
+    // console.log(
+    //   `[InteractionService] Finalized interaction ${interactionId} with status ${status}.`
+    // );
   },
 };

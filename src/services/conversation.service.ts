@@ -25,6 +25,7 @@ import { nanoid } from "nanoid";
 import * as VfsOps from "@/lib/litechat/vfs-operations";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { vfsEvent, VfsEventPayloads } from "@/types/litechat/events/vfs.events";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { PersistenceService } from "@/services/persistence.service";
 import type { Interaction } from "@/types/litechat/interaction";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
@@ -838,11 +839,30 @@ Keep the summary detailed enough that we can seamlessly continue our discussion,
 
       await PersistenceService.saveInteraction(initialUserInteraction);
 
+      // Add the initial interaction to the current conversation's in-memory store before switching
+      // This ensures the "Compacting..." message appears immediately in the UI
+      const interactionStoreState = useInteractionStore.getState();
+      interactionStoreState._addInteractionToState(initialUserInteraction);
+
       // FIRST: Select the new conversation so the interaction store is in the right context
       await conversationStoreState.selectItem(newConversationId, "conversation");
       
-      // Wait for conversation selection to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for conversation selection and interaction loading to complete
+      await new Promise<void>((resolve) => {
+        const handleInteractionLoaded = (payload: any) => {
+          if (payload.conversationId === newConversationId) {
+            emitter.off(interactionEvent.loaded, handleInteractionLoaded);
+            resolve();
+          }
+        };
+        emitter.on(interactionEvent.loaded, handleInteractionLoaded);
+        
+        // Fallback timeout in case event doesn't fire
+        setTimeout(() => {
+          emitter.off(interactionEvent.loaded, handleInteractionLoaded);
+          resolve();
+        }, 2000);
+      });
 
       // THEN: Create the compact turn data for the hidden compact interaction
       const compactTurnData: PromptTurnObject = {
