@@ -190,13 +190,13 @@ export const RulesControlDialogContent: React.FC<
   );
 
   const tabs: TabDefinition[] = [
-    { value: "tags", label: "Activate Tags", content: renderTagList() },
     { value: "rules", label: "Activate Rules", content: renderRuleList() },
+    { value: "tags", label: "Activate Tags", content: renderTagList() },
   ];
 
   return (
     <div className="p-0 max-w-lg">
-      <TabbedLayout tabs={tabs} defaultValue="tags" scrollable={false} />
+      <TabbedLayout tabs={tabs} defaultValue="rules" scrollable={false} />
     </div>
   );
 };

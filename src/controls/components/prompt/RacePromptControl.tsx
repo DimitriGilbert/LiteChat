@@ -60,8 +60,8 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
   };
 
   const handleStartRace = () => {
-    if (selectedModelIds.length < 2) {
-      toast.error("Please select at least 2 models to race");
+    if (selectedModelIds.length < 1) {
+      toast.error("Please select at least 1 model to race");
       return;
     }
 
@@ -134,7 +134,7 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="min-w-[65vw] max-h-[75vh] flex flex-col p-4">
           <DialogHeader>
             <DialogTitle>Race Models</DialogTitle>
             <DialogDescription>
@@ -143,24 +143,6 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Stagger Timing Input */}
-            <div className="space-y-2">
-              <Label htmlFor="stagger-input">Stagger Delay (ms)</Label>
-              <Input
-                id="stagger-input"
-                type="number"
-                min="0"
-                max="5000"
-                step="50"
-                value={staggerMs}
-                onChange={(e) => setStaggerMs(parseInt(e.target.value) || 250)}
-                placeholder="250"
-                className="w-full"
-              />
-              <p className="text-xs text-muted-foreground">
-                Delay between starting each model (0-5000ms)
-              </p>
-            </div>
 
             {/* Model Selection */}
             <div className="space-y-2">
@@ -197,6 +179,25 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                 </p>
               )}
             </div>
+
+            {/* Stagger Timing Input */}
+            <div className="space-y-2">
+              <Label htmlFor="stagger-input">Stagger Delay (ms)</Label>
+              <Input
+                id="stagger-input"
+                type="number"
+                min="0"
+                max="5000"
+                step="50"
+                value={staggerMs}
+                onChange={(e) => setStaggerMs(parseInt(e.target.value) || 250)}
+                placeholder="250"
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Delay between starting each model (0-5000ms)
+              </p>
+            </div>
           </div>
 
           <DialogFooter>
@@ -205,7 +206,7 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
             </Button>
             <Button 
               onClick={handleStartRace}
-              disabled={selectedModelIds.length < 2 || module.isLoadingProviders}
+              disabled={selectedModelIds.length < 1 || module.isLoadingProviders}
             >
               Enable Race Mode
             </Button>
