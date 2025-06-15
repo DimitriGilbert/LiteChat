@@ -23,31 +23,35 @@
 - **Auto title generation**: The AI will generate a title for your conversation
 - **Conversation export**: Export your conversation to a file
 - **Message regeneration**: When the model falls on its face, you can regenerate the message
+- **Conversation Sync**: Sync conversations with Git repositories for a "poor man" no thrill sync solution.
+- **Prompt Library**: Create, manage, and use reusable prompt templates
 
 ### 💻 **Power User Features**
-- **Mermaid Diagrams**: Real-time diagram rendering with full Mermaid.js support
-- **Virtual File System**: Browser-based filesystem with full CRUD operations
+- **Agents**: Create, manage, and use powerful AI agents and their associated tasks.
+- **Tool System**: AI can read/write files, execute Git commands, and more, including tools from MCP servers.
 - **Race**: you can send the same prompt to multiple models at once and see the results
-- **Regen with**: regenerate the message with a different model
+- **Mermaid Diagrams**: Real-time diagram rendering with full Mermaid.js support
 - **Response editor**: edit the response after it has been generated to remove the fluff and save on tokens
 - **Rules**: you can add rules to the AI to guide its behavior, **tags** are here to bundle rules together
-- **Prompt Templates & Agents**: Create, manage, and use reusable prompt templates, including powerful AI agents and their associated tasks.
+- **Regenerate with**: regenerate the message with a different model
 
 ### 🛠️ **Developer-Focused Features**
-- **Git Integration**: Clone, commit, push, pull directly in the browser
 - **Code Block Enhancements**: Filepath syntax, individual downloads, ZIP exports
-- **Tool System**: AI can read/write files, execute Git commands, and more, including tools from MCP servers.
+- **Codeblock editor**: you can edit the codeblock content directly in the browser, and use it in the follow up chats !
+- **Virtual File System**: Browser-based filesystem with full CRUD operations
+- **Git Integration**: Clone, commit, push, pull directly in the browser
 - **Structured Output**: you can ask the AI to return a structured output, like a JSON, a table, a list, etc. (untested ^^')
+- **Formedible codeblock**: LLMs can use the `formedible` codeblock to create a form to interact with the user in a deterministice maner using the [Formedible](https://github.com/DimitriGilbert/Formedible) library.
+
+> If you have a 1000 LoC to spare, you can create you own custom Codeblock renderer see [FormedibleBlockRendererModule](src/controls/modules/FormedibleBlockRendererModule.ts) for an example.
 
 ### 📁 **Project Organization**
 - **Hierarchical Projects**: Organize conversations in nested project structures
 - **Per-Project Settings**: Custom models, prompts, and configurations
 - **Rules & Tags**: Reusable prompt engineering with organization
-- **Conversation Sync**: Link conversations to Git repositories for version control
 
 ### 🔌 **MCP (Model Context Protocol) Integration**
-- **HTTP MCP Servers**: Connect to external MCP servers via Server-Sent Events
-- **Stdio MCP Servers**: Connect to external MCP servers via Stdio (via [node ./bin/mcp-bridge.js](./bin/mcp-bridge.js))
+- **HTTP and Stdio MCP Servers**: Connect to external MCP servers via HTTP Server-Sent Events, HTTP Stream Transport and Stdio (via [node ./bin/mcp-bridge.js](./bin/mcp-bridge.js))
 - **Automatic Tool Discovery**: Tools from MCP servers are automatically available to the AI
 - **Graceful Error Handling**: Configurable retry logic with exponential backoff
 - **Connection Management**: Real-time status monitoring and manual retry capabilities
@@ -68,17 +72,25 @@
 
 For comprehensive documentation, see the [`docs/`](./docs/) directory:
 
-- **[Getting Started Guide](./docs/index.md)** - Architecture overview and development setup
+- **[Getting Started Guide](./docs/readme.md)** - Architecture overview and development setup
 - **[AI Integration](./docs/ai-integration.md)** - Provider setup, streaming, and tool execution
 - **[MCP Integration](./docs/mcp-integration.md)** - Model Context Protocol server integration and external tools
+- **[MCP Bridge Specification](./docs/mcp-bridge-spec.md)** - MCP bridge protocol and implementation details
 - **[Virtual File System](./docs/vfs.md)** - Browser-based filesystem and file operations
 - **[Git Integration](./docs/git.md)** - Repository management and conversation sync
 - **[Canvas Features](./docs/canvas-features.md)** - Code blocks, diagrams, and interaction controls
+- **[Block Renderer System](./docs/block-renderer-system.md)** - Universal block rendering architecture
 - **[Modding System](./docs/modding.md)** - Extension API and custom functionality
 - **[Build & Deployment](./docs/build-deployment.md)** - Development, configuration, and deployment
 - **[Control Module System](./docs/control-modules.md)** - Modular UI architecture
 - **[Event System](./docs/event-system.md)** - Event-driven communication patterns
 - **[State Management](./docs/state-management.md)** - Zustand stores and data flow
+- **[Components](./docs/components.md)** - UI component architecture and patterns
+- **[Services](./docs/services.md)** - Core service layer and business logic
+- **[API Reference](./docs/api-reference.md)** - Complete API documentation
+- **[Types](./docs/types.md)** - TypeScript type definitions and interfaces
+- **[File Structure](./docs/file-structure.md)** - Project organization and file layout
+- **[Persistence](./docs/persistence.md)** - Data storage and persistence layer
 
 ## 🚀 Quick Start
 
@@ -185,9 +197,13 @@ I already toyed a bit before with [my Bash AI chat](https://ai-gents.dbuild.dev/
 
 How hard can it be? Right? You've created this [Bash AI chat](https://ai-gents.dbuild.dev/) (did I tell you it was in bash? Oh right, sorry...) in less than a week, you've done a big fat frontend project before, you just have to, you know... 🤝 ! easy ! 
 
-SUUURE budd, sure ! (spoiler alert, no !) So sure in fact that I am going to through fat rocks at myself, I wanted it local "only" (no server what so ever) AND, I am only going to use [t3.chat](https://t3.chat) to ENTIRELY "vibecode" the thing, because why not ? tis supposed to be the Future, right ?
+SUUURE budd, sure ! (spoiler alert, no !) So sure in fact that I was going to through fat rocks at myself, I wanted it local "only" (no server what so ever) AND, I was only going to use [t3.chat](https://t3.chat) to ENTIRELY "vibecode" the thing (several of my arms articulation thank me very much !), because i was going to do that on a budget, aaand... why not ? tis supposed to be the Future ! right !? ... right ??!
 
 I caved in after a few weeks and reused Cursor when the complete project was around 250k tokens in total (giving it all to gemini was possible but the results were crap) and targeted file feeding was becoming a real chore... plus at some point, things are so interdependant that you end up with significant portions of your code base anyway... (Sorry [t3.chat](https://t3.chat) team ^^' )
+
+I am very much more on the "function over form" team so you may find some ... meeeh, let's call them discutable choices, especially in the UI departement ! Tabbed dialogs ? Button placement from hell ? The "so close therefore so infuriating" vibe ? Blame gemini ! (or Theo, [his chat](https://t3.chat) did that !).
+
+> Plus I am almost out of cursor requests and there is no way in hell I am refactoring this madness manually ! It all has to be split anyway, sssoo, you know... (spoiler for the astute readers ? mmmaaayyybeeee!)
 
 It was fun though ! And now I have my own chat app ! And so can you :D !
 
