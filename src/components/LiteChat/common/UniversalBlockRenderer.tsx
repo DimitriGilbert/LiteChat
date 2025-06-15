@@ -10,6 +10,7 @@ interface UniversalBlockRendererProps {
   code: string;
   filepath?: string;
   isStreaming?: boolean;
+  interactionId?: string;
 }
 
 const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
@@ -17,6 +18,7 @@ const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
   code,
   filepath,
   isStreaming = false,
+  interactionId,
 }) => {
   const blockRenderers = useControlRegistryStore(
     useShallow((state) => state.blockRenderers)
@@ -31,6 +33,7 @@ const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
       filepath,
       isStreaming,
       blockId,
+      interactionId,
     };
 
     const renderer = BlockRendererService.findRendererForLanguage(lang, blockRenderers);

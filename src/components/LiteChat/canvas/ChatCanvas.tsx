@@ -379,6 +379,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
             turnData={userPromptToDisplay}
             timestamp={activeInteraction.startedAt} // Timestamp from active interaction (latest in turn)
             isAssistantComplete={activeInteraction.status === "COMPLETED" || activeInteraction.status === "ERROR"}
+            interactionId={activeInteraction.id}
           />
         );
       } else if (activeInteraction.type !== "message.user_assistant" && activeInteraction.type !== "message.assistant_regen") {

@@ -6,7 +6,7 @@ import type {
   LiteChatModApi,
   CanvasControlRenderContext,
 } from "@/types/litechat/modding";
-import { InteractionRating } from "@/components/LiteChat/canvas/interaction/InteractionRating";
+import { CompactInteractionRating } from "@/components/LiteChat/canvas/interaction/CompactInteractionRating";
 
 export class RatingActionControlModule implements ControlModule {
   readonly id = "core-canvas-rating-action";
@@ -22,7 +22,7 @@ export class RatingActionControlModule implements ControlModule {
         if (!context.interactionId || !context.interaction) {
           return null;
         }
-        return React.createElement(InteractionRating, {
+        return React.createElement(CompactInteractionRating, {
           interactionId: context.interactionId,
           currentRating: context.interaction.rating,
         });

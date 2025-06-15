@@ -10,10 +10,12 @@ export interface CanvasControlRenderContext {
   responseContent?: string;
   codeBlockLang?: string;
   codeBlockContent?: string;
+  codeBlockEditedContent?: string;
   codeBlockId?: string;
   codeBlockFilepath?: string;
   isFolded?: boolean;
   toggleFold?: () => void;
+  onEditModeChange?: (isEditing: boolean) => void;
   toolCall?: ToolCallPart;
   toolResult?: ToolResultPart;
   // This type should reflect the element the control is associated with

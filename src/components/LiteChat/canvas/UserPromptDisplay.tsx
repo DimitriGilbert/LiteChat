@@ -26,11 +26,13 @@ interface UserPromptDisplayProps {
   timestamp: Date | null;
   className?: string;
   isAssistantComplete?: boolean;
+  interactionId?: string;
 }
 
 // Component to render parsed user content
-const UserContentView: React.FC<{ markdownContent: string | null }> = ({
+const UserContentView: React.FC<{ markdownContent: string | null, interactionId?: string }> = ({
   markdownContent,
+  interactionId,
 }) => {
   const parsedContent = useMarkdownParser(markdownContent);
 
@@ -59,6 +61,7 @@ const UserContentView: React.FC<{ markdownContent: string | null }> = ({
               lang={item.lang}
               code={item.code}
               filepath={item.filepath}
+              interactionId={interactionId}
             />
           );
         }
@@ -69,7 +72,7 @@ const UserContentView: React.FC<{ markdownContent: string | null }> = ({
 };
 
 export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
-  ({ turnData, timestamp, className, isAssistantComplete = true }) => {
+  ({ turnData, timestamp, className, isAssistantComplete = true, interactionId }) => {
     const foldUserMessagesOnCompletion = useSettingsStore(
       (state) => state.foldUserMessagesOnCompletion,
     );
@@ -191,7 +194,7 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
               </div>
             )}
             {/* Use the new UserContentView component */}
-            <UserContentView markdownContent={turnData.content} />
+            <UserContentView markdownContent={turnData.content} interactionId={interactionId} />
           </>
         )}
         {isFolded && (

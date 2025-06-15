@@ -7,6 +7,7 @@ export interface BlockRendererContext {
   filepath?: string;
   isStreaming?: boolean;
   blockId?: string;
+  interactionId?: string;
 }
 
 export interface BlockRenderer {

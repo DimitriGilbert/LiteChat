@@ -28,7 +28,6 @@ const renderBlock = (
   item: string | UniversalBlockData,
   index: number,
   isStreamingBlock: boolean,
-  // @ts-expect-error unused, do not feel like fixing type for now
   interactionId: string
 ): React.ReactNode | null => {
   if (typeof item === "string") {
@@ -49,6 +48,7 @@ const renderBlock = (
         code={item.code}
         filepath={item.filepath}
         isStreaming={isStreamingBlock}
+        interactionId={interactionId}
       />
     );
   }

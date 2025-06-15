@@ -132,6 +132,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
             turnData={interaction.prompt}
             timestamp={interaction.startedAt}
             isAssistantComplete={isComplete}
+            interactionId={interaction.id}
           />
         )}
 
@@ -176,7 +177,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
         {showActions && footerActionsSlot && footerActionsSlot.length > 0 && (
           <div
             className={cn(
-              "absolute bottom-1 right-1 md:bottom-2 md:right-2 flex items-center space-x-0.5 md:space-x-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200",
+              "absolute bottom-1 left-1 md:bottom-2 md:left-2 flex items-center space-x-0.5 md:space-x-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200",
               "bg-card/80 backdrop-blur-sm p-0.5 md:p-1 rounded-md shadow-md z-20"
             )}
           >

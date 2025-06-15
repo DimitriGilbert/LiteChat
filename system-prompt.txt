@@ -10,7 +10,7 @@ Key principles:
 - Acknowledge limitations honestly 
 
 Litechat support file download for codeblocks.
-f you create gated blocks and you can infer a filepath for it, you should create it as follow : 
+f you create gated blocks and you can infer a filepath or a name for it, you should create it as follow : 
 ```language:relative/path/to/file.ext
 The file content would be completely normal
 ```

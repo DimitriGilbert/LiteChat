@@ -25,12 +25,14 @@ import { useShallow } from "zustand/react/shallow";
 import type { CanvasControl } from "@/types/litechat/canvas/control"; // For renderSlot type
 import { useControlRegistryStore } from "@/store/control.store"; // To get canvas controls
 import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control";
+import { InlineCodeEditor } from "@/controls/components/canvas/codeblock/EditCodeBlockControl";
 
 interface CodeBlockRendererProps {
   lang: string | undefined;
   code: string;
   filepath?: string;
   isStreaming?: boolean;
+  interactionId?: string;
 }
 
 const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
@@ -38,6 +40,7 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
   code,
   filepath,
   isStreaming = false,
+  interactionId,
 }) => {
   const { foldStreamingCodeBlocks } = useSettingsStore(
     useShallow((state) => ({
@@ -48,6 +51,15 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
   const [isFolded, setIsFolded] = useState(
     isStreaming ? foldStreamingCodeBlocks : false
   );
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedCode, setEditedCode] = useState(code);
+
+  // Update edited code when original code changes
+  useEffect(() => {
+    if (!isEditing) {
+      setEditedCode(code);
+    }
+  }, [code, isEditing]);
   const codeRef = useRef<HTMLElement>(null);
 
   const canvasControls = useControlRegistryStore(
@@ -74,11 +86,14 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
           if (control.renderer) {
             const context: CanvasControlRenderContext = {
               codeBlockContent: currentCode,
+              codeBlockEditedContent: editedCode,
               codeBlockLang: currentLang,
               codeBlockFilepath: currentFilepath,
               isFolded: currentIsFolded,
               toggleFold: currentToggleFold,
               canvasContextType: "codeblock",
+              interactionId: interactionId,
+              onEditModeChange: setIsEditing,
             };
             return (
               <React.Fragment key={control.id}>
@@ -90,7 +105,7 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
         })
         .filter(Boolean);
     },
-    [canvasControls]
+    [canvasControls, editedCode, interactionId, setIsEditing]
   );
 
   const highlightCode = useCallback(() => {
@@ -165,11 +180,20 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
         <div></div>
       </div>
 
-      {!isFolded && (
+      {!isFolded && !isEditing && (
         <div className="overflow-hidden w-full">
           <pre className="overflow-x-auto w-full relative overflow-wrap-anywhere border border-border rounded-b-lg bg-muted/20">
             <code ref={codeRef} className={languageClass + " block p-4 font-mono text-sm leading-relaxed"}></code>
           </pre>
+        </div>
+      )}
+      {!isFolded && isEditing && (
+        <div className="overflow-hidden w-full border border-border rounded-b-lg bg-muted/20">
+          <InlineCodeEditor
+            code={editedCode}
+            language={lang}
+            onChange={setEditedCode}
+          />
         </div>
       )}
       {isFolded && (

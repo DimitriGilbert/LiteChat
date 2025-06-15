@@ -50,7 +50,8 @@ import { ForkActionControlModule } from "@/controls/modules/canvas/ForkActionCon
 import { ForkWithModelActionControlModule } from "@/controls/modules/canvas/ForkWithModelActionControlModule";
 import { RatingActionControlModule } from "@/controls/modules/canvas/RatingActionControlModule";
 import { EditResponseControlModule } from "@/controls/modules/canvas/EditResponseControlModule";
-import { ExampleCanvasControlModule } from "@/controls/modules/example";
+import { EditCodeBlockControlModule } from "@/controls/modules/canvas/EditCodeBlockControlModule";
+// import { ExampleCanvasControlModule } from "@/controls/modules/example";
 import { FoldInteractionControlModule } from "@/controls/modules/canvas/interaction/FoldInteractionControlModule";
 import { ZipDownloadControlModule } from "@/controls/modules/canvas/interaction/ZipDownloadControlModule";
 import { CopyCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/CopyCodeBlockControlModule";
@@ -114,7 +115,8 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   CopyCodeBlockControlModule, // For CodeBlockRenderer header
   FoldCodeBlockControlModule, // For CodeBlockRenderer header
   DownloadCodeBlockControlModule, // For CodeBlockRenderer header
-  ExampleCanvasControlModule,
+  EditCodeBlockControlModule, // For CodeBlockRenderer header
+  // ExampleCanvasControlModule,
   ToolCallStepControlModule,
 ];
 
