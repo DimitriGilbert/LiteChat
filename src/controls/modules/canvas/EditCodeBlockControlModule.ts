@@ -93,6 +93,32 @@ export class EditCodeBlockControlModule implements ControlModule {
     }
   }
 
+  // Store mapping of blockId to content for lookup during editing
+  private blockIdToContentMap = new Map<string, { content: string; lang?: string; filepath?: string }>();
+
+  private findCodeBlockByContent(markdownString: string, targetContent: string, targetLang?: string, targetFilepath?: string): number {
+    const codeBlocks = this.parseMarkdownForCodeBlocks(markdownString);
+    
+    for (let i = 0; i < codeBlocks.length; i++) {
+      const block = codeBlocks[i];
+      if (block.code === targetContent && 
+          block.lang === targetLang && 
+          block.filepath === targetFilepath) {
+        return i;
+      }
+    }
+    
+    // Fallback: try to find by content only
+    for (let i = 0; i < codeBlocks.length; i++) {
+      const block = codeBlocks[i];
+      if (block.code === targetContent) {
+        return i;
+      }
+    }
+    
+    return -1;
+  }
+
   private replaceCodeBlockInMarkdown(originalMarkdown: string, blockIndex: number, newContent: string, language?: string, filepath?: string): string {
     // Split the markdown into lines for easier manipulation
     const lines = originalMarkdown.split('\n');
@@ -149,13 +175,18 @@ export class EditCodeBlockControlModule implements ControlModule {
         throw new Error("Invalid response content");
       }
 
-      // Extract block index from codeBlockId (format: "block-0", "block-1", etc.)
-      const blockIndexMatch = codeBlockId.match(/^block-(\d+)$/);
-      if (!blockIndexMatch) {
-        throw new Error("Invalid code block ID format");
-      }
+      // Find the code block by matching the original content, language, and filepath
+      // This is more reliable than trying to parse block indices from IDs
+      const targetBlockIndex = this.findCodeBlockByContent(
+        originalInteraction.response,
+        originalContent || "",
+        language,
+        filepath
+      );
       
-      const targetBlockIndex = parseInt(blockIndexMatch[1], 10);
+      if (targetBlockIndex === -1) {
+        throw new Error("Code block not found in response");
+      }
       
       // Use the robust replacement method
       const updatedResponse = this.replaceCodeBlockInMarkdown(
@@ -299,22 +330,9 @@ export class EditCodeBlockControlModule implements ControlModule {
           return null;
         }
 
-        // Generate a stable code block ID based on the block index in the interaction
-        // We need to parse the response to find which block index this is
-        const codeBlocks = this.parseMarkdownForCodeBlocks(currentInteraction.response);
-        let foundBlockIndex = -1;
-        
-        for (let i = 0; i < codeBlocks.length; i++) {
-          const block = codeBlocks[i];
-          // Check if this is the current block by comparing code content
-          if (block.code === context.codeBlockContent) {
-            foundBlockIndex = i;
-            break;
-          }
-        }
-
-        // Use the found block index, or fallback to 0 if not found
-        const codeBlockId = `block-${foundBlockIndex >= 0 ? foundBlockIndex : 0}`;
+        // Use the unique blockId from UniversalBlockRenderer if available
+        // This ensures we always edit the correct block, even with identical content
+        const codeBlockId = context.blockId || `fallback-${Date.now()}`;
 
         return React.createElement(EditCodeBlockControl, {
           interactionId: context.interactionId,

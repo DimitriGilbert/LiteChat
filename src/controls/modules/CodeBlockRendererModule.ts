@@ -30,6 +30,7 @@ export class CodeBlockRendererModule implements ControlModule {
           filepath: context.filepath,
           isStreaming: context.isStreaming,
           interactionId: context.interactionId,
+          blockId: context.blockId,
         });
       },
     };

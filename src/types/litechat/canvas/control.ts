@@ -13,6 +13,7 @@ export interface CanvasControlRenderContext {
   codeBlockEditedContent?: string;
   codeBlockId?: string;
   codeBlockFilepath?: string;
+  blockId?: string; // Unique block ID from UniversalBlockRenderer
   isFolded?: boolean;
   toggleFold?: () => void;
   onEditModeChange?: (isEditing: boolean) => void;

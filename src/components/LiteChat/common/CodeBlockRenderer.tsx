@@ -33,6 +33,7 @@ interface CodeBlockRendererProps {
   filepath?: string;
   isStreaming?: boolean;
   interactionId?: string;
+  blockId?: string;
 }
 
 const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
@@ -41,6 +42,7 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
   filepath,
   isStreaming = false,
   interactionId,
+  blockId,
 }) => {
   const { foldStreamingCodeBlocks } = useSettingsStore(
     useShallow((state) => ({
@@ -93,6 +95,7 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
               toggleFold: currentToggleFold,
               canvasContextType: "codeblock",
               interactionId: interactionId,
+              blockId: blockId,
               onEditModeChange: setIsEditing,
             };
             return (
