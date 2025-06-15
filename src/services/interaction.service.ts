@@ -1178,22 +1178,25 @@ export const InteractionService = {
         );
         
         try {
-          // SWITCH TO THE TARGET CONVERSATION FIRST!
+          // Switch to the target conversation first
           const conversationStore = useConversationStore.getState();
           await conversationStore.selectItem(targetConversationId, "conversation");
           
-          // Wait for conversation switch to complete
-          await new Promise(resolve => setTimeout(resolve, 50));
-          
-          // Get fresh interaction store state after conversation switch
+          // Get the current interaction to preserve existing metadata
           const interactionStore = useInteractionStore.getState();
+          const targetInteraction = interactionStore.interactions.find(i => i.id === targetUserInteractionId);
           
-          // Now update the interaction in the correct context
+          if (!targetInteraction) {
+            throw new Error(`Target interaction ${targetUserInteractionId} not found`);
+          }
+          
+          // Merge metadata instead of overwriting to preserve existing data
           const updates = {
             response: compactSummary,
             status: "COMPLETED" as InteractionStatus,
             endedAt: new Date(),
             metadata: {
+              ...targetInteraction.metadata, // Preserve existing metadata
               isCompactingInProgress: false,
               compactGeneratedAt: new Date().toISOString(),
             },
@@ -1201,7 +1204,7 @@ export const InteractionService = {
           
           interactionStore._updateInteractionInState(targetUserInteractionId, updates);
           
-          // EMIT THE FUCKING EVENT SO THE UI UPDATES!
+          // Emit event to update UI
           emitter.emit(interactionEvent.updated, {
             interactionId: targetUserInteractionId,
             updates: updates,
@@ -1225,14 +1228,16 @@ export const InteractionService = {
           try {
             const conversationStore = useConversationStore.getState();
             await conversationStore.selectItem(targetConversationId, "conversation");
-            await new Promise(resolve => setTimeout(resolve, 50));
             
             const interactionStore = useInteractionStore.getState();
+            const fallbackTargetInteraction = interactionStore.interactions.find(i => i.id === targetUserInteractionId);
+            
             const fallbackUpdates = {
               response: "Error generating compact summary. Please try again.",
               status: "ERROR" as InteractionStatus,
               endedAt: new Date(),
               metadata: {
+                ...(fallbackTargetInteraction?.metadata || {}), // Preserve existing metadata
                 isCompactingInProgress: false,
                 compactError: error instanceof Error ? error.message : String(error),
               },
