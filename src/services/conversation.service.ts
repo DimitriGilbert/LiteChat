@@ -27,6 +27,7 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { vfsEvent, VfsEventPayloads } from "@/types/litechat/events/vfs.events";
 import { PersistenceService } from "@/services/persistence.service";
 import type { Interaction } from "@/types/litechat/interaction";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 
 export const ConversationService = {
   async submitPrompt(turnData: PromptTurnObject): Promise<void> {
@@ -570,6 +571,104 @@ ${userContent}`;
         }`
       );
       throw error;
+    }
+  },
+
+  // Add a set to track ongoing fork operations
+  _pendingForks: new Set<string>(),
+
+  async forkConversation(interactionId: string): Promise<void> {
+    console.log(
+      `[ConversationService] forkConversation called for ID: ${interactionId}`
+    );
+    
+    // Prevent multiple simultaneous forks of the same interaction
+    if (this._pendingForks.has(interactionId)) {
+      console.warn(`[ConversationService] Fork already in progress for ${interactionId}`);
+      toast.info("Fork already in progress for this interaction.");
+      return;
+    }
+    
+    this._pendingForks.add(interactionId);
+    
+    try {
+      const interactionStore = useInteractionStore.getState();
+      const conversationStoreState = useConversationStore.getState();
+
+      const targetInteraction = interactionStore.interactions.find(
+        (i) => i.id === interactionId
+      );
+
+      if (!targetInteraction) {
+        toast.error("Cannot fork: Interaction not found.");
+        return;
+      }
+
+      const originalConversation = conversationStoreState.getConversationById(
+        targetInteraction.conversationId
+      );
+      if (!originalConversation) {
+        toast.error("Cannot fork: Original conversation not found.");
+        return;
+      }
+
+      // Get all interactions up to and including the target interaction
+      const interactionsToFork = interactionStore.interactions
+        .filter(
+          (i) =>
+            i.conversationId === targetInteraction.conversationId &&
+            i.index <= targetInteraction.index &&
+            i.parentId === null && // Only main spine interactions
+            (i.type === "message.user_assistant" || i.type === "message.assistant_regen")
+        )
+        .sort((a, b) => a.index - b.index);
+
+      // Create new conversation with "Fork: " prefix
+      const newConversationTitle = `Fork: ${originalConversation.title}`;
+      const newConversationId = await conversationStoreState.addConversation({
+        title: newConversationTitle,
+        projectId: originalConversation.projectId,
+        metadata: originalConversation.metadata,
+      });
+
+      // Duplicate all interactions up to the fork point into the single new conversation
+      for (let i = 0; i < interactionsToFork.length; i++) {
+        const interaction = interactionsToFork[i];
+        const newInteraction: Interaction = {
+          ...interaction,
+          id: nanoid(),
+          conversationId: newConversationId,
+          index: i,
+          parentId: null,
+          startedAt: new Date(),
+          endedAt: interaction.endedAt ? new Date() : null,
+          metadata: {
+            ...interaction.metadata,
+            forkedFromId: interaction.id,
+          },
+        };
+        await PersistenceService.saveInteraction(newInteraction);
+      }
+
+      // Select the new conversation and focus input
+      await conversationStoreState.selectItem(newConversationId, "conversation");
+      emitter.emit(promptEvent.focusInputRequest, undefined);
+
+      toast.success(`Conversation forked successfully: "${newConversationTitle}"`);
+    } catch (error) {
+      console.error(
+        "[ConversationService] Error during fork process:",
+        error
+      );
+      toast.error(
+        `Failed to fork conversation: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      throw error;
+    } finally {
+      // Always remove from pending forks
+      this._pendingForks.delete(interactionId);
     }
   },
 

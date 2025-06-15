@@ -198,9 +198,34 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
   );
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    // Try the viewport reference first
     if (viewportRef.current) {
       viewportRef.current.scrollTo({
         top: viewportRef.current.scrollHeight,
+        behavior: behavior,
+      });
+      return;
+    }
+    
+    // Fallback: try to find the viewport element directly
+    if (scrollAreaRef.current) {
+      const viewport = scrollAreaRef.current.querySelector(
+        "[data-radix-scroll-area-viewport]"
+      ) as HTMLDivElement | null;
+      if (viewport) {
+        viewportRef.current = viewport;
+        viewport.scrollTo({
+          top: viewport.scrollHeight,
+          behavior: behavior,
+        });
+        return;
+      }
+    }
+    
+    // Last resort: scroll the scroll area itself
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTo({
+        top: scrollAreaRef.current.scrollHeight,
         behavior: behavior,
       });
     }
@@ -217,7 +242,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
         });
       }
     }
-  }, [interactionGroups.length, status]);
+  }, [interactionGroups.length, status, streamingInteractionIds]);
 
   useEffect(() => {
     if (status === "streaming" && enableAutoScrollOnStream) {
@@ -262,9 +287,12 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
 
   useEffect(() => {
     if (scrollAreaRef.current) {
-      viewportRef.current = scrollAreaRef.current.querySelector(
+      const viewport = scrollAreaRef.current.querySelector(
         "[data-radix-scroll-area-viewport]"
-      );
+      ) as HTMLDivElement | null;
+      if (viewport) {
+        viewportRef.current = viewport;
+      }
     }
   }, []);
 

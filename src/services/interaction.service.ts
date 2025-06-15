@@ -44,6 +44,7 @@ import type { fs } from "@zenfs/core";
 import { conversationEvent } from "@/types/litechat/events/conversation.events";
 import { vfsEvent } from "@/types/litechat/events/vfs.events";
 import { canvasEvent,} from "@/types/litechat/events/canvas.events";
+import { providerEvent } from "@/types/litechat/events/provider.events";
 import { ConversationService } from "@/services/conversation.service";
 
 interface AIServiceCallOptions {
@@ -359,6 +360,97 @@ export const InteractionService = {
         } catch (error) {
           toast.error(`Race failed: ${String(error)}`);
           console.error(`[InteractionService] Error during race:`, error);
+        }
+      }
+    );
+
+    emitter.on(
+      canvasEvent.forkConversationRequest,
+      async (payload) => {
+        const { interactionId } = payload;
+        console.log(`[InteractionService] Received forkConversationRequest for ${interactionId}`);
+
+        const interaction = useInteractionStore
+          .getState()
+          .interactions.find((i) => i.id === interactionId);
+
+        if (!interaction) {
+          toast.error(
+            `Fork failed: Interaction ${interactionId} not found.`
+          );
+          console.warn(
+            `[InteractionService] Fork request for unknown interaction ${interactionId}`
+          );
+          return;
+        }
+
+        // Add safety checks: is global streaming off?
+        const interactionStoreState = useInteractionStore.getState();
+        const globalStreamingStatus = interactionStoreState.status;
+        if (globalStreamingStatus === "streaming") {
+          toast.info("Cannot fork while another response is streaming.");
+          return;
+        }
+
+        try {
+          await ConversationService.forkConversation(interactionId);
+        } catch (error) {
+          toast.error(`Failed to fork conversation: ${String(error)}`);
+          console.error(
+            `[InteractionService] Error forking conversation ${interactionId}:`,
+            error
+          );
+        }
+      }
+    );
+
+    emitter.on(
+      canvasEvent.forkConversationWithModelRequest,
+      async (payload) => {
+        const { interactionId, modelId } = payload;
+        console.log(`[InteractionService] Received forkConversationWithModelRequest for ${interactionId} with model ${modelId}`);
+
+        const interaction = useInteractionStore
+          .getState()
+          .interactions.find((i) => i.id === interactionId);
+
+        if (!interaction) {
+          toast.error(
+            `Fork failed: Interaction ${interactionId} not found.`
+          );
+          console.warn(
+            `[InteractionService] Fork request for unknown interaction ${interactionId}`
+          );
+          return;
+        }
+
+        // Add safety checks: is global streaming off?
+        const interactionStoreState = useInteractionStore.getState();
+        const globalStreamingStatus = interactionStoreState.status;
+        if (globalStreamingStatus === "streaming") {
+          toast.info("Cannot fork while another response is streaming.");
+          return;
+        }
+
+        try {
+          console.log(`[InteractionService] Creating fork conversation first, then setting model to ${modelId}`);
+          
+          // First, create the conversation
+          await ConversationService.forkConversation(interactionId);
+          
+          // Wait for the conversation creation to take effect
+          await new Promise(resolve => requestAnimationFrame(resolve));
+          
+          // Now set the model for the new conversation
+          console.log(`[InteractionService] Setting global model to ${modelId} for the new forked conversation`);
+          emitter.emit(providerEvent.selectModelRequest, { modelId });
+          
+        } catch (error) {
+          toast.error(`Failed to fork conversation: ${String(error)}`);
+          console.error(
+            `[InteractionService] Error forking conversation ${interactionId}:`,
+            error
+          );
         }
       }
     );

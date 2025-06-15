@@ -6,6 +6,8 @@ export const canvasEvent = {
   copyInteractionResponseRequest: "canvas.interaction.copy.response.request",
   regenerateInteractionRequest: "canvas.interaction.regenerate.request",
   regenerateInteractionWithModelRequest: "canvas.interaction.regenerate.with.model.request",
+  forkConversationRequest: "canvas.interaction.fork.conversation.request",
+  forkConversationWithModelRequest: "canvas.interaction.fork.conversation.with.model.request",
   raceInteractionRequest: "canvas.interaction.race.request",
   editResponseRequest: "canvas.interaction.edit.response.request",
   // rateInteractionRequest: "canvas.interaction.rate.request", // Removed
@@ -35,6 +37,13 @@ export interface CanvasEventPayloads {
     interactionId: string;
   };
   [canvasEvent.regenerateInteractionWithModelRequest]: {
+    interactionId: string;
+    modelId: string;
+  };
+  [canvasEvent.forkConversationRequest]: {
+    interactionId: string;
+  };
+  [canvasEvent.forkConversationWithModelRequest]: {
     interactionId: string;
     modelId: string;
   };

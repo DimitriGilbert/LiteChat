@@ -46,6 +46,8 @@ import { ModSettingsModule } from "@/controls/modules/ModSettingsModule";
 import { CopyActionControlModule } from "@/controls/modules/canvas/CopyActionControlModule";
 import { RegenerateActionControlModule } from "@/controls/modules/canvas/RegenerateActionControlModule";
 import { RegenerateWithModelActionControlModule } from "@/controls/modules/canvas/RegenerateWithModelActionControlModule";
+import { ForkActionControlModule } from "@/controls/modules/canvas/ForkActionControlModule";
+import { ForkWithModelActionControlModule } from "@/controls/modules/canvas/ForkWithModelActionControlModule";
 import { RatingActionControlModule } from "@/controls/modules/canvas/RatingActionControlModule";
 import { EditResponseControlModule } from "@/controls/modules/canvas/EditResponseControlModule";
 import { ExampleCanvasControlModule } from "@/controls/modules/example";
@@ -105,6 +107,8 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   ZipDownloadControlModule, // For InteractionCard header
   RegenerateActionControlModule, // For InteractionCard footer
   RegenerateWithModelActionControlModule, // For InteractionCard footer
+  ForkActionControlModule, // For InteractionCard footer
+  ForkWithModelActionControlModule, // For InteractionCard footer
   EditResponseControlModule, // For InteractionCard footer
   RatingActionControlModule, // For InteractionCard footer
   CopyCodeBlockControlModule, // For CodeBlockRenderer header

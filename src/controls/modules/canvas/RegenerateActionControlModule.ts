@@ -45,10 +45,16 @@ export class RegenerateActionControlModule implements ControlModule {
 
         const isLastTurn = lastInteractionOnSpine?.id === currentInteraction.id;
         
+        // Only show regenerate for the last turn, otherwise show fork
         const canRegenerate = 
           isLastTurn &&
           (currentInteraction.status === "COMPLETED" || currentInteraction.status === "ERROR") &&
           globalStreamingStatus !== "streaming";
+
+        // Don't show regenerate button if it's not the last turn (fork buttons will handle this)
+        if (!isLastTurn) {
+          return null;
+        }
 
         return React.createElement(RegenerateActionControl, {
           interactionId: currentInteraction.id,
