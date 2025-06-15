@@ -738,19 +738,58 @@ ${userContent}`;
       // Build the conversation history for compacting
       const historyMessages: CoreMessage[] = buildHistoryMessages(interactionsToCompact);
       
-      // Use custom prompt from settings or default
+      // Helper function to safely format message content for text summarization
+      const formatMessageContent = (content: any): string => {
+        if (typeof content === 'string') {
+          return content;
+        }
+        
+        if (Array.isArray(content)) {
+          return content.map(part => {
+            if (part.type === 'text') {
+              return part.text;
+            } else if (part.type === 'image') {
+              // For images, just indicate their presence without including the data
+              return '[Image attached]';
+            } else {
+              // For other content types, provide a brief description
+              return `[${part.type || 'Content'} attached]`;
+            }
+          }).join(' ');
+        }
+        
+        // For other object types, try to extract meaningful text or provide a placeholder
+        if (typeof content === 'object' && content !== null) {
+          // If it has a text property, use that
+          if ('text' in content && typeof content.text === 'string') {
+            return content.text;
+          }
+          // Otherwise, just indicate non-text content
+          return '[Non-text content]';
+        }
+        
+        return String(content);
+      };
+
+      // Format conversation history for text-based summarization
+      const formattedHistory = historyMessages.map(msg => 
+        `**${msg.role.toUpperCase()}:** ${formatMessageContent(msg.content)}`
+      ).join('\n\n');
+
+      // Use custom prompt from settings or default, ensuring history is always included
       const customPrompt = settingsStoreState.forkCompactPrompt;
-      const compactPrompt = customPrompt || `Please provide a comprehensive but concise summary of our previous conversation. Include:
+      const defaultPrompt = `Please provide a comprehensive but concise summary of our previous conversation. Include:
 1. The main topics discussed
 2. Key decisions or conclusions reached
 3. Important context that would be needed to continue the conversation
 4. Any specific technical details, code, or data that were mentioned
 
-Keep the summary detailed enough that we can seamlessly continue our discussion, but compact enough to be efficient.
+Keep the summary detailed enough that we can seamlessly continue our discussion, but compact enough to be efficient.`;
 
-Here is our conversation history to summarize:
-
-${historyMessages.map(msg => `**${msg.role.toUpperCase()}:** ${typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}`).join('\n\n')}`;
+      // If custom prompt is provided, use it as the instruction but always append the history
+      const compactPrompt = customPrompt 
+        ? `${customPrompt}\n\nHere is our conversation history to summarize:\n\n${formattedHistory}`
+        : `${defaultPrompt}\n\nHere is our conversation history to summarize:\n\n${formattedHistory}`;
 
       // Use custom model from settings if available, otherwise use the provided model
       const effectiveModelId = settingsStoreState.forkCompactModelId || compactModelId;

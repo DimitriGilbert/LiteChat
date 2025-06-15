@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
-import { SquareScissors } from "lucide-react";
+import { Axe } from "lucide-react";
 import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { canvasEvent } from "@/types/litechat/events/canvas.events";
@@ -70,11 +70,11 @@ export const ForkCompactActionControl: React.FC<
 
   return (
     <ActionTooltipButton
-      tooltipText="Fork & Compact"
+      tooltipText="Summarize"
       onClick={handleClick}
       aria-label="Fork Conversation with Compact Summary"
       disabled={disabled}
-      icon={<SquareScissors className="h-4 w-4" />}
+      icon={<Axe className="h-4 w-4" />}
       className="h-5 w-5 md:h-6 md:w-6"
     />
   );
