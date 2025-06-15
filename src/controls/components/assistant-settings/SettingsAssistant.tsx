@@ -1,11 +1,11 @@
 // src/controls/components/assistant-settings/SettingsAssistant.tsx
 // FULL FILE
 import React, { useMemo } from "react";
-import { useSettingsStore } from "@/store/settings.store";
-import { useShallow } from "zustand/react/shallow";
-import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
-import { RotateCcwIcon } from "lucide-react";
+// import { useSettingsStore } from "@/store/settings.store";
+// import { useShallow } from "zustand/react/shallow";
+// import { Separator } from "@/components/ui/separator";
+// import { Button } from "@/components/ui/button";
+// import { RotateCcwIcon } from "lucide-react";
 import {
   TabbedLayout,
   TabDefinition,
@@ -19,21 +19,21 @@ import { SettingsAssistantAgent } from "./SettingsAssistantAgent";
 import { SettingsAssistantMcp } from "./SettingsAssistantMcp";
 
 const SettingsAssistantComponent: React.FC = () => {
-  const { resetAssistantSettings } = useSettingsStore(
-    useShallow((state) => ({
-      resetAssistantSettings: state.resetAssistantSettings,
-    }))
-  );
+  // const { resetAssistantSettings } = useSettingsStore(
+  //   useShallow((state) => ({
+  //     resetAssistantSettings: state.resetAssistantSettings,
+  //   }))
+  // );
 
-  const handleResetClick = () => {
-    if (
-      window.confirm(
-        "Are you sure you want to reset all Assistant settings (Prompt, Parameters, Tools, Auto-Title) to their defaults?"
-      )
-    ) {
-      resetAssistantSettings();
-    }
-  };
+  // const handleResetClick = () => {
+  //   if (
+  //     window.confirm(
+  //       "Are you sure you want to reset all Assistant settings (Prompt, Parameters, Tools, Auto-Title) to their defaults?"
+  //     )
+  //   ) {
+  //     resetAssistantSettings();
+  //   }
+  // };
 
   const tabs: TabDefinition[] = useMemo(
     () => [
@@ -86,14 +86,14 @@ const SettingsAssistantComponent: React.FC = () => {
         contentContainerClassName="mt-3" // No flex-grow, no overflow
         scrollable={false} // Explicitly enable ScrollArea for content
       />
-      {/* Reset Button Section */}
-      <Separator className="mt-auto" />
+      {/* Reset Button Section, this fucks up the whole thing, appears in the middle of forms and shit ! */}
+      {/* <Separator className="mt-auto" />
       <div className="flex justify-end pt-3 flex-shrink-0">
         <Button variant="outline" size="sm" onClick={handleResetClick}>
           <RotateCcwIcon className="mr-2 h-4 w-4" />
           Reset All Assistant Settings
         </Button>
-      </div>
+      </div> */}
     </div>
   );
 };

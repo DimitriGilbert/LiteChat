@@ -238,10 +238,15 @@ export const TemplateFormBase: React.FC<TemplateFormBaseProps> = ({
         </div>
 
         {/* Variables */}
-        <VariableManager
-          variables={form.getFieldValue("variables")}
-          onVariablesChange={(variables: PromptVariable[]) => form.setFieldValue("variables", variables)}
-          templateId={template?.id}
+        <form.Field
+          name="variables"
+          children={(field) => (
+            <VariableManager
+              variables={field.state.value}
+              onVariablesChange={(variables: PromptVariable[]) => field.handleChange(variables)}
+              templateId={template?.id}
+            />
+          )}
         />
 
         {/* Follow-ups (only for prompts and tasks) */}
