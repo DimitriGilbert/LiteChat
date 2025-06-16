@@ -30,12 +30,14 @@ export class RacePromptControlModule implements ControlModule {
   private raceConfig: {
     modelIds: string[];
     staggerMs: number;
+    raceTimeoutSec: number;
     combineEnabled: boolean;
     combineModelId?: string;
     combinePrompt?: string;
   } = {
     modelIds: [],
     staggerMs: 250,
+    raceTimeoutSec: 120,
     combineEnabled: false,
   };
 
@@ -113,6 +115,7 @@ export class RacePromptControlModule implements ControlModule {
   setRaceMode(active: boolean, config?: {
     modelIds: string[];
     staggerMs: number;
+    raceTimeoutSec?: number;
     combineEnabled: boolean;
     combineModelId?: string;
     combinePrompt?: string;
@@ -120,11 +123,12 @@ export class RacePromptControlModule implements ControlModule {
     this.isRaceMode = active;
     
     if (active && config) {
-      this.raceConfig = { ...config };
+      this.raceConfig = { ...config, raceTimeoutSec: config.raceTimeoutSec || 120 };
     } else {
       this.raceConfig = {
         modelIds: [],
         staggerMs: 250,
+        raceTimeoutSec: 120,
         combineEnabled: false,
       };
     }
@@ -318,7 +322,7 @@ export class RacePromptControlModule implements ControlModule {
         const allChildIds = successfulChildren.map((r: { interaction: Interaction | null, modelId: string }) => r.interaction!.id);
 
         // Wait for all children to complete and then combine
-        await this.waitForRaceCompletion(mainInteraction.id, allChildIds);
+        await this.waitForRaceCompletion(mainInteraction.id, allChildIds, raceConfig.raceTimeoutSec);
         
       } else {
         // NON-COMBINE MODE: Create original interaction as main, then additional race children
@@ -422,14 +426,22 @@ export class RacePromptControlModule implements ControlModule {
     }
   }
 
-  private async waitForRaceCompletion(mainInteractionId: string, childInteractionIds: string[]): Promise<void> {
-
-    
+  private async waitForRaceCompletion(mainInteractionId: string, childInteractionIds: string[], timeoutSec: number = 120): Promise<void> {
+  
     return new Promise((resolve) => {
       let completedCount = 0;
       const targetCount = childInteractionIds.length;
+
+      let timeoutId: NodeJS.Timeout | null = null;
+
+      const cleanup = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        emitter.off(interactionEvent.completed, handleInteractionCompleted);
+      };
       
-      // Listen for interaction completion events
       const handleInteractionCompleted = (payload: { interactionId: string; status: string }) => {
         if (!childInteractionIds.includes(payload.interactionId)) {
           return; // Not one of our race children
@@ -438,12 +450,10 @@ export class RacePromptControlModule implements ControlModule {
         if (payload.status === "COMPLETED" || payload.status === "ERROR") {
           completedCount++;
           
-          // Update progress in the stream buffer for the UI to render
           const interactionStore = useInteractionStore.getState();
           const progressText = `🏁 Race progress: ${completedCount}/${targetCount} models completed\n\n⏳ ${completedCount === targetCount ? 'Combining responses...' : 'Waiting for remaining responses...'}`;
           interactionStore.setActiveStreamBuffer(mainInteractionId, progressText);
           
-          // Also update metadata, but not the response field
           const updates = {
             metadata: {
               isRaceCombining: true,
@@ -454,16 +464,33 @@ export class RacePromptControlModule implements ControlModule {
           interactionStore._updateInteractionInState(mainInteractionId, updates);
           
           if (completedCount === targetCount) {
-            // All completed, clean up listener and start combine process
-            emitter.off(interactionEvent.completed, handleInteractionCompleted);
+            cleanup();
             this.startCombineProcess(mainInteractionId, childInteractionIds);
             resolve();
           }
         }
       };
       
-      // Register event listener
       emitter.on(interactionEvent.completed, handleInteractionCompleted);
+
+      timeoutId = setTimeout(() => {
+        console.warn(`[RacePromptControlModule] Race timed out for main interaction ${mainInteractionId}.`);
+        cleanup();
+        
+        const interactionStore = useInteractionStore.getState();
+        const errorText = `❌ Race timed out. Only ${completedCount}/${targetCount} models responded within ${timeoutSec} seconds.`;
+        interactionStore.setActiveStreamBuffer(mainInteractionId, errorText);
+        interactionStore._updateInteractionInState(mainInteractionId, {
+          status: "ERROR",
+          endedAt: new Date(),
+          metadata: {
+            isRaceCombining: false,
+            combineError: "Race timed out",
+          },
+        });
+        interactionStore._removeStreamingId(mainInteractionId);
+        resolve(); // Resolve anyway to not leave the calling function hanging
+      }, timeoutSec * 1000); // Use configurable timeout
     });
   }
 
@@ -529,8 +556,8 @@ ${raceResponses}`;
         content: `[Internal combine generation for race interaction ${mainInteractionId}]`,
         parameters: combinePromptObject.parameters,
         metadata: {
-          ...combinePromptObject.metadata,
-          targetUserInteractionId: mainInteractionId, // This is the key - points to main interaction
+          modelId: combineModelId,
+          targetUserInteractionId: mainInteractionId, // This correctly points to the main interaction to be updated.
           targetConversationId: currentConversationId,
         }
       };

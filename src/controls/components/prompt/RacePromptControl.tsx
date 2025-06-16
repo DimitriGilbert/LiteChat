@@ -44,6 +44,7 @@ interface RacePromptControlProps {
       combineEnabled: boolean;
       combineModelId?: string;
       combinePrompt?: string;
+      raceTimeoutSec?: number;
     }) => void;
     isRaceModeActive: boolean;
   };
@@ -55,6 +56,7 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
   const [open, setOpen] = useState(false);
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const [staggerMs, setStaggerMs] = useState(250);
+  const [raceTimeoutSec, setRaceTimeoutSec] = useState(120);
   const [combineEnabled, setCombineEnabled] = useState(false);
   const [combineModelId, setCombineModelId] = useState<string | null>(null);
   const [combinePrompt, setCombinePrompt] = useState(
@@ -168,6 +170,7 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
     module.setRaceMode(true, {
       modelIds: selectedModelIds,
       staggerMs: staggerMs,
+      raceTimeoutSec: raceTimeoutSec,
       combineEnabled: combineEnabled,
       combineModelId: combineModelId || undefined,
       combinePrompt: combinePrompt
@@ -180,6 +183,7 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
     // Reset selections for next use
     setSelectedModelIds([]);
     setStaggerMs(250);
+    setRaceTimeoutSec(120);
     setFilterText("");
     setCapabilityFilters({
       reasoning: false,
@@ -411,22 +415,27 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
             </div>
 
             {/* Stagger Timing Input */}
-            <div className="space-y-2">
-              <Label htmlFor="stagger-input">Stagger Delay (ms)</Label>
-              <Input
-                id="stagger-input"
-                type="number"
-                min="0"
-                max="5000"
-                step="50"
-                value={staggerMs}
-                onChange={(e) => setStaggerMs(parseInt(e.target.value) || 250)}
-                placeholder="250"
-                className="w-full"
-              />
-              <p className="text-xs text-muted-foreground">
-                Delay between starting each model (0-5000ms)
-              </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="stagger-ms">Stagger (ms)</Label>
+                <Input
+                  id="stagger-ms"
+                  type="number"
+                  value={staggerMs}
+                  onChange={(e) => setStaggerMs(parseInt(e.target.value, 10))}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="race-timeout">Timeout (s)</Label>
+                <Input
+                  id="race-timeout"
+                  type="number"
+                  value={raceTimeoutSec}
+                  onChange={(e) => setRaceTimeoutSec(parseInt(e.target.value, 10))}
+                  className="mt-1"
+                />
+              </div>
             </div>
 
             {/* Combine Switch */}
