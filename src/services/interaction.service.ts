@@ -1142,7 +1142,7 @@ export const InteractionService = {
       typeof finalUpdates.response === "string"
     ) {
       const generatedTitle = finalUpdates.response.trim().replace(/^"|"$/g, "");
-      if (currentInteraction) {
+      if (currentInteraction && generatedTitle) {
         // console.log(
         //   `[InteractionService] Updating conversation ${currentInteraction.conversationId} title to: "${generatedTitle}"`
         // );

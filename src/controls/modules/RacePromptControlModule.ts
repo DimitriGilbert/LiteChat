@@ -154,9 +154,15 @@ export class RacePromptControlModule implements ControlModule {
 
       const interactionStore = useInteractionStore.getState();
       
+      // Validate current conversation ID
+      const currentConversationId = interactionStore.currentConversationId;
+      if (!currentConversationId) {
+        throw new Error("No current conversation ID available for race conversion");
+      }
+      
       // Find the original interaction that was just created
       const originalInteraction = interactionStore.interactions
-        .filter(i => i.type === "message.user_assistant" && i.conversationId === interactionStore.currentConversationId)
+        .filter(i => i.type === "message.user_assistant" && i.conversationId === currentConversationId)
         .sort((a, b) => (b.startedAt?.getTime() || 0) - (a.startedAt?.getTime() || 0))[0];
 
       if (!originalInteraction) {
@@ -176,10 +182,16 @@ export class RacePromptControlModule implements ControlModule {
           id: newMainId,
         };
         
-        const promptObject = await this.buildPromptObject(turnData, interactionStore.currentConversationId!, originalInteraction.index, turnData.metadata?.modelId || '');
+        // Validate model ID
+        const modelId = turnData.metadata?.modelId;
+        if (!modelId) {
+          throw new Error("No model ID available in turn data for race conversion");
+        }
+        
+        const promptObject = await this.buildPromptObject(turnData, currentConversationId, originalInteraction.index, modelId);
         const mainInteraction = await InteractionService.startInteraction(
           promptObject,
-          interactionStore.currentConversationId!,
+          currentConversationId,
           mainTurnData,
           "message.user_assistant"
         );
@@ -224,7 +236,7 @@ export class RacePromptControlModule implements ControlModule {
                 const childInteractionId = nanoid();
                 
                 // Build prompt object for this race participant
-                const promptObject = await this.buildPromptObject(turnData, interactionStore.currentConversationId!, mainInteraction.index + index + 2, modelId);
+                const promptObject = await this.buildPromptObject(turnData, currentConversationId, mainInteraction.index + index + 2, modelId);
 
                 // Create unique turnData for each additional child interaction
                 const childTurnData: PromptTurnObject = {
@@ -241,7 +253,7 @@ export class RacePromptControlModule implements ControlModule {
 
                 const childInteraction = await InteractionService.startInteraction(
                   promptObject,
-                  interactionStore.currentConversationId!,
+                  currentConversationId,
                   childTurnData,
                   "message.assistant_regen"
                 );
@@ -303,7 +315,7 @@ export class RacePromptControlModule implements ControlModule {
                 const childInteractionId = nanoid();
                 
                 // Build prompt object for this race participant
-                const promptObject = await this.buildPromptObject(turnData, interactionStore.currentConversationId!, originalInteraction.index + index + 1, modelId);
+                const promptObject = await this.buildPromptObject(turnData, currentConversationId, originalInteraction.index + index + 1, modelId);
 
                 // Create unique turnData for each child interaction
                 const childTurnData: PromptTurnObject = {
@@ -320,7 +332,7 @@ export class RacePromptControlModule implements ControlModule {
 
                 const childInteraction = await InteractionService.startInteraction(
                   promptObject,
-                  interactionStore.currentConversationId!,
+                  currentConversationId,
                   childTurnData,
                   "message.assistant_regen"
                 );
@@ -418,6 +430,12 @@ export class RacePromptControlModule implements ControlModule {
         throw new Error("Combine model not configured");
       }
       
+      // Validate current conversation ID
+      const currentConversationId = interactionStore.currentConversationId;
+      if (!currentConversationId) {
+        throw new Error("No current conversation ID available for combine process");
+      }
+      
       // Collect all race responses
       const raceResponses = childInteractionIds.map((id, index) => {
         const interaction = interactionStore.interactions.find(i => i.id === id);
@@ -464,14 +482,14 @@ ${raceResponses}`;
         metadata: {
           ...combinePromptObject.metadata,
           targetUserInteractionId: mainInteractionId, // This is the key - points to main interaction
-          targetConversationId: interactionStore.currentConversationId,
+          targetConversationId: currentConversationId,
         }
       };
 
       // Start the combine interaction using conversation.compact type - EXACTLY like ForkCompact
       await InteractionService.startInteraction(
         combinePromptObject,
-        interactionStore.currentConversationId!,
+        currentConversationId,
         combineTurnData,
         "conversation.compact" // This triggers the existing compact completion handler
       );
