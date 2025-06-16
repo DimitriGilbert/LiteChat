@@ -31,6 +31,7 @@ import { AutoTitleControlModule } from "@/controls/modules/AutoTitleControlModul
 import { UrlParameterControlModule } from "@/controls/modules/UrlParameterControlModule";
 import { ImageGenerationControlModule } from "@/controls/modules/ImageGenerationControlModule";
 import { RacePromptControlModule } from "@/controls/modules/RacePromptControlModule";
+import { ImprovePromptControlModule } from "@/controls/modules/ImprovePromptControlModule";
 import { PromptLibraryControlModule } from "@/controls/modules/PromptLibraryControlModule";
 import { AgentControlModule } from "@/controls/modules/AgentControlModule";
 
@@ -92,6 +93,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   ParameterControlModule,
   StructuredOutputControlModule,
   RacePromptControlModule,
+  ImprovePromptControlModule,
   PromptLibraryControlModule,
   AgentControlModule,
   GitSyncControlModule,

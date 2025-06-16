@@ -167,7 +167,13 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         style={{
           maxHeight: "min(40vh, 400px)",
           overflow: "hidden",
+          zIndex: 9999,
+          pointerEvents: 'auto'
         }}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerDownCapture={(e) => e.stopPropagation()}
       >
         <Command shouldFilter={false}>
           <div className="flex items-center border-b px-3">

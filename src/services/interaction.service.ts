@@ -555,7 +555,8 @@ export const InteractionService = {
         ? (startMiddlewareResult as { prompt: PromptObject }).prompt
         : prompt;
 
-    const interactionId = nanoid();
+    // Use the provided interaction ID from turnData if available, otherwise generate a new one
+    const interactionId = initiatingTurnData.id || nanoid();
     const abortController = new AbortController();
     this._activeControllers.set(interactionId, abortController);
     this._streamingToolData.set(interactionId, { calls: [], results: [] });
@@ -1160,7 +1161,25 @@ export const InteractionService = {
     //   currentInteractionMetadata: currentInteraction?.metadata
     // });
 
-        if (
+        // Handle prompt enhancement completion
+    if (
+      interactionType === "prompt.enhance" &&
+      status === "COMPLETED" &&
+      finalUpdates.response &&
+      typeof finalUpdates.response === "string"
+    ) {
+      const enhancedPrompt = finalUpdates.response.trim();
+      if (enhancedPrompt) {
+        // Import PromptEnhancementService to handle completion
+        const { PromptEnhancementService } = await import("@/services/prompt-enhancement.service");
+        await PromptEnhancementService.handleEnhancementCompletion(
+          interactionId,
+          enhancedPrompt
+        );
+      }
+    }
+
+    if (
       interactionType === "conversation.compact" &&
       status === "COMPLETED" &&
       finalUpdates.response &&
