@@ -555,7 +555,8 @@ export const InteractionService = {
         ? (startMiddlewareResult as { prompt: PromptObject }).prompt
         : prompt;
 
-    const interactionId = nanoid();
+    // Use the provided interaction ID from turnData if available, otherwise generate a new one
+    const interactionId = initiatingTurnData.id || nanoid();
     const abortController = new AbortController();
     this._activeControllers.set(interactionId, abortController);
     this._streamingToolData.set(interactionId, { calls: [], results: [] });

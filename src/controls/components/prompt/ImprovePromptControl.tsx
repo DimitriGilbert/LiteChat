@@ -100,7 +100,7 @@ export const ImprovePromptControl: React.FC<ImprovePromptControlProps> = ({
   }, []);
 
     // Custom ModelSelector field component
-  const ModelSelectorField: React.FC<any> = ({ fieldApi, label, ...props }) => (
+  const ModelSelectorField: React.FC<any> = ({ fieldApi, label }) => (
     <div className="space-y-2">
       <Label htmlFor="model-selector">{label}</Label>
       <ModelSelector

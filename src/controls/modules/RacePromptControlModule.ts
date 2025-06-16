@@ -18,6 +18,7 @@ import type { Interaction } from "@/types/litechat/interaction";
 import { buildHistoryMessages } from "@/lib/litechat/ai-helpers";
 import type { CoreMessage, TextPart, ImagePart } from "ai";
 
+
 export class RacePromptControlModule implements ControlModule {
   public readonly id = "race-prompt-control";
   private eventUnsubscribers: (() => void)[] = [];
@@ -196,10 +197,23 @@ export class RacePromptControlModule implements ControlModule {
                 }
               };
 
+              // Create unique turnData for each child interaction
+              const { nanoid } = await import("nanoid");
+              const childTurnData: PromptTurnObject = {
+                ...turnData,
+                id: nanoid(), // Each child gets its own unique ID
+                metadata: {
+                  ...turnData.metadata,
+                  raceTab: true,
+                  raceParticipantIndex: index + 1,
+                  parentTurnId: turnData.id, // Reference to parent
+                }
+              };
+
               const childInteraction = await InteractionService.startInteraction(
                 childPromptObject,
                 currentConversationId,
-                turnData,
+                childTurnData,
                 "message.assistant_regen"
               );
 
