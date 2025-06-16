@@ -268,7 +268,7 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="min-w-[65vw] max-h-[75vh] flex flex-col p-4">
+        <DialogContent className="min-w-[85vw] max min-h-[75vh] flex flex-col p-4">
           <DialogHeader>
             <DialogTitle>Race Models</DialogTitle>
             <DialogDescription>
