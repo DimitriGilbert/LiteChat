@@ -1208,16 +1208,16 @@ export const InteractionService = {
           // });
           
           // Merge metadata instead of overwriting to preserve existing data
-          const updates = {
-            response: compactSummary,
-            status: "COMPLETED" as InteractionStatus,
-            endedAt: new Date(),
-            metadata: {
-              ...targetInteraction.metadata, // Preserve existing metadata
-              isCompactingInProgress: false,
-              compactGeneratedAt: new Date().toISOString(),
-            },
-          };
+          // const updates = {
+          //   response: compactSummary,
+          //   status: "COMPLETED" as InteractionStatus,
+          //   endedAt: new Date(),
+          //   metadata: {
+          //     ...targetInteraction.metadata, // Preserve existing metadata
+          //     isCompactingInProgress: false,
+          //     compactGeneratedAt: new Date().toISOString(),
+          //   },
+          // };
           
           // console.log(`[InteractionService] Applying updates to ${targetUserInteractionId}:`, {
           //   responseLength: compactSummary.length,
