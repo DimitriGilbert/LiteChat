@@ -9,6 +9,7 @@ export type InteractionType =
   | "message.user_edit"
   | "conversation.title_generation"
   | "conversation.compact"
+  | "prompt.enhance"
   | "tool.execution"
   | "system.info"
   | "system.error";

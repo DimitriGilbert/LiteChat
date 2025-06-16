@@ -11,6 +11,11 @@ export const promptEvent = {
   inputTextStateChanged: "prompt.state.input.text.changed",
   submitted: "prompt.state.submitted",
 
+  // Prompt Enhancement Events
+  enhancementStarted: "prompt.enhancement.started",
+  enhancementCompleted: "prompt.enhancement.completed",
+  enhancementFailed: "prompt.enhancement.failed",
+
   // Action Request Events
   setModelIdRequest: "prompt.state.set.model.id.request",
   setTemperatureRequest: "prompt.state.set.temperature.request",
@@ -33,6 +38,9 @@ export const promptEvent = {
   focusInputRequest: "prompt.input.focus.request",
   submitPromptRequest: "prompt.submit.request",
 
+  // Prompt Enhancement Request Events
+  enhancePromptRequest: "prompt.enhance.request",
+
   // Original events (can be re-emitted by PromptWrapper if needed by mods)
   inputChanged: "prompt.inputChanged",
 } as const;
@@ -44,6 +52,12 @@ export interface PromptEventPayloads {
   [promptEvent.inputTextStateChanged]: { value: string };
   [promptEvent.submitted]: { turnData: PromptTurnObject };
   [promptEvent.inputChanged]: { value: string };
+  
+  // Prompt Enhancement Event Payloads
+  [promptEvent.enhancementStarted]: { interactionId: string; originalPrompt: string };
+  [promptEvent.enhancementCompleted]: { interactionId: string; enhancedPrompt: string };
+  [promptEvent.enhancementFailed]: { interactionId: string; error: string };
+  
   [promptEvent.setModelIdRequest]: { id: string | null };
   [promptEvent.setTemperatureRequest]: { value: number | null };
   [promptEvent.setMaxTokensRequest]: { value: number | null };
@@ -70,4 +84,5 @@ export interface PromptEventPayloads {
   [promptEvent.setInputTextRequest]: { text: string };
   [promptEvent.focusInputRequest]: undefined;
   [promptEvent.submitPromptRequest]: { turnData: PromptTurnObject };
+  [promptEvent.enhancePromptRequest]: { prompt: string; modelId: string; systemPrompt?: string };
 }
