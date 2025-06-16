@@ -75,7 +75,7 @@ export class RacePromptControlModule implements ControlModule {
       }
     );
 
-    // Register middleware to intercept prompt submissions when race mode is active
+    // Register middleware to detect when race is needed and convert the first interaction
     const unsubMiddleware = modApi.addMiddleware(
       ModMiddlewareHook.PROMPT_TURN_FINALIZE,
       async (payload: { turnData: PromptTurnObject }) => {
@@ -84,11 +84,12 @@ export class RacePromptControlModule implements ControlModule {
           const currentRaceConfig = { ...this.raceConfig };
           // Immediately disable race mode to prevent multiple triggers
           this.setRaceMode(false);
-          // Start the race asynchronously but return false to prevent normal submission
-          this.handleRaceSubmissionAsync(payload.turnData, currentRaceConfig);
-          return false; // Cancel normal submission
+          // Start the race after the original interaction is created
+          setTimeout(() => {
+            this.handleRaceConversion(payload.turnData, currentRaceConfig);
+          }, 100);
         }
-        return payload; // Allow normal processing
+        return payload; // Always allow normal processing
       }
     );
 
@@ -136,16 +137,15 @@ export class RacePromptControlModule implements ControlModule {
     return this.isRaceMode;
   }
 
-  // Async method that handles race submission without blocking middleware
-  private async handleRaceSubmissionAsync(turnData: PromptTurnObject, raceConfig?: typeof this.raceConfig): Promise<void> {
+  // New approach: Convert the original interaction to a race child and create proper main
+  private async handleRaceConversion(turnData: PromptTurnObject, raceConfig: typeof this.raceConfig): Promise<void> {
     try {
-      const config = raceConfig || this.raceConfig;
-      const { modelIds: raceModelIds, staggerMs, combineEnabled, combineModelId } = config;
+      const { modelIds: raceModelIds, staggerMs, combineEnabled, combineModelId } = raceConfig;
       
-      console.log(`[RacePromptControlModule] Starting race submission with ${raceModelIds.length} models:`, raceModelIds);
+      console.log(`[RacePromptControlModule] Converting to race with ${raceModelIds.length} additional models:`, raceModelIds);
       
       if (raceModelIds.length === 0) {
-        throw new Error("No models selected for race");
+        throw new Error("No additional models selected for race");
       }
 
       if (combineEnabled && !combineModelId) {
@@ -154,59 +154,79 @@ export class RacePromptControlModule implements ControlModule {
 
       const interactionStore = useInteractionStore.getState();
       
+      // Find the original interaction that was just created
+      const originalInteraction = interactionStore.interactions
+        .filter(i => i.type === "message.user_assistant" && i.conversationId === interactionStore.currentConversationId)
+        .sort((a, b) => (b.startedAt?.getTime() || 0) - (a.startedAt?.getTime() || 0))[0];
+
+      if (!originalInteraction) {
+        throw new Error("Could not find the original interaction to convert");
+      }
+
+      console.log(`[RacePromptControlModule] Found original interaction ${originalInteraction.id} to convert`);
+
       if (combineEnabled) {
-        // COMBINE MODE: Create placeholder main interaction that will be replaced with combined result
+        // COMBINE MODE: Create a new main placeholder and convert original + create additional children
         
-        // Calculate the correct index for the main interaction
-        const conversationInteractions = interactionStore.interactions.filter(
-          (i) => i.conversationId === interactionStore.currentConversationId
-        );
-        const nextIndex = conversationInteractions.reduce((max, i) => Math.max(max, i.index), -1) + 1;
+        // Create a new main interaction with placeholder
+        const { nanoid } = await import("nanoid");
+        const newMainId = nanoid();
+        const mainTurnData: PromptTurnObject = {
+          ...turnData,
+          id: newMainId,
+        };
         
-        // Create the main interaction directly (bypass middleware to avoid recursion)
-        const promptObject = await this.buildPromptObject(turnData, interactionStore.currentConversationId!, nextIndex, turnData.metadata?.modelId || '');
+        const promptObject = await this.buildPromptObject(turnData, interactionStore.currentConversationId!, originalInteraction.index, turnData.metadata?.modelId || '');
         const mainInteraction = await InteractionService.startInteraction(
           promptObject,
           interactionStore.currentConversationId!,
-          turnData,
+          mainTurnData,
           "message.user_assistant"
         );
 
         if (!mainInteraction) {
-          throw new Error("Could not create main interaction");
+          throw new Error("Could not create main race interaction");
         }
 
-        const mainInteractionId = mainInteraction.id;
-
-        // Immediately update the main interaction with placeholder and put it in streaming state
-        interactionStore._updateInteractionInState(mainInteractionId, {
-          response: "🏁 Starting race with " + raceModelIds.length + " models...\n\n⏳ Collecting responses for combination...",
+        // Update the main interaction with placeholder and race metadata
+        interactionStore._updateInteractionInState(mainInteraction.id, {
+          response: "🏁 Starting race with " + (raceModelIds.length + 1) + " models...\n\n⏳ Collecting responses for combination...",
           status: "STREAMING" as const,
           metadata: {
             ...mainInteraction.metadata,
             isRaceCombining: true,
-            raceParticipantCount: raceModelIds.length,
-            raceConfig: config,
+            raceParticipantCount: raceModelIds.length + 1,
+            raceConfig: raceConfig,
           },
         });
         
         // Add to streaming state
-        interactionStore._addStreamingId(mainInteractionId);
+        interactionStore._addStreamingId(mainInteraction.id);
 
-        // Create child interactions for race models + original model (ALL become tabs)
-        const allRaceModels = [mainInteraction.metadata?.modelId, ...raceModelIds].filter(Boolean) as string[];
-        
-        const childInteractionPromises = allRaceModels.map((modelId: string, index: number) => {
+        // Convert the original interaction to a race child
+        interactionStore._updateInteractionInState(originalInteraction.id, {
+          type: "message.assistant_regen" as const,
+          parentId: mainInteraction.id,
+          index: 1, // First tab
+          metadata: {
+            ...originalInteraction.metadata,
+            raceTab: true,
+            raceParticipantIndex: 1,
+            raceMainInteractionId: mainInteraction.id,
+          },
+        });
+
+                 // Create additional child interactions for race models
+         const additionalChildInteractionPromises = raceModelIds.map((modelId: string, index: number) => {
           return new Promise<{ interaction: Interaction | null, modelId: string }>((resolve) => {
             setTimeout(async () => {
               try {
-                const { nanoid } = await import("nanoid");
                 const childInteractionId = nanoid();
                 
                 // Build prompt object for this race participant
-                const promptObject = await this.buildPromptObject(turnData, interactionStore.currentConversationId!, mainInteraction.index + index + 1, modelId);
+                const promptObject = await this.buildPromptObject(turnData, interactionStore.currentConversationId!, mainInteraction.index + index + 2, modelId);
 
-                // Create unique turnData for each child interaction
+                // Create unique turnData for each additional child interaction
                 const childTurnData: PromptTurnObject = {
                   ...turnData,
                   id: childInteractionId,
@@ -214,8 +234,8 @@ export class RacePromptControlModule implements ControlModule {
                     ...turnData.metadata,
                     modelId: modelId,
                     raceTab: true,
-                    raceParticipantIndex: index + 1,
-                    raceMainInteractionId: mainInteractionId,
+                    raceParticipantIndex: index + 2,
+                    raceMainInteractionId: mainInteraction.id,
                   }
                 };
 
@@ -229,8 +249,8 @@ export class RacePromptControlModule implements ControlModule {
                 // Make this a child of the main interaction
                 if (childInteraction) {
                   const updates: Partial<Omit<Interaction, "id">> = {
-                    parentId: mainInteractionId,
-                    index: index + 1, // Tab index (0 is main, 1+ are additional tabs)
+                    parentId: mainInteraction.id,
+                    index: index + 2, // Tab index (0 is main, 1 is original, 2+ are additional)
                   };
 
                   interactionStore._updateInteractionInState(childInteraction.id, updates);
@@ -242,47 +262,39 @@ export class RacePromptControlModule implements ControlModule {
                 
                 resolve({ interaction: childInteraction, modelId });
               } catch (error) {
-                console.error(`[RacePromptControlModule] Error creating child interaction for ${modelId}:`, error);
+                console.error(`[RacePromptControlModule] Error creating additional child interaction for ${modelId}:`, error);
                 resolve({ interaction: null, modelId });
               }
             }, index * staggerMs);
           });
         });
 
-        // Wait for all child interactions to be created
-        const childResults = await Promise.all(childInteractionPromises);
-        const successfulChildren = childResults.filter(r => r.interaction !== null);
+        // Wait for all additional children to be created
+        const additionalChildResults = await Promise.all(additionalChildInteractionPromises);
+        const successfulAdditionalChildren = additionalChildResults.filter(r => r.interaction !== null);
         
-        console.log(`[RacePromptControlModule] Race children created. Successful: ${successfulChildren.length}/${allRaceModels.length}`);
+        // All child IDs including the converted original
+        const allChildIds = [originalInteraction.id, ...successfulAdditionalChildren.map(r => r.interaction!.id)];
+        
+        console.log(`[RacePromptControlModule] Race conversion completed. Total children: ${allChildIds.length}`);
 
         // Wait for all children to complete and then combine
-        await this.waitForRaceCompletion(mainInteractionId, successfulChildren.map(r => r.interaction!.id));
+        await this.waitForRaceCompletion(mainInteraction.id, allChildIds);
         
       } else {
-        // NON-COMBINE MODE: Original race behavior with normal main interaction
+        // NON-COMBINE MODE: Just convert original to child and create additional race children
         
-        // Calculate the correct index for the main interaction
-        const conversationInteractions = interactionStore.interactions.filter(
-          (i) => i.conversationId === interactionStore.currentConversationId
-        );
-        const nextIndex = conversationInteractions.reduce((max, i) => Math.max(max, i.index), -1) + 1;
-        
-        // Create the main interaction directly (bypass middleware to avoid recursion)
-        const promptObject = await this.buildPromptObject(turnData, interactionStore.currentConversationId!, nextIndex, turnData.metadata?.modelId || '');
-        const mainInteraction = await InteractionService.startInteraction(
-          promptObject,
-          interactionStore.currentConversationId!,
-          turnData,
-          "message.user_assistant"
-        );
+        // Convert the original interaction to a race child (but keep it as main type)
+        interactionStore._updateInteractionInState(originalInteraction.id, {
+          metadata: {
+            ...originalInteraction.metadata,
+            raceTab: true,
+            raceParticipantIndex: 1,
+            raceMainInteractionId: originalInteraction.id, // Self-reference for non-combine
+          },
+        });
 
-        if (!mainInteraction) {
-          throw new Error("Could not create main interaction");
-        }
-
-        const mainInteractionId = mainInteraction.id;
-
-        // Create child interactions for race models only (main stays normal)
+        // Create additional child interactions for race models only
         const childInteractionPromises = raceModelIds.map((modelId: string, index: number) => {
           return new Promise<{ interaction: Interaction | null, modelId: string }>((resolve) => {
             setTimeout(async () => {
@@ -291,7 +303,7 @@ export class RacePromptControlModule implements ControlModule {
                 const childInteractionId = nanoid();
                 
                 // Build prompt object for this race participant
-                const promptObject = await this.buildPromptObject(turnData, interactionStore.currentConversationId!, mainInteraction.index + index + 1, modelId);
+                const promptObject = await this.buildPromptObject(turnData, interactionStore.currentConversationId!, originalInteraction.index + index + 1, modelId);
 
                 // Create unique turnData for each child interaction
                 const childTurnData: PromptTurnObject = {
@@ -301,8 +313,8 @@ export class RacePromptControlModule implements ControlModule {
                     ...turnData.metadata,
                     modelId: modelId,
                     raceTab: true,
-                    raceParticipantIndex: index + 1,
-                    raceMainInteractionId: mainInteractionId,
+                    raceParticipantIndex: index + 2,
+                    raceMainInteractionId: originalInteraction.id,
                   }
                 };
 
@@ -313,11 +325,11 @@ export class RacePromptControlModule implements ControlModule {
                   "message.assistant_regen"
                 );
 
-                // Make this a child of the main interaction
+                // Make this a child of the original interaction
                 if (childInteraction) {
                   const updates: Partial<Omit<Interaction, "id">> = {
-                    parentId: mainInteractionId,
-                    index: index + 1, // Tab index (0 is main, 1+ are additional tabs)
+                    parentId: originalInteraction.id,
+                    index: index + 1, // Tab index
                   };
 
                   interactionStore._updateInteractionInState(childInteraction.id, updates);
@@ -340,18 +352,18 @@ export class RacePromptControlModule implements ControlModule {
         const childResults = await Promise.all(childInteractionPromises);
         const successfulChildren = childResults.filter(r => r.interaction !== null);
         
-        console.log(`[RacePromptControlModule] Non-combine race completed. Created ${successfulChildren.length}/${raceModelIds.length} child interactions`);
+        console.log(`[RacePromptControlModule] Non-combine race conversion completed. Created ${successfulChildren.length}/${raceModelIds.length} additional child interactions`);
         
-        toast.success(`Race started! Current model + ${successfulChildren.length} race models responding in tabs.`);
+        toast.success(`Race started! Original model + ${successfulChildren.length} additional race models responding in tabs.`);
       }
       
     } catch (error) {
-      toast.error(`Race failed: ${String(error)}`);
-      console.error(`[RacePromptControlModule] Error during race:`, error);
+      toast.error(`Race conversion failed: ${String(error)}`);
+      console.error(`[RacePromptControlModule] Error during race conversion:`, error);
     }
   }
 
-    private async waitForRaceCompletion(mainInteractionId: string, childInteractionIds: string[]): Promise<void> {
+  private async waitForRaceCompletion(mainInteractionId: string, childInteractionIds: string[]): Promise<void> {
     console.log(`[RacePromptControlModule] Setting up promise-based waiting for ${childInteractionIds.length} child interactions`);
     
     return new Promise((resolve) => {
