@@ -17,6 +17,9 @@ import { ModMiddlewareHook } from "@/types/litechat/middleware.types";
 import type { Interaction } from "@/types/litechat/interaction";
 import { buildHistoryMessages } from "@/lib/litechat/ai-helpers";
 import type { CoreMessage, TextPart, ImagePart } from "ai";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { interactionEvent } from "@/types/litechat/events/interaction.events";
+
 
 
 export class RacePromptControlModule implements ControlModule {
@@ -77,7 +80,13 @@ export class RacePromptControlModule implements ControlModule {
       ModMiddlewareHook.PROMPT_TURN_FINALIZE,
       async (payload: { turnData: PromptTurnObject }) => {
         if (this.isRaceMode) {
-          return await this.handleRaceSubmission(payload.turnData);
+          // Store config before disabling race mode
+          const currentRaceConfig = { ...this.raceConfig };
+          // Immediately disable race mode to prevent multiple triggers
+          this.setRaceMode(false);
+          // Start the race asynchronously but return false to prevent normal submission
+          this.handleRaceSubmissionAsync(payload.turnData, currentRaceConfig);
+          return false; // Cancel normal submission
         }
         return payload; // Allow normal processing
       }
@@ -127,222 +136,355 @@ export class RacePromptControlModule implements ControlModule {
     return this.isRaceMode;
   }
 
-  // This method will be called by middleware when race mode is active
-  async handleRaceSubmission(turnData: PromptTurnObject): Promise<false | { turnData: PromptTurnObject }> {
+  // Async method that handles race submission without blocking middleware
+  private async handleRaceSubmissionAsync(turnData: PromptTurnObject, raceConfig?: typeof this.raceConfig): Promise<void> {
     try {
-      console.log(`[RacePromptControlModule] Starting race submission with ${this.raceConfig.modelIds.length} models:`, this.raceConfig.modelIds);
+      const config = raceConfig || this.raceConfig;
+      const { modelIds: raceModelIds, staggerMs, combineEnabled, combineModelId } = config;
       
+      console.log(`[RacePromptControlModule] Starting race submission with ${raceModelIds.length} models:`, raceModelIds);
+      
+      if (raceModelIds.length === 0) {
+        throw new Error("No models selected for race");
+      }
+
+      if (combineEnabled && !combineModelId) {
+        throw new Error("Combine model not selected");
+      }
+
       const interactionStore = useInteractionStore.getState();
-      // const conversationStore = useConversationStore.getState();
       
-      // Get current conversation
-      const currentConversationId = interactionStore.currentConversationId;
-      if (!currentConversationId) {
-        toast.error("No active conversation for racing");
-        return false;
-      }
+      if (combineEnabled) {
+        // COMBINE MODE: Create placeholder main interaction that will be replaced with combined result
+        
+        // Calculate the correct index for the main interaction
+        const conversationInteractions = interactionStore.interactions.filter(
+          (i) => i.conversationId === interactionStore.currentConversationId
+        );
+        const nextIndex = conversationInteractions.reduce((max, i) => Math.max(max, i.index), -1) + 1;
+        
+        // Create the main interaction directly (bypass middleware to avoid recursion)
+        const promptObject = await this.buildPromptObject(turnData, interactionStore.currentConversationId!, nextIndex, turnData.metadata?.modelId || '');
+        const mainInteraction = await InteractionService.startInteraction(
+          promptObject,
+          interactionStore.currentConversationId!,
+          turnData,
+          "message.user_assistant"
+        );
 
-      if (this.raceConfig.modelIds.length === 0) {
-        toast.error("No models selected for racing");
-        this.setRaceMode(false);
-        return false;
-      }
-
-      toast.info(`Racing ${this.raceConfig.modelIds.length} models with your prompt...`);
-
-      // Get the conversation index for the new interactions
-      const conversationInteractions = interactionStore.interactions.filter(
-        (i) => i.conversationId === currentConversationId
-      );
-      const newIndex = conversationInteractions.reduce(
-        (max, i) => Math.max(max, i.index),
-        -1
-      ) + 1;
-
-      // Build the prompt object once (will be reused for all models)
-      const promptObject = await this.buildPromptObject(turnData, currentConversationId, newIndex);
-
-      // Store the model IDs before disabling race mode
-      const raceModelIds = [...this.raceConfig.modelIds];
-      const staggerMs = this.raceConfig.staggerMs;
-
-      // Get the currently selected model (this becomes the main interaction)
-      const promptState = usePromptStateStore.getState();
-      const currentModelId = promptState.modelId;
-      
-      if (!currentModelId) {
-        toast.error("No model currently selected");
-        this.setRaceMode(false);
-        return false;
-      }
-
-      // Disable race mode to prevent multiple races
-      this.setRaceMode(false);
-
-      // Create the main interaction with the currently selected model (this goes on the main spine)
-      const mainPromptObject = {
-        ...promptObject,
-        metadata: {
-          ...promptObject.metadata,
-          modelId: currentModelId,
+        if (!mainInteraction) {
+          throw new Error("Could not create main interaction");
         }
-      };
 
-      const mainInteraction = await InteractionService.startInteraction(
-        mainPromptObject,
-        currentConversationId,
-        turnData,
-        "message.user_assistant"
-      );
+        const mainInteractionId = mainInteraction.id;
 
-      if (!mainInteraction) {
-        throw new Error("Failed to create main race interaction");
-      }
+        // Immediately update the main interaction with placeholder and put it in streaming state
+        interactionStore._updateInteractionInState(mainInteractionId, {
+          response: "🏁 Starting race with " + raceModelIds.length + " models...\n\n⏳ Collecting responses for combination...",
+          status: "STREAMING" as const,
+          metadata: {
+            ...mainInteraction.metadata,
+            isRaceCombining: true,
+            raceParticipantCount: raceModelIds.length,
+            raceConfig: config,
+          },
+        });
+        
+        // Add to streaming state
+        interactionStore._addStreamingId(mainInteractionId);
 
-      // Create child interactions for ALL race models (these become tabs)
-      const childInteractionPromises = raceModelIds.map((modelId: string, index: number) => {
-        return new Promise<{ interaction: Interaction | null, modelId: string }>((resolve) => {
-          setTimeout(async () => {
-            try {
-              const childPromptObject = {
-                ...promptObject,
-                metadata: {
-                  ...promptObject.metadata,
-                  modelId: modelId,
-                  raceTab: true, // Mark this as a race tab
-                  raceParticipantIndex: index + 1, // Track the race position
-                }
-              };
+        // Create child interactions for race models + original model (ALL become tabs)
+        const allRaceModels = [mainInteraction.metadata?.modelId, ...raceModelIds].filter(Boolean) as string[];
+        
+        const childInteractionPromises = allRaceModels.map((modelId: string, index: number) => {
+          return new Promise<{ interaction: Interaction | null, modelId: string }>((resolve) => {
+            setTimeout(async () => {
+              try {
+                const { nanoid } = await import("nanoid");
+                const childInteractionId = nanoid();
+                
+                // Build prompt object for this race participant
+                const promptObject = await this.buildPromptObject(turnData, interactionStore.currentConversationId!, mainInteraction.index + index + 1, modelId);
 
-              // Create unique turnData for each child interaction
-              const { nanoid } = await import("nanoid");
-              const childTurnData: PromptTurnObject = {
-                ...turnData,
-                id: nanoid(), // Each child gets its own unique ID
-                metadata: {
-                  ...turnData.metadata,
-                  raceTab: true,
-                  raceParticipantIndex: index + 1,
-                  parentTurnId: turnData.id, // Reference to parent
-                }
-              };
-
-              const childInteraction = await InteractionService.startInteraction(
-                childPromptObject,
-                currentConversationId,
-                childTurnData,
-                "message.assistant_regen"
-              );
-
-              if (childInteraction) {
-                // Update the child interaction to be a tab of the main interaction
-                const updates: Partial<Omit<Interaction, "id">> = {
-                  parentId: mainInteraction.id,
-                  index: index + 1, // Tab index (0 is main, 1+ are additional tabs)
+                // Create unique turnData for each child interaction
+                const childTurnData: PromptTurnObject = {
+                  ...turnData,
+                  id: childInteractionId,
+                  metadata: {
+                    ...turnData.metadata,
+                    modelId: modelId,
+                    raceTab: true,
+                    raceParticipantIndex: index + 1,
+                    raceMainInteractionId: mainInteractionId,
+                  }
                 };
 
-                interactionStore._updateInteractionInState(childInteraction.id, updates);
-                await PersistenceService.saveInteraction({
-                  ...childInteraction,
-                  ...updates,
-                } as Interaction);
+                const childInteraction = await InteractionService.startInteraction(
+                  promptObject,
+                  interactionStore.currentConversationId!,
+                  childTurnData,
+                  "message.assistant_regen"
+                );
+
+                // Make this a child of the main interaction
+                if (childInteraction) {
+                  const updates: Partial<Omit<Interaction, "id">> = {
+                    parentId: mainInteractionId,
+                    index: index + 1, // Tab index (0 is main, 1+ are additional tabs)
+                  };
+
+                  interactionStore._updateInteractionInState(childInteraction.id, updates);
+                  await PersistenceService.saveInteraction({
+                    ...childInteraction,
+                    ...updates,
+                  } as Interaction);
+                }
+                
+                resolve({ interaction: childInteraction, modelId });
+              } catch (error) {
+                console.error(`[RacePromptControlModule] Error creating child interaction for ${modelId}:`, error);
+                resolve({ interaction: null, modelId });
               }
-
-              resolve({ interaction: childInteraction, modelId });
-            } catch (error) {
-              console.error(`[RacePromptControlModule] Race participant ${index + 1} failed:`, error);
-              resolve({ interaction: null, modelId });
-            }
-          }, (index + 1) * staggerMs); // Start after the main interaction
+            }, index * staggerMs);
+          });
         });
-      });
 
-      // Wait for all child interactions to be created
-      await Promise.all(childInteractionPromises);
-      
-      // If combine is enabled, handle the combine logic
-      if (this.raceConfig.combineEnabled && this.raceConfig.combineModelId && this.raceConfig.combinePrompt) {
-        console.log(`[RacePromptControlModule] Combine enabled, will wait for race completion and then combine with ${this.raceConfig.combineModelId}`);
+        // Wait for all child interactions to be created
+        const childResults = await Promise.all(childInteractionPromises);
+        const successfulChildren = childResults.filter(r => r.interaction !== null);
         
-        // Create a combine interaction but don't start it yet - it will be a placeholder
-        const { nanoid } = await import("nanoid");
-        const combineInteractionId = nanoid();
+        console.log(`[RacePromptControlModule] Race children created. Successful: ${successfulChildren.length}/${allRaceModels.length}`);
+
+        // Wait for all children to complete and then combine
+        await this.waitForRaceCompletion(mainInteractionId, successfulChildren.map(r => r.interaction!.id));
         
-        const combinePromptObject = {
-          ...promptObject,
-          system: this.raceConfig.combinePrompt,
-          messages: [], // Will be populated later with race results
-          metadata: {
-            ...promptObject.metadata,
-            modelId: this.raceConfig.combineModelId,
-            isCombineGeneration: true,
-            combineSourceInteractionId: mainInteraction.id,
-          }
-        };
+      } else {
+        // NON-COMBINE MODE: Original race behavior with normal main interaction
+        
+        // Calculate the correct index for the main interaction
+        const conversationInteractions = interactionStore.interactions.filter(
+          (i) => i.conversationId === interactionStore.currentConversationId
+        );
+        const nextIndex = conversationInteractions.reduce((max, i) => Math.max(max, i.index), -1) + 1;
+        
+        // Create the main interaction directly (bypass middleware to avoid recursion)
+        const promptObject = await this.buildPromptObject(turnData, interactionStore.currentConversationId!, nextIndex, turnData.metadata?.modelId || '');
+        const mainInteraction = await InteractionService.startInteraction(
+          promptObject,
+          interactionStore.currentConversationId!,
+          turnData,
+          "message.user_assistant"
+        );
 
-        const combineTurnData: PromptTurnObject = {
-          id: combineInteractionId,
-          content: "Combining race responses...",
-          parameters: promptObject.parameters,
-          metadata: {
-            isCombineGeneration: true,
-            combineSourceInteractionId: mainInteraction.id,
-          }
-        };
+        if (!mainInteraction) {
+          throw new Error("Could not create main interaction");
+        }
 
-        // Create combine interaction with placeholder status
-        const combineInteraction: Interaction = {
-          id: combineInteractionId,
-          conversationId: currentConversationId,
-          type: "message.assistant_regen",
-          prompt: { ...combineTurnData },
-          response: "Compacting...",
-          status: "STREAMING",
-          startedAt: new Date(),
-          endedAt: null,
-          metadata: {
-            ...combinePromptObject.metadata,
-            isCombineGeneration: true,
-            combineSourceInteractionId: mainInteraction.id,
-            isCompactingInProgress: true,
-          },
-          index: raceModelIds.length + 1, // After all race tabs
-          parentId: mainInteraction.id,
-        };
+        const mainInteractionId = mainInteraction.id;
 
-        // Add to state and save
-        interactionStore._addInteractionToState(combineInteraction);
-        interactionStore._addStreamingId(combineInteractionId);
-        await PersistenceService.saveInteraction(combineInteraction);
+        // Create child interactions for race models only (main stays normal)
+        const childInteractionPromises = raceModelIds.map((modelId: string, index: number) => {
+          return new Promise<{ interaction: Interaction | null, modelId: string }>((resolve) => {
+            setTimeout(async () => {
+              try {
+                const { nanoid } = await import("nanoid");
+                const childInteractionId = nanoid();
+                
+                // Build prompt object for this race participant
+                const promptObject = await this.buildPromptObject(turnData, interactionStore.currentConversationId!, mainInteraction.index + index + 1, modelId);
 
-        // Start a background process to wait for race completion and then combine
-        this.handleCombineCompletion(
-          mainInteraction.id,
-          combineInteractionId,
-          raceModelIds,
-          this.raceConfig.combineModelId,
-          this.raceConfig.combinePrompt,
-          promptObject
-        ).catch((error: any) => {
-          console.error(`[RacePromptControlModule] Error in combine completion:`, error);
+                // Create unique turnData for each child interaction
+                const childTurnData: PromptTurnObject = {
+                  ...turnData,
+                  id: childInteractionId,
+                  metadata: {
+                    ...turnData.metadata,
+                    modelId: modelId,
+                    raceTab: true,
+                    raceParticipantIndex: index + 1,
+                    raceMainInteractionId: mainInteractionId,
+                  }
+                };
+
+                const childInteraction = await InteractionService.startInteraction(
+                  promptObject,
+                  interactionStore.currentConversationId!,
+                  childTurnData,
+                  "message.assistant_regen"
+                );
+
+                // Make this a child of the main interaction
+                if (childInteraction) {
+                  const updates: Partial<Omit<Interaction, "id">> = {
+                    parentId: mainInteractionId,
+                    index: index + 1, // Tab index (0 is main, 1+ are additional tabs)
+                  };
+
+                  interactionStore._updateInteractionInState(childInteraction.id, updates);
+                  await PersistenceService.saveInteraction({
+                    ...childInteraction,
+                    ...updates,
+                  } as Interaction);
+                }
+                
+                resolve({ interaction: childInteraction, modelId });
+              } catch (error) {
+                console.error(`[RacePromptControlModule] Error creating child interaction for ${modelId}:`, error);
+                resolve({ interaction: null, modelId });
+              }
+            }, index * staggerMs);
+          });
         });
+
+        // Wait for all child interactions to be created
+        const childResults = await Promise.all(childInteractionPromises);
+        const successfulChildren = childResults.filter(r => r.interaction !== null);
+        
+        console.log(`[RacePromptControlModule] Non-combine race completed. Created ${successfulChildren.length}/${raceModelIds.length} child interactions`);
+        
+        toast.success(`Race started! Current model + ${successfulChildren.length} race models responding in tabs.`);
       }
-      
-      toast.success(`Race started! Current model + ${raceModelIds.length} race models responding in tabs.`);
-      
-      return false; // Cancel normal submission since we handled it
       
     } catch (error) {
       toast.error(`Race failed: ${String(error)}`);
       console.error(`[RacePromptControlModule] Error during race:`, error);
-      
-      // Disable race mode on error
-      this.setRaceMode(false);
-      return false; // Cancel normal submission
     }
   }
 
-  private async buildPromptObject(turnData: PromptTurnObject, conversationId: string, newIndex: number): Promise<PromptObject> {
+    private async waitForRaceCompletion(mainInteractionId: string, childInteractionIds: string[]): Promise<void> {
+    console.log(`[RacePromptControlModule] Setting up promise-based waiting for ${childInteractionIds.length} child interactions`);
+    
+    return new Promise((resolve) => {
+      let completedCount = 0;
+      const targetCount = childInteractionIds.length;
+      
+      // Listen for interaction completion events
+      const handleInteractionCompleted = (payload: { interactionId: string; status: string }) => {
+        if (!childInteractionIds.includes(payload.interactionId)) {
+          return; // Not one of our race children
+        }
+        
+        if (payload.status === "COMPLETED" || payload.status === "ERROR") {
+          completedCount++;
+          console.log(`[RacePromptControlModule] Race progress: ${completedCount}/${targetCount} models completed (${payload.interactionId})`);
+          
+          // Update progress in main interaction
+          const interactionStore = useInteractionStore.getState();
+          interactionStore._updateInteractionInState(mainInteractionId, {
+            response: `🏁 Race progress: ${completedCount}/${targetCount} models completed\n\n⏳ ${completedCount === targetCount ? 'Combining responses...' : 'Waiting for remaining responses...'}`,
+            metadata: {
+              isRaceCombining: true,
+              raceCompletedCount: completedCount,
+              raceParticipantCount: targetCount,
+            },
+          });
+          
+          if (completedCount === targetCount) {
+            // All completed, clean up listener and start combine process
+            console.log(`[RacePromptControlModule] All ${targetCount} race participants completed! Starting combine process...`);
+            emitter.off(interactionEvent.completed, handleInteractionCompleted);
+            this.startCombineProcess(mainInteractionId, childInteractionIds);
+            resolve();
+          }
+        }
+      };
+      
+      // Register event listener
+      emitter.on(interactionEvent.completed, handleInteractionCompleted);
+    });
+  }
+
+  private async startCombineProcess(mainInteractionId: string, childInteractionIds: string[]): Promise<void> {
+    try {
+      const interactionStore = useInteractionStore.getState();
+      const mainInteraction = interactionStore.interactions.find(i => i.id === mainInteractionId);
+      const storedRaceConfig = mainInteraction?.metadata?.raceConfig as typeof this.raceConfig;
+      
+      const { combineModelId, combinePrompt } = storedRaceConfig || {};
+      
+      if (!combineModelId) {
+        throw new Error("Combine model not configured");
+      }
+      
+      // Collect all race responses
+      const raceResponses = childInteractionIds.map((id, index) => {
+        const interaction = interactionStore.interactions.find(i => i.id === id);
+        const modelId = interaction?.metadata?.modelId || `Model ${index + 1}`;
+        const response = interaction?.response || "No response";
+        const status = interaction?.status || "UNKNOWN";
+        
+        return `**${modelId}** (${status}):\n${response}`;
+      }).join('\n\n---\n\n');
+
+      // Create combine prompt
+      const defaultCombinePrompt = `Please analyze and combine the following AI responses to provide a comprehensive, well-structured answer. 
+
+Take the best insights from each response, resolve any contradictions, and present a unified, clear, and complete answer. If responses differ significantly, explain the different perspectives and provide your reasoned conclusion.
+
+Focus on accuracy, completeness, and clarity in your combined response.`;
+
+      const finalCombinePrompt = `${combinePrompt || defaultCombinePrompt}
+
+Here are the responses to combine:
+
+${raceResponses}`;
+
+      // Create combine prompt object - EXACTLY like ForkCompact does
+      const combinePromptObject: PromptObject = {
+        system: "You are an expert at analyzing and synthesizing multiple AI responses into comprehensive, unified answers.",
+        messages: [{ role: "user", content: finalCombinePrompt }],
+        parameters: {
+          temperature: 0.3,
+          max_tokens: 4000,
+        },
+        metadata: {
+          modelId: combineModelId,
+          isCompactGeneration: true, // Use the same flag as ForkCompact
+        },
+      };
+
+      // Create combine turn data - EXACTLY like ForkCompact does  
+      const { nanoid } = await import("nanoid");
+      const combineTurnData: PromptTurnObject = {
+        id: nanoid(),
+        content: `[Internal combine generation for race interaction ${mainInteractionId}]`,
+        parameters: combinePromptObject.parameters,
+        metadata: {
+          ...combinePromptObject.metadata,
+          targetUserInteractionId: mainInteractionId, // This is the key - points to main interaction
+          targetConversationId: interactionStore.currentConversationId,
+        }
+      };
+
+      // Start the combine interaction using conversation.compact type - EXACTLY like ForkCompact
+      await InteractionService.startInteraction(
+        combinePromptObject,
+        interactionStore.currentConversationId!,
+        combineTurnData,
+        "conversation.compact" // This triggers the existing compact completion handler
+      );
+      
+    } catch (error) {
+      console.error(`[RacePromptControlModule] Error in combine process:`, error);
+      
+      // Update main interaction with error
+      const interactionStore = useInteractionStore.getState();
+      interactionStore._updateInteractionInState(mainInteractionId, {
+        response: `❌ Failed to combine responses: ${String(error)}`,
+        status: "ERROR" as const,
+        endedAt: new Date(),
+        metadata: {
+          isRaceCombining: false,
+          combineError: String(error),
+        },
+      });
+      
+      // Remove from streaming
+      interactionStore._removeStreamingId(mainInteractionId);
+    }
+  }
+
+  private async buildPromptObject(turnData: PromptTurnObject, conversationId: string, newIndex: number, modelId: string): Promise<PromptObject> {
     const interactionStore = useInteractionStore.getState();
     const projectStore = useProjectStore.getState();
     const conversationStore = useConversationStore.getState();
@@ -362,7 +504,7 @@ export class RacePromptControlModule implements ControlModule {
           i.parentId === null
       )
       .sort((a, b) => a.index - b.index);
-
+      
     const historyMessages: CoreMessage[] = buildHistoryMessages(historyInteractions);
 
     // Process the current turn data
@@ -391,12 +533,6 @@ export class RacePromptControlModule implements ControlModule {
       userMessageContentParts.push({ type: "text", text: userContent });
     }
 
-    const attachedFilesMeta = turnData.metadata?.attachedFiles ?? [];
-    if (attachedFilesMeta.length > 0) {
-      // TODO: Process files properly (reuse ConversationService._processFilesForPrompt logic)
-      // For now, just add them as text
-    }
-
     if (userMessageContentParts.length > 0) {
       historyMessages.push({ role: "user", content: userMessageContentParts });
     }
@@ -407,7 +543,7 @@ export class RacePromptControlModule implements ControlModule {
     if (systemRulesContent.length > 0) {
       baseSystemPrompt = `${baseSystemPrompt ? `${baseSystemPrompt}\n\n` : ""}${systemRulesContent.join('\n')}`;
     }
-
+    
     const promptState = usePromptStateStore.getState();
     const finalParameters = {
       temperature: promptState.temperature,
@@ -435,139 +571,12 @@ export class RacePromptControlModule implements ControlModule {
       parameters: finalParameters,
       metadata: {
         ...(turnData.metadata ?? {}),
-        attachedFiles: attachedFilesMeta.map(
+        modelId: modelId, // Use the specific race model
+        attachedFiles: turnData.metadata?.attachedFiles?.map(
           ({ contentBase64, contentText, ...rest }) => rest
         ),
       },
     };
-  }
-
-  private async handleCombineCompletion(
-    mainInteractionId: string,
-    combineInteractionId: string,
-    raceModelIds: string[],
-    combineModelId: string,
-    combinePrompt: string,
-    originalPromptObject: PromptObject
-  ): Promise<void> {
-    const interactionStore = useInteractionStore.getState();
-    
-    // Wait for all race interactions to complete
-    const checkCompletion = async (): Promise<boolean> => {
-      const allInteractions = interactionStore.interactions.filter(
-        i => i.parentId === mainInteractionId && i.status !== "STREAMING"
-      );
-      
-      // We need main + race models (excluding the combine interaction itself)
-      const expectedCompletions = 1 + raceModelIds.length;
-      const actualCompletions = allInteractions.filter(
-        i => i.metadata?.isCombineGeneration !== true
-      ).length;
-      
-      return actualCompletions >= expectedCompletions;
-    };
-
-    // Poll for completion with exponential backoff
-    let pollInterval = 1000; // Start with 1s
-    const maxInterval = 10000; // Max 10s
-    const maxWaitTime = 5 * 60 * 1000; // 5 minutes max
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < maxWaitTime) {
-      if (await checkCompletion()) {
-        break;
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
-      pollInterval = Math.min(pollInterval * 1.1, maxInterval);
-    }
-
-    // Collect all completed responses
-    const completedInteractions = interactionStore.interactions.filter(
-      i => (i.id === mainInteractionId || i.parentId === mainInteractionId) &&
-           i.status === "COMPLETED" &&
-           i.metadata?.isCombineGeneration !== true
-    );
-
-    if (completedInteractions.length === 0) {
-      console.error(`[RacePromptControlModule] No completed interactions found for combine`);
-      // Update combine interaction with error
-      interactionStore._updateInteractionInState(combineInteractionId, {
-        response: "Error: No race responses to combine",
-        status: "ERROR" as const,
-        endedAt: new Date(),
-        metadata: {
-          isCompactingInProgress: false,
-          compactError: "No completed race responses",
-        },
-      });
-      interactionStore._removeStreamingId(combineInteractionId);
-      return;
-    }
-
-    // Build combine messages
-    const combineMessages: CoreMessage[] = [
-      {
-        role: "user",
-        content: "Please analyze and combine the following AI model responses to the same prompt. Provide a comprehensive combined response that incorporates the best insights from each model while maintaining coherence and accuracy."
-      }
-    ];
-
-    completedInteractions.forEach((interaction, index) => {
-      const modelName = interaction.metadata?.modelId || `Model ${index + 1}`;
-      combineMessages.push({
-        role: "user", 
-        content: `\n\n=== Response from ${modelName} ===\n${interaction.response || 'No response'}`
-      });
-    });
-
-    // Create the combine prompt object
-    const combinePromptObject: PromptObject = {
-      system: combinePrompt,
-      messages: combineMessages,
-      parameters: originalPromptObject.parameters,
-      metadata: {
-        ...originalPromptObject.metadata,
-        modelId: combineModelId,
-        isCombineGeneration: true,
-        combineSourceInteractionId: mainInteractionId,
-        enabledTools: [], // No tools for combine
-      }
-    };
-
-    const combineTurnData: PromptTurnObject = {
-      id: combineInteractionId,
-      content: "Combining race responses...",
-      parameters: originalPromptObject.parameters,
-      metadata: {
-        isCombineGeneration: true,
-        combineSourceInteractionId: mainInteractionId,
-      }
-    };
-
-    try {
-      // Start the actual combine interaction
-      await InteractionService.startInteraction(
-        combinePromptObject,
-        interactionStore.currentConversationId!,
-        combineTurnData,
-        "message.assistant_regen"
-      );
-    } catch (error) {
-      console.error(`[RacePromptControlModule] Error starting combine interaction:`, error);
-      
-      // Update combine interaction with error
-      interactionStore._updateInteractionInState(combineInteractionId, {
-        response: `Error combining responses: ${String(error)}`,
-        status: "ERROR" as const,
-        endedAt: new Date(),
-        metadata: {
-          isCompactingInProgress: false,
-          compactError: String(error),
-        },
-      });
-      interactionStore._removeStreamingId(combineInteractionId);
-    }
   }
 
   register(modApi: LiteChatModApi): void {

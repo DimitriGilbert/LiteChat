@@ -1179,73 +1179,7 @@ export const InteractionService = {
       }
     }
 
-    // Handle combine generation completion for race module
-    if (
-      (interactionType === "message.assistant_regen" || interactionType === "conversation.compact") &&
-      status === "COMPLETED" &&
-      finalUpdates.response &&
-      typeof finalUpdates.response === "string" &&
-      currentInteraction?.metadata?.isCombineGeneration
-    ) {
-      const combineResponse = finalUpdates.response.trim();
-      const combineSourceInteractionId = currentInteraction?.metadata?.combineSourceInteractionId;
-      
-      if (combineResponse && combineSourceInteractionId) {
-        console.log(`[InteractionService] Combine generation completed for ${interactionId}, updating combine interaction`);
-        
-        try {
-          const interactionStore = useInteractionStore.getState();
-          
-          // Find the placeholder combine interaction that needs to be updated
-          const combineInteraction = interactionStore.interactions.find(i => 
-            i.parentId === combineSourceInteractionId && 
-            i.metadata?.isCombineGeneration === true &&
-            i.metadata?.isCompactingInProgress === true
-          );
-          
-          if (combineInteraction) {
-            const updatedMetadata = {
-              ...combineInteraction.metadata,
-              isCompactingInProgress: false,
-              combineGeneratedAt: new Date().toISOString(),
-            };
-            
-            interactionStore._updateInteractionInState(combineInteraction.id, {
-              response: combineResponse,
-              status: "COMPLETED" as InteractionStatus,
-              endedAt: new Date(),
-              metadata: updatedMetadata
-            });
-            
-            // Save to persistence
-            const updatedCombineInteraction = interactionStore.interactions.find(i => i.id === combineInteraction.id);
-            if (updatedCombineInteraction) {
-              await PersistenceService.saveInteraction(updatedCombineInteraction);
-            }
-            
-            // Emit event to update UI
-            emitter.emit(interactionEvent.updated, {
-              interactionId: combineInteraction.id,
-              updates: {
-                response: combineResponse,
-                status: "COMPLETED" as InteractionStatus,
-                endedAt: new Date(),
-                metadata: updatedMetadata
-              },
-            });
-            
-            // Remove from streaming state
-            interactionStore._removeStreamingId(combineInteraction.id);
-            
-            console.log(`[InteractionService] Successfully updated combine interaction ${combineInteraction.id}`);
-          } else {
-            console.warn(`[InteractionService] Could not find combine interaction for source ${combineSourceInteractionId}`);
-          }
-        } catch (error) {
-          console.error(`[InteractionService] Error updating combine interaction:`, error);
-        }
-      }
-    }
+
 
     if (
       interactionType === "conversation.compact" &&
@@ -1373,7 +1307,9 @@ export const InteractionService = {
             metadata: {
               ...targetInteraction.metadata,
               isCompactingInProgress: false,
+              isRaceCombining: false, // Clear race combining flag if it was set
               compactGeneratedAt: new Date().toISOString(),
+              combinedResponse: targetInteraction.metadata?.isRaceCombining ? true : undefined, // Mark as combined if it was a race
             }
           };
           
