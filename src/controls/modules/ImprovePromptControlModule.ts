@@ -2,11 +2,11 @@ import React from "react";
 import { type ControlModule } from "@/types/litechat/control";
 import type { LiteChatModApi } from "@/types/litechat/modding";
 import { ImprovePromptControl } from "@/controls/components/prompt/ImprovePromptControl";
-import { useProviderStore } from "@/store/provider.store";
 import { providerEvent } from "@/types/litechat/events/provider.events";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
 import type { ModelListItem } from "@/types/litechat/provider";
 import { PromptEnhancementService } from "@/services/prompt-enhancement.service";
+import { useProviderStore } from "@/store/provider.store";
 
 export class ImprovePromptControlModule implements ControlModule {
   public readonly id = "improve-prompt-control";
@@ -20,7 +20,7 @@ export class ImprovePromptControlModule implements ControlModule {
   public isLoadingProviders = false;
 
   // Prompt state
-  private currentPromptText = "";
+  public currentPromptText = "";
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApi = modApi;
@@ -28,26 +28,57 @@ export class ImprovePromptControlModule implements ControlModule {
     // Initialize the enhancement service
     PromptEnhancementService.initialize();
 
-    // Get initial provider state
-    const providerState = useProviderStore.getState();
-    this.globallyEnabledModels = providerState.getGloballyEnabledModelDefinitions();
-    this.isLoadingProviders = providerState.isLoading;
+    // Initialize state from provider store
+    const initialProviderState = useProviderStore.getState();
+    this.isLoadingProviders = initialProviderState.isLoading;
+    this.globallyEnabledModels = initialProviderState.getGloballyEnabledModelDefinitions();
 
     // Subscribe to provider events to track enabled models
     const unsubGloballyEnabledModelsUpdated = modApi.on(
       providerEvent.globallyEnabledModelsUpdated,
       (payload: { models: ModelListItem[] }) => {
-        this.globallyEnabledModels = payload.models;
-        this.notifyComponentUpdate?.();
+        let changed = false;
+        if (
+          JSON.stringify(this.globallyEnabledModels) !==
+          JSON.stringify(payload.models)
+        ) {
+          this.globallyEnabledModels = payload.models;
+          changed = true;
+        }
+
+        // Update loading state based on the provider store
+        const newLoadingState = useProviderStore.getState().isLoading;
+        if (this.isLoadingProviders !== newLoadingState) {
+          this.isLoadingProviders = newLoadingState;
+          changed = true;
+        }
+
+        if (changed) {
+          this.notifyComponentUpdate?.();
+        }
       }
     );
 
+    // If the module initializes after the provider store has already loaded everything,
+    // the globallyEnabledModelsUpdated event might have already fired.
     const unsubInitialDataLoaded = modApi.on(
       providerEvent.initialDataLoaded,
-      (data: any) => {
-        if (data.globallyEnabledModels) {
-          this.globallyEnabledModels = data.globallyEnabledModels;
-          this.isLoadingProviders = false;
+      () => {
+        const providerState = useProviderStore.getState();
+        let changed = false;
+        if (this.isLoadingProviders !== providerState.isLoading) {
+          this.isLoadingProviders = providerState.isLoading;
+          changed = true;
+        }
+        const currentModels = providerState.getGloballyEnabledModelDefinitions();
+        if (
+          JSON.stringify(this.globallyEnabledModels) !==
+          JSON.stringify(currentModels)
+        ) {
+          this.globallyEnabledModels = currentModels;
+          changed = true;
+        }
+        if (changed) {
           this.notifyComponentUpdate?.();
         }
       }

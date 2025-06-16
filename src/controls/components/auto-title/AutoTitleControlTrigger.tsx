@@ -2,7 +2,7 @@
 // FULL FILE
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { SparklesIcon } from "lucide-react";
+import { Captions } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -55,7 +55,7 @@ export const AutoTitleControlTrigger: React.FC<
                 : "Enable Auto-Title for this Chat"
             }
           >
-            <SparklesIcon
+            <Captions
               className={cn(
                 "h-4 w-4",
                 localAutoTitleEnabled ? "text-primary" : "text-muted-foreground"
