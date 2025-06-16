@@ -41,6 +41,7 @@ interface InteractionActions {
   setStatus: (status: InteractionState["status"]) => void;
   _addStreamingId: (id: string) => void;
   _removeStreamingId: (id: string) => void;
+  setActiveStreamBuffer: (id: string, content: string) => void;
   getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
@@ -237,6 +238,17 @@ export const useInteractionStore = create(
       });
       emitter.emit(interactionEvent.activeReasoningBuffersChanged, {
         buffers: get().activeReasoningBuffers,
+      });
+    },
+
+    setActiveStreamBuffer: (id, content) => {
+      set((state) => {
+        if (state.streamingInteractionIds.includes(id)) {
+          state.activeStreamBuffers[id] = content;
+        }
+      });
+      emitter.emit(interactionEvent.activeStreamBuffersChanged, {
+        buffers: get().activeStreamBuffers,
       });
     },
 

@@ -74,17 +74,18 @@ export class RacePromptControlModule implements ControlModule {
     // Register middleware to detect when race is needed and convert the first interaction
     const unsubMiddleware = modApi.addMiddleware(
       ModMiddlewareHook.INTERACTION_BEFORE_START,
-      async (payload: { prompt: PromptObject; conversationId: string }) => {
+      (payload: { prompt: PromptObject; conversationId: string }) => {
         if (this.isRaceMode) {
           // Store config before disabling race mode
           const currentRaceConfig = { ...this.raceConfig };
           // Immediately disable race mode to prevent multiple triggers
           this.setRaceMode(false);
           
-          // WAIT for race setup to complete before allowing middleware to finish
-          await this.handleRaceConversion(payload.prompt, payload.conversationId, currentRaceConfig);
+          // Run the race setup in the background (fire-and-forget)
+          // DO NOT await this, as it would block the UI thread.
+          this.handleRaceConversion(payload.prompt, payload.conversationId, currentRaceConfig);
           
-          // Return false to cancel the original interaction
+          // Return false to cancel the original interaction immediately
           return false;
         }
         return payload; // Allow normal processing for non-race interactions
@@ -211,12 +212,14 @@ export class RacePromptControlModule implements ControlModule {
           conversationId: conversationId,
           type: "message.user_assistant",
           prompt: { ...mainTurnData },
-          response: "🏁 Starting race with " + (raceModelIds.length + 1) + " models...\n\n⏳ Collecting responses for combination...",
+          response: null, // Response is null because content comes from stream buffer
           status: "STREAMING",
           startedAt: new Date(),
           endedAt: null,
           metadata: {
             ...mainTurnData.metadata,
+            isRaceCombining: true,
+            raceParticipantCount: raceModelIds.length + 1,
             toolCalls: [],
             toolResults: [],
           },
@@ -227,7 +230,18 @@ export class RacePromptControlModule implements ControlModule {
         // Add to state and persistence WITHOUT starting an AI call for it
         interactionStore._addInteractionToState(mainInteraction);
         interactionStore._addStreamingId(mainInteraction.id);
+        
+        // Set the initial content in the stream buffer for the UI to render
+        interactionStore.setActiveStreamBuffer(
+          mainInteraction.id,
+          "🏁 Starting race with " + (raceModelIds.length + 1) + " models...\n\n⏳ Collecting responses for combination..."
+        );
+        
         await PersistenceService.saveInteraction(mainInteraction);
+        
+        // Manually emit the 'added' event to ensure UI updates
+        emitter.emit(interactionEvent.added, { interaction: mainInteraction });
+
         emitter.emit(interactionEvent.started, {
           interactionId: mainInteraction.id,
           conversationId: mainInteraction.conversationId,
@@ -424,16 +438,20 @@ export class RacePromptControlModule implements ControlModule {
         if (payload.status === "COMPLETED" || payload.status === "ERROR") {
           completedCount++;
           
-          // Update progress in main interaction
+          // Update progress in the stream buffer for the UI to render
           const interactionStore = useInteractionStore.getState();
-          interactionStore._updateInteractionInState(mainInteractionId, {
-            response: `🏁 Race progress: ${completedCount}/${targetCount} models completed\n\n⏳ ${completedCount === targetCount ? 'Combining responses...' : 'Waiting for remaining responses...'}`,
+          const progressText = `🏁 Race progress: ${completedCount}/${targetCount} models completed\n\n⏳ ${completedCount === targetCount ? 'Combining responses...' : 'Waiting for remaining responses...'}`;
+          interactionStore.setActiveStreamBuffer(mainInteractionId, progressText);
+          
+          // Also update metadata, but not the response field
+          const updates = {
             metadata: {
               isRaceCombining: true,
               raceCompletedCount: completedCount,
               raceParticipantCount: targetCount,
             },
-          });
+          };
+          interactionStore._updateInteractionInState(mainInteractionId, updates);
           
           if (completedCount === targetCount) {
             // All completed, clean up listener and start combine process
