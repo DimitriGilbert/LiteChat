@@ -3,10 +3,7 @@ import { type ControlModule } from "@/types/litechat/control";
 import type { LiteChatModApi } from "@/types/litechat/modding";
 import { RacePromptControl } from "@/controls/components/prompt/RacePromptControl";
 import { useProviderStore } from "@/store/provider.store";
-import { usePromptStateStore } from "@/store/prompt.store";
-import { useConversationStore } from "@/store/conversation.store";
 import { useInteractionStore } from "@/store/interaction.store";
-import { useProjectStore } from "@/store/project.store";
 import { providerEvent } from "@/types/litechat/events/provider.events";
 import type { ModelListItem } from "@/types/litechat/provider";
 import { InteractionService } from "@/services/interaction.service";
@@ -15,8 +12,7 @@ import { toast } from "sonner";
 import type { PromptTurnObject, PromptObject } from "@/types/litechat/prompt";
 import { ModMiddlewareHook } from "@/types/litechat/middleware.types";
 import type { Interaction } from "@/types/litechat/interaction";
-import { buildHistoryMessages } from "@/lib/litechat/ai-helpers";
-import type { CoreMessage, TextPart, ImagePart } from "ai";
+
 import { emitter } from "@/lib/litechat/event-emitter";
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 
@@ -77,19 +73,21 @@ export class RacePromptControlModule implements ControlModule {
 
     // Register middleware to detect when race is needed and convert the first interaction
     const unsubMiddleware = modApi.addMiddleware(
-      ModMiddlewareHook.PROMPT_TURN_FINALIZE,
-      async (payload: { turnData: PromptTurnObject }) => {
+      ModMiddlewareHook.INTERACTION_BEFORE_START,
+      async (payload: { prompt: PromptObject; conversationId: string }) => {
         if (this.isRaceMode) {
           // Store config before disabling race mode
           const currentRaceConfig = { ...this.raceConfig };
           // Immediately disable race mode to prevent multiple triggers
           this.setRaceMode(false);
-          // Start the race after the original interaction is created
-          setTimeout(() => {
-            this.handleRaceConversion(payload.turnData, currentRaceConfig);
-          }, 100);
+          
+          // WAIT for race setup to complete before allowing middleware to finish
+          await this.handleRaceConversion(payload.prompt, payload.conversationId, currentRaceConfig);
+          
+          // Return false to cancel the original interaction
+          return false;
         }
-        return payload; // Always allow normal processing
+        return payload; // Allow normal processing for non-race interactions
       }
     );
 
@@ -137,12 +135,10 @@ export class RacePromptControlModule implements ControlModule {
     return this.isRaceMode;
   }
 
-  // New approach: Convert the original interaction to a race child and create proper main
-  private async handleRaceConversion(turnData: PromptTurnObject, raceConfig: typeof this.raceConfig): Promise<void> {
+  // New approach: Create race setup from scratch since we cancelled the original interaction
+  private async handleRaceConversion(prompt: PromptObject, conversationId: string, raceConfig: typeof this.raceConfig): Promise<void> {
     try {
       const { modelIds: raceModelIds, staggerMs, combineEnabled, combineModelId } = raceConfig;
-      
-      console.log(`[RacePromptControlModule] Converting to race with ${raceModelIds.length} additional models:`, raceModelIds);
       
       if (raceModelIds.length === 0) {
         throw new Error("No additional models selected for race");
@@ -154,106 +150,125 @@ export class RacePromptControlModule implements ControlModule {
 
       const interactionStore = useInteractionStore.getState();
       
-      // Validate current conversation ID
-      const currentConversationId = interactionStore.currentConversationId;
-      if (!currentConversationId) {
-        throw new Error("No current conversation ID available for race conversion");
+      // Extract the original user message from the prompt object
+      const userMessage = prompt.messages[prompt.messages.length - 1];
+      if (!userMessage || userMessage.role !== "user") {
+        throw new Error("Could not find user message in prompt");
       }
       
-      // Find the original interaction that was just created
-      const originalInteraction = interactionStore.interactions
-        .filter(i => i.type === "message.user_assistant" && i.conversationId === currentConversationId)
-        .sort((a, b) => (b.startedAt?.getTime() || 0) - (a.startedAt?.getTime() || 0))[0];
-
-      if (!originalInteraction) {
-        throw new Error("Could not find the original interaction to convert");
+      // Convert message content to string for turn data
+      let userContent = "";
+      if (typeof userMessage.content === "string") {
+        userContent = userMessage.content;
+      } else if (Array.isArray(userMessage.content)) {
+        userContent = userMessage.content
+          .filter(part => part.type === "text")
+          .map(part => (part as any).text)
+          .join("");
       }
 
-      console.log(`[RacePromptControlModule] Found original interaction ${originalInteraction.id} to convert`);
+      // Create a base turn data object from the prompt
+      const baseTurnData: PromptTurnObject = {
+        id: "",  // Will be set per interaction
+        content: userContent,
+        parameters: prompt.parameters || {},
+        metadata: {
+          ...prompt.metadata,
+          modelId: prompt.metadata?.modelId || "", // Will be overridden per interaction
+        },
+      };
+
+      const originalModelId = prompt.metadata?.modelId;
+      if (!originalModelId) {
+        throw new Error("No model ID available in prompt metadata");
+      }
 
       if (combineEnabled) {
-        // COMBINE MODE: Create a new main placeholder and convert original + create additional children
-        
-        // Create a new main interaction with placeholder
+        // COMBINE MODE: Manually create main interaction, then start children
         const { nanoid } = await import("nanoid");
-        const newMainId = nanoid();
+        
+        // --- Manually create the main placeholder interaction ---
+        const mainInteractionId = nanoid();
         const mainTurnData: PromptTurnObject = {
-          ...turnData,
-          id: newMainId,
-        };
-        
-        // Validate model ID
-        const modelId = turnData.metadata?.modelId;
-        if (!modelId) {
-          throw new Error("No model ID available in turn data for race conversion");
-        }
-        
-        const promptObject = await this.buildPromptObject(turnData, currentConversationId, originalInteraction.index, modelId);
-        const mainInteraction = await InteractionService.startInteraction(
-          promptObject,
-          currentConversationId,
-          mainTurnData,
-          "message.user_assistant"
-        );
-
-        if (!mainInteraction) {
-          throw new Error("Could not create main race interaction");
-        }
-
-        // Update the main interaction with placeholder and race metadata
-        interactionStore._updateInteractionInState(mainInteraction.id, {
-          response: "🏁 Starting race with " + (raceModelIds.length + 1) + " models...\n\n⏳ Collecting responses for combination...",
-          status: "STREAMING" as const,
+          ...baseTurnData,
+          id: mainInteractionId,
           metadata: {
-            ...mainInteraction.metadata,
+            ...baseTurnData.metadata,
+            modelId: combineModelId as string,
             isRaceCombining: true,
             raceParticipantCount: raceModelIds.length + 1,
             raceConfig: raceConfig,
           },
-        });
+        };
         
-        // Add to streaming state
-        interactionStore._addStreamingId(mainInteraction.id);
+        const conversationInteractions = interactionStore.interactions.filter(
+          (i) => i.conversationId === conversationId
+        );
+        const newIndex = conversationInteractions.reduce((max, i) => Math.max(max, i.index), -1) + 1;
 
-        // Convert the original interaction to a race child
-        interactionStore._updateInteractionInState(originalInteraction.id, {
-          type: "message.assistant_regen" as const,
-          parentId: mainInteraction.id,
-          index: 1, // First tab
+        const mainInteraction: Interaction = {
+          id: mainInteractionId,
+          conversationId: conversationId,
+          type: "message.user_assistant",
+          prompt: { ...mainTurnData },
+          response: "🏁 Starting race with " + (raceModelIds.length + 1) + " models...\n\n⏳ Collecting responses for combination...",
+          status: "STREAMING",
+          startedAt: new Date(),
+          endedAt: null,
           metadata: {
-            ...originalInteraction.metadata,
-            raceTab: true,
-            raceParticipantIndex: 1,
-            raceMainInteractionId: mainInteraction.id,
+            ...mainTurnData.metadata,
+            toolCalls: [],
+            toolResults: [],
           },
-        });
+          index: newIndex,
+          parentId: null,
+        };
 
-                 // Create additional child interactions for race models
-         const additionalChildInteractionPromises = raceModelIds.map((modelId: string, index: number) => {
+        // Add to state and persistence WITHOUT starting an AI call for it
+        interactionStore._addInteractionToState(mainInteraction);
+        interactionStore._addStreamingId(mainInteraction.id);
+        await PersistenceService.saveInteraction(mainInteraction);
+        emitter.emit(interactionEvent.started, {
+          interactionId: mainInteraction.id,
+          conversationId: mainInteraction.conversationId,
+          type: mainInteraction.type,
+        });
+        // --- End of manual creation ---
+
+
+        // Create child interactions for ALL models (original + race models)  
+        const allRaceModels = [originalModelId, ...raceModelIds];
+        const allChildInteractionPromises = allRaceModels.map((modelId: string, index: number) => {
           return new Promise<{ interaction: Interaction | null, modelId: string }>((resolve) => {
             setTimeout(async () => {
               try {
                 const childInteractionId = nanoid();
                 
-                // Build prompt object for this race participant
-                const promptObject = await this.buildPromptObject(turnData, currentConversationId, mainInteraction.index + index + 2, modelId);
-
-                // Create unique turnData for each additional child interaction
+                // Create unique turnData for each child interaction
                 const childTurnData: PromptTurnObject = {
-                  ...turnData,
+                  ...baseTurnData,
                   id: childInteractionId,
                   metadata: {
-                    ...turnData.metadata,
+                    ...baseTurnData.metadata,
                     modelId: modelId,
                     raceTab: true,
-                    raceParticipantIndex: index + 2,
+                    raceParticipantIndex: index + 1,
                     raceMainInteractionId: mainInteraction.id,
                   }
                 };
 
+                // Create prompt for this specific model
+                const childPrompt: PromptObject = {
+                  ...prompt,
+                  metadata: {
+                    ...prompt.metadata,
+                    modelId: modelId,
+                  },
+                };
+
                 const childInteraction = await InteractionService.startInteraction(
-                  promptObject,
-                  currentConversationId,
+                  childPrompt,
+                  conversationId,
                   childTurnData,
                   "message.assistant_regen"
                 );
@@ -262,7 +277,7 @@ export class RacePromptControlModule implements ControlModule {
                 if (childInteraction) {
                   const updates: Partial<Omit<Interaction, "id">> = {
                     parentId: mainInteraction.id,
-                    index: index + 2, // Tab index (0 is main, 1 is original, 2+ are additional)
+                    index: index + 1, // Tab index (0 is main, 1+ are children)
                   };
 
                   interactionStore._updateInteractionInState(childInteraction.id, updates);
@@ -274,73 +289,93 @@ export class RacePromptControlModule implements ControlModule {
                 
                 resolve({ interaction: childInteraction, modelId });
               } catch (error) {
-                console.error(`[RacePromptControlModule] Error creating additional child interaction for ${modelId}:`, error);
+                console.error(`[RacePromptControlModule] Error creating child interaction for ${modelId}:`, error);
                 resolve({ interaction: null, modelId });
               }
             }, index * staggerMs);
           });
         });
 
-        // Wait for all additional children to be created
-        const additionalChildResults = await Promise.all(additionalChildInteractionPromises);
-        const successfulAdditionalChildren = additionalChildResults.filter(r => r.interaction !== null);
+        // Wait for all children to be created
+        const allChildResults = await Promise.all(allChildInteractionPromises);
+        const successfulChildren = allChildResults.filter((r: { interaction: Interaction | null, modelId: string }) => r.interaction !== null);
         
-        // All child IDs including the converted original
-        const allChildIds = [originalInteraction.id, ...successfulAdditionalChildren.map(r => r.interaction!.id)];
-        
-        console.log(`[RacePromptControlModule] Race conversion completed. Total children: ${allChildIds.length}`);
+        // All child IDs
+        const allChildIds = successfulChildren.map((r: { interaction: Interaction | null, modelId: string }) => r.interaction!.id);
 
         // Wait for all children to complete and then combine
         await this.waitForRaceCompletion(mainInteraction.id, allChildIds);
         
       } else {
-        // NON-COMBINE MODE: Just convert original to child and create additional race children
+        // NON-COMBINE MODE: Create original interaction as main, then additional race children
         
-        // Convert the original interaction to a race child (but keep it as main type)
-        interactionStore._updateInteractionInState(originalInteraction.id, {
+        const { nanoid } = await import("nanoid");
+        const mainInteractionId = nanoid();
+        
+        // Create main interaction with original model
+        const mainTurnData: PromptTurnObject = {
+          ...baseTurnData,
+          id: mainInteractionId,
           metadata: {
-            ...originalInteraction.metadata,
+            ...baseTurnData.metadata,
+            modelId: originalModelId,
             raceTab: true,
             raceParticipantIndex: 1,
-            raceMainInteractionId: originalInteraction.id, // Self-reference for non-combine
+            raceMainInteractionId: mainInteractionId, // Self-reference
           },
-        });
+        };
+
+        const mainInteraction = await InteractionService.startInteraction(
+          prompt,
+          conversationId,
+          mainTurnData,
+          "message.user_assistant"
+        );
+
+        if (!mainInteraction) {
+          throw new Error("Could not create main race interaction");
+        }
 
         // Create additional child interactions for race models only
         const childInteractionPromises = raceModelIds.map((modelId: string, index: number) => {
           return new Promise<{ interaction: Interaction | null, modelId: string }>((resolve) => {
             setTimeout(async () => {
               try {
-                const { nanoid } = await import("nanoid");
                 const childInteractionId = nanoid();
                 
-                // Build prompt object for this race participant
-                const promptObject = await this.buildPromptObject(turnData, currentConversationId, originalInteraction.index + index + 1, modelId);
-
                 // Create unique turnData for each child interaction
                 const childTurnData: PromptTurnObject = {
-                  ...turnData,
+                  ...baseTurnData,
                   id: childInteractionId,
                   metadata: {
-                    ...turnData.metadata,
+                    ...baseTurnData.metadata,
                     modelId: modelId,
                     raceTab: true,
                     raceParticipantIndex: index + 2,
-                    raceMainInteractionId: originalInteraction.id,
+                    raceMainInteractionId: mainInteraction.id,
                   }
                 };
 
+                // Create prompt for this specific model
+                const childPrompt: PromptObject = {
+                  ...prompt,
+                  metadata: {
+                    ...prompt.metadata,
+                    modelId: modelId,
+                  },
+                };
+
                 const childInteraction = await InteractionService.startInteraction(
-                  promptObject,
-                  currentConversationId,
+                  childPrompt,
+                  conversationId,
                   childTurnData,
                   "message.assistant_regen"
                 );
 
-                // Make this a child of the original interaction
+                // Make this a child of the main interaction
                 if (childInteraction) {
                   const updates: Partial<Omit<Interaction, "id">> = {
-                    parentId: originalInteraction.id,
+                    parentId: mainInteraction.id,
                     index: index + 1, // Tab index
                   };
 
@@ -363,9 +398,7 @@ export class RacePromptControlModule implements ControlModule {
         // Wait for all child interactions to be created
         const childResults = await Promise.all(childInteractionPromises);
         const successfulChildren = childResults.filter(r => r.interaction !== null);
-        
-        console.log(`[RacePromptControlModule] Non-combine race conversion completed. Created ${successfulChildren.length}/${raceModelIds.length} additional child interactions`);
-        
+
         toast.success(`Race started! Original model + ${successfulChildren.length} additional race models responding in tabs.`);
       }
       
@@ -376,7 +409,7 @@ export class RacePromptControlModule implements ControlModule {
   }
 
   private async waitForRaceCompletion(mainInteractionId: string, childInteractionIds: string[]): Promise<void> {
-    console.log(`[RacePromptControlModule] Setting up promise-based waiting for ${childInteractionIds.length} child interactions`);
+
     
     return new Promise((resolve) => {
       let completedCount = 0;
@@ -390,7 +423,6 @@ export class RacePromptControlModule implements ControlModule {
         
         if (payload.status === "COMPLETED" || payload.status === "ERROR") {
           completedCount++;
-          console.log(`[RacePromptControlModule] Race progress: ${completedCount}/${targetCount} models completed (${payload.interactionId})`);
           
           // Update progress in main interaction
           const interactionStore = useInteractionStore.getState();
@@ -405,7 +437,6 @@ export class RacePromptControlModule implements ControlModule {
           
           if (completedCount === targetCount) {
             // All completed, clean up listener and start combine process
-            console.log(`[RacePromptControlModule] All ${targetCount} race participants completed! Starting combine process...`);
             emitter.off(interactionEvent.completed, handleInteractionCompleted);
             this.startCombineProcess(mainInteractionId, childInteractionIds);
             resolve();
@@ -459,7 +490,7 @@ Here are the responses to combine:
 
 ${raceResponses}`;
 
-      // Create combine prompt object - EXACTLY like ForkCompact does
+      // Create combine prompt object - Use the existing compact system
       const combinePromptObject: PromptObject = {
         system: "You are an expert at analyzing and synthesizing multiple AI responses into comprehensive, unified answers.",
         messages: [{ role: "user", content: finalCombinePrompt }],
@@ -473,7 +504,7 @@ ${raceResponses}`;
         },
       };
 
-      // Create combine turn data - EXACTLY like ForkCompact does  
+      // Create combine turn data - Use targetUserInteractionId to let existing handler work
       const { nanoid } = await import("nanoid");
       const combineTurnData: PromptTurnObject = {
         id: nanoid(),
@@ -486,7 +517,7 @@ ${raceResponses}`;
         }
       };
 
-      // Start the combine interaction using conversation.compact type - EXACTLY like ForkCompact
+      // Start the combine interaction using conversation.compact type - Let existing handler do the work
       await InteractionService.startInteraction(
         combinePromptObject,
         currentConversationId,
@@ -495,7 +526,7 @@ ${raceResponses}`;
       );
       
     } catch (error) {
-      console.error(`[RacePromptControlModule] Error in combine process:`, error);
+
       
       // Update main interaction with error
       const interactionStore = useInteractionStore.getState();
@@ -514,100 +545,7 @@ ${raceResponses}`;
     }
   }
 
-  private async buildPromptObject(turnData: PromptTurnObject, conversationId: string, newIndex: number, modelId: string): Promise<PromptObject> {
-    const interactionStore = useInteractionStore.getState();
-    const projectStore = useProjectStore.getState();
-    const conversationStore = useConversationStore.getState();
-    
-    const currentConversation = conversationStore.getConversationById(conversationId);
-    const currentProjectId = currentConversation?.projectId ?? null;
-    const effectiveSettings = projectStore.getEffectiveProjectSettings(currentProjectId);
 
-    // Build history up to the current index
-    const historyInteractions = interactionStore.interactions
-      .filter(
-        (i) =>
-          i.conversationId === conversationId &&
-          i.index < newIndex &&
-          i.status === "COMPLETED" &&
-          i.type === "message.user_assistant" &&
-          i.parentId === null
-      )
-      .sort((a, b) => a.index - b.index);
-      
-    const historyMessages: CoreMessage[] = buildHistoryMessages(historyInteractions);
-
-    // Process the current turn data
-    let userContent = turnData.content;
-    const userMessageContentParts: (TextPart | ImagePart)[] = [];
-
-    const effectiveRulesContent = turnData.metadata?.effectiveRulesContent ?? [];
-    const systemRulesContent = effectiveRulesContent
-      .filter((r) => r.type === "system")
-      .map((r) => r.content);
-    const beforeRulesContent = effectiveRulesContent
-      .filter((r) => r.type === "before")
-      .map((r) => r.content);
-    const afterRulesContent = effectiveRulesContent
-      .filter((r) => r.type === "after")
-      .map((r) => r.content);
-
-    if (beforeRulesContent.length > 0) {
-      userContent = `${beforeRulesContent.join('\n')}\n\n${userContent}`;
-    }
-    if (afterRulesContent.length > 0) {
-      userContent = `${userContent}\n\n${afterRulesContent.join('\n')}`;
-    }
-
-    if (userContent) {
-      userMessageContentParts.push({ type: "text", text: userContent });
-    }
-
-    if (userMessageContentParts.length > 0) {
-      historyMessages.push({ role: "user", content: userMessageContentParts });
-    }
-
-    const turnSystemPrompt = turnData.metadata?.turnSystemPrompt as string | undefined;
-    let baseSystemPrompt = turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
-
-    if (systemRulesContent.length > 0) {
-      baseSystemPrompt = `${baseSystemPrompt ? `${baseSystemPrompt}\n\n` : ""}${systemRulesContent.join('\n')}`;
-    }
-    
-    const promptState = usePromptStateStore.getState();
-    const finalParameters = {
-      temperature: promptState.temperature,
-      max_tokens: promptState.maxTokens,
-      top_p: promptState.topP,
-      top_k: promptState.topK,
-      presence_penalty: promptState.presencePenalty,
-      frequency_penalty: promptState.frequencyPenalty,
-      ...(turnData.parameters ?? {}),
-    };
-
-    // Remove null/undefined parameters
-    Object.keys(finalParameters).forEach((key) => {
-      if (
-        finalParameters[key as keyof typeof finalParameters] === null ||
-        finalParameters[key as keyof typeof finalParameters] === undefined
-      ) {
-        delete finalParameters[key as keyof typeof finalParameters];
-      }
-    });
-
-    return {
-      system: baseSystemPrompt,
-      messages: historyMessages,
-      parameters: finalParameters,
-      metadata: {
-        ...(turnData.metadata ?? {}),
-        modelId: modelId, // Use the specific race model
-        attachedFiles: turnData.metadata?.attachedFiles?.map(
-          ({ contentBase64, contentText, ...rest }) => rest
-        ),
-      },
-    };
-  }
 
   register(modApi: LiteChatModApi): void {
     modApi.registerPromptControl({
