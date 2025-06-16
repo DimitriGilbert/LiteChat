@@ -31,21 +31,29 @@ import { useInteractionStore } from "@/store/interaction.store";
 import { useShallow } from "zustand/react/shallow";
 import { ModelSelector } from "@/controls/components/global-model-selector/ModelSelector";
 
-type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal" | "imageGeneration";
+type CapabilityFilter =
+  | "reasoning"
+  | "webSearch"
+  | "tools"
+  | "multimodal"
+  | "imageGeneration";
 
 interface RacePromptControlProps {
   module: {
     globallyEnabledModels: ModelListItem[];
     isLoadingProviders: boolean;
     setNotifyCallback: (callback: (() => void) | null) => void;
-    setRaceMode: (active: boolean, config?: {
-      modelIds: string[];
-      staggerMs: number;
-      combineEnabled: boolean;
-      combineModelId?: string;
-      combinePrompt?: string;
-      raceTimeoutSec?: number;
-    }) => void;
+    setRaceMode: (
+      active: boolean,
+      config?: {
+        modelIds: string[];
+        staggerMs: number;
+        combineEnabled: boolean;
+        combineModelId?: string;
+        combinePrompt?: string;
+        raceTimeoutSec?: number;
+      }
+    ) => void;
     isRaceModeActive: boolean;
   };
 }
@@ -144,14 +152,13 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
     }));
   };
 
-  const activeCapabilityFilterCount = Object.values(capabilityFilters).filter(Boolean).length;
+  const activeCapabilityFilterCount =
+    Object.values(capabilityFilters).filter(Boolean).length;
   const totalActiveFilters = activeCapabilityFilterCount;
 
   const handleModelToggle = (modelId: string, checked: boolean) => {
-    setSelectedModelIds(prev => 
-      checked 
-        ? [...prev, modelId]
-        : prev.filter(id => id !== modelId)
+    setSelectedModelIds((prev) =>
+      checked ? [...prev, modelId] : prev.filter((id) => id !== modelId)
     );
   };
 
@@ -173,12 +180,14 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
       raceTimeoutSec: raceTimeoutSec,
       combineEnabled: combineEnabled,
       combineModelId: combineModelId || undefined,
-      combinePrompt: combinePrompt
+      combinePrompt: combinePrompt,
     });
-    
+
     setOpen(false);
-    
-    toast.info(`Race mode enabled! Send your prompt to race ${selectedModelIds.length} models.`);
+
+    toast.info(
+      `Race mode enabled! Send your prompt to race ${selectedModelIds.length} models.`
+    );
 
     // Reset selections for next use
     setSelectedModelIds([]);
@@ -206,13 +215,13 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     // If already in race mode, cancel it
     if (module.isRaceModeActive) {
       handleCancelRace();
       return;
     }
-    
+
     if (interactionStatus === "streaming") {
       toast.info("Cannot start race while another response is streaming");
       return;
@@ -227,8 +236,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
   };
 
   // Check if racing is available
-  const canRace = interactionStatus !== "streaming" &&
-                  module.globallyEnabledModels.length >= 2;
+  const canRace =
+    interactionStatus !== "streaming" &&
+    module.globallyEnabledModels.length >= 2;
 
   // Dynamic tooltip based on state
   const getTooltipText = () => {
@@ -252,7 +262,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
         aria-label="Race Multiple Models Against Each Other"
         disabled={!canRace}
         icon={<LandPlot />}
-        className={`h-5 w-5 md:h-6 md:w-6 ${module.isRaceModeActive ? 'bg-primary text-primary-foreground' : ''}`}
+        className={`h-5 w-5 md:h-6 md:w-6 ${
+          module.isRaceModeActive ? "bg-primary text-primary-foreground" : ""
+        }`}
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -260,7 +272,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
           <DialogHeader>
             <DialogTitle>Race Models</DialogTitle>
             <DialogDescription>
-              Select multiple models to race against each other. After clicking "Enable Race Mode", send your prompt and all selected models will respond.
+              Select multiple models to race against each other. After clicking
+              "Enable Race Mode", send your prompt and all selected models will
+              respond.
             </DialogDescription>
           </DialogHeader>
 
@@ -280,7 +294,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                 </div>
                 <div className="flex items-center gap-0.5">
                   <Button
-                    variant={capabilityFilters.reasoning ? "secondary" : "ghost"}
+                    variant={
+                      capabilityFilters.reasoning ? "secondary" : "ghost"
+                    }
                     size="sm"
                     className={cn(
                       "h-7 w-7 p-0",
@@ -293,7 +309,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                     <Brain className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant={capabilityFilters.webSearch ? "secondary" : "ghost"}
+                    variant={
+                      capabilityFilters.webSearch ? "secondary" : "ghost"
+                    }
                     size="sm"
                     className={cn(
                       "h-7 w-7 p-0",
@@ -319,7 +337,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                     <Wrench className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant={capabilityFilters.multimodal ? "secondary" : "ghost"}
+                    variant={
+                      capabilityFilters.multimodal ? "secondary" : "ghost"
+                    }
                     size="sm"
                     className={cn(
                       "h-7 w-7 p-0",
@@ -332,7 +352,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                     <ImageIcon className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant={capabilityFilters.imageGeneration ? "secondary" : "ghost"}
+                    variant={
+                      capabilityFilters.imageGeneration ? "secondary" : "ghost"
+                    }
                     size="sm"
                     className={cn(
                       "h-7 w-7 p-0",
@@ -355,7 +377,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
 
             {/* Model Selection */}
             <div className="space-y-2">
-              <Label>Select Models to Race ({selectedModelIds.length} selected)</Label>
+              <Label>
+                Select Models to Race ({selectedModelIds.length} selected)
+              </Label>
               <ScrollArea className="h-48 w-full border rounded-md p-3">
                 <div className="space-y-2">
                   {filteredModels.length === 0 ? (
@@ -368,11 +392,14 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                     </p>
                   ) : (
                     filteredModels.map((model: ModelListItem) => (
-                      <div key={model.id} className="flex items-center space-x-2">
+                      <div
+                        key={model.id}
+                        className="flex items-center space-x-2"
+                      >
                         <Checkbox
                           id={`model-${model.id}`}
                           checked={selectedModelIds.includes(model.id)}
-                          onCheckedChange={(checked) => 
+                          onCheckedChange={(checked) =>
                             handleModelToggle(model.id, checked === true)
                           }
                         />
@@ -389,22 +416,32 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                           <div className="flex gap-1 ml-2">
                             {model.metadataSummary?.supported_parameters?.includes(
                               "reasoning"
-                            ) && <Brain className="h-3.5 w-3.5 text-purple-500" />}
+                            ) && (
+                              <Brain className="h-3.5 w-3.5 text-purple-500" />
+                            )}
                             {(model.metadataSummary?.supported_parameters?.includes(
                               "web_search"
                             ) ||
                               model.metadataSummary?.supported_parameters?.includes(
                                 "web_search_options"
-                              )) && <Globe className="h-3.5 w-3.5 text-blue-500" />}
+                              )) && (
+                              <Globe className="h-3.5 w-3.5 text-blue-500" />
+                            )}
                             {model.metadataSummary?.supported_parameters?.includes(
                               "tools"
-                            ) && <Wrench className="h-3.5 w-3.5 text-orange-500" />}
+                            ) && (
+                              <Wrench className="h-3.5 w-3.5 text-orange-500" />
+                            )}
                             {model.metadataSummary?.input_modalities?.some(
                               (mod) => mod !== "text"
-                            ) && <ImageIcon className="h-3.5 w-3.5 text-green-500" />}
+                            ) && (
+                              <ImageIcon className="h-3.5 w-3.5 text-green-500" />
+                            )}
                             {model.metadataSummary?.output_modalities?.includes(
                               "image"
-                            ) && <Palette className="h-3.5 w-3.5 text-pink-500" />}
+                            ) && (
+                              <Palette className="h-3.5 w-3.5 text-pink-500" />
+                            )}
                           </div>
                         </Label>
                       </div>
@@ -432,7 +469,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                   id="race-timeout"
                   type="number"
                   value={raceTimeoutSec}
-                  onChange={(e) => setRaceTimeoutSec(parseInt(e.target.value, 10))}
+                  onChange={(e) =>
+                    setRaceTimeoutSec(parseInt(e.target.value, 10) || 120)
+                  }
                   className="mt-1"
                 />
               </div>
@@ -451,7 +490,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
             {/* Combine Model Selector */}
             {combineEnabled && (
               <div className="space-y-2">
-                <Label htmlFor="combine-model-selector">Combine with Model</Label>
+                <Label htmlFor="combine-model-selector">
+                  Combine with Model
+                </Label>
                 <ModelSelector
                   models={module.globallyEnabledModels}
                   value={combineModelId}
@@ -480,9 +521,11 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleStartRace}
-              disabled={selectedModelIds.length < 1 || module.isLoadingProviders}
+              disabled={
+                selectedModelIds.length < 1 || module.isLoadingProviders
+              }
             >
               Enable Race Mode
             </Button>
@@ -491,4 +534,4 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
       </Dialog>
     </>
   );
-}; 
+};
