@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
@@ -27,6 +29,7 @@ import {
 import type { ModelListItem } from "@/types/litechat/provider";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useShallow } from "zustand/react/shallow";
+import { ModelSelector } from "@/controls/components/global-model-selector/ModelSelector";
 
 type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal" | "imageGeneration";
 
@@ -35,7 +38,13 @@ interface RacePromptControlProps {
     globallyEnabledModels: ModelListItem[];
     isLoadingProviders: boolean;
     setNotifyCallback: (callback: (() => void) | null) => void;
-    setRaceMode: (active: boolean, modelIds?: string[], staggerMs?: number) => void;
+    setRaceMode: (active: boolean, config?: {
+      modelIds: string[];
+      staggerMs: number;
+      combineEnabled: boolean;
+      combineModelId?: string;
+      combinePrompt?: string;
+    }) => void;
     isRaceModeActive: boolean;
   };
 }
@@ -46,6 +55,11 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
   const [open, setOpen] = useState(false);
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const [staggerMs, setStaggerMs] = useState(250);
+  const [combineEnabled, setCombineEnabled] = useState(false);
+  const [combineModelId, setCombineModelId] = useState<string | null>(null);
+  const [combinePrompt, setCombinePrompt] = useState(
+    "You are a helpful assistant that analyzes and combines multiple AI model responses. Below are responses from different models to the same prompt. Please provide a comprehensive combined response that incorporates the best insights from each model while maintaining coherence and accuracy.\n\nPlease analyze the responses and provide a single, well-structured answer that combines their strengths."
+  );
   const [filterText, setFilterText] = useState("");
   const [capabilityFilters, setCapabilityFilters] = useState<
     Record<CapabilityFilter, boolean>
@@ -145,8 +159,19 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
       return;
     }
 
+    if (combineEnabled && !combineModelId) {
+      toast.error("Please select a model for combining");
+      return;
+    }
+
     // Enable race mode in the module
-    module.setRaceMode(true, selectedModelIds, staggerMs);
+    module.setRaceMode(true, {
+      modelIds: selectedModelIds,
+      staggerMs: staggerMs,
+      combineEnabled: combineEnabled,
+      combineModelId: combineModelId || undefined,
+      combinePrompt: combinePrompt
+    });
     
     setOpen(false);
     
@@ -163,6 +188,11 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
       multimodal: false,
       imageGeneration: false,
     });
+    setCombineEnabled(false);
+    setCombineModelId(null);
+    setCombinePrompt(
+      "You are a helpful assistant that analyzes and combines multiple AI model responses. Below are responses from different models to the same prompt. Please provide a comprehensive combined response that incorporates the best insights from each model while maintaining coherence and accuracy.\n\nPlease analyze the responses and provide a single, well-structured answer that combines their strengths."
+    );
   };
 
   const handleCancelRace = () => {
@@ -398,6 +428,43 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                 Delay between starting each model (0-5000ms)
               </p>
             </div>
+
+            {/* Combine Switch */}
+            <div className="space-y-2">
+              <Label htmlFor="combine-switch">Combine Models</Label>
+              <Switch
+                id="combine-switch"
+                checked={combineEnabled}
+                onCheckedChange={(checked) => setCombineEnabled(checked)}
+              />
+            </div>
+
+            {/* Combine Model Selector */}
+            {combineEnabled && (
+              <div className="space-y-2">
+                <Label htmlFor="combine-model-selector">Combine with Model</Label>
+                <ModelSelector
+                  models={module.globallyEnabledModels}
+                  value={combineModelId}
+                  onChange={(id: string | null) => setCombineModelId(id)}
+                  isLoading={module.isLoadingProviders}
+                />
+              </div>
+            )}
+
+            {/* Combine Prompt Input */}
+            {combineEnabled && (
+              <div className="space-y-2">
+                <Label htmlFor="combine-prompt">Combine Prompt</Label>
+                <Textarea
+                  id="combine-prompt"
+                  value={combinePrompt}
+                  onChange={(e) => setCombinePrompt(e.target.value)}
+                  placeholder="Enter a prompt to combine models"
+                  className="w-full"
+                />
+              </div>
+            )}
           </div>
 
           <DialogFooter>

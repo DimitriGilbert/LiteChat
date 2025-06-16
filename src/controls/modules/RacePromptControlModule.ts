@@ -28,8 +28,17 @@ export class RacePromptControlModule implements ControlModule {
 
   // Race state
   private isRaceMode = false;
-  private raceModelIds: string[] = [];
-  private raceStaggerMs = 250;
+  private raceConfig: {
+    modelIds: string[];
+    staggerMs: number;
+    combineEnabled: boolean;
+    combineModelId?: string;
+    combinePrompt?: string;
+  } = {
+    modelIds: [],
+    staggerMs: 250,
+    combineEnabled: false,
+  };
 
   // Provider state
   public globallyEnabledModels: ModelListItem[] = [];
@@ -92,15 +101,23 @@ export class RacePromptControlModule implements ControlModule {
     this.notifyComponentUpdate = callback;
   }
 
-  setRaceMode(active: boolean, modelIds?: string[], staggerMs?: number): void {
+  setRaceMode(active: boolean, config?: {
+    modelIds: string[];
+    staggerMs: number;
+    combineEnabled: boolean;
+    combineModelId?: string;
+    combinePrompt?: string;
+  }): void {
     this.isRaceMode = active;
     
-    if (active && modelIds && staggerMs !== undefined) {
-      this.raceModelIds = modelIds;
-      this.raceStaggerMs = staggerMs;
+    if (active && config) {
+      this.raceConfig = { ...config };
     } else {
-      this.raceModelIds = [];
-      this.raceStaggerMs = 250;
+      this.raceConfig = {
+        modelIds: [],
+        staggerMs: 250,
+        combineEnabled: false,
+      };
     }
     
     this.notifyComponentUpdate?.();
@@ -113,7 +130,7 @@ export class RacePromptControlModule implements ControlModule {
   // This method will be called by middleware when race mode is active
   async handleRaceSubmission(turnData: PromptTurnObject): Promise<false | { turnData: PromptTurnObject }> {
     try {
-      console.log(`[RacePromptControlModule] Starting race submission with ${this.raceModelIds.length} models:`, this.raceModelIds);
+      console.log(`[RacePromptControlModule] Starting race submission with ${this.raceConfig.modelIds.length} models:`, this.raceConfig.modelIds);
       
       const interactionStore = useInteractionStore.getState();
       // const conversationStore = useConversationStore.getState();
@@ -125,13 +142,13 @@ export class RacePromptControlModule implements ControlModule {
         return false;
       }
 
-      if (this.raceModelIds.length === 0) {
+      if (this.raceConfig.modelIds.length === 0) {
         toast.error("No models selected for racing");
         this.setRaceMode(false);
         return false;
       }
 
-      toast.info(`Racing ${this.raceModelIds.length} models with your prompt...`);
+      toast.info(`Racing ${this.raceConfig.modelIds.length} models with your prompt...`);
 
       // Get the conversation index for the new interactions
       const conversationInteractions = interactionStore.interactions.filter(
@@ -146,8 +163,8 @@ export class RacePromptControlModule implements ControlModule {
       const promptObject = await this.buildPromptObject(turnData, currentConversationId, newIndex);
 
       // Store the model IDs before disabling race mode
-      const raceModelIds = [...this.raceModelIds];
-      const staggerMs = this.raceStaggerMs;
+      const raceModelIds = [...this.raceConfig.modelIds];
+      const staggerMs = this.raceConfig.staggerMs;
 
       // Get the currently selected model (this becomes the main interaction)
       const promptState = usePromptStateStore.getState();
@@ -183,8 +200,8 @@ export class RacePromptControlModule implements ControlModule {
       }
 
       // Create child interactions for ALL race models (these become tabs)
-      const childInteractionPromises = raceModelIds.map((modelId, index) => {
-        return new Promise<void>((resolve) => {
+      const childInteractionPromises = raceModelIds.map((modelId: string, index: number) => {
+        return new Promise<{ interaction: Interaction | null, modelId: string }>((resolve) => {
           setTimeout(async () => {
             try {
               const childPromptObject = {
@@ -231,10 +248,10 @@ export class RacePromptControlModule implements ControlModule {
                 } as Interaction);
               }
 
-              resolve();
+              resolve({ interaction: childInteraction, modelId });
             } catch (error) {
               console.error(`[RacePromptControlModule] Race participant ${index + 1} failed:`, error);
-              resolve();
+              resolve({ interaction: null, modelId });
             }
           }, (index + 1) * staggerMs); // Start after the main interaction
         });
@@ -242,6 +259,74 @@ export class RacePromptControlModule implements ControlModule {
 
       // Wait for all child interactions to be created
       await Promise.all(childInteractionPromises);
+      
+      // If combine is enabled, handle the combine logic
+      if (this.raceConfig.combineEnabled && this.raceConfig.combineModelId && this.raceConfig.combinePrompt) {
+        console.log(`[RacePromptControlModule] Combine enabled, will wait for race completion and then combine with ${this.raceConfig.combineModelId}`);
+        
+        // Create a combine interaction but don't start it yet - it will be a placeholder
+        const { nanoid } = await import("nanoid");
+        const combineInteractionId = nanoid();
+        
+        const combinePromptObject = {
+          ...promptObject,
+          system: this.raceConfig.combinePrompt,
+          messages: [], // Will be populated later with race results
+          metadata: {
+            ...promptObject.metadata,
+            modelId: this.raceConfig.combineModelId,
+            isCombineGeneration: true,
+            combineSourceInteractionId: mainInteraction.id,
+          }
+        };
+
+        const combineTurnData: PromptTurnObject = {
+          id: combineInteractionId,
+          content: "Combining race responses...",
+          parameters: promptObject.parameters,
+          metadata: {
+            isCombineGeneration: true,
+            combineSourceInteractionId: mainInteraction.id,
+          }
+        };
+
+        // Create combine interaction with placeholder status
+        const combineInteraction: Interaction = {
+          id: combineInteractionId,
+          conversationId: currentConversationId,
+          type: "message.assistant_regen",
+          prompt: { ...combineTurnData },
+          response: "Compacting...",
+          status: "STREAMING",
+          startedAt: new Date(),
+          endedAt: null,
+          metadata: {
+            ...combinePromptObject.metadata,
+            isCombineGeneration: true,
+            combineSourceInteractionId: mainInteraction.id,
+            isCompactingInProgress: true,
+          },
+          index: raceModelIds.length + 1, // After all race tabs
+          parentId: mainInteraction.id,
+        };
+
+        // Add to state and save
+        interactionStore._addInteractionToState(combineInteraction);
+        interactionStore._addStreamingId(combineInteractionId);
+        await PersistenceService.saveInteraction(combineInteraction);
+
+        // Start a background process to wait for race completion and then combine
+        this.handleCombineCompletion(
+          mainInteraction.id,
+          combineInteractionId,
+          raceModelIds,
+          this.raceConfig.combineModelId,
+          this.raceConfig.combinePrompt,
+          promptObject
+        ).catch((error: any) => {
+          console.error(`[RacePromptControlModule] Error in combine completion:`, error);
+        });
+      }
       
       toast.success(`Race started! Current model + ${raceModelIds.length} race models responding in tabs.`);
       
@@ -355,6 +440,134 @@ export class RacePromptControlModule implements ControlModule {
         ),
       },
     };
+  }
+
+  private async handleCombineCompletion(
+    mainInteractionId: string,
+    combineInteractionId: string,
+    raceModelIds: string[],
+    combineModelId: string,
+    combinePrompt: string,
+    originalPromptObject: PromptObject
+  ): Promise<void> {
+    const interactionStore = useInteractionStore.getState();
+    
+    // Wait for all race interactions to complete
+    const checkCompletion = async (): Promise<boolean> => {
+      const allInteractions = interactionStore.interactions.filter(
+        i => i.parentId === mainInteractionId && i.status !== "STREAMING"
+      );
+      
+      // We need main + race models (excluding the combine interaction itself)
+      const expectedCompletions = 1 + raceModelIds.length;
+      const actualCompletions = allInteractions.filter(
+        i => i.metadata?.isCombineGeneration !== true
+      ).length;
+      
+      return actualCompletions >= expectedCompletions;
+    };
+
+    // Poll for completion with exponential backoff
+    let pollInterval = 1000; // Start with 1s
+    const maxInterval = 10000; // Max 10s
+    const maxWaitTime = 5 * 60 * 1000; // 5 minutes max
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < maxWaitTime) {
+      if (await checkCompletion()) {
+        break;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      pollInterval = Math.min(pollInterval * 1.1, maxInterval);
+    }
+
+    // Collect all completed responses
+    const completedInteractions = interactionStore.interactions.filter(
+      i => (i.id === mainInteractionId || i.parentId === mainInteractionId) &&
+           i.status === "COMPLETED" &&
+           i.metadata?.isCombineGeneration !== true
+    );
+
+    if (completedInteractions.length === 0) {
+      console.error(`[RacePromptControlModule] No completed interactions found for combine`);
+      // Update combine interaction with error
+      interactionStore._updateInteractionInState(combineInteractionId, {
+        response: "Error: No race responses to combine",
+        status: "ERROR" as const,
+        endedAt: new Date(),
+        metadata: {
+          isCompactingInProgress: false,
+          compactError: "No completed race responses",
+        },
+      });
+      interactionStore._removeStreamingId(combineInteractionId);
+      return;
+    }
+
+    // Build combine messages
+    const combineMessages: CoreMessage[] = [
+      {
+        role: "user",
+        content: "Please analyze and combine the following AI model responses to the same prompt. Provide a comprehensive combined response that incorporates the best insights from each model while maintaining coherence and accuracy."
+      }
+    ];
+
+    completedInteractions.forEach((interaction, index) => {
+      const modelName = interaction.metadata?.modelId || `Model ${index + 1}`;
+      combineMessages.push({
+        role: "user", 
+        content: `\n\n=== Response from ${modelName} ===\n${interaction.response || 'No response'}`
+      });
+    });
+
+    // Create the combine prompt object
+    const combinePromptObject: PromptObject = {
+      system: combinePrompt,
+      messages: combineMessages,
+      parameters: originalPromptObject.parameters,
+      metadata: {
+        ...originalPromptObject.metadata,
+        modelId: combineModelId,
+        isCombineGeneration: true,
+        combineSourceInteractionId: mainInteractionId,
+        enabledTools: [], // No tools for combine
+      }
+    };
+
+    const combineTurnData: PromptTurnObject = {
+      id: combineInteractionId,
+      content: "Combining race responses...",
+      parameters: originalPromptObject.parameters,
+      metadata: {
+        isCombineGeneration: true,
+        combineSourceInteractionId: mainInteractionId,
+      }
+    };
+
+    try {
+      // Start the actual combine interaction
+      await InteractionService.startInteraction(
+        combinePromptObject,
+        interactionStore.currentConversationId!,
+        combineTurnData,
+        "message.assistant_regen"
+      );
+    } catch (error) {
+      console.error(`[RacePromptControlModule] Error starting combine interaction:`, error);
+      
+      // Update combine interaction with error
+      interactionStore._updateInteractionInState(combineInteractionId, {
+        response: `Error combining responses: ${String(error)}`,
+        status: "ERROR" as const,
+        endedAt: new Date(),
+        metadata: {
+          isCompactingInProgress: false,
+          compactError: String(error),
+        },
+      });
+      interactionStore._removeStreamingId(combineInteractionId);
+    }
   }
 
   register(modApi: LiteChatModApi): void {
