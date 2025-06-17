@@ -3,17 +3,18 @@ import { immer } from "zustand/middleware/immer";
 import type { WorkflowRun, WorkflowRunStatus } from "@/types/litechat/workflow";
 import type { RegisteredActionHandler } from "@/types/litechat/control";
 import { workflowEvent, type WorkflowEventPayloads } from "@/types/litechat/events/workflow.events";
-import { emitter } from "@/lib/litechat/event-emitter";
+// import { emitter } from "@/lib/litechat/event-emitter";
 
 export interface WorkflowState {
   activeRun: WorkflowRun | null;
+  pausePayload: WorkflowEventPayloads[typeof workflowEvent.paused] | null;
 }
 
 export interface WorkflowActions {
   // Internal actions triggered by events
   _handleWorkflowStarted: (run: WorkflowRun) => void;
   _handleStepCompleted: (runId: string, stepId: string, output: any) => void;
-  _handleWorkflowPaused: (runId: string) => void;
+  _handleWorkflowPaused: (payload: WorkflowEventPayloads[typeof workflowEvent.paused]) => void;
   _handleWorkflowResumed: (runId: string) => void;
   _handleWorkflowCompleted: (runId: string) => void;
   _handleWorkflowError: (runId: string, error: string) => void;
@@ -27,10 +28,12 @@ export interface WorkflowActions {
 export const useWorkflowStore = create(
   immer<WorkflowState & WorkflowActions>((set, get) => ({
     activeRun: null,
+    pausePayload: null,
 
     _handleWorkflowStarted: (run) => {
       set((state) => {
         state.activeRun = run;
+        state.pausePayload = null;
       });
     },
 
@@ -52,32 +55,35 @@ export const useWorkflowStore = create(
       });
     },
 
-    _handleWorkflowPaused: (runId) => {
-      get()._updateRun(runId, "PAUSED");
+    _handleWorkflowPaused: (payload) => {
+      get()._updateRun(payload.runId, "PAUSED");
+      set({ pausePayload: payload });
     },
 
     _handleWorkflowResumed: (runId) => {
       get()._updateRun(runId, "RUNNING");
+      set({ pausePayload: null });
     },
 
     _handleWorkflowCompleted: (runId) => {
       get()._updateRun(runId, "COMPLETED", (run: WorkflowRun) => {
-        run.endedAt = new Date().toISOString();
+        run.completedAt = new Date().toISOString();
       });
       // Optionally clear after a delay
-      setTimeout(() => set({ activeRun: null }), 5000);
+      setTimeout(() => set({ activeRun: null, pausePayload: null }), 5000);
     },
 
     _handleWorkflowError: (runId, error) => {
       get()._updateRun(runId, "ERROR", (run: WorkflowRun) => {
         run.error = error;
-        run.endedAt = new Date().toISOString();
+        run.completedAt = new Date().toISOString();
       });
+      set({ pausePayload: null });
     },
 
     _handleWorkflowCancelled: (runId) => {
       if (get().activeRun?.runId === runId) {
-        set({ activeRun: null });
+        set({ activeRun: null, pausePayload: null });
       }
     },
 
@@ -96,7 +102,7 @@ export const useWorkflowStore = create(
         },
         {
           eventName: workflowEvent.paused,
-          handler: (payload: WorkflowEventPayloads[typeof workflowEvent.paused]) => actions._handleWorkflowPaused(payload.runId),
+          handler: (payload: WorkflowEventPayloads[typeof workflowEvent.paused]) => actions._handleWorkflowPaused(payload),
           storeId: "WorkflowStore",
         },
         {

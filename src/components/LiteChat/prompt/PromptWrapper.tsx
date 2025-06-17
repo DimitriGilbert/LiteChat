@@ -11,7 +11,7 @@ import type {
   PromptTurnObject,
   InputAreaRenderer,
   InputAreaRef,
-  ResolvedRuleContent,
+  // ResolvedRuleContent,
 } from "@/types/litechat/prompt";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
@@ -23,7 +23,7 @@ import { ModMiddlewareHook } from "@/types/litechat/modding";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
 import type { SidebarItemType } from "@/types/litechat/chat";
 import { usePromptStateStore } from "@/store/prompt.store";
-import type { RulesControlModule } from "@/controls/modules/RulesControlModule"; // Import type
+// import type { RulesControlModule } from "@/controls/modules/RulesControlModule"; 
 
 interface PromptWrapperProps {
   InputAreaRenderer: InputAreaRenderer;

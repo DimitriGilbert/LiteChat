@@ -1,20 +1,28 @@
 import React from 'react';
 import type { Interaction } from '@/types/litechat/interaction';
 import { useWorkflowStore } from '@/store/workflow.store';
-import { Loader2, CircleCheck, CircleX, Hourglass, UserCheck } from 'lucide-react';
-import { HumanInTheLoopControl } from './HumanInTheLoopControl';
+import { Loader2, CircleCheck, CircleX, UserCheck } from 'lucide-react';
+import { HumanInTheLoopControl } from '@/components/LiteChat/canvas/interaction/HumanInTheLoopControl';
+import { DataCorrectionControl } from './DataCorrectionControl';
 
 interface WorkflowStatusDisplayProps {
     interaction: Interaction;
 }
 
 export const WorkflowStatusDisplay: React.FC<WorkflowStatusDisplayProps> = ({ interaction }) => {
-    const activeRun = useWorkflowStore(state => state.activeRun);
+    const { activeRun, pausePayload } = useWorkflowStore(state => ({ 
+        activeRun: state.activeRun, 
+        pausePayload: state.pausePayload 
+    }));
 
-    const workflowName = interaction.metadata?.workflowName || 'Workflow';
-    const status = activeRun?.mainInteractionId === interaction.id ? activeRun.status : interaction.status;
-    const currentStep = activeRun?.mainInteractionId === interaction.id ? activeRun.currentStepIndex : 0;
-    const totalSteps = activeRun?.mainInteractionId === interaction.id ? activeRun.template.steps.length : 0;
+    if (!activeRun || activeRun.mainInteractionId !== interaction.id) {
+        return null;
+    }
+
+    const workflowName = activeRun.template.name || 'Workflow';
+    const status = activeRun.status;
+    const currentStep = activeRun.currentStepIndex;
+    const totalSteps = activeRun.template.steps.length;
 
     let Icon = Loader2;
     let text = `${workflowName}: Initializing...`;
@@ -28,9 +36,15 @@ export const WorkflowStatusDisplay: React.FC<WorkflowStatusDisplayProps> = ({ in
             color = "text-blue-500";
             break;
         case "PAUSED":
-            Icon = UserCheck;
-            text = `${workflowName}: Paused - Awaiting your input`;
-            color = "text-yellow-500";
+            if (pausePayload?.pauseReason === 'data-correction') {
+                Icon = UserCheck;
+                text = `${workflowName}: Paused - Awaiting data correction`;
+                color = "text-yellow-500";
+            } else {
+                Icon = UserCheck;
+                text = `${workflowName}: Paused - Awaiting your input`;
+                color = "text-yellow-500";
+            }
             break;
         case "COMPLETED":
             Icon = CircleCheck;
@@ -49,13 +63,31 @@ export const WorkflowStatusDisplay: React.FC<WorkflowStatusDisplayProps> = ({ in
             break;
     }
 
+    const renderPauseControl = () => {
+        if (status !== 'PAUSED' || !pausePayload) return null;
+
+        if (pausePayload.pauseReason === 'data-correction') {
+            return <DataCorrectionControl 
+                        runId={pausePayload.runId} 
+                        step={pausePayload.step}
+                        rawAssistantResponse={pausePayload.rawAssistantResponse} 
+                    />;
+        }
+
+        if (pausePayload.pauseReason === 'human-in-the-loop') {
+            return <HumanInTheLoopControl run={activeRun} />;
+        }
+
+        return null;
+    };
+
     return (
         <div className="p-4 space-y-4">
             <div className={`flex items-center gap-3 font-semibold text-lg ${color}`}>
                 <Icon className={`h-6 w-6 ${status === 'RUNNING' || status === 'STREAMING' ? 'animate-spin' : ''}`} />
                 <h2>{text}</h2>
             </div>
-            {status === 'PAUSED' && <HumanInTheLoopControl run={activeRun} />}
+            {renderPauseControl()}
             {status === 'ERROR' && activeRun?.error && (
                 <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-destructive text-sm">
                     <strong>Error:</strong> {activeRun.error}
@@ -63,4 +95,4 @@ export const WorkflowStatusDisplay: React.FC<WorkflowStatusDisplayProps> = ({ in
             )}
         </div>
     );
-}; 
+};

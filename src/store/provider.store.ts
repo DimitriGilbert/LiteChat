@@ -66,6 +66,7 @@ export interface ProviderActions {
   setGlobalModelSortOrder: (combinedIds: string[]) => Promise<void>;
   getSelectedModel: () => AiModelConfig | undefined;
   getApiKeyForProvider: (providerId: string) => string | undefined;
+  getModelConfigById: (combinedId: string) => AiModelConfig | undefined;
   getActiveProviders: () => AiProviderConfig[];
   getAllAvailableModelDefsForProvider: (
     providerConfigId: string
@@ -147,6 +148,25 @@ export const useProviderStore = create(
     getGloballyEnabledModelDefinitions: () => {
       // This function should simply return the already processed and sorted list
       return get().globallyEnabledModelDefinitions;
+    },
+
+    getModelConfigById: (combinedId: string) => {
+      const { dbProviderConfigs, dbApiKeys } = get();
+      const { providerId, modelId } = splitModelId(combinedId);
+
+      if (!providerId || !modelId) {
+        console.warn(`[ProviderStore] Invalid combined ID for getModelConfigById: ${combinedId}`);
+        return undefined;
+      }
+
+      const providerConfig = dbProviderConfigs.find(p => p.id === providerId);
+      if (!providerConfig) {
+        console.warn(`[ProviderStore] Could not find provider config for ID: ${providerId}`);
+        return undefined;
+      }
+
+      const apiKey = dbApiKeys.find(k => k.id === providerConfig.apiKeyId)?.value;
+      return get().createAiModelConfig(providerConfig, modelId, apiKey);
     },
 
     createAiModelConfig: (config, modelId, apiKey) => {

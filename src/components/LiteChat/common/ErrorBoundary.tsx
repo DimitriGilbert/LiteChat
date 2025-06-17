@@ -172,7 +172,7 @@ Based on this information, what are the likely causes and potential solutions? F
       ) : (
         <div
           role="alert"
-          className="flex flex-col items-center justify-center h-screen w-screen p-4 bg-background text-foreground"
+          className="flex flex-col items-center justify-center h-screen w-screen p-4 bg-background text-foreground z-[9999]"
         >
           <div className="max-w-2xl w-full border border-destructive bg-destructive/10 rounded-lg p-6 text-center shadow-lg">
             <LCErrorIcon className="h-24 w-24 text-destructive mx-auto mb-4" />

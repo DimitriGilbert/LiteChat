@@ -20,6 +20,10 @@ export interface PromptTemplate {
   rules?: string[]; // Rule names to auto-select
   type?: PromptTemplateType; // Optional field: prompt | task | agent (defaults to "prompt")
   parentId?: string | null; // New field: for tasks, references the agent ID
+  structuredOutput?: { // For requesting structured output
+    schema: Record<string, 'string' | 'number' | 'boolean' | 'object' | 'array'>;
+    jsonSchema: object;
+  };
   followUps?: string[]; // New field: references to other prompt IDs
   isPublic: boolean;
   createdAt: Date;

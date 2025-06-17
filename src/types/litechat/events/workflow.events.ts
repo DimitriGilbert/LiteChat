@@ -1,4 +1,4 @@
-import type { WorkflowTemplate, WorkflowRun } from "../workflow";
+import type { WorkflowTemplate, WorkflowRun, WorkflowStep } from "../workflow";
 
 export const workflowEvent = {
   // --- Requests ---
@@ -43,8 +43,12 @@ export interface WorkflowEventPayloads {
   };
   [workflowEvent.paused]: {
     runId: string;
-    // The data for the human to review
-    dataForReview: any;
+    step: WorkflowStep;
+    pauseReason: 'human-in-the-loop' | 'data-correction';
+    // For 'human-in-the-loop'
+    dataForReview?: any;
+    // For 'data-correction'
+    rawAssistantResponse?: string;
   };
   [workflowEvent.resumed]: {
     runId: string;

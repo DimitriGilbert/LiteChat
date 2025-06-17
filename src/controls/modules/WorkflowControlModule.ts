@@ -7,6 +7,10 @@ import type { WorkflowTemplate } from "@/types/litechat/workflow";
 import { useInteractionStore } from "@/store/interaction.store";
 import { promptTemplateEvent } from "@/types/litechat/events/prompt-template.events";
 import type { PromptTemplate } from "@/types/litechat/prompt-template";
+import { useProviderStore } from "@/store/provider.store";
+import type { AiModelConfig, ModelListItem } from "@/types/litechat/provider";
+import { providerEvent } from "@/types/litechat/events/provider.events";
+import { usePromptTemplateStore } from "@/store/prompt-template.store";
 
 export class WorkflowControlModule implements ControlModule {
   readonly id = "core-workflow-control";
@@ -15,10 +19,16 @@ export class WorkflowControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
   private allTemplates: PromptTemplate[] = [];
+  private allModels: ModelListItem[] = [];
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApi = modApi;
     this.isStreaming = useInteractionStore.getState().status === "streaming";
+    const providerStore = useProviderStore.getState();
+    if (!providerStore.isLoading) {
+      this.allModels = providerStore.getGloballyEnabledModelDefinitions();
+    }
+    this.allTemplates = usePromptTemplateStore.getState().promptTemplates;
 
     const unsubStatus = modApi.on("interaction.status.changed", (payload) => {
       if (typeof payload === "object" && payload && "status" in payload) {
@@ -37,7 +47,12 @@ export class WorkflowControlModule implements ControlModule {
         }
     });
 
-    this.eventUnsubscribers.push(unsubStatus, unsubTemplatesChanged);
+    const unsubModelsChanged = modApi.on(providerEvent.globallyEnabledModelsUpdated, (payload) => {
+        this.allModels = payload.models;
+        this.notifyComponentUpdate?.();
+    });
+
+    this.eventUnsubscribers.push(unsubStatus, unsubTemplatesChanged, unsubModelsChanged);
     
     // Request templates on initialization
     modApi.emit(promptTemplateEvent.loadPromptTemplatesRequest, {});
@@ -47,7 +62,20 @@ export class WorkflowControlModule implements ControlModule {
   
   public getIsStreaming = (): boolean => this.isStreaming;
   public getPromptTemplates = (): PromptTemplate[] => this.allTemplates.filter(t => (t.type || 'prompt') === 'prompt');
-  public getAgentTasks = (): PromptTemplate[] => this.allTemplates.filter(t => t.type === 'agent' || t.type === 'task');
+  public getAgentTasks = (): (PromptTemplate & { prefixedName: string })[] => {
+    const agents = this.allTemplates.filter(t => t.type === 'agent');
+    const agentNameById = new Map(agents.map(a => [a.id, a.name]));
+    
+    return this.allTemplates
+      .filter(t => t.type === 'task' && t.parentId)
+      .map(t => ({
+        ...t,
+        prefixedName: `${agentNameById.get(t.parentId!) || 'Unknown Agent'}: ${t.name}`
+      }));
+  };
+  public getAllTemplates = (): PromptTemplate[] => this.allTemplates;
+  public getModels = (): ModelListItem[] => this.allModels;
+  public getGlobalModel = (): AiModelConfig | undefined => useProviderStore.getState().getSelectedModel();
 
   public setNotifyCallback = (cb: (() => void) | null): void => {
     this.notifyComponentUpdate = cb;

@@ -4,6 +4,7 @@ export interface WorkflowStep {
   id: string; // nanoid
   name: string; // User-defined name for the step
   type: WorkflowStepType;
+  modelId?: string; // ID of the model to use for this step
 
   // For 'prompt' or 'agent-task' types
   templateId?: string; // ID of the PromptTemplate
@@ -16,8 +17,9 @@ export interface WorkflowStep {
   // The values are JSONPath-like strings to extract data from the previous step's structured output (e.g., '$.user.email').
   inputMapping?: Record<string, string>;
 
-  prompt?: string; // The prompt template for this step
+  prompt?: string; // The prompt template for this step, denormalized from PromptTemplate
   structuredOutput?: {
+    // The schema for the expected structured output. Denormalized from PromptTemplate
     schema: Record<string, 'string' | 'number' | 'boolean' | 'object' | 'array'>;
     jsonSchema: object;
   };
@@ -32,7 +34,7 @@ export interface WorkflowTemplate {
   updatedAt: string; // ISO 8601
 }
 
-export type WorkflowRunStatus = "IDLE" | "RUNNING" | "PAUSED" | "COMPLETED" | "ERROR";
+export type WorkflowRunStatus = "IDLE" | "RUNNING" | "PAUSED" | "COMPLETED" | "ERROR" | "STREAMING" | "CANCELLED";
 
 export interface WorkflowRun {
   runId: string; // Unique ID for this specific run

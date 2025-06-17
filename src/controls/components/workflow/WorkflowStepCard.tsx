@@ -4,18 +4,43 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { PromptTemplate } from '@/types/litechat/prompt-template';
+import type { ModelListItem } from '@/types/litechat/provider';
+import { ModelSelector } from '@/controls/components/global-model-selector/ModelSelector';
 
 interface WorkflowStepCardProps {
     step: WorkflowStep;
     onChange: (updatedStep: WorkflowStep) => void;
     promptTemplates: PromptTemplate[];
-    agentTasks: PromptTemplate[];
+    agentTasks: (PromptTemplate & { prefixedName: string })[];
+    allTemplates: PromptTemplate[];
+    models: ModelListItem[];
 }
 
-export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({ step, onChange, promptTemplates, agentTasks }) => {
+export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({ 
+    step, 
+    onChange, 
+    promptTemplates, 
+    agentTasks,
+    allTemplates,
+    models,
+}) => {
     
-    const templatesToShow = step.type === 'prompt' ? promptTemplates : agentTasks;
+    const templatesToShow = step.type === 'prompt' 
+        ? promptTemplates 
+        : step.type === 'agent-task'
+            ? agentTasks
+            : [];
 
+    const handleTemplateChange = (templateId: string) => {
+        const template = allTemplates.find(t => t.id === templateId);
+        onChange({
+            ...step,
+            templateId: templateId,
+            prompt: template?.prompt,
+            structuredOutput: template?.structuredOutput,
+        });
+    };
+    
     return (
         <div className="p-4 border rounded-lg space-y-3 bg-muted/20">
             <div className="space-y-1">
@@ -27,17 +52,26 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({ step, onChan
                 />
             </div>
             <div className="space-y-1">
+                <Label>Model</Label>
+                <ModelSelector
+                    value={step.modelId}
+                    onChange={(value) => onChange({ ...step, modelId: value || undefined })}
+                    models={models}
+                    className="w-full"
+                />
+            </div>
+            <div className="space-y-1">
                 <Label htmlFor={`step-type-${step.id}`}>Step Type</Label>
                 <Select
                     value={step.type}
-                    onValueChange={(value) => onChange({ ...step, type: value as WorkflowStep['type'], templateId: undefined })}
+                    onValueChange={(value) => onChange({ ...step, type: value as WorkflowStep['type'], templateId: undefined, prompt: undefined, structuredOutput: undefined })}
                 >
                     <SelectTrigger id={`step-type-${step.id}`}>
                         <SelectValue placeholder="Select step type" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="prompt">AI Prompt</SelectItem>
-                        <SelectItem value="agent-task">Agent Task</SelectItem>
+                        <SelectItem value="prompt">AI Prompt (from Template)</SelectItem>
+                        <SelectItem value="agent-task">Agent Task (from Template)</SelectItem>
                         <SelectItem value="human-in-the-loop">Human in the Loop</SelectItem>
                     </SelectContent>
                 </Select>
@@ -47,7 +81,7 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({ step, onChan
                     <Label htmlFor={`step-template-${step.id}`}>Template</Label>
                     <Select
                         value={step.templateId}
-                        onValueChange={(value) => onChange({ ...step, templateId: value })}
+                        onValueChange={handleTemplateChange}
                     >
                         <SelectTrigger id={`step-template-${step.id}`}>
                             <SelectValue placeholder="Select a template" />
@@ -55,7 +89,7 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({ step, onChan
                         <SelectContent>
                             {templatesToShow.map(template => (
                                 <SelectItem key={template.id} value={template.id}>
-                                    {template.name}
+                                    {step.type === 'agent-task' ? (template as any).prefixedName : template.name}
                                 </SelectItem>
                             ))}
                         </SelectContent>
