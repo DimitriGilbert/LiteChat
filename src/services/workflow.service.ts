@@ -532,9 +532,24 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
       console.error(`[WorkflowService] Error creating step ${stepIndex}:`, error);
       const errorMsg = error instanceof Error ? error.message : String(error);
       const interactionStore = useInteractionStore.getState();
-      interactionStore.appendStreamBuffer(run.mainInteractionId, `\n❌ **Error creating step ${stepIndex + 1}:** ${errorMsg}`);
-      interactionStore._updateInteractionInState(run.mainInteractionId, { status: 'ERROR', endedAt: new Date() });
-      interactionStore._removeStreamingId(run.mainInteractionId);
+      
+              // Update the main interaction response (like RacePromptControlModule does)
+        const errorUpdates = {
+          response: `❌ **Workflow Error**\n\nFailed to create step ${stepIndex + 1}: ${errorMsg}`,
+          status: 'ERROR' as const,
+          endedAt: new Date()
+        };
+        interactionStore._updateInteractionInState(run.mainInteractionId, errorUpdates);
+        interactionStore._removeStreamingId(run.mainInteractionId);
+        
+        // Save to persistence (like RacePromptControlModule does)
+        const errorMainInteraction = interactionStore.interactions.find(i => i.id === run.mainInteractionId);
+        if (errorMainInteraction) {
+          PersistenceService.saveInteraction({
+            ...errorMainInteraction,
+            ...errorUpdates,
+          } as Interaction).catch(console.error);
+        }
       emitter.emit(workflowEvent.error, { runId: run.runId, error: errorMsg });
     }
   },
@@ -629,20 +644,57 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
       if (activeRun.currentStepIndex >= activeRun.template.steps.length) {
         const interactionStore = useInteractionStore.getState();
         
-        const finalOutput = Object.entries(activeRun.stepOutputs)
-          .map(([key, value]) => `**${key}**: ${JSON.stringify(value, null, 2)}`)
-          .join('\n\n');
+        // Format workflow completion as markdown with input and all step outputs
+        const mainInteraction = interactionStore.interactions.find(i => i.id === activeRun.mainInteractionId);
+        const originalInput = mainInteraction?.prompt?.content || "No input";
         
-        interactionStore.setActiveStreamBuffer(
-          activeRun.mainInteractionId, 
-          `✅ **Workflow Completed.**\n\n**Final Outputs:**\n${finalOutput}`
-        );
+        // Build markdown summary
+        let markdownSummary = `# ${activeRun.template.name}\n\n`;
+        markdownSummary += `**Original Input:** ${originalInput}\n\n`;
+        markdownSummary += `---\n\n`;
         
-        interactionStore._updateInteractionInState(activeRun.mainInteractionId, { 
-          status: 'COMPLETED', 
-          endedAt: new Date() 
+        // Add each step's output
+        Object.entries(activeRun.stepOutputs).forEach(([stepKey, output], index) => {
+          if (stepKey === 'trigger') {
+            markdownSummary += `## Initial Processing\n\n`;
+          } else {
+            // Steps are sequential: step0, step1, step2... so index-1 (since trigger is index 0)
+            const stepIndex = index - 1;
+            const stepName = activeRun.template.steps[stepIndex]?.name || `Step ${stepIndex + 1}`;
+            markdownSummary += `## ${stepName}\n\n`;
+          }
+          
+          if (typeof output === 'object' && output !== null) {
+            // Format structured output nicely
+            Object.entries(output).forEach(([key, value]) => {
+              markdownSummary += `**${key}:** ${value}\n\n`;
+            });
+          } else {
+            markdownSummary += `${output}\n\n`;
+          }
+          
+          markdownSummary += `---\n\n`;
         });
+        
+        markdownSummary += `✅ **Workflow completed successfully**`;
+        
+        // Update the main interaction response (like RacePromptControlModule does)
+        const completionUpdates = {
+          response: markdownSummary,
+          status: 'COMPLETED' as const,
+          endedAt: new Date()
+        };
+        interactionStore._updateInteractionInState(activeRun.mainInteractionId, completionUpdates);
         interactionStore._removeStreamingId(activeRun.mainInteractionId);
+        
+        // Save to persistence (like RacePromptControlModule does)
+        const completionMainInteraction = interactionStore.interactions.find(i => i.id === activeRun.mainInteractionId);
+        if (completionMainInteraction) {
+          PersistenceService.saveInteraction({
+            ...completionMainInteraction,
+            ...completionUpdates,
+          } as Interaction).catch(console.error);
+        }
         
         emitter.emit(workflowEvent.completed, { runId: activeRun.runId, finalOutput: activeRun.stepOutputs });
         console.log(`[WorkflowService] Workflow completed: ${runId}`);
