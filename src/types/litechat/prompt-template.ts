@@ -3,7 +3,7 @@ export interface PromptVariable {
   description: string;
   type: "string" | "number" | "boolean" | "array";
   required: boolean;
-  default?: string;
+  default?: any;
   instructions?: string;
 }
 

@@ -11,7 +11,6 @@ import type {
   PromptTurnObject,
   InputAreaRenderer,
   InputAreaRef,
-  ResolvedRuleContent,
 } from "@/types/litechat/prompt";
 import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";

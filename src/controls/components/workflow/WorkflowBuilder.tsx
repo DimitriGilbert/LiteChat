@@ -15,7 +15,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useFormedible } from '@/hooks/use-formedible';
 import type { PromptTemplate } from '@/types/litechat/prompt-template';
 import { compilePromptTemplate } from '@/lib/litechat/prompt-util';
-import * as z from 'zod';
 
 interface WorkflowBuilderProps {
     module: WorkflowControlModule;
@@ -31,41 +30,21 @@ const TriggerForm: React.FC<{
 
     const fields = useMemo(() => template.variables.map(v => ({
         name: v.name,
-        type: v.type, // Assumes mapping between variable types and formedible field types
+        type: v.type,
         label: v.name,
         placeholder: v.description,
         description: v.instructions,
         required: v.required,
     })), [template]);
     
-    const zodSchema = useMemo(() => z.object(
-        template.variables.reduce((acc, v) => {
-            let validator: z.ZodTypeAny = z.any();
-            switch(v.type) {
-                case 'string': validator = z.string(); break;
-                case 'number': validator = z.number(); break;
-                case 'boolean': validator = z.boolean(); break;
-            }
-            if(v.required) {
-                // A non-empty check for strings, basic check for others
-                if (validator instanceof z.ZodString) {
-                     validator = validator.min(1, `${v.name} is required.`);
-                }
-            }
-            acc[v.name] = validator;
-            return acc;
-        }, {} as Record<string, z.ZodTypeAny>)
-    ), [template]);
-
     const { Form } = useFormedible({
         fields,
-        schema: zodSchema,
         formOptions: {
             defaultValues: initialValues,
             onChange: ({ value }) => onValuesChange(value),
         },
         formClassName: 'mt-4 border-t pt-4',
-        submitLabel: 'N/A - Values captured on change'
+        showSubmitButton: false,
     });
 
     return <Form />;
@@ -86,6 +65,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     const [customPrompt, setCustomPrompt] = useState('');
     const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
     const [formValues, setFormValues] = useState<Record<string, any>>({});
+    const [compilationError, setCompilationError] = useState<string | null>(null);
     
     const promptTemplates = module.getPromptTemplates();
     const agentTasks = module.getAgentTasks();
@@ -96,6 +76,19 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
         if (!selectedTemplateId) return null;
         return allTemplates.find(t => t.id === selectedTemplateId);
     }, [selectedTemplateId, allTemplates]);
+
+    const handleFormValuesChange = async (values: Record<string, any>) => {
+        setFormValues(values);
+        if (selectedTemplate) {
+            try {
+                // We compile here to validate the inputs in real-time
+                await compilePromptTemplate(selectedTemplate, values);
+                setCompilationError(null);
+            } catch (error) {
+                setCompilationError(error instanceof Error ? error.message : "Invalid input");
+            }
+        }
+    };
 
     const handleAddStep = () => {
         const newStep: WorkflowStep = {
@@ -114,6 +107,11 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     };
 
     const handleRunWorkflow = async () => {
+        if (compilationError) {
+            module.getModApi()?.showToast("error", `Please fix the errors before running: ${compilationError}`);
+            return;
+        }
+
         let finalInitialPrompt = '';
         if (triggerType === 'custom') {
             finalInitialPrompt = customPrompt;
@@ -132,7 +130,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     };
 
     const isRunDisabled = (triggerType === 'custom' && !customPrompt) ||
-                          (triggerType !== 'custom' && !selectedTemplateId) ||
+                          (triggerType !== 'custom' && (!selectedTemplateId || !!compilationError)) ||
                           workflow.steps.length === 0;
 
     const templatesForTrigger = triggerType === 'template' ? promptTemplates : agentTasks;
@@ -218,11 +216,16 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                                             </SelectContent>
                                         </Select>
                                         {selectedTemplate && (
-                                            <TriggerForm 
-                                                template={selectedTemplate} 
-                                                onValuesChange={setFormValues}
-                                                initialValues={formValues}
-                                            />
+                                            <div className='mt-2'>
+                                                <TriggerForm 
+                                                    template={selectedTemplate} 
+                                                    onValuesChange={handleFormValuesChange}
+                                                    initialValues={formValues}
+                                                />
+                                                {compilationError && (
+                                                    <p className="text-sm text-destructive mt-2">{compilationError}</p>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 )}
@@ -250,12 +253,11 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                                             No subsequent steps. Add one to create a sequence.
                                         </div>
                                     )}
+                                    <Button size="sm" onClick={handleAddStep} className="w-full mt-4">
+                                        <Plus className="h-4 w-4 mr-2" /> Add Step
+                                    </Button>
                                 </div>
                             </ScrollArea>
-                            <Button variant="outline" onClick={handleAddStep}>
-                                <Plus className="mr-2 h-4 w-4" />
-                                Add Step
-                            </Button>
                         </div>
                     </div>
 

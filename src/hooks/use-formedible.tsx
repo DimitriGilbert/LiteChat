@@ -107,6 +107,7 @@ interface UseFormedibleOptions<TFormValues> {
   disabled?: boolean;
   loading?: boolean;
   resetOnSubmitSuccess?: boolean;
+  showSubmitButton?: boolean;
 }
 
 const defaultFieldComponents: Record<string, React.ComponentType<any>> = {
@@ -181,6 +182,7 @@ export function useFormedible<TFormValues extends Record<string, any>>(
     disabled = false,
     loading = false,
     resetOnSubmitSuccess = false,
+    showSubmitButton = true,
   } = options;
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -422,7 +424,7 @@ export function useFormedible<TFormValues extends Record<string, any>>(
     };
 
     const renderNavigation = () => {
-      if (!hasPages) {
+      if (!hasPages && showSubmitButton) {
         return (
           <form.Subscribe
             selector={(state) => ({

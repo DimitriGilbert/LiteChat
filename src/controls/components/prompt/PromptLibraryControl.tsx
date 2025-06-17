@@ -5,6 +5,7 @@ import { usePromptTemplateStore } from "@/store/prompt-template.store";
 import { useShallow } from "zustand/react/shallow";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { uiEvent } from "@/types/litechat/events/ui.events";
+import { parseVariableValue } from "@/lib/litechat/prompt-util";
 
 import { toast } from "sonner";
 // Forward declare the module type to avoid circular import issues
@@ -157,26 +158,14 @@ function PromptTemplateForm({
           variable.type === "number" ? "number" : 
           variable.type === "array" ? "textarea" : "text",
     label: variable.name,
-    placeholder: variable.default || `Enter ${variable.name}`,
+    placeholder: variable.default != null ? String(variable.default) : `Enter ${variable.name}`,
     description: variable.description || variable.instructions,
     required: variable.required,
   }));
 
   const defaultValues = template.variables.reduce((acc, variable) => {
-    if (variable.default) {
-      if (variable.type === "number") {
-        acc[variable.name] = parseFloat(variable.default) || 0;
-      } else if (variable.type === "boolean") {
-        acc[variable.name] = variable.default.toLowerCase() === "true";
-      } else if (variable.type === "array") {
-        try {
-          acc[variable.name] = JSON.parse(variable.default);
-        } catch {
-          acc[variable.name] = variable.default.split(",").map(s => s.trim());
-        }
-      } else {
-        acc[variable.name] = variable.default;
-      }
+    if (variable.default !== undefined) {
+      acc[variable.name] = parseVariableValue(variable.default, variable.type);
     }
     return acc;
   }, {} as Record<string, any>);

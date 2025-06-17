@@ -1,35 +1,75 @@
-import type { PromptTemplate, PromptFormData, CompiledPrompt } from "@/types/litechat/prompt-template";
+import type { PromptTemplate, PromptFormData, CompiledPrompt, PromptVariable } from "@/types/litechat/prompt-template";
+
+/**
+ * Parses the string-based default value from a prompt variable into its correct type.
+ * @param variable The prompt variable definition.
+ * @returns The parsed default value, or undefined if none is present.
+ */
+export function parseVariableValue(value: any, type: PromptVariable['type']): any {
+    if (value === undefined || value === null) return value;
+
+    switch (type) {
+        case "number":
+            const num = parseFloat(value);
+            return isNaN(num) ? undefined : num;
+        case "boolean":
+            return String(value).toLowerCase() === "true";
+        case "array":
+            if (Array.isArray(value)) return value; // Already an array
+            try {
+                const parsed = JSON.parse(value);
+                return Array.isArray(parsed) ? parsed : [String(value)];
+            } catch {
+                return String(value).split(",").map(s => s.trim());
+            }
+        case "string":
+        default:
+            return String(value);
+    }
+}
 
 /**
  * Replaces placeholders in a template string with corresponding values from a FormData object.
+ * It now supports flexible spacing (e.g., {{ variable }}) and correctly serializes objects/arrays.
  *
- * @param content - The template string with placeholders (e.g., "Hello, {{name}}").
- * @param variables - An array of variable definitions for the template.
+ * @param content - The template string with placeholders.
  * @param formData - An object containing the data to fill in the placeholders.
  * @returns The content with placeholders filled.
  */
-function fillPlaceholders(content: string, variables: PromptTemplate['variables'], formData: PromptFormData): string {
-    let filledContent = content;
-    if (!variables) {
-        return filledContent;
-    }
-    variables.forEach(variable => {
-        const placeholder = `{{${variable.name}}}`;
-        const value = formData[variable.name];
+function fillPlaceholders(content: string, formData: PromptFormData): string {
+    // Regex to find {{variable_name}} with optional whitespace
+    return content.replace(/\{\{\s*([\w_.-]+)\s*\}\}/g, (match, variableName) => {
+        const value = formData[variableName];
 
-        if (value !== undefined) {
-            // For array values (e.g., from multi-select), join them into a string
-            const replacement = Array.isArray(value) ? value.join(', ') : String(value);
-            filledContent = filledContent.replace(new RegExp(placeholder, 'g'), replacement);
+        if (value === undefined || value === null) {
+            // Keep placeholder for missing non-required variables
+            return match;
         }
+
+        // Handle arrays: serialize objects, convert others to string, then join
+        if (Array.isArray(value)) {
+            return value.map(item => {
+                if (item === null) return 'null';
+                if (typeof item === 'object') return JSON.stringify(item);
+                return String(item);
+            }).join(', ');
+        }
+        
+        // Handle non-array objects
+        if (typeof value === 'object') {
+            return JSON.stringify(value);
+        }
+
+        // Handle primitives
+        return String(value);
     });
-    return filledContent;
 }
 
 
 /**
  * Compiles a prompt template with the given form data.
- * It fills placeholders, selects tools, and selects rules.
+ * It validates required variables, applies defaults, fills placeholders, 
+ * and selects tools and rules.
  *
  * @param template - The PromptTemplate object to compile.
  * @param formData - The form data to use for compilation.
@@ -37,9 +77,31 @@ function fillPlaceholders(content: string, variables: PromptTemplate['variables'
  */
 export async function compilePromptTemplate(template: PromptTemplate, formData: PromptFormData): Promise<CompiledPrompt> {
     const variables = template.variables || [];
+    const processedFormData = { ...formData };
+
+    // Validate required variables and apply defaults
+    for (const variable of variables) {
+        let value = processedFormData[variable.name];
+
+        // Use default value if the current value is undefined or null
+        if ((value === undefined || value === null) && variable.default !== undefined) {
+            value = parseVariableValue(variable.default, variable.type);
+            processedFormData[variable.name] = value;
+        }
+
+        // Check for required variables
+        if (variable.required) {
+            if (value === undefined || value === null || value === '') {
+                throw new Error(`Required variable "${variable.name}" is missing or empty.`);
+            }
+            if (Array.isArray(value) && value.length === 0) {
+                throw new Error(`Required variable "${variable.name}" cannot be an empty array.`);
+            }
+        }
+    }
     
     // Fill in the main content
-    const compiledContent = fillPlaceholders(template.prompt, variables, formData);
+    const compiledContent = fillPlaceholders(template.prompt, processedFormData);
     
     // TODO: Add logic for selecting tools and rules based on formData if needed in the future
     const selectedTools = template.tools || [];

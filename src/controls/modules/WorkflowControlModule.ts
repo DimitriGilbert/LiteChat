@@ -77,6 +77,8 @@ export class WorkflowControlModule implements ControlModule {
   public getModels = (): ModelListItem[] => this.allModels;
   public getGlobalModel = (): AiModelConfig | undefined => useProviderStore.getState().getSelectedModel();
 
+  public getModApi = (): LiteChatModApi | null => this.modApi;
+
   public setNotifyCallback = (cb: (() => void) | null): void => {
     this.notifyComponentUpdate = cb;
   };
