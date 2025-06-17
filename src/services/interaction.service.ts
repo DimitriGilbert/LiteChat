@@ -590,8 +590,8 @@ export const InteractionService = {
       endedAt: null,
       type: interactionType,
       status: "STREAMING",
-      prompt: initiatingTurnData,
-      response: "",
+      prompt: { ...initiatingTurnData }, // Create a copy to avoid reference mutations
+      response: null, // Keep as null for proper API contract
       index: newIndex,
       parentId: defaultParentId,
       metadata: {
