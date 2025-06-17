@@ -12,7 +12,6 @@ interface WorkflowStepCardProps {
     onChange: (updatedStep: WorkflowStep) => void;
     promptTemplates: PromptTemplate[];
     agentTasks: (PromptTemplate & { prefixedName: string })[];
-    allTemplates: PromptTemplate[];
     models: ModelListItem[];
 }
 
@@ -21,7 +20,6 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
     onChange, 
     promptTemplates, 
     agentTasks,
-    allTemplates,
     models,
 }) => {
     
@@ -32,12 +30,13 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
             : [];
 
     const handleTemplateChange = (templateId: string) => {
-        const template = allTemplates.find(t => t.id === templateId);
+        // Only store reference - NO data duplication
         onChange({
             ...step,
             templateId: templateId,
-            prompt: template?.prompt,
-            structuredOutput: template?.structuredOutput,
+            // Remove duplicated fields - get from template at runtime
+            prompt: undefined,
+            structuredOutput: undefined,
         });
     };
     
@@ -80,7 +79,7 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
                 <div className="space-y-1">
                     <Label htmlFor={`step-template-${step.id}`}>Template</Label>
                     <Select
-                        value={step.templateId}
+                        value={step.templateId || ''}
                         onValueChange={handleTemplateChange}
                     >
                         <SelectTrigger id={`step-template-${step.id}`}>

@@ -1,7 +1,7 @@
 // src/components/LiteChat/canvas/interaction/CardHeader.tsx
 // FULL FILE
 import React from "react";
-import { BotIcon, ClockIcon, ZapIcon, CoinsIcon } from "lucide-react";
+import { BotIcon, ClockIcon, ZapIcon, CoinsIcon, WandSparklesIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -9,8 +9,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import type { InteractionType } from "@/types/litechat/interaction";
 
 interface CardHeaderProps {
+  interactionType: InteractionType;
   displayModelName: string;
   timeAgo: string;
   isFolded: boolean; // Maintained for consistency, fold button is now a control
@@ -29,7 +31,17 @@ const formatMs = (ms: number | undefined): string => {
   return `${(ms / 1000).toFixed(2)}s`;
 };
 
+const InteractionIcon = ({ type }: { type: InteractionType }) => {
+  switch (type) {
+    case 'message.workflow_step':
+      return <WandSparklesIcon className="h-4 w-4 text-secondary flex-shrink-0 mt-0.5" />;
+    default:
+      return <BotIcon className="h-4 w-4 text-secondary flex-shrink-0 mt-0.5" />;
+  }
+};
+
 export const CardHeader: React.FC<CardHeaderProps> = ({
+  interactionType,
   displayModelName,
   timeAgo,
   // responseContent, // No longer needed here for copy
@@ -54,7 +66,7 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
       )}
     >
       <div className="flex items-start gap-1 min-w-0 mb-1 sm:mb-0">
-        <BotIcon className="h-4 w-4 text-secondary flex-shrink-0 mt-0.5" />
+        <InteractionIcon type={interactionType} />
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-1">
             <span className="text-xs font-semibold text-secondary truncate mr-1">

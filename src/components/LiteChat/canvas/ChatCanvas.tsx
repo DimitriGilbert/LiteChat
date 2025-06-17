@@ -324,6 +324,9 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
       // Determine the user prompt associated with this active interaction (turn)
       if (activeInteraction.type === "message.user_assistant" && activeInteraction.prompt) {
         userPromptToDisplay = activeInteraction.prompt;
+      } else if (activeInteraction.type === "message.workflow_step" && activeInteraction.prompt) {
+        // Workflow steps have their own prompts
+        userPromptToDisplay = activeInteraction.prompt;
       } else if (activeInteraction.type === "message.assistant_regen" && activeInteraction.metadata?.regeneratedFromId) {
         // Find the original user_assistant interaction that this regen chain started from.
         // This original interaction should be a child of the current activeInteraction or one of its ancestors in the regen chain.
@@ -382,7 +385,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
             interactionId={activeInteraction.id}
           />
         );
-      } else if (activeInteraction.type !== "message.user_assistant" && activeInteraction.type !== "message.assistant_regen") {
+      } else if (activeInteraction.type !== "message.user_assistant" && activeInteraction.type !== "message.assistant_regen" && activeInteraction.type !== "message.workflow_step") {
         // If it's some other type of active interaction on the spine that doesn't have a typical prompt/response structure, 
         // it might need its own renderer or be skipped. For now, we skip if no prompt found for assistant types.
         // This case should be rare for visible chat messages.

@@ -175,6 +175,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
           {menuSlot}
 
           <CardHeader
+            interactionType={interaction.type}
             displayModelName={displayModelName}
             timeAgo={timeAgo}
             isFolded={isResponseFolded}

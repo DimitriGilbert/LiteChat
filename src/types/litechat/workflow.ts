@@ -38,7 +38,8 @@ export type WorkflowRunStatus = "IDLE" | "RUNNING" | "PAUSED" | "COMPLETED" | "E
 
 export interface WorkflowRun {
   runId: string; // Unique ID for this specific run
-  mainInteractionId: string; // The ID of the parent 'workflow.run' interaction
+  conversationId: string; // The conversation this run belongs to
+  mainInteractionId: string; // The "host" interaction for this run's UI
   template: WorkflowTemplate;
   status: WorkflowRunStatus;
   currentStepIndex: number;

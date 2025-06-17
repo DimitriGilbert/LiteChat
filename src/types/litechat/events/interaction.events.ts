@@ -70,6 +70,7 @@ export interface InteractionEventPayloads {
     error?: string;
     toolCalls?: ToolCallPart[];
     toolResults?: ToolResultPart[];
+    interaction?: Interaction;
   };
   [interactionEvent.loadInteractionsRequest]: { conversationId: string };
   [interactionEvent.rateInteractionRequest]: {

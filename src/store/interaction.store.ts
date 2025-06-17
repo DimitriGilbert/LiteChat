@@ -42,6 +42,8 @@ interface InteractionActions {
   _addStreamingId: (id: string) => void;
   _removeStreamingId: (id: string) => void;
   setActiveStreamBuffer: (id: string, content: string) => void;
+  appendStreamBuffer: (id: string, chunk: string) => void;
+  removeActiveStreamBuffer: (id: string) => void;
   getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
@@ -243,12 +245,23 @@ export const useInteractionStore = create(
 
     setActiveStreamBuffer: (id, content) => {
       set((state) => {
-        if (state.streamingInteractionIds.includes(id)) {
-          state.activeStreamBuffers[id] = content;
+        state.activeStreamBuffers[id] = content;
+      });
+    },
+
+    appendStreamBuffer: (id, chunk) => {
+      set((state) => {
+        if (state.activeStreamBuffers[id] === undefined) {
+          state.activeStreamBuffers[id] = chunk;
+        } else {
+          state.activeStreamBuffers[id] += chunk;
         }
       });
-      emitter.emit(interactionEvent.activeStreamBuffersChanged, {
-        buffers: get().activeStreamBuffers,
+    },
+
+    removeActiveStreamBuffer: (id) => {
+      set((state) => {
+        delete state.activeStreamBuffers[id];
       });
     },
 
@@ -367,55 +380,21 @@ export const useInteractionStore = create(
     },
 
     _addStreamingId: (id) => {
-      let statusChanged = false;
       set((state) => {
         if (!state.streamingInteractionIds.includes(id)) {
           state.streamingInteractionIds.push(id);
-          state.activeStreamBuffers[id] = "";
-          state.activeReasoningBuffers[id] = "";
-          if (state.streamingInteractionIds.length === 1) {
-            state.status = "streaming";
-            statusChanged = true;
-          }
-          state.error = null;
         }
-      });
-      if (statusChanged) {
-        emitter.emit(interactionEvent.statusChanged, {
-          status: "streaming",
-        });
-      }
-      emitter.emit(interactionEvent.streamingIdsChanged, {
-        streamingIds: get().streamingInteractionIds,
       });
     },
 
     _removeStreamingId: (id) => {
-      let statusChanged = false;
       set((state) => {
-        const index = state.streamingInteractionIds.indexOf(id);
-        if (index !== -1) {
-          state.streamingInteractionIds.splice(index, 1);
-          delete state.activeStreamBuffers[id];
-          delete state.activeReasoningBuffers[id];
-          if (
-            state.streamingInteractionIds.length === 0 &&
-            state.status === "streaming"
-          ) {
-            state.status = state.error ? "error" : "idle";
-            statusChanged = true;
-          }
-        }
-      });
-      if (statusChanged) {
-        emitter.emit(interactionEvent.statusChanged, {
-          status: get().status,
-        });
-      }
-      emitter.emit(interactionEvent.streamingIdsChanged, {
-        streamingIds: get().streamingInteractionIds,
+        state.streamingInteractionIds = state.streamingInteractionIds.filter(
+          (streamingId) => streamingId !== id
+        );
       });
     },
+
     getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
       const storeId = "interactionStore";
       const actions = get();

@@ -11,58 +11,85 @@ import { useProviderStore } from "@/store/provider.store";
 import type { AiModelConfig, ModelListItem } from "@/types/litechat/provider";
 import { providerEvent } from "@/types/litechat/events/provider.events";
 import { usePromptTemplateStore } from "@/store/prompt-template.store";
+import { toast } from "sonner";
 
 export class WorkflowControlModule implements ControlModule {
   readonly id = "core-workflow-control";
   private modApi: LiteChatModApi | null = null;
-  private isStreaming = false;
-  private notifyComponentUpdate: (() => void) | null = null;
   private eventUnsubscribers: (() => void)[] = [];
-  private allTemplates: PromptTemplate[] = [];
-  private allModels: ModelListItem[] = [];
+  private notifyComponentUpdate: (() => void) | null = null;
+
+  // Provider state
+  public globallyEnabledModels: ModelListItem[] = [];
+  public isLoadingProviders = false;
+  public allTemplates: PromptTemplate[] = [];
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApi = modApi;
-    this.isStreaming = useInteractionStore.getState().status === "streaming";
-    const providerStore = useProviderStore.getState();
-    if (!providerStore.isLoading) {
-      this.allModels = providerStore.getGloballyEnabledModelDefinitions();
-    }
+
+    // Get initial provider state
+    const providerState = useProviderStore.getState();
+    this.globallyEnabledModels = providerState.getGloballyEnabledModelDefinitions();
+    this.isLoadingProviders = providerState.isLoading;
     this.allTemplates = usePromptTemplateStore.getState().promptTemplates;
 
-    const unsubStatus = modApi.on("interaction.status.changed", (payload) => {
-      if (typeof payload === "object" && payload && "status" in payload) {
-        const newStreamingStatus = payload.status === "streaming";
-        if (this.isStreaming !== newStreamingStatus) {
-          this.isStreaming = newStreamingStatus;
+    // Subscribe to provider events to track enabled models
+    const unsubGloballyEnabledModelsUpdated = modApi.on(
+      providerEvent.globallyEnabledModelsUpdated,
+      (payload: { models: ModelListItem[] }) => {
+        this.globallyEnabledModels = payload.models;
+        this.notifyComponentUpdate?.();
+      }
+    );
+
+    const unsubInitialDataLoaded = modApi.on(
+      providerEvent.initialDataLoaded,
+      (data: any) => {
+        if (data.globallyEnabledModels) {
+          this.globallyEnabledModels = data.globallyEnabledModels;
+          this.isLoadingProviders = false;
           this.notifyComponentUpdate?.();
         }
       }
-    });
+    );
 
-    const unsubTemplatesChanged = modApi.on(promptTemplateEvent.promptTemplatesChanged, (payload) => {
+    const unsubTemplatesChanged = modApi.on(
+      promptTemplateEvent.promptTemplatesChanged,
+      (payload) => {
         if (payload?.promptTemplates) {
-            this.allTemplates = payload.promptTemplates;
-            this.notifyComponentUpdate?.();
+          this.allTemplates = payload.promptTemplates;
+          this.notifyComponentUpdate?.();
         }
-    });
+      }
+    );
 
-    const unsubModelsChanged = modApi.on(providerEvent.globallyEnabledModelsUpdated, (payload) => {
-        this.allModels = payload.models;
-        this.notifyComponentUpdate?.();
-    });
+    this.eventUnsubscribers.push(
+      unsubGloballyEnabledModelsUpdated,
+      unsubInitialDataLoaded,
+      unsubTemplatesChanged
+    );
 
-    this.eventUnsubscribers.push(unsubStatus, unsubTemplatesChanged, unsubModelsChanged);
-    
     // Request templates on initialization
     modApi.emit(promptTemplateEvent.loadPromptTemplatesRequest, {});
   }
 
-  // --- Public API for the Component ---
-  
-  public getIsStreaming = (): boolean => this.isStreaming;
-  public getPromptTemplates = (): PromptTemplate[] => this.allTemplates.filter(t => (t.type || 'prompt') === 'prompt');
-  public getAgentTasks = (): (PromptTemplate & { prefixedName: string })[] => {
+  destroy(): void {
+    this.eventUnsubscribers.forEach((unsub) => unsub());
+    this.eventUnsubscribers = [];
+    this.notifyComponentUpdate = null;
+    this.modApi = null;
+  }
+
+  setNotifyCallback(callback: (() => void) | null): void {
+    this.notifyComponentUpdate = callback;
+  }
+
+  // Public API for the component
+  getPromptTemplates(): PromptTemplate[] {
+    return this.allTemplates.filter(t => (t.type || 'prompt') === 'prompt');
+  }
+
+  getAgentTasks(): (PromptTemplate & { prefixedName: string })[] {
     const agents = this.allTemplates.filter(t => t.type === 'agent');
     const agentNameById = new Map(agents.map(a => [a.id, a.name]));
     
@@ -72,22 +99,29 @@ export class WorkflowControlModule implements ControlModule {
         ...t,
         prefixedName: `${agentNameById.get(t.parentId!) || 'Unknown Agent'}: ${t.name}`
       }));
-  };
-  public getAllTemplates = (): PromptTemplate[] => this.allTemplates;
-  public getModels = (): ModelListItem[] => this.allModels;
-  public getGlobalModel = (): AiModelConfig | undefined => useProviderStore.getState().getSelectedModel();
+  }
 
-  public getModApi = (): LiteChatModApi | null => this.modApi;
+  getAllTemplates(): PromptTemplate[] {
+    return this.allTemplates;
+  }
 
-  public setNotifyCallback = (cb: (() => void) | null): void => {
-    this.notifyComponentUpdate = cb;
-  };
+  getModels(): ModelListItem[] {
+    return this.globallyEnabledModels;
+  }
 
-  public startWorkflow = (template: WorkflowTemplate, initialPrompt: string): void => {
-    this.modApi?.emit(workflowEvent.startRequest, { template, initialPrompt });
-  };
+  getGlobalModel(): AiModelConfig | undefined {
+    return useProviderStore.getState().getSelectedModel();
+  }
 
-  // --- ControlModule Implementation ---
+  startWorkflow(template: WorkflowTemplate, initialPrompt: string): void {
+    const conversationId = useInteractionStore.getState().currentConversationId;
+    if (!conversationId) {
+      toast.error("Cannot start workflow: No active conversation selected.");
+      console.error("[WorkflowControlModule] startWorkflow called without an active conversation.");
+      return;
+    }
+    this.modApi?.emit(workflowEvent.startRequest, { template, initialPrompt, conversationId });
+  }
 
   register(modApi: LiteChatModApi): void {
     this.modApi = modApi;
@@ -96,13 +130,5 @@ export class WorkflowControlModule implements ControlModule {
       status: () => "ready",
       triggerRenderer: () => React.createElement(WorkflowBuilder, { module: this }),
     });
-  }
-
-  destroy(): void {
-    this.eventUnsubscribers.forEach((unsub) => unsub());
-    this.eventUnsubscribers = [];
-    this.notifyComponentUpdate = null;
-    this.modApi = null;
-    console.log(`[${this.id}] Destroyed.`);
   }
 } 

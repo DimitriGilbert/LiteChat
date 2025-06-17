@@ -583,41 +583,37 @@ export const InteractionService = {
     const startTime = performance.now();
     this._interactionStartTimes.set(interactionId, startTime);
 
-    const interactionData: Interaction = {
+    const interaction: Interaction = {
       id: interactionId,
       conversationId: conversationId,
-      type: interactionType,
-      prompt: { ...initiatingTurnData },
-      response: null,
-      status: "STREAMING",
       startedAt: new Date(),
       endedAt: null,
+      type: interactionType,
+      status: "STREAMING",
+      prompt: initiatingTurnData,
+      response: "",
+      index: newIndex,
+      parentId: defaultParentId,
       metadata: {
         ...(initiatingTurnData.metadata || {}),
         ...(finalPrompt.metadata || {}),
         toolCalls: [],
         toolResults: [],
         reasoning: undefined,
-        timeToFirstToken: undefined,
-        generationTime: undefined,
-        isTitleGeneration: interactionType === "conversation.title_generation",
-        isCompactGeneration: interactionType === "conversation.compact",
       },
-      index: newIndex,
-      parentId: defaultParentId,
     };
 
     if (interactionType !== "conversation.title_generation" && interactionType !== "conversation.compact") {
-      interactionStoreState._addInteractionToState(interactionData);
+      interactionStoreState._addInteractionToState(interaction);
       interactionStoreState._addStreamingId(interactionId);
     } else {
-      interactionStoreState._addInteractionToState(interactionData);
+      interactionStoreState._addInteractionToState(interaction);
       interactionStoreState._addStreamingId(interactionId);
       console.log(
         `[InteractionService] Added ${interactionType} interaction ${interactionId} to state.`
       );
     }
-    PersistenceService.saveInteraction({ ...interactionData }).catch((e) => {
+    PersistenceService.saveInteraction({ ...interaction }).catch((e) => {
       console.error(
         `[InteractionService] Failed initial persistence for ${interactionId}`,
         e
@@ -627,7 +623,7 @@ export const InteractionService = {
     emitter.emit(interactionEvent.started, {
       interactionId,
       conversationId,
-      type: interactionData.type,
+      type: interaction.type,
     });
 
     const targetModelId = finalPrompt.metadata?.modelId;
@@ -904,7 +900,7 @@ export const InteractionService = {
       }
     );
 
-    return interactionData; 
+    return interaction; 
   },
 
   abortInteraction(interactionId: string): void {
@@ -1425,6 +1421,7 @@ export const InteractionService = {
     }
 
     emitter.emit(interactionEvent.completed, {
+      interaction: finalInteractionState,
       interactionId,
       status: status,
       error: error?.message,

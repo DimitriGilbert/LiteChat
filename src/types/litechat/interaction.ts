@@ -7,6 +7,7 @@ export type InteractionType =
   | "message.user_assistant"
   | "message.assistant_regen"
   | "message.user_edit"
+  | "message.workflow_step"
   | "conversation.title_generation"
   | "conversation.compact"
   | "prompt.enhance"
@@ -22,7 +23,8 @@ export type InteractionStatus =
   | "ERROR"
   | "WARNING"
   | "CANCELLED"
-  | "PAUSED";
+  | "PAUSED"
+  | "AWAITING_INPUT";
 
 // Represents one logical unit in the conversation flow
 export interface Interaction {

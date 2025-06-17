@@ -4,6 +4,8 @@ export const workflowEvent = {
   // --- Requests ---
   // Fired by the UI to start a new workflow
   startRequest: "workflow.start.request",
+  // Fired by the reactive UI engine to run the next step in a workflow
+  runNextStepRequest: "workflow.runNextStep.request",
   // Fired by the UI (Human in the Loop control) to resume a paused workflow
   resumeRequest: "workflow.resume.request",
   // Fired by the UI to cancel a running workflow
@@ -29,6 +31,10 @@ export interface WorkflowEventPayloads {
   [workflowEvent.startRequest]: {
     template: WorkflowTemplate;
     initialPrompt: string; // The first user message that kicks off the workflow
+    conversationId: string; // The ID of the conversation this workflow belongs to
+  };
+  [workflowEvent.runNextStepRequest]: {
+    run: WorkflowRun;
   };
   [workflowEvent.resumeRequest]: {
     runId: string;

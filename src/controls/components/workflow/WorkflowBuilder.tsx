@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { WorkflowControlModule } from '@/controls/modules/WorkflowControlModule';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -13,42 +13,15 @@ import { WorkflowStepCard } from './WorkflowStepCard';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFormedible } from '@/hooks/use-formedible';
-import type { PromptTemplate } from '@/types/litechat/prompt-template';
 import { compilePromptTemplate } from '@/lib/litechat/prompt-util';
+import { useInteractionStore } from '@/store/interaction.store';
+import { toast } from 'sonner';
 
 interface WorkflowBuilderProps {
     module: WorkflowControlModule;
 }
 
 type TriggerType = 'custom' | 'template' | 'task';
-
-const TriggerForm: React.FC<{
-    template: PromptTemplate;
-    onValuesChange: (values: Record<string, any>) => void;
-    initialValues: Record<string, any>;
-}> = ({ template, onValuesChange, initialValues }) => {
-
-    const fields = useMemo(() => template.variables.map(v => ({
-        name: v.name,
-        type: v.type,
-        label: v.name,
-        placeholder: v.description,
-        description: v.instructions,
-        required: v.required,
-    })), [template]);
-    
-    const { Form } = useFormedible({
-        fields,
-        formOptions: {
-            defaultValues: initialValues,
-            onChange: ({ value }) => onValuesChange(value),
-        },
-        formClassName: 'mt-4 border-t pt-4',
-        showSubmitButton: false,
-    });
-
-    return <Form />;
-}
 
 export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     const [open, setOpen] = useState(false);
@@ -64,46 +37,70 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     const [triggerType, setTriggerType] = useState<TriggerType>('custom');
     const [customPrompt, setCustomPrompt] = useState('');
     const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-    const [initialFormValues, setInitialFormValues] = useState<Record<string, any>>({});
-    
-    // Use refs to avoid re-renders on compilation
-    const formValuesRef = useRef<Record<string, any>>({});
-    const compilationResultRef = useRef<{ content: string; error: string | null }>({ content: '', error: null });
-    const previewElementRef = useRef<HTMLDivElement | null>(null);
+    const [, setForceUpdate] = useState(0);
 
+    // Get data from module (following RacePromptControl pattern)
     const promptTemplates = module.getPromptTemplates();
     const agentTasks = module.getAgentTasks();
     const allTemplates = module.getAllTemplates();
     const models = module.getModels();
 
+    // Check streaming status from store (following RegenerateActionControlModule pattern)
+    const isStreaming = useInteractionStore(state => state.status === "streaming");
+
+    // Set up notification callback (following RacePromptControl pattern)
+    useEffect(() => {
+        const notifyUpdate = () => setForceUpdate(prev => prev + 1);
+        module.setNotifyCallback(notifyUpdate);
+        
+        return () => {
+            module.setNotifyCallback(null);
+        };
+    }, [module]);
+
     const selectedTemplate = useMemo(() => {
         if (!selectedTemplateId) return null;
-        // Reset state when template changes
-        setInitialFormValues({});
-        formValuesRef.current = {};
-        compilationResultRef.current = { content: '', error: null };
         return allTemplates.find(t => t.id === selectedTemplateId);
     }, [selectedTemplateId, allTemplates]);
+    
+    const fields = useMemo(() => {
+        if (!selectedTemplate) return [];
+        return selectedTemplate.variables.map(v => ({
+            name: v.name,
+            type: v.type || 'text',
+            label: v.name,
+            placeholder: v.description,
+            description: v.instructions,
+            required: v.required,
+        }))
+    }, [selectedTemplate]);
 
-    const handleFormValuesChange = async (values: Record<string, any>) => {
-        // Only update the ref, NOT state. This prevents re-renders.
-        formValuesRef.current = values;
+    const { form: triggerForm, Form: TriggerFormFields } = useFormedible({
+        fields,
+        formOptions: {
+            defaultValues: {},
+        },
+        showSubmitButton: false,
+        formClassName: 'space-y-4 mt-4 border-t pt-4',
+    });
 
-        if (selectedTemplate) {
+    const handleRunWorkflow = async () => {
+        if (triggerType === 'custom') {
+            if (!customPrompt) {
+                toast.error("Custom prompt cannot be empty.");
+                return;
+            }
+            module.startWorkflow(workflow, customPrompt);
+            setOpen(false);
+        } else if (selectedTemplate) {
             try {
-                const result = await compilePromptTemplate(selectedTemplate, formValuesRef.current);
-                compilationResultRef.current = { content: result.content, error: null };
-                if (previewElementRef.current) {
-                    previewElementRef.current.textContent = result.content;
-                    previewElementRef.current.classList.remove('text-destructive');
-                }
+                const formData = triggerForm.state.values as Record<string, any>;
+                const finalInitialPrompt = await compilePromptTemplate(selectedTemplate, formData);
+                module.startWorkflow(workflow, finalInitialPrompt.content);
+                setOpen(false);
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : "Invalid input";
-                compilationResultRef.current = { content: '', error: errorMessage };
-                if (previewElementRef.current) {
-                    previewElementRef.current.textContent = errorMessage;
-                    previewElementRef.current.classList.add('text-destructive');
-                }
+                toast.error(`Trigger error: ${errorMessage}`);
             }
         }
     };
@@ -124,32 +121,8 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
         }));
     };
 
-    const handleRunWorkflow = async () => {
-        if (triggerType !== 'custom' && compilationResultRef.current.error) {
-            module.getModApi()?.showToast("error", `Please fix the trigger errors: ${compilationResultRef.current.error}`);
-            return;
-        }
-
-        let finalInitialPrompt = '';
-        if (triggerType === 'custom') {
-            finalInitialPrompt = customPrompt;
-        } else if (selectedTemplate) {
-            // Use the value from the ref for the final compilation
-            const result = await compilePromptTemplate(selectedTemplate, formValuesRef.current);
-            finalInitialPrompt = result.content;
-        }
-
-        if (!finalInitialPrompt) {
-            console.error("Cannot run workflow with an empty initial prompt.");
-            return;
-        }
-        
-        module.startWorkflow(workflow, finalInitialPrompt);
-        setOpen(false);
-    };
-
     const isRunDisabled = (triggerType === 'custom' && !customPrompt) ||
-                          (triggerType !== 'custom' && (!selectedTemplateId || !!compilationResultRef.current.error)) ||
+                          (triggerType !== 'custom' && !selectedTemplateId) ||
                           workflow.steps.length === 0;
 
     const templatesForTrigger = triggerType === 'template' ? promptTemplates : agentTasks;
@@ -160,7 +133,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                 tooltipText="Open Workflow Builder"
                 onClick={() => setOpen(true)}
                 aria-label="Open Workflow Builder"
-                disabled={module.getIsStreaming()}
+                disabled={isStreaming}
                 icon={<Bot />}
                 className="h-5 w-5 md:h-6 md:w-6"
             />
@@ -196,7 +169,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                             
                             <div className="border rounded-md p-3 flex-grow flex flex-col space-y-4">
                                 <Label className="font-semibold">Trigger / Initial Message</Label>
-                                <RadioGroup value={triggerType} onValueChange={(v) => {setTriggerType(v as TriggerType); setSelectedTemplateId(null); setInitialFormValues({})}}>
+                                <RadioGroup value={triggerType} onValueChange={(v) => {setTriggerType(v as TriggerType); setSelectedTemplateId(null);}}>
                                     <div className="flex items-center space-x-2">
                                         <RadioGroupItem value="custom" id="r-custom" />
                                         <Label htmlFor="r-custom">Custom Prompt</Label>
@@ -234,24 +207,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {selectedTemplate && (
-                                            <div className='mt-2 space-y-2'>
-                                                <TriggerForm 
-                                                    template={selectedTemplate} 
-                                                    onValuesChange={handleFormValuesChange}
-                                                    initialValues={initialFormValues}
-                                                />
-                                                <div>
-                                                    <Label className="text-sm font-medium">Live Preview</Label>
-                                                    <div 
-                                                        ref={previewElementRef}
-                                                        className="mt-1 p-3 bg-muted rounded text-sm font-mono whitespace-pre-wrap max-h-48 overflow-y-auto"
-                                                    >
-                                                        {selectedTemplate.prompt}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
+                                        {selectedTemplate && <TriggerFormFields />}
                                     </div>
                                 )}
                             </div>
@@ -263,15 +219,14 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                             <ScrollArea className="border rounded-md p-3 flex-grow">
                                 <div className="space-y-4">
                                     {workflow.steps.map((step) => (
-                                        <WorkflowStepCard
-                                            key={step.id}
-                                            step={step}
-                                            onChange={handleStepChange}
-                                            promptTemplates={promptTemplates}
-                                            agentTasks={agentTasks}
-                                            allTemplates={allTemplates}
-                                            models={models}
-                                        />
+                                                                                    <WorkflowStepCard
+                                                key={step.id}
+                                                step={step}
+                                                onChange={handleStepChange}
+                                                promptTemplates={promptTemplates}
+                                                agentTasks={agentTasks}
+                                                models={models}
+                                            />
                                     ))}
                                     {workflow.steps.length === 0 && (
                                         <div className="text-center text-muted-foreground py-8">
@@ -288,7 +243,11 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
 
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                        <Button onClick={handleRunWorkflow} disabled={isRunDisabled}>
+                        <Button 
+                            onClick={handleRunWorkflow}
+                            type="button"
+                            disabled={isRunDisabled}
+                        >
                             Run Workflow
                         </Button>
                     </DialogFooter>
