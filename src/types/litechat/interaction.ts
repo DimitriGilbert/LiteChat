@@ -12,7 +12,8 @@ export type InteractionType =
   | "prompt.enhance"
   | "tool.execution"
   | "system.info"
-  | "system.error";
+  | "system.error"
+  | "workflow.run";
 
 export type InteractionStatus =
   | "PENDING"
@@ -20,7 +21,8 @@ export type InteractionStatus =
   | "COMPLETED"
   | "ERROR"
   | "WARNING"
-  | "CANCELLED";
+  | "CANCELLED"
+  | "PAUSED";
 
 // Represents one logical unit in the conversation flow
 export interface Interaction {

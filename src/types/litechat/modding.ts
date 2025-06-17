@@ -24,6 +24,7 @@ import { type McpEventPayloads } from "./events/mcp.events";
 import { type BlockRendererEventPayloads } from "./events/block-renderer.events";
 import type { CanvasControl as CoreCanvasControlFromTypes } from "./canvas/control";
 import type { BlockRenderer } from "./canvas/block-renderer";
+import { type WorkflowEventPayloads } from "./events/workflow.events";
 
 import {
   type ModMiddlewareHookName,
@@ -171,6 +172,7 @@ export type ModEventPayloadMap = AppEventPayloads &
   ControlRegistryEventPayloads &
   BlockRendererEventPayloads &
   McpEventPayloads &
+  WorkflowEventPayloads &
   Record<string, any>;
 
 interface BaseControl {

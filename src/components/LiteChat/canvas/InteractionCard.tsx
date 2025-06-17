@@ -16,6 +16,7 @@ import { useShallow } from "zustand/react/shallow";
 import { CardHeader } from "@/components/LiteChat/canvas/interaction/CardHeader";
 import { AssistantResponse } from "@/components/LiteChat/canvas/interaction/AssistantResponse";
 import type { CanvasControl, CanvasControlRenderContext } from "@/types/litechat/canvas/control";
+import { WorkflowStatusDisplay } from './interaction/WorkflowStatusDisplay';
 
 interface InteractionCardProps {
   interaction: Interaction;
@@ -116,6 +117,37 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
     );
     const contentSlot = renderSlot?.("content", interaction);
     const menuSlot = renderSlot?.("menu", interaction);
+
+    // Special renderer for workflow runs
+    if (interaction.type === 'workflow.run') {
+        return (
+            <div
+                ref={cardRef}
+                className={cn(
+                    "group/card relative rounded-lg border bg-card p-3 md:p-4 shadow-sm",
+                    "overflow-wrap-anywhere",
+                    isError ? "border-destructive/50 bg-destructive/5" : "border-border",
+                    className
+                )}
+            >
+                {showPrompt && interaction.prompt && (
+                    <UserPromptDisplay
+                        turnData={interaction.prompt}
+                        timestamp={interaction.startedAt}
+                        isAssistantComplete={isComplete}
+                        interactionId={interaction.id}
+                    />
+                )}
+                <div className={cn(
+                    "relative group/assistant",
+                    showPrompt && interaction.prompt ? "mt-3 pt-3 border-t border-border/50" : ""
+                )}>
+                    <WorkflowStatusDisplay interaction={interaction} />
+                    {/* Child interactions (steps) will be rendered in tabs by ResponseTabsContainer */}
+                </div>
+            </div>
+        )
+    }
 
     return (
       <div

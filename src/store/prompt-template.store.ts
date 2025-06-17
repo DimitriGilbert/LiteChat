@@ -7,6 +7,7 @@ import { PersistenceService } from "@/services/persistence.service";
 import type { PromptTemplate, CompiledPrompt, PromptFormData, PromptTemplateType } from "@/types/litechat/prompt-template";
 import type { RegisteredActionHandler } from "@/types/litechat/control";
 import { promptTemplateEvent } from "@/types/litechat/events/prompt-template.events";
+import { compilePromptTemplate as compileUtil } from '@/lib/litechat/prompt-util';
 
 interface PromptTemplateState {
   promptTemplates: PromptTemplate[];
@@ -165,53 +166,7 @@ export const usePromptTemplateStore = create(
       }
 
       try {
-        // Compile the prompt by replacing variables with form data
-        let compiledContent = template.prompt;
-        
-        for (const variable of template.variables) {
-          const value = formData[variable.name];
-          
-          // Handle both {{variable}} and {{ variable }} formats
-          const patterns = [
-            new RegExp(`{{\\s*${variable.name}\\s*}}`, 'g'),  // Flexible spacing
-            new RegExp(`{{${variable.name}}}`, 'g'),          // No spaces
-            new RegExp(`{{ ${variable.name} }}`, 'g')          // With spaces
-          ];
-          
-          if (value !== undefined && value !== null) {
-            // Convert value to string representation
-            let stringValue: string;
-            if (typeof value === 'object') {
-              stringValue = JSON.stringify(value);
-            } else {
-              stringValue = String(value);
-            }
-            
-            // Apply all patterns to ensure we catch all formats
-            for (const pattern of patterns) {
-              const beforeReplace = compiledContent;
-              compiledContent = compiledContent.replace(pattern, stringValue);
-              if (beforeReplace !== compiledContent) {
-                console.log(`Replaced "${variable.name}" using pattern ${pattern} in:`, beforeReplace, '→', compiledContent);
-              }
-            }
-          } else if (variable.required) {
-            throw new Error(`Required variable "${variable.name}" is missing`);
-          } else if (variable.default) {
-            // Apply default value using all patterns
-            for (const pattern of patterns) {
-              compiledContent = compiledContent.replace(pattern, variable.default);
-            }
-          }
-        }
-
-        const result: CompiledPrompt = {
-          content: compiledContent,
-          selectedTools: template.tools,
-          selectedRules: template.rules,
-        };
-
-        return result;
+        return await compileUtil(template, formData);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Failed to compile prompt template";
         toast.error(errorMessage);

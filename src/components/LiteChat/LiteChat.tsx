@@ -40,6 +40,7 @@ import { uiEvent } from "@/types/litechat/events/ui.events";
 import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { projectEvent } from "@/types/litechat/events/project.events";
 import type { LiteChatModApi } from "@/types/litechat/modding";
+import { WorkflowService } from "@/services/workflow.service";
 
 let initializedControlModules: ControlModule[] = [];
 let appInitializationPromise: Promise<ControlModule[]> | null = null;
@@ -140,6 +141,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
     const modApiToUse = coreModApiRef.current;
 
     EventActionCoordinatorService.initialize();
+    WorkflowService.initialize();
 
     const initializeApp = async () => {
       if (hasInitializedSuccessfully) {

@@ -34,6 +34,7 @@ import { RacePromptControlModule } from "@/controls/modules/RacePromptControlMod
 import { ImprovePromptControlModule } from "@/controls/modules/ImprovePromptControlModule";
 import { PromptLibraryControlModule } from "@/controls/modules/PromptLibraryControlModule";
 import { AgentControlModule } from "@/controls/modules/AgentControlModule";
+import { WorkflowControlModule } from "@/controls/modules/WorkflowControlModule";
 
 // Import new/updated Settings Modules
 import { GeneralSettingsModule } from "@/controls/modules/GeneralSettingsModule";
@@ -96,6 +97,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   ImprovePromptControlModule,
   PromptLibraryControlModule,
   AgentControlModule,
+  WorkflowControlModule,
   GitSyncControlModule,
   ManualSyncSidebarControlModule,
   VfsToolsModule,
