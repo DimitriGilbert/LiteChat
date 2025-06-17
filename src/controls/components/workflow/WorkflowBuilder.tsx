@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import type { WorkflowControlModule } from '@/controls/modules/WorkflowControlModule';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -64,9 +64,13 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     const [triggerType, setTriggerType] = useState<TriggerType>('custom');
     const [customPrompt, setCustomPrompt] = useState('');
     const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-    const [formValues, setFormValues] = useState<Record<string, any>>({});
-    const [compilationError, setCompilationError] = useState<string | null>(null);
+    const [initialFormValues, setInitialFormValues] = useState<Record<string, any>>({});
     
+    // Use refs to avoid re-renders on compilation
+    const formValuesRef = useRef<Record<string, any>>({});
+    const compilationResultRef = useRef<{ content: string; error: string | null }>({ content: '', error: null });
+    const previewElementRef = useRef<HTMLDivElement | null>(null);
+
     const promptTemplates = module.getPromptTemplates();
     const agentTasks = module.getAgentTasks();
     const allTemplates = module.getAllTemplates();
@@ -74,18 +78,32 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
 
     const selectedTemplate = useMemo(() => {
         if (!selectedTemplateId) return null;
+        // Reset state when template changes
+        setInitialFormValues({});
+        formValuesRef.current = {};
+        compilationResultRef.current = { content: '', error: null };
         return allTemplates.find(t => t.id === selectedTemplateId);
     }, [selectedTemplateId, allTemplates]);
 
     const handleFormValuesChange = async (values: Record<string, any>) => {
-        setFormValues(values);
+        // Only update the ref, NOT state. This prevents re-renders.
+        formValuesRef.current = values;
+
         if (selectedTemplate) {
             try {
-                // We compile here to validate the inputs in real-time
-                await compilePromptTemplate(selectedTemplate, values);
-                setCompilationError(null);
+                const result = await compilePromptTemplate(selectedTemplate, formValuesRef.current);
+                compilationResultRef.current = { content: result.content, error: null };
+                if (previewElementRef.current) {
+                    previewElementRef.current.textContent = result.content;
+                    previewElementRef.current.classList.remove('text-destructive');
+                }
             } catch (error) {
-                setCompilationError(error instanceof Error ? error.message : "Invalid input");
+                const errorMessage = error instanceof Error ? error.message : "Invalid input";
+                compilationResultRef.current = { content: '', error: errorMessage };
+                if (previewElementRef.current) {
+                    previewElementRef.current.textContent = errorMessage;
+                    previewElementRef.current.classList.add('text-destructive');
+                }
             }
         }
     };
@@ -107,8 +125,8 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     };
 
     const handleRunWorkflow = async () => {
-        if (compilationError) {
-            module.getModApi()?.showToast("error", `Please fix the errors before running: ${compilationError}`);
+        if (triggerType !== 'custom' && compilationResultRef.current.error) {
+            module.getModApi()?.showToast("error", `Please fix the trigger errors: ${compilationResultRef.current.error}`);
             return;
         }
 
@@ -116,7 +134,8 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
         if (triggerType === 'custom') {
             finalInitialPrompt = customPrompt;
         } else if (selectedTemplate) {
-            const result = await compilePromptTemplate(selectedTemplate, formValues);
+            // Use the value from the ref for the final compilation
+            const result = await compilePromptTemplate(selectedTemplate, formValuesRef.current);
             finalInitialPrompt = result.content;
         }
 
@@ -130,7 +149,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     };
 
     const isRunDisabled = (triggerType === 'custom' && !customPrompt) ||
-                          (triggerType !== 'custom' && (!selectedTemplateId || !!compilationError)) ||
+                          (triggerType !== 'custom' && (!selectedTemplateId || !!compilationResultRef.current.error)) ||
                           workflow.steps.length === 0;
 
     const templatesForTrigger = triggerType === 'template' ? promptTemplates : agentTasks;
@@ -177,7 +196,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                             
                             <div className="border rounded-md p-3 flex-grow flex flex-col space-y-4">
                                 <Label className="font-semibold">Trigger / Initial Message</Label>
-                                <RadioGroup value={triggerType} onValueChange={(v) => {setTriggerType(v as TriggerType); setSelectedTemplateId(null); setFormValues({})}}>
+                                <RadioGroup value={triggerType} onValueChange={(v) => {setTriggerType(v as TriggerType); setSelectedTemplateId(null); setInitialFormValues({})}}>
                                     <div className="flex items-center space-x-2">
                                         <RadioGroupItem value="custom" id="r-custom" />
                                         <Label htmlFor="r-custom">Custom Prompt</Label>
@@ -216,15 +235,21 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                                             </SelectContent>
                                         </Select>
                                         {selectedTemplate && (
-                                            <div className='mt-2'>
+                                            <div className='mt-2 space-y-2'>
                                                 <TriggerForm 
                                                     template={selectedTemplate} 
                                                     onValuesChange={handleFormValuesChange}
-                                                    initialValues={formValues}
+                                                    initialValues={initialFormValues}
                                                 />
-                                                {compilationError && (
-                                                    <p className="text-sm text-destructive mt-2">{compilationError}</p>
-                                                )}
+                                                <div>
+                                                    <Label className="text-sm font-medium">Live Preview</Label>
+                                                    <div 
+                                                        ref={previewElementRef}
+                                                        className="mt-1 p-3 bg-muted rounded text-sm font-mono whitespace-pre-wrap max-h-48 overflow-y-auto"
+                                                    >
+                                                        {selectedTemplate.prompt}
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
                                     </div>

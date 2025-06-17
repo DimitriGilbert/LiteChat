@@ -424,7 +424,8 @@ export function useFormedible<TFormValues extends Record<string, any>>(
     };
 
     const renderNavigation = () => {
-      if (!hasPages && showSubmitButton) {
+      if (!showSubmitButton) return null;
+      if (!hasPages) {
         return (
           <form.Subscribe
             selector={(state) => ({
