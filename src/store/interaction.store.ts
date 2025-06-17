@@ -245,17 +245,27 @@ export const useInteractionStore = create(
 
     setActiveStreamBuffer: (id, content) => {
       set((state) => {
-        state.activeStreamBuffers[id] = content;
+        if (state.streamingInteractionIds.includes(id)) {
+          state.activeStreamBuffers[id] = content;
+        }
+      });
+      emitter.emit(interactionEvent.activeStreamBuffersChanged, {
+        buffers: get().activeStreamBuffers,
       });
     },
 
     appendStreamBuffer: (id, chunk) => {
       set((state) => {
-        if (state.activeStreamBuffers[id] === undefined) {
-          state.activeStreamBuffers[id] = chunk;
-        } else {
-          state.activeStreamBuffers[id] += chunk;
+        if (state.streamingInteractionIds.includes(id)) {
+          if (state.activeStreamBuffers[id] === undefined) {
+            state.activeStreamBuffers[id] = chunk;
+          } else {
+            state.activeStreamBuffers[id] += chunk;
+          }
         }
+      });
+      emitter.emit(interactionEvent.activeStreamBuffersChanged, {
+        buffers: get().activeStreamBuffers,
       });
     },
 
