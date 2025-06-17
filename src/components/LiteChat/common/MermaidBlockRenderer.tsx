@@ -230,59 +230,59 @@ const MermaidBlockRendererComponent: React.FC<MermaidBlockRendererProps> = ({
         </div>
       </div>
 
-      {!isFolded && (
-        <div className="overflow-hidden w-full">
-          {showCode ? (
-            // Show raw code using CodeBlockRenderer
-            <CodeBlockRenderer
-              lang="mermaid"
-              code={code}
-              isStreaming={isStreaming}
-            />
-          ) : (
-            // Show diagram
-            <>
-              {isLoading && (
-                <div className="flex items-center justify-center p-8">
-                  <Loader2Icon className="h-6 w-6 animate-spin text-muted-foreground" />
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    Rendering diagram...
-                  </span>
-                </div>
-              )}
-              
-              {error && (
-                <div className="flex items-center gap-2 p-4 border border-destructive/20 bg-destructive/10 rounded-md">
-                  <AlertCircleIcon className="h-5 w-5 text-destructive flex-shrink-0" />
-                  <div className="text-sm text-destructive">
-                    <div className="font-medium">Failed to render Mermaid diagram</div>
-                    <div className="text-xs mt-1 opacity-80">{error}</div>
+        {!isFolded && !isStreaming && (
+          <div className="overflow-hidden w-full">
+            {showCode ? (
+              // Show raw code using CodeBlockRenderer
+              <CodeBlockRenderer
+                lang="mermaid"
+                code={code}
+                isStreaming={isStreaming}
+              />
+            ) : (
+              // Show diagram
+              <>
+                {isLoading && (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2Icon className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-sm text-muted-foreground">
+                      Rendering diagram...
+                    </span>
                   </div>
-                </div>
-              )}
-              
-              {svgContent && !isLoading && !error && (
-                <div 
-                  ref={containerRef}
-                  className="mermaid-container p-4 bg-background border rounded-md overflow-auto"
-                  dangerouslySetInnerHTML={{ __html: svgContent }}
-                />
-              )}
-            </>
-          )}
-        </div>
-      )}
-      
-      {isFolded && (
-        <div
-          className="folded-content-preview p-4 cursor-pointer w-full box-border"
-          onClick={toggleFold}
-        >
-          <pre className="whitespace-pre-wrap break-words text-muted-foreground font-mono text-sm">
-            {foldedPreviewText}
-          </pre>
-        </div>
-      )}
+                )}
+                
+                {error && (
+                  <div className="flex items-center gap-2 p-4 border border-destructive/20 bg-destructive/10 rounded-md">
+                    <AlertCircleIcon className="h-5 w-5 text-destructive flex-shrink-0" />
+                    <div className="text-sm text-destructive">
+                      <div className="font-medium">Failed to render Mermaid diagram</div>
+                      <div className="text-xs mt-1 opacity-80">{error}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {svgContent && !isLoading && !error && (
+                  <div 
+                    ref={containerRef}
+                    className="mermaid-container p-4 bg-background border rounded-md overflow-auto"
+                    dangerouslySetInnerHTML={{ __html: svgContent }}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        )}
+        
+        {(isFolded || isStreaming) && (
+          <div
+            className="folded-content-preview p-4 cursor-pointer w-full box-border"
+            onClick={toggleFold}
+          >
+            <pre className="whitespace-pre-wrap break-words text-muted-foreground font-mono text-sm">
+              {foldedPreviewText}
+            </pre>
+          </div>
+        )}
     </div>
   );
 };

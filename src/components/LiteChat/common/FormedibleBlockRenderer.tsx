@@ -748,9 +748,9 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
 
   return (
     <div className="code-block-container group/codeblock my-4 max-w-full">
-      <div className="code-block-header sticky top-0 z-10 flex items-center justify-between">
+      <div className="code-block-header sticky top-0 z-[var(--z-sticky)] flex items-center justify-between">
         <div className="flex items-center gap-1">
-          <div className="text-sm font-medium">FORMEDIBLE</div>
+          <div className="text-sm font-medium">Formedible</div>
           <div className="flex items-center gap-0.5 opacity-0 group-hover/codeblock:opacity-100 focus-within:opacity-100 transition-opacity">
             {codeBlockHeaderActions}
           </div>

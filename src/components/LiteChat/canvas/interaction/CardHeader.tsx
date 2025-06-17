@@ -50,7 +50,7 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
   return (
     <div
       className={cn(
-        "flex flex-col sm:flex-row justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-20 p-1 -m-1 rounded-t"
+        "flex flex-col sm:flex-row justify-between items-start mb-2 sticky top-0 bg-card/80 backdrop-blur-sm z-[var(--z-sticky)] p-1 -m-1 rounded-t"
       )}
     >
       <div className="flex items-start gap-1 min-w-0 mb-1 sm:mb-0">

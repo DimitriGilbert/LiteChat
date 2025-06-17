@@ -455,13 +455,13 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         </div>
 
         {isMobileSidebarOpen && (
-          <div className="md:hidden fixed inset-0 z-40 flex">
+          <div className="md:hidden fixed inset-0 z-[var(--z-sidebar)] flex">
             <div
               className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-fadeIn"
               onClick={toggleMobileSidebar}
             ></div>
             <div className="relative w-4/5 max-w-sm bg-card border-r border-border h-full flex flex-col animate-slideInFromLeft shadow-2xl">
-              <div className="sticky top-0 z-10 flex justify-between items-center p-4 border-b border-border bg-card">
+              <div className="sticky top-0 z-[var(--z-sticky)] flex justify-between items-center p-4 border-b border-border bg-card">
                 <h2 className="font-semibold text-card-foreground">LiteChat Menu</h2>
                 <button
                   onClick={toggleMobileSidebar}

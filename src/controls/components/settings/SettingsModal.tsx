@@ -119,8 +119,8 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
               onValueChange={handleTabChangeByLayout}
               className="flex-grow overflow-hidden px-4 md:px-6"
               listClassName="-mx-4 md:-mx-6 px-2 md:px-6 py-1 md:py-0"
-              contentContainerClassName="flex-grow overflow-y-auto pb-4 md:pb-6"
-              scrollable={false}
+              contentContainerClassName="flex-grow pb-4 md:pb-6"
+              scrollable={true}
             />
           ) : (
             <div className="flex-grow flex items-center justify-center text-muted-foreground p-4">

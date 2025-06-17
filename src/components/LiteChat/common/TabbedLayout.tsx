@@ -87,7 +87,7 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
     >
       <TabsList
         className={cn(
-          "flex-shrink-0 sticky top-0 bg-background z-10 flex-wrap h-auto justify-start border-b gap-0.5 sm:gap-1 p-0.5 sm:p-1 px-2 sm:px-6",
+          "flex-shrink-0 sticky top-0 bg-background z-[var(--z-sticky)] flex-wrap h-auto justify-start border-b gap-0.5 sm:gap-1 p-0.5 sm:p-1 px-2 sm:px-6",
           listClassName
         )}
       >
@@ -109,7 +109,7 @@ export const TabbedLayout: React.FC<TabbedLayoutProps> = ({
             value={tab.value}
             // Keep content mounted but hidden for better state preservation if needed
             // Or use forceMount on TabsContent if state reset on tab change is desired
-            className="data-[state=inactive]:hidden h-full"
+            className="data-[state=inactive]:hidden h-full [transform:translateZ(0)]"
           >
             {tab.content}
           </TabsContent>
