@@ -110,33 +110,6 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         metadata.modelId = currentModelIdFromPromptStore;
       }
 
-      const rulesModule = promptControls.find(
-        (c) => c.id === "core-rules-tags"
-      ) as RulesControlModule | undefined;
-
-      if (rulesModule && metadata.activeRuleIds && metadata.activeTagIds) {
-        const effectiveRulesContent: ResolvedRuleContent[] = [];
-        const allEffectiveRuleIds = new Set<string>(metadata.activeRuleIds);
-
-        metadata.activeTagIds.forEach((tagId: string) => {
-          rulesModule
-            .getRulesForTag(tagId)
-            .forEach((rule) => allEffectiveRuleIds.add(rule.id));
-        });
-
-        allEffectiveRuleIds.forEach((ruleId) => {
-          const rule = rulesModule.getRuleById(ruleId);
-          if (rule) {
-            effectiveRulesContent.push({
-              type: rule.type,
-              content: rule.content,
-              sourceRuleId: rule.id,
-            });
-          }
-        });
-        metadata.effectiveRulesContent = effectiveRulesContent;
-      }
-
       let turnData: PromptTurnObject = {
         id: nanoid(),
         content: trimmedValue,
