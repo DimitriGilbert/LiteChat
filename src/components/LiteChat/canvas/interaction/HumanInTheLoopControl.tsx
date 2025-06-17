@@ -11,7 +11,14 @@ interface HumanInTheLoopControlProps {
 }
 
 export const HumanInTheLoopControl: React.FC<HumanInTheLoopControlProps> = ({ run }) => {
-    const [resumeData, setResumeData] = useState('');
+    const [resumeData, setResumeData] = useState(() => {
+        if (!run) return '';
+        try {
+            return JSON.stringify(run.stepOutputs, null, 2);
+        } catch {
+            return '';
+        }
+    });
 
     if (!run) {
         return null;
@@ -40,7 +47,7 @@ export const HumanInTheLoopControl: React.FC<HumanInTheLoopControlProps> = ({ ru
                 <Label htmlFor={`hitl-data-${run.runId}`}>Data (edit if needed)</Label>
                 <Textarea
                     id={`hitl-data-${run.runId}`}
-                    defaultValue={JSON.stringify(run.stepOutputs, null, 2)}
+                    value={resumeData}
                     onChange={(e) => setResumeData(e.target.value)}
                     rows={8}
                     className="font-mono text-xs"

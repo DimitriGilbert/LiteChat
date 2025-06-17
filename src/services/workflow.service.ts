@@ -11,26 +11,26 @@ import { compilePromptTemplate } from "@/lib/litechat/prompt-util";
 import type { PromptTemplate } from "@/types/litechat/prompt-template";
 import { useProviderStore } from "@/store/provider.store";
 
-class WorkflowServiceImpl {
-  private isInitialized = false;
-  private eventUnsubscribers: (() => void)[] = [];
+// Note: Refactored to a static class to align with other services like InteractionService.
+// This service's lifecycle is tied to the application's lifecycle, so event listeners
+// are registered once and are not manually unsubscribed.
+export const WorkflowService = {
+  isInitialized: false,
 
-  public initialize(): void {
+  initialize(): void {
     if (this.isInitialized) {
       return;
     }
 
-    const unsubStart = emitter.on(workflowEvent.startRequest, this.handleWorkflowStartRequest);
-    const unsubResume = emitter.on(workflowEvent.resumeRequest, this.handleWorkflowResumeRequest);
-    const unsubInteractionCompleted = emitter.on(interactionEvent.completed, this.handleInteractionCompleted);
-
-    // @ts-expect-error - this is a workaround, TS is throwing, IDNW
-    this.eventUnsubscribers.push(unsubStart, unsubResume, unsubInteractionCompleted);
+    emitter.on(workflowEvent.startRequest, this.handleWorkflowStartRequest);
+    emitter.on(workflowEvent.resumeRequest, this.handleWorkflowResumeRequest);
+    emitter.on(interactionEvent.completed, this.handleInteractionCompleted);
+    
     this.isInitialized = true;
     console.log("[WorkflowService] Initialized.");
-  }
+  },
 
-  private _resolveJsonPath(obj: any, path: string): any {
+  _resolveJsonPath(obj: any, path: string): any {
     // Basic resolver for paths like "stepId.output.fieldName"
     if (path.startsWith('$.')) {
       path = path.substring(2);
@@ -44,48 +44,29 @@ class WorkflowServiceImpl {
       current = current[part];
     }
     return current;
-  }
+  },
 
-  private async _compileStepPrompt(step: WorkflowStep, context: Record<string, any>): Promise<string> {
+  async _compileStepPrompt(step: WorkflowStep, context: Record<string, any>): Promise<string> {
     if (!step.prompt) {
-      return "";
+        return "";
     }
 
     const formData: Record<string, any> = {};
-    
-    if (step.inputMapping) {
-      for (const [varName, jsonPath] of Object.entries(step.inputMapping)) {
-        const value = this._resolveJsonPath(context, jsonPath);
-        if (value !== undefined) {
-          formData[varName] = value;
-        } else {
-          console.warn(`[WorkflowService] Could not resolve input mapping for variable "${varName}" with path "${jsonPath}"`);
-        }
-      }
-    }
-
     const placeholderRegex = /\{\{(.*?)\}\}/g;
+    
+    const uniquePlaceholders = new Set<string>();
     let match;
     while ((match = placeholderRegex.exec(step.prompt)) !== null) {
-      const fullPath = match[1].trim();
-      const pathParts = fullPath.split('.');
-      const varName = pathParts[pathParts.length - 1];
-      
-      if (!(varName in formData)) {
-          let value: any = context;
-          try {
-            for (const k of pathParts) {
-                if (value && typeof value === 'object' && k in value) {
-                    value = value[k];
-                } else {
-                    throw new Error(`Could not resolve path: ${fullPath}`);
-                }
-            }
-            formData[varName] = value;
-          } catch (e) {
-             console.warn(`[WorkflowService] Could not resolve template variable via regex fallback: ${fullPath}`);
-          }
-      }
+        uniquePlaceholders.add(match[1].trim());
+    }
+
+    for (const fullPath of uniquePlaceholders) {
+        const value = this._resolveJsonPath(context, `$.${fullPath}`);
+        if (value !== undefined) {
+            formData[fullPath] = value;
+        } else {
+            console.warn(`[WorkflowService] Could not resolve template variable: ${fullPath}`);
+        }
     }
 
     const tempTemplate: PromptTemplate = {
@@ -93,7 +74,12 @@ class WorkflowServiceImpl {
       name: step.name,
       description: '',
       prompt: step.prompt,
-      variables: Object.keys(formData).map(name => ({ name, type: 'string', required: true, description: '' })),
+      variables: Array.from(uniquePlaceholders).map(path => ({ 
+        name: path, 
+        type: 'string', 
+        required: true, 
+        description: '' 
+      })),
       tags: [],
       isPublic: false,
       createdAt: new Date(),
@@ -102,9 +88,9 @@ class WorkflowServiceImpl {
 
     const compiled = await compilePromptTemplate(tempTemplate, formData);
     return compiled.content;
-  }
+  },
 
-  private handleWorkflowStartRequest = async (payload: WorkflowEventPayloads[typeof workflowEvent.startRequest]): Promise<void> => {
+  handleWorkflowStartRequest: async (payload: WorkflowEventPayloads[typeof workflowEvent.startRequest]): Promise<void> => {
     console.log("[WorkflowService] Workflow start request received", payload);
     const { template, initialPrompt } = payload;
 
@@ -148,15 +134,15 @@ class WorkflowServiceImpl {
       };
 
       emitter.emit(workflowEvent.started, { run });
-      this.runNextStep(run);
+      WorkflowService.runNextStep(run);
 
     } catch (error) {
       console.error("[WorkflowService] Error starting workflow:", error);
       emitter.emit(workflowEvent.error, { runId: "", error: String(error) });
     }
-  };
+  },
 
-  private runNextStep = async (run: WorkflowRun): Promise<void> => {
+  runNextStep: async (run: WorkflowRun): Promise<void> => {
     console.log(`[WorkflowService] Running step ${run.currentStepIndex} for run ${run.runId}`);
 
     if (run.currentStepIndex >= run.template.steps.length) {
@@ -184,7 +170,7 @@ class WorkflowServiceImpl {
         console.log(`[WorkflowService] Workflow ${run.runId} paused for human in the loop.`);
 
       } else if (currentStep.type === "prompt" || currentStep.type === "agent-task") {
-        const promptText = await this._compileStepPrompt(currentStep, run.stepOutputs);
+        const promptText = await WorkflowService._compileStepPrompt(currentStep, run.stepOutputs);
 
         const providerStore = useProviderStore.getState();
         const modelConfig = currentStep.modelId && currentStep.modelId !== 'global'
@@ -239,9 +225,9 @@ class WorkflowServiceImpl {
       console.error(`[WorkflowService] Error running step ${currentStep.id} for run ${run.runId}:`, error);
       emitter.emit(workflowEvent.error, { runId: run.runId, error: `Failed on step "${currentStep.name}": ${String(error)}` });
     }
-  };
+  },
 
-  private handleWorkflowResumeRequest = async (payload: WorkflowEventPayloads[typeof workflowEvent.resumeRequest]): Promise<void> => {
+  handleWorkflowResumeRequest: async (payload: WorkflowEventPayloads[typeof workflowEvent.resumeRequest]): Promise<void> => {
     console.log("[WorkflowService] Workflow resume request received", payload);
     const { runId, resumeData } = payload;
     const activeRun = useWorkflowStore.getState().activeRun;
@@ -263,11 +249,11 @@ class WorkflowServiceImpl {
     
     const nextRunState = useWorkflowStore.getState().activeRun;
     if(nextRunState) {
-      this.runNextStep(nextRunState);
+      WorkflowService.runNextStep(nextRunState);
     }
-  };
+  },
 
-  private handleInteractionCompleted = (payload: { interactionId: string; status: string; interaction?: Interaction }): void => {
+  handleInteractionCompleted: (payload: { interactionId: string; status: string; interaction?: Interaction }): void => {
     const activeRun = useWorkflowStore.getState().activeRun;
     if (!activeRun || activeRun.status !== "RUNNING") {
       return;
@@ -352,16 +338,7 @@ class WorkflowServiceImpl {
 
     const nextRunState = useWorkflowStore.getState().activeRun;
     if (nextRunState) {
-      this.runNextStep(nextRunState);
+      WorkflowService.runNextStep(nextRunState);
     }
-  };
-
-  public destroy(): void {
-    this.eventUnsubscribers.forEach(unsub => unsub());
-    this.eventUnsubscribers = [];
-    this.isInitialized = false;
-    console.log("[WorkflowService] Destroyed.");
-  }
-}
-
-export const WorkflowService = new WorkflowServiceImpl(); 
+  },
+}; 
