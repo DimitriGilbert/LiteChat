@@ -50,6 +50,7 @@ export const useWorkflowStore = create(
 
     _handleStepCompleted: (runId, stepId, output) => {
       get()._updateRun(runId, "RUNNING", (run: WorkflowRun) => {
+        console.log(`[WorkflowStore] Step completed: ${stepId}, incrementing currentStepIndex from ${run.currentStepIndex} to ${run.currentStepIndex + 1}`);
         run.stepOutputs[stepId] = output;
         run.currentStepIndex += 1;
       });

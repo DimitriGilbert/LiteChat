@@ -13,23 +13,36 @@ import { PersistenceService } from "./persistence.service";
 import { usePromptStateStore } from "@/store/prompt.store";
 import { usePromptTemplateStore } from "@/store/prompt-template.store";
 import { InteractionService } from "./interaction.service";
-import { ConversationService } from "./conversation.service";
+import { useProjectStore } from "@/store/project.store";
+import { useControlRegistryStore } from "@/store/control.store";
+import { useConversationStore } from "@/store/conversation.store";
+import type { CoreMessage } from "ai";
+import { buildHistoryMessages } from "@/lib/litechat/ai-helpers";
 
 // Note: Refactored to a static class to align with other services like InteractionService.
 // This service's lifecycle is tied to the application's lifecycle, so event listeners
 // are registered once and are not manually unsubscribed.
 export const WorkflowService = {
   isInitialized: false,
+  activeWorkflowConfig: null as { template: any; initialPrompt: string; conversationId: string } | null,
 
   initialize: () => {
     if (WorkflowService.isInitialized) return;
+    
+    // Listen for workflow start requests
     emitter.on(workflowEvent.startRequest, WorkflowService.handleWorkflowStartRequest);
+    
+    // Listen for interaction completions to handle step progression
     emitter.on(interactionEvent.completed, WorkflowService.handleInteractionCompleted);
-    emitter.on(workflowEvent.runNextStepRequest, (e) => WorkflowService.runNextStep(e.run));
+    
+    // Listen for step completion events
     emitter.on(workflowEvent.stepCompleted, WorkflowService.handleStepCompleted);
+    
+    // Listen for resume requests
     emitter.on(workflowEvent.resumeRequest, WorkflowService.handleWorkflowResumeRequest);
+    
     WorkflowService.isInitialized = true;
-    console.log("[WorkflowService] Initialized.");
+    console.log("[WorkflowService] Initialized - workflows start immediately on request.");
   },
 
   _resolveJsonPath: (obj: any, path: string): any => {
@@ -39,7 +52,6 @@ export const WorkflowService = {
       return path.split('.').reduce((acc, part) => {
         if (acc === null || acc === undefined) return undefined;
         if (part.includes('[') && part.includes(']')) {
-          // Handle array access like 'items[0]'
           const [prop, indexStr] = part.split('[');
           const index = parseInt(indexStr.replace(']', ''));
           return acc[prop]?.[index];
@@ -52,31 +64,26 @@ export const WorkflowService = {
     }
   },
 
-  _compileStepPrompt: async (step: WorkflowStep, context: Record<string, any>): Promise<CompiledPrompt> => {
+  _compileStepPrompt: async (step: WorkflowStep, context: Record<string, any>, stepIndex: number): Promise<CompiledPrompt> => {
     if (!step.templateId) {
       throw new Error(`Step ${step.name} has no templateId specified`);
     }
 
-    // Get REAL template from store (like PromptLibraryControlModule)
     const { promptTemplates } = usePromptTemplateStore.getState();
     const template = promptTemplates.find(t => t.id === step.templateId);
     if (!template) {
       throw new Error(`Template ${step.templateId} not found for step ${step.name}`);
     }
 
-    // Build form data from context using inputMapping
-    const formData: Record<string, any> = {};
-    template.variables.forEach(variable => {
-      const mappingPath = step.inputMapping?.[variable.name];
-      if (mappingPath) {
-        const value = WorkflowService._resolveJsonPath(context, mappingPath);
-        if (value !== undefined) {
-          formData[variable.name] = value;
-        }
-      }
-    });
+    // Get the immediate previous step output
+    const previousStepKey = stepIndex === 0 ? 'trigger' : `step${stepIndex - 1}`;
+    const previousStepOutput = context[previousStepKey];
+    
+    // Use the parsed output directly as form data
+    const formData = previousStepOutput || {};
 
-    // Use EXISTING compilation utility (like PromptLibraryControlModule)
+    console.log(`[WorkflowService] Compiling template "${template.name}" for step "${step.name}" with data:`, formData);
+
     return await compilePromptTemplate(template, formData);
   },
 
@@ -85,7 +92,7 @@ export const WorkflowService = {
       return interaction.response || "No output";
     }
 
-    // Try to parse structured output (like current handleInteractionCompleted)
+    // Try to parse structured output
     if (interaction.metadata?.toolCalls?.length) {
       try {
         const toolCall = JSON.parse(interaction.metadata.toolCalls[0]);
@@ -113,153 +120,419 @@ export const WorkflowService = {
     const { template, initialPrompt, conversationId } = payload;
     if (!conversationId) return;
 
-    const interactionStore = useInteractionStore.getState();
-    const newIndex = interactionStore.interactions.filter(i => i.conversationId === conversationId).length;
+    // DEBUG: Log template details
+    console.log("[WorkflowService] Template details:", {
+      name: template.name,
+      stepsCount: template.steps?.length || 0,
+      steps: template.steps?.map((s: any) => ({ id: s.id, name: s.name, type: s.type, templateId: s.templateId })) || []
+    });
 
-    const mainInteractionId = nanoid();
-    const mainInteraction: Interaction = {
-      id: mainInteractionId, conversationId, startedAt: new Date(), endedAt: null,
-      type: 'message.user_assistant', status: 'STREAMING',
-      prompt: { id: nanoid(), content: initialPrompt, parameters: {}, metadata: { isWorkflowRun: true, workflowName: template.name } },
-      response: "🚀 Workflow starting...",
-      index: newIndex, parentId: null,
-      metadata: { isWorkflowRun: true, workflowName: template.name, workflowTemplateId: template.id },
-    };
-
-    interactionStore._addInteractionToState(mainInteraction);
-    interactionStore._addStreamingId(mainInteraction.id);
-    await PersistenceService.saveInteraction(mainInteraction);
-    emitter.emit(interactionEvent.added, { interaction: mainInteraction });
-    emitter.emit(interactionEvent.started, { interactionId: mainInteraction.id, conversationId, type: mainInteraction.type });
-
-    const run: WorkflowRun = {
-      runId: nanoid(), conversationId, mainInteractionId, template, status: "RUNNING", currentStepIndex: -1,
-      stepOutputs: {}, // Initialize as empty. The trigger's output will be added first.
-      startedAt: new Date().toISOString(),
-    };
-    emitter.emit(workflowEvent.started, { run });
-
-    // --- EXECUTE THE INITIAL PROMPT AS THE TRIGGER STEP ---
-    console.log(`%c[WorkflowService] ==> Executing initial prompt for run ${run.runId}`, 'color: #9C27B0; font-weight: bold;');
-    interactionStore.appendStreamBuffer(mainInteractionId, `\n\n---\n▶️ **Executing: Initial User Prompt**`);
-
-    const turnData: PromptTurnObject = {
+    // Start the workflow immediately using the provided initial prompt
+    // No need to wait for middleware interception like race system
+    console.log("[WorkflowService] Starting workflow immediately with initial prompt");
+    
+    // Build complete prompt object with all controls (structured output, tools, etc.)
+    const baseTurnData: PromptTurnObject = {
       id: nanoid(),
       content: initialPrompt,
-      parameters: {}, // Use default parameters for the initial prompt
+      parameters: {},
       metadata: {
-        isWorkflowStep: true,
-        workflowRunId: run.runId,
-        workflowStepId: 'trigger', // Special ID for the initial step
-        workflowMainInteractionId: mainInteractionId,
-        modelId: usePromptStateStore.getState().modelId, // Use the globally selected model for this
+        modelId: usePromptStateStore.getState().modelId || undefined,
       },
     };
 
-    const promptObject: PromptObject = {
-      messages: [{ role: 'user', content: initialPrompt }],
-      parameters: turnData.parameters,
-      metadata: turnData.metadata,
-    };
+    const { promptObject } = await WorkflowService.buildCompletePromptObject(
+      conversationId, 
+      initialPrompt, 
+      baseTurnData
+    );
     
-    // Start the interaction. Completion is handled by the `handleInteractionCompleted` listener.
-    InteractionService.startInteraction(promptObject, conversationId, turnData, "message.workflow_step")
-      .catch(error => {
-        const errorMsg = `Failed on initial prompt: ${String(error)}`;
-        console.error(`%c[WorkflowService] ==> Workflow ERROR for run ${run.runId} on initial prompt`, 'color: #F44336; font-weight: bold;', error);
-        interactionStore.appendStreamBuffer(run.mainInteractionId, `\n❌ **Error:** ${errorMsg}`);
-        interactionStore._updateInteractionInState(run.mainInteractionId, { status: 'ERROR', endedAt: new Date() });
-        interactionStore._removeStreamingId(run.mainInteractionId);
-        emitter.emit(workflowEvent.error, { runId: run.runId, error: errorMsg });
-      });
+    await WorkflowService.handleWorkflowConversion(promptObject, conversationId, { template, initialPrompt, conversationId });
   },
 
-  runNextStep: async (run: WorkflowRun): Promise<void> => {
-    const interactionStore = useInteractionStore.getState();
-    const currentRun = useWorkflowStore.getState().activeRun;
-
-    if (!currentRun || currentRun.runId !== run.runId) {
-      console.warn(`[WorkflowService] runNextStep received for run ${run.runId}, but active run is ${currentRun?.runId}. Aborting.`);
-      return;
-    }
-    
-    if (interactionStore.currentConversationId !== currentRun.conversationId) {
-      console.warn(`[WorkflowService] runNextStep for ${run.runId} ignored, conversation has changed.`);
-      return;
-    }
-    
-    // The store holds the index of the last completed step. `currentStepIndex` is -1 for the trigger.
-    // The first real step is at index 0.
-    const stepIdxToRun = currentRun.currentStepIndex + 1;
-
-    // Check if we are done.
-    if (stepIdxToRun >= currentRun.template.steps.length) {
-      interactionStore.appendStreamBuffer(currentRun.mainInteractionId, "\n\n✅ **Workflow Completed.**");
-      
-      const finalOutput = Object.entries(currentRun.stepOutputs)
-        .map(([key, value]) => `**${key}**: ${JSON.stringify(value, null, 2)}`)
-        .join('\n\n');
-      interactionStore.setActiveStreamBuffer(currentRun.mainInteractionId, `✅ **Workflow Completed.**\n\n**Final Outputs:**\n${finalOutput}`);
-
-      interactionStore._updateInteractionInState(currentRun.mainInteractionId, { status: 'COMPLETED', endedAt: new Date() });
-      interactionStore._removeStreamingId(currentRun.mainInteractionId);
-      emitter.emit(workflowEvent.completed, { runId: currentRun.runId, finalOutput: currentRun.stepOutputs });
-      console.log(`%c[WorkflowService] ==> Workflow COMPLETED for run ${currentRun.runId}`, 'color: #4CAF50; font-weight: bold;');
-      return;
-    }
-
-    const currentStep = currentRun.template.steps[stepIdxToRun];
-    const stepName = currentStep.name || `Step ${stepIdxToRun + 1}`;
-    
-    console.log(`%c[WorkflowService] ==> Executing step ${stepIdxToRun}: "${stepName}" for run ${currentRun.runId}`, 'color: #2196F3; font-weight: bold;');
-    interactionStore.appendStreamBuffer(currentRun.mainInteractionId, `\n\n---\n▶️ **Executing: ${stepName}**`);
-
+  // Main workflow conversion handler (equivalent to handleRaceConversion)
+  handleWorkflowConversion: async (prompt: PromptObject, conversationId: string, workflowConfig: { template: any; initialPrompt: string; conversationId: string }): Promise<void> => {
     try {
-      if (currentStep.type === "human-in-the-loop") {
-        interactionStore.appendStreamBuffer(currentRun.mainInteractionId, `\n⏸️ **Paused:** ${currentStep.instructionsForHuman || 'Requires human input.'}`);
-        interactionStore._updateInteractionInState(currentRun.mainInteractionId, { status: 'AWAITING_INPUT' });
-        interactionStore._removeStreamingId(currentRun.mainInteractionId);
-        emitter.emit(workflowEvent.paused, { runId: currentRun.runId, step: currentStep, pauseReason: 'human-in-the-loop', dataForReview: currentRun.stepOutputs });
-        console.log(`%c[WorkflowService] ==> Workflow PAUSED for run ${currentRun.runId} at step "${stepName}"`, 'color: #FF9800; font-weight: bold;');
+      const { template } = workflowConfig;
+      
+      if (!template.steps || template.steps.length === 0) {
+        throw new Error("Workflow template has no steps");
+      }
+
+      const interactionStore = useInteractionStore.getState();
+      
+      // Extract user content from prompt (like race system)
+      const userMessage = prompt.messages[prompt.messages.length - 1];
+      if (!userMessage || userMessage.role !== "user") {
+        throw new Error("Could not find user message in prompt");
+      }
+      
+      let userContent = "";
+      if (typeof userMessage.content === "string") {
+        userContent = userMessage.content;
+      } else if (Array.isArray(userMessage.content)) {
+        userContent = userMessage.content
+          .filter(part => part.type === "text")
+          .map(part => (part as any).text)
+          .join("");
+      }
+
+      // Create base turn data (like race system)
+      const baseTurnData: PromptTurnObject = {
+        id: "",  // Will be set per interaction
+        content: userContent,
+        parameters: prompt.parameters || {},
+        metadata: {
+          ...prompt.metadata,
+          modelId: prompt.metadata?.modelId || "",
+        },
+      };
+
+      // --- Manually create the main workflow host interaction (like race main interaction) ---
+      const mainInteractionId = nanoid();
+      const runId = nanoid();
+      
+      const conversationInteractions = interactionStore.interactions.filter(
+        (i) => i.conversationId === conversationId
+      );
+      const newIndex = conversationInteractions.reduce((max, i) => Math.max(max, i.index), -1) + 1;
+
+      const mainInteraction: Interaction = {
+        id: mainInteractionId,
+        conversationId: conversationId,
+        type: "message.user_assistant",
+        prompt: {
+          id: mainInteractionId,
+          content: userContent,
+          parameters: {},
+          metadata: {
+            isWorkflowRun: true,
+            workflowName: template.name,
+            workflowTemplateId: template.id,
+            workflowRunId: runId,
+          }
+        },
+        response: null, // Content comes from stream buffer
+        status: "STREAMING",
+        startedAt: new Date(),
+        endedAt: null,
+        metadata: {
+          isWorkflowRun: true,
+          workflowName: template.name,
+          workflowTemplateId: template.id,
+          workflowRunId: runId,
+          toolCalls: [],
+          toolResults: [],
+        },
+        index: newIndex,
+        parentId: null,
+      };
+
+      // Add to state and persistence (like race system)
+      interactionStore._addInteractionToState(mainInteraction);
+      interactionStore._addStreamingId(mainInteraction.id);
+      
+      // Set initial content in stream buffer
+      interactionStore.setActiveStreamBuffer(
+        mainInteraction.id,
+        `🚀 **${template.name}**\n\nWorkflow starting with ${template.steps.length} step${template.steps.length > 1 ? 's' : ''}...`
+      );
+      
+      await PersistenceService.saveInteraction(mainInteraction);
+      
+      // Emit events (like race system)
+      emitter.emit(interactionEvent.added, { interaction: mainInteraction });
+      emitter.emit(interactionEvent.started, {
+        interactionId: mainInteraction.id,
+        conversationId: mainInteraction.conversationId,
+        type: mainInteraction.type,
+      });
+
+      // Create workflow run
+      const run: WorkflowRun = {
+        runId,
+        conversationId,
+        mainInteractionId,
+        template,
+        status: "RUNNING",
+        currentStepIndex: -1, // Start at -1, trigger step is 0
+        stepOutputs: {},
+        startedAt: new Date().toISOString(),
+      };
+
+      // Start the trigger step as first child (like race system)
+      await WorkflowService.createTriggerStep(mainInteraction, run, baseTurnData);
+      
+      // Emit workflow started event
+      emitter.emit(workflowEvent.started, { run });
+      
+    } catch (error) {
+      console.error(`[WorkflowService] Error during workflow conversion:`, error);
+    }
+  },
+
+  // Create trigger step as child interaction (like race children)
+  createTriggerStep: async (mainInteraction: Interaction, run: WorkflowRun, baseTurnData: PromptTurnObject): Promise<void> => {
+    try {
+      // Build structured output schema based on what step 0 needs
+      const nextStep = run.template.steps[0];
+      const triggerParameters = { ...baseTurnData.parameters };
+      
+      if (nextStep?.templateId) {
+        // Get the template for step 0 to see what variables it needs
+        const { promptTemplates } = usePromptTemplateStore.getState();
+        const nextStepTemplate = promptTemplates.find(t => t.id === nextStep.templateId);
+        
+        if (nextStepTemplate && nextStepTemplate.variables && nextStepTemplate.variables.length > 0) {
+          // Build structured output schema for the variables step 0 needs
+          const { schema } = WorkflowService._createStructuredOutputSchema(nextStepTemplate.variables);
+          
+          triggerParameters.structured_output = schema;
+          console.log(`[WorkflowService] Trigger step will output structured data for step "${nextStep.name}" variables:`, nextStepTemplate.variables.map(v => v.name));
+        }
+      } else if (nextStep?.structuredOutput) {
+        // Fallback to step's own structured output if defined
+        triggerParameters.structured_output = nextStep.structuredOutput.jsonSchema;
+        console.log(`[WorkflowService] Trigger step will output structured data for next step: ${nextStep.name}`);
+      }
+
+      const triggerTurnData: PromptTurnObject = {
+        ...baseTurnData,
+        id: nanoid(),
+        parameters: triggerParameters,
+        metadata: {
+          ...baseTurnData.metadata,
+          isWorkflowStep: true,
+          workflowRunId: run.runId,
+          workflowStepId: 'trigger',
+          workflowMainInteractionId: mainInteraction.id,
+          workflowTab: true,
+          workflowStepIndex: 0, // Tab index
+        },
+      };
+
+      // TRIGGER outputs variables for step[0]
+      if (nextStep?.templateId && triggerParameters.structured_output) {
+        // Get the global system prompt from project settings
+        const conversationStoreState = useConversationStore.getState();
+        const projectStoreState = useProjectStore.getState();
+        const currentConversation = conversationStoreState.getConversationById(run.conversationId);
+        const currentProjectId = currentConversation?.projectId ?? null;
+        const effectiveSettings = projectStoreState.getEffectiveProjectSettings(currentProjectId);
+        const globalSystemPrompt = effectiveSettings.systemPrompt || "You are a helpful AI assistant.";
+        
+        // Get the proper specification for this step
+        const { promptTemplates } = usePromptTemplateStore.getState();
+        const nextStepTemplate = promptTemplates.find(t => t.id === nextStep.templateId);
+        
+        if (nextStepTemplate && nextStepTemplate.variables && nextStepTemplate.variables.length > 0) {
+          const { specification } = WorkflowService._createStructuredOutputSchema(nextStepTemplate.variables);
+          
+          triggerTurnData.metadata.turnSystemPrompt = `${globalSystemPrompt}
+
+You are part of a workflow system. ${specification}`;
+        } else {
+          triggerTurnData.metadata.turnSystemPrompt = `${globalSystemPrompt}
+
+You are part of a workflow system. You ABSOLUTELY MUST respect the following output format when answering to not break the workflow:
+
+${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
+        }
+      }
+
+      console.log(`[WorkflowService] Creating trigger step as child tab for run ${run.runId}`);
+      
+      // Rebuild the prompt object with the structured output for next step
+      const { promptObject: triggerPrompt } = await WorkflowService.buildCompletePromptObject(
+        run.conversationId,
+        baseTurnData.content,
+        triggerTurnData
+      );
+      
+      const triggerInteraction = await InteractionService.startInteraction(
+        triggerPrompt,
+        run.conversationId,
+        triggerTurnData,
+        "message.user_assistant"
+      );
+
+      if (triggerInteraction) {
+        // Set as child of main interaction (like race system)
+        const updates: Partial<Omit<Interaction, "id">> = {
+          parentId: mainInteraction.id,
+          index: 0, // Tab index for trigger
+        };
+
+        const interactionStore = useInteractionStore.getState();
+        interactionStore._updateInteractionInState(triggerInteraction.id, updates);
+        await PersistenceService.saveInteraction({
+          ...triggerInteraction,
+          ...updates,
+        } as Interaction);
+
+        console.log(`[WorkflowService] Trigger step created as child ${triggerInteraction.id} of main ${mainInteraction.id}`);
+      }
+    } catch (error) {
+      console.error(`[WorkflowService] Error creating trigger step:`, error);
+    }
+  },
+
+  // Create regular workflow step as child interaction (like race children)
+  createWorkflowStep: async (run: WorkflowRun, stepIndex: number): Promise<void> => {
+    try {
+      const step = run.template.steps[stepIndex];
+      if (!step) {
+        throw new Error(`Step at index ${stepIndex} not found`);
+      }
+
+      const stepName = step.name || `Step ${stepIndex + 1}`;
+      console.log(`[WorkflowService] Creating step "${stepName}" as child tab for run ${run.runId}`);
+
+      // Update main interaction progress
+      const interactionStore = useInteractionStore.getState();
+      interactionStore.appendStreamBuffer(run.mainInteractionId, `\n\n---\n▶️ **Executing: ${stepName}**`);
+
+      if (step.type === "human-in-the-loop") {
+        interactionStore.appendStreamBuffer(run.mainInteractionId, `\n⏸️ **Paused:** ${step.instructionsForHuman || 'Requires human input.'}`);
+        interactionStore._updateInteractionInState(run.mainInteractionId, { status: 'AWAITING_INPUT' });
+        interactionStore._removeStreamingId(run.mainInteractionId);
+        emitter.emit(workflowEvent.paused, { runId: run.runId, step, pauseReason: 'human-in-the-loop', dataForReview: run.stepOutputs });
         return;
       }
 
-      const compiled = await WorkflowService._compileStepPrompt(currentStep, currentRun.stepOutputs);
-      const modelId = currentStep.modelId ?? usePromptStateStore.getState().modelId;
+      // Compile step prompt
+      const compiled = await WorkflowService._compileStepPrompt(step, run.stepOutputs, stepIndex);
+      const modelId = step.modelId ?? usePromptStateStore.getState().modelId;
 
-      if (!modelId) throw new Error(`Could not determine a valid AI model ID for step "${stepName}".`);
+      if (!modelId) {
+        throw new Error(`Could not determine a valid AI model ID for step "${stepName}".`);
+      }
+
+      console.log(`[WorkflowService] Step "${stepName}" configuration:`, {
+        modelId,
+        hasStructuredOutput: !!step.structuredOutput,
+        structuredOutputSchema: step.structuredOutput?.schema,
+        enabledTools: compiled.selectedTools?.length || 0,
+        selectedRules: compiled.selectedRules?.length || 0
+      });
+
+      // Template details will be handled by buildCompletePromptObject
+
+      // Add structured output schema for the NEXT step if it exists
+      const nextStepIndex = stepIndex + 1;
+      const nextStep = run.template.steps[nextStepIndex];
+      const stepParameters: Record<string, any> = {};
       
-      // Build proper PromptTurnObject with compiled template metadata (like ConversationService)
-      const turnData: PromptTurnObject = {
+      if (nextStep?.templateId) {
+        // Get the template for the NEXT step to see what variables it needs
+        const { promptTemplates } = usePromptTemplateStore.getState();
+        const nextStepTemplate = promptTemplates.find(t => t.id === nextStep.templateId);
+        
+        if (nextStepTemplate && nextStepTemplate.variables && nextStepTemplate.variables.length > 0) {
+          // Build structured output schema for the variables the NEXT step needs
+          const { schema, specification } = WorkflowService._createStructuredOutputSchema(nextStepTemplate.variables);
+          
+          stepParameters.structured_output = schema;
+          console.log(`[WorkflowService] Step "${stepName}" will output structured data for next step "${nextStep.name}" variables:`, nextStepTemplate.variables.map(v => v.name));
+          
+          // Store the specification for the system prompt
+          stepParameters.outputSpecification = specification;
+        }
+      } else if (nextStep?.structuredOutput) {
+        // Fallback to step's own structured output if defined
+        stepParameters.structured_output = nextStep.structuredOutput.jsonSchema;
+        console.log(`[WorkflowService] Step "${stepName}" will output structured data for next step: ${nextStep.name}`);
+      }
+
+      // Create step turn data with step-specific configuration
+      const stepTurnData: PromptTurnObject = {
         id: nanoid(),
         content: compiled.content,
-        parameters: {}, // Will be merged with global parameters by ConversationService
+        parameters: stepParameters,
         metadata: {
           isWorkflowStep: true,
-          workflowRunId: currentRun.runId,
-          workflowStepId: currentStep.id,
-          workflowMainInteractionId: currentRun.mainInteractionId,
-          modelId,
-          // Include tools and rules from template compilation
+          workflowRunId: run.runId,
+          workflowStepId: step.id,
+          workflowMainInteractionId: run.mainInteractionId,
+          workflowTab: true,
+          workflowStepIndex: stepIndex + 1, // Tab index (0 is trigger, 1+ are steps)
+          modelId, // Step-specific model ID override
           enabledTools: compiled.selectedTools,
           effectiveRulesContent: compiled.selectedRules?.map(ruleId => ({ 
             sourceRuleId: ruleId,
-            content: "/* Rule content will be resolved by ConversationService */",
+            content: "/* Rule content will be resolved */",
             type: "before" as const,
           })),
         },
       };
 
-      console.log(`[WorkflowService] Using ConversationService.submitPrompt for step "${stepName}" (run: ${currentRun.runId})`);
-      
-      // Use EXISTING ConversationService.submitPrompt (like other parts of the system)
-      // This ensures proper system prompt construction, parameter merging, and rule application
-      await ConversationService.submitPrompt(turnData);
+      // Each step uses its OWN template's system prompt + workflow output format for the NEXT step
+      if (stepParameters.structured_output) {
+        const { promptTemplates } = usePromptTemplateStore.getState();
+        const currentStepTemplate = promptTemplates.find(t => t.id === step.templateId);
+        
+        if (currentStepTemplate) {
+          // Get the global system prompt from project settings
+          const conversationStoreState = useConversationStore.getState();
+          const projectStoreState = useProjectStore.getState();
+          const currentConversation = conversationStoreState.getConversationById(run.conversationId);
+          const currentProjectId = currentConversation?.projectId ?? null;
+          const effectiveSettings = projectStoreState.getEffectiveProjectSettings(currentProjectId);
+          const globalSystemPrompt = effectiveSettings.systemPrompt || "You are a helpful AI assistant.";
+          
+          const templateSystemPrompt = currentStepTemplate.prompt || "";
+          const baseSystemPrompt = templateSystemPrompt ? `${globalSystemPrompt}\n\n${templateSystemPrompt}` : globalSystemPrompt;
+          
+          // Use the specification if available, otherwise fall back to JSON schema
+          if (stepParameters.outputSpecification) {
+            stepTurnData.metadata.turnSystemPrompt = `${baseSystemPrompt}
 
+You are part of a workflow system. ${stepParameters.outputSpecification}`;
+          } else {
+            stepTurnData.metadata.turnSystemPrompt = `${baseSystemPrompt}
+
+You are part of a workflow system. You ABSOLUTELY MUST respect the following output format when answering to not break the workflow:
+
+${JSON.stringify(stepParameters.structured_output, null, 2)}`;
+          }
+        }
+      }
+
+      // Build complete step prompt with all controls (structured output, tools, etc.)
+      const { promptObject: stepPrompt } = await WorkflowService.buildCompletePromptObject(
+        run.conversationId,
+        compiled.content,
+        stepTurnData
+      );
+
+      // Create child interaction using InteractionService.startInteraction (like race system)
+      const stepInteraction = await InteractionService.startInteraction(
+        stepPrompt,
+        run.conversationId,
+        stepTurnData,
+        "message.assistant_regen"
+      );
+
+      if (stepInteraction) {
+        // Set as child of main interaction (like race system)
+        const updates: Partial<Omit<Interaction, "id">> = {
+          parentId: run.mainInteractionId,
+          index: stepIndex + 1, // Tab index
+        };
+
+        interactionStore._updateInteractionInState(stepInteraction.id, updates);
+        await PersistenceService.saveInteraction({
+          ...stepInteraction,
+          ...updates,
+        } as Interaction);
+
+        console.log(`[WorkflowService] Step "${stepName}" created as child ${stepInteraction.id} of main ${run.mainInteractionId}`);
+      }
     } catch (error) {
-      const errorMsg = `Failed on step "${stepName}": ${String(error)}`;
-      console.error(`%c[WorkflowService] ==> Workflow ERROR for run ${run.runId} at step "${stepName}"`, 'color: #F44336; font-weight: bold;', error);
-      interactionStore.appendStreamBuffer(run.mainInteractionId, `\n❌ **Error:** ${errorMsg}`);
+      console.error(`[WorkflowService] Error creating step ${stepIndex}:`, error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const interactionStore = useInteractionStore.getState();
+      interactionStore.appendStreamBuffer(run.mainInteractionId, `\n❌ **Error creating step ${stepIndex + 1}:** ${errorMsg}`);
       interactionStore._updateInteractionInState(run.mainInteractionId, { status: 'ERROR', endedAt: new Date() });
       interactionStore._removeStreamingId(run.mainInteractionId);
       emitter.emit(workflowEvent.error, { runId: run.runId, error: errorMsg });
@@ -272,82 +545,115 @@ export const WorkflowService = {
       return;
     }
 
-    const { workflowRunId, workflowStepId } = interaction.metadata;
-    console.log(`[WorkflowService] handleInteractionCompleted received for run: ${workflowRunId}, step: ${workflowStepId}, status: ${payload.status}`);
-    const activeRun = useWorkflowStore.getState().activeRun;
-
-    if (!activeRun) {
-      console.warn(`[WorkflowService] Received completed step for run ${workflowRunId}, but no active run in store. Ignoring.`);
-      return;
-    }
-    if (activeRun.runId !== workflowRunId) {
-      console.warn(`[WorkflowService] Mismatched run ID. Store has ${activeRun.runId}, completed interaction has ${workflowRunId}. Ignoring.`);
-      return;
-    }
-
-    if (payload.status === "ERROR" || payload.status === "CANCELLED") {
-      const errorMsg = `Step failed with status ${payload.status}. ${interaction.response || ""}`;
-      console.error(`%c[WorkflowService] ==> Workflow ERROR for run ${activeRun.runId} due to interaction failure.`, 'color: #F44336; font-weight: bold;', interaction);
-      useInteractionStore.getState().appendStreamBuffer(activeRun.mainInteractionId, `\n❌ **Error:** ${errorMsg}`);
-      emitter.emit(workflowEvent.error, { runId: activeRun.runId, error: errorMsg });
-      return;
-    }
-    
-    // --- HANDLE TRIGGER STEP COMPLETION ---
-    if (workflowStepId === 'trigger') {
-      const output = interaction.response ?? "No output";
-      useInteractionStore.getState().appendStreamBuffer(activeRun.mainInteractionId, `\n✔️ **Finished: Initial User Prompt**`);
+    // Wait for interaction to be fully finalized before processing output
+    setTimeout(() => {
+      const { workflowRunId, workflowStepId } = interaction.metadata;
+      console.log(`[WorkflowService] Step completed for run: ${workflowRunId}, step: ${workflowStepId}, status: ${payload.status}`);
       
-      // Announce the completion of the 'trigger' step.
-      // This will cause the store to save the output and increment the step index to 0.
-      // It will also cause _handleStepCompletedAndRunNext to fire, starting the first *real* step.
-      emitter.emit(workflowEvent.stepCompleted, { runId: activeRun.runId, stepId: 'trigger', output: output });
-      return; // End here for the trigger step.
-    }
+      const activeRun = useWorkflowStore.getState().activeRun;
+      if (!activeRun || activeRun.runId !== workflowRunId) {
+        console.warn(`[WorkflowService] Mismatched or no active run for ${workflowRunId}`);
+        return;
+      }
 
-    // --- HANDLE REGULAR STEP COMPLETION ---
-    const stepSpec = activeRun.template.steps.find(s => s.id === workflowStepId);
-    if (!stepSpec) {
-      console.error(`[WorkflowService] CRITICAL: Could not find step with ID ${workflowStepId} in template for run ${activeRun.runId}.`);
-      return;
-    }
+      if (payload.status === "ERROR" || payload.status === "CANCELLED") {
+        const errorMsg = `Step failed with status ${payload.status}. ${interaction.response || ""}`;
+        console.error(`[WorkflowService] Step error for run ${activeRun.runId}:`, errorMsg);
+        useInteractionStore.getState().appendStreamBuffer(activeRun.mainInteractionId, `\n❌ **Error:** ${errorMsg}`);
+        emitter.emit(workflowEvent.error, { runId: activeRun.runId, error: errorMsg });
+        return;
+      }
 
-    let stepOutput: any;
-    try {
-      stepOutput = WorkflowService._parseStepOutput(interaction, stepSpec);
-    } catch (error) {
-      // Could not parse structured output, pause for manual correction
-      emitter.emit(workflowEvent.paused, { 
-        runId: activeRun.runId, 
-        step: stepSpec, 
-        pauseReason: 'data-correction', 
-        rawAssistantResponse: interaction.response 
-      });
-      return;
-    }
+      // Handle trigger step completion
+      if (workflowStepId === 'trigger') {
+        // For trigger step, parse its structured output (it was configured to output for step 0)
+        let triggerOutput: any;
+        
+        // Try to parse structured output from the trigger step response
+        try {
+          // Create a fake step with structured output to use the parser
+          const fakeStep = { structuredOutput: { jsonSchema: {} } } as WorkflowStep;
+          triggerOutput = WorkflowService._parseStepOutput(interaction, fakeStep);
+        } catch (error) {
+          console.warn(`[WorkflowService] Trigger step structured output parsing failed:`, error);
+          // Fallback: use raw response
+          triggerOutput = interaction.response ?? "No output";
+        }
+        
+        useInteractionStore.getState().appendStreamBuffer(activeRun.mainInteractionId, `\n✔️ **Finished: Initial User Prompt**`);
+        emitter.emit(workflowEvent.stepCompleted, { runId: activeRun.runId, stepId: 'trigger', output: triggerOutput });
+        return;
+      }
 
-    const finalStepName = stepSpec.name || 'Unnamed Step';
-    useInteractionStore.getState().appendStreamBuffer(activeRun.mainInteractionId, `\n✔️ **Finished: ${finalStepName}**`);
-    
-    console.log(`[WorkflowService] Emitting stepCompleted for step "${finalStepName}" in run ${activeRun.runId}`);
-    emitter.emit(workflowEvent.stepCompleted, { runId: activeRun.runId, stepId: workflowStepId as string, output: stepOutput });
+      // Handle regular step completion
+      const stepSpec = activeRun.template.steps.find((s: any) => s.id === workflowStepId);
+      if (!stepSpec) {
+        console.error(`[WorkflowService] Could not find step ${workflowStepId} in template`);
+        return;
+      }
+
+      let stepOutput: any;
+      try {
+        stepOutput = WorkflowService._parseStepOutput(interaction, stepSpec);
+      } catch (error) {
+        emitter.emit(workflowEvent.paused, { 
+          runId: activeRun.runId, 
+          step: stepSpec, 
+          pauseReason: 'data-correction', 
+          rawAssistantResponse: interaction.response 
+        });
+        return;
+      }
+
+      const finalStepName = stepSpec.name || 'Unnamed Step';
+      useInteractionStore.getState().appendStreamBuffer(activeRun.mainInteractionId, `\n✔️ **Finished: ${finalStepName}**`);
+      emitter.emit(workflowEvent.stepCompleted, { runId: activeRun.runId, stepId: workflowStepId as string, output: stepOutput });
+    }, 100); // 100ms delay to ensure interaction is fully finalized
   },
 
   handleStepCompleted: (payload: WorkflowEventPayloads[typeof workflowEvent.stepCompleted]): void => {
-    const { runId } = payload;
-    const activeRun = useWorkflowStore.getState().activeRun;
-
-    if (!activeRun || activeRun.runId !== runId) {
-      if (activeRun) console.log(`[WorkflowService] Ignored step completion for run ${runId}, active run is ${activeRun.runId}.`);
-      return;
-    }
+    const { runId, stepId } = payload;
     
-    if (activeRun.status === 'RUNNING') {
-      console.log(`[WorkflowService] Triggering next step for run ${runId}. Next index: ${activeRun.currentStepIndex + 1}`);
-      emitter.emit(workflowEvent.runNextStepRequest, { run: activeRun });
-    } else {
-      console.log(`[WorkflowService] Workflow ${runId} is no longer RUNNING (current status: ${activeRun.status}). Not triggering next step.`);
-    }
+    // Wait for store to process step completion
+    setTimeout(() => {
+      const activeRun = useWorkflowStore.getState().activeRun;
+      if (!activeRun || activeRun.runId !== runId || activeRun.status !== 'RUNNING') {
+        console.log(`[WorkflowService] Step completion ignored - no active run or status changed`);
+        return;
+      }
+      
+      // DEBUG: Log step progression details
+      console.log(`[WorkflowService] Step completed: ${stepId}, currentStepIndex: ${activeRun.currentStepIndex}, totalSteps: ${activeRun.template.steps.length}`);
+      
+      // Check if workflow is complete (currentStepIndex now points to completed steps)
+      if (activeRun.currentStepIndex >= activeRun.template.steps.length) {
+        const interactionStore = useInteractionStore.getState();
+        
+        const finalOutput = Object.entries(activeRun.stepOutputs)
+          .map(([key, value]) => `**${key}**: ${JSON.stringify(value, null, 2)}`)
+          .join('\n\n');
+        
+        interactionStore.setActiveStreamBuffer(
+          activeRun.mainInteractionId, 
+          `✅ **Workflow Completed.**\n\n**Final Outputs:**\n${finalOutput}`
+        );
+        
+        interactionStore._updateInteractionInState(activeRun.mainInteractionId, { 
+          status: 'COMPLETED', 
+          endedAt: new Date() 
+        });
+        interactionStore._removeStreamingId(activeRun.mainInteractionId);
+        
+        emitter.emit(workflowEvent.completed, { runId: activeRun.runId, finalOutput: activeRun.stepOutputs });
+        console.log(`[WorkflowService] Workflow completed: ${runId}`);
+        return;
+      }
+      
+      // Create current step (store has already incremented currentStepIndex)
+      console.log(`[WorkflowService] Creating current step ${activeRun.currentStepIndex} for run ${runId}`);
+      WorkflowService.createWorkflowStep(activeRun, activeRun.currentStepIndex);
+      
+    }, 0);
   },
 
   handleWorkflowResumeRequest: async (payload: WorkflowEventPayloads[typeof workflowEvent.resumeRequest]): Promise<void> => {
@@ -355,16 +661,193 @@ export const WorkflowService = {
     const { runId, resumeData } = payload;
     const activeRun = useWorkflowStore.getState().activeRun;
     if (!activeRun || activeRun.runId !== runId) {
-      console.warn(`[WorkflowService] Cannot resume run ${runId}, it is not the active run.`);
+      console.warn(`[WorkflowService] Cannot resume run ${runId}, not active`);
       return;
     }
+    
     const stepSpec = activeRun.template.steps[activeRun.currentStepIndex];
     if (!stepSpec) {
-      console.error(`[WorkflowService] Cannot resume run ${runId}, could not find current step spec at index ${activeRun.currentStepIndex}.`);
+      console.error(`[WorkflowService] Cannot resume, no step at index ${activeRun.currentStepIndex}`);
       return;
     }
 
-    console.log(`[WorkflowService] Emitting stepCompleted for resumed step "${stepSpec.name}" in run ${activeRun.runId}`);
     emitter.emit(workflowEvent.stepCompleted, { runId: activeRun.runId, stepId: stepSpec.id, output: resumeData });
+  },
+
+  /**
+   * Extract and build complete PromptObject like ConversationService.submitPrompt does
+   * This ensures all prompt controls (structured output, tools, parameters) are included
+   */
+  async buildCompletePromptObject(
+    conversationId: string, 
+    userContent: string, 
+    baseTurnData: PromptTurnObject
+  ): Promise<{ promptObject: PromptObject; turnData: PromptTurnObject }> {
+    const interactionStoreState = useInteractionStore.getState();
+    const projectStoreState = useProjectStore.getState();
+    const promptState = usePromptStateStore.getState();
+    const conversationStoreState = useConversationStore.getState();
+
+    const controlRegistryState = useControlRegistryStore.getState();
+
+    // Get conversation and project settings
+    const currentConversation = conversationStoreState.getConversationById(conversationId);
+    const currentProjectId = currentConversation?.projectId ?? null;
+    const effectiveSettings = projectStoreState.getEffectiveProjectSettings(currentProjectId);
+
+    // Collect parameters and metadata from all prompt controls
+    const promptControls = Object.values(controlRegistryState.promptControls);
+    let parameters: Record<string, any> = {};
+    let metadata: Record<string, any> = { ...baseTurnData.metadata };
+
+    for (const control of promptControls) {
+      if (control.getParameters) {
+        const params = await control.getParameters();
+        if (params) parameters = { ...parameters, ...params };
+      }
+      if (control.getMetadata) {
+        const meta = await control.getMetadata();
+        if (meta) metadata = { ...metadata, ...meta };
+      }
+    }
+
+    // Build history from existing interactions
+    const activeInteractionsOnSpine = interactionStoreState.interactions
+      .filter(i => i.conversationId === conversationId && i.parentId === null && i.status === "COMPLETED")
+      .sort((a, b) => a.index - b.index);
+
+    const turnsForHistoryBuilder: Interaction[] = activeInteractionsOnSpine.map(activeInteraction => {
+      if (activeInteraction.type === "message.assistant_regen" && activeInteraction.metadata?.regeneratedFromId) {
+        const originalInteraction = interactionStoreState.interactions.find(
+          orig => orig.id === activeInteraction.metadata!.regeneratedFromId
+        );
+        if (originalInteraction && originalInteraction.prompt && originalInteraction.type === "message.user_assistant") {
+          return {
+            ...activeInteraction,
+            prompt: originalInteraction.prompt,
+            type: "message.user_assistant",
+          } as Interaction;
+        }
+      }
+      if (activeInteraction.type === "message.user_assistant" && activeInteraction.prompt) {
+        return activeInteraction;
+      }
+      return null;
+    }).filter(Boolean) as Interaction[];
+
+    const historyMessages: CoreMessage[] = buildHistoryMessages(turnsForHistoryBuilder);
+
+    // Add current user message
+    historyMessages.push({ role: "user", content: userContent });
+
+    // Build system prompt with rules if any
+    const turnSystemPrompt = metadata?.turnSystemPrompt as string | undefined;
+    let baseSystemPrompt = turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
+
+    const effectiveRulesContent = metadata?.effectiveRulesContent ?? [];
+    const systemRulesContent = effectiveRulesContent
+      .filter((r: any) => r.type === "system")
+      .map((r: any) => r.content);
+
+    if (systemRulesContent.length > 0) {
+      baseSystemPrompt = `${baseSystemPrompt ? `${baseSystemPrompt}\n\n` : ""}${systemRulesContent.join("\n")}`;
+    }
+
+    // Build final parameters from prompt state + control parameters
+    const finalParameters = {
+      temperature: promptState.temperature,
+      max_tokens: promptState.maxTokens,
+      top_p: promptState.topP,
+      top_k: promptState.topK,
+      presence_penalty: promptState.presencePenalty,
+      frequency_penalty: promptState.frequencyPenalty,
+      ...parameters, // Control parameters override prompt state
+      ...(baseTurnData.parameters ?? {}), // Base turn data parameters have highest priority
+    };
+
+    // DEBUG: Log parameter building
+    console.log(`[WorkflowService] Building prompt parameters:`, {
+      promptStateParams: { temperature: promptState.temperature, max_tokens: promptState.maxTokens },
+      controlParams: parameters,
+      baseTurnParams: baseTurnData.parameters,
+      finalParams: finalParameters
+    });
+
+    // Remove null/undefined parameters
+    Object.keys(finalParameters).forEach((key) => {
+      if (
+        finalParameters[key as keyof typeof finalParameters] === null ||
+        finalParameters[key as keyof typeof finalParameters] === undefined
+      ) {
+        delete finalParameters[key as keyof typeof finalParameters];
+      }
+    });
+
+    // Build complete metadata
+    const completeMetadata = {
+      ...metadata,
+      modelId: metadata.modelId || promptState.modelId || undefined,
+    };
+
+    // Build complete turn data
+    const completeTurnData: PromptTurnObject = {
+      ...baseTurnData,
+      content: userContent,
+      parameters: finalParameters,
+      metadata: completeMetadata,
+    };
+
+    // Build complete prompt object
+    const promptObject: PromptObject = {
+      system: baseSystemPrompt,
+      messages: historyMessages,
+      parameters: finalParameters,
+      metadata: completeMetadata,
+    };
+
+    return { promptObject, turnData: completeTurnData };
+  },
+
+  /**
+   * Create proper structured output schema and specification for workflow steps
+   * This ensures the model outputs actual data values, not schema format
+   */
+  _createStructuredOutputSchema: (variables: Array<{ name: string; type: string; description?: string; required?: boolean }>): { schema: object; specification: string } => {
+    // Build the JSON schema for structured output
+    const schema = {
+      type: "object",
+      properties: {} as Record<string, any>,
+      required: [] as string[],
+      additionalProperties: false
+    };
+
+    variables.forEach(variable => {
+      schema.properties[variable.name] = {
+        type: variable.type === 'number' ? 'number' : 'string',
+        description: variable.description || `The ${variable.name} value`
+      };
+      if (variable.required) {
+        schema.required.push(variable.name);
+      }
+    });
+
+    // Create specification text that clearly explains the expected output format
+    const exampleOutput = variables.reduce((acc, variable) => {
+      const exampleValue = variable.type === 'number' ? 42 : `"your ${variable.name} here"`;
+      acc[variable.name] = exampleValue;
+      return acc;
+    }, {} as Record<string, any>);
+
+    const specification = `You must respond with a JSON object containing the actual values (not schema definitions). 
+
+Expected format:
+${JSON.stringify(exampleOutput, null, 2)}
+
+Required fields: ${schema.required.join(', ')}
+${variables.map(v => `- ${v.name}: ${v.description || `The ${v.name} value`}`).join('\n')}
+
+IMPORTANT: Provide the actual values, not schema definitions with "type" and "description" fields.`;
+
+    return { schema, specification };
   },
 };

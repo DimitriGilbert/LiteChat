@@ -120,7 +120,11 @@ export class WorkflowControlModule implements ControlModule {
       console.error("[WorkflowControlModule] startWorkflow called without an active conversation.");
       return;
     }
+    
+    // Start the workflow immediately with the initial prompt
     this.modApi?.emit(workflowEvent.startRequest, { template, initialPrompt, conversationId });
+    
+    toast.success(`Workflow "${template.name}" started with ${template.steps.length} steps!`);
   }
 
   register(modApi: LiteChatModApi): void {
