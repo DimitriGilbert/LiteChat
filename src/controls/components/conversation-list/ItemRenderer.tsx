@@ -28,6 +28,11 @@ import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipB
 import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { uiEvent } from "@/types/litechat/events/ui.events";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface ConversationItemProps {
   item: SidebarItem;
@@ -93,6 +98,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
       isProject ? (item as Project).name : (item as Conversation).title
     );
     const localEditInputRef = useRef<HTMLInputElement | null>(null);
+    const [popoverOpen, setPopoverOpen] = useState(false);
 
     useEffect(() => {
       if (isGloballyEditingThis) {
@@ -293,7 +299,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
         <div
           className={cn(
             "items-center flex-shrink-0 ml-1",
-            isGloballyEditingThis
+            isGloballyEditingThis || popoverOpen
               ? "flex"
               : "hidden group-hover:flex transition-all duration-150"
           )}
@@ -352,36 +358,45 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                   className="h-5 w-5 text-muted-foreground hover:text-foreground"
                 />
               ) : (
-                <div className="relative group/export">
-                  <ActionTooltipButton
-                    tooltipText="Export Conversation"
-                    aria-label={`Export ${displayName}`}
-                    icon={<DownloadIcon />}
-                    className="h-5 w-5 text-muted-foreground group-hover/export:text-foreground"
-                  />
-                  <div
-                    className="absolute right-0 top-full mt-1 hidden group-hover/export:flex
-                                 bg-popover border border-border rounded-md shadow-lg p-0.5 z-10 gap-0.5"
+                <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <ActionTooltipButton
+                      tooltipText="Export Conversation"
+                      aria-label={`Export ${displayName}`}
+                      icon={<DownloadIcon />}
+                      className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                    />
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-auto p-0.5"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-5 px-1.5 text-xs"
-                      onClick={(e) => onExportConversation(item.id, "json", e)}
-                    >
-                      JSON
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-5 px-1.5 text-xs"
-                      onClick={(e) => onExportConversation(item.id, "md", e)}
-                    >
-                      MD
-                    </Button>
-                  </div>
-                </div>
+                    <div className="flex gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 px-1.5 text-xs"
+                        onClick={(e) => {
+                          onExportConversation(item.id, "json", e);
+                          setPopoverOpen(false);
+                        }}
+                      >
+                        JSON
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 px-1.5 text-xs"
+                        onClick={(e) => {
+                          onExportConversation(item.id, "md", e);
+                          setPopoverOpen(false);
+                        }}
+                      >
+                        MD
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               )}
               <ActionTooltipButton
                 tooltipText="Delete"

@@ -126,7 +126,10 @@ export const FollowUpSelector: React.FC<FollowUpSelectorProps> = ({
                 </div>
                 
                 {isOpen && (
-                  <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-60 overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
+                  <div
+                    className="absolute top-full left-0 right-0 mt-1 max-h-60 overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md"
+                    style={{ position: "relative", zIndex: "var(--z-popover)" }}
+                  >
                     <div className="p-2">
                       <Input
                         placeholder="Search templates..."

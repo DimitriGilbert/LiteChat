@@ -166,7 +166,7 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
 
   return (
     <div className="code-block-container group/codeblock my-4 max-w-full">
-      <div className="code-block-header sticky top-0 z-10 flex items-center justify-between px-3 py-2 border border-b-0 border-border bg-muted/50 rounded-t-lg">
+      <div className="code-block-header sticky top-0 z-[var(--z-sticky)] flex items-center justify-between px-3 py-2 border border-b-0 border-border bg-muted/50 rounded-t-lg">
         <div className="flex items-center gap-1">
           <div className="text-sm font-medium">
             {lang ? lang.toUpperCase() : "CODE"}

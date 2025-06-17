@@ -88,7 +88,7 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
     // Added relative container for sticky header
     <div className="relative h-full">
       <Table className="w-full text-sm">
-        <TableHeader className="sticky top-0 bg-card z-10">
+        <TableHeader className="sticky top-0 bg-card z-[var(--z-sticky)]">
           <TableRow className="hover:bg-card">
             <TableHead className="w-[40px] px-2"></TableHead>
             <TableHead className="w-[40px] px-2"></TableHead>

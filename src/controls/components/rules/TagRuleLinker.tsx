@@ -1,23 +1,11 @@
 // src/components/LiteChat/settings/tags/TagRuleLinker.tsx
 // FULL FILE
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import type { DbRule, DbTag } from "@/types/litechat/rules";
 import { Button } from "@/components/ui/button";
 import { Check, ChevronsUpDown, XIcon } from "lucide-react";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -36,12 +24,25 @@ export const TagRuleLinker: React.FC<TagRuleLinkerProps> = ({
   onLinkChange,
   disabled = false,
 }) => {
-  const [open, setOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [filterText, setFilterText] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const sortedRules = useMemo(
     () => [...allRules].sort((a, b) => a.name.localeCompare(b.name)),
-    [allRules],
+    [allRules]
   );
 
   const filteredRules = useMemo(() => {
@@ -51,7 +52,7 @@ export const TagRuleLinker: React.FC<TagRuleLinkerProps> = ({
       (rule) =>
         rule.name.toLowerCase().includes(lowerFilter) ||
         rule.content.toLowerCase().includes(lowerFilter) ||
-        rule.type.toLowerCase().includes(lowerFilter),
+        rule.type.toLowerCase().includes(lowerFilter)
     );
   }, [sortedRules, filterText]);
 
@@ -59,11 +60,9 @@ export const TagRuleLinker: React.FC<TagRuleLinkerProps> = ({
     (ruleId: string) => {
       const isCurrentlyLinked = linkedRuleIds.has(ruleId);
       onLinkChange(tag.id, ruleId, !isCurrentlyLinked);
-      // Keep popover open after selection
-      // setOpen(false);
       setFilterText("");
     },
-    [linkedRuleIds, onLinkChange, tag.id],
+    [linkedRuleIds, onLinkChange, tag.id]
   );
 
   const handleUnlink = useCallback(
@@ -71,7 +70,7 @@ export const TagRuleLinker: React.FC<TagRuleLinkerProps> = ({
       e.stopPropagation();
       onLinkChange(tag.id, ruleId, false);
     },
-    [onLinkChange, tag.id],
+    [onLinkChange, tag.id]
   );
 
   const selectedRules = useMemo(() => {
@@ -81,64 +80,64 @@ export const TagRuleLinker: React.FC<TagRuleLinkerProps> = ({
   return (
     <div className="space-y-3">
       <Label className="font-medium">Associated Rules for "{tag.name}"</Label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className="w-full justify-between h-9"
-            disabled={disabled || allRules.length === 0}
-          >
-            <span className="truncate">
-              {selectedRules.length > 0
-                ? `${selectedRules.length} rule(s) selected`
-                : "Select rules..."}
-            </span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder="Search rules..."
-              value={filterText}
-              onValueChange={setFilterText}
-            />
-            <CommandList>
-              <CommandEmpty>
-                {allRules.length === 0
-                  ? "No rules defined."
-                  : "No rules found."}
-              </CommandEmpty>
-              <CommandGroup>
-                {filteredRules.map((rule) => {
+      <div className="relative" ref={dropdownRef}>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={isOpen}
+          className="w-full justify-between h-9"
+          disabled={disabled || allRules.length === 0}
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          <span className="truncate">
+            {selectedRules.length > 0
+              ? `${selectedRules.length} rule(s) selected`
+              : "Select rules..."}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+        {isOpen && (
+          <div className="absolute top-full left-0 right-0 z-[var(--z-popover)] mt-1 rounded-md border bg-popover text-popover-foreground shadow-md">
+            <div className="p-2">
+              <Input
+                placeholder="Search rules..."
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                className="h-8"
+              />
+            </div>
+            <div className="max-h-48 overflow-auto">
+              {filteredRules.length === 0 ? (
+                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                  {allRules.length === 0 ? "No rules defined." : "No rules found."}
+                </div>
+              ) : (
+                filteredRules.map((rule) => {
                   const isSelected = linkedRuleIds.has(rule.id);
                   return (
-                    <CommandItem
+                    <div
                       key={rule.id}
-                      value={rule.id} // Use ID for value
-                      onSelect={() => handleSelect(rule.id)}
-                      className="cursor-pointer"
+                      onClick={() => handleSelect(rule.id)}
+                      className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
                     >
                       <Check
                         className={cn(
                           "mr-2 h-4 w-4",
-                          isSelected ? "opacity-100" : "opacity-0",
+                          isSelected ? "opacity-100" : "opacity-0"
                         )}
                       />
                       <span className="truncate">{rule.name}</span>
                       <span className="ml-2 text-xs text-muted-foreground">
                         ({rule.type})
                       </span>
-                    </CommandItem>
+                    </div>
                   );
-                })}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+                })
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Display selected rules as badges */}
       {selectedRules.length > 0 && (

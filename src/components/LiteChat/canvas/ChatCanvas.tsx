@@ -497,7 +497,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
                   <Button
                     variant="outline"
                     size="icon"
-                    className="absolute bottom-4 right-4 z-20 h-8 w-8 rounded-full shadow-md bg-background/80 backdrop-blur-sm hover:bg-muted"
+                    className="absolute bottom-4 right-4 z-[var(--z-sticky)] h-8 w-8 rounded-full shadow-md bg-background/80 backdrop-blur-sm hover:bg-muted"
                     onClick={() => scrollToBottom()}
                     aria-label="Scroll to bottom"
                   >
@@ -516,7 +516,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
                   <Button
                     variant="outline"
                     size="icon"
-                    className="absolute bottom-4 right-14 z-20 h-8 w-8 rounded-full shadow-md bg-background/80 backdrop-blur-sm hover:bg-muted"
+                    className="absolute bottom-4 right-14 z-[var(--z-sticky)] h-8 w-8 rounded-full shadow-md bg-background/80 backdrop-blur-sm hover:bg-muted"
                     onClick={() => setEnableAutoScrollOnStream(!enableAutoScrollOnStream)}
                     aria-label={enableAutoScrollOnStream ? "Disable follow stream" : "Enable follow stream"}
                   >

@@ -99,6 +99,13 @@
   --sidebar-accent-foreground: oklch(0.2 0.05 230);
   --sidebar-border: oklch(0.8 0.03 230);
   --sidebar-ring: oklch(0.7 0.2 140);
+
+  /* Z-Index Scale */
+  --z-sticky: 10;
+  --z-sidebar: 40;
+  --z-dialog: 50;
+  --z-popover: 60;
+  --z-toast: 999;
 }
 
 .dark {
