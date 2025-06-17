@@ -380,18 +380,53 @@ export const useInteractionStore = create(
     },
 
     _addStreamingId: (id) => {
+      let statusChanged = false;
       set((state) => {
         if (!state.streamingInteractionIds.includes(id)) {
           state.streamingInteractionIds.push(id);
+          state.activeStreamBuffers[id] = "";
+          state.activeReasoningBuffers[id] = "";
+          if (state.streamingInteractionIds.length === 1) {
+            state.status = "streaming";
+            statusChanged = true;
+          }
+          state.error = null;
         }
+      });
+      if (statusChanged) {
+        emitter.emit(interactionEvent.statusChanged, {
+          status: "streaming",
+        });
+      }
+      emitter.emit(interactionEvent.streamingIdsChanged, {
+        streamingIds: get().streamingInteractionIds,
       });
     },
 
     _removeStreamingId: (id) => {
+      let statusChanged = false;
       set((state) => {
-        state.streamingInteractionIds = state.streamingInteractionIds.filter(
-          (streamingId) => streamingId !== id
-        );
+        const index = state.streamingInteractionIds.indexOf(id);
+        if (index !== -1) {
+          state.streamingInteractionIds.splice(index, 1);
+          delete state.activeStreamBuffers[id];
+          delete state.activeReasoningBuffers[id];
+          if (
+            state.streamingInteractionIds.length === 0 &&
+            state.status === "streaming"
+          ) {
+            state.status = state.error ? "error" : "idle";
+            statusChanged = true;
+          }
+        }
+      });
+      if (statusChanged) {
+        emitter.emit(interactionEvent.statusChanged, {
+          status: get().status,
+        });
+      }
+      emitter.emit(interactionEvent.streamingIdsChanged, {
+        streamingIds: get().streamingInteractionIds,
       });
     },
 
