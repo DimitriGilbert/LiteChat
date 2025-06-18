@@ -25,6 +25,26 @@ export const ResponseTabsContainer: React.FC<ResponseTabsContainerProps> = ({
   activeStreamingInteractionId,
 }) => {
   const [activeTabIndex, setActiveTabIndex] = useState(0);
+  
+  // DEBUG: Check workflow tab detection
+  React.useEffect(() => {
+    const hasWorkflow = interactionGroup.some(i => i.metadata?.isWorkflowRun || i.metadata?.isWorkflowStep);
+    if (hasWorkflow) {
+      console.log(`[ResponseTabsContainer] Workflow tabs:`, {
+        totalTabs: interactionGroup.length,
+        activeStreamingId: activeStreamingInteractionId,
+        tabs: interactionGroup.map((i, idx) => ({
+          index: idx,
+          id: i.id,
+          parentId: i.parentId,
+          status: i.status,
+          isWorkflowRun: !!i.metadata?.isWorkflowRun,
+          isWorkflowStep: !!i.metadata?.isWorkflowStep,
+          stepId: i.metadata?.workflowStepId
+        }))
+      });
+    }
+  }, [interactionGroup, activeStreamingInteractionId]);
 
   if (!interactionGroup || interactionGroup.length === 0) {
     return null;

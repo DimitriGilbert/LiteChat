@@ -644,8 +644,10 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
             /```flow\n[\s\S]*?\n```/,
             `\`\`\`flow\n${updatedFlowContent}\n\`\`\``
           );
+          // Update stream buffer directly (main stays streaming like race system)
           interactionStore.setActiveStreamBuffer(activeRun.mainInteractionId, newContent);
         } else {
+          // Append progress directly to stream buffer
           interactionStore.appendStreamBuffer(activeRun.mainInteractionId, `\n✔️ **Finished: Initial User Prompt**`);
         }
         
@@ -687,9 +689,11 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
           /```flow\n[\s\S]*?\n```/,
           `\`\`\`flow\n${updatedFlowContent}\n\`\`\``
         );
+        // Update stream buffer directly (main stays streaming like race system)
         interactionStore.setActiveStreamBuffer(activeRun.mainInteractionId, newContent);
       } else {
         const finalStepName = stepSpec.name || 'Unnamed Step';
+        // Append progress directly to stream buffer
         interactionStore.appendStreamBuffer(activeRun.mainInteractionId, `\n✔️ **Finished: ${finalStepName}**`);
       }
       
@@ -990,4 +994,6 @@ IMPORTANT: Keep your response as they would be in normal condition you can use a
 
     return { schema, specification };
   },
+
+  
 };

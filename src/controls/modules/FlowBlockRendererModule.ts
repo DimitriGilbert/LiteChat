@@ -23,12 +23,6 @@ export class FlowBlockRendererModule implements ControlModule {
       supportedLanguages: ["flow", "workflow", "reactflow"], // Multiple language aliases
       priority: 10, // Higher priority than fallback renderer
       renderer: (context: BlockRendererContext) => {
-        console.log(`[FlowBlockRendererModule] Rendering flow block:`, {
-          lang: context.lang,
-          codeLength: context.code?.length || 0,
-          isStreaming: context.isStreaming,
-          codePreview: context.code?.substring(0, 100) + (context.code?.length > 100 ? '...' : ''),
-        });
         return React.createElement(FlowBlockRenderer, {
           code: context.code,
           isStreaming: context.isStreaming,
