@@ -101,7 +101,7 @@ export class JSONFlowParser implements FlowParser {
       return `Node ${index}: Missing required field: type`;
     }
 
-    const validTypes = ['trigger', 'prompt', 'agent-task', 'human-in-the-loop', 'custom'];
+    const validTypes = ['trigger', 'prompt', 'agent-task', 'human-in-the-loop', 'custom', 'input', 'output', 'default', 'group'];
     if (!validTypes.includes(node.type)) {
       return `Node ${index}: Invalid type '${node.type}'. Must be one of: ${validTypes.join(', ')}`;
     }
@@ -123,6 +123,30 @@ export class JSONFlowParser implements FlowParser {
       if (!validStatuses.includes(node.status)) {
         return `Node ${index}: Invalid status '${node.status}'. Must be one of: ${validStatuses.join(', ')}`;
       }
+    }
+
+    // Validate styling options
+    if (node.style && typeof node.style !== 'object') {
+      return `Node ${index}: Style must be an object`;
+    }
+
+    if (node.style) {
+      const validStyleKeys = [
+        'background', 'backgroundColor', 'color', 'border', 'borderColor', 'borderWidth', 'borderRadius',
+        'width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight',
+        'padding', 'margin', 'fontSize', 'fontWeight', 'opacity', 'boxShadow'
+      ];
+      
+      for (const key in node.style) {
+        if (!validStyleKeys.includes(key)) {
+          return `Node ${index}: Invalid style property '${key}'. Valid properties: ${validStyleKeys.join(', ')}`;
+        }
+      }
+    }
+
+    // Validate className
+    if (node.className && typeof node.className !== 'string') {
+      return `Node ${index}: className must be a string`;
     }
 
     return null;
@@ -149,6 +173,76 @@ export class JSONFlowParser implements FlowParser {
       return `Edge ${index}: Target node '${edge.target}' does not exist`;
     }
 
+    // Validate edge type
+    if (edge.type) {
+      const validEdgeTypes = ['default', 'straight', 'step', 'smoothstep', 'bezier', 'custom'];
+      if (!validEdgeTypes.includes(edge.type)) {
+        return `Edge ${index}: Invalid type '${edge.type}'. Must be one of: ${validEdgeTypes.join(', ')}`;
+      }
+    }
+
+    // Validate styling options
+    if (edge.style && typeof edge.style !== 'object') {
+      return `Edge ${index}: Style must be an object`;
+    }
+
+    if (edge.style) {
+      const validStyleKeys = [
+        'stroke', 'strokeWidth', 'strokeDasharray', 'strokeOpacity',
+        'fill', 'color', 'opacity'
+      ];
+      
+      for (const key in edge.style) {
+        if (!validStyleKeys.includes(key)) {
+          return `Edge ${index}: Invalid style property '${key}'. Valid properties: ${validStyleKeys.join(', ')}`;
+        }
+      }
+    }
+
+    // Validate markers
+    if (edge.markerEnd) {
+      const markerError = this.validateMarker(edge.markerEnd, `Edge ${index} markerEnd`);
+      if (markerError) return markerError;
+    }
+
+    if (edge.markerStart) {
+      const markerError = this.validateMarker(edge.markerStart, `Edge ${index} markerStart`);
+      if (markerError) return markerError;
+    }
+
+    return null;
+  }
+
+  private validateMarker(marker: any, context: string): string | null {
+    if (typeof marker === 'string') {
+      // Custom marker reference is valid
+      return null;
+    }
+
+    if (typeof marker !== 'object') {
+      return `${context}: Marker must be an object or string`;
+    }
+
+    if (marker.type) {
+      const validMarkerTypes = ['Arrow', 'ArrowClosed'];
+      if (!validMarkerTypes.includes(marker.type)) {
+        return `${context}: Invalid marker type '${marker.type}'. Must be one of: ${validMarkerTypes.join(', ')}`;
+      }
+    }
+
+    // Validate marker properties
+    if (marker.width && typeof marker.width !== 'number') {
+      return `${context}: Marker width must be a number`;
+    }
+
+    if (marker.height && typeof marker.height !== 'number') {
+      return `${context}: Marker height must be a number`;
+    }
+
+    if (marker.color && typeof marker.color !== 'string') {
+      return `${context}: Marker color must be a string`;
+    }
+
     return null;
   }
 }
@@ -156,15 +250,19 @@ export class JSONFlowParser implements FlowParser {
 // Auto-layout utility for nodes without positions
 export function autoLayoutNodes(nodes: FlowNode[]): FlowNode[] {
   const HORIZONTAL_SPACING = 400;
+  const VERTICAL_SPACING = 150;
 
   return nodes.map((node, index) => {
     if (node.position.x === 0 && node.position.y === 0 && index > 0) {
       // Auto-position nodes that don't have explicit positions
+      const row = Math.floor(index / 3);
+      const col = index % 3;
+      
       return {
         ...node,
         position: {
-          x: index * HORIZONTAL_SPACING,
-          y: 0
+          x: col * HORIZONTAL_SPACING,
+          y: row * VERTICAL_SPACING
         }
       };
     }
@@ -187,12 +285,12 @@ export function generateSequentialEdges(nodes: FlowNode[]): FlowEdge[] {
       animated: sourceNode.status === 'running' || targetNode.status === 'running',
       type: 'smoothstep',
       style: { 
-        stroke: '#1f2937',
+        stroke: getEdgeColor(sourceNode.status),
         strokeWidth: 2,
       },
       markerEnd: {
         type: 'ArrowClosed',
-        color: '#1f2937',
+        color: getEdgeColor(sourceNode.status),
         width: 18,
         height: 18,
       }
@@ -200,4 +298,56 @@ export function generateSequentialEdges(nodes: FlowNode[]): FlowEdge[] {
   }
   
   return edges;
+}
+
+// Helper function to get edge color based on status
+function getEdgeColor(status?: StepStatus): string {
+  switch (status) {
+    case 'success':
+      return '#22c55e'; // green
+    case 'error':
+      return '#ef4444'; // red
+    case 'running':
+      return '#3b82f6'; // blue
+    case 'pending':
+    default:
+      return '#6b7280'; // gray
+  }
+}
+
+// Generate a radial layout for nodes
+export function generateRadialLayout(nodes: FlowNode[], centerX = 400, centerY = 300, radius = 200): FlowNode[] {
+  if (nodes.length === 0) return nodes;
+  if (nodes.length === 1) {
+    return [{ ...nodes[0], position: { x: centerX, y: centerY } }];
+  }
+
+  const angleStep = (2 * Math.PI) / nodes.length;
+  
+  return nodes.map((node, index) => {
+    const angle = index * angleStep;
+    const x = centerX + radius * Math.cos(angle);
+    const y = centerY + radius * Math.sin(angle);
+    
+    return {
+      ...node,
+      position: { x, y }
+    };
+  });
+}
+
+// Generate a grid layout for nodes
+export function generateGridLayout(nodes: FlowNode[], columns = 3, cellWidth = 300, cellHeight = 200): FlowNode[] {
+  return nodes.map((node, index) => {
+    const row = Math.floor(index / columns);
+    const col = index % columns;
+    
+    return {
+      ...node,
+      position: {
+        x: col * cellWidth,
+        y: row * cellHeight
+      }
+    };
+  });
 } 

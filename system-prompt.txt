@@ -95,130 +95,243 @@ Each edge requires:
 
 **Examples:**
 
-Simple workflow:
+Simple process flow:
 ```flow
 {
-  "type": "workflow",
-  "name": "Content Creation Workflow",
+  "type": "process",
+  "name": "Order Processing System",
+  "description": "E-commerce order fulfillment process",
+  "background": {
+    "variant": "dots",
+    "gap": 20,
+    "color": "#e5e7eb"
+  },
   "nodes": [
     {
-      "id": "initial",
-      "type": "trigger",
-      "label": "User Input",
-      "position": { "x": 0, "y": 0 },
+      "id": "start",
+      "type": "input",
+      "label": "New Order",
+      "position": { "x": 0, "y": 100 },
       "status": "success",
-      "data": {
-        "templateName": "Initial Prompt",
-        "modelName": "GPT-4"
+      "style": {
+        "backgroundColor": "#dcfce7",
+        "borderColor": "#22c55e",
+        "color": "#166534"
       }
     },
     {
-      "id": "analyze",
-      "type": "prompt",
-      "label": "Analyze Content",
-      "position": { "x": 300, "y": 0 },
+      "id": "validate",
+      "type": "default",
+      "label": "Validate Payment",
+      "position": { "x": 200, "y": 100 },
       "status": "running",
-      "data": {
-        "templateName": "Content Analyzer",
-        "modelName": "Claude-3"
+      "style": {
+        "backgroundColor": "#dbeafe",
+        "borderColor": "#3b82f6",
+        "color": "#1e40af"
       }
     },
     {
-      "id": "review",
-      "type": "human-in-the-loop",
-      "label": "Human Review",
-      "position": { "x": 600, "y": 0 },
+      "id": "fulfill",
+      "type": "default",
+      "label": "Ship Order",
+      "position": { "x": 400, "y": 100 },
       "status": "pending",
-      "data": {
-        "templateName": "Review Step"
+      "style": {
+        "backgroundColor": "#fef3c7",
+        "borderColor": "#f59e0b",
+        "color": "#92400e"
+      }
+    },
+    {
+      "id": "complete",
+      "type": "output",
+      "label": "Order Complete",
+      "position": { "x": 600, "y": 100 },
+      "status": "pending",
+      "style": {
+        "backgroundColor": "#f3e8ff",
+        "borderColor": "#8b5cf6",
+        "color": "#6b21a8"
       }
     }
   ],
   "edges": [
     {
       "id": "e1",
-      "source": "initial",
-      "target": "analyze",
-      "animated": true
+      "source": "start",
+      "target": "validate",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#22c55e",
+        "strokeWidth": 2
+      },
+      "markerEnd": {
+        "type": "ArrowClosed",
+        "color": "#22c55e"
+      }
     },
     {
       "id": "e2",
-      "source": "analyze",
-      "target": "review"
+      "source": "validate",
+      "target": "fulfill",
+      "type": "smoothstep",
+      "style": {
+        "stroke": "#3b82f6",
+        "strokeWidth": 2
+      },
+      "markerEnd": {
+        "type": "ArrowClosed",
+        "color": "#3b82f6"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "fulfill",
+      "target": "complete",
+      "type": "smoothstep",
+      "style": {
+        "stroke": "#6b7280",
+        "strokeWidth": 2,
+        "strokeDasharray": "5,5"
+      },
+      "markerEnd": {
+        "type": "ArrowClosed",
+        "color": "#6b7280"
+      }
     }
   ]
 }
 ```
 
-Multi-step AI workflow:
+Organizational flowchart:
 ```flow
 {
-  "type": "workflow",
-  "name": "Research and Writing Pipeline",
+  "type": "flowchart",
+  "name": "Decision Making Process",
+  "description": "Company decision approval workflow",
+  "background": {
+    "variant": "lines",
+    "gap": [40, 40],
+    "color": "#f3f4f6"
+  },
   "nodes": [
     {
-      "id": "start",
-      "type": "trigger",
-      "label": "Research Topic",
-      "position": { "x": 0, "y": 100 },
-      "status": "success"
-    },
-    {
-      "id": "gather",
-      "type": "agent-task",
-      "label": "Gather Information",
-      "position": { "x": 250, "y": 0 },
-      "status": "success",
-      "data": {
-        "templateName": "Research Agent",
-        "modelName": "GPT-4o"
+      "id": "proposal",
+      "type": "input",
+      "label": "New Proposal",
+      "position": { "x": 200, "y": 0 },
+      "style": {
+        "backgroundColor": "#eff6ff",
+        "borderColor": "#2563eb",
+        "borderWidth": 2,
+        "borderRadius": 8
       }
     },
     {
-      "id": "analyze",
-      "type": "agent-task",
-      "label": "Analyze Data",
-      "position": { "x": 250, "y": 200 },
-      "status": "running",
-      "data": {
-        "templateName": "Analysis Agent",
-        "modelName": "Claude-3.5"
+      "id": "review",
+      "type": "default",
+      "label": "Team Review",
+      "position": { "x": 200, "y": 150 },
+      "style": {
+        "backgroundColor": "#fef2f2",
+        "borderColor": "#dc2626"
       }
     },
     {
-      "id": "write",
-      "type": "prompt",
-      "label": "Write Draft",
-      "position": { "x": 500, "y": 100 },
-      "status": "pending",
-      "data": {
-        "templateName": "Writing Template",
-        "modelName": "GPT-4"
+      "id": "approve",
+      "type": "default",
+      "label": "Manager Approval",
+      "position": { "x": 50, "y": 300 },
+      "style": {
+        "backgroundColor": "#f0fdf4",
+        "borderColor": "#16a34a"
+      }
+    },
+    {
+      "id": "reject",
+      "type": "default",
+      "label": "Needs Revision",
+      "position": { "x": 350, "y": 300 },
+      "style": {
+        "backgroundColor": "#fef2f2",
+        "borderColor": "#dc2626"
+      }
+    },
+    {
+      "id": "implement",
+      "type": "output",
+      "label": "Implementation",
+      "position": { "x": 50, "y": 450 },
+      "style": {
+        "backgroundColor": "#ecfdf5",
+        "borderColor": "#059669"
+      }
+    },
+    {
+      "id": "revise",
+      "type": "default",
+      "label": "Back to Team",
+      "position": { "x": 350, "y": 450 },
+      "style": {
+        "backgroundColor": "#fffbeb",
+        "borderColor": "#d97706"
       }
     }
   ],
   "edges": [
     {
       "id": "e1",
-      "source": "start",
-      "target": "gather",
-      "animated": true
+      "source": "proposal",
+      "target": "review",
+      "type": "straight",
+      "markerEnd": { "type": "ArrowClosed" }
     },
     {
       "id": "e2",
-      "source": "start",
-      "target": "analyze",
-      "animated": true
+      "source": "review",
+      "target": "approve",
+      "type": "smoothstep",
+      "label": "Approved",
+      "style": { "stroke": "#16a34a" },
+      "markerEnd": { "type": "ArrowClosed", "color": "#16a34a" }
     },
     {
       "id": "e3",
-      "source": "gather",
-      "target": "write"
+      "source": "review",
+      "target": "reject",
+      "type": "smoothstep",
+      "label": "Rejected",
+      "style": { "stroke": "#dc2626" },
+      "markerEnd": { "type": "ArrowClosed", "color": "#dc2626" }
     },
     {
       "id": "e4",
-      "source": "analyze",
-      "target": "write"
+      "source": "approve",
+      "target": "implement",
+      "type": "straight",
+      "style": { "stroke": "#059669" },
+      "markerEnd": { "type": "ArrowClosed", "color": "#059669" }
+    },
+    {
+      "id": "e5",
+      "source": "reject",
+      "target": "revise",
+      "type": "straight",
+      "style": { "stroke": "#d97706" },
+      "markerEnd": { "type": "ArrowClosed", "color": "#d97706" }
+    },
+    {
+      "id": "e6",
+      "source": "revise",
+      "target": "review",
+      "type": "bezier",
+      "style": { 
+        "stroke": "#6b7280",
+        "strokeDasharray": "5,5"
+      },
+      "markerEnd": { "type": "Arrow", "color": "#6b7280" }
     }
   ]
 }

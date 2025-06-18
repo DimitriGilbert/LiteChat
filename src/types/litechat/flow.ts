@@ -1,29 +1,112 @@
 export type StepStatus = 'pending' | 'running' | 'success' | 'error';
 
+export type NodeType = 'trigger' | 'prompt' | 'agent-task' | 'human-in-the-loop' | 'custom' | 'input' | 'output' | 'default' | 'group';
+export type EdgeType = 'default' | 'straight' | 'step' | 'smoothstep' | 'bezier' | 'custom';
+export type MarkerType = 'Arrow' | 'ArrowClosed';
+
+export interface NodeStyle {
+  background?: string;
+  backgroundColor?: string;
+  color?: string;
+  border?: string;
+  borderColor?: string;
+  borderWidth?: number | string;
+  borderRadius?: number | string;
+  width?: number | string;
+  height?: number | string;
+  minWidth?: number | string;
+  minHeight?: number | string;
+  maxWidth?: number | string;
+  maxHeight?: number | string;
+  padding?: number | string;
+  margin?: number | string;
+  fontSize?: number | string;
+  fontWeight?: number | string;
+  opacity?: number;
+  boxShadow?: string;
+}
+
+export interface EdgeStyle {
+  stroke?: string;
+  strokeWidth?: number;
+  strokeDasharray?: string;
+  strokeOpacity?: number;
+  fill?: string;
+  color?: string;
+  opacity?: number;
+}
+
+export interface EdgeMarker {
+  type?: MarkerType;
+  width?: number;
+  height?: number;
+  color?: string;
+  orient?: string;
+}
+
 export interface FlowNode {
   id: string;
-  type: 'trigger' | 'prompt' | 'agent-task' | 'human-in-the-loop' | 'custom';
+  type: NodeType;
   label: string;
   position: { x: number; y: number };
   status?: StepStatus;
   data?: Record<string, any>;
+  style?: NodeStyle;
+  className?: string;
+  width?: number;
+  height?: number;
+  hidden?: boolean;
+  selected?: boolean;
+  draggable?: boolean;
+  selectable?: boolean;
+  connectable?: boolean;
 }
 
 export interface FlowEdge {
   id: string;
   source: string;
   target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
   animated?: boolean;
-  type?: string;
-  style?: Record<string, any>;
-  markerEnd?: Record<string, any>;
+  type?: EdgeType;
+  style?: EdgeStyle;
+  markerStart?: EdgeMarker | string;
+  markerEnd?: EdgeMarker | string;
+  label?: string;
+  labelStyle?: Record<string, any>;
+  labelShowBg?: boolean;
+  labelBgStyle?: Record<string, any>;
+  hidden?: boolean;
+  selected?: boolean;
+  deletable?: boolean;
+  updatable?: boolean;
+}
+
+export interface FlowBackground {
+  variant?: 'dots' | 'lines' | 'cross';
+  gap?: number | [number, number];
+  size?: number;
+  offset?: number | [number, number];
+  lineWidth?: number;
+  color?: string;
+  bgColor?: string;
+}
+
+export interface FlowViewport {
+  x?: number;
+  y?: number;
+  zoom?: number;
 }
 
 export interface FlowData {
-  type: 'workflow' | 'custom';
+  type: 'workflow' | 'process' | 'diagram' | 'mindmap' | 'architecture' | 'flowchart' | 'custom';
   name?: string;
+  description?: string;
   nodes: FlowNode[];
   edges: FlowEdge[];
+  background?: FlowBackground;
+  viewport?: FlowViewport;
   metadata?: Record<string, any>;
 }
 
