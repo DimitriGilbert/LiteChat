@@ -54,6 +54,176 @@ sequenceDiagram
     Note over Client,Server: User receives response
 ```
 
+### Flow diagrams
+
+LiteChat supports interactive workflow flow diagrams using the `flow` codeblock. These are particularly useful for visualizing workflows, processes, and step-by-step procedures.
+
+**Functionality:**
+- The `flow` block interprets a JSON object that defines nodes (steps) and edges (connections) in a workflow
+- It renders an interactive React Flow diagram with custom node types for different step types
+- Nodes can have different statuses (pending, running, success, error) with visual indicators
+- Supports various node types: trigger, prompt, agent-task, human-in-the-loop, and generic steps
+- Includes zoom, pan, minimap, and download capabilities
+
+**Usage:**
+To generate a flow diagram, enclose your flow definition within a markdown code block with the language identifier `flow`.
+
+**Expected Content Format:**
+The content inside the `flow` block must be a valid JSON object containing:
+- `type`: Usually "workflow" for workflow diagrams
+- `name`: Display name for the workflow
+- `nodes`: Array of node objects defining the steps
+- `edges`: Array of edge objects defining connections between steps
+
+**Node Structure:**
+Each node requires:
+- `id`: Unique identifier for the node
+- `type`: Node type ("trigger", "prompt", "agent-task", "human-in-the-loop", or custom)
+- `label`: Display label for the node
+- `position`: Object with `x` and `y` coordinates
+- `status`: (Optional) Current status ("pending", "running", "success", "error")
+- `data`: (Optional) Additional data like `templateName`, `modelName`, etc.
+
+**Edge Structure:**
+Each edge requires:
+- `id`: Unique identifier for the edge
+- `source`: ID of the source node
+- `target`: ID of the target node
+- `type`: (Optional) Edge type, defaults to "smoothstep"
+- `animated`: (Optional) Boolean for animation
+- `style`: (Optional) Styling object
+
+**Examples:**
+
+Simple workflow:
+```flow
+{
+  "type": "workflow",
+  "name": "Content Creation Workflow",
+  "nodes": [
+    {
+      "id": "initial",
+      "type": "trigger",
+      "label": "User Input",
+      "position": { "x": 0, "y": 0 },
+      "status": "success",
+      "data": {
+        "templateName": "Initial Prompt",
+        "modelName": "GPT-4"
+      }
+    },
+    {
+      "id": "analyze",
+      "type": "prompt",
+      "label": "Analyze Content",
+      "position": { "x": 300, "y": 0 },
+      "status": "running",
+      "data": {
+        "templateName": "Content Analyzer",
+        "modelName": "Claude-3"
+      }
+    },
+    {
+      "id": "review",
+      "type": "human-in-the-loop",
+      "label": "Human Review",
+      "position": { "x": 600, "y": 0 },
+      "status": "pending",
+      "data": {
+        "templateName": "Review Step"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "initial",
+      "target": "analyze",
+      "animated": true
+    },
+    {
+      "id": "e2",
+      "source": "analyze",
+      "target": "review"
+    }
+  ]
+}
+```
+
+Multi-step AI workflow:
+```flow
+{
+  "type": "workflow",
+  "name": "Research and Writing Pipeline",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "trigger",
+      "label": "Research Topic",
+      "position": { "x": 0, "y": 100 },
+      "status": "success"
+    },
+    {
+      "id": "gather",
+      "type": "agent-task",
+      "label": "Gather Information",
+      "position": { "x": 250, "y": 0 },
+      "status": "success",
+      "data": {
+        "templateName": "Research Agent",
+        "modelName": "GPT-4o"
+      }
+    },
+    {
+      "id": "analyze",
+      "type": "agent-task",
+      "label": "Analyze Data",
+      "position": { "x": 250, "y": 200 },
+      "status": "running",
+      "data": {
+        "templateName": "Analysis Agent",
+        "modelName": "Claude-3.5"
+      }
+    },
+    {
+      "id": "write",
+      "type": "prompt",
+      "label": "Write Draft",
+      "position": { "x": 500, "y": 100 },
+      "status": "pending",
+      "data": {
+        "templateName": "Writing Template",
+        "modelName": "GPT-4"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "start",
+      "target": "gather",
+      "animated": true
+    },
+    {
+      "id": "e2",
+      "source": "start",
+      "target": "analyze",
+      "animated": true
+    },
+    {
+      "id": "e3",
+      "source": "gather",
+      "target": "write"
+    },
+    {
+      "id": "e4",
+      "source": "analyze",
+      "target": "write"
+    }
+  ]
+}
+```
+
 ### Formedible codeblocks
 
 For guided deterministic interaction with the user through a form, you can use the `formedible` codeblock.
