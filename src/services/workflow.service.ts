@@ -195,9 +195,9 @@ export const WorkflowService = {
       const runId = nanoid();
       
       const conversationInteractions = interactionStore.interactions.filter(
-        (i) => i.conversationId === conversationId
+        (i: Interaction) => i.conversationId === conversationId
       );
-      const newIndex = conversationInteractions.reduce((max, i) => Math.max(max, i.index), -1) + 1;
+      const newIndex = conversationInteractions.reduce((max: number, i: Interaction) => Math.max(max, i.index), -1) + 1;
 
       const mainInteraction: Interaction = {
         id: mainInteractionId,
@@ -554,6 +554,7 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
           index: stepIndex + 1, // Tab index
         };
 
+        const interactionStore = useInteractionStore.getState();
         interactionStore._updateInteractionInState(stepInteraction.id, updates);
         await PersistenceService.saveInteraction({
           ...stepInteraction,
