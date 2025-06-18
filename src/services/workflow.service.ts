@@ -230,7 +230,7 @@ export const WorkflowService = {
         parentId: null,
       };
 
-      // Add to state and persistence (like race system)
+      // Add to state and persistence WITHOUT starting an AI call for it (like race system)
       interactionStore._addInteractionToState(mainInteraction);
       interactionStore._addStreamingId(mainInteraction.id);
       
@@ -242,7 +242,7 @@ export const WorkflowService = {
       
       await PersistenceService.saveInteraction(mainInteraction);
       
-      // Emit events (like race system)
+      // Manually emit events (like race system)
       emitter.emit(interactionEvent.added, { interaction: mainInteraction });
       emitter.emit(interactionEvent.started, {
         interactionId: mainInteraction.id,
@@ -276,6 +276,9 @@ export const WorkflowService = {
       });
       
       interactionStore.setActiveStreamBuffer(mainInteraction.id, fullContent);
+      
+      // Keep main interaction streaming throughout (like race system)
+      // Main interaction receives manual updates via setActiveStreamBuffer during child completion
 
       // Start the trigger step as first child (like race system)
       await WorkflowService.createTriggerStep(mainInteraction, run, baseTurnData);
@@ -313,12 +316,16 @@ export const WorkflowService = {
         console.log(`[WorkflowService] Trigger step will output structured data for next step: ${nextStep.name}`);
       }
 
+      console.log(`[WorkflowService] Creating trigger step as child tab for run ${run.runId}`);
+      
+      // Create unique turnData for trigger child (like race system)
       const triggerTurnData: PromptTurnObject = {
         ...baseTurnData,
         id: nanoid(),
         parameters: triggerParameters,
         metadata: {
           ...baseTurnData.metadata,
+          modelId: baseTurnData.metadata?.modelId || usePromptStateStore.getState().modelId,
           isWorkflowStep: true,
           workflowRunId: run.runId,
           workflowStepId: 'trigger',
@@ -356,18 +363,25 @@ You are part of a workflow system. You ABSOLUTELY MUST respect the following out
 ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
         }
       }
-
-      console.log(`[WorkflowService] Creating trigger step as child tab for run ${run.runId}`);
       
-      // Rebuild the prompt object with the structured output for next step
+      // Build complete prompt object with all controls (like race system)
       const { promptObject: triggerPrompt } = await WorkflowService.buildCompletePromptObject(
         run.conversationId,
         baseTurnData.content,
         triggerTurnData
       );
       
+      // Create child prompt for this specific model (like race system)
+      const childPrompt: PromptObject = {
+        ...triggerPrompt,
+        metadata: {
+          ...triggerPrompt.metadata,
+          modelId: triggerTurnData.metadata.modelId,
+        },
+      };
+
       const triggerInteraction = await InteractionService.startInteraction(
-        triggerPrompt,
+        childPrompt,
         run.conversationId,
         triggerTurnData,
         "message.user_assistant"
@@ -478,19 +492,19 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
         console.log(`[WorkflowService] Step "${stepName}" will output structured data for next step: ${nextStep.name}`);
       }
 
-      // Create step turn data with step-specific configuration
+      // Create step turn data with step-specific configuration (like race system)
       const stepTurnData: PromptTurnObject = {
         id: nanoid(),
         content: compiled.content,
         parameters: stepParameters,
         metadata: {
+          modelId, // Step-specific model ID override
           isWorkflowStep: true,
           workflowRunId: run.runId,
           workflowStepId: step.id,
           workflowMainInteractionId: run.mainInteractionId,
           workflowTab: true,
           workflowStepIndex: stepIndex + 1, // Tab index (0 is trigger, 1+ are steps)
-          modelId, // Step-specific model ID override
           enabledTools: compiled.selectedTools,
           effectiveRulesContent: compiled.selectedRules?.map(ruleId => ({ 
             sourceRuleId: ruleId,
@@ -532,16 +546,24 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
         }
       }
 
-      // Build complete step prompt with all controls (structured output, tools, etc.)
+      // Build complete step prompt with all controls (like race system)
       const { promptObject: stepPrompt } = await WorkflowService.buildCompletePromptObject(
         run.conversationId,
         compiled.content,
         stepTurnData
       );
 
-      // Create child interaction using InteractionService.startInteraction (like race system)
+      // Create child prompt for this specific model (like race system)
+      const childPrompt: PromptObject = {
+        ...stepPrompt,
+        metadata: {
+          ...stepPrompt.metadata,
+          modelId: stepTurnData.metadata.modelId,
+        },
+      };
+
       const stepInteraction = await InteractionService.startInteraction(
-        stepPrompt,
+        childPrompt,
         run.conversationId,
         stepTurnData,
         "message.assistant_regen"
