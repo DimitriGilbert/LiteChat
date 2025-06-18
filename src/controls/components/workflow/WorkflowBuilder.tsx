@@ -326,10 +326,7 @@ const TemplateVariableFormWrapper = React.forwardRef<
         formOptions: {
             defaultValues: initialVariables,
             onChange: async ({ value }) => {
-                // Update local state for ref access
-                setFormData(value);
-                
-                // Immediate DOM update for live preview
+                // ONLY direct DOM update for live preview - NO state updates to prevent re-renders
                 if (previewRef.current) {
                     try {
                         const compiled = await module.compileTemplate(template.id, value);
@@ -341,7 +338,7 @@ const TemplateVariableFormWrapper = React.forwardRef<
                 }
             },
             onBlur: async ({ value }) => {
-                // Also update on blur to ensure data is captured
+                // Update state ONLY on blur to capture data without causing re-renders during typing
                 setFormData(value);
             },
         },
