@@ -18,6 +18,7 @@ import { useControlRegistryStore } from "@/store/control.store";
 import { useConversationStore } from "@/store/conversation.store";
 import type { CoreMessage } from "ai";
 import { buildHistoryMessages } from "@/lib/litechat/ai-helpers";
+import { WorkflowFlowGenerator } from "@/lib/litechat/workflow-flow-generator";
 
 // Note: Refactored to a static class to align with other services like InteractionService.
 // This service's lifecycle is tied to the application's lifecycle, so event listeners
@@ -25,6 +26,7 @@ import { buildHistoryMessages } from "@/lib/litechat/ai-helpers";
 export const WorkflowService = {
   isInitialized: false,
   activeWorkflowConfig: null as { template: any; initialPrompt: string; conversationId: string } | null,
+  flowGenerator: new WorkflowFlowGenerator(),
 
   initialize: () => {
     if (WorkflowService.isInitialized) return;
@@ -232,10 +234,10 @@ export const WorkflowService = {
       interactionStore._addInteractionToState(mainInteraction);
       interactionStore._addStreamingId(mainInteraction.id);
       
-      // Set initial content in stream buffer
+      // Set initial content in stream buffer (will be updated with flow content after run is created)
       interactionStore.setActiveStreamBuffer(
         mainInteraction.id,
-        `🚀 **${template.name}**\n\nWorkflow starting with ${template.steps.length} step${template.steps.length > 1 ? 's' : ''}...`
+        `# ${template.name}\n\nWorkflow starting with ${template.steps.length} step${template.steps.length > 1 ? 's' : ''}...`
       );
       
       await PersistenceService.saveInteraction(mainInteraction);
@@ -259,6 +261,21 @@ export const WorkflowService = {
         stepOutputs: {},
         startedAt: new Date().toISOString(),
       };
+
+      // Generate and update with flow content
+      const initialFlowContent = WorkflowService.flowGenerator.generateInitialFlow(run);
+      console.log(`[WorkflowService] Generated initial flow content:`, {
+        flowContentLength: initialFlowContent.length,
+        flowContentPreview: initialFlowContent.substring(0, 200) + (initialFlowContent.length > 200 ? '...' : ''),
+      });
+      
+      const fullContent = `# ${template.name}\n\nWorkflow starting with ${template.steps.length} step${template.steps.length > 1 ? 's' : ''}...\n\n\`\`\`flow\n${initialFlowContent}\n\`\`\``;
+      console.log(`[WorkflowService] Setting stream buffer with full content:`, {
+        fullContentLength: fullContent.length,
+        mainInteractionId: mainInteraction.id,
+      });
+      
+      interactionStore.setActiveStreamBuffer(mainInteraction.id, fullContent);
 
       // Start the trigger step as first child (like race system)
       await WorkflowService.createTriggerStep(mainInteraction, run, baseTurnData);
@@ -390,7 +407,24 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
 
       // Update main interaction progress
       const interactionStore = useInteractionStore.getState();
-      interactionStore.appendStreamBuffer(run.mainInteractionId, `\n\n---\n▶️ **Executing: ${stepName}**`);
+      
+      // Update flow content with step status
+      const currentContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || '';
+      const flowMatch = currentContent.match(/```flow\n([\s\S]*?)\n```/);
+      if (flowMatch && flowMatch[1]) {
+        const updatedFlowContent = WorkflowService.flowGenerator.updateNodeStatus(
+          flowMatch[1], 
+          step.id, 
+          'running'
+        );
+        const newContent = currentContent.replace(
+          /```flow\n[\s\S]*?\n```/,
+          `\`\`\`flow\n${updatedFlowContent}\n\`\`\``
+        );
+        interactionStore.setActiveStreamBuffer(run.mainInteractionId, newContent);
+      } else {
+        interactionStore.appendStreamBuffer(run.mainInteractionId, `\n\n---\n▶️ **Executing: ${stepName}**`);
+      }
 
       if (step.type === "human-in-the-loop") {
         interactionStore.appendStreamBuffer(run.mainInteractionId, `\n⏸️ **Paused:** ${step.instructionsForHuman || 'Requires human input.'}`);
@@ -595,7 +629,25 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
           triggerOutput = interaction.response ?? "No output";
         }
         
-        useInteractionStore.getState().appendStreamBuffer(activeRun.mainInteractionId, `\n✔️ **Finished: Initial User Prompt**`);
+        // Update flow content for completed trigger
+        const interactionStore = useInteractionStore.getState();
+        const currentContent = interactionStore.activeStreamBuffers[activeRun.mainInteractionId] || '';
+        const flowMatch = currentContent.match(/```flow\n([\s\S]*?)\n```/);
+        if (flowMatch && flowMatch[1]) {
+          const updatedFlowContent = WorkflowService.flowGenerator.updateNodeStatus(
+            flowMatch[1], 
+            'initial', 
+            'success'
+          );
+          const newContent = currentContent.replace(
+            /```flow\n[\s\S]*?\n```/,
+            `\`\`\`flow\n${updatedFlowContent}\n\`\`\``
+          );
+          interactionStore.setActiveStreamBuffer(activeRun.mainInteractionId, newContent);
+        } else {
+          interactionStore.appendStreamBuffer(activeRun.mainInteractionId, `\n✔️ **Finished: Initial User Prompt**`);
+        }
+        
         emitter.emit(workflowEvent.stepCompleted, { runId: activeRun.runId, stepId: 'trigger', output: triggerOutput });
         return;
       }
@@ -620,8 +672,26 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
         return;
       }
 
-      const finalStepName = stepSpec.name || 'Unnamed Step';
-      useInteractionStore.getState().appendStreamBuffer(activeRun.mainInteractionId, `\n✔️ **Finished: ${finalStepName}**`);
+      // Update flow content for completed step
+      const interactionStore = useInteractionStore.getState();
+      const currentContent = interactionStore.activeStreamBuffers[activeRun.mainInteractionId] || '';
+      const flowMatch = currentContent.match(/```flow\n([\s\S]*?)\n```/);
+      if (flowMatch && flowMatch[1]) {
+        const updatedFlowContent = WorkflowService.flowGenerator.updateNodeStatus(
+          flowMatch[1], 
+          workflowStepId as string, 
+          'success'
+        );
+        const newContent = currentContent.replace(
+          /```flow\n[\s\S]*?\n```/,
+          `\`\`\`flow\n${updatedFlowContent}\n\`\`\``
+        );
+        interactionStore.setActiveStreamBuffer(activeRun.mainInteractionId, newContent);
+      } else {
+        const finalStepName = stepSpec.name || 'Unnamed Step';
+        interactionStore.appendStreamBuffer(activeRun.mainInteractionId, `\n✔️ **Finished: ${finalStepName}**`);
+      }
+      
       emitter.emit(workflowEvent.stepCompleted, { runId: activeRun.runId, stepId: workflowStepId as string, output: stepOutput });
     }, 100); // 100ms delay to ensure interaction is fully finalized
   },
@@ -678,9 +748,25 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
         
         markdownSummary += `✅ **Workflow completed successfully**`;
         
+        // Update flow content to finalized state
+        const currentContent = interactionStore.activeStreamBuffers[activeRun.mainInteractionId] || '';
+        const flowMatch = currentContent.match(/```flow\n([\s\S]*?)\n```/);
+        let finalContent = markdownSummary;
+        
+        if (flowMatch && flowMatch[1]) {
+          const finalizedFlowContent = WorkflowService.flowGenerator.finalizeWorkflow(
+            flowMatch[1], 
+            activeRun.stepOutputs
+          );
+          finalContent = currentContent.replace(
+            /```flow\n[\s\S]*?\n```/,
+            `\`\`\`flow\n${finalizedFlowContent}\n\`\`\``
+          ).replace(/Workflow starting with.*?\.\.\./, `✅ **Workflow completed successfully**\n\n**Summary:**\n${markdownSummary}`);
+        }
+        
         // Update the main interaction response (like RacePromptControlModule does)
         const completionUpdates = {
-          response: markdownSummary,
+          response: finalContent,
           status: 'COMPLETED' as const,
           endedAt: new Date()
         };

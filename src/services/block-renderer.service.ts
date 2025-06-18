@@ -14,7 +14,14 @@ export class BlockRendererService {
   ): BlockRenderer | null {
     const renderers = Object.values(registeredRenderers);
     
+    console.log(`[BlockRendererService] Finding renderer for language "${lang}":`, {
+      totalRenderers: renderers.length,
+      availableRendererIds: renderers.map(r => r.id),
+      availableLanguages: renderers.map(r => ({ id: r.id, languages: r.supportedLanguages })),
+    });
+    
     if (renderers.length === 0) {
+      console.log(`[BlockRendererService] No renderers registered`);
       return null;
     }
 
@@ -28,11 +35,21 @@ export class BlockRendererService {
       !renderer.supportedLanguages || renderer.supportedLanguages.length === 0
     );
 
+    console.log(`[BlockRendererService] Renderer selection for "${lang}":`, {
+      specificRenderers: specificRenderers.map(r => ({ id: r.id, priority: r.priority })),
+      fallbackRenderers: fallbackRenderers.map(r => ({ id: r.id, priority: r.priority })),
+    });
+
     // Combine and sort by priority (higher priority first)
     const candidateRenderers = [...specificRenderers, ...fallbackRenderers]
       .sort((a, b) => (b.priority || 0) - (a.priority || 0));
 
-    return candidateRenderers[0] || null;
+    const selectedRenderer = candidateRenderers[0] || null;
+    console.log(`[BlockRendererService] Selected renderer for "${lang}":`, 
+      selectedRenderer ? { id: selectedRenderer.id, priority: selectedRenderer.priority } : null
+    );
+
+    return selectedRenderer;
   }
 
   /**

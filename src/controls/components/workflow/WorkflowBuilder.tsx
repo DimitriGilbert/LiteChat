@@ -520,7 +520,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     } | null>(null);
     
     // Keep track of when we've initialized forms to avoid unnecessary resets
-    const [formsInitialized, setFormsInitialized] = useState(false);
+    // const [, setFormsInitialized] = useState(false);
     
     // Cache for visualizer data - only updated when switching to visualizer tab
     const [visualizerData, setVisualizerData] = useState<{
