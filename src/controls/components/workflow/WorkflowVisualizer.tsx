@@ -16,42 +16,80 @@ import type { WorkflowTemplate, WorkflowStep } from '@/types/litechat/workflow';
 
 import '@xyflow/react/dist/style.css';
 
-// Enhanced template interface with all display data
-interface EnhancedTemplate {
-  id: string;
-  name: string;
-  type: 'prompt' | 'task';
+// Step data that the visualizer receives - STATIC DISPLAY ONLY
+interface StepDisplayData {
+  stepName: string;
+  templateName?: string;
+  modelName?: string;
+  type: string;
+  status?: StepStatus;
 }
+
+// Step status for workflow execution
+type StepStatus = 'pending' | 'running' | 'success' | 'error';
 
 interface WorkflowVisualizerProps {
   workflow: WorkflowTemplate;
   className?: string;
-  // Enhanced templates with all data needed for display - NO STORE ACCESS NEEDED
-  enhancedTemplates: EnhancedTemplate[];
+  // STATIC data prepared by the builder - NO PROCESSING IN VISUALIZER
+  initialStepData: StepDisplayData;
+  stepDisplayData: StepDisplayData[];
+  // Optional step statuses for execution visualization
+  stepStatuses?: Record<string, StepStatus>;
 }
 
-const HORIZONTAL_SPACING = 300;
+const HORIZONTAL_SPACING = 400;
 
 const WorkflowStepNode: React.FC<{ data: any }> = ({ data }) => {
-  const getNodeColor = (type: string) => {
+  const getNodeColor = (type: string, status?: StepStatus) => {
+    // Status-based colors take priority (with glow)
+    if (status) {
+      switch (status) {
+        case 'running':
+          return 'bg-blue-50 border-blue-400 text-blue-900 shadow-lg shadow-blue-200';
+        case 'success':
+          return 'bg-green-50 border-green-400 text-green-900 shadow-lg shadow-green-200';
+        case 'error':
+          return 'bg-red-50 border-red-400 text-red-900 shadow-lg shadow-red-200';
+        case 'pending':
+          return 'bg-gray-50 border-gray-300 text-gray-700 shadow-lg shadow-gray-200';
+      }
+    }
+
+    // Default type-based colors (minimal shadow when no status)
     switch (type) {
-      case 'trigger':
-        return 'bg-blue-100 border-blue-300 text-blue-900';
+      case 'initial':
+        return 'bg-indigo-100 border-indigo-400 text-indigo-900 shadow-sm';
       case 'prompt':
-        return 'bg-green-100 border-green-300 text-green-900';
+        return 'bg-green-100 border-green-400 text-green-900 shadow-sm';
       case 'agent-task':
-        return 'bg-purple-100 border-purple-300 text-purple-900';
+        return 'bg-purple-100 border-purple-400 text-purple-900 shadow-sm';
       case 'human-in-the-loop':
-        return 'bg-orange-100 border-orange-300 text-orange-900';
+        return 'bg-orange-100 border-orange-400 text-orange-900 shadow-sm';
       default:
-        return 'bg-gray-100 border-gray-300 text-gray-900';
+        return 'bg-gray-100 border-gray-400 text-gray-900 shadow-sm';
     }
   };
 
-  const getTypeIcon = (type: string) => {
+  const getTypeIcon = (type: string, status?: StepStatus) => {
+    // Status-based icons take priority
+    if (status) {
+      switch (status) {
+        case 'running':
+          return '⏳';
+        case 'success':
+          return '✅';
+        case 'error':
+          return '❌';
+        case 'pending':
+          return '⏸️';
+      }
+    }
+
+    // Default type-based icons
     switch (type) {
-      case 'trigger':
-        return '🚀';
+      case 'initial':
+        return '🎯';
       case 'prompt':
         return '💬';
       case 'agent-task':
@@ -65,19 +103,26 @@ const WorkflowStepNode: React.FC<{ data: any }> = ({ data }) => {
 
   return (
     <div className={cn(
-      'px-4 py-3 shadow-lg rounded-lg border-2 min-w-[200px] max-w-[250px]',
-      getNodeColor(data.type)
+      'px-4 py-3 rounded-lg border-2 min-w-[200px] max-w-[280px]',
+      getNodeColor(data.type, data.status)
     )}>
-      <Handle type="target" position={Position.Left} id="input" className="!bg-gray-600" />
+      <Handle type="target" position={Position.Left} id="input" className="!bg-gray-700" />
       
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-lg">{getTypeIcon(data.type)}</span>
-        <span className="font-semibold text-sm capitalize">{data.type}</span>
+        <span className="text-lg">{getTypeIcon(data.type, data.status)}</span>
+        <span className="font-semibold text-sm">{data.stepName || data.name}</span>
+        {data.status && (
+          <span className="text-xs px-2 py-1 rounded-full bg-white/60 font-medium capitalize">
+            {data.status}
+          </span>
+        )}
       </div>
       
-      <div className="text-sm font-medium mb-1 line-clamp-2">
-        {data.name}
-      </div>
+      {data.templateName && (
+        <div className="text-sm font-medium mb-1 text-slate-700">
+          {data.templateName}
+        </div>
+      )}
       
       {data.modelName && (
         <div className="text-xs opacity-75 font-mono bg-white/50 px-2 py-1 rounded">
@@ -85,7 +130,7 @@ const WorkflowStepNode: React.FC<{ data: any }> = ({ data }) => {
         </div>
       )}
       
-      <Handle type="source" position={Position.Right} id="output" className="!bg-gray-600" />
+      <Handle type="source" position={Position.Right} id="output" className="!bg-gray-700" />
     </div>
   );
 };
@@ -98,53 +143,38 @@ const nodeTypes = {
 export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
   workflow,
   className,
-  enhancedTemplates,
+  initialStepData,
+  stepDisplayData,
+  stepStatuses = {},
 }) => {
-  // Generate visualization data from props - PURE CALCULATION
+  // Generate visualization data from props - PURE DISPLAY ONLY
   const { nodes, edges } = useMemo(() => {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
 
-    // Add initial step node
-    const getInitialStepName = () => {
-      if (workflow.triggerType === 'custom' && workflow.triggerPrompt) {
-        return workflow.triggerPrompt.length > 30 ? 
-               workflow.triggerPrompt.slice(0, 30) + '...' : 
-               workflow.triggerPrompt;
-      } else if (workflow.triggerType === 'template' && workflow.triggerRef) {
-        const template = enhancedTemplates.find(t => t.id === workflow.triggerRef && t.type === 'prompt');
-        return template?.name || 'Prompt Template';
-      } else if (workflow.triggerType === 'task' && workflow.triggerRef) {
-        const task = enhancedTemplates.find(t => t.id === workflow.triggerRef && t.type === 'task');
-        return task?.name || 'Agent Task';
-      }
-      return 'Initial Step';
-    };
-
+    // Add initial step node with data from props
     nodes.push({
-      id: 'trigger',
+      id: 'initial',
       type: 'workflowStep',
       position: { x: 0, y: 0 },
       data: {
-        name: getInitialStepName(),
-        type: 'trigger',
+        stepName: initialStepData.stepName,
+        templateName: initialStepData.templateName,
+        type: 'initial',
+        modelName: initialStepData.modelName,
+        status: stepStatuses['initial'],
       },
     });
 
-    // Add workflow step nodes
+    // Add workflow step nodes with data from props
     if (workflow.steps && workflow.steps.length > 0) {
       workflow.steps.forEach((step: WorkflowStep, index: number) => {
         const nodeX = (index + 1) * HORIZONTAL_SPACING;
-        const modelName = step.modelId ? step.modelId.split(' ')[0].split('(')[0] : undefined;
-
-        // Get template name from enhanced templates
-        const getDisplayName = () => {
-          if (step.templateId) {
-            const templateType = step.type === 'prompt' ? 'prompt' : 'task';
-            const template = enhancedTemplates.find(t => t.id === step.templateId && t.type === templateType);
-            return template?.name || step.name || `Unknown ${templateType}`;
-          }
-          return step.name || 'Unnamed Step';
+        const displayData = stepDisplayData[index] || {
+          stepName: step.name || 'Unnamed Step',
+          templateName: undefined,
+          modelName: undefined,
+          type: step.type,
         };
 
         nodes.push({
@@ -152,14 +182,16 @@ export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
           type: 'workflowStep',
           position: { x: nodeX, y: 0 },
           data: {
-            name: getDisplayName(),
-            type: step.type,
-            modelName: modelName,
+            stepName: displayData.stepName,
+            templateName: displayData.templateName,
+            type: displayData.type,
+            modelName: displayData.modelName,
+            status: stepStatuses[step.id],
           },
         });
 
-        // Create edge
-        const sourceId = index === 0 ? 'trigger' : workflow.steps[index - 1].id;
+        // Create edge with better contrast
+        const sourceId = index === 0 ? 'initial' : workflow.steps[index - 1].id;
         edges.push({
           id: `${sourceId}-${step.id}`,
           source: sourceId,
@@ -169,21 +201,21 @@ export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
           type: 'smoothstep',
           animated: true,
           style: { 
-            stroke: 'hsl(var(--primary))', 
-            strokeWidth: 4,
+            stroke: '#1f2937', // Much darker gray for better contrast
+            strokeWidth: 3,
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: 'hsl(var(--primary))',
-            width: 20,
-            height: 20,
+            color: '#1f2937',
+            width: 18,
+            height: 18,
           },
         });
       });
     }
 
     return { nodes, edges };
-  }, [workflow, enhancedTemplates]);
+  }, [workflow, initialStepData, stepDisplayData, stepStatuses]);
 
   // Show empty state if no steps
   if (!workflow.steps || workflow.steps.length === 0) {
@@ -211,8 +243,8 @@ export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
         fitView
         fitViewOptions={{
           padding: 50,
-          maxZoom: 1.5,
-          minZoom: 0.1,
+          maxZoom: 2.25, // 1.5 * 1.5 = 50% closer
+          minZoom: 0.15, // 0.1 * 1.5 = 50% closer
         }}
         proOptions={{ hideAttribution: true }}
         nodesDraggable={false}
@@ -226,8 +258,16 @@ export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
       >
         <MiniMap 
           nodeColor={(node) => {
+            if (node.data?.status) {
+              switch (node.data.status) {
+                case 'running': return '#3b82f6';
+                case 'success': return '#10b981';
+                case 'error': return '#ef4444';
+                case 'pending': return '#6b7280';
+              }
+            }
             switch (node.data?.type) {
-              case 'trigger': return '#3b82f6';
+              case 'initial': return '#6366f1';
               case 'prompt': return '#10b981';
               case 'agent-task': return '#8b5cf6';
               case 'human-in-the-loop': return '#f59e0b';

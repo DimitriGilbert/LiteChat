@@ -155,7 +155,7 @@ export const WorkflowRawEditor: React.FC<WorkflowRawEditorProps> = ({
     debounceTimerRef.current = setTimeout(() => {
       const validation = validateAndParse(value);
       setValidationError(validation.error || '');
-    }, 300); // Faster debounce for validation display
+    }, 750); // Increased from 300ms to 750ms for better textarea UX
   }, [validateAndParse]);
 
   // Handle changes to the raw editor - ONLY update local state, NO parent onChange

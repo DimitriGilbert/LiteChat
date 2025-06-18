@@ -118,6 +118,12 @@ export class WorkflowControlModule implements ControlModule {
     return useProviderStore.getState().getSelectedModel();
   }
 
+  // Template compilation method for preview functionality
+  async compileTemplate(templateId: string, formData: Record<string, any> = {}): Promise<{ content: string; selectedTools?: string[]; selectedRules?: string[]; }> {
+    const { compilePromptTemplate } = usePromptTemplateStore.getState();
+    return await compilePromptTemplate(templateId, formData);
+  }
+
   async loadWorkflows(): Promise<void> {
     try {
       this.workflows = await PersistenceService.loadWorkflows();

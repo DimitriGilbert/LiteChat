@@ -6,12 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { PromptTemplate } from '@/types/litechat/prompt-template';
 import type { ModelListItem } from '@/types/litechat/provider';
 import { ModelSelector } from '@/controls/components/global-model-selector/ModelSelector';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface WorkflowStepCardProps {
     step: WorkflowStep;
     onChange: (updatedStep: WorkflowStep) => void;
+    onDelete: () => void;
     promptTemplates: PromptTemplate[];
     agentTasks: (PromptTemplate & { prefixedName: string })[];
     models: ModelListItem[];
@@ -20,6 +21,7 @@ interface WorkflowStepCardProps {
 export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({ 
     step, 
     onChange, 
+    onDelete, 
     promptTemplates, 
     agentTasks,
     models,
@@ -61,11 +63,25 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
                         ({step.type === 'agent-task' ? 'Agent Task' : step.type === 'human-in-the-loop' ? 'Human Review' : 'AI Prompt'})
                     </div>
                 </div>
-                {step.modelId && (
-                    <div className="text-xs text-muted-foreground">
-                        {step.modelId}
-                    </div>
-                )}
+                <div className="flex items-center gap-2">
+                    {step.modelId && (
+                        <div className="text-xs text-muted-foreground">
+                            {step.modelId}
+                        </div>
+                    )}
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={(e) => {
+                            e.stopPropagation(); // Prevent expanding/collapsing
+                            onDelete();
+                        }}
+                        title="Delete step"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
             </div>
 
             {/* Expandable content */}
