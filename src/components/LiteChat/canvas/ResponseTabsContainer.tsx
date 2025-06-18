@@ -4,7 +4,7 @@ import { InteractionCard } from './InteractionCard';
 import { StreamingInteractionCard } from './StreamingInteractionCard';
 import { CanvasControl, CanvasControlRenderContext } from '@/types/litechat/canvas/control';
 import { Button } from '@/components/ui/button';
-import { SparkleIcon, HistoryIcon, LandPlot, NotebookPenIcon } from 'lucide-react'; // Import icons and LandPlot icon and NotebookPenIcon
+import { SparkleIcon, HistoryIcon, LandPlot, NotebookPenIcon, Workflow } from 'lucide-react'; // Import icons and LandPlot icon and NotebookPenIcon
 
 interface ResponseTabsContainerProps {
   interactionGroup: Interaction[]; // Original interaction + its regenerations/edits, sorted chronologically
@@ -77,6 +77,9 @@ export const ResponseTabsContainer: React.FC<ResponseTabsContainerProps> = ({
             } else if (interaction.metadata?.originalVersion) {
               // Original version of an edited response
               return <NotebookPenIcon className="h-3.5 w-3.5 mr-1 flex-shrink-0" />;
+            } else if (interaction.metadata?.workflowTab) {
+              // Workflow step tab
+              return <Workflow className="h-3.5 w-3.5 mr-1 flex-shrink-0" />;
             } else {
               // Regular regeneration tab
               return <HistoryIcon className="h-3.5 w-3.5 mr-1 flex-shrink-0" />;

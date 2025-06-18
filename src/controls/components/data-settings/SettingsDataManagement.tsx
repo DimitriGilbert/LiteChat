@@ -22,6 +22,7 @@ import {
   PlugIcon,
   FileTextIcon,
   BotIcon,
+  WorkflowIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
@@ -49,6 +50,7 @@ const fullImportOptionsSchema = z.object({
   importMcpServers: z.boolean(),
   importPromptTemplates: z.boolean(),
   importAgents: z.boolean(),
+  importWorkflows: z.boolean(),
 });
 
 const fullExportOptionsSchema = z.object({
@@ -63,6 +65,7 @@ const fullExportOptionsSchema = z.object({
   importMcpServers: z.boolean(),
   importPromptTemplates: z.boolean(),
   importAgents: z.boolean(),
+  importWorkflows: z.boolean(),
 });
 
 const SettingsDataManagementComponent: React.FC = () => {
@@ -97,6 +100,7 @@ const SettingsDataManagementComponent: React.FC = () => {
       importMcpServers: true,
       importPromptTemplates: true,
       importAgents: true,
+      importWorkflows: true,
     } as FullImportOptions,
     validators: {
       onChange: fullImportOptionsSchema, // Validate on change
@@ -117,6 +121,7 @@ const SettingsDataManagementComponent: React.FC = () => {
       importMcpServers: true,
       importPromptTemplates: true,
       importAgents: true,
+      importWorkflows: true,
     } as FullExportOptions,
     validators: {
       onChange: fullExportOptionsSchema, // Validate on change
@@ -354,6 +359,7 @@ const SettingsDataManagementComponent: React.FC = () => {
               {renderOptionCheckbox(importOptionsForm, "importMcpServers", "MCP Servers", PlugIcon, isFullImporting, 'import')}
               {renderOptionCheckbox(importOptionsForm, "importPromptTemplates", "Prompt Templates", FileTextIcon, isFullImporting, 'import')}
               {renderOptionCheckbox(importOptionsForm, "importAgents", "Agents", BotIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, "importWorkflows", "Workflows", WorkflowIcon, isFullImporting, 'import')}
             </div>
             <input
               type="file"
@@ -398,6 +404,7 @@ const SettingsDataManagementComponent: React.FC = () => {
               {renderOptionCheckbox(exportOptionsForm, "importMcpServers", "MCP Servers", PlugIcon, isFullExporting, 'export')}
               {renderOptionCheckbox(exportOptionsForm, "importPromptTemplates", "Prompt Templates", FileTextIcon, isFullExporting, 'export')}
               {renderOptionCheckbox(exportOptionsForm, "importAgents", "Agents", BotIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importWorkflows", "Workflows", WorkflowIcon, isFullExporting, 'export')}
             </div>
             <Button
               onClick={handleFullExportClick}

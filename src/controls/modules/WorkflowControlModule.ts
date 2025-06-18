@@ -11,6 +11,7 @@ import { useProviderStore } from "@/store/provider.store";
 import type { AiModelConfig, ModelListItem } from "@/types/litechat/provider";
 import { providerEvent } from "@/types/litechat/events/provider.events";
 import { usePromptTemplateStore } from "@/store/prompt-template.store";
+import { PersistenceService } from "@/services/persistence.service";
 import { toast } from "sonner";
 
 export class WorkflowControlModule implements ControlModule {
@@ -23,6 +24,7 @@ export class WorkflowControlModule implements ControlModule {
   public globallyEnabledModels: ModelListItem[] = [];
   public isLoadingProviders = false;
   public allTemplates: PromptTemplate[] = [];
+  public workflows: WorkflowTemplate[] = [];
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApi = modApi;
@@ -71,6 +73,9 @@ export class WorkflowControlModule implements ControlModule {
 
     // Request templates on initialization
     modApi.emit(promptTemplateEvent.loadPromptTemplatesRequest, {});
+    
+    // Load workflows
+    await this.loadWorkflows();
   }
 
   destroy(): void {
@@ -111,6 +116,23 @@ export class WorkflowControlModule implements ControlModule {
 
   getGlobalModel(): AiModelConfig | undefined {
     return useProviderStore.getState().getSelectedModel();
+  }
+
+  async loadWorkflows(): Promise<void> {
+    try {
+      this.workflows = await PersistenceService.loadWorkflows();
+      this.notifyComponentUpdate?.();
+    } catch (error) {
+      console.error('[WorkflowControlModule] Failed to load workflows:', error);
+    }
+  }
+
+  getWorkflows(): WorkflowTemplate[] {
+    return this.workflows;
+  }
+
+  async refreshWorkflows(): Promise<void> {
+    await this.loadWorkflows();
   }
 
   startWorkflow(template: WorkflowTemplate, initialPrompt: string): void {

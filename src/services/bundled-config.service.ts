@@ -40,6 +40,7 @@ export class BundledConfigService {
         importMcpServers: true,
         importPromptTemplates: true,
         importAgents: true,
+        importWorkflows: true,
         ...options
       };
 

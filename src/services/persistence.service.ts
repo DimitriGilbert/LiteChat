@@ -9,7 +9,8 @@ import type { SyncRepo } from "@/types/litechat/sync";
 import type { Project } from "@/types/litechat/project";
 import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
 import type { DbPromptTemplate, PromptTemplate } from "@/types/litechat/prompt-template";
-import type { DbAppState } from "@/lib/litechat/db";
+import type { DbAppState, DbWorkflow } from "@/lib/litechat/db";
+import type { WorkflowTemplate } from "@/types/litechat/workflow";
 import type { FullExportOptions } from "./import-export.service";
 import { nanoid } from "nanoid";
 
@@ -60,6 +61,7 @@ export interface FullExportData {
   mcpServers?: any[]; // MCP server configurations
   promptTemplates?: any[]; // All prompt templates
   agents?: any[]; // Agents with their tasks
+  workflows?: WorkflowTemplate[]; // Workflow templates
 }
 
 export class PersistenceService {
@@ -549,6 +551,9 @@ export class PersistenceService {
       const tasks = allTemplates.filter(t => (t as any).type === "task" && agentIds.includes((t as any).parentId));
       exportData.agents = [...agents, ...tasks];
     }
+    if (options.importWorkflows) {
+      exportData.workflows = await this.loadWorkflows();
+    }
 
     return exportData;
   }
@@ -567,6 +572,7 @@ export class PersistenceService {
       importMcpServers?: boolean;
       importPromptTemplates?: boolean;
       importAgents?: boolean;
+      importWorkflows?: boolean;
     }
   ): Promise<void> {
     if (data.version !== 1) {
@@ -590,6 +596,7 @@ export class PersistenceService {
         db.mods,
         db.syncRepos,
         db.promptTemplates,
+        db.workflows,
       ],
       async () => {
         if (options.importSettings) await db.appState.clear();
@@ -634,6 +641,9 @@ export class PersistenceService {
               await db.promptTemplates.where("id").anyOf(idsToDelete).delete();
             }
           }
+        }
+        if (options.importWorkflows) {
+          await db.workflows.clear();
         }
 
         if (options.importSettings && data.settings) {
@@ -716,6 +726,17 @@ export class PersistenceService {
             }, ["createdAt", "updatedAt"]))
           );
         }
+        if (options.importWorkflows && data.workflows) {
+          const workflowsToImport = data.workflows.map((w) => ({
+            id: w.id || nanoid(),
+            name: w.name,
+            description: w.description,
+            definition: JSON.stringify(w),
+            createdAt: new Date(w.createdAt),
+            updatedAt: new Date(w.updatedAt),
+          }));
+          await db.workflows.bulkPut(workflowsToImport);
+        }
       }
     );
   }
@@ -750,6 +771,50 @@ export class PersistenceService {
     }
   }
 
+  // Workflows
+  static async loadWorkflows(): Promise<WorkflowTemplate[]> {
+    try {
+      const workflows = await db.workflows.orderBy("name").toArray();
+      return workflows.map((w) => ({
+        ...JSON.parse(w.definition),
+        id: w.id,
+        name: w.name,
+        description: w.description,
+        createdAt: w.createdAt.toISOString(),
+        updatedAt: w.updatedAt.toISOString(),
+      }));
+    } catch (error) {
+      console.error("PersistenceService: Error loading workflows:", error);
+      throw error;
+    }
+  }
+
+  static async saveWorkflow(workflow: WorkflowTemplate): Promise<string> {
+    try {
+      const dbWorkflow: DbWorkflow = {
+        id: workflow.id,
+        name: workflow.name,
+        description: workflow.description,
+        definition: JSON.stringify(workflow),
+        createdAt: new Date(workflow.createdAt),
+        updatedAt: new Date(workflow.updatedAt),
+      };
+      return await db.workflows.put(dbWorkflow);
+    } catch (error) {
+      console.error("PersistenceService: Error saving workflow:", error);
+      throw error;
+    }
+  }
+
+  static async deleteWorkflow(id: string): Promise<void> {
+    try {
+      await db.workflows.delete(id);
+    } catch (error) {
+      console.error("PersistenceService: Error deleting workflow:", error);
+      throw error;
+    }
+  }
+
   // --- Clear All Data ---
   static async clearAllData(): Promise<void> {
     try {
@@ -768,6 +833,7 @@ export class PersistenceService {
           db.tags,
           db.tagRuleLinks,
           db.promptTemplates,
+          db.workflows,
         ],
         async () => {
           await db.conversations.clear();
@@ -782,6 +848,7 @@ export class PersistenceService {
           await db.tags.clear();
           await db.tagRuleLinks.clear();
           await db.promptTemplates.clear();
+          await db.workflows.clear();
         }
       );
     } catch (error) {
