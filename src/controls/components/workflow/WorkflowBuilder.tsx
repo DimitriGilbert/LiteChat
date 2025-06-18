@@ -606,25 +606,42 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     };
 
     const handleEditWorkflow = (existingWorkflow: WorkflowTemplate) => {
-        setCurrentWorkflow(existingWorkflow);
-        setInitialMetadata({ 
+        const newMetadata = { 
             name: existingWorkflow.name, 
             description: existingWorkflow.description 
-        });
-        setInitialTrigger({
+        };
+        const newTrigger = {
             triggerType: (existingWorkflow.triggerType as TriggerType) || 'custom',
             customPrompt: existingWorkflow.triggerPrompt || '',
             selectedTemplateId: existingWorkflow.triggerRef || '',
             templateVariables: existingWorkflow.templateVariables || {},
-        });
-        setInitialSteps(existingWorkflow.steps || []);
+        };
+        const newSteps = existingWorkflow.steps || [];
+        
+        setCurrentWorkflow(existingWorkflow);
+        setInitialMetadata(newMetadata);
+        setInitialTrigger(newTrigger);
+        setInitialSteps(newSteps);
         setIsEditingExisting(true);
         setActiveTab('builder');
         setVisualizerData(null);
+        
+        // Reset forms with the workflow data after a small delay to ensure components are mounted
+        setTimeout(() => {
+            metadataFormRef.current?.reset(newMetadata);
+            triggerFormRef.current?.reset(newTrigger);
+            stepsFormRef.current?.reset(newSteps);
+        }, 100);
     };
 
     const handleSaveWorkflow = async () => {
-        const { metadata } = await gatherFormData();
+        // Gather all current form data before saving
+        const { metadata, trigger, steps } = await gatherFormData();
+        
+        // Update initial data to preserve current form state
+        setInitialMetadata(metadata);
+        setInitialTrigger(trigger);
+        setInitialSteps(steps);
         
         if (!metadata.name.trim()) {
             toast.error("Workflow name cannot be empty.");
@@ -650,7 +667,13 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     };
 
     const handleForkWorkflow = async () => {
-        const { metadata } = await gatherFormData();
+        // Gather all current form data before forking
+        const { metadata, trigger, steps } = await gatherFormData();
+        
+        // Update initial data to preserve current form state
+        setInitialMetadata(metadata);
+        setInitialTrigger(trigger);
+        setInitialSteps(steps);
         
         if (!metadata.name.trim()) {
             toast.error("Workflow name cannot be empty.");
