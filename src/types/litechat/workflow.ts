@@ -30,6 +30,10 @@ export interface WorkflowTemplate {
   name: string;
   description: string;
   steps: WorkflowStep[];
+  // Trigger information
+  triggerType?: 'custom' | 'template' | 'task';
+  triggerRef?: string; // template or task ID
+  triggerPrompt?: string; // for custom prompts
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
 }

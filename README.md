@@ -27,6 +27,7 @@
 - **Prompt Library**: Create, manage, and use reusable prompt templates
 
 ### 💻 **Power User Features**
+- **Workflow Automation**: Create, save, and execute multi-step AI workflows with automated sequences, variable mapping, and intelligent orchestration
 - **Agents**: Create, manage, and use powerful AI agents and their associated tasks.
 - **Tool System**: AI can read/write files, execute Git commands, and more, including tools from MCP servers.
 - **Race**: you can send the same prompt to multiple models at once and see the results
@@ -80,6 +81,7 @@ For comprehensive documentation, see the [`docs/`](./docs/) directory:
 - **[Git Integration](./docs/git.md)** - Repository management and conversation sync
 - **[Canvas Features](./docs/canvas-features.md)** - Code blocks, diagrams, and interaction controls
 - **[Block Renderer System](./docs/block-renderer-system.md)** - Universal block rendering architecture
+- **[Workflow System](./docs/workflow-system.md)** - Multi-step AI automation and workflow orchestration
 - **[Modding System](./docs/modding.md)** - Extension API and custom functionality
 - **[Build & Deployment](./docs/build-deployment.md)** - Development, configuration, and deployment
 - **[Control Module System](./docs/control-modules.md)** - Modular UI architecture
@@ -191,7 +193,7 @@ For detailed development setup, contribution guidelines, and architectural infor
 
 If you have made it through the whole AI slope (but still relevant) part, first of all, congratulation, you are deserveful (I am sure that is a word !) of these human written words ! And you might be asking yourself that question: `WHY ?`
 
-I am a happy [t3.chat](https://t3.chat) user but I was (and well, after adding them to my chat, I AM) missing a few features. So I did what every sane person on the internet nowdays does, whine at length to the support in an (Oh so thoughtfully crafted) email.
+I am a happy [t3.chat](https://t3.chat) user but I was (and well, after adding them to my chat, I AM) missing a few features - like the ability to chain AI interactions into automated workflows (because who doesn't want their AI to do the work while they make coffee?). So I did what every sane person on the internet nowdays does, whine at length to the support in an (Oh so thoughtfully crafted) email.
 
 I already toyed a bit before with [my Bash AI chat](https://ai-gents.dbuild.dev/) (yes, Bash, because, I mean, why not ?) and these features I asked were what I was missing from it (plus a UI, but how hard can UI be, I have done that before !) and after receiving a very fast (like within the hour for the real support problem and 2 more for a complete feedback on my lengthy boat of an email/wishlist) and insightful (and detailled, and thoughtful, and ... ! best support exchange with a company when it comes to a fat) "nope", my hubris took over ! 
 
