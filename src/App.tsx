@@ -66,6 +66,7 @@ import { ToolCallStepControlModule } from "@/controls/modules/canvas/tool/ToolCa
 // Import block renderer modules
 import { CodeBlockRendererModule } from "@/controls/modules/CodeBlockRendererModule";
 import { MermaidBlockRendererModule } from "@/controls/modules/MermaidBlockRendererModule";
+import { FlowBlockRendererModule } from "@/controls/modules/FlowBlockRendererModule";
 import { FormedibleBlockRendererModule } from "@/controls/modules/FormedibleBlockRendererModule";
 
 // Define the application's specific control module registration order HERE
@@ -108,6 +109,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   // Block Renderers (should be registered early)
   CodeBlockRendererModule,
   MermaidBlockRendererModule,
+  FlowBlockRendererModule,
   FormedibleBlockRendererModule,
   // Canvas Action Controls
   CopyActionControlModule, // For InteractionCard header

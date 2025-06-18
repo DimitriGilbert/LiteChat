@@ -239,6 +239,7 @@ export function useFormedible<TFormValues extends Record<string, any>>(
     const unsubscribers: (() => void)[] = [];
     let autoSubmitTimeout: NodeJS.Timeout;
     let onChangeTimeout: NodeJS.Timeout;
+    let onBlurTimeout: NodeJS.Timeout;
 
     if (formOptions?.onChange || autoSubmitOnChange) {
       const unsubscribe = form.store.subscribe(() => {
@@ -266,16 +267,51 @@ export function useFormedible<TFormValues extends Record<string, any>>(
       unsubscribers.push(unsubscribe);
     }
 
+    // Set up onBlur event listener
+    if (formOptions?.onBlur) {
+      let lastFocusedField: string | null = null;
+      
+      const handleBlur = (event: FocusEvent) => {
+        const target = event.target as HTMLElement;
+        const fieldName = target.getAttribute('name');
+        
+        if (fieldName && lastFocusedField === fieldName) {
+          clearTimeout(onBlurTimeout);
+          onBlurTimeout = setTimeout(() => {
+            const formApi = form;
+            const values = formApi.state.values;
+            formOptions.onBlur!({ value: values as TFormValues, formApi });
+          }, 100); // 100ms debounce for blur
+        }
+      };
+
+      const handleFocus = (event: FocusEvent) => {
+        const target = event.target as HTMLElement;
+        const fieldName = target.getAttribute('name');
+        lastFocusedField = fieldName;
+      };
+
+      // Add event listeners to document for blur/focus events
+      document.addEventListener('blur', handleBlur, true);
+      document.addEventListener('focus', handleFocus, true);
+      
+      unsubscribers.push(() => {
+        document.removeEventListener('blur', handleBlur, true);
+        document.removeEventListener('focus', handleFocus, true);
+      });
+    }
+
     // Clean up timeouts on unmount
     unsubscribers.push(() => {
       clearTimeout(autoSubmitTimeout);
       clearTimeout(onChangeTimeout);
+      clearTimeout(onBlurTimeout);
     });
 
     return () => {
       unsubscribers.forEach(unsub => unsub());
     };
-  }, [form, autoSubmitOnChange, autoSubmitDebounceMs, disabled, loading]);
+  }, [form, autoSubmitOnChange, autoSubmitDebounceMs, disabled, loading, formOptions?.onChange, formOptions?.onBlur]);
 
   const getCurrentPageFields = () => fieldsByPage[currentPage] || [];
 

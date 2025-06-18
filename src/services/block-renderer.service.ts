@@ -32,7 +32,9 @@ export class BlockRendererService {
     const candidateRenderers = [...specificRenderers, ...fallbackRenderers]
       .sort((a, b) => (b.priority || 0) - (a.priority || 0));
 
-    return candidateRenderers[0] || null;
+    const selectedRenderer = candidateRenderers[0] || null;
+
+    return selectedRenderer;
   }
 
   /**

@@ -69,7 +69,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       const interval = 1000 / streamingRenderFPS;
       let isMounted = true;
 
-      const updateDisplay = (timestamp: number) => {
+              const updateDisplay = (timestamp: number) => {
         if (!isMounted) return;
 
         const isStillStreaming = useInteractionStore
@@ -86,6 +86,9 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
               useInteractionStore.getState().activeReasoningBuffers[
                 interactionId
               ] ?? "";
+            
+
+            
             setDisplayedContent(latestBuffer);
             setReasoningContent(latestReasoningBuffer);
             lastUpdateTimeRef.current = timestamp;

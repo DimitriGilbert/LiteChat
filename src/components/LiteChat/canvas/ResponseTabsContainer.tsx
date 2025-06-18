@@ -4,7 +4,7 @@ import { InteractionCard } from './InteractionCard';
 import { StreamingInteractionCard } from './StreamingInteractionCard';
 import { CanvasControl, CanvasControlRenderContext } from '@/types/litechat/canvas/control';
 import { Button } from '@/components/ui/button';
-import { SparkleIcon, HistoryIcon, LandPlot, NotebookPenIcon } from 'lucide-react'; // Import icons and LandPlot icon and NotebookPenIcon
+import { SparkleIcon, HistoryIcon, LandPlot, NotebookPenIcon, Workflow } from 'lucide-react'; // Import icons and LandPlot icon and NotebookPenIcon
 
 interface ResponseTabsContainerProps {
   interactionGroup: Interaction[]; // Original interaction + its regenerations/edits, sorted chronologically
@@ -25,6 +25,26 @@ export const ResponseTabsContainer: React.FC<ResponseTabsContainerProps> = ({
   activeStreamingInteractionId,
 }) => {
   const [activeTabIndex, setActiveTabIndex] = useState(0);
+  
+  // DEBUG: Check workflow tab detection
+  React.useEffect(() => {
+    const hasWorkflow = interactionGroup.some(i => i.metadata?.isWorkflowRun || i.metadata?.isWorkflowStep);
+    if (hasWorkflow) {
+      console.log(`[ResponseTabsContainer] Workflow tabs:`, {
+        totalTabs: interactionGroup.length,
+        activeStreamingId: activeStreamingInteractionId,
+        tabs: interactionGroup.map((i, idx) => ({
+          index: idx,
+          id: i.id,
+          parentId: i.parentId,
+          status: i.status,
+          isWorkflowRun: !!i.metadata?.isWorkflowRun,
+          isWorkflowStep: !!i.metadata?.isWorkflowStep,
+          stepId: i.metadata?.workflowStepId
+        }))
+      });
+    }
+  }, [interactionGroup, activeStreamingInteractionId]);
 
   if (!interactionGroup || interactionGroup.length === 0) {
     return null;
@@ -77,6 +97,9 @@ export const ResponseTabsContainer: React.FC<ResponseTabsContainerProps> = ({
             } else if (interaction.metadata?.originalVersion) {
               // Original version of an edited response
               return <NotebookPenIcon className="h-3.5 w-3.5 mr-1 flex-shrink-0" />;
+            } else if (interaction.metadata?.workflowTab) {
+              // Workflow step tab
+              return <Workflow className="h-3.5 w-3.5 mr-1 flex-shrink-0" />;
             } else {
               // Regular regeneration tab
               return <HistoryIcon className="h-3.5 w-3.5 mr-1 flex-shrink-0" />;

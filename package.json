@@ -44,6 +44,7 @@
     "@tailwindcss/vite": "^4.0.17",
     "@tanstack/react-form": "^1.12.2",
     "@tanstack/react-virtual": "^3.13.8",
+    "@xyflow/react": "^12.7.0",
     "@zenfs/core": "^2.0.0",
     "@zenfs/dom": "^1.1.6",
     "ai": "^4.3.16",

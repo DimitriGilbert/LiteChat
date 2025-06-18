@@ -10,9 +10,19 @@ import type { Project } from "@/types/litechat/project";
 import type { DbRule, DbTag, DbTagRuleLink } from "@/types/litechat/rules";
 import type { DbPromptTemplate } from "@/types/litechat/prompt-template";
 
+
 export interface DbAppState {
   key: string;
   value: any;
+}
+
+export interface DbWorkflow {
+  id: string;
+  name: string;
+  description: string;
+  definition: string; // JSON representation of WorkflowTemplate
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export class LiteChatDatabase extends Dexie {
@@ -28,10 +38,30 @@ export class LiteChatDatabase extends Dexie {
   tags!: Table<DbTag, string>;
   tagRuleLinks!: Table<DbTagRuleLink, string>;
   promptTemplates!: Table<DbPromptTemplate, string>;
+  workflows!: Table<DbWorkflow, string>;
 
   constructor() {
     super("LiteChatDatabase_Rewrite_v1");
-    // Bump version for prompt templates
+    // Bump version for workflows
+    this.version(10).stores({
+      conversations:
+        "++id, title, createdAt, updatedAt, syncRepoId, lastSyncedAt, projectId",
+      // Add rating index to interactions
+      interactions:
+        "++id, conversationId, index, type, status, startedAt, parentId, rating",
+      mods: "++id, &name, enabled, loadOrder",
+      appState: "&key",
+      providerConfigs: "++id, &name, type, isEnabled, apiKeyId",
+      apiKeys: "++id, &name",
+      syncRepos: "++id, &name, remoteUrl, username",
+      projects: "++id, &path, parentId, createdAt, updatedAt, name",
+      rules: "++id, &name, type, createdAt, updatedAt",
+      tags: "++id, &name, createdAt, updatedAt",
+      tagRuleLinks: "++id, tagId, ruleId, &[tagId+ruleId]",
+      promptTemplates: "++id, &name, createdAt, updatedAt, isPublic",
+      workflows: "++id, &name, createdAt, updatedAt",
+    });
+    // Previous version for migration
     this.version(9).stores({
       conversations:
         "++id, title, createdAt, updatedAt, syncRepoId, lastSyncedAt, projectId",
@@ -49,7 +79,6 @@ export class LiteChatDatabase extends Dexie {
       tagRuleLinks: "++id, tagId, ruleId, &[tagId+ruleId]",
       promptTemplates: "++id, &name, createdAt, updatedAt, isPublic",
     });
-    // Previous version for migration
     this.version(8).stores({
       conversations:
         "++id, title, createdAt, updatedAt, syncRepoId, lastSyncedAt, projectId",

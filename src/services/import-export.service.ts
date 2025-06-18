@@ -142,6 +142,7 @@ export interface FullImportOptions {
   importMcpServers: boolean;
   importPromptTemplates: boolean;
   importAgents: boolean;
+  importWorkflows: boolean;
 }
 export type FullExportOptions = FullImportOptions;
 
@@ -577,6 +578,66 @@ export class ImportExportService {
       toast.success(`Imported ${data.mcpServers.length} MCP server configurations.`);
     } catch (error) {
       console.error("ImportExportService: Error importing MCP servers", error);
+      toast.error(
+        `Import failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  static async exportWorkflows(): Promise<void> {
+    try {
+      const workflows = await PersistenceService.loadWorkflows();
+      
+      const exportData = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        workflows,
+      };
+      
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const timestamp = format(new Date(), "yyyy-MM-dd_HH-mm-ss");
+      const filename = `litechat_workflows_${timestamp}.json`;
+      
+      triggerDownload(blob, filename);
+      toast.success(`Exported ${workflows.length} workflows.`);
+    } catch (error) {
+      console.error("ImportExportService: Error exporting workflows", error);
+      toast.error(
+        `Export failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  static async importWorkflows(file: File): Promise<void> {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      if (!data || typeof data !== "object" || !data.workflows || !Array.isArray(data.workflows)) {
+        throw new Error("Invalid workflows file format.");
+      }
+      
+      let importedCount = 0;
+      for (const workflow of data.workflows) {
+        try {
+          await PersistenceService.saveWorkflow({
+            ...workflow,
+            id: workflow.id || nanoid(), // Generate new ID if missing
+            createdAt: workflow.createdAt ? workflow.createdAt : new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+          importedCount++;
+        } catch (error) {
+          console.warn(`Failed to import workflow ${workflow.name}:`, error);
+        }
+      }
+      
+      toast.success(`Imported ${importedCount} workflows.`);
+    } catch (error) {
+      console.error("ImportExportService: Error importing workflows", error);
       toast.error(
         `Import failed: ${error instanceof Error ? error.message : String(error)}`,
       );
