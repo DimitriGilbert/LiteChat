@@ -30,16 +30,6 @@ interface WorkflowBuilderProps {
 type TriggerType = 'custom' | 'template' | 'task';
 type ActiveTab = 'list' | 'builder';
 
-interface WorkflowFormData {
-    name: string;
-    description: string;
-    triggerType: TriggerType;
-    customPrompt: string;
-    selectedTemplateId: string;
-    templateVariables: Record<string, any>;
-    steps: WorkflowStep[];
-}
-
 const createEmptyWorkflow = (): WorkflowTemplate => ({
     id: '',
     name: 'My New Workflow',
@@ -49,171 +39,279 @@ const createEmptyWorkflow = (): WorkflowTemplate => ({
     updatedAt: '',
 });
 
-export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
-    const [open, setOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<ActiveTab>("list");
-    const [activeStepsTab, setActiveStepsTab] = useState<string>("builder");
-    const [currentWorkflow, setCurrentWorkflow] = useState<WorkflowTemplate>(createEmptyWorkflow());
-    const [isEditingExisting, setIsEditingExisting] = useState(false);
-    
-    // Use ref for preview DOM element - direct manipulation for live typing
-    const previewElementRef = useRef<HTMLDivElement | null>(null);
-    
-    // State for compiled content - updated only on blur/tab switch for visualizer
-    const [compiledPreviewContent, setCompiledPreviewContent] = useState<string>('');
-    // Force re-render trigger for visualizer when compiled content changes
-    const [visualizerUpdateKey, setVisualizerUpdateKey] = useState(0);
-    
-    // Check streaming status from store
-    const isStreaming = useInteractionStore(state => state.streamingInteractionIds.length > 0);
-
-    // Get data from module
-    const promptTemplates = module.getPromptTemplates();
-    const agentTasks = module.getAgentTasks();
-    const allTemplates = module.getAllTemplates();
-    const models = module.getModels();
-
-    // TANSTACK FORM - Single source of truth for all workflow form state
-    const workflowForm = useForm({
-        defaultValues: {
-            name: currentWorkflow.name,
-            description: currentWorkflow.description,
-            triggerType: (currentWorkflow.triggerType as TriggerType) || 'custom',
-            customPrompt: currentWorkflow.triggerPrompt || '',
-            selectedTemplateId: currentWorkflow.triggerRef || '',
-            templateVariables: {} as Record<string, any>,
-            steps: currentWorkflow.steps || [],
-        },
-        onSubmit: async ({ value }) => {
-            await handleSaveWorkflow(value);
-        },
+// Separate form component for workflow metadata - manages its own state
+const WorkflowMetadataForm = React.forwardRef<
+    { 
+        getData: () => { name: string; description: string };
+        reset: (data: { name: string; description: string }) => void;
+    },
+    { initialData: { name: string; description: string } }
+>(({ initialData }, ref) => {
+    const metadataForm = useForm({
+        defaultValues: initialData,
     });
 
-    // Get current form values for reactive updates
-    const formValues = workflowForm.state.values;
-    
-    // Get selected template for variable form
-    const selectedTemplate = formValues.triggerType === 'template' && formValues.selectedTemplateId ? 
-        promptTemplates.find(t => t.id === formValues.selectedTemplateId) : null;
-    
-    // Calculate compiled trigger prompt from template variables
-    const compiledTriggerPrompt = useMemo(() => {
-        if (formValues.triggerType === 'custom') {
-            return formValues.customPrompt;
-        } else if (formValues.triggerType === 'template' && selectedTemplate) {
-            // Use the compiled content from state (updated by form blur)
-            return compiledPreviewContent || selectedTemplate.prompt;
-        }
-        return undefined;
-    }, [formValues.triggerType, formValues.customPrompt, selectedTemplate, compiledPreviewContent]);
+    // Expose getData and reset methods via ref
+    React.useImperativeHandle(ref, () => ({
+        getData: () => metadataForm.state.values,
+        reset: (data: { name: string; description: string }) => {
+            metadataForm.setFieldValue('name', data.name);
+            metadataForm.setFieldValue('description', data.description);
+        },
+    }));
 
-    // Build live workflow from form state (for visualizer and other components)
-    const liveWorkflow: WorkflowTemplate = useMemo(() => ({
-        ...currentWorkflow,
-        name: formValues.name,
-        description: formValues.description,
-        triggerType: formValues.triggerType,
-        triggerPrompt: compiledTriggerPrompt,
-        triggerRef: formValues.triggerType !== 'custom' ? formValues.selectedTemplateId : undefined,
-        templateVariables: formValues.templateVariables, // Include template variables in workflow
-        steps: formValues.steps,
-    }), [currentWorkflow, formValues, compiledTriggerPrompt]);
-    
-    // Get selected task
-    const selectedTask = formValues.triggerType === 'task' && formValues.selectedTemplateId ? 
-        agentTasks.find(t => t.id === formValues.selectedTemplateId) : null;
-
-    // Process initial step data for visualizer (BUILDER DOES THE PROCESSING)
-    const initialStepData = useMemo(() => {
-        console.log('Calculating initialStepData...');
-        console.log('formValues.triggerType:', formValues.triggerType);
-        console.log('formValues.selectedTemplateId:', formValues.selectedTemplateId);
-        console.log('selectedTemplate:', selectedTemplate?.name);
-        
-        if (formValues.triggerType === 'custom' && formValues.customPrompt) {
-            const preview = formValues.customPrompt.length > 100 ? 
-                           formValues.customPrompt.slice(0, 100) + '...' : 
-                           formValues.customPrompt;
-            console.log('Using custom prompt preview:', preview);
-            return {
-                stepName: 'Custom Prompt',
-                templateName: preview,
-                type: 'initial',
-                previewContent: preview,
-            };
-        } else if (formValues.triggerType === 'template' && formValues.selectedTemplateId && selectedTemplate) {
-            // Use compiled state content for visualizer (updated on blur/tab switch)
-            const contentToShow = compiledPreviewContent || selectedTemplate.prompt;
-            console.log('Final content to show:', contentToShow);
-            const preview = contentToShow.length > 100 ? 
-                           contentToShow.slice(0, 100) + '...' : 
-                           contentToShow;
-            console.log('Template preview for visualizer:', preview);
-            return {
-                stepName: selectedTemplate.name,
-                templateName: preview,
-                type: 'initial',
-                previewContent: preview,
-            };
-        } else if (formValues.triggerType === 'task' && formValues.selectedTemplateId && selectedTask) {
-            // For tasks, use raw content since we don't have task compilation in preview yet
-            const preview = selectedTask.prompt.length > 100 ? 
-                           selectedTask.prompt.slice(0, 100) + '...' : 
-                           selectedTask.prompt;
-            console.log('Using task preview:', preview);
-            return {
-                stepName: selectedTask.name,
-                templateName: preview,
-                type: 'initial',
-                previewContent: preview,
-            };
+    // Only set initial values on mount, don't reset on prop changes
+    const mountedRef = useRef(false);
+    useEffect(() => {
+        if (!mountedRef.current) {
+            metadataForm.setFieldValue('name', initialData.name);
+            metadataForm.setFieldValue('description', initialData.description);
+            mountedRef.current = true;
         }
-        console.log('Using default initial step data');
-        return {
-            stepName: 'Initial Step',
-            templateName: undefined,
-            type: 'initial',
-            previewContent: undefined,
+    }, []);
+
+    return (
+        <div className="space-y-4">
+            <metadataForm.Field name="name">
+                {(field) => (
+                    <div className="space-y-2">
+                        <Label htmlFor="wf-name">Workflow Name</Label>
+                        <Input
+                            id="wf-name"
+                            value={field.state.value}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            onBlur={field.handleBlur}
+                        />
+                    </div>
+                )}
+            </metadataForm.Field>
+
+            <metadataForm.Field name="description">
+                {(field) => (
+                    <div className="space-y-2">
+                        <Label htmlFor="wf-desc">Description</Label>
+                        <Textarea
+                            id="wf-desc"
+                            value={field.state.value}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            onBlur={field.handleBlur}
+                            rows={3}
+                        />
+                    </div>
+                )}
+            </metadataForm.Field>
+        </div>
+    );
+});
+
+WorkflowMetadataForm.displayName = 'WorkflowMetadataForm';
+
+// Separate form component for trigger configuration - manages its own state
+const TriggerConfigForm = React.forwardRef<
+    { 
+        getData: () => {
+            triggerType: TriggerType;
+            customPrompt: string;
+            selectedTemplateId: string;
+            templateVariables: Record<string, any>;
+        },
+        getCompiledPrompt: () => Promise<string>;
+        reset: (data: {
+            triggerType: TriggerType;
+            customPrompt: string;
+            selectedTemplateId: string;
+            templateVariables: Record<string, any>;
+        }) => void;
+    },
+    {
+        initialData: {
+            triggerType: TriggerType;
+            customPrompt: string;
+            selectedTemplateId: string;
+            templateVariables: Record<string, any>;
         };
-    }, [formValues.triggerType, formValues.customPrompt, formValues.selectedTemplateId, selectedTemplate, selectedTask]);
+        promptTemplates: any[];
+        agentTasks: any[];
+        module: WorkflowControlModule;
+    }
+>(({ initialData, promptTemplates, agentTasks, module }, ref) => {
+    const triggerForm = useForm({
+        defaultValues: initialData,
+    });
 
-    // Process step display data for visualizer (BUILDER DOES THE PROCESSING)
-    const stepDisplayData = useMemo(() => {
-        return formValues.steps.map(step => {
-            // Get clean model name from models list
-            const getCleanModelName = () => {
-                if (!step.modelId) return undefined;
-                const model = models.find(m => m.id === step.modelId);
-                return model ? model.name : step.modelId; // Fallback to ID if not found
-            };
-
-            // Get template name
-            const getTemplateName = () => {
-                if (step.templateId) {
-                    if (step.type === 'prompt') {
-                        const template = promptTemplates.find(t => t.id === step.templateId);
-                        return template?.name;
-                    } else if (step.type === 'agent-task') {
-                        const task = agentTasks.find(t => t.id === step.templateId);
-                        return task?.name;
-                    }
-                }
-                return undefined;
-            };
-
-            return {
-                stepName: step.name || 'Unnamed Step',
-                templateName: getTemplateName(),
-                modelName: getCleanModelName(),
-                type: step.type,
-            };
+    // Use state subscription to ensure UI updates when form state changes
+    const [currentValues, setCurrentValues] = useState(triggerForm.state.values);
+    
+    useEffect(() => {
+        const unsubscribe = triggerForm.store.subscribe(() => {
+            setCurrentValues(triggerForm.state.values);
         });
-    }, [formValues.steps, models, promptTemplates, agentTasks]);
+        return unsubscribe;
+    }, []);
+    const selectedTemplate = currentValues.triggerType === 'template' && currentValues.selectedTemplateId ? 
+        promptTemplates.find(t => t.id === currentValues.selectedTemplateId) : null;
+    const selectedTask = currentValues.triggerType === 'task' && currentValues.selectedTemplateId ? 
+        agentTasks.find(t => t.id === currentValues.selectedTemplateId) : null;
 
-    // Template variable form (only when template is selected)
+    const templateVariableFormRef = useRef<{ getData: () => Record<string, any> } | null>(null);
+
+    // Expose getData methods via ref
+    React.useImperativeHandle(ref, () => ({
+        getData: () => {
+            const formData = triggerForm.state.values;
+            const templateVars = templateVariableFormRef.current?.getData() || {};
+            return {
+                ...formData,
+                templateVariables: templateVars,
+            };
+        },
+        getCompiledPrompt: async () => {
+            const data = triggerForm.state.values;
+            const templateVars = templateVariableFormRef.current?.getData() || {};
+            
+            if (data.triggerType === 'custom') {
+                return data.customPrompt;
+            } else if (data.triggerType === 'template' && data.selectedTemplateId && selectedTemplate) {
+                try {
+                    const compiled = await module.compileTemplate(selectedTemplate.id, templateVars);
+                    return compiled.content;
+                } catch (error) {
+                    return `Error: ${error instanceof Error ? error.message : 'Compilation failed'}`;
+                }
+            } else if (data.triggerType === 'task' && data.selectedTemplateId && selectedTask) {
+                return selectedTask.prompt;
+            }
+            return '';
+        },
+        reset: (data) => {
+            triggerForm.setFieldValue('triggerType', data.triggerType);
+            triggerForm.setFieldValue('customPrompt', data.customPrompt);
+            triggerForm.setFieldValue('selectedTemplateId', data.selectedTemplateId);
+            triggerForm.setFieldValue('templateVariables', data.templateVariables);
+            setCurrentValues(data); // Update local state too
+        },
+    }));
+
+    // Only set initial values on mount, don't reset on prop changes
+    const mountedRef = useRef(false);
+    useEffect(() => {
+        if (!mountedRef.current) {
+            triggerForm.setFieldValue('triggerType', initialData.triggerType);
+            triggerForm.setFieldValue('customPrompt', initialData.customPrompt);
+            triggerForm.setFieldValue('selectedTemplateId', initialData.selectedTemplateId);
+            triggerForm.setFieldValue('templateVariables', initialData.templateVariables);
+            mountedRef.current = true;
+        }
+    }, []);
+
+    const templatesForTrigger = currentValues.triggerType === 'template' ? promptTemplates : agentTasks;
+
+    return (
+        <div className="border rounded-md p-3 space-y-4">
+            <Label className="font-semibold">Trigger / Initial Message</Label>
+            
+            <triggerForm.Field name="triggerType">
+                {(field) => (
+                    <RadioGroup 
+                        value={field.state.value} 
+                        onValueChange={(value) => {
+                            field.handleChange(value as TriggerType);
+                            triggerForm.setFieldValue('selectedTemplateId', '');
+                            triggerForm.setFieldValue('templateVariables', {});
+                        }}
+                    >
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="custom" id="r-custom" />
+                            <Label htmlFor="r-custom">Custom Prompt</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="template" id="r-template" />
+                            <Label htmlFor="r-template">Prompt from Template</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="task" id="r-task" />
+                            <Label htmlFor="r-task">Agent Task</Label>
+                        </div>
+                    </RadioGroup>
+                )}
+            </triggerForm.Field>
+
+            {currentValues.triggerType === 'custom' && (
+                <triggerForm.Field name="customPrompt">
+                    {(field) => (
+                        <Textarea
+                            value={field.state.value}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            onBlur={field.handleBlur}
+                            placeholder="Enter the first message to start the workflow..."
+                            className="min-h-[100px]"
+                        />
+                    )}
+                </triggerForm.Field>
+            )}
+
+            {(currentValues.triggerType === 'template' || currentValues.triggerType === 'task') && (
+                <div className="space-y-2">
+                    <triggerForm.Field name="selectedTemplateId">
+                        {(field) => (
+                            <Select 
+                                value={field.state.value} 
+                                onValueChange={(value) => {
+                                    field.handleChange(value);
+                                    triggerForm.setFieldValue('templateVariables', {});
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder={`Select a ${currentValues.triggerType}...`} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {templatesForTrigger.map(t => (
+                                        <SelectItem key={t.id} value={t.id}>
+                                            {currentValues.triggerType === 'task' ? (t as any).prefixedName : t.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                    </triggerForm.Field>
+                    
+                    {/* Template Variable Form using useFormedible */}
+                    {selectedTemplate && selectedTemplate.variables.length > 0 && (
+                        <TemplateVariableFormWrapper
+                            key={selectedTemplate.id} // Remount when template changes
+                            ref={templateVariableFormRef}
+                            template={selectedTemplate}
+                            initialVariables={currentValues.templateVariables}
+                            module={module}
+                        />
+                    )}
+                </div>
+            )}
+        </div>
+    );
+});
+
+TriggerConfigForm.displayName = 'TriggerConfigForm';
+
+// Wrapper for template variables using useFormedible
+const TemplateVariableFormWrapper = React.forwardRef<
+    { getData: () => Record<string, any> },
+    {
+        template: any;
+        initialVariables: Record<string, any>;
+        module: WorkflowControlModule;
+    }
+>(({ template, initialVariables, module }, ref) => {
+    const [formData, setFormData] = useState(initialVariables);
+    const previewRef = useRef<HTMLDivElement>(null);
+
+    // Expose getData method via ref
+    React.useImperativeHandle(ref, () => ({
+        getData: () => formData,
+    }));
+
     const templateFields = useMemo(() => {
-        if (!selectedTemplate) return [];
-        return selectedTemplate.variables.map(v => ({
+        return template.variables.map((v: any) => ({
             name: v.name,
             type: v.type || 'text',
             label: v.name,
@@ -221,107 +319,285 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
             description: v.instructions,
             required: v.required,
         }));
-    }, [selectedTemplate]);
+    }, [template.variables]);
 
-    // Use ref to store current selectedTemplate for onChange closure
-    const selectedTemplateRef = useRef<typeof selectedTemplate>(null);
-    selectedTemplateRef.current = selectedTemplate;
-
-    const { Form: TemplateVariableForm } = useFormedible({
+    const { Form } = useFormedible({
         fields: templateFields,
         formOptions: {
-            defaultValues: formValues.templateVariables,
+            defaultValues: initialVariables,
             onChange: async ({ value }) => {
-                console.log('🔥 TemplateVariableForm onChange:', value);
-                // Update DOM immediately for live preview - NO RE-RENDERS (like PromptLibraryControl)
-                if (!selectedTemplateRef.current || !previewElementRef.current) return;
+                // Update local state for ref access
+                setFormData(value);
                 
-                try {
-                    const compiled = await module.compileTemplate(selectedTemplateRef.current.id, value);
-                    previewElementRef.current.textContent = compiled.content;
-                } catch (error) {
-                    const errorMessage = `Error: ${error instanceof Error ? error.message : 'Compilation failed'}`;
-                    previewElementRef.current.textContent = errorMessage;
+                // Immediate DOM update for live preview
+                if (previewRef.current) {
+                    try {
+                        const compiled = await module.compileTemplate(template.id, value);
+                        previewRef.current.textContent = compiled.content;
+                    } catch (error) {
+                        const errorMessage = `Error: ${error instanceof Error ? error.message : 'Compilation failed'}`;
+                        previewRef.current.textContent = errorMessage;
+                    }
                 }
             },
             onBlur: async ({ value }) => {
-                console.log('🔥 TemplateVariableForm onBlur:', value);
-                console.log('🔥 Current formValues.templateVariables:', formValues.templateVariables);
-                
-                // Update main workflow form with template variables
-                workflowForm.setFieldValue('templateVariables', value);
-                console.log('🔥 Updated main form templateVariables to:', value);
-                
-                if (!selectedTemplateRef.current) return;
-                
-                try {
-                    const compiled = await module.compileTemplate(selectedTemplateRef.current.id, value);
-                    console.log('🔥 Compiled content in onBlur:', compiled.content);
-                    setCompiledPreviewContent(compiled.content);
-                    setVisualizerUpdateKey(prev => prev + 1); // Force visualizer update
-                } catch (error) {
-                    const errorMessage = `Error: ${error instanceof Error ? error.message : 'Compilation failed'}`;
-                    setCompiledPreviewContent(errorMessage);
-                    setVisualizerUpdateKey(prev => prev + 1); // Force visualizer update
-                }
-            }
+                // Also update on blur to ensure data is captured
+                setFormData(value);
+            },
         },
         showSubmitButton: false,
         formClassName: 'space-y-4 mt-4 border-t pt-4',
     });
 
-    // No automatic onChange re-rendering - workflow builder updates only on blur/manual actions
-
-    // Update preview directly in DOM - NO REACT RE-RENDERS (like PromptLibraryControl)
-    const updatePreview = async (formData: Record<string, any>) => {
-        console.log('WorkflowBuilder updatePreview called with:', formData);
-        console.log('selectedTemplate:', selectedTemplate?.name);
-        console.log('previewElementRef.current:', previewElementRef.current);
-        
-        if (!selectedTemplate || !previewElementRef.current) {
-            console.log('Early return - missing template or ref');
-            return;
-        }
-        
-        try {
-            console.log('Calling compileTemplate...');
-            const compiled = await module.compileTemplate(selectedTemplate.id, formData);
-            console.log('Compiled result:', compiled.content);
-            previewElementRef.current.textContent = compiled.content;
-            console.log('Updated DOM preview element');
-        } catch (error) {
-            console.error('Preview compilation error:', error);
-            const errorMessage = `Error: ${error instanceof Error ? error.message : 'Compilation failed'}`;
-            previewElementRef.current.textContent = errorMessage;
-        }
-    };
-
-        // Initialize preview when template is selected
+    // Initialize preview and form data
     useEffect(() => {
-        if (selectedTemplate && previewElementRef.current) {
-            previewElementRef.current.textContent = selectedTemplate.prompt;
-            setCompiledPreviewContent(selectedTemplate.prompt);
-            workflowForm.setFieldValue('templateVariables', {});
-            setVisualizerUpdateKey(prev => prev + 1);
-        } else if (!selectedTemplate) {
-            setCompiledPreviewContent('');
-            workflowForm.setFieldValue('templateVariables', {});
+        if (previewRef.current) {
+            previewRef.current.textContent = template.prompt;
         }
-    }, [selectedTemplate]); // Remove workflowForm dependency to prevent re-renders!
+        setFormData(initialVariables);
+        
+        // If we have initial variables and template, compile the preview
+        if (Object.keys(initialVariables).length > 0) {
+            module.compileTemplate(template.id, initialVariables).then((compiled) => {
+                if (previewRef.current) {
+                    previewRef.current.textContent = compiled.content;
+                }
+            }).catch((error) => {
+                if (previewRef.current) {
+                    const errorMessage = `Error: ${error instanceof Error ? error.message : 'Compilation failed'}`;
+                    previewRef.current.textContent = errorMessage;
+                }
+            });
+        }
+    }, [template.id, template.prompt]); // Re-run when template changes
 
-    // Compilation happens in the template variable form onBlur handler
+    return (
+        <div>
+            <Form />
+            <div className="mt-4 border rounded-lg p-3">
+                <Label className="text-sm font-medium">Live Preview</Label>
+                <div 
+                    ref={previewRef}
+                    className="mt-2 p-3 bg-muted rounded text-sm font-mono whitespace-pre-wrap max-h-32 overflow-y-auto"
+                >
+                    {template.prompt}
+                </div>
+            </div>
+        </div>
+    );
+});
+
+TemplateVariableFormWrapper.displayName = 'TemplateVariableFormWrapper';
+
+// Separate form component for steps management - manages its own state
+const StepsForm = React.forwardRef<
+    { 
+        getData: () => WorkflowStep[];
+        reset: (steps: WorkflowStep[]) => void;
+    },
+    {
+        initialSteps: WorkflowStep[];
+        promptTemplates: any[];
+        agentTasks: any[];
+        models: any[];
+    }
+>(({ initialSteps, promptTemplates, agentTasks, models }, ref) => {
+    const [steps, setSteps] = useState<WorkflowStep[]>(initialSteps);
+
+    // Expose getData and reset methods via ref
+    React.useImperativeHandle(ref, () => ({
+        getData: () => steps,
+        reset: (newSteps: WorkflowStep[]) => {
+            setSteps(newSteps);
+        },
+    }));
+
+    // Only set initial steps on mount, don't reset on prop changes
+    const mountedRef = useRef(false);
+    useEffect(() => {
+        if (!mountedRef.current) {
+            setSteps(initialSteps);
+            mountedRef.current = true;
+        }
+    }, []);
+
+    const handleAddStep = useCallback(() => {
+        const newStep: WorkflowStep = {
+            id: nanoid(),
+            name: `Step ${steps.length + 1}`,
+            type: 'prompt',
+            modelId: '',
+            templateId: undefined,
+        };
+        setSteps(prev => [...prev, newStep]);
+    }, [steps.length]);
+
+    const handleStepChange = useCallback((index: number, updatedStep: WorkflowStep) => {
+        setSteps(prev => {
+            const newSteps = [...prev];
+            newSteps[index] = updatedStep;
+            return newSteps;
+        });
+    }, []);
+
+    const handleStepDelete = useCallback((index: number) => {
+        setSteps(prev => prev.filter((_, i) => i !== index));
+    }, []);
+
+    return (
+        <div className="h-full flex flex-col">
+            <ScrollArea className="flex-1 border rounded-md p-3">
+                <div className="space-y-4">
+                    {steps.map((step, index) => (
+                        <WorkflowStepCard
+                            key={step.id}
+                            step={step}
+                            onChange={(updatedStep) => handleStepChange(index, updatedStep)}
+                            onDelete={() => handleStepDelete(index)}
+                            promptTemplates={promptTemplates}
+                            agentTasks={agentTasks}
+                            models={models}
+                        />
+                    ))}
+                    {steps.length === 0 && (
+                        <div className="text-center text-muted-foreground py-8">
+                            No subsequent steps. Add one to create a sequence.
+                        </div>
+                    )}
+                    <Button size="sm" onClick={handleAddStep} className="w-full mt-4">
+                        <Plus className="h-4 w-4 mr-2" /> Add Step
+                    </Button>
+                </div>
+            </ScrollArea>
+        </div>
+    );
+});
+
+StepsForm.displayName = 'StepsForm';
+
+export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
+    const [open, setOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState<ActiveTab>("list");
+    const [activeStepsTab, setActiveStepsTab] = useState<string>("builder");
+    const [currentWorkflow, setCurrentWorkflow] = useState<WorkflowTemplate>(createEmptyWorkflow());
+    const [isEditingExisting, setIsEditingExisting] = useState(false);
+    
+    // Initial form data - only for initialization, not maintained reactively
+    const [initialMetadata, setInitialMetadata] = useState({ 
+        name: currentWorkflow.name, 
+        description: currentWorkflow.description 
+    });
+    
+    const [initialTrigger, setInitialTrigger] = useState({
+        triggerType: (currentWorkflow.triggerType as TriggerType) || 'custom',
+        customPrompt: currentWorkflow.triggerPrompt || '',
+        selectedTemplateId: currentWorkflow.triggerRef || '',
+        templateVariables: currentWorkflow.templateVariables || {},
+    });
+    
+    const [initialSteps, setInitialSteps] = useState<WorkflowStep[]>(currentWorkflow.steps || []);
+    
+    // Refs to access form data when needed
+    const metadataFormRef = useRef<{ 
+        getData: () => { name: string; description: string };
+        reset: (data: { name: string; description: string }) => void;
+    } | null>(null);
+    const triggerFormRef = useRef<{ 
+        getData: () => {
+            triggerType: TriggerType;
+            customPrompt: string;
+            selectedTemplateId: string;
+            templateVariables: Record<string, any>;
+        },
+        getCompiledPrompt: () => Promise<string>;
+        reset: (data: {
+            triggerType: TriggerType;
+            customPrompt: string;
+            selectedTemplateId: string;
+            templateVariables: Record<string, any>;
+        }) => void;
+    } | null>(null);
+    const stepsFormRef = useRef<{ 
+        getData: () => WorkflowStep[];
+        reset: (steps: WorkflowStep[]) => void;
+    } | null>(null);
+    
+    // Keep track of when we've initialized forms to avoid unnecessary resets
+    const [formsInitialized, setFormsInitialized] = useState(false);
+    
+    // Cache for visualizer data - only updated when switching to visualizer tab
+    const [visualizerData, setVisualizerData] = useState<{
+        workflow: WorkflowTemplate;
+        initialStepData: any;
+        stepDisplayData: any[];
+    } | null>(null);
+    
+    // Check streaming status from store
+    const isStreaming = useInteractionStore(state => state.streamingInteractionIds.length > 0);
+
+    // Get data from module
+    const promptTemplates = module.getPromptTemplates();
+    const agentTasks = module.getAgentTasks();
+    const models = module.getModels();
+
+    // Function to gather all form data when needed
+    const gatherFormData = useCallback(async (): Promise<{
+        metadata: { name: string; description: string };
+        trigger: {
+            triggerType: TriggerType;
+            customPrompt: string;
+            selectedTemplateId: string;
+            templateVariables: Record<string, any>;
+        };
+        compiledPrompt: string;
+        steps: WorkflowStep[];
+    }> => {
+        const metadata = metadataFormRef.current?.getData() || initialMetadata;
+        const trigger = triggerFormRef.current?.getData() || initialTrigger;
+        const compiledPrompt = await (triggerFormRef.current?.getCompiledPrompt() || Promise.resolve(''));
+        const steps = stepsFormRef.current?.getData() || initialSteps;
+        
+        return { metadata, trigger, compiledPrompt, steps };
+    }, [initialMetadata, initialTrigger, initialSteps]);
+
+    // Function to build workflow from gathered data
+    const buildWorkflow = useCallback(async (): Promise<WorkflowTemplate> => {
+        const { metadata, trigger, compiledPrompt, steps } = await gatherFormData();
+        
+        return {
+            ...currentWorkflow,
+            name: metadata.name,
+            description: metadata.description,
+            triggerType: trigger.triggerType,
+            triggerPrompt: compiledPrompt,
+            triggerRef: trigger.triggerType !== 'custom' ? trigger.selectedTemplateId : undefined,
+            templateVariables: trigger.templateVariables,
+            steps: steps,
+        };
+    }, [currentWorkflow, gatherFormData]);
 
     const resetWorkflow = () => {
         const emptyWorkflow = createEmptyWorkflow();
+        const newMetadata = { name: emptyWorkflow.name, description: emptyWorkflow.description };
+        const newTrigger = {
+            triggerType: 'custom' as TriggerType,
+            customPrompt: '',
+            selectedTemplateId: '',
+            templateVariables: {},
+        };
+        const newSteps: WorkflowStep[] = [];
+        
         setCurrentWorkflow(emptyWorkflow);
-        workflowForm.reset();
-        workflowForm.setFieldValue('name', emptyWorkflow.name);
-        workflowForm.setFieldValue('description', emptyWorkflow.description);
-        workflowForm.setFieldValue('triggerType', 'custom');
-        workflowForm.setFieldValue('customPrompt', '');
-        workflowForm.setFieldValue('selectedTemplateId', '');
-        workflowForm.setFieldValue('steps', []);
+        setInitialMetadata(newMetadata);
+        setInitialTrigger(newTrigger);
+        setInitialSteps(newSteps);
         setIsEditingExisting(false);
+        setVisualizerData(null);
+        
+        // Reset all forms
+        metadataFormRef.current?.reset(newMetadata);
+        triggerFormRef.current?.reset(newTrigger);
+        stepsFormRef.current?.reset(newSteps);
     };
 
     const handleCreateNew = () => {
@@ -331,37 +607,36 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
 
     const handleEditWorkflow = (existingWorkflow: WorkflowTemplate) => {
         setCurrentWorkflow(existingWorkflow);
-        workflowForm.setFieldValue('name', existingWorkflow.name);
-        workflowForm.setFieldValue('description', existingWorkflow.description);
-        workflowForm.setFieldValue('triggerType', (existingWorkflow.triggerType as TriggerType) || 'custom');
-        workflowForm.setFieldValue('customPrompt', existingWorkflow.triggerPrompt || '');
-        workflowForm.setFieldValue('selectedTemplateId', existingWorkflow.triggerRef || '');
-        workflowForm.setFieldValue('steps', existingWorkflow.steps || []);
+        setInitialMetadata({ 
+            name: existingWorkflow.name, 
+            description: existingWorkflow.description 
+        });
+        setInitialTrigger({
+            triggerType: (existingWorkflow.triggerType as TriggerType) || 'custom',
+            customPrompt: existingWorkflow.triggerPrompt || '',
+            selectedTemplateId: existingWorkflow.triggerRef || '',
+            templateVariables: existingWorkflow.templateVariables || {},
+        });
+        setInitialSteps(existingWorkflow.steps || []);
         setIsEditingExisting(true);
         setActiveTab('builder');
+        setVisualizerData(null);
     };
 
-    const handleSaveWorkflow = async (formData: WorkflowFormData) => {
-        if (!formData.name.trim()) {
+    const handleSaveWorkflow = async () => {
+        const { metadata } = await gatherFormData();
+        
+        if (!metadata.name.trim()) {
             toast.error("Workflow name cannot be empty.");
             return;
         }
 
         try {
             const now = new Date().toISOString();
-            const workflowToSave: WorkflowTemplate = {
-                ...currentWorkflow,
-                id: currentWorkflow.id || nanoid(),
-                name: formData.name,
-                description: formData.description,
-                triggerType: formData.triggerType,
-                triggerRef: formData.triggerType !== 'custom' ? formData.selectedTemplateId : undefined,
-                triggerPrompt: compiledTriggerPrompt, // Use compiled content
-                templateVariables: formData.templateVariables,
-                steps: formData.steps,
-                createdAt: currentWorkflow.createdAt || now,
-                updatedAt: now,
-            };
+            const workflowToSave = await buildWorkflow();
+            workflowToSave.id = currentWorkflow.id || nanoid();
+            workflowToSave.createdAt = currentWorkflow.createdAt || now;
+            workflowToSave.updatedAt = now;
 
             await PersistenceService.saveWorkflow(workflowToSave);
             setCurrentWorkflow(workflowToSave);
@@ -375,30 +650,24 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     };
 
     const handleForkWorkflow = async () => {
-        const formData = workflowForm.state.values;
-        if (!formData.name.trim()) {
+        const { metadata } = await gatherFormData();
+        
+        if (!metadata.name.trim()) {
             toast.error("Workflow name cannot be empty.");
             return;
         }
 
         try {
             const now = new Date().toISOString();
-            const forkedWorkflow: WorkflowTemplate = {
-                ...currentWorkflow,
-                id: nanoid(),
-                name: `${formData.name} (Fork)`,
-                description: formData.description,
-                triggerType: formData.triggerType,
-                triggerRef: formData.triggerType !== 'custom' ? formData.selectedTemplateId : undefined,
-                triggerPrompt: compiledTriggerPrompt, // Use compiled content
-                templateVariables: formData.templateVariables,
-                steps: formData.steps,
-                createdAt: now,
-                updatedAt: now,
-            };
+            const forkedWorkflow = await buildWorkflow();
+            forkedWorkflow.id = nanoid();
+            forkedWorkflow.name = `${metadata.name} (Fork)`;
+            forkedWorkflow.createdAt = now;
+            forkedWorkflow.updatedAt = now;
 
             await PersistenceService.saveWorkflow(forkedWorkflow);
             setCurrentWorkflow(forkedWorkflow);
+            setInitialMetadata({ name: forkedWorkflow.name, description: forkedWorkflow.description });
             setIsEditingExisting(true);
             await module.refreshWorkflows();
             toast.success(`Forked workflow as "${forkedWorkflow.name}"`);
@@ -409,37 +678,27 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     };
 
     const handleRunWorkflow = async () => {
-        const formData = workflowForm.state.values;
+        const { trigger, steps } = await gatherFormData();
         
-        if (formData.triggerType === 'custom') {
-            if (!formData.customPrompt) {
+        if (trigger.triggerType === 'custom') {
+            if (!trigger.customPrompt) {
                 toast.error("Custom prompt cannot be empty.");
                 return;
             }
         } else {
-            if (!formData.selectedTemplateId) {
+            if (!trigger.selectedTemplateId) {
                 toast.error("Please select a template or task.");
                 return;
             }
         }
 
-        if (formData.steps.length === 0) {
+        if (steps.length === 0) {
             toast.error("Workflow must have at least one step.");
             return;
         }
 
         try {
-            const workflowToRun: WorkflowTemplate = {
-                ...currentWorkflow,
-                name: formData.name,
-                description: formData.description,
-                triggerType: formData.triggerType,
-                triggerRef: formData.triggerType !== 'custom' ? formData.selectedTemplateId : undefined,
-                triggerPrompt: compiledTriggerPrompt, // Use compiled content
-                templateVariables: formData.templateVariables,
-                steps: formData.steps,
-            };
-
+            const workflowToRun = await buildWorkflow();
             await module.startWorkflow(workflowToRun, workflowToRun.triggerPrompt || '');
             setOpen(false);
             toast.success("Workflow started!");
@@ -449,23 +708,114 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
         }
     };
 
-    const handleAddStep = useCallback(() => {
-        const currentSteps = workflowForm.state.values.steps;
-        const newStep: WorkflowStep = {
-            id: nanoid(),
-            name: `Step ${currentSteps.length + 1}`,
-            type: 'prompt',
-            modelId: '',
-            templateId: undefined,
-        };
-        workflowForm.setFieldValue('steps', [...currentSteps, newStep]);
-    }, [workflowForm]);
+    // Update visualizer data when switching to visualizer tab
+    const handleStepsTabChange = useCallback(async (value: string) => {
+        // ALWAYS gather form data before tab change to preserve state
+        try {
+            const { metadata, trigger, steps } = await gatherFormData();
+            
+            // Update our initial data with current form values to prevent reset
+            setInitialMetadata(metadata);
+            setInitialTrigger(trigger);
+            setInitialSteps(steps);
+        } catch (error) {
+            console.error('Failed to gather form data before tab change:', error);
+        }
+        
+        setActiveStepsTab(value);
+        
+        if (value === 'visualizer' || value === 'raw') {
+            try {
+                const { trigger, steps } = await gatherFormData();
+                const workflow = await buildWorkflow();
+                
+                // Get selected template/task for visualizer
+                const selectedTemplate = trigger.triggerType === 'template' && trigger.selectedTemplateId ? 
+                    promptTemplates.find(t => t.id === trigger.selectedTemplateId) : null;
+                const selectedTask = trigger.triggerType === 'task' && trigger.selectedTemplateId ? 
+                    agentTasks.find(t => t.id === trigger.selectedTemplateId) : null;
 
-    const isRunDisabled = (formValues.triggerType === 'custom' && !formValues.customPrompt) ||
-                          (formValues.triggerType !== 'custom' && !formValues.selectedTemplateId) ||
-                          formValues.steps.length === 0;
+                // Process initial step data for visualizer
+                let initialStepData;
+                if (trigger.triggerType === 'custom' && trigger.customPrompt) {
+                    const preview = trigger.customPrompt.length > 100 ? 
+                                   trigger.customPrompt.slice(0, 100) + '...' : 
+                                   trigger.customPrompt;
+                    initialStepData = {
+                        stepName: 'Custom Prompt',
+                        templateName: preview,
+                        type: 'initial',
+                        previewContent: preview,
+                    };
+                } else if (trigger.triggerType === 'template' && trigger.selectedTemplateId && selectedTemplate) {
+                    const contentToShow = workflow.triggerPrompt || selectedTemplate.prompt;
+                    const preview = contentToShow.length > 100 ? 
+                                   contentToShow.slice(0, 100) + '...' : 
+                                   contentToShow;
+                    initialStepData = {
+                        stepName: selectedTemplate.name,
+                        templateName: preview,
+                        type: 'initial',
+                        previewContent: preview,
+                    };
+                } else if (trigger.triggerType === 'task' && trigger.selectedTemplateId && selectedTask) {
+                    const preview = selectedTask.prompt.length > 100 ? 
+                                   selectedTask.prompt.slice(0, 100) + '...' : 
+                                   selectedTask.prompt;
+                    initialStepData = {
+                        stepName: selectedTask.name,
+                        templateName: preview,
+                        type: 'initial',
+                        previewContent: preview,
+                    };
+                } else {
+                    initialStepData = {
+                        stepName: 'Initial Step',
+                        templateName: undefined,
+                        type: 'initial',
+                        previewContent: undefined,
+                    };
+                }
 
-    const templatesForTrigger = formValues.triggerType === 'template' ? promptTemplates : agentTasks;
+                // Process step display data for visualizer
+                const stepDisplayData = steps.map(step => {
+                    const getCleanModelName = () => {
+                        if (!step.modelId) return undefined;
+                        const model = models.find(m => m.id === step.modelId);
+                        return model ? model.name : step.modelId;
+                    };
+
+                    const getTemplateName = () => {
+                        if (step.templateId) {
+                            if (step.type === 'prompt') {
+                                const template = promptTemplates.find(t => t.id === step.templateId);
+                                return template?.name;
+                            } else if (step.type === 'agent-task') {
+                                const task = agentTasks.find(t => t.id === step.templateId);
+                                return task?.name;
+                            }
+                        }
+                        return undefined;
+                    };
+
+                    return {
+                        stepName: step.name || 'Unnamed Step',
+                        templateName: getTemplateName(),
+                        modelName: getCleanModelName(),
+                        type: step.type,
+                    };
+                });
+
+                setVisualizerData({
+                    workflow,
+                    initialStepData,
+                    stepDisplayData,
+                });
+            } catch (error) {
+                console.error('Failed to gather data for visualizer:', error);
+            }
+        }
+    }, [gatherFormData, buildWorkflow, promptTemplates, agentTasks, models]);
 
     const tabs = [
         {
@@ -488,186 +838,38 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                 <div className="grid grid-cols-1 xl:grid-cols-4 lg:grid-cols-3 gap-6 h-full overflow-hidden p-2">
                     {/* Left Side: Trigger & Workflow Config - 1/4 in XL, 1/3 in LG */}
                     <div className="xl:col-span-1 lg:col-span-1 flex flex-col gap-4 overflow-y-auto max-h-full">
-                        {/* Workflow Name - Tanstack Form Field */}
-                        <workflowForm.Field name="name">
-                            {(field) => (
-                                <div className="space-y-2">
-                                    <Label htmlFor="wf-name">Workflow Name</Label>
-                                    <Input
-                                        id="wf-name"
-                                        value={field.state.value}
-                                        onChange={(e) => field.handleChange(e.target.value)}
-                                        onBlur={field.handleBlur}
-                                    />
-                                    {field.state.meta.errors && (
-                                        <div className="text-sm text-red-500">
-                                            {field.state.meta.errors}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </workflowForm.Field>
-
-                        {/* Workflow Description - Tanstack Form Field */}
-                        <workflowForm.Field name="description">
-                            {(field) => (
-                                <div className="space-y-2">
-                                    <Label htmlFor="wf-desc">Description</Label>
-                                    <Textarea
-                                        id="wf-desc"
-                                        value={field.state.value}
-                                        onChange={(e) => field.handleChange(e.target.value)}
-                                        onBlur={field.handleBlur}
-                                        rows={3}
-                                    />
-                                    {field.state.meta.errors && (
-                                        <div className="text-sm text-red-500">
-                                            {field.state.meta.errors}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </workflowForm.Field>
+                        <WorkflowMetadataForm
+                            ref={metadataFormRef}
+                            initialData={initialMetadata}
+                        />
                         
-                        <div className="border rounded-md p-3 flex-grow flex flex-col space-y-4">
-                            <Label className="font-semibold">Trigger / Initial Message</Label>
-                            
-                            {/* Trigger Type Selection - Tanstack Form Field - IMMEDIATE onChange */}
-                            <workflowForm.Field name="triggerType">
-                                {(field) => (
-                                    <RadioGroup 
-                                        value={field.state.value} 
-                                        onValueChange={(value) => {
-                                            field.handleChange(value as TriggerType);
-                                            workflowForm.setFieldValue('selectedTemplateId', '');
-                                            // Immediate update for radio buttons - no debounce
-                                            setCurrentWorkflow(prev => ({ ...prev }));
-                                        }}
-                                    >
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="custom" id="r-custom" />
-                                            <Label htmlFor="r-custom">Custom Prompt</Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="template" id="r-template" />
-                                            <Label htmlFor="r-template">Prompt from Template</Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="task" id="r-task" />
-                                            <Label htmlFor="r-task">Agent Task</Label>
-                                        </div>
-                                    </RadioGroup>
-                                )}
-                            </workflowForm.Field>
-
-                            {/* Custom Prompt Field - Tanstack Form Field - DEBOUNCED onChange */}
-                            {formValues.triggerType === 'custom' && (
-                                <workflowForm.Field name="customPrompt">
-                                    {(field) => (
-                                        <Textarea
-                                            value={field.state.value}
-                                            onChange={(e) => field.handleChange(e.target.value)}
-                                            onBlur={field.handleBlur}
-                                            placeholder="Enter the first message to start the workflow..."
-                                            className="flex-grow min-h-[100px]"
-                                        />
-                                    )}
-                                </workflowForm.Field>
-                            )}
-
-                            {/* Template/Task Selection - Tanstack Form Field - IMMEDIATE onChange */}
-                            {(formValues.triggerType === 'template' || formValues.triggerType === 'task') && (
-                                <div className="space-y-2">
-                                    <workflowForm.Field name="selectedTemplateId">
-                                        {(field) => (
-                                            <Select 
-                                                value={field.state.value} 
-                                                onValueChange={(value) => {
-                                                    field.handleChange(value);
-                                                    // Immediate update for selects - no debounce
-                                                    setCurrentWorkflow(prev => ({ ...prev }));
-                                                }}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder={`Select a ${formValues.triggerType}...`} />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {templatesForTrigger.map(t => (
-                                                        <SelectItem key={t.id} value={t.id}>
-                                                            {formValues.triggerType === 'task' ? (t as any).prefixedName : t.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        )}
-                                    </workflowForm.Field>
-                                    
-                                    {/* Template Variable Form (if template has variables) */}
-                                    {selectedTemplate && selectedTemplate.variables.length > 0 && <TemplateVariableForm />}
-                                    
-                                    {/* Live Preview Panel (like PromptLibraryControl) */}
-                                    {selectedTemplate && (
-                                        <div className="mt-4 border rounded-lg p-3">
-                                            <Label className="text-sm font-medium">Live Preview</Label>
-                                            <div 
-                                                ref={previewElementRef}
-                                                className="mt-2 p-3 bg-muted rounded text-sm font-mono whitespace-pre-wrap max-h-32 overflow-y-auto"
-                                            >
-                                                {selectedTemplate.prompt}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
+                        <TriggerConfigForm
+                            ref={triggerFormRef}
+                            initialData={initialTrigger}
+                            promptTemplates={promptTemplates}
+                            agentTasks={agentTasks}
+                            module={module}
+                        />
                     </div>
 
                     {/* Right Side: Steps with Tabbed Layout - 3/4 in XL, 2/3 in LG */}
                     <div className="xl:col-span-3 lg:col-span-2 flex flex-col h-full">
-                        <Label className="mb-2">Workflow Steps ({formValues.steps.length})</Label>
+                        <Label className="mb-2">Workflow Steps</Label>
                         <div className="flex-1 min-h-0">
                             <TabbedLayout
-                                onValueChange={(value) => {
-                                    // Just switch tabs, don't do any form operations here
-                                    setActiveStepsTab(value);
-                                }}
+                                onValueChange={handleStepsTabChange}
                                 tabs={[
                                     {
                                         value: 'builder',
                                         label: 'Builder',
                                         content: (
-                                            <div className="h-full flex flex-col">
-                                                <ScrollArea className="flex-1 border rounded-md p-3">
-                                                    <div className="space-y-4">
-                                                        {formValues.steps.map((step, index) => (
-                                                            <WorkflowStepCard
-                                                                key={step.id}
-                                                                step={step}
-                                                                onChange={(updatedStep) => {
-                                                                    const updatedSteps = [...formValues.steps];
-                                                                    updatedSteps[index] = updatedStep;
-                                                                    workflowForm.setFieldValue('steps', updatedSteps);
-                                                                }}
-                                                                onDelete={() => {
-                                                                    const updatedSteps = formValues.steps.filter((_, i) => i !== index);
-                                                                    workflowForm.setFieldValue('steps', updatedSteps);
-                                                                }}
-                                                                promptTemplates={promptTemplates}
-                                                                agentTasks={agentTasks}
-                                                                models={models}
-                                                            />
-                                                        ))}
-                                                        {formValues.steps.length === 0 && (
-                                                            <div className="text-center text-muted-foreground py-8">
-                                                                No subsequent steps. Add one to create a sequence.
-                                                            </div>
-                                                        )}
-                                                        <Button size="sm" onClick={handleAddStep} className="w-full mt-4">
-                                                            <Plus className="h-4 w-4 mr-2" /> Add Step
-                                                        </Button>
-                                                    </div>
-                                                </ScrollArea>
-                                            </div>
+                                            <StepsForm
+                                                ref={stepsFormRef}
+                                                initialSteps={initialSteps}
+                                                promptTemplates={promptTemplates}
+                                                agentTasks={agentTasks}
+                                                models={models}
+                                            />
                                         ),
                                     },
                                     {
@@ -675,12 +877,17 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                                         label: 'Visualizer',
                                         content: (
                                             <div className="h-full w-full border rounded-md">
-                                                <WorkflowVisualizer 
-                                                    key={visualizerUpdateKey}
-                                                    workflow={liveWorkflow}
-                                                    initialStepData={initialStepData}
-                                                    stepDisplayData={stepDisplayData}
-                                                />
+                                                {visualizerData ? (
+                                                    <WorkflowVisualizer 
+                                                        workflow={visualizerData.workflow}
+                                                        initialStepData={visualizerData.initialStepData}
+                                                        stepDisplayData={visualizerData.stepDisplayData}
+                                                    />
+                                                ) : (
+                                                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                                                        Loading visualizer...
+                                                    </div>
+                                                )}
                                             </div>
                                         ),
                                     },
@@ -689,32 +896,44 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                                         label: 'Raw Editor',
                                         content: (
                                             <div className="h-full border rounded-md">
-                                                <WorkflowRawEditor
-                                                    workflow={liveWorkflow}
-                                                    onChange={(updatedWorkflow) => {
-                                                        // Update form values from raw editor
-                                                        workflowForm.setFieldValue('name', updatedWorkflow.name);
-                                                        workflowForm.setFieldValue('description', updatedWorkflow.description);
-                                                        workflowForm.setFieldValue('triggerType', (updatedWorkflow.triggerType as TriggerType) || 'custom');
-                                                        workflowForm.setFieldValue('customPrompt', updatedWorkflow.triggerPrompt || '');
-                                                        workflowForm.setFieldValue('selectedTemplateId', updatedWorkflow.triggerRef || '');
-                                                        workflowForm.setFieldValue('steps', updatedWorkflow.steps);
-                                                    }}
-                                                    onSave={async (updatedWorkflow) => {
-                                                        const now = new Date().toISOString();
-                                                        const workflowToSave: WorkflowTemplate = {
-                                                            ...updatedWorkflow,
-                                                            id: updatedWorkflow.id || nanoid(),
-                                                            createdAt: updatedWorkflow.createdAt || now,
-                                                            updatedAt: now,
-                                                        };
-                                                        await PersistenceService.saveWorkflow(workflowToSave);
-                                                        setCurrentWorkflow(workflowToSave);
-                                                        setIsEditingExisting(true);
-                                                        await module.refreshWorkflows();
-                                                    }}
-                                                    className="h-full p-3"
-                                                />
+                                                {visualizerData ? (
+                                                    <WorkflowRawEditor
+                                                        workflow={visualizerData.workflow}
+                                                        onChange={async (updatedWorkflow) => {
+                                                            setInitialMetadata({
+                                                                name: updatedWorkflow.name,
+                                                                description: updatedWorkflow.description,
+                                                            });
+                                                            setInitialTrigger({
+                                                                triggerType: (updatedWorkflow.triggerType as TriggerType) || 'custom',
+                                                                customPrompt: updatedWorkflow.triggerPrompt || '',
+                                                                selectedTemplateId: updatedWorkflow.triggerRef || '',
+                                                                templateVariables: updatedWorkflow.templateVariables || {},
+                                                            });
+                                                            setInitialSteps(updatedWorkflow.steps);
+                                                            // Update visualizer data as well
+                                                            setVisualizerData(prev => prev ? { ...prev, workflow: updatedWorkflow } : null);
+                                                        }}
+                                                        onSave={async (updatedWorkflow) => {
+                                                            const now = new Date().toISOString();
+                                                            const workflowToSave: WorkflowTemplate = {
+                                                                ...updatedWorkflow,
+                                                                id: updatedWorkflow.id || nanoid(),
+                                                                createdAt: updatedWorkflow.createdAt || now,
+                                                                updatedAt: now,
+                                                            };
+                                                            await PersistenceService.saveWorkflow(workflowToSave);
+                                                            setCurrentWorkflow(workflowToSave);
+                                                            setIsEditingExisting(true);
+                                                            await module.refreshWorkflows();
+                                                        }}
+                                                        className="h-full p-3"
+                                                    />
+                                                ) : (
+                                                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                                                        Loading editor...
+                                                    </div>
+                                                )}
                                             </div>
                                         ),
                                     },
@@ -754,9 +973,20 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                         <TabbedLayout
                             tabs={tabs}
                             initialValue={activeTab}
-                            onValueChange={(value) => {
+                            onValueChange={async (value) => {
+                                // Gather form data before tab change to preserve state
+                                if (activeTab === 'builder' && value !== 'builder') {
+                                    try {
+                                        const { metadata, trigger, steps } = await gatherFormData();
+                                        setInitialMetadata(metadata);
+                                        setInitialTrigger(trigger);
+                                        setInitialSteps(steps);
+                                    } catch (error) {
+                                        console.error('Failed to gather form data before main tab change:', error);
+                                    }
+                                }
+                                
                                 setActiveTab(value as ActiveTab);
-                                // Refresh workflows when switching to list tab
                                 if (value === 'list') {
                                     module.refreshWorkflows();
                                 }
@@ -785,7 +1015,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                                 
                                 <Button 
                                     variant="outline" 
-                                    onClick={() => workflowForm.handleSubmit()}
+                                    onClick={handleSaveWorkflow}
                                     className="flex items-center gap-2"
                                 >
                                     <Save className="h-4 w-4" />
@@ -794,7 +1024,6 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                                 
                                 <Button 
                                     onClick={handleRunWorkflow}
-                                    disabled={isRunDisabled}
                                     className="flex items-center gap-2"
                                 >
                                     <Workflow className="h-4 w-4" />
@@ -807,4 +1036,4 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
             </Dialog>
         </>
     );
-}; 
+};
