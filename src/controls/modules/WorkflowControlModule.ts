@@ -172,31 +172,8 @@ export class WorkflowControlModule implements ControlModule {
       return { isValid: false, error: 'Invalid characters in query' };
     }
     
-    // Build sample context for validation
-    const sampleContext = {
-      workflow: workflow ? {
-        id: workflow.id,
-        name: workflow.name,
-        description: workflow.description,
-        steps: workflow.steps.map((step, idx) => ({
-          id: step.id,
-          name: step.name,
-          type: step.type,
-          index: idx,
-        })),
-      } : {
-        id: 'sample-workflow',
-        name: 'Sample Workflow',
-        description: 'A sample workflow for validation',
-        steps: [],
-      },
-      trigger: { message: 'Sample trigger output', processed: true },
-      step0: { result: 'Sample step 0 result', data: { field1: 'value1', field2: 42 } },
-      step1: { summary: 'Sample step 1 summary', items: ['item1', 'item2'] },
-      currentStepId: workflow?.steps[stepIndex || 0]?.id || 'current-step',
-      previousStepId: stepIndex && stepIndex > 0 ? workflow?.steps[stepIndex - 1]?.id : undefined,
-      nextStepId: stepIndex !== undefined && workflow && stepIndex < workflow.steps.length - 1 ? workflow.steps[stepIndex + 1]?.id : undefined,
-    };
+    // Build realistic sample context based on actual workflow
+    const sampleContext = this._buildRealisticSampleContext(workflow, stepIndex);
     
     // Test the query against the sample context
     try {
@@ -205,6 +182,152 @@ export class WorkflowControlModule implements ControlModule {
     } catch (error) {
       return { isValid: false, error: `Query execution failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
     }
+  }
+
+  // Build realistic sample context based on actual workflow and form data
+  private _buildRealisticSampleContext(workflow?: WorkflowTemplate, stepIndex?: number): Record<string, any> {
+    // Keep original workflow template intact - NO TRANSFORMATIONS
+    const context: Record<string, any> = {
+      workflow: workflow || {
+        id: 'sample-workflow',
+        name: 'Sample Workflow',
+        description: 'A sample workflow for validation',
+        triggerType: 'custom',
+        triggerPrompt: 'Sample initial prompt',
+        steps: [],
+      }
+    };
+
+    // Build initial_step data - this should be RAW AI OUTPUT, not template metadata!
+    let initialStepData: any = {};
+    
+    if (workflow) {
+      // Check if first step is a transform to determine if we should show raw text or structured data
+      const firstStep = workflow.steps[0];
+      const isNextStepTransform = firstStep?.type === 'transform';
+      
+      if (isNextStepTransform) {
+        // Next step is transform - show RAW TEXT output (no structured format)
+        initialStepData = "Sample AI response text that would be output by the initial step. This is raw, unstructured text that the transform step will process using JSONPath queries to extract specific data.";
+      } else {
+        // Next step needs structured data - show structured output
+        if (workflow.triggerType === 'custom') {
+          initialStepData = {
+            analysis: "Sample analysis of the custom prompt",
+            key_points: ["point 1", "point 2", "point 3"],
+            confidence: 0.85
+          };
+        } else if (workflow.triggerType === 'template' && workflow.triggerRef) {
+          const template = this.allTemplates.find(t => t.id === workflow.triggerRef);
+          initialStepData = {
+            summary: `Sample output from template: ${template?.name || 'Selected Template'}`,
+            extracted_data: "Sample extracted information",
+            status: "completed"
+          };
+        } else if (workflow.triggerType === 'task' && workflow.triggerRef) {
+          const task = this.allTemplates.find(t => t.id === workflow.triggerRef);
+          initialStepData = {
+            result: `Sample result from agent task: ${task?.name || 'Selected Task'}`,
+            recommendations: ["rec 1", "rec 2"],
+            next_actions: "Sample next actions"
+          };
+        }
+      }
+    } else {
+      // Fallback sample - assume transform step to show raw text
+      initialStepData = "Sample AI response text for validation purposes.";
+    }
+    
+    context.initial_step = initialStepData;
+
+    // Build outputs array with proper indexing - limit to previous steps only
+    const outputs: any[] = [];
+    
+    // outputs[0] = initial_step (trigger output)
+    outputs[0] = initialStepData;
+    
+    // Generate realistic previous step outputs based on workflow steps
+    if (workflow && stepIndex !== undefined) {
+      for (let i = 0; i < stepIndex; i++) {
+        const step = workflow.steps[i];
+        let stepOutput: any = {};
+        
+        // Check if the NEXT step (i+1) is a transform to determine output format
+        const nextStepAfterThis = workflow.steps[i + 1];
+        const isNextStepTransform = nextStepAfterThis?.type === 'transform';
+        
+        if (step.type === 'prompt' || step.type === 'agent-task') {
+          if (isNextStepTransform) {
+            // Next step is transform - provide RAW TEXT output
+            stepOutput = `Sample AI response from ${step.name}. This is the raw text output that would be generated by the AI model when processing this step. It contains unstructured information that the transform step will extract using JSONPath queries.`;
+          } else {
+            // Next step needs structured data
+            const template = this.allTemplates.find(t => t.id === step.templateId);
+            if (template?.variables) {
+              // Create sample outputs based on template variables
+              stepOutput = template.variables.reduce((acc: any, variable: any) => {
+                switch (variable.type) {
+                  case 'number':
+                    acc[variable.name] = 42;
+                    break;
+                  case 'boolean':
+                    acc[variable.name] = true;
+                    break;
+                  case 'array':
+                    acc[variable.name] = ['item1', 'item2'];
+                    break;
+                  case 'object':
+                    acc[variable.name] = { nested: 'value' };
+                    break;
+                  default:
+                    acc[variable.name] = `Sample ${variable.name}`;
+                }
+                return acc;
+              }, {});
+            } else {
+              stepOutput = {
+                result: `Sample output from ${step.name}`,
+                step_type: step.type,
+                step_name: step.name
+              };
+            }
+          }
+        } else if (step.type === 'transform') {
+          stepOutput = {
+            transformed_data: 'Sample transformed data',
+            step_type: 'transform',
+            step_name: step.name
+          };
+        } else if (step.type === 'human-in-the-loop') {
+          stepOutput = {
+            human_input: 'Sample human review result',
+            approved: true,
+            step_type: 'human-in-the-loop',
+            step_name: step.name
+          };
+        }
+        
+        // outputs[1] = step0, outputs[2] = step1, etc.
+        outputs[i + 1] = stepOutput;
+      }
+    } else {
+      // Default sample previous steps - assume no transform for now
+      outputs[1] = { 
+        analysis: 'Sample analysis result', 
+        confidence: 0.85,
+        entities: ['entity1', 'entity2']
+      };
+      outputs[2] = { 
+        summary: 'Sample summary from step 1', 
+        items: ['processed_item1', 'processed_item2'],
+        metadata: { source: 'step1', timestamp: '2024-01-01T00:00:00Z' }
+      };
+    }
+
+    // Add outputs array to context
+    context.outputs = outputs;
+
+    return context;
   }
 
   // Helper method for JSONPath resolution (copied from WorkflowService)

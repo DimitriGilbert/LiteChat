@@ -771,6 +771,19 @@ export class PersistenceService {
     }
   }
 
+  static async loadPromptTemplateById(id: string): Promise<PromptTemplate | null> {
+    try {
+      const template = await db.promptTemplates.get(id);
+      if (!template) {
+        return null;
+      }
+      return ensureDateFields(template, ["createdAt", "updatedAt"]) as PromptTemplate;
+    } catch (error) {
+      console.error("PersistenceService: Error loading prompt template by ID:", error);
+      throw error;
+    }
+  }
+
   // Workflows
   static async loadWorkflows(): Promise<WorkflowTemplate[]> {
     try {

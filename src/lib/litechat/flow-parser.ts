@@ -101,7 +101,7 @@ export class JSONFlowParser implements FlowParser {
       return `Node ${index}: Missing required field: type`;
     }
 
-    const validTypes = ['trigger', 'prompt', 'agent-task', 'human-in-the-loop', 'custom', 'input', 'output', 'default', 'group'];
+    const validTypes = ['trigger', 'prompt', 'agent-task', 'transform', 'human-in-the-loop', 'custom', 'input', 'output', 'default', 'group'];
     if (!validTypes.includes(node.type)) {
       return `Node ${index}: Invalid type '${node.type}'. Must be one of: ${validTypes.join(', ')}`;
     }

@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { PromptTemplate } from '@/types/litechat/prompt-template';
 import type { ModelListItem } from '@/types/litechat/provider';
 import { ModelSelector } from '@/controls/components/global-model-selector/ModelSelector';
-import { ChevronDown, ChevronRight, Trash2, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface WorkflowStepCardProps {
@@ -54,27 +54,6 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newName = e.target.value;
         onChange({ ...step, name: newName });
-    };
-
-    // Transform mappings handlers
-    const handleTransformMappingAdd = () => {
-        const newMappings = { ...(step.transformMappings || {}), 'new_field': '$.previous_step' };
-        onChange({ ...step, transformMappings: newMappings });
-    };
-
-    const handleTransformMappingRemove = (fieldName: string) => {
-        const newMappings = { ...(step.transformMappings || {}) };
-        delete newMappings[fieldName];
-        onChange({ ...step, transformMappings: newMappings });
-    };
-
-    const handleTransformMappingChange = (oldFieldName: string, newFieldName: string, query: string) => {
-        const newMappings = { ...(step.transformMappings || {}) };
-        if (oldFieldName !== newFieldName) {
-            delete newMappings[oldFieldName];
-        }
-        newMappings[newFieldName] = query;
-        onChange({ ...step, transformMappings: newMappings });
     };
 
     // Validate JSON query
@@ -227,76 +206,101 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
                                 <Label>Data Transformations</Label>
-                                <Button 
-                                    type="button" 
-                                    variant="outline" 
-                                    size="sm"
-                                    onClick={handleTransformMappingAdd}
-                                    className="h-8 px-2"
-                                >
-                                    <Plus className="h-4 w-4 mr-1" />
-                                    Add Field
-                                </Button>
                             </div>
                             
-                            <div className="text-xs text-muted-foreground p-2 bg-blue-50 rounded">
+                            <div className="text-xs text-muted-foreground p-2 bg-muted/30 rounded border">
                                 <strong>Available Context:</strong>
-                                <br />• <code>$.workflow</code> - Workflow template data
-                                <br />• <code>$.trigger</code> - Initial trigger output
-                                <br />• <code>$.step0</code>, <code>$.step1</code>, etc. - Previous step outputs
-                                <br />• <code>$.currentStepId</code>, <code>$.previousStepId</code>, <code>$.nextStepId</code> - Step references
+                                <br />• <code>$.workflow</code> - Original workflow template (name, steps, etc.)
+                                <br />• <code>$.initial_step</code> - Initial user input/prompt output
+                                <br />• <code>$.outputs[0]</code> - Initial step output (same as $.initial_step)
+                                <br />• <code>$.outputs[1]</code>, <code>$.outputs[2]</code>, etc. - Previous step outputs by index
+                                <br />• <strong>Static values:</strong> Use <code>"literal text"</code> or <code>123</code> for static data
                             </div>
 
-                            {Object.entries(step.transformMappings || {}).map(([fieldName, query]) => {
-                                const validation = validateJsonQuery(query);
-                                return (
-                                    <div key={fieldName} className="border rounded-lg p-3 space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex-1">
-                                                <Label className="text-xs">Field Name</Label>
-                                                <Input
-                                                    value={fieldName}
-                                                    onChange={(e) => handleTransformMappingChange(fieldName, e.target.value, query)}
-                                                    placeholder="output_field_name"
-                                                    className="h-8"
-                                                />
-                                            </div>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleTransformMappingRemove(fieldName)}
-                                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </Button>
+                            {(() => {
+                                // Get the next step to determine required fields
+                                const nextStepIndex = (stepIndex ?? 0) + 1;
+                                const nextStep = workflow?.steps?.[nextStepIndex];
+                                let requiredFields: Array<{name: string; type: string; description?: string; required?: boolean}> = [];
+                                
+                                if (nextStep?.templateId) {
+                                    if (nextStep.type === 'prompt') {
+                                        const template = promptTemplates.find(t => t.id === nextStep.templateId);
+                                        requiredFields = template?.variables || [];
+                                    } else if (nextStep.type === 'agent-task') {
+                                        const task = agentTasks.find(t => t.id === nextStep.templateId);
+                                        requiredFields = task?.variables || [];
+                                    }
+                                }
+
+                                if (requiredFields.length === 0) {
+                                    return (
+                                        <div className="text-center text-muted-foreground py-4 border-2 border-dashed border-border rounded-lg">
+                                            {nextStep ? 
+                                                `Next step "${nextStep.name}" has no template variables to configure.` :
+                                                'No next step found. Transform steps need a following step with template variables.'
+                                            }
                                         </div>
-                                        <div>
-                                            <Label className="text-xs">JSON Query</Label>
-                                            <Input
-                                                value={query}
-                                                onChange={(e) => handleTransformMappingChange(fieldName, fieldName, e.target.value)}
-                                                placeholder="$.previous_step.field_name"
-                                                className={`h-8 ${!validation.isValid ? 'border-red-500' : validation.result !== undefined ? 'border-green-500' : ''}`}
-                                            />
-                                            {!validation.isValid && (
-                                                <div className="text-xs text-red-500 mt-1">{validation.error}</div>
-                                            )}
-                                            {validation.isValid && validation.result !== undefined && (
-                                                <div className="text-xs text-green-600 mt-1 p-2 bg-green-50 rounded">
-                                                    <strong>Sample result:</strong> {JSON.stringify(validation.result)}
+                                    );
+                                }
+
+                                return requiredFields.map((field) => {
+                                    const currentQuery = step.transformMappings?.[field.name] || '';
+                                    const validation = validateJsonQuery(currentQuery);
+                                    const isStaticValue = currentQuery && (
+                                        (currentQuery.startsWith('"') && currentQuery.endsWith('"')) ||
+                                        !isNaN(Number(currentQuery)) ||
+                                        currentQuery === 'true' ||
+                                        currentQuery === 'false'
+                                    );
+                                    
+                                    return (
+                                        <div key={field.name} className="border border-border rounded-lg p-3 space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex-1">
+                                                    <Label className="text-sm font-medium">{field.name}</Label>
+                                                    {field.required && <span className="text-destructive ml-1">*</span>}
+                                                    {field.description && (
+                                                        <div className="text-xs text-muted-foreground mt-1">{field.description}</div>
+                                                    )}
                                                 </div>
-                                            )}
+                                                <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                                                    {field.type}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <Label className="text-xs">JSON Query or Static Value</Label>
+                                                <Input
+                                                    value={currentQuery}
+                                                    onChange={(e) => {
+                                                        const newMappings = { ...(step.transformMappings || {}) };
+                                                        newMappings[field.name] = e.target.value;
+                                                        onChange({ ...step, transformMappings: newMappings });
+                                                    }}
+                                                    placeholder={`$.initial_step.${field.name} or "static text" or 123`}
+                                                    className={`h-8 ${
+                                                        !validation.isValid && !isStaticValue ? 'border-destructive' : 
+                                                        (validation.result !== undefined || isStaticValue) ? 'border-primary' : ''
+                                                    }`}
+                                                />
+                                                {!validation.isValid && !isStaticValue && (
+                                                    <div className="text-xs text-destructive mt-1">{validation.error}</div>
+                                                )}
+                                                {isStaticValue && (
+                                                    <div className="text-xs text-primary mt-1 p-2 bg-primary/10 border border-primary/20 rounded">
+                                                        <strong>Static value:</strong> {currentQuery}
+                                                    </div>
+                                                )}
+                                                {validation.isValid && validation.result !== undefined && !isStaticValue && (
+                                                    <div className="text-xs text-primary mt-1 p-2 bg-primary/10 border border-primary/20 rounded">
+                                                        <strong>Sample result:</strong> {JSON.stringify(validation.result)}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
-                            
-                            {(!step.transformMappings || Object.keys(step.transformMappings).length === 0) && (
-                                <div className="text-center text-muted-foreground py-4 border-2 border-dashed rounded-lg">
-                                    No transformations configured. Add fields to transform data from previous steps.
-                                </div>
-                            )}
+                                    );
+                                });
+                            })()}
                         </div>
                     )}
                 </div>
