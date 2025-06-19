@@ -22,6 +22,7 @@ export const providerEvent = {
   loadInitialDataRequest: "provider.load.initial.data.request",
   selectModelRequest: "provider.select.model.request",
   addApiKeyRequest: "provider.add.api.key.request",
+  updateApiKeyRequest: "provider.update.api.key.request",
   deleteApiKeyRequest: "provider.delete.api.key.request",
   addProviderConfigRequest: "provider.add.config.request",
   updateProviderConfigRequest: "provider.update.config.request",
@@ -56,6 +57,12 @@ export interface ProviderEventPayloads {
   [providerEvent.loadInitialDataRequest]: undefined;
   [providerEvent.selectModelRequest]: { modelId: string | null };
   [providerEvent.addApiKeyRequest]: {
+    name: string;
+    providerId: string;
+    value: string;
+  };
+  [providerEvent.updateApiKeyRequest]: {
+    id: string;
     name: string;
     providerId: string;
     value: string;

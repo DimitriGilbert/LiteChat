@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { SearchIcon } from "lucide-react";
+import { SearchIcon, Brain, Globe, Wrench, Image as ImageIcon, Palette } from "lucide-react";
 import type { OpenRouterModel } from "@/types/litechat/provider";
 import { cn } from "@/lib/utils";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -302,13 +302,33 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
                     />
                     <Label
                       htmlFor={`enable-model-${providerId}-${model.id}`}
-                      className="text-sm font-normal text-card-foreground flex-grow cursor-pointer truncate pl-2"
+                      className="text-sm font-normal text-card-foreground flex-grow cursor-pointer truncate pl-2 flex justify-between items-center"
                       title={model.name || model.id}
                       onClick={
                         onModelClick ? () => onModelClick(model.id) : undefined
                       }
                     >
-                      {model.name || model.id}
+                      <span className="truncate">
+                        {model.name || model.id}
+                      </span>
+                      <div className="flex gap-1 ml-2 flex-shrink-0">
+                        {model.supported_parameters?.includes("reasoning") && (
+                          <Brain className="h-3.5 w-3.5 text-purple-500" />
+                        )}
+                        {(model.supported_parameters?.includes("web_search") ||
+                          model.supported_parameters?.includes("web_search_options")) && (
+                          <Globe className="h-3.5 w-3.5 text-blue-500" />
+                        )}
+                        {model.supported_parameters?.includes("tools") && (
+                          <Wrench className="h-3.5 w-3.5 text-orange-500" />
+                        )}
+                        {model.architecture?.input_modalities?.some(
+                          (mod) => mod !== "text"
+                        ) && <ImageIcon className="h-3.5 w-3.5 text-green-500" />}
+                        {model.architecture?.output_modalities?.includes("image") && (
+                          <Palette className="h-3.5 w-3.5 text-pink-500" />
+                        )}
+                      </div>
                     </Label>
                   </div>
                 );

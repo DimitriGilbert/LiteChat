@@ -10,8 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2Icon, Loader2, PlusIcon } from "lucide-react";
-import type { DbApiKey } from "@/types/litechat/provider";
+import { Trash2Icon, Loader2, PlusIcon, EditIcon } from "lucide-react";
+import type { DbApiKey, DbProviderType } from "@/types/litechat/provider";
 import { useShallow } from "zustand/react/shallow";
 import { useProviderStore } from "@/store/provider.store";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,10 +21,11 @@ import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipB
 import { ApiKeyForm } from "@/components/LiteChat/common/ApiKeysForm";
 
 const SettingsApiKeysComponent: React.FC = () => {
-  const { apiKeys, addApiKey, deleteApiKey, isLoading } = useProviderStore(
+  const { apiKeys, addApiKey, updateApiKey, deleteApiKey, isLoading } = useProviderStore(
     useShallow((state) => ({
       apiKeys: state.dbApiKeys,
       addApiKey: state.addApiKey,
+      updateApiKey: state.updateApiKey,
       deleteApiKey: state.deleteApiKey,
       isLoading: state.isLoading,
     })),
@@ -32,6 +33,8 @@ const SettingsApiKeysComponent: React.FC = () => {
 
   const [isAdding, setIsAdding] = useState(false);
   const [isSavingNew, setIsSavingNew] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
 
   const handleSaveNewKey = useCallback(
@@ -49,6 +52,43 @@ const SettingsApiKeysComponent: React.FC = () => {
     },
     [addApiKey],
   );
+
+  const handleSaveEditKey = useCallback(
+    async (name: string, providerId: string, value: string, id?: string) => {
+      if (!id) return;
+      setIsSavingEdit(true);
+      try {
+        await updateApiKey(id, name, providerId, value);
+        setEditingId(null);
+      } catch (error) {
+        console.error("Failed to update API key (from component):", error);
+        // Toast handled by store action
+      } finally {
+        setIsSavingEdit(false);
+      }
+    },
+    [updateApiKey]
+  );
+
+  const handleSaveKey = useCallback(
+    async (name: string, providerId: string, value: string, id?: string) => {
+      if (id) {
+        await handleSaveEditKey(name, providerId, value, id);
+      } else {
+        await handleSaveNewKey(name, providerId, value);
+      }
+    },
+    [handleSaveNewKey, handleSaveEditKey]
+  );
+
+  const handleEdit = useCallback((key: DbApiKey) => {
+    setEditingId(key.id);
+    setIsAdding(false); // Close add form if open
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingId(null);
+  }, []);
 
   const handleDelete = useCallback(
     async (id: string, name: string) => {
@@ -84,9 +124,12 @@ const SettingsApiKeysComponent: React.FC = () => {
         </p>
       </div>
 
-      {!isAdding && (
+      {!isAdding && !editingId && (
         <Button
-          onClick={() => setIsAdding(true)}
+          onClick={() => {
+            setIsAdding(true);
+            setEditingId(null); // Close edit form if open
+          }}
           variant="outline"
           className="w-full mb-4"
           disabled={isLoading}
@@ -99,10 +142,33 @@ const SettingsApiKeysComponent: React.FC = () => {
         <div className="border rounded-md p-4 space-y-3 bg-card shadow-md mb-4">
           <h4 className="font-semibold text-card-foreground">Add New Key</h4>
           <ApiKeyForm
-            onSave={handleSaveNewKey}
+            onSave={handleSaveKey}
             onCancel={() => setIsAdding(false)}
-            disabled={isSavingNew}
+            disabled={isSavingNew || isLoading}
           />
+        </div>
+      )}
+
+      {editingId && (
+        <div className="border rounded-md p-4 space-y-3 bg-card shadow-md mb-4">
+          <h4 className="font-semibold text-card-foreground">Edit API Key</h4>
+          {(() => {
+            const editKey = apiKeys?.find(k => k.id === editingId);
+            if (!editKey) return null;
+            
+            return (
+              <ApiKeyForm
+                initialName={editKey.name}
+                initialProviderType={editKey.providerId as DbProviderType}
+                initialValue={editKey.value}
+                onSave={handleSaveKey}
+                onCancel={handleCancelEdit}
+                disabled={isSavingEdit || isLoading}
+                isEditMode={true}
+                editId={editingId}
+              />
+            );
+          })()}
         </div>
       )}
 
@@ -144,22 +210,32 @@ const SettingsApiKeysComponent: React.FC = () => {
                         {format(new Date(key.createdAt), "PPp")}
                       </TableCell>
                       <TableCell className="text-right">
-                        <ActionTooltipButton
-                          tooltipText="Delete Key"
-                          onClick={() =>
-                            handleDelete(key.id, key.name || "Unnamed Key")
-                          }
-                          disabled={isKeyDeleting}
-                          aria-label={`Delete key ${key.name || "Unnamed Key"}`}
-                          icon={
-                            isKeyDeleting ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2Icon />
-                            )
-                          }
-                          className="text-destructive hover:text-destructive/80 h-8 w-8"
-                        />
+                        <div className="flex justify-end space-x-1">
+                          <ActionTooltipButton
+                            tooltipText="Edit Key"
+                            onClick={() => handleEdit(key)}
+                            disabled={isKeyDeleting || editingId !== null}
+                            aria-label={`Edit key ${key.name || "Unnamed Key"}`}
+                            icon={<EditIcon className="h-4 w-4" />}
+                            className="text-muted-foreground hover:text-foreground h-8 w-8"
+                          />
+                          <ActionTooltipButton
+                            tooltipText="Delete Key"
+                            onClick={() =>
+                              handleDelete(key.id, key.name || "Unnamed Key")
+                            }
+                            disabled={isKeyDeleting || editingId !== null}
+                            aria-label={`Delete key ${key.name || "Unnamed Key"}`}
+                            icon={
+                              isKeyDeleting ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2Icon />
+                              )
+                            }
+                            className="text-destructive hover:text-destructive/80 h-8 w-8"
+                          />
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

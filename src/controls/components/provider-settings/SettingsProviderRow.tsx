@@ -54,7 +54,7 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     return [...models].sort((a, b) =>
       (a.name || a.id).localeCompare(b.name || b.id)
     );
-  }, [provider.id, getAllAvailableModelDefsForProvider]);
+  }, [provider.id, provider.fetchedModels, provider.modelsLastFetchedAt, getAllAvailableModelDefsForProvider]);
 
   useEffect(() => {
     if (isEditing) {
@@ -87,6 +87,8 @@ const ProviderRowComponent: React.FC<ProviderRowProps> = ({
     provider.baseURL,
     provider.enabledModels,
     provider.autoFetchModels,
+    provider.fetchedModels,
+    provider.modelsLastFetchedAt,
     getAllAvailableModelDefsForProvider,
   ]);
 

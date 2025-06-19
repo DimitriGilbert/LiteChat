@@ -24,15 +24,20 @@ interface ApiKeyFormProps {
   initialName?: string;
   initialValue?: string;
   initialApiKeyId?: string | null; 
+  // Enhanced onSave to support both add and edit modes
   onSave: (
     name: string,
     providerId: DbProviderType, // Assuming providerId will be non-null on save
     value: string,
+    id?: string // Optional id parameter for edit mode
   ) => Promise<string | void>;
   onCancel: () => void;
   // isSaving prop will be handled by form.state.isSubmitting
   disabled?: boolean; // External disabled state
   className?: string;
+  // Edit mode props for backwards compatibility
+  isEditMode?: boolean; // Indicates if this is an edit form
+  editId?: string; // The ID of the API key being edited
 }
 
 const providerTypeValues = PROVIDER_TYPES.map((pt) => pt.value) as [
@@ -58,6 +63,8 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
   onCancel,
   disabled = false,
   className,
+  isEditMode = false,
+  editId,
 }) => {
   const keyInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,7 +80,7 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
     },
     onSubmit: async ({ value }) => {
       // Type assertion because schema ensures providerType is not null here
-      await onSave(value.keyName, value.providerType as DbProviderType, value.keyValue);
+      await onSave(value.keyName, value.providerType as DbProviderType, value.keyValue, editId);
     },
   });
 
@@ -227,7 +234,7 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
               <SaveIcon className="h-4 w-4 mr-1" />
               {isSubmitting || isValidating
                 ? "Saving..."
-                : "Save API Key"}
+                : isEditMode ? "Update API Key" : "Save API Key"}
             </Button>
           )}
         />

@@ -53,6 +53,12 @@ export interface ProviderActions {
     providerId: string,
     value: string
   ) => Promise<string>;
+  updateApiKey: (
+    id: string,
+    name: string,
+    providerId: string,
+    value: string
+  ) => Promise<void>;
   deleteApiKey: (id: string) => Promise<void>;
   addProviderConfig: (
     configData: Omit<DbProviderConfig, "id" | "createdAt" | "updatedAt">
@@ -319,6 +325,41 @@ export const useProviderStore = create(
       }
     },
 
+    updateApiKey: async (id, name, providerId, value) => {
+      const existingKey = get().dbApiKeys.find((k) => k.id === id);
+      if (!existingKey) {
+        throw new Error(`API Key with id ${id} not found`);
+      }
+      
+      const updatedKey: DbApiKey = {
+        ...existingKey,
+        name,
+        providerId,
+        value,
+        updatedAt: new Date(),
+      };
+      
+      try {
+        await PersistenceService.saveApiKey(updatedKey);
+        set((state) => {
+          const index = state.dbApiKeys.findIndex((k) => k.id === id);
+          if (index !== -1) {
+            state.dbApiKeys[index] = updatedKey;
+          }
+        });
+        toast.success(`API Key "${name}" updated.`);
+        emitter.emit(providerEvent.apiKeysChanged, {
+          apiKeys: get().dbApiKeys,
+        });
+      } catch (e) {
+        console.error("ProviderStore: Error updating API key", e);
+        toast.error(
+          `Failed to update API Key: ${e instanceof Error ? e.message : String(e)}`
+        );
+        throw e;
+      }
+    },
+
     deleteApiKey: async (id) => {
       const keyName =
         get().dbApiKeys.find((k) => k.id === id)?.name ?? "Unknown Key";
@@ -417,7 +458,14 @@ export const useProviderStore = create(
         await PersistenceService.saveProviderConfig(updatedConfigData);
         set((state) => {
           const index = state.dbProviderConfigs.findIndex((p) => p.id === id);
-          if (index !== -1) state.dbProviderConfigs[index] = updatedConfigData;
+          if (index !== -1) {
+            // Create new array reference to ensure useShallow detects changes
+            state.dbProviderConfigs = [
+              ...state.dbProviderConfigs.slice(0, index),
+              updatedConfigData,
+              ...state.dbProviderConfigs.slice(index + 1),
+            ];
+          }
         });
         get()._updateGloballyEnabledModelDefinitions(); // This will re-sort and emit
         emitter.emit(providerEvent.configsChanged, {
@@ -659,6 +707,13 @@ export const useProviderStore = create(
           handler: (
             p: ProviderEventPayloads[typeof providerEvent.addApiKeyRequest]
           ) => actions.addApiKey(p.name, p.providerId, p.value).then(() => {}),
+          storeId,
+        },
+        {
+          eventName: providerEvent.updateApiKeyRequest,
+          handler: (
+            p: ProviderEventPayloads[typeof providerEvent.updateApiKeyRequest]
+          ) => actions.updateApiKey(p.id, p.name, p.providerId, p.value),
           storeId,
         },
         {
