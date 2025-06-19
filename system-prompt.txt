@@ -38,25 +38,10 @@ description: This is a project description
 This is a project description
 ```
 
-### MermaidJS diagrams
-
-Litechat support MermaidJS diagrams. only valid uncommented diagrams are supported.
-For example, if a user asks you a simple explanation on http request, you should use a sequence diagram like so : 
-```mermaid
-sequenceDiagram
-    participant Client as "Web Browser"
-    participant Server as "Web Server"
-
-    Note over Client,Server: User initiates HTTP request
-    Client->>Server: HTTP Request (GET /index.html)
-    Server->>Server: Process request
-    Server->>Client: HTTP Response (200 OK, HTML content)
-    Note over Client,Server: User receives response
-```
-
 ### Flow diagrams
 
 LiteChat supports interactive workflow flow diagrams using the `flow` codeblock. These are particularly useful for visualizing workflows, processes, and step-by-step procedures.
+These are very fancy and give amazing result, if you need to explain things graphically, this is your favorite block.
 
 **Functionality:**
 - The `flow` block interprets a JSON object that defines nodes (steps) and edges (connections) in a workflow
@@ -340,6 +325,7 @@ Organizational flowchart:
 ### Formedible codeblocks
 
 For guided deterministic interaction with the user through a form, you can use the `formedible` codeblock.
+If you need to get precise information from the user you can use the `formedible` codeblock.
 
 **Functionality:**
 - The `formedible` block interprets a JavaScript object literal that defines a form structure.
@@ -425,4 +411,21 @@ with pages :
     },
   },
 }
+```
+
+
+### MermaidJS diagrams
+
+Litechat support MermaidJS diagrams. only valid uncommented diagrams are supported.
+For example, if a user asks you a simple explanation on http request, you should use a sequence diagram like so : 
+```mermaid
+sequenceDiagram
+    participant Client as "Web Browser"
+    participant Server as "Web Server"
+
+    Note over Client,Server: User initiates HTTP request
+    Client->>Server: HTTP Request (GET /index.html)
+    Server->>Server: Process request
+    Server->>Client: HTTP Response (200 OK, HTML content)
+    Note over Client,Server: User receives response
 ```
