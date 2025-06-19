@@ -860,9 +860,9 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
             value: 'builder',
             label: isEditingExisting ? 'Edit Workflow' : 'New Workflow',
             content: (
-                <div className="grid grid-cols-1 xl:grid-cols-4 lg:grid-cols-3 gap-6 h-full overflow-hidden p-2">
-                    {/* Left Side: Trigger & Workflow Config - 1/4 in XL, 1/3 in LG */}
-                    <div className="xl:col-span-1 lg:col-span-1 flex flex-col gap-4 overflow-y-auto max-h-full">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 h-full overflow-hidden p-1 md:p-2">
+                    {/* Left Side: Trigger & Workflow Config - Responsive column spans */}
+                    <div className="lg:col-span-4 xl:col-span-3 2xl:col-span-3 flex flex-col gap-3 md:gap-4 overflow-y-auto max-h-full">
                         <WorkflowMetadataForm
                             ref={metadataFormRef}
                             initialData={initialMetadata}
@@ -877,8 +877,8 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                         />
                     </div>
 
-                    {/* Right Side: Steps with Tabbed Layout - 3/4 in XL, 2/3 in LG */}
-                    <div className="xl:col-span-3 lg:col-span-2 flex flex-col h-full">
+                    {/* Right Side: Steps with Tabbed Layout - Responsive column spans */}
+                    <div className="lg:col-span-8 xl:col-span-9 2xl:col-span-9 flex flex-col h-full">
                         <Label className="mb-2">Workflow Steps</Label>
                         <div className="flex-1 min-h-0">
                             <TabbedLayout
@@ -1023,8 +1023,8 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                     </div>
 
                     {activeTab === 'builder' && (
-                        <DialogFooter className="p-2 md:p-3 pt-1 md:pt-2">
-                            <div className="flex gap-2 flex-wrap">
+                        <DialogFooter className="p-1 sm:p-2 md:p-3 pt-0.5 sm:pt-1 md:pt-2">
+                            <div className="flex gap-1 sm:gap-2 flex-wrap">
                                 <Button variant="outline" onClick={() => setOpen(false)}>
                                     Cancel
                                 </Button>

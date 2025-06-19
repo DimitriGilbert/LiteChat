@@ -64,6 +64,8 @@ const WorkflowStepNode: React.FC<{ data: any }> = ({ data }) => {
         return 'bg-green-100 border-green-400 text-green-900 shadow-sm';
       case 'agent-task':
         return 'bg-purple-100 border-purple-400 text-purple-900 shadow-sm';
+      case 'transform':
+        return 'bg-yellow-100 border-yellow-400 text-yellow-900 shadow-sm';
       case 'human-in-the-loop':
         return 'bg-orange-100 border-orange-400 text-orange-900 shadow-sm';
       default:
@@ -94,6 +96,8 @@ const WorkflowStepNode: React.FC<{ data: any }> = ({ data }) => {
         return '💬';
       case 'agent-task':
         return '🤖';
+      case 'transform':
+        return '🔄';
       case 'human-in-the-loop':
         return '👤';
       default:
@@ -118,13 +122,19 @@ const WorkflowStepNode: React.FC<{ data: any }> = ({ data }) => {
         )}
       </div>
       
-      {data.templateName && (
+      {data.templateName && data.type !== 'transform' && (
         <div className="text-sm font-medium mb-1 text-slate-700">
           {data.templateName}
         </div>
       )}
       
-      {data.modelName && (
+      {data.type === 'transform' && (
+        <div className="text-sm font-medium mb-1 text-slate-700">
+          Data Transform
+        </div>
+      )}
+      
+      {data.modelName && data.type !== 'transform' && (
         <div className="text-xs opacity-75 font-mono bg-white/50 px-2 py-1 rounded">
           {data.modelName}
         </div>

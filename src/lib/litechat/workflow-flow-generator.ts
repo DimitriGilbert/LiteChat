@@ -33,7 +33,10 @@ export class WorkflowFlowGenerator implements FlowContentGenerator {
           label: step.name || `Step ${index + 1}`,
           position: { x: (index + 1) * 400, y: 0 },
           status: 'pending' as const,
-          data: {
+          data: step.type === 'transform' ? {
+            // Transform steps don't use AI models or templates
+            transformType: 'Data Transform'
+          } : {
             modelName: this.getModelName(step.modelId),
             templateName: this.getTemplateName(step.templateId)
           }
@@ -250,7 +253,10 @@ export class WorkflowFlowGenerator implements FlowContentGenerator {
           label: step.name || `Step ${index + 1}`,
           position: { x: (index + 1) * 400, y: 0 },
           status: stepStatuses[step.id] || 'pending',
-          data: {
+          data: step.type === 'transform' ? {
+            // Transform steps don't use AI models or templates
+            transformType: 'Data Transform'
+          } : {
             modelName: this.getModelName(step.modelId),
             templateName: this.getTemplateName(step.templateId)
           }

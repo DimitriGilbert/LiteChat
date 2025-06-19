@@ -1,9 +1,10 @@
 import { emitter } from "@/lib/litechat/event-emitter";
-import { workflowEvent, type WorkflowEventPayloads } from "@/types/litechat/events/workflow.events";
+import { workflowEvent, type WorkflowEventPayloads, createWorkflowEventMetadata, WORKFLOW_EVENT_PRIORITIES } from "@/types/litechat/events/workflow.events";
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import type { Interaction } from "@/types/litechat/interaction";
 import { useWorkflowStore } from "@/store/workflow.store";
 import type { WorkflowRun, WorkflowStep } from "@/types/litechat/workflow";
+import { WorkflowError } from "@/types/litechat/workflow";
 import { nanoid } from "nanoid";
 import { compilePromptTemplate } from "@/lib/litechat/prompt-util";
 import type { CompiledPrompt } from "@/types/litechat/prompt-template";
@@ -14,11 +15,26 @@ import { usePromptStateStore } from "@/store/prompt.store";
 import { usePromptTemplateStore } from "@/store/prompt-template.store";
 import { InteractionService } from "./interaction.service";
 import { useProjectStore } from "@/store/project.store";
+import { useProviderStore } from "@/store/provider.store";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useConversationStore } from "@/store/conversation.store";
 import type { CoreMessage } from "ai";
 import { buildHistoryMessages } from "@/lib/litechat/ai-helpers";
 import { WorkflowFlowGenerator } from "@/lib/litechat/workflow-flow-generator";
+import type { StepStatus } from "@/types/litechat/flow";
+
+// Flow content manipulation types for better type safety
+interface FlowContentUpdate {
+  stepId: string;
+  status: StepStatus;
+  output?: any;
+}
+
+interface FlowContentMatch {
+  fullMatch: string;
+  flowContent: string;
+  hasFlow: boolean;
+}
 
 // Note: Refactored to a static class to align with other services like InteractionService.
 // This service's lifecycle is tied to the application's lifecycle, so event listeners
@@ -27,6 +43,65 @@ export const WorkflowService = {
   isInitialized: false,
   activeWorkflowConfig: null as { template: any; initialPrompt: string; conversationId: string } | null,
   flowGenerator: new WorkflowFlowGenerator(),
+
+  // Typed helper methods for flow content manipulation
+  _extractFlowContent: (content: string): FlowContentMatch => {
+    const flowMatch = content.match(/```flow\n([\s\S]*?)\n```/);
+    return {
+      fullMatch: flowMatch?.[0] || '',
+      flowContent: flowMatch?.[1] || '',
+      hasFlow: !!flowMatch
+    };
+  },
+
+  _updateFlowInContent: (content: string, updatedFlowContent: string): string => {
+    const flowMatch = WorkflowService._extractFlowContent(content);
+    if (flowMatch.hasFlow) {
+      return content.replace(
+        /```flow\n[\s\S]*?\n```/,
+        `\`\`\`flow\n${updatedFlowContent}\n\`\`\``
+      );
+    }
+    return content;
+  },
+
+  _updateStepStatusInFlow: (content: string, update: FlowContentUpdate): string => {
+    const flowMatch = WorkflowService._extractFlowContent(content);
+    if (flowMatch.hasFlow) {
+      const updatedFlowContent = WorkflowService.flowGenerator.updateNodeStatus(
+        flowMatch.flowContent,
+        update.stepId,
+        update.status
+      );
+      return WorkflowService._updateFlowInContent(content, updatedFlowContent);
+    }
+    return content;
+  },
+
+  _addStepOutputToFlow: (content: string, stepId: string, output: any): string => {
+    const flowMatch = WorkflowService._extractFlowContent(content);
+    if (flowMatch.hasFlow) {
+      const updatedFlowContent = WorkflowService.flowGenerator.addStepOutput(
+        flowMatch.flowContent,
+        stepId,
+        output
+      );
+      return WorkflowService._updateFlowInContent(content, updatedFlowContent);
+    }
+    return content;
+  },
+
+  _finalizeFlowVisualization: (content: string, finalOutput: Record<string, any>): string => {
+    const flowMatch = WorkflowService._extractFlowContent(content);
+    if (flowMatch.hasFlow) {
+      const finalizedFlowContent = WorkflowService.flowGenerator.finalizeWorkflow(
+        flowMatch.flowContent,
+        finalOutput
+      );
+      return WorkflowService._updateFlowInContent(content, finalizedFlowContent);
+    }
+    return content;
+  },
 
   initialize: () => {
     if (WorkflowService.isInitialized) return;
@@ -158,7 +233,11 @@ export const WorkflowService = {
     const nextStep = run.template.steps[nextStepIndex];
     
     if (!nextStep?.templateId) {
-      throw new Error(`Transform step "${step.name}" has no following step with a template to provide data for`);
+      throw new WorkflowError(
+        `Transform step "${step.name}" has no following step with a template to provide data for`,
+        'STEP_NOT_FOUND',
+        { runId: run.runId, stepId: step.id, stepIndex, stepType: 'transform' }
+      );
     }
 
     // Get the required fields from the next step's template - LOAD FRESH FROM DATABASE
@@ -169,7 +248,11 @@ export const WorkflowService = {
     }
 
     if (!nextStepTemplate?.variables?.length) {
-      throw new Error(`Next step "${nextStep.name}" template has no variables to transform data for`);
+      throw new WorkflowError(
+        `Next step "${nextStep.name}" template has no variables to transform data for`,
+        'TEMPLATE_NOT_FOUND',
+        { runId: run.runId, stepId: step.id, stepIndex, stepType: 'transform', templateId: nextStep.templateId }
+      );
     }
 
     // Build context using the new unified method
@@ -210,16 +293,24 @@ export const WorkflowService = {
             console.warn(`[WorkflowService] Transform step "${step.name}": Query "${query}" for field "${fieldName}" returned undefined`);
           }
         } else {
-          throw new Error(`Invalid query format: "${query}". Must be a JSON path starting with "$." or a static value.`);
+          throw new WorkflowError(
+            `Invalid query format: "${query}". Must be a JSON path starting with "$." or a static value.`,
+            'JSONPATH_INVALID',
+            { runId: run.runId, stepId: step.id, stepIndex, stepType: 'transform', query }
+          );
         }
         
         console.log(`[WorkflowService] Field "${fieldName}" resolved to:`, value);
         transformedData[fieldName] = value;
         
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        console.error(`[WorkflowService] Transform error for field "${fieldName}":`, error);
-        throw new Error(`Transform error for field "${fieldName}": ${errorMsg}`);
+        const workflowError = WorkflowError.fromError(
+          error,
+          'TRANSFORM_STEP_FAILED',
+          { runId: run.runId, stepId: step.id, stepIndex, stepType: 'transform', query, expectedFields: [fieldName] }
+        );
+        console.error(`[WorkflowService] Transform error for field "${fieldName}":`, workflowError);
+        throw workflowError;
       }
     }
 
@@ -229,13 +320,21 @@ export const WorkflowService = {
 
   _compileStepPrompt: async (step: WorkflowStep, run: WorkflowRun, stepIndex: number): Promise<CompiledPrompt> => {
     if (!step.templateId) {
-      throw new Error(`Step ${step.name} has no templateId specified`);
+      throw new WorkflowError(
+        `Step "${step.name}" has no templateId specified`,
+        'TEMPLATE_NOT_FOUND',
+        { runId: run.runId, stepId: step.id, stepIndex, stepType: step.type }
+      );
     }
 
     // Load template fresh from database instead of stale store
     const template = await PersistenceService.loadPromptTemplateById(step.templateId);
     if (!template) {
-      throw new Error(`Template ${step.templateId} not found for step ${step.name}`);
+      throw new WorkflowError(
+        `Template "${step.templateId}" not found for step "${step.name}"`,
+        'TEMPLATE_NOT_FOUND',
+        { runId: run.runId, stepId: step.id, stepIndex, stepType: step.type, templateId: step.templateId }
+      );
     }
 
     // Get the immediate previous step output from run.stepOutputs
@@ -257,7 +356,15 @@ export const WorkflowService = {
 
     console.log(`[WorkflowService] Compiling template "${template.name}" for step "${step.name}" with data:`, formData);
 
-    return await compilePromptTemplate(template, formData);
+    try {
+      return await compilePromptTemplate(template, formData);
+    } catch (error) {
+      throw WorkflowError.fromError(
+        error,
+        'TEMPLATE_COMPILATION_FAILED',
+        { runId: run.runId, stepId: step.id, stepIndex, stepType: step.type, templateId: step.templateId }
+      );
+    }
   },
 
   _parseStepOutput: (interaction: Interaction, step: WorkflowStep): any => {
@@ -291,7 +398,29 @@ export const WorkflowService = {
   handleWorkflowStartRequest: async (payload: WorkflowEventPayloads[typeof workflowEvent.startRequest]): Promise<void> => {
     console.log("[WorkflowService] Workflow start request received", payload);
     const { template, initialPrompt, conversationId } = payload;
-    if (!conversationId) return;
+    
+    if (!conversationId) {
+      throw new WorkflowError(
+        'No conversation ID provided for workflow start',
+        'CONVERSATION_NOT_FOUND',
+        { templateId: template?.id }
+      );
+    }
+
+    if (!template) {
+      throw new WorkflowError(
+        'No workflow template provided',
+        'WORKFLOW_NOT_FOUND'
+      );
+    }
+
+    if (!template.steps || template.steps.length === 0) {
+      throw new WorkflowError(
+        `Workflow "${template.name}" has no steps defined`,
+        'WORKFLOW_NOT_FOUND',
+        { templateId: template.id }
+      );
+    }
 
     // DEBUG: Log template details
     console.log("[WorkflowService] Template details:", {
@@ -455,7 +584,10 @@ export const WorkflowService = {
       await WorkflowService.createTriggerStep(mainInteraction, run, baseTurnData);
       
       // Emit workflow started event
-      emitter.emit(workflowEvent.started, { run });
+      emitter.emit(workflowEvent.started, { 
+        run,
+        metadata: createWorkflowEventMetadata(run.runId, 'high', 1)
+      });
       
     } catch (error) {
       console.error(`[WorkflowService] Error during workflow conversion:`, error);
@@ -579,9 +711,25 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
         } as Interaction);
 
         console.log(`[WorkflowService] Initial step created as child ${initialStepInteraction.id} of main ${mainInteraction.id}`);
+      } else {
+        throw new WorkflowError(`Failed to create initial step interaction`, 'STEP_CREATION_FAILED', { 
+          runId: run.runId, 
+          stepType: 'trigger' 
+        });
       }
     } catch (error) {
-      console.error(`[WorkflowService] Error creating initial step:`, error);
+      const workflowError = WorkflowError.fromError(error, 'TRIGGER_STEP_FAILED', { 
+        runId: run.runId 
+      });
+      console.error(`[WorkflowService] ${workflowError.message}:`, workflowError);
+      
+      // Emit error event for proper handling
+      emitter.emit(workflowEvent.error, { 
+        runId: run.runId, 
+        error: workflowError.message 
+      });
+      
+      throw workflowError;
     }
   },
 
@@ -590,29 +738,36 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
     try {
       const step = run.template.steps[stepIndex];
       if (!step) {
-        throw new Error(`Step at index ${stepIndex} not found`);
+        throw new WorkflowError(
+          `Step at index ${stepIndex} not found`,
+          'STEP_NOT_FOUND',
+          { runId: run.runId, stepIndex }
+        );
       }
 
       const stepName = step.name || `Step ${stepIndex + 1}`;
       console.log(`[WorkflowService] Creating step "${stepName}" as child tab for run ${run.runId}`);
 
+      // Emit step starting event for UI preparation
+      emitter.emit(workflowEvent.stepStarting, {
+        runId: run.runId,
+        step,
+        stepIndex,
+        metadata: createWorkflowEventMetadata(run.runId, 'normal', stepIndex + 2)
+      });
+
       // Update main interaction progress
       const interactionStore = useInteractionStore.getState();
       
-      // Update flow content with step status
+      // Update flow content with step status using typed helper
       const currentContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || '';
-      const flowMatch = currentContent.match(/```flow\n([\s\S]*?)\n```/);
-      if (flowMatch && flowMatch[1]) {
-        const updatedFlowContent = WorkflowService.flowGenerator.updateNodeStatus(
-          flowMatch[1], 
-          step.id, 
-          'running'
-        );
-        const newContent = currentContent.replace(
-          /```flow\n[\s\S]*?\n```/,
-          `\`\`\`flow\n${updatedFlowContent}\n\`\`\``
-        );
-        interactionStore.setActiveStreamBuffer(run.mainInteractionId, newContent);
+      const updatedContent = WorkflowService._updateStepStatusInFlow(currentContent, {
+        stepId: step.id,
+        status: 'running'
+      });
+      
+      if (updatedContent !== currentContent) {
+        interactionStore.setActiveStreamBuffer(run.mainInteractionId, updatedContent);
       } else {
         interactionStore.appendStreamBuffer(run.mainInteractionId, `\n\n---\n▶️ **Executing: ${stepName}**`);
       }
@@ -621,7 +776,13 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
         interactionStore.appendStreamBuffer(run.mainInteractionId, `\n⏸️ **Paused:** ${step.instructionsForHuman || 'Requires human input.'}`);
         interactionStore._updateInteractionInState(run.mainInteractionId, { status: 'AWAITING_INPUT' });
         interactionStore._removeStreamingId(run.mainInteractionId);
-        emitter.emit(workflowEvent.paused, { runId: run.runId, step, pauseReason: 'human-in-the-loop', dataForReview: run.stepOutputs });
+        emitter.emit(workflowEvent.paused, { 
+          runId: run.runId, 
+          step, 
+          pauseReason: 'human-in-the-loop', 
+          dataForReview: run.stepOutputs,
+          metadata: createWorkflowEventMetadata(run.runId, 'normal', stepIndex + 10)
+        });
         return;
       }
 
@@ -632,50 +793,50 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
           
           // Update flow content for completed transform
           const currentContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || '';
-          const flowMatch = currentContent.match(/```flow\n([\s\S]*?)\n```/);
-          if (flowMatch && flowMatch[1]) {
-            const updatedFlowContent = WorkflowService.flowGenerator.updateNodeStatus(
-              flowMatch[1], 
-              step.id, 
-              'success'
-            );
-            const newContent = currentContent.replace(
-              /```flow\n[\s\S]*?\n```/,
-              `\`\`\`flow\n${updatedFlowContent}\n\`\`\``
-            );
-            interactionStore.setActiveStreamBuffer(run.mainInteractionId, newContent);
+          const updatedContent = WorkflowService._updateStepStatusInFlow(currentContent, {
+            stepId: step.id,
+            status: 'success'
+          });
+          
+          if (updatedContent !== currentContent) {
+            interactionStore.setActiveStreamBuffer(run.mainInteractionId, updatedContent);
           } else {
             interactionStore.appendStreamBuffer(run.mainInteractionId, `\n✔️ **Completed: ${stepName}** - Data transformed`);
           }
           
           // Emit step completion directly (no interaction to wait for)
-          emitter.emit(workflowEvent.stepCompleted, { runId: run.runId, stepId: step.id, output: transformOutput });
+          emitter.emit(workflowEvent.stepCompleted, { 
+            runId: run.runId, 
+            stepId: step.id, 
+            output: transformOutput,
+            metadata: createWorkflowEventMetadata(run.runId, 'normal', stepIndex + 20)
+          });
           return;
         } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          console.error(`[WorkflowService] Transform step error:`, error);
+          const workflowError = WorkflowError.fromError(error, 'TRANSFORM_STEP_FAILED', { 
+            runId: run.runId, 
+            stepId: step.id, 
+            stepIndex,
+            stepType: 'transform'
+          });
+          console.error(`[WorkflowService] ${workflowError.message}:`, workflowError);
           
           // Update flow content for failed transform
           const currentContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || '';
-          const flowMatch = currentContent.match(/```flow\n([\s\S]*?)\n```/);
-          if (flowMatch && flowMatch[1]) {
-            const updatedFlowContent = WorkflowService.flowGenerator.updateNodeStatus(
-              flowMatch[1], 
-              step.id, 
-              'error'
-            );
-            const newContent = currentContent.replace(
-              /```flow\n[\s\S]*?\n```/,
-              `\`\`\`flow\n${updatedFlowContent}\n\`\`\``
-            );
-            interactionStore.setActiveStreamBuffer(run.mainInteractionId, newContent);
+          const updatedContent = WorkflowService._updateStepStatusInFlow(currentContent, {
+            stepId: step.id,
+            status: 'error'
+          });
+          
+          if (updatedContent !== currentContent) {
+            interactionStore.setActiveStreamBuffer(run.mainInteractionId, updatedContent);
           } else {
-            interactionStore.appendStreamBuffer(run.mainInteractionId, `\n❌ **Error in ${stepName}:** ${errorMsg}`);
+            interactionStore.appendStreamBuffer(run.mainInteractionId, `\n❌ **Error in ${stepName}:** ${workflowError.getUserMessage()}`);
           }
           
           // Update the main interaction response with error
           const errorUpdates = {
-            response: `❌ **Workflow Error**\n\nTransform step "${stepName}" failed: ${errorMsg}`,
+            response: `❌ **Workflow Error**\n\nTransform step "${stepName}" failed: ${workflowError.getUserMessage()}`,
             status: 'ERROR' as const,
             endedAt: new Date()
           };
@@ -691,8 +852,23 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
             } as Interaction).catch(console.error);
           }
           
-          emitter.emit(workflowEvent.error, { runId: run.runId, error: errorMsg });
+          emitter.emit(workflowEvent.error, { runId: run.runId, error: workflowError.getUserMessage() });
           return;
+        }
+      }
+
+      // Validate model availability if specified
+      if (step.modelId) {
+        const providerState = useProviderStore.getState();
+        const availableModels = providerState.getGloballyEnabledModelDefinitions();
+        const isModelAvailable = availableModels.some((model: any) => model.id === step.modelId);
+        
+        if (!isModelAvailable) {
+          throw new WorkflowError(
+            `Model "${step.modelId}" is not available or enabled`,
+            'MODEL_NOT_AVAILABLE',
+            { runId: run.runId, stepId: step.id, stepIndex, stepType: step.type, modelId: step.modelId }
+          );
         }
       }
 
@@ -1013,14 +1189,20 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
         markdownSummary += `**Original Input:** ${originalInput}\n\n`;
         markdownSummary += `---\n\n`;
         
-        // Add each step's output
+        // Add each step's output (excluding transform steps)
         Object.entries(activeRun.stepOutputs).forEach(([stepKey, output], index) => {
           if (stepKey === 'trigger') {
             markdownSummary += `## Initial Processing\n\n`;
           } else {
-            // Steps are sequential: step0, step1, step2... so index-1 (since trigger is index 0)
-            const stepIndex = index - 1;
-            const stepName = activeRun.template.steps[stepIndex]?.name || `Step ${stepIndex + 1}`;
+            // Find the actual step definition to check its type
+            const stepDefinition = activeRun.template.steps.find((step: any) => step.id === stepKey);
+            
+            // Skip transform steps - they don't generate user-visible content
+            if (stepDefinition?.type === 'transform') {
+              return;
+            }
+            
+            const stepName = stepDefinition?.name || stepKey;
             markdownSummary += `## ${stepName}\n\n`;
           }
           
