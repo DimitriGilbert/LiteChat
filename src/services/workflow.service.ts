@@ -167,11 +167,33 @@ export const WorkflowService = {
     try {
       return path.split(".").reduce((acc, part) => {
         if (acc === null || acc === undefined) return undefined;
+        
+        // Handle array indices (including multi-dimensional arrays)
         if (part.includes("[") && part.includes("]")) {
-          const [prop, indexStr] = part.split("[");
-          const index = parseInt(indexStr.replace("]", ""));
-          return acc[prop]?.[index];
+          // Split property name from array indices
+          const propMatch = part.match(/^([^[]*)/);
+          const prop = propMatch ? propMatch[1] : "";
+          
+          // Extract all array indices
+          const indexMatches = part.match(/\[(\d+)\]/g);
+          if (!indexMatches) return undefined;
+          
+          // Start with the property (if it exists)
+          let current = prop ? acc[prop] : acc;
+          
+          // Apply each array index in sequence
+          for (const indexMatch of indexMatches) {
+            const indexStr = indexMatch.slice(1, -1); // Remove [ and ]
+            const index = parseInt(indexStr, 10);
+            if (isNaN(index) || current === null || current === undefined) {
+              return undefined;
+            }
+            current = current[index];
+          }
+          
+          return current;
         }
+        
         return acc[part];
       }, obj);
     } catch (error) {
@@ -1621,7 +1643,7 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
   handleStepCompleted: (
     payload: WorkflowEventPayloads[typeof workflowEvent.stepCompleted]
   ): void => {
-    const { runId, stepId } = payload;
+    const { runId } = payload;
 
     // Wait for store to process step completion
     setTimeout(() => {
