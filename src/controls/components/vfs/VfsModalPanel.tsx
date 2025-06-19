@@ -113,8 +113,8 @@ export const VfsModalPanel: React.FC<VfsModalPanelProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleDialogClose()}>
       <DialogContent className="sm:max-w-[90vw] md:max-w-[80vw] lg:max-w-[70vw] w-[90vw] h-[80vh] min-h-[500px] max-h-[90vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="p-4 pb-2 border-b flex-shrink-0">
-          <DialogTitle>Virtual Filesystem</DialogTitle>
+        <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 border-b flex-shrink-0">
+          <DialogTitle className="p-2">Virtual Filesystem</DialogTitle>
           <DialogDescription>
             Manage files associated with the current context. Select files to
             attach them to your next prompt.
@@ -127,7 +127,7 @@ export const VfsModalPanel: React.FC<VfsModalPanelProps> = ({
         <div className="flex-grow overflow-hidden">
           <FileManager />
         </div>
-        <DialogFooter className="p-4 pt-2 border-t flex-shrink-0">
+        <DialogFooter className="p-2 md:p-3 pt-1 md:pt-2 border-t flex-shrink-0">
           <Button variant="outline" onClick={handleDialogClose}>
             Close
           </Button>

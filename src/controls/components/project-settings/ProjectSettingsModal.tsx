@@ -381,8 +381,8 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
           "min-h-[500px] max-h-[90vh]"
         )}
       >
-        <DialogHeader className="p-4 md:p-6 pb-2 md:pb-4 flex-shrink-0">
-          <DialogTitle>Project Settings: {project?.name}</DialogTitle>
+        <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 flex-shrink-0">
+          <DialogTitle className="p-2">Project Settings: {project?.name}</DialogTitle>
           <DialogDescription>
             Configure default settings for this project. Settings inherit from
             parent projects or global defaults if not set here.
@@ -399,7 +399,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
           scrollable={false}
         />
 
-        <DialogFooter className="flex-shrink-0 border-t p-4 md:p-6 pt-3 md:pt-4 mt-auto">
+        <DialogFooter className="flex-shrink-0 border-t p-2 md:p-3 pt-1 md:pt-2 mt-auto">
           <Button variant="outline" onClick={onClose} disabled={isSaving}>
             Cancel
           </Button>

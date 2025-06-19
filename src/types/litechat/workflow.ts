@@ -1,4 +1,4 @@
-export type WorkflowStepType = "prompt" | "agent-task" | "human-in-the-loop";
+export type WorkflowStepType = "prompt" | "agent-task" | "human-in-the-loop" | "transform";
 
 export interface WorkflowStep {
   id: string; // nanoid
@@ -11,6 +11,9 @@ export interface WorkflowStep {
   
   // For 'human-in-the-loop'
   instructionsForHuman?: string; // e.g., "Please review the summary and make any necessary corrections."
+
+  // For 'transform' type - JSON query mappings to transform data
+  transformMappings?: Record<string, string>; // Field name -> JSONPath query string
 
   // Defines how to map output from the *previous* step to the input variables of *this* step.
   // The keys are the variable names in this step's template (e.g., 'customer_email').

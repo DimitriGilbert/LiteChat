@@ -155,6 +155,77 @@ export class WorkflowControlModule implements ControlModule {
     toast.success(`Workflow "${template.name}" started with ${template.steps.length} steps!`);
   }
 
+  // Validate transform queries against a sample context
+  validateTransformQuery(query: string, workflow?: WorkflowTemplate, stepIndex?: number): { isValid: boolean; error?: string; result?: any } {
+    if (!query.trim()) {
+      return { isValid: false, error: 'Query cannot be empty' };
+    }
+    
+    // Basic JSONPath validation
+    if (!query.startsWith('$.')) {
+      return { isValid: false, error: 'Query must start with "$."' };
+    }
+    
+    // Check for invalid characters or patterns
+    const invalidChars = /[^a-zA-Z0-9_.$\[\]]/;
+    if (invalidChars.test(query.replace(/\[(\d+)\]/g, ''))) {
+      return { isValid: false, error: 'Invalid characters in query' };
+    }
+    
+    // Build sample context for validation
+    const sampleContext = {
+      workflow: workflow ? {
+        id: workflow.id,
+        name: workflow.name,
+        description: workflow.description,
+        steps: workflow.steps.map((step, idx) => ({
+          id: step.id,
+          name: step.name,
+          type: step.type,
+          index: idx,
+        })),
+      } : {
+        id: 'sample-workflow',
+        name: 'Sample Workflow',
+        description: 'A sample workflow for validation',
+        steps: [],
+      },
+      trigger: { message: 'Sample trigger output', processed: true },
+      step0: { result: 'Sample step 0 result', data: { field1: 'value1', field2: 42 } },
+      step1: { summary: 'Sample step 1 summary', items: ['item1', 'item2'] },
+      currentStepId: workflow?.steps[stepIndex || 0]?.id || 'current-step',
+      previousStepId: stepIndex && stepIndex > 0 ? workflow?.steps[stepIndex - 1]?.id : undefined,
+      nextStepId: stepIndex !== undefined && workflow && stepIndex < workflow.steps.length - 1 ? workflow.steps[stepIndex + 1]?.id : undefined,
+    };
+    
+    // Test the query against the sample context
+    try {
+      const result = this._resolveJsonPath(sampleContext, query);
+      return { isValid: true, result };
+    } catch (error) {
+      return { isValid: false, error: `Query execution failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
+    }
+  }
+
+  // Helper method for JSONPath resolution (copied from WorkflowService)
+  private _resolveJsonPath(obj: any, path: string): any {
+    if (path.startsWith('$.')) path = path.substring(2);
+    
+    try {
+      return path.split('.').reduce((acc, part) => {
+        if (acc === null || acc === undefined) return undefined;
+        if (part.includes('[') && part.includes(']')) {
+          const [prop, indexStr] = part.split('[');
+          const index = parseInt(indexStr.replace(']', ''));
+          return acc[prop]?.[index];
+        }
+        return acc[part];
+      }, obj);
+    } catch (error) {
+      throw new Error(`JSONPath resolution failed for ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   register(modApi: LiteChatModApi): void {
     this.modApi = modApi;
     modApi.registerPromptControl({

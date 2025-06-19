@@ -103,8 +103,8 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
             // "min-h-[500px] max-h-[95vh]"
           )}
         >
-          <DialogHeader className="p-4 md:p-6 pb-2 md:pb-4 flex-shrink-0">
-            <DialogTitle>Settings</DialogTitle>
+          <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 flex-shrink-0">
+            <DialogTitle className="p-2">Settings</DialogTitle>
             <DialogDescription>
               Manage application settings, AI behavior, API keys, providers, and
               data.
@@ -129,7 +129,7 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
             </div>
           )}
 
-          <DialogFooter className="flex-shrink-0 border-t p-4 md:p-6 pt-3 md:pt-4 mt-auto">
+          <DialogFooter className="flex-shrink-0 border-t p-2 md:p-3 pt-1 md:pt-2 mt-auto">
             <Button variant="outline" onClick={() => handleOpenChange(false)}>
               Close
             </Button>

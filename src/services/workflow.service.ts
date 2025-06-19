@@ -66,6 +66,102 @@ export const WorkflowService = {
     }
   },
 
+  /**
+   * Validate JSON query strings for transform steps
+   */
+  _validateJsonQuery: (query: string, context: Record<string, any>): { isValid: boolean; error?: string; result?: any } => {
+    if (!query.trim()) {
+      return { isValid: false, error: 'Query cannot be empty' };
+    }
+    
+    // Basic JSONPath validation
+    if (!query.startsWith('$.')) {
+      return { isValid: false, error: 'Query must start with "$."' };
+    }
+    
+    // Check for invalid characters or patterns
+    const invalidChars = /[^a-zA-Z0-9_.$\[\]]/;
+    if (invalidChars.test(query.replace(/\[(\d+)\]/g, ''))) {
+      return { isValid: false, error: 'Invalid characters in query' };
+    }
+    
+    // Test the query against the context
+    try {
+      const result = WorkflowService._resolveJsonPath(context, query);
+      return { isValid: true, result };
+    } catch (error) {
+      return { isValid: false, error: `Query execution failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
+    }
+  },
+
+  /**
+   * Build full context for transform steps including workflow data and all previous outputs
+   */
+  _buildTransformContext: (run: WorkflowRun, stepIndex: number): Record<string, any> => {
+    const context: Record<string, any> = {
+      workflow: {
+        id: run.template.id,
+        name: run.template.name,
+        description: run.template.description,
+        steps: run.template.steps.map((step, idx) => ({
+          id: step.id,
+          name: step.name,
+          type: step.type,
+          index: idx,
+        })),
+      },
+      ...run.stepOutputs, // Include all previous step outputs (trigger, step0, step1, etc.)
+    };
+
+    // Add step references
+    if (stepIndex > 0) {
+      context.previousStepId = run.template.steps[stepIndex - 1]?.id;
+    }
+    context.currentStepId = run.template.steps[stepIndex]?.id;
+    if (stepIndex < run.template.steps.length - 1) {
+      context.nextStepId = run.template.steps[stepIndex + 1]?.id;
+    }
+
+    return context;
+  },
+
+  /**
+   * Execute transform step - validate queries and apply transformations
+   */
+  _executeTransformStep: async (run: WorkflowRun, step: WorkflowStep, stepIndex: number): Promise<any> => {
+    if (!step.transformMappings || Object.keys(step.transformMappings).length === 0) {
+      throw new Error(`Transform step "${step.name}" has no transformations configured`);
+    }
+
+    const context = WorkflowService._buildTransformContext(run, stepIndex);
+    const output: Record<string, any> = {};
+    const errors: string[] = [];
+
+    console.log(`[WorkflowService] Executing transform step "${step.name}" with context:`, {
+      availableKeys: Object.keys(context),
+      transformMappings: step.transformMappings,
+    });
+
+    // Process each transformation mapping
+    for (const [fieldName, query] of Object.entries(step.transformMappings)) {
+      const validation = WorkflowService._validateJsonQuery(query, context);
+      
+      if (!validation.isValid) {
+        errors.push(`Field "${fieldName}": ${validation.error}`);
+        continue;
+      }
+
+      output[fieldName] = validation.result;
+      console.log(`[WorkflowService] Transform result for "${fieldName}": ${query} => ${JSON.stringify(validation.result)}`);
+    }
+
+    if (errors.length > 0) {
+      throw new Error(`Transform validation failed:\n${errors.join('\n')}`);
+    }
+
+    return output;
+  },
+
   _compileStepPrompt: async (step: WorkflowStep, context: Record<string, any>, stepIndex: number): Promise<CompiledPrompt> => {
     if (!step.templateId) {
       throw new Error(`Step ${step.name} has no templateId specified`);
@@ -448,6 +544,77 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
         return;
       }
 
+      if (step.type === "transform") {
+        try {
+          // Execute transform step synchronously (no AI call needed)
+          const transformOutput = await WorkflowService._executeTransformStep(run, step, stepIndex);
+          
+          // Update flow content for completed transform
+          const currentContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || '';
+          const flowMatch = currentContent.match(/```flow\n([\s\S]*?)\n```/);
+          if (flowMatch && flowMatch[1]) {
+            const updatedFlowContent = WorkflowService.flowGenerator.updateNodeStatus(
+              flowMatch[1], 
+              step.id, 
+              'success'
+            );
+            const newContent = currentContent.replace(
+              /```flow\n[\s\S]*?\n```/,
+              `\`\`\`flow\n${updatedFlowContent}\n\`\`\``
+            );
+            interactionStore.setActiveStreamBuffer(run.mainInteractionId, newContent);
+          } else {
+            interactionStore.appendStreamBuffer(run.mainInteractionId, `\n✔️ **Completed: ${stepName}** - Data transformed`);
+          }
+          
+          // Emit step completion directly (no interaction to wait for)
+          emitter.emit(workflowEvent.stepCompleted, { runId: run.runId, stepId: step.id, output: transformOutput });
+          return;
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          console.error(`[WorkflowService] Transform step error:`, error);
+          
+          // Update flow content for failed transform
+          const currentContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || '';
+          const flowMatch = currentContent.match(/```flow\n([\s\S]*?)\n```/);
+          if (flowMatch && flowMatch[1]) {
+            const updatedFlowContent = WorkflowService.flowGenerator.updateNodeStatus(
+              flowMatch[1], 
+              step.id, 
+              'error'
+            );
+            const newContent = currentContent.replace(
+              /```flow\n[\s\S]*?\n```/,
+              `\`\`\`flow\n${updatedFlowContent}\n\`\`\``
+            );
+            interactionStore.setActiveStreamBuffer(run.mainInteractionId, newContent);
+          } else {
+            interactionStore.appendStreamBuffer(run.mainInteractionId, `\n❌ **Error in ${stepName}:** ${errorMsg}`);
+          }
+          
+          // Update the main interaction response with error
+          const errorUpdates = {
+            response: `❌ **Workflow Error**\n\nTransform step "${stepName}" failed: ${errorMsg}`,
+            status: 'ERROR' as const,
+            endedAt: new Date()
+          };
+          interactionStore._updateInteractionInState(run.mainInteractionId, errorUpdates);
+          interactionStore._removeStreamingId(run.mainInteractionId);
+          
+          // Save to persistence
+          const errorMainInteraction = interactionStore.interactions.find(i => i.id === run.mainInteractionId);
+          if (errorMainInteraction) {
+            PersistenceService.saveInteraction({
+              ...errorMainInteraction,
+              ...errorUpdates,
+            } as Interaction).catch(console.error);
+          }
+          
+          emitter.emit(workflowEvent.error, { runId: run.runId, error: errorMsg });
+          return;
+        }
+      }
+
       // Compile step prompt
       const compiled = await WorkflowService._compileStepPrompt(step, run.stepOutputs, stepIndex);
       const modelId = step.modelId ?? usePromptStateStore.getState().modelId;
@@ -466,30 +633,36 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
 
       // Template details will be handled by buildCompletePromptObject
 
-      // Add structured output schema for the NEXT step if it exists
+      // Add structured output schema for the NEXT step if it exists and is not a transform step
       const nextStepIndex = stepIndex + 1;
       const nextStep = run.template.steps[nextStepIndex];
       const stepParameters: Record<string, any> = {};
       
-      if (nextStep?.templateId) {
-        // Get the template for the NEXT step to see what variables it needs
-        const { promptTemplates } = usePromptTemplateStore.getState();
-        const nextStepTemplate = promptTemplates.find(t => t.id === nextStep.templateId);
-        
-        if (nextStepTemplate && nextStepTemplate.variables && nextStepTemplate.variables.length > 0) {
-          // Build structured output schema for the variables the NEXT step needs
-          const { schema, specification } = WorkflowService._createStructuredOutputSchema(nextStepTemplate.variables);
+      // Only add structured output constraints if the NEXT step is not a transform step
+      // Transform steps can handle any input format through JSON queries
+      if (nextStep && nextStep.type !== 'transform' && nextStep.type !== 'human-in-the-loop') {
+        if (nextStep.templateId) {
+          // Get the template for the NEXT step to see what variables it needs
+          const { promptTemplates } = usePromptTemplateStore.getState();
+          const nextStepTemplate = promptTemplates.find(t => t.id === nextStep.templateId);
           
-          stepParameters.structured_output = schema;
-          console.log(`[WorkflowService] Step "${stepName}" will output structured data for next step "${nextStep.name}" variables:`, nextStepTemplate.variables.map(v => v.name));
-          
-          // Store the specification for the system prompt
-          stepParameters.outputSpecification = specification;
+          if (nextStepTemplate && nextStepTemplate.variables && nextStepTemplate.variables.length > 0) {
+            // Build structured output schema for the variables the NEXT step needs
+            const { schema, specification } = WorkflowService._createStructuredOutputSchema(nextStepTemplate.variables);
+            
+            stepParameters.structured_output = schema;
+            console.log(`[WorkflowService] Step "${stepName}" will output structured data for next step "${nextStep.name}" variables:`, nextStepTemplate.variables.map(v => v.name));
+            
+            // Store the specification for the system prompt
+            stepParameters.outputSpecification = specification;
+          }
+        } else if (nextStep.structuredOutput) {
+          // Fallback to step's own structured output if defined
+          stepParameters.structured_output = nextStep.structuredOutput.jsonSchema;
+          console.log(`[WorkflowService] Step "${stepName}" will output structured data for next step: ${nextStep.name}`);
         }
-      } else if (nextStep?.structuredOutput) {
-        // Fallback to step's own structured output if defined
-        stepParameters.structured_output = nextStep.structuredOutput.jsonSchema;
-        console.log(`[WorkflowService] Step "${stepName}" will output structured data for next step: ${nextStep.name}`);
+      } else if (nextStep?.type === 'transform') {
+        console.log(`[WorkflowService] Step "${stepName}" will output free-form data for transform step "${nextStep.name}" - no format constraints`);
       }
 
       // Create step turn data with step-specific configuration (like race system)

@@ -69,8 +69,8 @@ export const EditResponseControl: React.FC<EditResponseControlProps> = ({
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="!w-[80vw] !h-[85vh] !max-w-none flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Edit Assistant Response</DialogTitle>
+          <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 flex-shrink-0">
+            <DialogTitle className="p-2">Edit Assistant Response</DialogTitle>
           </DialogHeader>
 
           <div className="flex-1 space-y-4 overflow-hidden">
@@ -86,7 +86,7 @@ export const EditResponseControl: React.FC<EditResponseControlProps> = ({
             </div>
           </div>
 
-          <DialogFooter className="flex-shrink-0">
+          <DialogFooter className="flex-shrink-0 p-2 md:p-3 pt-1 md:pt-2">
             <Button variant="outline" onClick={handleCancel}>
               Cancel
             </Button>

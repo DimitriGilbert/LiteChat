@@ -49,12 +49,12 @@ export const ActionDialog: React.FC<ActionDialogProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className={cn(className)}>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+        <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 flex-shrink-0">
+          <DialogTitle className="p-2">{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         <div className={cn("py-4", contentClassName)}>{children}</div>
-        <DialogFooter>
+        <DialogFooter className="p-2 md:p-3 pt-1 md:pt-2">
           {/* Use DialogClose for the Cancel button */}
           <DialogClose asChild>
             <Button variant="outline" disabled={isSubmitting}>

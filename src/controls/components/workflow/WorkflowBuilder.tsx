@@ -397,8 +397,10 @@ const StepsForm = React.forwardRef<
         promptTemplates: any[];
         agentTasks: any[];
         models: any[];
+        module: any;
+        currentWorkflow: WorkflowTemplate;
     }
->(({ initialSteps, promptTemplates, agentTasks, models }, ref) => {
+>(({ initialSteps, promptTemplates, agentTasks, models, module, currentWorkflow }, ref) => {
     const [steps, setSteps] = useState<WorkflowStep[]>(initialSteps);
 
     // Expose getData and reset methods via ref
@@ -454,6 +456,9 @@ const StepsForm = React.forwardRef<
                             promptTemplates={promptTemplates}
                             agentTasks={agentTasks}
                             models={models}
+                            module={module}
+                            workflow={currentWorkflow}
+                            stepIndex={index}
                         />
                     ))}
                     {steps.length === 0 && (
@@ -889,6 +894,8 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                                                 promptTemplates={promptTemplates}
                                                 agentTasks={agentTasks}
                                                 models={models}
+                                                module={module}
+                                                currentWorkflow={currentWorkflow}
                                             />
                                         ),
                                     },
@@ -981,9 +988,9 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
             />
 
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="!w-[95vw] !h-[85vh] !max-w-none flex flex-col p-0">
-                    <DialogHeader className="px-6 pt-6 pb-2">
-                        <DialogTitle>Workflow Builder</DialogTitle>
+                <DialogContent className="!w-[95vw] !h-[95vh] !max-w-none flex flex-col p-0">
+                    <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 flex-shrink-0">
+                        <DialogTitle className="p-2">Workflow Builder</DialogTitle>
                         <DialogDescription>
                             Create and manage automated sequences of AI interactions.
                         </DialogDescription>
@@ -1016,7 +1023,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                     </div>
 
                     {activeTab === 'builder' && (
-                        <DialogFooter className="px-6 pb-6">
+                        <DialogFooter className="p-2 md:p-3 pt-1 md:pt-2">
                             <div className="flex gap-2 flex-wrap">
                                 <Button variant="outline" onClick={() => setOpen(false)}>
                                     Cancel

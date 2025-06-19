@@ -269,8 +269,8 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="min-w-[85vw] max min-h-[75vh] flex flex-col p-4">
-          <DialogHeader>
-            <DialogTitle>Race Models</DialogTitle>
+          <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 flex-shrink-0">
+            <DialogTitle className="p-2">Race Models</DialogTitle>
             <DialogDescription>
               Select multiple models to race against each other. After clicking
               "Enable Race Mode", send your prompt and all selected models will
@@ -517,7 +517,7 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0 p-2 md:p-3 pt-1 md:pt-2">
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
