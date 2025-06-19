@@ -493,10 +493,17 @@ ${userContent}`;
 
     let newGeneratedInteraction: Interaction | null = null;
     try {
+      // CRITICAL FIX: Generate a new unique ID for the regenerated interaction
+      // to avoid ID collision with the original interaction
+      const newTurnData: PromptTurnObject = {
+        ...originalTurnData,
+        id: nanoid(), // Generate new unique ID instead of reusing original
+      };
+
       newGeneratedInteraction = await InteractionService.startInteraction(
         promptObject,
         conversationId,
-        originalTurnData,
+        newTurnData, // Use new turn data with unique ID
         "message.assistant_regen"
       );
 
@@ -527,6 +534,7 @@ ${userContent}`;
       }
       console.log("[ConversationService] New active interaction state after potential updates:", JSON.parse(JSON.stringify(finalNewInteractionState)));
       
+      // Build the chain of interactions to update (original and any previous regens)
       const versionsToUpdate: Interaction[] = [];
       let currentInteractionInChain: Interaction | undefined | null = targetInteraction;
 
@@ -540,17 +548,20 @@ ${userContent}`;
         }
       }
 
+      // Sort chronologically to maintain proper ordering
       const chronologicalVersionsToUpdate = versionsToUpdate.sort((a, b) => {
         const timeA = a.startedAt?.getTime() ?? 0;
         const timeB = b.startedAt?.getTime() ?? 0;
         return timeA - timeB;
       });
 
+      // CRITICAL FIX: Make old interactions children of the NEW regenerated interaction
+      // (not children of themselves, which was the bug)
       for (let i = 0; i < chronologicalVersionsToUpdate.length; i++) {
         const interactionToUpdate = chronologicalVersionsToUpdate[i];
         const updatesForOldVersion: Partial<Omit<Interaction, "id">> = {
-          parentId: finalNewInteractionState.id,
-          index: i, 
+          parentId: finalNewInteractionState.id, // Make them children of the NEW interaction
+          index: i, // Children get sequential index starting from 0
         };
         console.log(`[ConversationService] Updating old version ${interactionToUpdate.id} to be child of ${finalNewInteractionState.id} with childIndex ${i}`, JSON.parse(JSON.stringify(updatesForOldVersion)));
 
