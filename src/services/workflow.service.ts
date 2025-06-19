@@ -1,5 +1,5 @@
 import { emitter } from "@/lib/litechat/event-emitter";
-import { workflowEvent, type WorkflowEventPayloads, createWorkflowEventMetadata, WORKFLOW_EVENT_PRIORITIES } from "@/types/litechat/events/workflow.events";
+import { workflowEvent, type WorkflowEventPayloads, createWorkflowEventMetadata } from "@/types/litechat/events/workflow.events";
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import type { Interaction } from "@/types/litechat/interaction";
 import { useWorkflowStore } from "@/store/workflow.store";
@@ -1190,7 +1190,7 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
         markdownSummary += `---\n\n`;
         
         // Add each step's output (excluding transform steps)
-        Object.entries(activeRun.stepOutputs).forEach(([stepKey, output], index) => {
+        Object.entries(activeRun.stepOutputs).forEach(([stepKey, output]) => {
           if (stepKey === 'trigger') {
             markdownSummary += `## Initial Processing\n\n`;
           } else {

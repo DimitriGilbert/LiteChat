@@ -1,6 +1,5 @@
 import { emitter } from "@/lib/litechat/event-emitter";
 import { 
-  workflowEvent, 
   type WorkflowEventPayloads, 
   type WorkflowEventMetadata,
   WORKFLOW_EVENT_PRIORITIES,
