@@ -66,7 +66,11 @@ export const ConversationService = {
 
     // Correctly build history for the AI
     const activeInteractionsOnSpine = interactionStoreState.interactions
-      .filter(i => i.parentId === null && i.status === "COMPLETED")
+      .filter(i => 
+        i.conversationId === conversationId &&
+        i.parentId === null && 
+        i.status === "COMPLETED"
+      )
       .sort((a, b) => a.index - b.index);
 
     const turnsForHistoryBuilder: Interaction[] = activeInteractionsOnSpine.map(activeInteraction => {
