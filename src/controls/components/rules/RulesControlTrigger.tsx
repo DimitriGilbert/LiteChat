@@ -16,8 +16,6 @@ import {
 } from "@/components/ui/tooltip";
 import { RulesControlDialogContent } from "./RulesControlDialogContent";
 import type { RulesControlModule } from "@/controls/modules/RulesControlModule";
-import { Badge } from "@/components/ui/badge";
-import { ChevronDown, Settings } from "lucide-react";
 import { toast } from "sonner";
 
 interface RulesControlTriggerProps {
