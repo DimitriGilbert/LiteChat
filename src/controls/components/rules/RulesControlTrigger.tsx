@@ -66,6 +66,14 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
     [module]
   );
 
+  const handleAutoSelectRules = useCallback(async () => {
+    // TODO: Implement AI-powered rule selection
+    // This would analyze the current prompt and suggest relevant rules
+    console.log('Auto-selecting rules based on prompt context...');
+    // For now, just show a placeholder
+    alert('Auto-select rules feature will be implemented in Issue #40');
+  }, []);
+
   const handleTriggerClick = () => {
     if (!hasRulesOrTags) {
       const settingsOpened = module.handleTriggerClick();
@@ -130,6 +138,7 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
             allRules={allRules}
             allTags={allTags}
             getRulesForTag={getRulesForTag}
+            onAutoSelectRules={handleAutoSelectRules}
           />
         </PopoverContent>
       )}

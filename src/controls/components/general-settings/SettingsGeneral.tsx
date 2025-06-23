@@ -36,6 +36,7 @@ const SettingsGeneralComponent: React.FC = () => {
       setStreamingRenderFPS: state.setStreamingRenderFPS,
       setAutoScrollInterval: state.setAutoScrollInterval,
       setEnableAutoScrollOnStream: state.setEnableAutoScrollOnStream,
+      setEnableAdvancedSettings: state.setEnableAdvancedSettings,
       resetGeneralSettings: state.resetGeneralSettings,
     }))
   );
@@ -48,6 +49,7 @@ const SettingsGeneralComponent: React.FC = () => {
       streamingRenderFPS: state.streamingRenderFPS,
       autoScrollInterval: state.autoScrollInterval,
       enableAutoScrollOnStream: state.enableAutoScrollOnStream,
+      enableAdvancedSettings: state.enableAdvancedSettings,
     }))
   );
 
@@ -125,6 +127,48 @@ const SettingsGeneralComponent: React.FC = () => {
       className="p-1 space-y-4"
     >
       <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium">General Settings</h3>
+          <div className="flex items-center space-x-2">
+            <label htmlFor="advanced-toggle" className="text-sm font-medium text-muted-foreground">
+              Advanced Settings
+            </label>
+            <input
+              id="advanced-toggle"
+              type="checkbox"
+              checked={storeValues.enableAdvancedSettings}
+              onChange={(e) => storeSetters.setEnableAdvancedSettings(e.target.checked)}
+              className="sr-only"
+            />
+            <button
+              type="button"
+              onClick={() => storeSetters.setEnableAdvancedSettings(!storeValues.enableAdvancedSettings)}
+              className={cn(
+                "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                storeValues.enableAdvancedSettings ? "bg-primary" : "bg-input"
+              )}
+              aria-labelledby="advanced-toggle"
+            >
+              <span
+                className={cn(
+                  "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
+                  storeValues.enableAdvancedSettings ? "translate-x-6" : "translate-x-1"
+                )}
+              />
+            </button>
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {storeValues.enableAdvancedSettings 
+            ? "Advanced configuration options are visible. Toggle off to hide complex settings."
+            : "Basic mode - advanced configuration options are hidden. Toggle on to show all settings."
+          }
+        </p>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-3">
         <h3 className="text-lg font-medium">Streaming & Display</h3>
 
         <SwitchField
@@ -162,58 +206,62 @@ const SettingsGeneralComponent: React.FC = () => {
           description="Automatically scroll to the bottom as new content arrives."
         />
 
-        <div className="rounded-lg border p-3 shadow-sm space-y-2">
-          <SliderField
-            form={form}
-            name="streamingRenderFPS"
-            label="Streaming Update Rate"
-            min={3}
-            max={60}
-            step={1}
-            valueLabelSuffix=" FPS"
-          />
-          <NumberField
-            form={form}
-            name="streamingRenderFPS"
-            label="FPS Input" // Hidden or visually distinct label if SliderField shows value
-            min={3}
-            max={60}
-            step={1}
-            className="w-24 h-8 text-xs ml-auto" // Style to place it like original
-            aria-label="Streaming Render FPS Value"
-          />
-          {/* Original description was under a common Label. We can add it to SliderField or here explicitly */}
-          <p className={cn("text-sm text-muted-foreground")}>
-            Controls how frequently the UI updates during streaming (3-60 FPS).
-          </p>
-        </div>
+        {storeValues.enableAdvancedSettings && (
+          <div className="rounded-lg border p-3 shadow-sm space-y-2">
+            <SliderField
+              form={form}
+              name="streamingRenderFPS"
+              label="Streaming Update Rate"
+              min={3}
+              max={60}
+              step={1}
+              valueLabelSuffix=" FPS"
+            />
+            <NumberField
+              form={form}
+              name="streamingRenderFPS"
+              label="FPS Input" // Hidden or visually distinct label if SliderField shows value
+              min={3}
+              max={60}
+              step={1}
+              className="w-24 h-8 text-xs ml-auto" // Style to place it like original
+              aria-label="Streaming Render FPS Value"
+            />
+            {/* Original description was under a common Label. We can add it to SliderField or here explicitly */}
+            <p className={cn("text-sm text-muted-foreground")}>
+              Controls how frequently the UI updates during streaming (3-60 FPS).
+            </p>
+          </div>
+        )}
 
-        <div className="rounded-lg border p-3 shadow-sm space-y-2">
-          <SliderField
-            form={form}
-            name="autoScrollInterval"
-            label="Auto-Scroll Interval"
-            min={50}
-            max={5000}
-            step={50}
-            valueLabelSuffix=" ms"
-            disabled={!form.state.values.enableAutoScrollOnStream}
-          />
-          <NumberField
-            form={form}
-            name="autoScrollInterval"
-            label="Interval Input (ms)" // Hidden or visually distinct label
-            min={50}
-            max={5000}
-            step={50}
-            className="w-24 h-8 text-xs ml-auto" // Style to place it like original
-            disabled={!form.state.values.enableAutoScrollOnStream}
-            aria-label="Auto Scroll Interval Value"
-          />
-          <p className={cn("text-sm text-muted-foreground")}>
-            How often to scroll to the bottom during streaming (50-5000 ms).
-          </p>
-        </div>
+        {storeValues.enableAdvancedSettings && (
+          <div className="rounded-lg border p-3 shadow-sm space-y-2">
+            <SliderField
+              form={form}
+              name="autoScrollInterval"
+              label="Auto-Scroll Interval"
+              min={50}
+              max={5000}
+              step={50}
+              valueLabelSuffix=" ms"
+              disabled={!form.state.values.enableAutoScrollOnStream}
+            />
+            <NumberField
+              form={form}
+              name="autoScrollInterval"
+              label="Interval Input (ms)" // Hidden or visually distinct label
+              min={50}
+              max={5000}
+              step={50}
+              className="w-24 h-8 text-xs ml-auto" // Style to place it like original
+              disabled={!form.state.values.enableAutoScrollOnStream}
+              aria-label="Auto Scroll Interval Value"
+            />
+            <p className={cn("text-sm text-muted-foreground")}>
+              How often to scroll to the bottom during streaming (50-5000 ms).
+            </p>
+          </div>
+        )}
       </div>
 
       <Separator />

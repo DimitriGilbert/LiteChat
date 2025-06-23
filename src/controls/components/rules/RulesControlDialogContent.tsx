@@ -22,6 +22,7 @@ interface RulesControlDialogContentProps {
   allRules: DbRule[]; // Add prop
   allTags: DbTag[]; // Add prop
   getRulesForTag: (tagId: string) => DbRule[]; // Add prop
+  onAutoSelectRules?: () => void; // Add auto-select callback
 }
 
 export const RulesControlDialogContent: React.FC<
@@ -34,6 +35,7 @@ export const RulesControlDialogContent: React.FC<
   allRules, // Destructure
   allTags, // Destructure
   getRulesForTag, // Destructure
+  onAutoSelectRules, // Destructure
 }) => {
   const [tagFilter, setTagFilter] = useState("");
   const [ruleFilter, setRuleFilter] = useState("");
@@ -168,6 +170,17 @@ export const RulesControlDialogContent: React.FC<
             className="pl-8 h-9"
           />
         </div>
+        {onAutoSelectRules && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onAutoSelectRules}
+            className="h-9 px-3"
+            title="Auto-select rules based on prompt context"
+          >
+            Auto-Select
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
