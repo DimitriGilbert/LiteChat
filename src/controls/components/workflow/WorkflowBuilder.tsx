@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import type { WorkflowControlModule } from '@/controls/modules/WorkflowControlModule';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,6 +22,24 @@ import { PersistenceService } from '@/services/persistence.service';
 import { toast } from 'sonner';
 import { nanoid } from 'nanoid';
 import { useForm } from '@tanstack/react-form';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 
 interface WorkflowBuilderProps {
     module: WorkflowControlModule;
@@ -402,6 +420,7 @@ const StepsForm = React.forwardRef<
     }
 >(({ initialSteps, promptTemplates, agentTasks, models, module, currentWorkflow }, ref) => {
     const [steps, setSteps] = useState<WorkflowStep[]>(initialSteps);
+    const [activeStepId, setActiveStepId] = useState<string | null>(null);
 
     // Expose getData and reset methods via ref
     React.useImperativeHandle(ref, () => ({
@@ -419,6 +438,24 @@ const StepsForm = React.forwardRef<
             mountedRef.current = true;
         }
     }, []);
+
+    // Drag and drop sensors - configured for modal usage
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8, // Require 8px movement before drag starts
+            },
+        }),
+        useSensor(TouchSensor, {
+            activationConstraint: {
+                delay: 200,
+                tolerance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
 
     const handleAddStep = useCallback(() => {
         const newStep: WorkflowStep = {
@@ -443,24 +480,130 @@ const StepsForm = React.forwardRef<
         setSteps(prev => prev.filter((_, i) => i !== index));
     }, []);
 
+    // Step reordering handlers
+    const handleMoveStep = useCallback((fromIndex: number, toIndex: number) => {
+        setSteps(prev => arrayMove(prev, fromIndex, toIndex));
+    }, []);
+
+    const handleMoveToTop = useCallback((index: number) => {
+        if (index > 0) {
+            handleMoveStep(index, 0);
+        }
+    }, [handleMoveStep]);
+
+    const handleMoveUp = useCallback((index: number) => {
+        if (index > 0) {
+            handleMoveStep(index, index - 1);
+        }
+    }, [handleMoveStep]);
+
+    const handleMoveDown = useCallback((index: number) => {
+        if (index < steps.length - 1) {
+            handleMoveStep(index, index + 1);
+        }
+    }, [handleMoveStep, steps.length]);
+
+    // Drag handlers
+    const handleDragStart = useCallback((event: DragStartEvent) => {
+        console.log('🐛 [WorkflowBuilder] DragStart:', {
+            activeId: event.active.id,
+            event
+        });
+        setActiveStepId(event.active.id as string);
+    }, []);
+
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const { active, over } = event;
+        console.log('🐛 [WorkflowBuilder] DragEnd:', {
+            activeId: active.id,
+            overId: over?.id,
+            over,
+            event
+        });
+        
+        if (over && active.id !== over.id) {
+            const activeIndex = steps.findIndex(step => step.id === active.id);
+            const overIndex = steps.findIndex(step => step.id === over.id);
+            
+            console.log('🐛 [WorkflowBuilder] Reordering:', {
+                activeIndex,
+                overIndex,
+                stepsLength: steps.length
+            });
+            
+            if (activeIndex !== -1 && overIndex !== -1) {
+                handleMoveStep(activeIndex, overIndex);
+                console.log('🐛 [WorkflowBuilder] Move executed');
+            } else {
+                console.log('🐛 [WorkflowBuilder] Move NOT executed - invalid indices');
+            }
+        } else {
+            console.log('🐛 [WorkflowBuilder] No reordering - same position or no over target');
+        }
+        setActiveStepId(null);
+    }, [steps, handleMoveStep]);
+
+    const handleDragCancel = useCallback(() => {
+        console.log('🐛 [WorkflowBuilder] DragCancel');
+        setActiveStepId(null);
+    }, []);
+
+    const stepIds = useMemo(() => steps.map(step => step.id), [steps]);
+
+    console.log('🐛 [WorkflowBuilder] Component render:', {
+        stepsCount: steps.length,
+        activeStepId,
+        stepIds,
+        sensors: sensors.length
+    });
+
     return (
-        <div className="h-full flex flex-col">
-            <ScrollArea className="flex-1 border rounded-md p-3">
+        <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
+            onDragMove={(event) => {
+                console.log('🐛 [WorkflowBuilder] DragMove:', {
+                    activeId: event.active.id,
+                    overId: event.over?.id
+                });
+            }}
+            onDragOver={(event) => {
+                console.log('🐛 [WorkflowBuilder] DragOver:', {
+                    activeId: event.active.id,
+                    overId: event.over?.id
+                });
+            }}
+            modifiers={[]}
+        >
+            <div className="h-full flex flex-col border rounded-md p-3">
                 <div className="space-y-4">
-                    {steps.map((step, index) => (
-                        <WorkflowStepCard
-                            key={step.id}
-                            step={step}
-                            onChange={(updatedStep) => handleStepChange(index, updatedStep)}
-                            onDelete={() => handleStepDelete(index)}
-                            promptTemplates={promptTemplates}
-                            agentTasks={agentTasks}
-                            models={models}
-                            module={module}
-                            workflow={currentWorkflow}
-                            stepIndex={index}
-                        />
-                    ))}
+                    <SortableContext
+                        items={stepIds}
+                        strategy={verticalListSortingStrategy}
+                    >
+                        {steps.map((step, index) => (
+                            <WorkflowStepCard
+                                key={step.id}
+                                step={step}
+                                onChange={(updatedStep: WorkflowStep) => handleStepChange(index, updatedStep)}
+                                onDelete={() => handleStepDelete(index)}
+                                onMoveToTop={() => handleMoveToTop(index)}
+                                onMoveUp={() => handleMoveUp(index)}
+                                onMoveDown={() => handleMoveDown(index)}
+                                promptTemplates={promptTemplates}
+                                agentTasks={agentTasks}
+                                models={models}
+                                module={module}
+                                workflow={currentWorkflow}
+                                stepIndex={index}
+                                isFirst={index === 0}
+                                isLast={index === steps.length - 1}
+                            />
+                        ))}
+                    </SortableContext>
                     {steps.length === 0 && (
                         <div className="text-center text-muted-foreground py-8">
                             No subsequent steps. Add one to create a sequence.
@@ -470,8 +613,26 @@ const StepsForm = React.forwardRef<
                         <Plus className="h-4 w-4 mr-2" /> Add Step
                     </Button>
                 </div>
-            </ScrollArea>
-        </div>
+            </div>
+            <DragOverlay dropAnimation={null}>
+                {activeStepId ? (
+                    <WorkflowStepCard
+                        step={steps.find(s => s.id === activeStepId)!}
+                        onChange={() => {}}
+                        onDelete={() => {}}
+                        promptTemplates={promptTemplates}
+                        agentTasks={agentTasks}
+                        models={models}
+                        module={module}
+                        workflow={currentWorkflow}
+                        stepIndex={steps.findIndex(s => s.id === activeStepId)}
+                        isFirst={false}
+                        isLast={false}
+                        isDragDisabled={true}
+                    />
+                ) : null}
+            </DragOverlay>
+        </DndContext>
     );
 });
 
