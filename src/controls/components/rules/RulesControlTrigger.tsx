@@ -16,6 +16,9 @@ import {
 } from "@/components/ui/tooltip";
 import { RulesControlDialogContent } from "./RulesControlDialogContent";
 import type { RulesControlModule } from "@/controls/modules/RulesControlModule";
+import { Badge } from "@/components/ui/badge";
+import { ChevronDown, Settings } from "lucide-react";
+import { toast } from "sonner";
 
 interface RulesControlTriggerProps {
   module: RulesControlModule;
@@ -70,8 +73,11 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
     // TODO: Implement AI-powered rule selection
     // This would analyze the current prompt and suggest relevant rules
     console.log('Auto-selecting rules based on prompt context...');
-    // For now, just show a placeholder
-    alert('Auto-select rules feature will be implemented in Issue #40');
+    // Use toast instead of alert for better UX
+    toast.info('Auto-select rules feature coming soon!', {
+      description: 'This feature will be implemented in Issue #40 to automatically suggest relevant rules based on your prompt context.',
+      duration: 4000,
+    });
   }, []);
 
   const handleTriggerClick = () => {

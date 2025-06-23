@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -17,53 +17,58 @@ export const PWAInstaller: React.FC = () => {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
 
-  useEffect(() => {
-    // Check if app is already installed
-    const checkInstalled = () => {
-      if (window.matchMedia('(display-mode: standalone)').matches) {
-        setIsInstalled(true);
-        return;
-      }
-      
-      // Check for iOS standalone mode
-      if ((window.navigator as any).standalone) {
-        setIsInstalled(true);
-        return;
-      }
-    };
+  // Check if app is already installed
+  const checkInstalled = useCallback(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+      return true;
+    }
+    
+    // Check for iOS standalone mode
+    if ((window.navigator as any).standalone) {
+      setIsInstalled(true);
+      return true;
+    }
+    
+    return false;
+  }, []);
 
+  // Memoized event handlers to prevent unnecessary re-registration
+  const handleBeforeInstallPrompt = useCallback((e: Event) => {
+    e.preventDefault();
+    const promptEvent = e as BeforeInstallPromptEvent;
+    setDeferredPrompt(promptEvent);
+    
+    // Show install banner after a delay if not dismissed before and not installed
+    setTimeout(() => {
+      const dismissed = localStorage.getItem('pwa-install-dismissed');
+      if (!dismissed && !checkInstalled()) {
+        setShowInstallBanner(true);
+      }
+    }, 5000); // Show after 5 seconds
+  }, [checkInstalled]);
+
+  const handleAppInstalled = useCallback(() => {
+    setIsInstalled(true);
+    setShowInstallBanner(false);
+    setDeferredPrompt(null);
+    toast.success('LiteChat installed successfully!');
+  }, []);
+
+  useEffect(() => {
+    // Initial installation check
     checkInstalled();
 
-    // Listen for beforeinstallprompt event
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-      
-      // Show install banner after a delay if not dismissed before
-      setTimeout(() => {
-        const dismissed = localStorage.getItem('pwa-install-dismissed');
-        if (!dismissed && !isInstalled) {
-          setShowInstallBanner(true);
-        }
-      }, 5000); // Show after 5 seconds
-    };
-
-    // Listen for app installed event
-    const handleAppInstalled = () => {
-      setIsInstalled(true);
-      setShowInstallBanner(false);
-      setDeferredPrompt(null);
-      toast.success('LiteChat installed successfully!');
-    };
-
+    // Add event listeners
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
 
+    // Cleanup function
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, [isInstalled]);
+  }, []); // Empty dependency array - event handlers are memoized
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
@@ -88,7 +93,12 @@ export const PWAInstaller: React.FC = () => {
 
   const handleDismiss = () => {
     setShowInstallBanner(false);
-    localStorage.setItem('pwa-install-dismissed', 'true');
+    try {
+      localStorage.setItem('pwa-install-dismissed', 'true');
+    } catch (error) {
+      // Handle localStorage errors (e.g., in private browsing mode)
+      console.warn('Could not save PWA install dismissal preference:', error);
+    }
   };
 
   // Don't show anything if already installed or no prompt available
