@@ -524,9 +524,6 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
         reset: (steps: WorkflowStep[]) => void;
     } | null>(null);
     
-    // Keep track of when we've initialized forms to avoid unnecessary resets
-    // const [, setFormsInitialized] = useState(false);
-    
     // Cache for visualizer data - only updated when switching to visualizer tab
     const [visualizerData, setVisualizerData] = useState<{
         workflow: WorkflowTemplate;
@@ -608,23 +605,28 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     };
 
     const handleEditWorkflow = (existingWorkflow: WorkflowTemplate) => {
+        // Set editing mode and load existing workflow data
+        setIsEditingExisting(true);
+        setCurrentWorkflow(existingWorkflow);
+        
         const newMetadata = { 
             name: existingWorkflow.name, 
             description: existingWorkflow.description 
         };
+        
         const newTrigger = {
-            triggerType: (existingWorkflow.triggerType as TriggerType) || 'custom',
+            triggerType: existingWorkflow.triggerType || 'custom' as TriggerType,
             customPrompt: existingWorkflow.triggerPrompt || '',
             selectedTemplateId: existingWorkflow.triggerRef || '',
             templateVariables: existingWorkflow.templateVariables || {},
         };
+        
         const newSteps = existingWorkflow.steps || [];
         
-        setCurrentWorkflow(existingWorkflow);
         setInitialMetadata(newMetadata);
         setInitialTrigger(newTrigger);
         setInitialSteps(newSteps);
-        setIsEditingExisting(true);
+        
         setActiveTab('builder');
         setVisualizerData(null);
         
@@ -634,6 +636,8 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
             triggerFormRef.current?.reset(newTrigger);
             stepsFormRef.current?.reset(newSteps);
         }, 100);
+        
+        setOpen(true);
     };
 
     const handleSaveWorkflow = async () => {
