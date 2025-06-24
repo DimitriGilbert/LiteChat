@@ -123,6 +123,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
         return (
             <div
                 ref={cardRef}
+                data-interaction-id={interaction.id}
                 className={cn(
                     "group/card relative rounded-lg border bg-card p-3 md:p-4 shadow-sm",
                     "overflow-wrap-anywhere",
@@ -152,6 +153,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
     return (
       <div
         ref={cardRef}
+        data-interaction-id={interaction.id}
         className={cn(
           "group/card relative rounded-lg border bg-card p-3 md:p-4 shadow-sm transition-colors hover:bg-muted/50",
           "overflow-wrap-anywhere",
