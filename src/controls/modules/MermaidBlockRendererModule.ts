@@ -4,9 +4,27 @@ import type { BlockRenderer, BlockRendererContext } from "@/types/litechat/canva
 import { MermaidBlockRenderer } from "@/components/LiteChat/common/MermaidBlockRenderer";
 import React from "react";
 
+// Control rule prompt for Mermaid diagrams - extracted from system prompt for easy modification
+const MERMAID_CONTROL_PROMPT = `Litechat support MermaidJS diagrams. only valid uncommented diagrams are supported.
+For example, if a user asks you a simple explanation on http request, you should use a sequence diagram like so : 
+\`\`\`mermaid
+sequenceDiagram
+    participant Client as "Web Browser"
+    participant Server as "Web Server"
+
+    Note over Client,Server: User initiates HTTP request
+    Client->>Server: HTTP Request (GET /index.html)
+    Server->>Server: Process request
+    Server->>Client: HTTP Response (200 OK, HTML content)
+    Note over Client,Server: User receives response
+\`\`\`
+
+Use Mermaid diagrams for flowcharts, sequence diagrams, class diagrams, state diagrams, ER diagrams, user journey diagrams, and other visual representations. Always use the 'mermaid' language identifier for proper diagram rendering.`;
+
 export class MermaidBlockRendererModule implements ControlModule {
   readonly id = "core-block-renderer-mermaid";
   private unregisterCallback?: () => void;
+  private unregisterRuleCallback?: () => void;
 
   async initialize(): Promise<void> {
     // No initialization needed
@@ -31,12 +49,25 @@ export class MermaidBlockRendererModule implements ControlModule {
     };
 
     this.unregisterCallback = modApi.registerBlockRenderer(mermaidBlockRenderer);
+
+    this.unregisterRuleCallback = modApi.registerRule({
+      id: `${this.id}-control-rule`,
+      name: "Mermaid Diagram Control",
+      content: MERMAID_CONTROL_PROMPT,
+      type: "control",
+      alwaysOn: true,
+      moduleId: this.id,
+    });
   }
 
   destroy(): void {
     if (this.unregisterCallback) {
       this.unregisterCallback();
       this.unregisterCallback = undefined;
+    }
+    if (this.unregisterRuleCallback) {
+      this.unregisterRuleCallback();
+      this.unregisterRuleCallback = undefined;
     }
   }
 } 

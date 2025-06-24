@@ -84,6 +84,7 @@ export interface SettingsState {
   enableAutoScrollOnStream: boolean;
   autoSyncOnStreamComplete: boolean;
   autoInitializeReposOnStartup: boolean;
+  controlRuleAlwaysOn: Record<string, boolean>;
 }
 
 interface SettingsActions {
@@ -125,6 +126,7 @@ interface SettingsActions {
   setEnableAutoScrollOnStream: (enabled: boolean) => void;
   setAutoSyncOnStreamComplete: (enabled: boolean) => void;
   setAutoInitializeReposOnStartup: (enabled: boolean) => void;
+  setControlRuleAlwaysOn: (ruleId: string, alwaysOn: boolean) => void;
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>;
   resetAssistantSettings: () => Promise<void>;
@@ -167,6 +169,7 @@ const DEFAULT_AUTO_SCROLL_INTERVAL = 1000;
 const DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM = true;
 const DEFAULT_AUTO_SYNC_ON_STREAM_COMPLETE = false;
 const DEFAULT_AUTO_INITIALIZE_REPOS_ON_STARTUP = false;
+const DEFAULT_CONTROL_RULE_ALWAYS_ON = {};
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set, get) => ({
@@ -205,6 +208,7 @@ export const useSettingsStore = create(
     enableAutoScrollOnStream: DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM,
     autoSyncOnStreamComplete: DEFAULT_AUTO_SYNC_ON_STREAM_COMPLETE,
     autoInitializeReposOnStartup: DEFAULT_AUTO_INITIALIZE_REPOS_ON_STARTUP,
+    controlRuleAlwaysOn: DEFAULT_CONTROL_RULE_ALWAYS_ON,
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -447,6 +451,18 @@ export const useSettingsStore = create(
         enabled,
       });
     },
+    setControlRuleAlwaysOn: (ruleId, alwaysOn) => {
+      set((state) => ({
+        controlRuleAlwaysOn: {
+          ...state.controlRuleAlwaysOn,
+          [ruleId]: alwaysOn,
+        },
+      }));
+      PersistenceService.saveSetting("controlRuleAlwaysOn", get().controlRuleAlwaysOn);
+      
+      // Emit event so components can react to control rule preference changes
+      emitter.emit(settingsEvent.loaded, { settings: get() });
+    },
 
     loadSettings: async () => {
       try {
@@ -485,6 +501,7 @@ export const useSettingsStore = create(
           enableAutoScrollOnStream,
           autoSyncOnStreamComplete,
           autoInitializeReposOnStartup,
+          controlRuleAlwaysOn,
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -616,6 +633,10 @@ export const useSettingsStore = create(
             "autoInitializeReposOnStartup",
             DEFAULT_AUTO_INITIALIZE_REPOS_ON_STARTUP
           ),
+          PersistenceService.loadSetting<Record<string, boolean>>(
+            "controlRuleAlwaysOn",
+            DEFAULT_CONTROL_RULE_ALWAYS_ON
+          ),
         ]);
 
         const loadedSettings = {
@@ -653,6 +674,7 @@ export const useSettingsStore = create(
           enableAutoScrollOnStream,
           autoSyncOnStreamComplete,
           autoInitializeReposOnStartup,
+          controlRuleAlwaysOn,
         };
         set(loadedSettings);
         emitter.emit(settingsEvent.loaded, { settings: loadedSettings });

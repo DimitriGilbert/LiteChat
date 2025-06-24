@@ -34,6 +34,7 @@ export const useControlRegistryStore = create(
     middlewareRegistry: {},
     tools: {},
     modalProviders: {},
+    controlRules: {}, // Added for control rules
 
     // Actions
     registerPromptControl: (control) => {
@@ -273,6 +274,41 @@ export const useControlRegistryStore = create(
         providers: get().modalProviders,
       });
     },
+
+    registerControlRule: (rule) => {
+      set((state) => {
+        if (state.controlRules[rule.id]) {
+          console.warn(
+            `ControlRegistryStore: ControlRule with ID "${rule.id}" already registered. Overwriting.`
+          );
+        }
+        state.controlRules[rule.id] = rule;
+      });
+      emitter.emit(controlRegistryEvent.controlRulesChanged, {
+        controlRules: get().controlRules,
+      });
+      return () => get().unregisterControlRule(rule.id);
+    },
+
+    unregisterControlRule: (id) => {
+      set((state) => {
+        if (state.controlRules[id]) {
+          delete state.controlRules[id];
+        } else {
+          console.warn(
+            `ControlRegistryStore: ControlRule with ID "${id}" not found for unregistration.`
+          );
+        }
+      });
+      emitter.emit(controlRegistryEvent.controlRulesChanged, {
+        controlRules: get().controlRules,
+      });
+    },
+
+    getControlRules: () => {
+      return Object.freeze({ ...get().controlRules });
+    },
+
     getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
       const storeId = "controlRegistryStore";
       const actions = get();
@@ -421,6 +457,24 @@ export const useControlRegistryStore = create(
             payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.unregisterModalProviderRequest]
           ) => {
             actions.unregisterModalProvider(payload.modalId);
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.registerControlRuleRequest,
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.registerControlRuleRequest]
+          ) => {
+            actions.registerControlRule(payload.rule);
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.unregisterControlRuleRequest,
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.unregisterControlRuleRequest]
+          ) => {
+            actions.unregisterControlRule(payload.id);
           },
           storeId,
         },

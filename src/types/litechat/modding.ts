@@ -90,6 +90,42 @@ export interface ReadonlyChatContextSnapshot {
   readonly gitUserEmail: string | null;
 }
 
+interface BaseControl {
+  id: string;
+  status?: () => "ready" | "loading" | "error";
+}
+
+export interface ModControlRule {
+  id: string;
+  name: string;
+  content: string;
+  type: "control";
+  alwaysOn: boolean;
+  moduleId: string; // Source module that registered this rule
+}
+
+export interface ModPromptControl extends BaseControl {
+  triggerRenderer?: () => React.ReactNode;
+  renderer?: () => React.ReactNode;
+  getParameters?: () =>
+    | Record<string, any>
+    | undefined
+    | Promise<Record<string, any> | undefined>;
+  getMetadata?: () =>
+    | Record<string, any>
+    | undefined
+    | Promise<Record<string, any> | undefined>;
+  clearOnSubmit?: () => void;
+}
+
+export interface ModChatControl extends BaseControl {
+  panel?: "sidebar" | "sidebar-footer" | "header" | "drawer_right" | "main";
+  renderer?: () => React.ReactElement | null;
+  iconRenderer?: () => React.ReactElement | null;
+  settingsRenderer?: () => React.ReactElement | null;
+  show?: () => boolean;
+}
+
 export interface LiteChatModApi {
   readonly modId: string;
   readonly modName: string;
@@ -97,6 +133,7 @@ export interface LiteChatModApi {
   registerChatControl: (control: ModChatControl) => () => void;
   registerCanvasControl: (control: CoreCanvasControlFromTypes) => () => void; // Added
   registerBlockRenderer: (renderer: BlockRenderer) => () => void;
+  registerRule: (rule: ModControlRule) => () => void;
   registerTool: <P extends z.ZodSchema<any>>(
     toolName: string,
     definition: Tool<P>,
@@ -174,33 +211,6 @@ export type ModEventPayloadMap = AppEventPayloads &
   McpEventPayloads &
   WorkflowEventPayloads &
   Record<string, any>;
-
-interface BaseControl {
-  id: string;
-  status?: () => "ready" | "loading" | "error";
-}
-
-export interface ModPromptControl extends BaseControl {
-  triggerRenderer?: () => React.ReactNode;
-  renderer?: () => React.ReactNode;
-  getParameters?: () =>
-    | Record<string, any>
-    | undefined
-    | Promise<Record<string, any> | undefined>;
-  getMetadata?: () =>
-    | Record<string, any>
-    | undefined
-    | Promise<Record<string, any> | undefined>;
-  clearOnSubmit?: () => void;
-}
-
-export interface ModChatControl extends BaseControl {
-  panel?: "sidebar" | "sidebar-footer" | "header" | "drawer_right" | "main";
-  renderer?: () => React.ReactElement | null;
-  iconRenderer?: () => React.ReactElement | null;
-  settingsRenderer?: () => React.ReactElement | null;
-  show?: () => boolean;
-}
 
 // Re-export CanvasControlRenderContext from its correct location
 export type { CanvasControlRenderContext } from "./canvas/control";

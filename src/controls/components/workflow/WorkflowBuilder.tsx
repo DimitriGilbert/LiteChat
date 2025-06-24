@@ -36,7 +36,6 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
   DragStartEvent,
   DragOverlay,
 } from "@dnd-kit/core";

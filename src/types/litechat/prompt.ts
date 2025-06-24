@@ -6,7 +6,7 @@ import { ChatControlStatus } from "./chat";
 
 // Define a structure for resolved rule content in metadata
 export interface ResolvedRuleContent {
-  type: "system" | "before" | "after";
+  type: "system" | "before" | "after" | "control";
   content: string;
   sourceRuleId?: string; // Optional: for tracing back to original rule
   sourceTagId?: string; // Optional: if applied via a tag

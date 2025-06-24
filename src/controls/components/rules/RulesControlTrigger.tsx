@@ -17,6 +17,9 @@ import {
 import { RulesControlDialogContent } from "./RulesControlDialogContent";
 import type { RulesControlModule } from "@/controls/modules/RulesControlModule";
 import { toast } from "sonner";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { settingsEvent } from "@/types/litechat/events/settings.events";
+import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
 
 interface RulesControlTriggerProps {
   module: RulesControlModule;
@@ -26,9 +29,23 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
   module,
 }) => {
   const [, forceUpdate] = useState({});
+  
   useEffect(() => {
+    // Listen to module notifications
     module.setNotifyCallback(() => forceUpdate({}));
-    return () => module.setNotifyCallback(null);
+    
+    // Listen to settings changes AND control rule changes
+    const handleSettingsChanged = () => forceUpdate({});
+    const handleControlRulesChanged = () => forceUpdate({});
+    
+    emitter.on(settingsEvent.loaded, handleSettingsChanged);
+    emitter.on(controlRegistryEvent.controlRulesChanged, handleControlRulesChanged);
+    
+    return () => {
+      module.setNotifyCallback(null);
+      emitter.off(settingsEvent.loaded, handleSettingsChanged);
+      emitter.off(controlRegistryEvent.controlRulesChanged, handleControlRulesChanged);
+    };
   }, [module]);
 
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -42,6 +59,9 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
   const allRules = module.getAllRules();
   const allTags = module.getAllTags();
   const getRulesForTag = module.getRulesForTag;
+
+  // console.log('RulesControlTrigger render, allRules:', allRules.map(r => ({ id: r.id, name: r.name, alwaysOn: r.alwaysOn, type: r.type })));
+  // console.log('RulesControlTrigger render, activeRuleIds:', Array.from(activeRuleIds));
 
   const handleToggleTag = useCallback(
     (tagId: string, isActive: boolean) => {

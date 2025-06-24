@@ -11,6 +11,7 @@ import type {
   ModPromptControl,
   ModChatControl,
   ModalProvider,
+  ModControlRule,
 } from "@/types/litechat/modding";
 import type { ChatControl as CoreChatControlFromTypes } from "@/types/litechat/chat";
 import type { PromptControl as CorePromptControlFromTypes } from "@/types/litechat/prompt";
@@ -85,6 +86,19 @@ export function createModApi(mod: DbMod): LiteChatModApi {
         emitter.emit(blockRendererEvent.unregisterBlockRendererRequest, {
           id: renderer.id,
         });
+      unsubscribers.push(u);
+      return u;
+    },
+    registerRule: (rule: ModControlRule) => {
+      // Control rules are registered in memory only, not saved to database
+      emitter.emit(controlRegistryEvent.registerControlRuleRequest, {
+        rule,
+      });
+      const u = () => {
+        emitter.emit(controlRegistryEvent.unregisterControlRuleRequest, {
+          id: rule.id,
+        });
+      };
       unsubscribers.push(u);
       return u;
     },

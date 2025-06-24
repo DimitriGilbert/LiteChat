@@ -5,11 +5,16 @@ import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { rulesEvent } from "@/types/litechat/events/rules.events";
+import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import { RulesControlTrigger } from "@/controls/components/rules/RulesControlTrigger";
 import { SettingsRulesAndTags } from "@/controls/components/rules/SettingsRulesAndTags";
 import type { DbRule, DbTag } from "@/types/litechat/rules";
 import type { ResolvedRuleContent } from "@/types/litechat/prompt";
+import type { ModControlRule } from "@/types/litechat/modding";
+import { useControlRegistryStore } from "@/store/control.store";
+import { useSettingsStore } from "../../store/settings.store";
+import { emitter } from "@/lib/litechat/event-emitter";
 
 export class RulesControlModule implements ControlModule {
   readonly id = "core-rules-tags";
@@ -61,32 +66,83 @@ export class RulesControlModule implements ControlModule {
       this.notifySettingsComponentUpdate?.();
     });
 
-    this.eventUnsubscribers.push(unsubStatus, unsubRulesLoaded);
+    const unsubControlRules = modApi.on(controlRegistryEvent.controlRulesChanged, (payload) => {
+      if (payload) {
+        // Auto-populate always-on control rules
+        this.populateAlwaysOnRules();
+        this.updateHasRulesOrTags();
+        
+        // Notify only the prompt trigger component, not the settings component
+        // (settings component listens to events directly to avoid feedback loops)
+        this.notifyComponentUpdate?.();
+      }
+    });
+
+    this.eventUnsubscribers.push(unsubStatus, unsubRulesLoaded, unsubControlRules);
   }
 
   private populateAlwaysOnRules() {
-    // Auto-activate always-on rules
-    const alwaysOnRuleIds = this.allRules
+    // Auto-activate always-on rules from both database and control rules
+    const dbAlwaysOnRuleIds = this.allRules
       .filter(rule => rule.alwaysOn)
       .map(rule => rule.id);
     
-    if (alwaysOnRuleIds.length > 0) {
+    const controlRules = this.getControlRulesFromStore();
+    const settings = useSettingsStore.getState();
+    
+    // For control rules, use settings preferences instead of module defaults
+    const controlAlwaysOnRuleIds = Object.values(controlRules)
+      .filter(rule => settings.controlRuleAlwaysOn[rule.id] ?? true) // Use DB setting or default to true
+      .map(rule => rule.id);
+    
+    const allAlwaysOnRuleIds = [...dbAlwaysOnRuleIds, ...controlAlwaysOnRuleIds];
+    
+    if (allAlwaysOnRuleIds.length > 0) {
       this.transientActiveRuleIds = new Set([
         ...this.transientActiveRuleIds,
-        ...alwaysOnRuleIds
+        ...allAlwaysOnRuleIds
       ]);
     }
   }
 
+  private getControlRulesFromStore(): Record<string, ModControlRule> {
+    // Access control rules from the store directly
+    return useControlRegistryStore.getState().getControlRules();
+  }
+
   private updateHasRulesOrTags() {
+    const controlRules = this.getControlRulesFromStore();
     const newHasRulesOrTags =
-      this.allRules.length > 0 || this.allTags.length > 0;
+      this.allRules.length > 0 || Object.keys(controlRules).length > 0 || this.allTags.length > 0;
     if (this.hasRulesOrTags !== newHasRulesOrTags) {
       this.hasRulesOrTags = newHasRulesOrTags;
     }
   }
 
-  public getAllRules = (): DbRule[] => this.allRules;
+  public getAllRules = (): DbRule[] => {
+    // Merge database rules and control rules, converting control rules to DbRule format
+    const dbRules = this.allRules;
+    const controlRules = this.getControlRulesFromStore();
+    const settings = useSettingsStore.getState();
+    
+    // Convert control rules to DbRule format with settings override for alwaysOn
+    const controlRulesAsDbRules: DbRule[] = Object.values(controlRules).map(controlRule => ({
+      id: controlRule.id,
+      name: controlRule.name,
+      content: controlRule.content,
+      type: controlRule.type,
+      alwaysOn: settings.controlRuleAlwaysOn[controlRule.id] ?? true, // Use DB setting or default to true
+      createdAt: new Date(), // Default date for control rules
+      updatedAt: new Date(), // Default date for control rules
+    }));
+    
+    const allRules = [...dbRules, ...controlRulesAsDbRules];
+    // console.log('getAllRules called, control rule preferences:', settings.controlRuleAlwaysOn);
+    // console.log('getAllRules returning:', allRules.map(r => ({ id: r.id, name: r.name, alwaysOn: r.alwaysOn, type: r.type })));
+    
+    return allRules;
+  };
+
   public getAllTags = (): DbTag[] => this.allTags;
   public getTagRuleLinks = (): { tagId: string; ruleId: string }[] =>
     this.tagRuleLinks;
@@ -100,7 +156,27 @@ export class RulesControlModule implements ControlModule {
     return this.allRules.filter((rule) => ruleIds.has(rule.id));
   };
   public getRuleById = (ruleId: string): DbRule | undefined => {
-    return this.allRules.find((r) => r.id === ruleId);
+    // First check database rules
+    const dbRule = this.allRules.find((r) => r.id === ruleId);
+    if (dbRule) return dbRule;
+    
+    // Then check control rules
+    const controlRules = this.getControlRulesFromStore();
+    const controlRule = controlRules[ruleId];
+    if (controlRule) {
+      const settings = useSettingsStore.getState();
+      return {
+        id: controlRule.id,
+        name: controlRule.name,
+        content: controlRule.content,
+        type: controlRule.type,
+        alwaysOn: settings.controlRuleAlwaysOn[controlRule.id] ?? true, // Use DB setting or default to true
+        createdAt: new Date(), // Default date for control rules
+        updatedAt: new Date(), // Default date for control rules
+      };
+    }
+    
+    return undefined;
   };
   public getTagById = (tagId: string): DbTag | undefined => {
     return this.allTags.find((t) => t.id === tagId);
@@ -117,9 +193,53 @@ export class RulesControlModule implements ControlModule {
     id: string,
     updates: Partial<Omit<DbRule, "id" | "createdAt">>
   ) => {
+    // For control rules, only allow alwaysOn updates via settings
+    if (this.isControlRule(id)) {
+      // Only allow toggling alwaysOn for control rules
+      if (Object.keys(updates).length === 1 && 'alwaysOn' in updates) {
+        // Update via settings store instead of in-memory control rules
+        useSettingsStore.getState().setControlRuleAlwaysOn(id, updates.alwaysOn!);
+        
+        // Update active rules based on the new alwaysOn setting
+        if (updates.alwaysOn) {
+          // Add to active rules if turned on
+          this.transientActiveRuleIds.add(id);
+        } else {
+          // Remove from active rules if turned off
+          this.transientActiveRuleIds.delete(id);
+        }
+        
+        // IMMEDIATELY notify components BEFORE emitting events to force refresh
+        this.notifyComponentUpdate?.();
+        this.notifySettingsComponentUpdate?.();
+        
+        // Emit control rules changed event so trigger components can refresh
+        emitter.emit(controlRegistryEvent.controlRulesChanged, {
+          controlRules: this.getControlRulesFromStore(),
+        });
+        
+        // Force another notification after event emission
+        setTimeout(() => {
+          this.notifyComponentUpdate?.();
+        }, 0);
+        
+        return;
+      } else {
+        console.warn(`Attempted to update control rule "${id}" with non-alwaysOn properties. Only alwaysOn can be modified for control rules.`);
+        return;
+      }
+    }
+    // For database rules, use the rules event system
     this.modApiRef?.emit(rulesEvent.updateRuleRequest, { id, updates });
   };
+  
   public deleteRule = (id: string) => {
+    // Prevent deleting control rules - they are managed automatically by modules
+    if (this.isControlRule(id)) {
+      console.warn(`Attempted to delete control rule "${id}". Control rules are managed automatically by modules.`);
+      // Silently ignore the delete request for control rules
+      return;
+    }
     this.modApiRef?.emit(rulesEvent.deleteRuleRequest, { id });
   };
   public addTag = (data: Omit<DbTag, "id" | "createdAt" | "updatedAt">) => {
@@ -225,12 +345,24 @@ export class RulesControlModule implements ControlModule {
         clearOnSubmit: () => {
           let changed = false;
           
-          // Clear regular rules but preserve always-on rules
-          const alwaysOnRuleIds = new Set(
+          // Clear regular rules but preserve always-on rules from both database and control rules
+          const dbAlwaysOnRuleIds = new Set(
             this.allRules
               .filter(rule => rule.alwaysOn)
               .map(rule => rule.id)
           );
+          
+          const controlRules = this.getControlRulesFromStore();
+          const settings = useSettingsStore.getState();
+          
+          // For control rules, use settings preferences instead of module defaults
+          const controlAlwaysOnRuleIds = new Set(
+            Object.values(controlRules)
+              .filter(rule => settings.controlRuleAlwaysOn[rule.id] ?? true) // Use DB setting or default to true
+              .map(rule => rule.id)
+          );
+          
+          const allAlwaysOnRuleIds = new Set([...dbAlwaysOnRuleIds, ...controlAlwaysOnRuleIds]);
           
           if (this.transientActiveTagIds.size > 0) {
             this.transientActiveTagIds = new Set<string>();
@@ -240,7 +372,7 @@ export class RulesControlModule implements ControlModule {
           // Only remove rules that are not always-on
           const newActiveRuleIds = new Set<string>();
           this.transientActiveRuleIds.forEach(ruleId => {
-            if (alwaysOnRuleIds.has(ruleId)) {
+            if (allAlwaysOnRuleIds.has(ruleId)) {
               newActiveRuleIds.add(ruleId);
             } else {
               changed = true;
@@ -284,4 +416,10 @@ export class RulesControlModule implements ControlModule {
     this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
+
+  // Helper method to check if a rule is a control rule
+  public isControlRule = (ruleId: string): boolean => {
+    const controlRules = this.getControlRulesFromStore();
+    return controlRules.hasOwnProperty(ruleId);
+  };
 }
