@@ -95,6 +95,14 @@ export class RulesControlModule implements ControlModule {
       .filter(rule => settings.controlRuleAlwaysOn[rule.id] ?? true) // Use DB setting or default to true
       .map(rule => rule.id);
     
+    // Debug logging to track the issue
+    console.log('[RulesControlModule] Control rules evaluation:', {
+      controlRuleIds: Object.keys(controlRules),
+      settings: settings.controlRuleAlwaysOn,
+      filteredControlRuleIds: controlAlwaysOnRuleIds,
+      dbAlwaysOnRuleIds
+    });
+    
     const allAlwaysOnRuleIds = [...dbAlwaysOnRuleIds, ...controlAlwaysOnRuleIds];
     
     if (allAlwaysOnRuleIds.length > 0) {
@@ -103,6 +111,8 @@ export class RulesControlModule implements ControlModule {
         ...allAlwaysOnRuleIds
       ]);
     }
+    
+    console.log('[RulesControlModule] Final transientActiveRuleIds:', Array.from(this.transientActiveRuleIds));
   }
 
   private getControlRulesFromStore(): Record<string, ModControlRule> {
@@ -321,6 +331,30 @@ export class RulesControlModule implements ControlModule {
                 sourceRuleId: rule.id,
               });
             }
+          });
+
+          // Debug logging to track what's being sent to system prompt
+          console.log('[RulesControlModule] getMetadata - Sending to system prompt:', {
+            activeRuleIds,
+            allEffectiveRuleIds: Array.from(allEffectiveRuleIds),
+            effectiveRulesContent: effectiveRulesContent.map(r => ({ 
+              sourceRuleId: r.sourceRuleId, 
+              type: r.type, 
+              contentPreview: r.content.substring(0, 100) + '...' 
+            }))
+          });
+          
+          // Enhanced debug: Show actual rule names and settings
+          const controlRules = this.getControlRulesFromStore();
+          const settings = useSettingsStore.getState();
+          console.log('[RulesControlModule] getMetadata - Detailed rule analysis:', {
+            allControlRuleIds: Object.keys(controlRules),
+            controlRuleSettings: settings.controlRuleAlwaysOn,
+            activeRuleIdsWithNames: activeRuleIds.map(id => {
+              const rule = this.getRuleById(id);
+              return { id, name: rule?.name || 'Unknown', type: rule?.type, isControl: this.isControlRule(id) };
+            }),
+            currentTransientActiveRuleIds: Array.from(this.transientActiveRuleIds)
           });
 
           if (

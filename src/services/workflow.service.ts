@@ -1884,7 +1884,7 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
 
     const effectiveRulesContent = metadata?.effectiveRulesContent ?? [];
     const systemRulesContent = effectiveRulesContent
-      .filter((r: any) => r.type === "system")
+      .filter((r: any) => r.type === "system" || r.type === "control")
       .map((r: any) => r.content);
 
     if (systemRulesContent.length > 0) {

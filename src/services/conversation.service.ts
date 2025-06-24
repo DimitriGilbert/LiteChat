@@ -106,8 +106,18 @@ export const ConversationService = {
     const effectiveRulesContent: ResolvedRuleContent[] =
       turnData.metadata?.effectiveRulesContent ?? [];
 
+    // Debug logging to track rules extraction  
+    console.log('[ConversationService] Rules content extraction:', {
+      effectiveRulesContentCount: effectiveRulesContent.length,
+      effectiveRulesContent: effectiveRulesContent.map(rule => ({
+        type: rule.type,
+        sourceRuleId: rule.sourceRuleId,
+        contentPreview: rule.content.substring(0, 100) + '...'
+      }))
+    });
+
     const systemRulesContent = effectiveRulesContent
-      .filter((r) => r.type === "system")
+      .filter((r) => r.type === "system" || r.type === "control")
       .map((r) => r.content);
     const beforeRulesContent = effectiveRulesContent
       .filter((r) => r.type === "before")
@@ -157,6 +167,15 @@ ${userContent}`;
       turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
 
     if (systemRulesContent.length > 0) {
+      // Debug logging to track system prompt construction
+      console.log('[ConversationService] System prompt construction:', {
+        turnSystemPrompt: turnSystemPrompt?.substring(0, 200) + '...',
+        effectiveSystemPrompt: effectiveSettings.systemPrompt?.substring(0, 200) + '...',
+        baseSystemPromptBeforeRules: baseSystemPrompt?.substring(0, 200) + '...',
+        systemRulesContent: systemRulesContent.map(content => content.substring(0, 200) + '...'),
+        systemRulesContentCount: systemRulesContent.length
+      });
+      
       baseSystemPrompt = `${
         baseSystemPrompt
           ? `${baseSystemPrompt}
@@ -165,6 +184,8 @@ ${userContent}`;
           : ""
       }${systemRulesContent.join(`
 `)}`;
+      
+      console.log('[ConversationService] Final system prompt length:', baseSystemPrompt?.length);
     }
 
     const finalParameters = {
@@ -392,7 +413,7 @@ ${userContent}`;
       originalTurnData.metadata?.effectiveRulesContent ?? [];
 
     const systemRulesContent = effectiveRulesContent
-      .filter((r) => r.type === "system")
+      .filter((r) => r.type === "system" || r.type === "control")
       .map((r) => r.content);
     const beforeRulesContent = effectiveRulesContent
       .filter((r) => r.type === "before")
