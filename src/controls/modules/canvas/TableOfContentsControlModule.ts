@@ -68,88 +68,83 @@ export class TableOfContentsControlModule implements ControlModule {
           }
 
           // CALCULATE TARGET POSITION MANUALLY
-          const viewportRect = scrollViewport.getBoundingClientRect();
           const elementRect = element.getBoundingClientRect();
-          
-          // Calculate where the element is relative to the scrollable content
+          const viewportRect = scrollViewport.getBoundingClientRect();
           const currentScrollTop = scrollViewport.scrollTop;
           const elementTopRelativeToViewport = elementRect.top - viewportRect.top;
-          const targetScrollTop = Math.max(0, currentScrollTop + elementTopRelativeToViewport - 20);
-          
-          console.log(`ToC: BEFORE manual scroll to interaction ${interactionId}:`, {
-            currentScrollTop,
-            elementTopRelativeToViewport,
-            targetScrollTop,
-            elementRect: { top: elementRect.top, bottom: elementRect.bottom },
-            viewportRect: { top: viewportRect.top, bottom: viewportRect.bottom }
-          });
+          const targetScrollTop = currentScrollTop + elementTopRelativeToViewport - 20; // 20px offset from top
 
-          // Mark as auto-scroll to prevent ChatCanvas from detecting it as user scroll
-          // @ts-ignore - Adding custom property to track ToC scroll
-          scrollViewport._isToCScrolling = true;
+
+          // Mark as ToC scrolling to prevent ChatCanvas from detecting it as user scroll
+          (scrollViewport as any)._isToCScrolling = true;
           
-          // FORCE SCROLL WITH MULTIPLE ATTEMPTS
-          let attempt = 0;
+          // Force scroll with multiple attempts
+          let attempt = 1;
           const maxAttempts = 5;
           
-          const forceScroll = () => {
-            attempt++;
+          const forceScroll = async () => {
             console.log(`ToC: Force scroll attempt ${attempt} to position ${targetScrollTop}`);
             
-            // Try both instant and smooth
             scrollViewport.scrollTo({
               top: targetScrollTop,
-              behavior: attempt <= 2 ? "smooth" : "instant"
+              behavior: "smooth"
             });
             
-            // Check if we reached the target after a short delay
+            // Check position after scroll
             setTimeout(() => {
-              const actualPosition = scrollViewport.scrollTop;
-              const distance = Math.abs(actualPosition - targetScrollTop);
+              const actualScrollTop = scrollViewport.scrollTop;
+              const distance = Math.abs(actualScrollTop - targetScrollTop);
               
-              console.log(`ToC: Attempt ${attempt} result - target: ${targetScrollTop}, actual: ${actualPosition}, distance: ${distance}`);
+              console.log(`ToC: Attempt ${attempt} result - target: ${targetScrollTop}, actual: ${actualScrollTop}, distance: ${distance}`);
               
-              // If we're not close enough and haven't exhausted attempts, try again
               if (distance > 50 && attempt < maxAttempts) {
                 console.log(`ToC: Attempt ${attempt} failed, trying again...`);
+                attempt++;
                 forceScroll();
               } else {
-                console.log(`ToC: Scroll ${distance <= 50 ? 'SUCCESS' : 'FINAL'} after ${attempt} attempts`);
-                // Clean up the flag
+                if (distance <= 50) {
+                  console.log(`ToC: Scroll SUCCESS after ${attempt} attempts`);
+                } else {
+                  console.log(`ToC: Scroll FINAL after ${attempt} attempts (distance: ${distance}px)`);
+                }
+                
+                // Clear ToC scrolling flag after success/final attempt
                 setTimeout(() => {
-                  // @ts-ignore
-                  scrollViewport._isToCScrolling = false;
-                }, 500);
+                  (scrollViewport as any)._isToCScrolling = false;
+                }, 1000);
+                
+                addHighlight(element);
               }
-            }, attempt <= 2 ? 100 : 50); // Shorter delay for instant scrolls
+            }, 50);
           };
           
-          // Start the force scroll sequence
           forceScroll();
 
-          // Debug logging 50ms AFTER scroll start
+          // Debug logging AFTER scroll start
           setTimeout(() => {
+            const actualScrollTop = scrollViewport.scrollTop;
             console.log(`ToC: 50ms AFTER scroll start for ${interactionId}:`, {
-              actualScrollTop: scrollViewport.scrollTop,
+              actualScrollTop,
               targetScrollTop,
-              distance: Math.abs(scrollViewport.scrollTop - targetScrollTop)
+              distance: Math.abs(actualScrollTop - targetScrollTop),
             });
           }, 50);
 
-          // Debug logging 200ms AFTER scroll start
           setTimeout(() => {
-            const finalPosition = scrollViewport.scrollTop;
-            const isVisible = element.getBoundingClientRect().top < window.innerHeight && element.getBoundingClientRect().bottom > 0;
+            const actualScrollTop = scrollViewport.scrollTop;
+            const elementVisible = element.getBoundingClientRect().top >= viewportRect.top && 
+                                   element.getBoundingClientRect().bottom <= viewportRect.bottom;
+            const distance = Math.abs(actualScrollTop - targetScrollTop);
+            const success = elementVisible ? 'VISIBLE' : 'NOT_VISIBLE';
+            
             console.log(`ToC: 200ms AFTER scroll start for ${interactionId}:`, {
-              actualScrollTop: finalPosition,
+              actualScrollTop,
               targetScrollTop,
-              elementVisible: isVisible,
-              distance: Math.abs(finalPosition - targetScrollTop),
-              success: isVisible ? "VISIBLE" : "NOT_VISIBLE"
+              elementVisible,
+              distance,
+              success
             });
           }, 200);
-
-          addHighlight(element);
         };
 
         const scrollToHeading = (headingText: string) => {

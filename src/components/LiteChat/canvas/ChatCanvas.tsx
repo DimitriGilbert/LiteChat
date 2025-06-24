@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useLayoutEffect,
 } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { StreamingInteractionCard } from "./StreamingInteractionCard";
@@ -58,6 +59,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
   const autoScrollIntervalTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastUserScrollTimeRef = useRef<number>(0);
   const isAutoScrollingRef = useRef<boolean>(false);
+  const initialScrollDone = useRef(false);
 
   const streamingInteractionIds = useInteractionStore(
     (state) => state.streamingInteractionIds
@@ -202,12 +204,9 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     isAutoScrollingRef.current = true;
-    console.log(`ChatCanvas: scrollToBottom called with behavior: ${behavior}`);
     
     // Try the viewport reference first
     if (viewportRef.current) {
-      const beforeScroll = viewportRef.current.scrollTop;
-      console.log(`ChatCanvas: Before auto-scroll - scrollTop: ${beforeScroll}, scrollHeight: ${viewportRef.current.scrollHeight}`);
       
       viewportRef.current.scrollTo({
         top: viewportRef.current.scrollHeight,
@@ -216,8 +215,6 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
       
       setTimeout(() => { 
         isAutoScrollingRef.current = false;
-        const afterScroll = viewportRef.current?.scrollTop || 0;
-        console.log(`ChatCanvas: After auto-scroll - scrollTop: ${afterScroll}`);
       }, 100);
       return;
     }
@@ -261,15 +258,12 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
       const isToCScrolling = (viewportRef.current as any)._isToCScrolling;
 
       if (userRecentlyScrolled) {
-        console.log(`ChatCanvas: Blocking auto-scroll due to recent user scroll (${timeSinceUserScroll}ms ago)`);
       }
 
       if (isToCScrolling) {
-        console.log(`ChatCanvas: Blocking auto-scroll due to ToC navigation in progress`);
       }
 
       if ((isAtBottom || status !== "streaming") && !userRecentlyScrolled && !isToCScrolling) {
-        console.log(`ChatCanvas: Triggering auto-scroll - isAtBottom: ${isAtBottom}, status: ${status}`);
         requestAnimationFrame(() => {
           scrollToBottom(status === "streaming" ? "smooth" : "auto");
         });
@@ -291,15 +285,12 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
         const isToCScrolling = viewportRef.current && (viewportRef.current as any)._isToCScrolling;
         
         if (userRecentlyScrolled) {
-          console.log(`ChatCanvas: Blocking interval auto-scroll due to recent user scroll (${timeSinceUserScroll}ms ago)`);
         }
         
         if (isToCScrolling) {
-          console.log(`ChatCanvas: Blocking interval auto-scroll due to ToC navigation in progress`);
         }
         
         if (!userRecentlyScrolled && !isToCScrolling) {
-          console.log(`ChatCanvas: Triggering interval auto-scroll`);
           scrollToBottom("smooth");
         }
       }, autoScrollInterval);
@@ -327,9 +318,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
       const isToCScrolling = (viewportRef.current as any)._isToCScrolling;
       if (!isAutoScrollingRef.current && !isToCScrolling) {
         lastUserScrollTimeRef.current = Date.now();
-        console.log(`ChatCanvas: User scroll detected at ${Date.now()}`);
       } else if (isToCScrolling) {
-        console.log(`ChatCanvas: ToC scroll detected - ignoring as user scroll`);
       }
       
       const { scrollHeight, clientHeight, scrollTop } = viewportRef.current;
@@ -358,6 +347,42 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
       }
     }
   }, []);
+
+  // --- NEW: Initial load scroll (runs after DOM is ready) ---
+  useLayoutEffect(() => {
+    if (
+      !initialScrollDone.current &&
+      interactionGroups.length > 0 &&
+      viewportRef.current
+    ) {
+      const timeSinceUserScroll = Date.now() - lastUserScrollTimeRef.current;
+      const userRecentlyScrolled = timeSinceUserScroll < 2000;
+      if (!userRecentlyScrolled) {
+        requestAnimationFrame(() => {
+          scrollToBottom("auto");
+          initialScrollDone.current = true;
+        });
+      }
+    }
+  }, [interactionGroups.length, conversationId]);
+
+  // Add a second useLayoutEffect to catch late interaction updates
+  useLayoutEffect(() => {
+    if (
+      !initialScrollDone.current &&
+      interactionGroups.length > 0 &&
+      viewportRef.current
+    ) {
+      const timeSinceUserScroll = Date.now() - lastUserScrollTimeRef.current;
+      const userRecentlyScrolled = timeSinceUserScroll < 2000;
+      if (!userRecentlyScrolled) {
+        requestAnimationFrame(() => {
+          scrollToBottom("auto");
+          initialScrollDone.current = true;
+        });
+      }
+    }
+  }, [interactions, conversationId]);
 
   const renderedInteractionCards = useMemo(() => {
     // console.log("[ChatCanvas] Full interactions array received by renderedInteractionCards:", JSON.parse(JSON.stringify(interactions))); // Log full interactions array
@@ -540,6 +565,32 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
   };
 
   const maxWidthClass = chatMaxWidth || "max-w-7xl";
+
+  useEffect(() => {
+    initialScrollDone.current = false;
+  }, [conversationId]);
+
+  // Add MutationObserver-based scroll-to-bottom on conversation switch
+  useEffect(() => {
+    if (!viewportRef.current) return;
+    if (initialScrollDone.current) return;
+
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+          scrollToBottom("auto");
+          initialScrollDone.current = true;
+          break;
+        }
+      }
+    });
+
+    observer.observe(viewportRef.current, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [conversationId, interactionGroups.length]);
 
   return (
     <div className={cn("flex-grow relative", className)}>
