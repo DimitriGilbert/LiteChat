@@ -14,6 +14,7 @@ import { toast } from "sonner";
 const gitConfigSchema = z.object({
   gitUserName: z.string().min(1, "User name cannot be empty."),
   gitUserEmail: z.string().email("Invalid email address."),
+  gitGlobalPat: z.string(),
 });
 
 // Utility component for field meta messages
@@ -41,13 +42,15 @@ function FieldMetaMessages({ field }: { field: AnyFieldApi }) {
 }
 
 const SettingsGitConfigComponent: React.FC = () => {
-  const { gitUserName, setGitUserName, gitUserEmail, setGitUserEmail } =
+  const { gitUserName, setGitUserName, gitUserEmail, setGitUserEmail, gitGlobalPat, setGitGlobalPat } =
     useSettingsStore(
       useShallow((state) => ({
         gitUserName: state.gitUserName,
         setGitUserName: state.setGitUserName,
         gitUserEmail: state.gitUserEmail,
         setGitUserEmail: state.setGitUserEmail,
+        gitGlobalPat: state.gitGlobalPat,
+        setGitGlobalPat: state.setGitGlobalPat,
       }))
     );
 
@@ -55,6 +58,7 @@ const SettingsGitConfigComponent: React.FC = () => {
     defaultValues: {
       gitUserName: gitUserName ?? "",
       gitUserEmail: gitUserEmail ?? "",
+      gitGlobalPat: gitGlobalPat ?? "",
     },
     validators: {
       onChange: gitConfigSchema,
@@ -63,6 +67,7 @@ const SettingsGitConfigComponent: React.FC = () => {
       try {
         setGitUserName(value.gitUserName);
         setGitUserEmail(value.gitUserEmail);
+        setGitGlobalPat(value.gitGlobalPat || null);
         toast.success("Git user configuration updated!");
       } catch (error) {
         toast.error("Failed to update Git configuration.");
@@ -75,8 +80,9 @@ const SettingsGitConfigComponent: React.FC = () => {
     form.reset({
       gitUserName: gitUserName ?? "",
       gitUserEmail: gitUserEmail ?? "",
+      gitGlobalPat: gitGlobalPat ?? "",
     });
-  }, [gitUserName, gitUserEmail, form]);
+  }, [gitUserName, gitUserEmail, gitGlobalPat, form]);
 
   return (
     <div className="space-y-4 p-1">
@@ -125,6 +131,29 @@ const SettingsGitConfigComponent: React.FC = () => {
                     placeholder="your.email@example.com"
                     className={field.state.meta.errors.length ? "border-destructive" : ""}
                   />
+                  <FieldMetaMessages field={field} />
+                </div>
+              )}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-4">
+            <form.Field
+              name="gitGlobalPat"
+              children={(field) => (
+                <div className="space-y-1.5">
+                  <Label htmlFor={field.name}>Global Personal Access Token</Label>
+                  <Input
+                    id={field.name}
+                    type="password"
+                    value={field.state.value || ""}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                    className={field.state.meta.errors.length ? "border-destructive" : ""}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Used for Git operations when no repo-specific auth is configured
+                  </p>
                   <FieldMetaMessages field={field} />
                 </div>
               )}

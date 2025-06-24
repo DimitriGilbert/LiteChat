@@ -44,6 +44,7 @@ interface InteractionActions {
   setActiveStreamBuffer: (id: string, content: string) => void;
   appendStreamBuffer: (id: string, chunk: string) => void;
   removeActiveStreamBuffer: (id: string) => void;
+  promoteChildToParent: (childId: string, currentParentId: string) => Promise<void>;
   getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
@@ -438,6 +439,45 @@ export const useInteractionStore = create(
       emitter.emit(interactionEvent.streamingIdsChanged, {
         streamingIds: get().streamingInteractionIds,
       });
+    },
+
+    promoteChildToParent: async (childId, currentParentId) => {
+      set((state) => {
+        const child = state.interactions.find(i => i.id === childId);
+        const currentParent = state.interactions.find(i => i.id === currentParentId);
+        
+        if (child && currentParent) {
+          // Swap parent-child relationship
+          child.parentId = null;                    // Child becomes parent
+          child.index = currentParent.index;        // Inherits position in conversation
+          
+          currentParent.parentId = childId;         // Parent becomes child
+          currentParent.index = 0;                  // First child tab
+          
+          // Other siblings become children of promoted child
+          state.interactions.forEach(interaction => {
+            if (interaction.parentId === currentParentId && interaction.id !== childId) {
+              interaction.parentId = childId;
+              interaction.index += 1; // Shift down in tab order
+            }
+          });
+        }
+      });
+      
+      // Persist all changes
+      const child = get().interactions.find(i => i.id === childId);
+      const currentParent = get().interactions.find(i => i.id === currentParentId);
+      
+      if (child && currentParent) {
+        await Promise.all([
+          PersistenceService.saveInteraction(child),
+          PersistenceService.saveInteraction(currentParent),
+          // Save all affected siblings
+          ...get().interactions
+            .filter(i => i.parentId === childId && i.id !== currentParentId)
+            .map(i => PersistenceService.saveInteraction(i))
+        ]);
+      }
     },
 
     getRegisteredActionHandlers: (): RegisteredActionHandler[] => {

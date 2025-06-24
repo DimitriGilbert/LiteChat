@@ -23,6 +23,7 @@ export const settingsEvent = {
   streamingRenderFpsChanged: "settings.streaming.render.fps.changed",
   gitUserNameChanged: "settings.git.user.name.changed",
   gitUserEmailChanged: "settings.git.user.email.changed",
+  gitGlobalPatChanged: "settings.git.global.pat.changed",
   toolMaxStepsChanged: "settings.tool.max.steps.changed",
   prismThemeUrlChanged: "settings.prism.theme.url.changed",
   autoTitleEnabledChanged: "settings.auto.title.enabled.changed",
@@ -32,6 +33,8 @@ export const settingsEvent = {
     "settings.auto.title.prompt.max.length.changed",
   autoTitleIncludeFilesChanged: "settings.auto.title.include.files.changed",
   autoTitleIncludeRulesChanged: "settings.auto.title.include.rules.changed",
+  forkCompactPromptChanged: "settings.fork.compact.prompt.changed",
+  forkCompactModelIdChanged: "settings.fork.compact.model.id.changed",
   customFontFamilyChanged: "settings.custom.font.family.changed",
   customFontSizeChanged: "settings.custom.font.size.changed",
   chatMaxWidthChanged: "settings.chat.max.width.changed",
@@ -66,6 +69,7 @@ export const settingsEvent = {
   setStreamingRenderFpsRequest: "settings.set.streaming.render.fps.request",
   setGitUserNameRequest: "settings.set.git.user.name.request",
   setGitUserEmailRequest: "settings.set.git.user.email.request",
+  setGitGlobalPatRequest: "settings.set.git.global.pat.request",
   setToolMaxStepsRequest: "settings.set.tool.max.steps.request",
   setPrismThemeUrlRequest: "settings.set.prism.theme.url.request",
   setAutoTitleEnabledRequest: "settings.set.auto.title.enabled.request",
@@ -77,6 +81,8 @@ export const settingsEvent = {
     "settings.set.auto.title.include.files.request",
   setAutoTitleIncludeRulesRequest:
     "settings.set.auto.title.include.rules.request",
+  setForkCompactPromptRequest: "settings.set.fork.compact.prompt.request",
+  setForkCompactModelIdRequest: "settings.set.fork.compact.model.id.request",
   setCustomFontFamilyRequest: "settings.set.custom.font.family.request",
   setCustomFontSizeRequest: "settings.set.custom.font.size.request",
   setChatMaxWidthRequest: "settings.set.chat.max.width.request",
@@ -131,6 +137,7 @@ export interface SettingsEventPayloads {
   };
   [settingsEvent.gitUserNameChanged]: { name: SettingsState["gitUserName"] };
   [settingsEvent.gitUserEmailChanged]: { email: SettingsState["gitUserEmail"] };
+  [settingsEvent.gitGlobalPatChanged]: { pat: SettingsState["gitGlobalPat"] };
   [settingsEvent.toolMaxStepsChanged]: { steps: SettingsState["toolMaxSteps"] };
   [settingsEvent.prismThemeUrlChanged]: { url: SettingsState["prismThemeUrl"] };
   [settingsEvent.autoTitleEnabledChanged]: {
@@ -150,6 +157,12 @@ export interface SettingsEventPayloads {
   };
   [settingsEvent.autoTitleIncludeRulesChanged]: {
     include: SettingsState["autoTitleIncludeRules"];
+  };
+  [settingsEvent.forkCompactPromptChanged]: {
+    prompt: SettingsState["forkCompactPrompt"];
+  };
+  [settingsEvent.forkCompactModelIdChanged]: {
+    modelId: SettingsState["forkCompactModelId"];
   };
   [settingsEvent.customFontFamilyChanged]: {
     fontFamily: SettingsState["customFontFamily"];
@@ -214,6 +227,7 @@ export interface SettingsEventPayloads {
   [settingsEvent.setGitUserEmailRequest]: {
     email: SettingsState["gitUserEmail"];
   };
+  [settingsEvent.setGitGlobalPatRequest]: { pat: SettingsState["gitGlobalPat"] };
   [settingsEvent.setToolMaxStepsRequest]: {
     steps: SettingsState["toolMaxSteps"];
   };
@@ -237,6 +251,12 @@ export interface SettingsEventPayloads {
   };
   [settingsEvent.setAutoTitleIncludeRulesRequest]: {
     include: SettingsState["autoTitleIncludeRules"];
+  };
+  [settingsEvent.setForkCompactPromptRequest]: {
+    prompt: SettingsState["forkCompactPrompt"];
+  };
+  [settingsEvent.setForkCompactModelIdRequest]: {
+    modelId: SettingsState["forkCompactModelId"];
   };
   [settingsEvent.setCustomFontFamilyRequest]: {
     fontFamily: SettingsState["customFontFamily"];

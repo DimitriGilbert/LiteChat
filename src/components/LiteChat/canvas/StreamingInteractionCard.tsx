@@ -259,6 +259,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
     return (
       <div
         ref={cardRef}
+        data-interaction-id={interaction.id}
         className={cn(
           "group/card relative rounded-lg border bg-card p-3 md:p-4 shadow-sm transition-colors",
           interactionStatus === "ERROR"

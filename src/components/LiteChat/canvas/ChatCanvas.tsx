@@ -56,6 +56,8 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const autoScrollIntervalTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastUserScrollTimeRef = useRef<number>(0);
+  const isAutoScrollingRef = useRef<boolean>(false);
 
   const streamingInteractionIds = useInteractionStore(
     (state) => state.streamingInteractionIds
@@ -181,6 +183,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
                   ? contextInteraction.response
                   : undefined,
               canvasContextType: targetType,
+              scrollViewport: viewportRef.current,
             };
             const finalContext = { ...baseContext, ...overrideContext };
             
@@ -198,12 +201,24 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
   );
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    isAutoScrollingRef.current = true;
+    console.log(`ChatCanvas: scrollToBottom called with behavior: ${behavior}`);
+    
     // Try the viewport reference first
     if (viewportRef.current) {
+      const beforeScroll = viewportRef.current.scrollTop;
+      console.log(`ChatCanvas: Before auto-scroll - scrollTop: ${beforeScroll}, scrollHeight: ${viewportRef.current.scrollHeight}`);
+      
       viewportRef.current.scrollTo({
         top: viewportRef.current.scrollHeight,
         behavior: behavior,
       });
+      
+      setTimeout(() => { 
+        isAutoScrollingRef.current = false;
+        const afterScroll = viewportRef.current?.scrollTop || 0;
+        console.log(`ChatCanvas: After auto-scroll - scrollTop: ${afterScroll}`);
+      }, 100);
       return;
     }
     
@@ -218,6 +233,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
           top: viewport.scrollHeight,
           behavior: behavior,
         });
+        setTimeout(() => { isAutoScrollingRef.current = false; }, 100);
         return;
       }
     }
@@ -228,6 +244,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
         top: scrollAreaRef.current.scrollHeight,
         behavior: behavior,
       });
+      setTimeout(() => { isAutoScrollingRef.current = false; }, 100);
     }
   };
 
@@ -236,7 +253,23 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
       const { scrollHeight, clientHeight, scrollTop } = viewportRef.current;
       const isAtBottom = scrollHeight - clientHeight <= scrollTop + 150;
 
-      if (isAtBottom || status !== "streaming") {
+      // Don't auto-scroll if user manually scrolled recently (within last 2 seconds)
+      const timeSinceUserScroll = Date.now() - lastUserScrollTimeRef.current;
+      const userRecentlyScrolled = timeSinceUserScroll < 2000;
+
+      // CRITICAL: Don't auto-scroll if ToC navigation is in progress
+      const isToCScrolling = (viewportRef.current as any)._isToCScrolling;
+
+      if (userRecentlyScrolled) {
+        console.log(`ChatCanvas: Blocking auto-scroll due to recent user scroll (${timeSinceUserScroll}ms ago)`);
+      }
+
+      if (isToCScrolling) {
+        console.log(`ChatCanvas: Blocking auto-scroll due to ToC navigation in progress`);
+      }
+
+      if ((isAtBottom || status !== "streaming") && !userRecentlyScrolled && !isToCScrolling) {
+        console.log(`ChatCanvas: Triggering auto-scroll - isAtBottom: ${isAtBottom}, status: ${status}`);
         requestAnimationFrame(() => {
           scrollToBottom(status === "streaming" ? "smooth" : "auto");
         });
@@ -250,7 +283,25 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
         clearInterval(autoScrollIntervalTimerRef.current);
       }
       autoScrollIntervalTimerRef.current = setInterval(() => {
-        scrollToBottom("smooth");
+        // Don't auto-scroll if user manually scrolled recently
+        const timeSinceUserScroll = Date.now() - lastUserScrollTimeRef.current;
+        const userRecentlyScrolled = timeSinceUserScroll < 2000;
+        
+        // CRITICAL: Don't auto-scroll if ToC navigation is in progress
+        const isToCScrolling = viewportRef.current && (viewportRef.current as any)._isToCScrolling;
+        
+        if (userRecentlyScrolled) {
+          console.log(`ChatCanvas: Blocking interval auto-scroll due to recent user scroll (${timeSinceUserScroll}ms ago)`);
+        }
+        
+        if (isToCScrolling) {
+          console.log(`ChatCanvas: Blocking interval auto-scroll due to ToC navigation in progress`);
+        }
+        
+        if (!userRecentlyScrolled && !isToCScrolling) {
+          console.log(`ChatCanvas: Triggering interval auto-scroll`);
+          scrollToBottom("smooth");
+        }
       }, autoScrollInterval);
     } else {
       if (autoScrollIntervalTimerRef.current) {
@@ -268,22 +319,34 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
+    
     const handleScroll = () => {
-      if (!viewportRef.current) return; // Add null check for viewportRef.current
+      if (!viewportRef.current) return;
+      
+      // Track user scrolling (not auto-scroll and not ToC scroll)
+      const isToCScrolling = (viewportRef.current as any)._isToCScrolling;
+      if (!isAutoScrollingRef.current && !isToCScrolling) {
+        lastUserScrollTimeRef.current = Date.now();
+        console.log(`ChatCanvas: User scroll detected at ${Date.now()}`);
+      } else if (isToCScrolling) {
+        console.log(`ChatCanvas: ToC scroll detected - ignoring as user scroll`);
+      }
+      
       const { scrollHeight, clientHeight, scrollTop } = viewportRef.current;
       const shouldShow =
         scrollTop < scrollHeight - clientHeight - clientHeight * 0.5;
       setShowJumpToBottom(shouldShow);
     };
+    
     viewport.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll(); // Initial check
+    
     return () => {
       if (viewportRef.current) {
-        // Add null check before removing listener
         viewportRef.current.removeEventListener("scroll", handleScroll);
       }
     };
-  }, []); // Removed viewportRef.current from dependencies to avoid re-running on every render
+  }, []);
 
   useEffect(() => {
     if (scrollAreaRef.current) {

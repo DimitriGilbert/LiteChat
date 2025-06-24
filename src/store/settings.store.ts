@@ -66,6 +66,7 @@ export interface SettingsState {
   streamingRenderFPS: number;
   gitUserName: string | null;
   gitUserEmail: string | null;
+  gitGlobalPat: string | null;
   toolMaxSteps: number;
   prismThemeUrl: string | null;
   autoTitleEnabled: boolean;
@@ -104,6 +105,7 @@ interface SettingsActions {
   setStreamingRenderFPS: (fps: number) => void;
   setGitUserName: (name: string | null) => void;
   setGitUserEmail: (email: string | null) => void;
+  setGitGlobalPat: (pat: string | null) => void;
   setToolMaxSteps: (steps: number) => void;
   setPrismThemeUrl: (url: string | null) => void;
   setAutoTitleEnabled: (enabled: boolean) => void;
@@ -151,6 +153,7 @@ const DEFAULT_FOLD_USER_MESSAGES_ON_COMPLETION = false;
 const DEFAULT_STREAMING_FPS = 15;
 const DEFAULT_GIT_USER_NAME = null;
 const DEFAULT_GIT_USER_EMAIL = null;
+const DEFAULT_GIT_GLOBAL_PAT = null;
 const DEFAULT_TOOL_MAX_STEPS = 5;
 const DEFAULT_PRISM_THEME_URL = null;
 const DEFAULT_AUTO_TITLE_ENABLED = true;
@@ -190,6 +193,7 @@ export const useSettingsStore = create(
     streamingRenderFPS: DEFAULT_STREAMING_FPS,
     gitUserName: DEFAULT_GIT_USER_NAME,
     gitUserEmail: DEFAULT_GIT_USER_EMAIL,
+    gitGlobalPat: DEFAULT_GIT_GLOBAL_PAT,
     toolMaxSteps: DEFAULT_TOOL_MAX_STEPS,
     prismThemeUrl: DEFAULT_PRISM_THEME_URL,
     autoTitleEnabled: DEFAULT_AUTO_TITLE_ENABLED,
@@ -312,6 +316,14 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("gitUserEmail", trimmedEmail);
       emitter.emit(settingsEvent.gitUserEmailChanged, {
         email: trimmedEmail,
+      });
+    },
+    setGitGlobalPat: (pat) => {
+      const trimmedPat = pat?.trim() || null;
+      set({ gitGlobalPat: trimmedPat });
+      PersistenceService.saveSetting("gitGlobalPat", trimmedPat);
+      emitter.emit(settingsEvent.gitGlobalPatChanged, {
+        pat: trimmedPat,
       });
     },
     setToolMaxSteps: (steps) => {
@@ -483,6 +495,7 @@ export const useSettingsStore = create(
           streamingFps,
           gitUserName,
           gitUserEmail,
+          gitGlobalPat,
           toolMaxSteps,
           prismThemeUrl,
           autoTitleEnabled,
@@ -560,6 +573,10 @@ export const useSettingsStore = create(
           PersistenceService.loadSetting<string | null>(
             "gitUserEmail",
             DEFAULT_GIT_USER_EMAIL
+          ),
+          PersistenceService.loadSetting<string | null>(
+            "gitGlobalPat",
+            DEFAULT_GIT_GLOBAL_PAT
           ),
           PersistenceService.loadSetting<number>(
             "toolMaxSteps",
@@ -656,6 +673,7 @@ export const useSettingsStore = create(
           streamingRenderFPS: streamingFps,
           gitUserName,
           gitUserEmail,
+          gitGlobalPat,
           toolMaxSteps,
           prismThemeUrl,
           autoTitleEnabled,
@@ -855,6 +873,13 @@ export const useSettingsStore = create(
           handler: (
             p: SettingsEventPayloads[typeof settingsEvent.setGitUserEmailRequest]
           ) => actions.setGitUserEmail(p.email),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setGitGlobalPatRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setGitGlobalPatRequest]
+          ) => actions.setGitGlobalPat(p.pat),
           storeId,
         },
         {

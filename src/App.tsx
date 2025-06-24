@@ -56,6 +56,8 @@ import { ForkCompactActionControlModule } from "@/controls/modules/canvas/ForkCo
 import { RatingActionControlModule } from "@/controls/modules/canvas/RatingActionControlModule";
 import { EditResponseControlModule } from "@/controls/modules/canvas/EditResponseControlModule";
 import { EditCodeBlockControlModule } from "@/controls/modules/canvas/EditCodeBlockControlModule";
+import { PromoteInteractionControlModule } from "@/controls/modules/canvas/PromoteInteractionControlModule";
+import { TableOfContentsControlModule } from "@/controls/modules/canvas/TableOfContentsControlModule";
 // import { ExampleCanvasControlModule } from "@/controls/modules/example";
 import { FoldInteractionControlModule } from "@/controls/modules/canvas/interaction/FoldInteractionControlModule";
 import { ZipDownloadControlModule } from "@/controls/modules/canvas/interaction/ZipDownloadControlModule";
@@ -116,6 +118,8 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   CopyActionControlModule, // For InteractionCard header
   FoldInteractionControlModule, // For InteractionCard header
   ZipDownloadControlModule, // For InteractionCard header
+  TableOfContentsControlModule, // For InteractionCard header
+  PromoteInteractionControlModule, // For InteractionCard header
   RegenerateActionControlModule, // For InteractionCard footer
   RegenerateWithModelActionControlModule, // For InteractionCard footer
   ForkActionControlModule, // For InteractionCard footer
