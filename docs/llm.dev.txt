@@ -13,6 +13,7 @@ LiteChat is a modular, event-driven React application built with TypeScript, fea
 - **AI Integration**: Vercel AI SDK with multiple providers
 - **Event System**: mitt event emitter for decoupled communication
 - **Build System**: Vite with TypeScript
+- **Forms**: TanStack Form with Zod validation
 
 ### Key Architectural Principles
 1. **100% Client-Side**: No server dependencies, all data in IndexedDB
@@ -21,6 +22,8 @@ LiteChat is a modular, event-driven React application built with TypeScript, fea
 4. **Immutable State**: Zustand + Immer for safe mutations
 5. **Type Safety**: Comprehensive TypeScript coverage
 6. **Controlled Extensibility**: Safe modding API for extensions
+7. **Universal Block Rendering**: Extensible code block system
+8. **Canvas Control Integration**: Contextual UI controls for interactions
 
 ## Project Structure
 
@@ -30,25 +33,32 @@ src/
 │   ├── LiteChat/           # Main application components
 │   │   ├── canvas/         # Chat canvas and interaction display
 │   │   ├── chat/           # Chat controls and UI
-│   │   ├── common/         # Shared components
+│   │   ├── common/         # Shared components (UniversalBlockRenderer, etc.)
 │   │   ├── file-manager/   # VFS file management
 │   │   └── prompt/         # Prompt input area
 │   └── ui/                 # shadcn/ui components
 ├── controls/               # Control Module system
 │   ├── modules/            # Control Module implementations
 │   │   ├── canvas/         # Canvas interaction modules
-│   │   └── example/        # Example modules
+│   │   └── example/        # Example modules for reference
 │   └── components/         # Module-specific components
 ├── hooks/                  # React hooks
+│   ├── litechat/          # LiteChat-specific hooks
+│   ├── use-formedible.tsx # TanStack Form abstraction (DO NOT USE react-hook-form)
+│   └── use-prompt-compilation.tsx # Template compilation hook
 ├── lib/                    # Core libraries and utilities
 │   └── litechat/          # Core LiteChat functionality
 ├── modding/               # Modding system implementation
 ├── services/              # Business logic services
+│   ├── ai.service.ts      # AI integration and streaming
+│   ├── block-renderer.service.ts # Universal block rendering
+│   ├── persistence.service.ts # Database operations
+│   └── conversation.service.ts # Conversation management
 ├── store/                 # Zustand state stores
 ├── types/                 # TypeScript type definitions
 │   └── litechat/         # LiteChat-specific types
 │       ├── events/        # Event definitions
-│       ├── canvas/        # Canvas types
+│       ├── canvas/        # Canvas and block renderer types
 │       └── middleware/    # Middleware types
 ├── App.tsx               # Module registration and app setup
 └── main.tsx              # Application entry point
@@ -108,18 +118,16 @@ export class ParameterControlModule implements ControlModule {
   register(modApi: LiteChatModApi): void {
     this.unregisterCallback = modApi.registerPromptControl({
       id: this.id,
-      component: ParameterControlTrigger,
-      moduleInstance: this,
-      order: 30,
+      triggerRenderer: () => React.createElement(ParameterControlTrigger, { module: this }),
+      getMetadata: () => this.turnEnabled ? {
+        temperature: this.temperature,
+        parametersEnabled: this.turnEnabled,
+      } : undefined,
+      clearOnSubmit: () => {
+        this.turnEnabled = false;
+        this.notifyComponentUpdate?.();
+      },
     });
-  }
-  
-  // Modules can contribute metadata to prompts
-  getMetadata(): Record<string, any> {
-    return {
-      temperature: this.temperature,
-      parametersEnabled: this.turnEnabled,
-    };
   }
 }
 ```
@@ -168,7 +176,34 @@ export class CopyActionControlModule implements ControlModule {
       placement: "header",
       component: CopyActionComponent,
       moduleInstance: this,
+      showCondition: (context) => {
+        // Only show for completed interactions
+        return context.interaction.status === "COMPLETED";
+      }
     });
+  }
+}
+```
+
+#### Block Renderer Modules
+Extend code block rendering with specialized visualizations:
+
+```typescript
+export class MermaidBlockRendererModule implements ControlModule {
+  register(modApi: LiteChatModApi): void {
+    const mermaidRenderer: BlockRenderer = {
+      id: this.id,
+      supportedLanguages: ["mermaid"],
+      priority: 10,
+      renderer: (context: BlockRendererContext) => {
+        return React.createElement(MermaidBlockRenderer, {
+          code: context.code,
+          isStreaming: context.isStreaming,
+        });
+      },
+    };
+
+    this.unregisterCallback = modApi.registerBlockRenderer(mermaidRenderer);
   }
 }
 ```
@@ -182,8 +217,85 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   UrlParameterControlModule,
   GeneralSettingsModule,
   ThemeSettingsControlModule,
+  // Block renderers should be registered early for proper initialization
+  CodeBlockRendererModule,
+  MermaidBlockRendererModule,
+  FormedibleBlockRendererModule,
+  FlowBlockRendererModule,
   // ... order matters for dependencies
 ];
+```
+
+## Universal Block Renderer System
+
+LiteChat features an extensible Block Renderer System that allows custom rendering of code blocks based on language.
+
+### Core Components
+
+1. **BlockRenderer Interface**: Defines how to render specific languages
+2. **BlockRendererService**: Manages renderer selection and execution  
+3. **UniversalBlockRenderer**: Main component that routes to appropriate renderers
+4. **Control Modules**: Register language-specific renderers
+
+### Block Renderer Interface
+
+```typescript
+interface BlockRenderer {
+  id: string;
+  supportedLanguages?: string[]; // ["mermaid"], ["js", "typescript"], etc.
+  priority?: number; // Higher priority wins for conflicting languages
+  renderer: (context: BlockRendererContext) => React.ReactNode;
+  onMounted?: (context: BlockRendererContext & { element: HTMLElement }) => void;
+  onUnmounted?: (context: BlockRendererContext) => void;
+}
+
+interface BlockRendererContext {
+  lang: string | undefined;
+  code: string;
+  filepath?: string;
+  isStreaming?: boolean;
+  blockId?: string;
+  interactionId?: string;
+}
+```
+
+### Renderer Selection Logic
+
+1. **Specific Language Match**: Renderers that explicitly support the block's language
+2. **Priority**: Among matching renderers, higher priority wins
+3. **Fallback**: Renderers with no `supportedLanguages` serve as fallbacks
+4. **Default**: Simple pre/code fallback if no renderers match
+
+### Built-in Renderers
+
+- **CodeBlockRendererModule**: General code with syntax highlighting (fallback, priority 0)
+- **MermaidBlockRendererModule**: Mermaid diagrams (priority 10)
+- **FormedibleBlockRendererModule**: Interactive forms (priority 10)
+- **FlowBlockRendererModule**: React Flow diagrams (priority 10)
+
+### Creating Custom Block Renderers
+
+```typescript
+export class CustomRendererModule implements ControlModule {
+  readonly id = "my-custom-renderer";
+  
+  register(modApi: LiteChatModApi): void {
+    const customRenderer: BlockRenderer = {
+      id: this.id,
+      supportedLanguages: ["mylang", "custom"],
+      priority: 8,
+      renderer: (context: BlockRendererContext) => {
+        return React.createElement(MyCustomComponent, {
+          code: context.code,
+          lang: context.lang,
+          isStreaming: context.isStreaming,
+        });
+      },
+    };
+
+    this.unregisterCallback = modApi.registerBlockRenderer(customRenderer);
+  }
+}
 ```
 
 ## Event System Architecture
@@ -228,6 +340,7 @@ Notify that state has changed:
 export const settingsEvent = {
   themeChanged: "settings.theme.changed",
   temperatureChanged: "settings.temperature.changed",
+  autoTitleEnabledChanged: "settings.auto.title.enabled.changed",
   // ...
 };
 ```
@@ -258,7 +371,9 @@ export interface ModEventPayloadMap extends
   VfsEventPayloads,
   UiEventPayloads,
   GitEventPayloads,
-  PromptEventPayloads
+  PromptEventPayloads,
+  BlockRendererEventPayloads,
+  McpEventPayloads
 {}
 
 interface SettingsEventPayloads {
@@ -330,41 +445,65 @@ export const useExampleStore = create(
 - Manages conversations, projects, selection state
 - Handles Git sync repositories and conversation linking
 - Coordinates with InteractionStore for message loading
+- Provides `selectedItemId` and `selectedItemType` for context
 
 #### InteractionStore (`src/store/interaction.store.ts`)
 - Manages messages/interactions for current conversation
 - Handles streaming state and response buffers
 - Coordinates with AI services for real-time updates
+- Tracks parent-child relationships for race conditions/regeneration
+- Methods: `promoteChildToParent`, `appendInteractionResponseChunk`
 
 #### ProviderStore (`src/store/provider.store.ts`)
 - Manages AI provider configurations and API keys
 - Handles model fetching and selection
 - Provides enabled models across all providers
+- Integrates with AI SDK for multiple provider support
 
 #### SettingsStore (`src/store/settings.store.ts`)
 - Global application settings (theme, AI parameters, Git config)
-- Per-project setting overrides
+- Auto-title configuration (`autoTitleEnabled`, `autoTitleAlwaysOn`, `autoTitleModelId`)
+- Form-related settings with TanStack Form integration
+- Control rule preferences (`controlRuleAlwaysOn: Record<string, boolean>`)
+- Git user configuration (`gitUserName`, `gitUserEmail`)
 - Persistence through PersistenceService
 
 #### VfsStore (`src/store/vfs.store.ts`)
 - Virtual File System state for current context
-- File/folder tree management
-- Context switching between projects
+- File/folder tree management with parent-child relationships
+- Context switching between projects (`vfsKey`)
+- Integration with ZenFS and IndexedDB backend
 
 #### ProjectStore (`src/store/project.store.ts`)
 - Project hierarchy and settings inheritance
 - Effective settings calculation with cascading
 - Path-based project organization
+- Default rules and tags per project
 
 #### PromptTemplateStore (`src/store/prompt-template.store.ts`)
-- Manages prompt templates, including regular prompts, agents (`type: "agent"`), and tasks (`type: "task"`)
-- Handles compilation of templates with form data
-- Persistence through PersistenceService
+- Manages prompt templates, agents (`type: "agent"`), and tasks (`type: "task"`)
+- Handles compilation of templates with form data and variable substitution
+- Integration with TanStack Form for template editing
+- Auto-selection of tools, rules, and tags in templates
 
 #### McpStore (`src/store/mcp.store.ts`)
-- Manages MCP server configurations (stored as settings in `appState`)
-- Tracks connection status and retries for MCP servers
-- Persistence through PersistenceService (via `appState`)
+- Manages MCP server configurations and connection status
+- Bridge configuration for stdio MCP servers (`bridgeConfig`)
+- Retry settings and connection timeouts
+- Server status tracking and tool discovery
+- Tool response size configuration (`maxResponseSize`)
+
+#### ControlRegistryStore (`src/store/control.store.ts`)
+- Central registry for all Control Module registrations
+- Block renderers registry (`blockRenderers: Record<string, BlockRenderer>`)
+- Prompt controls, canvas controls, chat controls
+- Control rules from modules (separate from user rules)
+
+#### RulesStore (`src/store/rules.store.ts`)  
+- User-defined rules and tags
+- Rule-tag associations
+- Always-on rule management
+- Integration with prompt compilation
 
 ### Event Action Coordinator
 
@@ -379,6 +518,7 @@ export class EventActionCoordinatorService {
       useConversationStore,
       usePromptTemplateStore,
       useMcpStore,
+      useRulesStore,
       // ... all stores
     ];
 
@@ -418,7 +558,7 @@ export const initializeFsOp = async (vfsKey: string): Promise<typeof fs | null> 
   return fs;
 };
 
-// File operations
+// File operations (all run through VFS worker for performance)
 export const writeFileOp = async (path: string, content: ArrayBuffer): Promise<void>;
 export const readFileOp = async (path: string): Promise<ArrayBuffer>;
 export const deleteItemOp = async (path: string, recursive?: boolean): Promise<void>;
@@ -445,14 +585,14 @@ interface VfsState {
 
 ## AI Integration Architecture
 
-LiteChat provides comprehensive AI integration through the Vercel AI SDK.
+LiteChat provides comprehensive AI integration through the Vercel AI SDK with support for multiple providers and advanced features.
 
 ### Provider Support
 
 Supported AI providers:
-- **OpenAI**: GPT models with function calling, vision, reasoning
-- **Google Gemini**: Gemini Pro with multimodal capabilities
-- **Anthropic Claude**: Via OpenAI-compatible interface
+- **OpenAI**: GPT models with function calling, vision, reasoning, structured output
+- **Google Gemini**: Gemini Pro with multimodal capabilities  
+- **Anthropic Claude**: Via OpenAI-compatible interface with reasoning support
 - **OpenRouter**: Access to 100+ models
 - **Local Providers**: Ollama, LMStudio, OpenAI-compatible APIs
 
@@ -473,10 +613,11 @@ export class AIService {
       tools: payload.tools,
       maxTokens: payload.maxTokens,
       temperature: payload.temperature,
+      experimental_providerMetadata: payload.providerMetadata,
       // ... other parameters
     });
 
-    // Process stream parts
+    // Process stream parts with proper error handling
     for await (const part of result.fullStream) {
       switch (part.type) {
         case "text-delta":
@@ -494,6 +635,9 @@ export class AIService {
             usage: part.usage,
           });
           break;
+        case "error":
+          callbacks.onError(part.error);
+          break;
       }
     }
   }
@@ -502,7 +646,7 @@ export class AIService {
 
 ### Tool System
 
-AI tools are registered by Control Modules:
+AI tools are registered by Control Modules and support advanced features:
 
 ```typescript
 // Tool definition with Zod schema
@@ -513,7 +657,7 @@ const readFileToolDefinition = {
   }),
 };
 
-// Tool implementation
+// Tool implementation with context
 const readFileImplementation = async (
   { path }: { path: string },
   context: ToolExecutionContext
@@ -536,16 +680,17 @@ const readFileImplementation = async (
 
 ### Streaming Management
 
-Real-time response streaming with buffer management:
+Real-time response streaming with sophisticated buffer management:
 
 ```typescript
 interface InteractionState {
   activeStreamBuffers: Record<string, string>;     // Main response content
-  activeReasoningBuffers: Record<string, string>;  // Reasoning content
+  activeReasoningBuffers: Record<string, string>;  // Reasoning content (Claude, etc.)
   streamingInteractionIds: string[];               // Active streams
+  status: "idle" | "streaming" | "completed" | "error";
 }
 
-// Stream processing
+// Stream processing with race condition handling
 appendInteractionResponseChunk: (id: string, chunk: string) => {
   set((state) => {
     if (!state.activeStreamBuffers[id]) {
@@ -556,14 +701,77 @@ appendInteractionResponseChunk: (id: string, chunk: string) => {
 };
 ```
 
+## MCP (Model Context Protocol) Integration
+
+LiteChat provides comprehensive MCP integration with multiple transport protocols and flexible deployment options.
+
+### Supported Transport Protocols
+
+1. **Streamable HTTP (MCP 2025-03-26)** - Primary
+   - Latest MCP specification with enhanced features
+   - Session management and security improvements
+   - Single endpoint design with better error handling
+
+2. **Stdio Transport** - Local/Remote Servers
+   - Via LiteChat MCP Bridge service
+   - Supports local and remote bridge deployments
+   - Process management and secure proxy functionality
+
+3. **SSE Transport** - Legacy Compatibility
+   - Backwards compatibility with older MCP implementations
+   - Automatic fallback when newer protocols fail
+
+### Bridge Configuration
+
+The MCP Bridge supports flexible deployment scenarios:
+
+```typescript
+interface McpBridgeConfig {
+  url?: string;        // Full URL: http://192.168.1.100:3001
+  host?: string;       // Host only: 192.168.1.100  
+  port?: number;       // Port only: 3001
+}
+
+// Auto-detection fallback: localhost ports 3001, 8080, 3000, 8000
+```
+
+### MCP Server Configuration
+
+```typescript
+interface McpServerConfig {
+  id: string;
+  name: string;
+  url: string;          // HTTP/HTTPS or stdio:// URLs
+  description?: string;
+  headers?: Record<string, string>;
+  enabled: boolean;
+}
+```
+
+### Tool Integration
+
+MCP tools are registered as individual tools in the tool selector:
+
+```typescript
+// Tools are prefixed with server name for identification
+const toolName = `mcp_${serverId}_${originalToolName}`;
+
+// Each tool can be toggled independently
+this.unregisterCallback = modApi.registerTool(
+  toolName,
+  toolDefinition,
+  toolImplementation
+);
+```
+
 ## Git Integration
 
-LiteChat provides browser-based Git operations using isomorphic-git.
+LiteChat provides browser-based Git operations using isomorphic-git with comprehensive sync capabilities.
 
 ### Git Operations (`src/lib/litechat/vfs-git-operations.ts`)
 
 ```typescript
-// Clone repository
+// Clone repository with authentication
 export const cloneRepoOp = async (
   url: string,
   dir: string,
@@ -579,7 +787,7 @@ export const cloneRepoOp = async (
   });
 };
 
-// Commit changes
+// Commit with proper author configuration
 export const commitOp = async (
   message: string,
   options?: GitOperationOptions
@@ -611,7 +819,7 @@ repository/
 
 ### Git Tools for AI
 
-Git operations available as AI tools:
+Git operations available as AI tools through GitToolsModule:
 
 ```typescript
 export class GitToolsModule implements ControlModule {
@@ -627,9 +835,78 @@ export class GitToolsModule implements ControlModule {
 }
 ```
 
+## Form System Architecture
+
+LiteChat uses TanStack Form exclusively with a strict abstraction layer.
+
+### Form Hook Pattern
+
+**CRITICAL**: Always use `use-formedible.tsx` abstraction, never `react-hook-form`:
+
+```typescript
+// ✅ CORRECT: Use TanStack Form via abstraction
+import { useFormedible } from "@/hooks/use-formedible";
+
+const MyComponent = () => {
+  const form = useFormedible({
+    defaultValues: { name: "", email: "" },
+    validators: { 
+      onChange: z.object({
+        name: z.string().min(1),
+        email: z.string().email(),
+      })
+    },
+    onSubmit: async ({ value }) => {
+      await saveData(value);
+    },
+  });
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); form.handleSubmit(); }}>
+      <form.Field name="name" children={(field) => (
+        <Input 
+          value={field.state.value}
+          onChange={(e) => field.handleChange(e.target.value)}
+          onBlur={field.handleBlur}
+        />
+      )} />
+    </form>
+  );
+};
+```
+
+### Settings Form Pattern
+
+Settings forms follow a consistent pattern with event integration:
+
+```typescript
+// Settings form with store integration
+const form = useForm({
+  defaultValues: {
+    autoTitleEnabled: settings.autoTitleEnabled ?? false,
+    autoTitleModelId: settings.autoTitleModelId ?? null,
+  },
+  validators: { onChange: settingsSchema },
+  onSubmit: async ({ value }) => {
+    // Use events, not direct store calls
+    emitter.emit(settingsEvent.setAutoTitleEnabledRequest, { 
+      enabled: value.autoTitleEnabled 
+    });
+  },
+});
+
+// Reset form when store changes
+useEffect(() => {
+  form.reset({
+    autoTitleEnabled: settings.autoTitleEnabled ?? false,
+    autoTitleModelId: settings.autoTitleModelId ?? null,
+  });
+}, [settings.autoTitleEnabled, settings.autoTitleModelId, form]);
+```
+
 ## Modding System
 
-LiteChat provides a secure modding system allowing external extensions.
+LiteChat provides a secure modding system allowing external extensions while maintaining system integrity.
 
 ### LiteChatModApi Interface
 
@@ -645,6 +922,7 @@ interface LiteChatModApi {
   registerChatControl(control: ModChatControl): () => void;
   registerCanvasControl(control: ModCanvasControl): () => void;
   registerSettingsTab(tab: CustomSettingTab): () => void;
+  registerBlockRenderer(renderer: BlockRenderer): () => void;
   
   // Tool Registration
   registerTool<T extends z.ZodSchema>(
@@ -652,6 +930,9 @@ interface LiteChatModApi {
     tool: Tool<T>,
     implementation: ToolImplementation<T>
   ): () => void;
+  
+  // Rule Registration (Control Rules)
+  registerRule(rule: ModControlRule): () => void;
   
   // Event System
   on<K extends keyof ModEventPayloadMap>(
@@ -664,8 +945,9 @@ interface LiteChatModApi {
     payload: ModEventPayloadMap[K]
   ): void;
   
-  // Utilities
+  // Context and Utilities
   getContext(): ModApiContext;
+  getContextSnapshot(): ModApiContextSnapshot;
   log(level: 'info' | 'warn' | 'error', message: string, ...args: any[]): void;
   toast(message: string, options?: ToastOptions): void;
 }
@@ -677,20 +959,22 @@ interface LiteChatModApi {
 function createMyMod(modApi: LiteChatModApi) {
   let internalState = { enabled: true };
 
-  // Register components
+  // Register components with proper cleanup
   const unregisterControl = modApi.registerPromptControl({
     id: 'my-control',
-    status: () => internalState.enabled ? 'ready' : 'disabled',
-    triggerRenderer: () => React.createElement(MyControlComponent),
+    triggerRenderer: () => React.createElement(MyControlComponent, { modApi }),
     getMetadata: () => ({ customFlag: internalState.enabled }),
+    clearOnSubmit: () => {
+      internalState.enabled = false;
+    },
   });
 
-  // Subscribe to events
+  // Subscribe to events with proper cleanup
   const unregisterEvent = modApi.on('conversation.selected.item.changed', (payload) => {
     modApi.log('info', 'Conversation changed:', payload.itemId);
   });
 
-  // Cleanup function
+  // Cleanup function - CRITICAL for proper module lifecycle
   return () => {
     unregisterControl();
     unregisterEvent();
@@ -706,18 +990,44 @@ function createMyMod(modApi: LiteChatModApi) {
 ```typescript
 export class MyControlModule implements ControlModule {
   readonly id = "my-module";
-  readonly dependencies = ["some-dependency"];
+  readonly dependencies = ["some-dependency"]; // Optional dependencies
+  
+  private unregisterCallback: (() => void) | null = null;
+  private eventUnsubscribers: (() => void)[] = [];
+  private modApiRef: LiteChatModApi | null = null;
   
   async initialize(modApi: LiteChatModApi): Promise<void> {
-    // Setup and event subscriptions
+    this.modApiRef = modApi;
+    
+    // Subscribe to events for state management
+    const unsubscribe = modApi.on(someEvent.changed, (payload) => {
+      this.handleStateChange(payload);
+    });
+    this.eventUnsubscribers.push(unsubscribe);
   }
   
   register(modApi: LiteChatModApi): void {
-    // Register UI components, tools, etc.
+    if (this.unregisterCallback) {
+      console.warn(`[${this.id}] Already registered. Skipping.`);
+      return;
+    }
+    
+    this.unregisterCallback = modApi.registerPromptControl({
+      id: this.id,
+      triggerRenderer: () => React.createElement(MyComponent, { module: this }),
+      getMetadata: () => ({ moduleEnabled: true }),
+    });
   }
   
   destroy(): void {
-    // Cleanup
+    this.eventUnsubscribers.forEach((unsub) => unsub());
+    this.eventUnsubscribers = [];
+    if (this.unregisterCallback) {
+      this.unregisterCallback();
+      this.unregisterCallback = null;
+    }
+    this.modApiRef = null;
+    console.log(`[${this.id}] Destroyed.`);
   }
 }
 ```
@@ -725,7 +1035,7 @@ export class MyControlModule implements ControlModule {
 2. **Add to App.tsx**:
 ```typescript
 const controlModulesToRegister: ControlModuleConstructor[] = [
-  // ... existing modules
+  // ... existing modules in dependency order
   MyControlModule,
 ];
 ```
@@ -764,9 +1074,33 @@ export interface ModEventPayloadMap extends
 ```typescript
 export const useMyStore = create(
   immer<MyState & MyActions>((set, get) => ({
-    // State and actions
+    // State
+    data: [],
+    loading: false,
+    
+    // Actions
+    loadData: async () => {
+      set((state) => { state.loading = true; });
+      try {
+        const data = await MyService.loadData();
+        set((state) => { 
+          state.data = data; 
+          state.loading = false; 
+        });
+        emitter.emit(myDomainEvent.dataChanged, { data });
+      } catch (error) {
+        set((state) => { state.loading = false; });
+        console.error('Load failed:', error);
+      }
+    },
+    
+    // Event integration
     getRegisteredActionHandlers: () => [
-      // Event handlers
+      {
+        eventName: myDomainEvent.loadDataRequest,
+        handler: () => get().loadData(),
+        storeId: "myStore",
+      },
     ],
   }))
 );
@@ -781,18 +1115,25 @@ const storesWithActionHandlers = [
 ];
 ```
 
-### Persistence (Import/Export) Services
-
-When adding new data types for persistence, ensure they are integrated into the `PersistenceService` for database operations and the `ImportExportService` for backup/restore functionalities. This includes defining appropriate interfaces in `FullExportData` and `FullImportOptions`, and implementing the logic for saving/loading and clearing the data.
-
 ### Code Organization Principles
 
 1. **Separation of Concerns**: Each module/service handles one domain
 2. **Event-Driven**: Use events for communication, not direct calls
-3. **Type Safety**: All interfaces and events strongly typed
+3. **Type Safety**: All interfaces and events strongly typed  
 4. **Immutable Updates**: Use Immer for safe state mutations
 5. **Error Boundaries**: Graceful error handling and recovery
 6. **Clean Dependencies**: Explicit dependencies, avoid circular imports
+7. **Form Abstraction**: Always use `use-formedible.tsx`, never direct form libraries
+8. **Worker Operations**: Heavy operations (VFS, Git) must run in workers
+
+### Performance Considerations
+
+1. **Lazy Loading**: Modules loaded on demand
+2. **Event Batching**: Batch state updates when possible
+3. **Memoization**: Use React.memo and useMemo for expensive operations
+4. **VFS Optimization**: Efficient file tree operations in workers
+5. **Stream Management**: Proper cleanup of streaming responses
+6. **Block Renderer Caching**: Cache expensive renderer operations
 
 ### Testing Approach
 
@@ -800,14 +1141,7 @@ When adding new data types for persistence, ensure they are integrated into the 
 - **Integration Tests**: Test module interactions through events
 - **End-to-End**: Test complete user workflows
 - **Type Checking**: Comprehensive TypeScript coverage
-
-### Performance Considerations
-
-1. **Lazy Loading**: Modules loaded on demand
-2. **Event Batching**: Batch state updates when possible
-3. **Memoization**: Use React.memo and useMemo for expensive operations
-4. **VFS Optimization**: Efficient file tree operations
-5. **Stream Management**: Proper cleanup of streaming responses
+- **Build Validation**: Always test builds before completion
 
 ## Build and Deployment
 
@@ -825,6 +1159,9 @@ npm test
 
 # Type checking
 npx tsc --noEmit
+
+# MCP Bridge (for stdio MCP servers)
+node bin/mcp-bridge.js
 ```
 
 ### Build Process
@@ -849,5 +1186,63 @@ Key build-time environment variables:
 2. **GitHub Pages**: Automated deployment via `npm run deploy`
 3. **Docker**: Nginx-based container deployment
 4. **Local Hosting**: Simple HTTP server for local use
+
+## Advanced Patterns
+
+### Control Rules vs User Rules
+
+- **User Rules**: Created by users in Rules settings, stored in database
+- **Control Rules**: Automatically registered by modules, guide AI behavior
+- **Always-On Logic**: Both types support always-on behavior
+- **Settings Integration**: Control rules can be toggled in settings
+
+### Worker Communication
+
+VFS and Git operations run in dedicated workers:
+
+```typescript
+// All heavy operations go through workers
+await VfsWorker.writeFile(path, content);
+await GitWorker.commitChanges(message);
+
+// Never run these on main thread
+// ❌ fs.writeFileSync(path, content); 
+```
+
+### Race Condition Management
+
+Interaction parent-child relationships handle race conditions:
+
+```typescript
+// Parent interaction spawns children for regeneration/races
+const parentInteraction = { id: "parent", parentId: null };
+const childInteraction = { id: "child", parentId: "parent", index: 0 };
+
+// Promotion swaps the relationship
+await promoteChildToParent("child", "parent");
+// Result: child becomes parent, parent becomes child
+```
+
+### Template Compilation
+
+Prompt templates support variable substitution and auto-selection:
+
+```typescript
+const template = {
+  content: "Hello {{name}}, please {{action}}",
+  variables: [
+    { name: "name", type: "text", required: true },
+    { name: "action", type: "text", required: true }
+  ],
+  tools: ["vfs_read_file"],
+  rules: ["rule-123"],
+  tags: ["tag-456"]
+};
+
+const compiled = await compileTemplate(template, {
+  name: "User",
+  action: "help me code"
+});
+```
 
 This comprehensive developer guide covers LiteChat's architecture, codebase organization, and development patterns. Use this context to understand how to work with and extend LiteChat effectively. 
