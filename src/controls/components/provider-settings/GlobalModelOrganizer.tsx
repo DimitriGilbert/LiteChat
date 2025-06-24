@@ -16,6 +16,8 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -66,6 +68,8 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
     tools: false,
     multimodal: false,
   });
+
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   useEffect(() => {
     setSelectedProviders(new Set(dbProviderConfigs.map((p) => p.id)));
@@ -176,16 +180,24 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
     [filteredAndOrderedModelsForDisplay]
   );
 
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  }, []);
+
+  const handleDragCancel = useCallback(() => {
+    setActiveId(null);
+  }, []);
+
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
       if (over && active.id !== over.id) {
         // Operate on the full `enabledAndOrderedModels` list for reordering
         const currentFullOrderIds = enabledAndOrderedModels.map((m) => m.id);
-        const activeId = active.id as string;
+        const draggedId = active.id as string;
         const overId = over.id as string;
 
-        const oldIndexInFullList = currentFullOrderIds.indexOf(activeId);
+        const oldIndexInFullList = currentFullOrderIds.indexOf(draggedId);
         const newIndexInFullList = currentFullOrderIds.indexOf(overId);
 
         if (oldIndexInFullList !== -1 && newIndexInFullList !== -1) {
@@ -201,6 +213,7 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
           );
         }
       }
+      setActiveId(null);
     },
     [enabledAndOrderedModels, setGlobalModelSortOrderFromModule]
   );
@@ -248,7 +261,11 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
   );
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px movement before drag starts
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -310,7 +327,10 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
+              modifiers={[]}
             >
               <SortableContext
                 items={sortableItemIdsForDisplay}
@@ -341,6 +361,20 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
                   )
                 )}
               </SortableContext>
+              <DragOverlay dropAnimation={null}>
+                {activeId ? (
+                  <SortableModelItem
+                    id={activeId}
+                    modelDetails={filteredAndOrderedModelsForDisplay.find(m => m.id === activeId)!}
+                    onMoveToTop={() => {}}
+                    onMoveUp={() => {}}
+                    onMoveDown={() => {}}
+                    isFirst={false}
+                    isLast={false}
+                    buttonsDisabled={true}
+                  />
+                ) : null}
+              </DragOverlay>
             </DndContext>
           ) : (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground">

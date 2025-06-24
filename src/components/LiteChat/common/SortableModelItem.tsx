@@ -58,7 +58,8 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 10 : undefined,
+    zIndex: isDragging ? 9999 : undefined,
+    position: isDragging ? ('relative' as const) : undefined,
   };
 
   const supportedParams = new Set(
@@ -82,18 +83,26 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
       style={style}
       className={cn(
         "flex items-center space-x-2 p-2 rounded border border-transparent bg-muted/50 hover:bg-muted mb-1",
-        isDragging && "shadow-lg border-primary bg-card",
+        isDragging && "shadow-2xl border-primary bg-card opacity-75 transform scale-105",
         "cursor-grab active:cursor-grabbing"
       )}
       aria-label={`Drag to reorder model ${modelDetails.name}`}
+      onMouseDown={(e) => {
+        // Only prevent default if not clicking on buttons
+        const target = e.target as HTMLElement;
+        if (!target.closest('button')) {
+          e.preventDefault();
+        }
+      }}
     >
       <button
         {...attributes}
         {...listeners}
         type="button"
-        className={cn("p-1 flex-shrink-0", "hover:text-foreground")}
+        className={cn("p-1 flex-shrink-0 touch-none", "hover:text-foreground")}
         aria-hidden="true"
         tabIndex={-1}
+        style={{ touchAction: 'none' }}
       >
         <GripVerticalIcon className="h-5 w-5 text-muted-foreground" />
       </button>
