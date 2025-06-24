@@ -13,6 +13,7 @@ import {
 } from '@xyflow/react';
 import { cn } from '@/lib/utils';
 import type { WorkflowTemplate, WorkflowStep } from '@/types/litechat/workflow';
+import { getTreeLayout } from '@/lib/litechat/tree-layout';
 
 import '@xyflow/react/dist/style.css';
 
@@ -179,7 +180,6 @@ export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
     // Add workflow step nodes with data from props
     if (workflow.steps && workflow.steps.length > 0) {
       workflow.steps.forEach((step: WorkflowStep, index: number) => {
-        const nodeX = (index + 1) * HORIZONTAL_SPACING;
         const displayData = stepDisplayData[index] || {
           stepName: step.name || 'Unnamed Step',
           templateName: undefined,
@@ -190,7 +190,8 @@ export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
         nodes.push({
           id: step.id,
           type: 'workflowStep',
-          position: { x: nodeX, y: 0 },
+          // position will be set by getTreeLayout
+          position: { x: 0, y: 0 },
           data: {
             stepName: displayData.stepName,
             templateName: displayData.templateName,
@@ -211,12 +212,12 @@ export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
           type: 'smoothstep',
           animated: true,
           style: { 
-            stroke: '#1f2937', // Much darker gray for better contrast
+            stroke: 'var(--chart-3)',
             strokeWidth: 3,
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: '#1f2937',
+            color: 'var(--chart-3)',
             width: 18,
             height: 18,
           },
@@ -224,7 +225,9 @@ export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
       });
     }
 
-    return { nodes, edges };
+    // Use d3-hierarchy to layout nodes
+    const layoutedNodes = getTreeLayout(nodes, edges, [220, 120]);
+    return { nodes: layoutedNodes, edges };
   }, [workflow, initialStepData, stepDisplayData, stepStatuses]);
 
   // Show empty state if no steps

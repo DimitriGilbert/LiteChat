@@ -14,7 +14,7 @@ import {
   Background,
   BackgroundVariant,
   MiniMap,
-  MarkerType,
+  MarkerType as XYMarkerType,
   Handle,
   Position,
 } from '@xyflow/react';
@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { FlowData, FlowNode, StepStatus } from "@/types/litechat/flow";
 import { JSONFlowParser, autoLayoutNodes } from "@/lib/litechat/flow-parser";
+import { getTreeLayout } from '@/lib/litechat/tree-layout';
 
 import '@xyflow/react/dist/style.css';
 
@@ -40,32 +41,29 @@ interface FlowBlockRendererProps {
 // Custom Flow Node Component
 const FlowStepNode: React.FC<{ data: any }> = ({ data }) => {
   const getNodeColor = (type: string, status?: StepStatus) => {
-    // Status-based colors take priority (with glow)
     if (status) {
       switch (status) {
         case 'running':
-          return 'bg-blue-50 border-blue-400 text-blue-900 shadow-lg shadow-blue-200';
+          return 'bg-[var(--card-foreground)] border-[var(--primary)] text-[var(--secondary)] shadow-lg shadow-[var(--primary)/20]';
         case 'success':
-          return 'bg-green-50 border-green-400 text-green-900 shadow-lg shadow-green-200';
+          return 'bg-[var(--card-foreground)] border-[var(--chart-2)] text-[var(--primary)] shadow-lg shadow-[var(--chart-2)/20]';
         case 'error':
-          return 'bg-red-50 border-red-400 text-red-900 shadow-lg shadow-red-200';
+          return 'bg-[var(--card-foreground)] border-[var(--destructive)] text-[var(--destructive)] shadow-lg shadow-[var(--destructive)/20]';
         case 'pending':
-          return 'bg-gray-50 border-gray-300 text-gray-700 shadow-lg shadow-gray-200';
+          return 'bg-[var(--card-foreground)] border-[var(--muted)] text-[var(--background)] shadow-lg shadow-[var(--muted)/20]';
       }
     }
-
-    // Default type-based colors (minimal shadow when no status)
     switch (type) {
       case 'trigger':
-        return 'bg-indigo-100 border-indigo-400 text-indigo-900 shadow-sm';
+        return 'bg-[var(--card-foreground)] border-[var(--primary)] text-[var(--card)] shadow-sm';
       case 'prompt':
-        return 'bg-green-100 border-green-400 text-green-900 shadow-sm';
+        return 'bg-[var(--card-foreground)] border-[var(--chart-1)] text-[var(--card)] shadow-sm';
       case 'agent-task':
-        return 'bg-purple-100 border-purple-400 text-purple-900 shadow-sm';
+        return 'bg-[var(--card-foreground)] border-[var(--chart-2)] text-[var(--card)] shadow-sm';
       case 'human-in-the-loop':
-        return 'bg-orange-100 border-orange-400 text-orange-900 shadow-sm';
+        return 'bg-[var(--card-foreground)] border-[var(--chart-4)] text-[var(--card)] shadow-sm';
       default:
-        return 'bg-gray-100 border-gray-400 text-gray-900 shadow-sm';
+        return 'bg-[var(--card-foreground)] border-[var(--border)] text-[var(--card)] shadow-sm';
     }
   };
 
@@ -274,7 +272,7 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
       const layoutedNodes = autoLayoutNodes(data.nodes);
 
       // Convert to React Flow format
-      const reactFlowNodes: Node[] = layoutedNodes.map((node: FlowNode) => ({
+      let reactFlowNodes: Node[] = layoutedNodes.map((node: FlowNode) => ({
         id: node.id,
         type: 'flowStep',
         position: node.position ?? { x: 0, y: 0 },
@@ -287,24 +285,37 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
           ...node.data,
         },
       }));
-
-      const reactFlowEdges: Edge[] = data.edges.map((edge) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        type: edge.type || 'smoothstep',
-        animated: edge.animated || false,
-        style: edge.style || { 
-          stroke: '#1f2937',
-          strokeWidth: 2,
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: '#1f2937',
-          width: 18,
-          height: 18,
-        },
-      }));
+      // Map FlowEdge[] to Edge[] for getTreeLayout
+      const reactFlowEdges: Edge[] = data.edges.map((edge) => {
+        let markerEnd: Edge['markerEnd'] = undefined;
+        if (edge.markerEnd && typeof edge.markerEnd === 'object') {
+          // Only assign if type is a valid XYMarkerType
+          const validTypes = Object.values(XYMarkerType);
+          const type = (edge.markerEnd as any).type;
+          if (type && validTypes.includes(type)) {
+            markerEnd = {
+              ...edge.markerEnd,
+              type: type,
+            };
+          } else {
+            markerEnd = {
+              ...edge.markerEnd,
+              type: XYMarkerType.ArrowClosed,
+            };
+          }
+        }
+        return {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          type: edge.type as any,
+          animated: edge.animated,
+          style: edge.style,
+          markerEnd,
+        };
+      });
+      // Use d3-hierarchy to layout nodes
+      reactFlowNodes = getTreeLayout(reactFlowNodes, reactFlowEdges, [220, 120]);
 
       setNodes(reactFlowNodes);
       setEdges(reactFlowEdges);
