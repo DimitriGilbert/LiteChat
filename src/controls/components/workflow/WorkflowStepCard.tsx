@@ -63,15 +63,15 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
         disabled: isDragDisabled 
     });
 
-    console.log('🐛 [WorkflowStepCard] Render:', {
-        stepId: step.id,
-        stepName: step.name,
-        isDragDisabled,
-        isDragging,
-        hasListeners: !!listeners,
-        hasAttributes: !!attributes,
-        transform: transform ? `${transform.x}, ${transform.y}` : 'none'
-    });
+    // console.log('🐛 [WorkflowStepCard] Render:', {
+    //     stepId: step.id,
+    //     stepName: step.name,
+    //     isDragDisabled,
+    //     isDragging,
+    //     hasListeners: !!listeners,
+    //     hasAttributes: !!attributes,
+    //     transform: transform ? `${transform.x}, ${transform.y}` : 'none'
+    // });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -177,41 +177,41 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
                         }}
                         onClick={(e) => {
                             e.stopPropagation(); // Don't expand when clicking drag handle
-                            console.log('🐛 [WorkflowStepCard] Drag handle CLICK:', {
-                                stepId: step.id,
-                                disabled: isDragDisabled,
-                                target: e.target
-                            });
+                            // console.log('🐛 [WorkflowStepCard] Drag handle CLICK:', {
+                            //     stepId: step.id,
+                            //     disabled: isDragDisabled,
+                            //     target: e.target
+                            // });
                         }}
                         onMouseDown={(e) => {
                             e.stopPropagation(); // Don't expand when clicking drag handle
-                            console.log('🐛 [WorkflowStepCard] Drag handle mousedown:', {
-                                stepId: step.id,
-                                disabled: isDragDisabled,
-                                button: e.button,
-                                target: e.target
-                            });
+                            // console.log('🐛 [WorkflowStepCard] Drag handle mousedown:', {
+                            //     stepId: step.id,
+                            //     disabled: isDragDisabled,
+                            //     button: e.button,
+                            //     target: e.target
+                            // });
                         }}
-                        onMouseUp={(e) => {
-                            console.log('🐛 [WorkflowStepCard] Drag handle mouseup:', {
-                                stepId: step.id,
-                                target: e.target
-                            });
-                        }}
-                        onMouseEnter={(e) => {
-                            console.log('🐛 [WorkflowStepCard] Drag handle mouseenter:', {
-                                stepId: step.id,
-                                target: e.target
-                            });
-                        }}
+                        // onMouseUp={(e) => {
+                        //     console.log('🐛 [WorkflowStepCard] Drag handle mouseup:', {
+                        //         stepId: step.id,
+                        //         target: e.target
+                        //     });
+                        // }}
+                        // onMouseEnter={(e) => {
+                        //     console.log('🐛 [WorkflowStepCard] Drag handle mouseenter:', {
+                        //         stepId: step.id,
+                        //         target: e.target
+                        //     });
+                        // }}
                         onPointerDown={(e) => {
                             e.stopPropagation(); // Don't expand when clicking drag handle
-                            console.log('🐛 [WorkflowStepCard] Drag handle pointerdown:', {
-                                stepId: step.id,
-                                disabled: isDragDisabled,
-                                pointerType: e.pointerType,
-                                target: e.target
-                            });
+                            // console.log('🐛 [WorkflowStepCard] Drag handle pointerdown:', {
+                            //     stepId: step.id,
+                            //     disabled: isDragDisabled,
+                            //     pointerType: e.pointerType,
+                            //     target: e.target
+                            // });
                         }}
                     >
                         <GripVertical className="h-4 w-4 text-muted-foreground" />

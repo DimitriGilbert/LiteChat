@@ -511,57 +511,57 @@ const StepsForm = React.forwardRef<
 
     // Drag handlers
     const handleDragStart = useCallback((event: DragStartEvent) => {
-        console.log('🐛 [WorkflowBuilder] DragStart:', {
-            activeId: event.active.id,
-            event
-        });
+        // console.log('🐛 [WorkflowBuilder] DragStart:', {
+        //     activeId: event.active.id,
+        //     event
+        // });
         setActiveStepId(event.active.id as string);
     }, []);
 
-    const handleDragEnd = useCallback((event: DragEndEvent) => {
-        const { active, over } = event;
-        console.log('🐛 [WorkflowBuilder] DragEnd:', {
-            activeId: active.id,
-            overId: over?.id,
-            over,
-            event
-        });
+    const handleDragEnd = useCallback((/*event: DragEndEvent*/) => {
+        // const { active, over } = event;
+        // console.log('🐛 [WorkflowBuilder] DragEnd:', {
+        //     activeId: active.id,
+        //     overId: over?.id,
+        //     over,
+        //     event
+        // });
         
-        if (over && active.id !== over.id) {
-            const activeIndex = steps.findIndex(step => step.id === active.id);
-            const overIndex = steps.findIndex(step => step.id === over.id);
+        // if (over && active.id !== over.id) {
+        //     const activeIndex = steps.findIndex(step => step.id === active.id);
+        //     const overIndex = steps.findIndex(step => step.id === over.id);
             
-            console.log('🐛 [WorkflowBuilder] Reordering:', {
-                activeIndex,
-                overIndex,
-                stepsLength: steps.length
-            });
+        //     console.log('🐛 [WorkflowBuilder] Reordering:', {
+        //         activeIndex,
+        //         overIndex,
+        //         stepsLength: steps.length
+        //     });
             
-            if (activeIndex !== -1 && overIndex !== -1) {
-                handleMoveStep(activeIndex, overIndex);
-                console.log('🐛 [WorkflowBuilder] Move executed');
-            } else {
-                console.log('🐛 [WorkflowBuilder] Move NOT executed - invalid indices');
-            }
-        } else {
-            console.log('🐛 [WorkflowBuilder] No reordering - same position or no over target');
-        }
+        //     if (activeIndex !== -1 && overIndex !== -1) {
+        //         handleMoveStep(activeIndex, overIndex);
+        //         console.log('🐛 [WorkflowBuilder] Move executed');
+        //     } else {
+        //         console.log('🐛 [WorkflowBuilder] Move NOT executed - invalid indices');
+        //     }
+        // } else {
+        //     console.log('🐛 [WorkflowBuilder] No reordering - same position or no over target');
+        // }
         setActiveStepId(null);
     }, [steps, handleMoveStep]);
 
     const handleDragCancel = useCallback(() => {
-        console.log('🐛 [WorkflowBuilder] DragCancel');
+        // console.log('🐛 [WorkflowBuilder] DragCancel');
         setActiveStepId(null);
     }, []);
 
     const stepIds = useMemo(() => steps.map(step => step.id), [steps]);
 
-    console.log('🐛 [WorkflowBuilder] Component render:', {
-        stepsCount: steps.length,
-        activeStepId,
-        stepIds,
-        sensors: sensors.length
-    });
+        // console.log('🐛 [WorkflowBuilder] Component render:', {
+        //     stepsCount: steps.length,
+        //     activeStepId,
+        //     stepIds,
+        //     sensors: sensors.length
+        // });
 
     return (
         <DndContext
@@ -570,18 +570,18 @@ const StepsForm = React.forwardRef<
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
-            onDragMove={(event) => {
-                console.log('🐛 [WorkflowBuilder] DragMove:', {
-                    activeId: event.active.id,
-                    overId: event.over?.id
-                });
-            }}
-            onDragOver={(event) => {
-                console.log('🐛 [WorkflowBuilder] DragOver:', {
-                    activeId: event.active.id,
-                    overId: event.over?.id
-                });
-            }}
+            // onDragMove={(event) => {
+            //     console.log('🐛 [WorkflowBuilder] DragMove:', {
+            //         activeId: event.active.id,
+            //         overId: event.over?.id
+            //     });
+            // }}
+            // onDragOver={(event) => {
+            //     console.log('🐛 [WorkflowBuilder] DragOver:', {
+            //         activeId: event.active.id,
+            //         overId: event.over?.id
+            //     });
+            // }}
             modifiers={[]}
         >
             <div className="h-full flex flex-col border rounded-md p-3">
