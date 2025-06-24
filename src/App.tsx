@@ -71,6 +71,7 @@ import { CodeBlockRendererModule } from "@/controls/modules/CodeBlockRendererMod
 import { MermaidBlockRendererModule } from "@/controls/modules/MermaidBlockRendererModule";
 import { FlowBlockRendererModule } from "@/controls/modules/FlowBlockRendererModule";
 import { FormedibleBlockRendererModule } from "@/controls/modules/FormedibleBlockRendererModule";
+import { ChartBlockRendererModule } from "@/controls/modules/ChartBlockRendererModule";
 
 // Define the application's specific control module registration order HERE
 const controlModulesToRegister: ControlModuleConstructor[] = [
@@ -114,6 +115,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   MermaidBlockRendererModule,
   FlowBlockRendererModule,
   FormedibleBlockRendererModule,
+  ChartBlockRendererModule,
   // Canvas Action Controls
   CopyActionControlModule, // For InteractionCard header
   FoldInteractionControlModule, // For InteractionCard header
