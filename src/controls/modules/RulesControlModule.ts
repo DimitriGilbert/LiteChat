@@ -126,19 +126,18 @@ export class RulesControlModule implements ControlModule {
     const settings = useSettingsStore.getState();
     
     // Convert control rules to DbRule format with settings override for alwaysOn
+    const defaultDate = new Date(); // Create once and reuse
     const controlRulesAsDbRules: DbRule[] = Object.values(controlRules).map(controlRule => ({
       id: controlRule.id,
       name: controlRule.name,
       content: controlRule.content,
       type: controlRule.type,
       alwaysOn: settings.controlRuleAlwaysOn[controlRule.id] ?? true, // Use DB setting or default to true
-      createdAt: new Date(), // Default date for control rules
-      updatedAt: new Date(), // Default date for control rules
+      createdAt: defaultDate,
+      updatedAt: defaultDate,
     }));
     
     const allRules = [...dbRules, ...controlRulesAsDbRules];
-    // console.log('getAllRules called, control rule preferences:', settings.controlRuleAlwaysOn);
-    // console.log('getAllRules returning:', allRules.map(r => ({ id: r.id, name: r.name, alwaysOn: r.alwaysOn, type: r.type })));
     
     return allRules;
   };
@@ -194,6 +193,7 @@ export class RulesControlModule implements ControlModule {
     updates: Partial<Omit<DbRule, "id" | "createdAt">>
   ) => {
     // For control rules, only allow alwaysOn updates via settings
+    // For control rules, only allow alwaysOn updates via settings
     if (this.isControlRule(id)) {
       // Only allow toggling alwaysOn for control rules
       if (Object.keys(updates).length === 1 && 'alwaysOn' in updates) {
@@ -209,19 +209,14 @@ export class RulesControlModule implements ControlModule {
           this.transientActiveRuleIds.delete(id);
         }
         
-        // IMMEDIATELY notify components BEFORE emitting events to force refresh
-        this.notifyComponentUpdate?.();
-        this.notifySettingsComponentUpdate?.();
-        
         // Emit control rules changed event so trigger components can refresh
         emitter.emit(controlRegistryEvent.controlRulesChanged, {
           controlRules: this.getControlRulesFromStore(),
         });
         
-        // Force another notification after event emission
-        setTimeout(() => {
-          this.notifyComponentUpdate?.();
-        }, 0);
+        // Single notification after state is updated
+        this.notifyComponentUpdate?.();
+        this.notifySettingsComponentUpdate?.();
         
         return;
       } else {
@@ -232,7 +227,6 @@ export class RulesControlModule implements ControlModule {
     // For database rules, use the rules event system
     this.modApiRef?.emit(rulesEvent.updateRuleRequest, { id, updates });
   };
-  
   public deleteRule = (id: string) => {
     // Prevent deleting control rules - they are managed automatically by modules
     if (this.isControlRule(id)) {
