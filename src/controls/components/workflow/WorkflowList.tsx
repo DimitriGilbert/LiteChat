@@ -95,7 +95,7 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
             const template = module.getPromptTemplates().find(t => t.id === workflow.triggerRef);
             if (template && template.variables && template.variables.length > 0) {
                 // Check if templateVariables has all required values
-                const hasAllValues = template.variables.every((variable: any) => {
+                const hasAllValues = template.variables.every(variable => {
                     const value = workflow.templateVariables?.[variable.name];
                     return value !== undefined && value !== null && value !== '';
                 });
