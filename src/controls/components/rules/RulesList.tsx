@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Edit2Icon, Trash2Icon, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import type { DbRule } from "@/types/litechat/rules";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
@@ -46,6 +47,7 @@ export const RulesList: React.FC<RulesListProps> = ({
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Type</TableHead>
+            <TableHead>Always On</TableHead>
             <TableHead>Content Preview</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -54,12 +56,12 @@ export const RulesList: React.FC<RulesListProps> = ({
           {isLoading ? (
             <>
               <TableRow>
-                <TableCell colSpan={4}>
+                <TableCell colSpan={5}>
                   <Skeleton className="h-10 w-full" />
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell colSpan={4}>
+                <TableCell colSpan={5}>
                   <Skeleton className="h-10 w-full" />
                 </TableCell>
               </TableRow>
@@ -67,7 +69,7 @@ export const RulesList: React.FC<RulesListProps> = ({
           ) : rules.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={4}
+                colSpan={5}
                 className="h-24 text-center text-muted-foreground"
               >
                 No rules defined yet.
@@ -80,6 +82,13 @@ export const RulesList: React.FC<RulesListProps> = ({
                 <TableRow key={rule.id}>
                   <TableCell className="font-medium">{rule.name}</TableCell>
                   <TableCell className="capitalize">{rule.type}</TableCell>
+                  <TableCell>
+                    {rule.alwaysOn && (
+                      <Badge variant="secondary" className="text-xs">
+                        Always On
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell className="text-xs text-muted-foreground truncate max-w-xs">
                     {rule.content}
                   </TableCell>

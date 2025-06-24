@@ -6,8 +6,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Workflow, Plus, Save, GitFork } from 'lucide-react';
+import { Workflow, Plus, Save, GitFork, Edit } from 'lucide-react';
 import { ActionTooltipButton } from '@/components/LiteChat/common/ActionTooltipButton';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '@/components/ui/hover-card';
+import { Badge } from '@/components/ui/badge';
 import type { WorkflowStep, WorkflowTemplate } from '@/types/litechat/workflow';
 import { WorkflowStepCard } from './WorkflowStepCard';
 import { WorkflowList } from './WorkflowList';
@@ -976,16 +982,146 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
         },
     ];
 
+    const shortcutWorkflows = module.getShortcutWorkflows();
+    const [searchTerm, setSearchTerm] = useState("");
+    
+    // Filter workflows based on search term
+    const filteredWorkflows = shortcutWorkflows.filter(workflow =>
+        workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        workflow.description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const checkIfWorkflowNeedsInput = useCallback((workflow: WorkflowTemplate): boolean => {
+        // Check if trigger needs input
+        if (workflow.triggerType === 'custom' && !workflow.triggerPrompt) {
+            return true; // Custom trigger without prompt
+        }
+        
+        if (workflow.triggerType === 'template' && workflow.triggerRef) {
+            // Check if template has variables that need values
+            const template = module.getPromptTemplates().find(t => t.id === workflow.triggerRef);
+            if (template && template.variables && template.variables.length > 0) {
+                // Check if templateVariables has all required values
+                const hasAllValues = template.variables.every((variable: any) => {
+                    const value = workflow.templateVariables?.[variable.name];
+                    return value !== undefined && value !== null && value !== '';
+                });
+                if (!hasAllValues) return true;
+            }
+        }
+        
+        // Workflow is ready to run
+        return false;
+    }, [module]);
+
+    const handleRunShortcutWorkflow = useCallback((workflow: WorkflowTemplate) => {
+        const needsInput = checkIfWorkflowNeedsInput(workflow);
+        
+        if (needsInput) {
+            // Open builder for configuration
+            handleEditWorkflow(workflow);
+            toast.info(`Workflow "${workflow.name}" needs configuration`, {
+                description: "Opening workflow builder to set up required inputs.",
+                duration: 3000,
+            });
+        } else {
+            // Use workflow's trigger prompt or fallback to simple default
+            const triggerPrompt = workflow.triggerPrompt || "Execute workflow";
+            module.startWorkflow(workflow, triggerPrompt);
+            toast.success(`Workflow "${workflow.name}" started!`);
+        }
+    }, [checkIfWorkflowNeedsInput, module, handleEditWorkflow]);
+
     return (
         <>
-            <ActionTooltipButton
-                tooltipText="Open Workflow Builder"
-                onClick={() => setOpen(true)}
-                aria-label="Open Workflow Builder"
-                disabled={isStreaming}
-                icon={<Workflow />}
-                className="h-5 w-5 md:h-6 md:w-6"
-            />
+            {shortcutWorkflows.length > 0 ? (
+                <HoverCard>
+                    <HoverCardTrigger asChild>
+                        <ActionTooltipButton
+                            tooltipText="Open Workflow Builder"
+                            onClick={() => setOpen(true)}
+                            aria-label="Open Workflow Builder"
+                            disabled={isStreaming}
+                            icon={<Workflow />}
+                            className="h-5 w-5 md:h-6 md:w-6"
+                        />
+                    </HoverCardTrigger>
+                    <HoverCardContent className="w-80 p-0" align="start">
+                        <div className="p-3 border-b">
+                            <h4 className="font-semibold text-sm mb-2">Quick Workflows</h4>
+                            <Input
+                                placeholder="Search workflows..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="h-8"
+                            />
+                        </div>
+                        <ScrollArea className="max-h-64">
+                            <div className="p-2 space-y-1">
+                                {filteredWorkflows.length === 0 ? (
+                                    <div className="text-center text-muted-foreground py-4 text-sm">
+                                        {searchTerm ? "No workflows match your search" : "No shortcut workflows available"}
+                                    </div>
+                                ) : (
+                                    filteredWorkflows.map((workflow) => {
+                                        const needsInput = checkIfWorkflowNeedsInput(workflow);
+                                        
+                                        return (
+                                            <div
+                                                key={workflow.id}
+                                                className="flex items-center gap-2 p-2 rounded hover:bg-accent transition-colors group"
+                                            >
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-6 w-6 p-0 opacity-50 group-hover:opacity-100"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleEditWorkflow(workflow);
+                                                    }}
+                                                >
+                                                    <Edit className="h-3 w-3" />
+                                                </Button>
+                                                
+                                                <div 
+                                                    className="flex-1 min-w-0 cursor-pointer"
+                                                    onClick={() => handleRunShortcutWorkflow(workflow)}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium text-sm truncate">{workflow.name}</span>
+                                                        <Badge variant="outline" className="text-xs px-1 py-0">
+                                                            {workflow.steps.length}
+                                                        </Badge>
+                                                        {needsInput && (
+                                                            <Badge variant="secondary" className="text-xs px-1 py-0">
+                                                                Setup
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    {workflow.description && (
+                                                        <div className="text-xs text-muted-foreground truncate mt-0.5">
+                                                            {workflow.description}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </ScrollArea>
+                    </HoverCardContent>
+                </HoverCard>
+            ) : (
+                <ActionTooltipButton
+                    tooltipText="Open Workflow Builder"
+                    onClick={() => setOpen(true)}
+                    aria-label="Open Workflow Builder"
+                    disabled={isStreaming}
+                    icon={<Workflow />}
+                    className="h-5 w-5 md:h-6 md:w-6"
+                />
+            )}
 
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="!w-[95vw] !h-[95vh] !max-w-none flex flex-col p-0">

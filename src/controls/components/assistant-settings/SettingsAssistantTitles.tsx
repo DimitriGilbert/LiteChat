@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 const assistantTitlesSchema = z.object({
   autoTitleEnabled: z.boolean(),
+  autoTitleAlwaysOn: z.boolean(),
   autoTitleModelId: z.string().nullable(), // Changed from .optional()
   autoTitlePromptMaxLength: z.number().min(100).max(4000),
   autoTitleIncludeFiles: z.boolean(),
@@ -38,6 +39,8 @@ export const SettingsAssistantTitles: React.FC = () => {
     useShallow((state) => ({
       autoTitleEnabled: state.autoTitleEnabled,
       setAutoTitleEnabled: state.setAutoTitleEnabled,
+      autoTitleAlwaysOn: state.autoTitleAlwaysOn,
+      setAutoTitleAlwaysOn: state.setAutoTitleAlwaysOn,
       autoTitleModelId: state.autoTitleModelId,
       setAutoTitleModelId: state.setAutoTitleModelId,
       autoTitlePromptMaxLength: state.autoTitlePromptMaxLength,
@@ -52,6 +55,7 @@ export const SettingsAssistantTitles: React.FC = () => {
   const form = useForm({
     defaultValues: {
       autoTitleEnabled: storeAccess.autoTitleEnabled ?? false,
+      autoTitleAlwaysOn: storeAccess.autoTitleAlwaysOn ?? false,
       autoTitleModelId: storeAccess.autoTitleModelId ?? null, // Ensures it's string or null
       autoTitlePromptMaxLength: storeAccess.autoTitlePromptMaxLength ?? 768,
       autoTitleIncludeFiles: storeAccess.autoTitleIncludeFiles ?? false,
@@ -64,6 +68,7 @@ export const SettingsAssistantTitles: React.FC = () => {
     onSubmit: async ({ value }) => {
       try {
         storeAccess.setAutoTitleEnabled(value.autoTitleEnabled);
+        storeAccess.setAutoTitleAlwaysOn(value.autoTitleAlwaysOn);
         // Ensure null is passed if value.autoTitleModelId is null/undefined
         storeAccess.setAutoTitleModelId(value.autoTitleModelId ?? null);
         storeAccess.setAutoTitlePromptMaxLength(value.autoTitlePromptMaxLength);
@@ -80,6 +85,7 @@ export const SettingsAssistantTitles: React.FC = () => {
   useEffect(() => {
     form.reset({
       autoTitleEnabled: storeAccess.autoTitleEnabled ?? false,
+      autoTitleAlwaysOn: storeAccess.autoTitleAlwaysOn ?? false,
       autoTitleModelId: storeAccess.autoTitleModelId ?? null,
       autoTitlePromptMaxLength: storeAccess.autoTitlePromptMaxLength ?? 768,
       autoTitleIncludeFiles: storeAccess.autoTitleIncludeFiles ?? false,
@@ -87,6 +93,7 @@ export const SettingsAssistantTitles: React.FC = () => {
     });
   }, [
     storeAccess.autoTitleEnabled,
+    storeAccess.autoTitleAlwaysOn,
     storeAccess.autoTitleModelId,
     storeAccess.autoTitlePromptMaxLength,
     storeAccess.autoTitleIncludeFiles,
@@ -123,6 +130,24 @@ export const SettingsAssistantTitles: React.FC = () => {
       />
       {form.state.values.autoTitleEnabled && (
         <div className="space-y-3 pl-6 border-l-2 border-muted">
+          <form.Field
+            name="autoTitleAlwaysOn"
+            children={(field) => (
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id={field.name}
+                  checked={field.state.value}
+                  onCheckedChange={field.handleChange}
+                  onBlur={field.handleBlur}
+                  aria-labelledby={`${field.name}-label`}
+                />
+                <Label id={`${field.name}-label`} htmlFor={field.name}>
+                  Always On (disable per-turn control)
+                </Label>
+                <FieldMetaMessages field={field} />
+              </div>
+            )}
+          />
           <form.Field
             name="autoTitleModelId"
             children={(field) => (

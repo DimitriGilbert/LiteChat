@@ -38,6 +38,7 @@ export interface WorkflowTemplate {
   triggerRef?: string; // template or task ID
   triggerPrompt?: string; // for custom prompts
   templateVariables?: Record<string, any>; // values for template variables
+  isShortcut?: boolean; // New field for shortcut workflows
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
 }

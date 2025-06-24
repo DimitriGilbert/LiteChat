@@ -26,6 +26,7 @@ export const settingsEvent = {
   toolMaxStepsChanged: "settings.tool.max.steps.changed",
   prismThemeUrlChanged: "settings.prism.theme.url.changed",
   autoTitleEnabledChanged: "settings.auto.title.enabled.changed",
+  autoTitleAlwaysOnChanged: "settings.auto.title.always.on.changed",
   autoTitleModelIdChanged: "settings.auto.title.model.id.changed",
   autoTitlePromptMaxLengthChanged:
     "settings.auto.title.prompt.max.length.changed",
@@ -68,6 +69,7 @@ export const settingsEvent = {
   setToolMaxStepsRequest: "settings.set.tool.max.steps.request",
   setPrismThemeUrlRequest: "settings.set.prism.theme.url.request",
   setAutoTitleEnabledRequest: "settings.set.auto.title.enabled.request",
+  setAutoTitleAlwaysOnRequest: "settings.set.auto.title.always.on.request",
   setAutoTitleModelIdRequest: "settings.set.auto.title.model.id.request",
   setAutoTitlePromptMaxLengthRequest:
     "settings.set.auto.title.prompt.max.length.request",
@@ -133,6 +135,9 @@ export interface SettingsEventPayloads {
   [settingsEvent.prismThemeUrlChanged]: { url: SettingsState["prismThemeUrl"] };
   [settingsEvent.autoTitleEnabledChanged]: {
     enabled: SettingsState["autoTitleEnabled"];
+  };
+  [settingsEvent.autoTitleAlwaysOnChanged]: {
+    enabled: SettingsState["autoTitleAlwaysOn"];
   };
   [settingsEvent.autoTitleModelIdChanged]: {
     modelId: SettingsState["autoTitleModelId"];
@@ -217,6 +222,9 @@ export interface SettingsEventPayloads {
   };
   [settingsEvent.setAutoTitleEnabledRequest]: {
     enabled: SettingsState["autoTitleEnabled"];
+  };
+  [settingsEvent.setAutoTitleAlwaysOnRequest]: {
+    enabled: SettingsState["autoTitleAlwaysOn"];
   };
   [settingsEvent.setAutoTitleModelIdRequest]: {
     modelId: SettingsState["autoTitleModelId"];

@@ -27,8 +27,11 @@ export const AutoTitleControlTrigger: React.FC<
 
   const localAutoTitleEnabled = module.getTurnEnabled();
   const isStreaming = module.getIsStreaming();
+  const autoTitleAlwaysOn = module.getAutoTitleAlwaysOn();
   const isVisible =
-    module.getGlobalAutoTitleEnabled() && module.getIsFirstInteraction();
+    module.getGlobalAutoTitleEnabled() && 
+    module.getIsFirstInteraction() && 
+    !autoTitleAlwaysOn;
 
   const handleToggle = useCallback(() => {
     const newState = !localAutoTitleEnabled;

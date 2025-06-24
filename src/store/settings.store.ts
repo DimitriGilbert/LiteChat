@@ -69,6 +69,7 @@ export interface SettingsState {
   toolMaxSteps: number;
   prismThemeUrl: string | null;
   autoTitleEnabled: boolean;
+  autoTitleAlwaysOn: boolean;
   autoTitleModelId: string | null;
   autoTitlePromptMaxLength: number;
   autoTitleIncludeFiles: boolean;
@@ -105,6 +106,7 @@ interface SettingsActions {
   setToolMaxSteps: (steps: number) => void;
   setPrismThemeUrl: (url: string | null) => void;
   setAutoTitleEnabled: (enabled: boolean) => void;
+  setAutoTitleAlwaysOn: (enabled: boolean) => void;
   setAutoTitleModelId: (modelId: string | null) => void;
   setAutoTitlePromptMaxLength: (length: number) => void;
   setAutoTitleIncludeFiles: (include: boolean) => void;
@@ -150,6 +152,7 @@ const DEFAULT_GIT_USER_EMAIL = null;
 const DEFAULT_TOOL_MAX_STEPS = 5;
 const DEFAULT_PRISM_THEME_URL = null;
 const DEFAULT_AUTO_TITLE_ENABLED = true;
+const DEFAULT_AUTO_TITLE_ALWAYS_ON = false;
 const DEFAULT_AUTO_TITLE_MODEL_ID = null;
 const DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH = 768;
 const DEFAULT_AUTO_TITLE_INCLUDE_FILES = false;
@@ -187,6 +190,7 @@ export const useSettingsStore = create(
     toolMaxSteps: DEFAULT_TOOL_MAX_STEPS,
     prismThemeUrl: DEFAULT_PRISM_THEME_URL,
     autoTitleEnabled: DEFAULT_AUTO_TITLE_ENABLED,
+    autoTitleAlwaysOn: DEFAULT_AUTO_TITLE_ALWAYS_ON,
     autoTitleModelId: DEFAULT_AUTO_TITLE_MODEL_ID,
     autoTitlePromptMaxLength: DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH,
     autoTitleIncludeFiles: DEFAULT_AUTO_TITLE_INCLUDE_FILES,
@@ -327,6 +331,11 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("autoTitleEnabled", enabled);
       emitter.emit(settingsEvent.autoTitleEnabledChanged, { enabled });
     },
+    setAutoTitleAlwaysOn: (enabled) => {
+      set({ autoTitleAlwaysOn: enabled });
+      PersistenceService.saveSetting("autoTitleAlwaysOn", enabled);
+      emitter.emit(settingsEvent.autoTitleAlwaysOnChanged, { enabled });
+    },
     setAutoTitleModelId: (modelId) => {
       set({ autoTitleModelId: modelId });
       PersistenceService.saveSetting("autoTitleModelId", modelId);
@@ -461,6 +470,7 @@ export const useSettingsStore = create(
           toolMaxSteps,
           prismThemeUrl,
           autoTitleEnabled,
+          autoTitleAlwaysOn,
           autoTitleModelId,
           autoTitlePromptMaxLength,
           autoTitleIncludeFiles,
@@ -546,6 +556,10 @@ export const useSettingsStore = create(
             "autoTitleEnabled",
             DEFAULT_AUTO_TITLE_ENABLED
           ),
+          PersistenceService.loadSetting<boolean>(
+            "autoTitleAlwaysOn",
+            DEFAULT_AUTO_TITLE_ALWAYS_ON
+          ),
           PersistenceService.loadSetting<string | null>(
             "autoTitleModelId",
             DEFAULT_AUTO_TITLE_MODEL_ID
@@ -624,6 +638,7 @@ export const useSettingsStore = create(
           toolMaxSteps,
           prismThemeUrl,
           autoTitleEnabled,
+          autoTitleAlwaysOn,
           autoTitleModelId,
           autoTitlePromptMaxLength,
           autoTitleIncludeFiles,
@@ -676,6 +691,7 @@ export const useSettingsStore = create(
         get().setFrequencyPenalty(DEFAULT_FREQUENCY_PENALTY);
         get().setToolMaxSteps(DEFAULT_TOOL_MAX_STEPS);
         get().setAutoTitleEnabled(DEFAULT_AUTO_TITLE_ENABLED);
+        get().setAutoTitleAlwaysOn(DEFAULT_AUTO_TITLE_ALWAYS_ON);
         get().setAutoTitleModelId(DEFAULT_AUTO_TITLE_MODEL_ID);
         get().setAutoTitlePromptMaxLength(DEFAULT_AUTO_TITLE_PROMPT_MAX_LENGTH);
         get().setAutoTitleIncludeFiles(DEFAULT_AUTO_TITLE_INCLUDE_FILES);
@@ -838,6 +854,13 @@ export const useSettingsStore = create(
           handler: (
             p: SettingsEventPayloads[typeof settingsEvent.setAutoTitleEnabledRequest]
           ) => actions.setAutoTitleEnabled(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoTitleAlwaysOnRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setAutoTitleAlwaysOnRequest]
+          ) => actions.setAutoTitleAlwaysOn(p.enabled),
           storeId,
         },
         {
