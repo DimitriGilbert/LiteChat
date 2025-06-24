@@ -23,8 +23,8 @@ const getRepositoryHelpText = (repoUrl: string) => {
   if (repoUrl.startsWith('git@') || repoUrl.includes('ssh://')) {
     return (
       <div className="text-sm text-amber-600 mt-1 flex items-center gap-1">
-        <InfoIcon className="h-4 w-4" />
-        Recommendation: Use HTTPS URLs for better browser compatibility (e.g., https://github.com/user/repo.git)
+        <InfoIcon className="h-4 w-4" aria-label="Info" aria-hidden="true" />
+        Recommendation: Use HTTPS URLs for better browser compatibility and authentication (e.g., https://github.com/user/repo.git)
       </div>
     );
   }

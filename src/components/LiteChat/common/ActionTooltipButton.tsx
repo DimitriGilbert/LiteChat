@@ -47,9 +47,12 @@ export const ActionTooltipButton: React.FC<ActionTooltipButtonProps> = ({
             {...rest}
           >
             {React.isValidElement(icon) 
-              ? React.cloneElement(icon as React.ReactElement<any>, {
-                  className: cn("h-3.5 w-3.5", iconClassName, (icon as React.ReactElement<any>).props?.className)
-                })
+              ? (() => {
+                  const { className: iconOrigClassName } = (icon as React.ReactElement<{ className?: string }>).props;
+                  return React.cloneElement(icon as React.ReactElement<{ className?: string }>, {
+                    className: cn("h-3.5 w-3.5", iconClassName, iconOrigClassName)
+                  });
+                })()
               : icon
             }
           </Button>

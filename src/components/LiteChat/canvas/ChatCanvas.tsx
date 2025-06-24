@@ -203,6 +203,8 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
   );
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    if (!viewportRef.current) return;
+    // console.log('[ChatCanvas] scrollToBottom called. scrollTop:', viewportRef.current.scrollTop, 'scrollHeight:', viewportRef.current.scrollHeight, 'behavior:', behavior);
     isAutoScrollingRef.current = true;
     
     // Try the viewport reference first
@@ -249,20 +251,10 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
     if (viewportRef.current) {
       const { scrollHeight, clientHeight, scrollTop } = viewportRef.current;
       const isAtBottom = scrollHeight - clientHeight <= scrollTop + 150;
-
-      // Don't auto-scroll if user manually scrolled recently (within last 2 seconds)
       const timeSinceUserScroll = Date.now() - lastUserScrollTimeRef.current;
       const userRecentlyScrolled = timeSinceUserScroll < 2000;
-
-      // CRITICAL: Don't auto-scroll if ToC navigation is in progress
       const isToCScrolling = (viewportRef.current as any)._isToCScrolling;
-
-      if (userRecentlyScrolled) {
-      }
-
-      if (isToCScrolling) {
-      }
-
+      // console.log('[ChatCanvas] auto-scroll effect', {isAtBottom, status, userRecentlyScrolled, isToCScrolling, deps: {interactionGroupsLength: interactionGroups.length, status, streamingInteractionIds}});
       if ((isAtBottom || status !== "streaming") && !userRecentlyScrolled && !isToCScrolling) {
         requestAnimationFrame(() => {
           scrollToBottom(status === "streaming" ? "smooth" : "auto");
@@ -283,13 +275,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
         
         // CRITICAL: Don't auto-scroll if ToC navigation is in progress
         const isToCScrolling = viewportRef.current && (viewportRef.current as any)._isToCScrolling;
-        
-        if (userRecentlyScrolled) {
-        }
-        
-        if (isToCScrolling) {
-        }
-        
+                
         if (!userRecentlyScrolled && !isToCScrolling) {
           scrollToBottom("smooth");
         }
@@ -318,8 +304,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
       const isToCScrolling = (viewportRef.current as any)._isToCScrolling;
       if (!isAutoScrollingRef.current && !isToCScrolling) {
         lastUserScrollTimeRef.current = Date.now();
-      } else if (isToCScrolling) {
-      }
+      } 
       
       const { scrollHeight, clientHeight, scrollTop } = viewportRef.current;
       const shouldShow =

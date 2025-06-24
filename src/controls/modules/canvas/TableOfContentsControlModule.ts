@@ -74,77 +74,51 @@ export class TableOfContentsControlModule implements ControlModule {
           const elementTopRelativeToViewport = elementRect.top - viewportRect.top;
           const targetScrollTop = currentScrollTop + elementTopRelativeToViewport - 20; // 20px offset from top
 
+          // console.log('[ToC] About to scroll to interaction', interactionId, 'targetScrollTop:', targetScrollTop, 'current:', scrollViewport.scrollTop);
+          scrollViewport.scrollTo({
+            top: targetScrollTop,
+            behavior: "instant"
+          });
+          // console.log('[ToC] After scrollTo for', interactionId, 'scrollTop now:', scrollViewport.scrollTop);
+
+          // Patch: After 150ms, check if scrollTop is still at target, if not, re-apply scroll once
+          // THIS IS PURE SHIT ! I WILL NEED A FIX AT SOME POINT !
+          // TODO FIX THIS !
+          setTimeout(() => {
+            const currentScrollTop = scrollViewport.scrollTop;
+            const distance = Math.abs(currentScrollTop - targetScrollTop);
+            if (distance > 2) {
+              // console.log('[ToC] 150ms patch: scrollTop drifted (', currentScrollTop, '), re-applying scrollTo', targetScrollTop);
+              scrollViewport.scrollTo({
+                top: targetScrollTop,
+                behavior: "instant"
+              });
+            // } else {
+              // console.log('[ToC] 150ms patch: scrollTop still correct (', currentScrollTop, ')');
+            }
+          }, 250);
 
           // Mark as ToC scrolling to prevent ChatCanvas from detecting it as user scroll
           (scrollViewport as any)._isToCScrolling = true;
-          
-          // Force scroll with multiple attempts
-          let attempt = 1;
-          const maxAttempts = 5;
-          
-          const forceScroll = async () => {
-            console.log(`ToC: Force scroll attempt ${attempt} to position ${targetScrollTop}`);
-            
-            scrollViewport.scrollTo({
-              top: targetScrollTop,
-              behavior: "smooth"
-            });
-            
-            // Check position after scroll
-            setTimeout(() => {
-              const actualScrollTop = scrollViewport.scrollTop;
-              const distance = Math.abs(actualScrollTop - targetScrollTop);
-              
-              console.log(`ToC: Attempt ${attempt} result - target: ${targetScrollTop}, actual: ${actualScrollTop}, distance: ${distance}`);
-              
-              if (distance > 50 && attempt < maxAttempts) {
-                console.log(`ToC: Attempt ${attempt} failed, trying again...`);
-                attempt++;
-                forceScroll();
-              } else {
-                if (distance <= 50) {
-                  console.log(`ToC: Scroll SUCCESS after ${attempt} attempts`);
-                } else {
-                  console.log(`ToC: Scroll FINAL after ${attempt} attempts (distance: ${distance}px)`);
-                }
-                
-                // Clear ToC scrolling flag after success/final attempt
+
+          // Use IntersectionObserver to detect when element is visible
+          const observer = new window.IntersectionObserver((entries, obs) => {
+            entries.forEach(entry => {
+              if (entry.isIntersecting) {
+                // console.log('[ToC] IntersectionObserver: element is intersecting for', interactionId);
+                addHighlight(element);
+                obs.disconnect();
+                // Clear ToC scrolling flag after highlight
                 setTimeout(() => {
                   (scrollViewport as any)._isToCScrolling = false;
                 }, 1000);
-                
-                addHighlight(element);
               }
-            }, 50);
-          };
-          
-          forceScroll();
-
-          // Debug logging AFTER scroll start
-          setTimeout(() => {
-            const actualScrollTop = scrollViewport.scrollTop;
-            console.log(`ToC: 50ms AFTER scroll start for ${interactionId}:`, {
-              actualScrollTop,
-              targetScrollTop,
-              distance: Math.abs(actualScrollTop - targetScrollTop),
             });
-          }, 50);
-
-          setTimeout(() => {
-            const actualScrollTop = scrollViewport.scrollTop;
-            const elementVisible = element.getBoundingClientRect().top >= viewportRect.top && 
-                                   element.getBoundingClientRect().bottom <= viewportRect.bottom;
-            const distance = Math.abs(actualScrollTop - targetScrollTop);
-            const success = elementVisible ? 'VISIBLE' : 'NOT_VISIBLE';
-            
-            console.log(`ToC: 200ms AFTER scroll start for ${interactionId}:`, {
-              actualScrollTop,
-              targetScrollTop,
-              elementVisible,
-              distance,
-              success
-            });
-          }, 200);
+          }, {
+            root: scrollViewport,
+            threshold: 0.1 // 10% visible is enough
+          });
+          observer.observe(element);
         };
 
         const scrollToHeading = (headingText: string) => {
@@ -208,6 +182,7 @@ export class TableOfContentsControlModule implements ControlModule {
         };
 
         const addHighlight = (element: HTMLElement) => {
+          // console.log('[ToC] addHighlight called for', element.dataset.interactionId);
           element.style.outline = "2px solid #3b82f6";
           element.style.outlineOffset = "2px";
           setTimeout(() => {
