@@ -168,13 +168,13 @@ ${userContent}`;
 
     if (systemRulesContent.length > 0) {
       // Debug logging to track system prompt construction
-      console.log('[ConversationService] System prompt construction:', {
-        turnSystemPrompt: turnSystemPrompt?.substring(0, 200) + '...',
-        effectiveSystemPrompt: effectiveSettings.systemPrompt?.substring(0, 200) + '...',
-        baseSystemPromptBeforeRules: baseSystemPrompt?.substring(0, 200) + '...',
-        systemRulesContent: systemRulesContent.map(content => content.substring(0, 200) + '...'),
-        systemRulesContentCount: systemRulesContent.length
-      });
+      // console.log('[ConversationService] System prompt construction:', {
+      //   turnSystemPrompt: turnSystemPrompt?.substring(0, 200) + '...',
+      //   effectiveSystemPrompt: effectiveSettings.systemPrompt?.substring(0, 200) + '...',
+      //   baseSystemPromptBeforeRules: baseSystemPrompt?.substring(0, 200) + '...',
+      //   systemRulesContent: systemRulesContent.map(content => content.substring(0, 200) + '...'),
+      //   systemRulesContentCount: systemRulesContent.length
+      // });
       
       baseSystemPrompt = `${
         baseSystemPrompt
@@ -185,7 +185,7 @@ ${userContent}`;
       }${systemRulesContent.join(`
 `)}`;
       
-      console.log('[ConversationService] Final system prompt length:', baseSystemPrompt?.length);
+      // console.log('[ConversationService] Final system prompt length:', baseSystemPrompt?.length);
     }
 
     const finalParameters = {
@@ -238,9 +238,9 @@ ${userContent}`;
       );
 
       if (shouldGenerateTitle) {
-        console.log(
-          "[ConversationService] Triggering asynchronous title generation."
-        );
+        // console.log(
+        //   "[ConversationService] Triggering asynchronous title generation."
+        // );
         const rulesForTitleContext: DbRule[] = (
           turnData.metadata?.effectiveRulesContent ?? []
         ).map((erc) => ({
@@ -363,9 +363,9 @@ ${userContent}`;
   },
 
   async regenerateInteraction(interactionId: string): Promise<void> {
-    console.log(
-      `[ConversationService] regenerateInteraction called for ID: ${interactionId}`
-    );
+    // console.log(
+    //   `[ConversationService] regenerateInteraction called for ID: ${interactionId}`
+    // );
     const interactionStore = useInteractionStore.getState();
     const projectStoreState = useProjectStore.getState();
     const promptState = usePromptStateStore.getState();
@@ -374,7 +374,7 @@ ${userContent}`;
     const targetInteraction = interactionStore.interactions.find(
       (i) => i.id === interactionId
     );
-    console.log("[ConversationService] Target interaction for regen:", JSON.parse(JSON.stringify(targetInteraction)));
+    // console.log("[ConversationService] Target interaction for regen:", JSON.parse(JSON.stringify(targetInteraction)));
 
     if (!targetInteraction || !targetInteraction.prompt) {
       toast.error("Cannot regenerate: Original interaction data missing.");
@@ -557,7 +557,7 @@ ${userContent}`;
         } as Interaction;
         await PersistenceService.saveInteraction(finalNewInteractionState);
       }
-      console.log("[ConversationService] New active interaction state after potential updates:", JSON.parse(JSON.stringify(finalNewInteractionState)));
+      // console.log("[ConversationService] New active interaction state after potential updates:", JSON.parse(JSON.stringify(finalNewInteractionState)));
       
       // Build the chain of interactions to update (original and any previous regens)
       const versionsToUpdate: Interaction[] = [];
@@ -588,7 +588,7 @@ ${userContent}`;
           parentId: finalNewInteractionState.id, // Make them children of the NEW interaction
           index: i, // Children get sequential index starting from 0
         };
-        console.log(`[ConversationService] Updating old version ${interactionToUpdate.id} to be child of ${finalNewInteractionState.id} with childIndex ${i}`, JSON.parse(JSON.stringify(updatesForOldVersion)));
+        // console.log(`[ConversationService] Updating old version ${interactionToUpdate.id} to be child of ${finalNewInteractionState.id} with childIndex ${i}`, JSON.parse(JSON.stringify(updatesForOldVersion)));
 
         interactionStore._updateInteractionInState(interactionToUpdate.id, updatesForOldVersion);
         await PersistenceService.saveInteraction({
@@ -616,9 +616,9 @@ ${userContent}`;
   _pendingCompactForks: new Set<string>(),
 
   async forkConversation(interactionId: string): Promise<void> {
-    console.log(
-      `[ConversationService] forkConversation called for ID: ${interactionId}`
-    );
+    // console.log(
+    //   `[ConversationService] forkConversation called for ID: ${interactionId}`
+    // );
     
     // Prevent multiple simultaneous forks of the same interaction
     if (this._pendingForks.has(interactionId)) {
@@ -711,9 +711,9 @@ ${userContent}`;
   },
 
   async forkConversationCompact(interactionId: string, compactModelId: string): Promise<void> {
-    console.log(
-      `[ConversationService] forkConversationCompact called for ID: ${interactionId} with model: ${compactModelId}`
-    );
+    // console.log(
+    //   `[ConversationService] forkConversationCompact called for ID: ${interactionId} with model: ${compactModelId}`
+    // );
     
     // Prevent multiple simultaneous compact forks of the same interaction
     if (this._pendingCompactForks.has(interactionId)) {
@@ -1012,9 +1012,9 @@ Keep the summary detailed enough that we can seamlessly continue our discussion,
   async _ensureVfsReady(
     targetVfsKey: string
   ): Promise<typeof FsType | undefined> {
-    console.log(
-      `[ConversationService] Ensuring VFS ready for key "${targetVfsKey}"...`
-    );
+    // console.log(
+    //   `[ConversationService] Ensuring VFS ready for key "${targetVfsKey}"...`
+    // );
     return new Promise((resolve, reject) => {
       const handleFsInstanceChanged = (
         payload: VfsEventPayloads[typeof vfsEvent.fsInstanceChanged]
