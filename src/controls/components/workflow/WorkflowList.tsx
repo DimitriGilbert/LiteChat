@@ -111,16 +111,12 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
         const needsInput = checkIfWorkflowNeedsInput(workflow);
         
         if (needsInput) {
-            // Open builder for configuration
+            // Open builder for configuration - it already has a run button
             onEditWorkflow(workflow);
-            toast.info(`Workflow "${workflow.name}" needs configuration`, {
-                description: "Opening workflow builder to set up required inputs.",
-                duration: 3000,
-            });
         } else {
-            // Use workflow's trigger prompt or fallback to simple default
-            const triggerPrompt = workflow.triggerPrompt || "Execute workflow";
-            module.startWorkflow(workflow, triggerPrompt);
+            // Run directly with sensible defaults
+            const defaultPrompt = workflow.triggerPrompt || "Run workflow";
+            module.startWorkflow(workflow, defaultPrompt);
             onWorkflowRun?.(); // Close dialog after starting workflow
             toast.success(`Workflow "${workflow.name}" started!`);
         }

@@ -16,7 +16,6 @@ import type { PromptTurnObject, PromptObject } from "@/types/litechat/prompt";
 import { useInteractionStore } from "@/store/interaction.store";
 import { PersistenceService } from "./persistence.service";
 import { usePromptStateStore } from "@/store/prompt.store";
-import { usePromptTemplateStore } from "@/store/prompt-template.store";
 import { InteractionService } from "./interaction.service";
 import { useProjectStore } from "@/store/project.store";
 import { useProviderStore } from "@/store/provider.store";
@@ -841,11 +840,8 @@ export const WorkflowService = {
         nextStep.type !== "human-in-the-loop"
       ) {
         if (nextStep.templateId) {
-          // Get the template for step 0 to see what variables it needs
-          const { promptTemplates } = usePromptTemplateStore.getState();
-          const nextStepTemplate = promptTemplates.find(
-            (t) => t.id === nextStep.templateId
-          );
+          // Load fresh template from database instead of stale store
+          const nextStepTemplate = await PersistenceService.loadPromptTemplateById(nextStep.templateId);
 
           if (
             nextStepTemplate &&
@@ -915,10 +911,7 @@ export const WorkflowService = {
           effectiveSettings.systemPrompt || "You are a helpful AI assistant.";
 
         // Get the proper specification for this step
-        const { promptTemplates } = usePromptTemplateStore.getState();
-        const nextStepTemplate = promptTemplates.find(
-          (t) => t.id === nextStep.templateId
-        );
+        const nextStepTemplate = await PersistenceService.loadPromptTemplateById(nextStep.templateId);
 
         if (
           nextStepTemplate &&
@@ -1277,11 +1270,8 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
         nextStep.type !== "human-in-the-loop"
       ) {
         if (nextStep.templateId) {
-          // Get the template for the NEXT step to see what variables it needs
-          const { promptTemplates } = usePromptTemplateStore.getState();
-          const nextStepTemplate = promptTemplates.find(
-            (t) => t.id === nextStep.templateId
-          );
+          // Load fresh template from database instead of stale store
+          const nextStepTemplate = await PersistenceService.loadPromptTemplateById(nextStep.templateId);
 
           if (
             nextStepTemplate &&
@@ -1341,10 +1331,9 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
 
       // Each step uses its OWN template's system prompt + workflow output format for the NEXT step
       if (stepParameters.structured_output) {
-        const { promptTemplates } = usePromptTemplateStore.getState();
-        const currentStepTemplate = promptTemplates.find(
-          (t) => t.id === step.templateId
-        );
+        // Load fresh template from database instead of stale store
+        const currentStepTemplate = step.templateId ? 
+          await PersistenceService.loadPromptTemplateById(step.templateId) : null;
 
         if (currentStepTemplate) {
           // Get the global system prompt from project settings
