@@ -14,6 +14,7 @@ These are very fancy and give amazing result, if you need to explain things grap
 - Nodes can have different statuses (pending, running, success, error) with visual indicators
 - Supports various node types: trigger, prompt, agent-task, human-in-the-loop, and generic steps
 - Includes zoom, pan, minimap, and download capabilities
+- Automatic layout positioning for nodes when coordinates are not specified
 
 **Usage:**
 To generate a flow diagram, enclose your flow definition within a markdown code block with the language identifier \`flow\`.
@@ -28,9 +29,10 @@ The content inside the \`flow\` block must be a valid JSON object containing:
 **Node Structure:**
 Each node requires:
 - \`id\`: Unique identifier for the node
-- \`type\`: Node type ("trigger", "prompt", "agent-task", "human-in-the-loop", or custom)
+- \`type\`: Node type ('trigger', 'prompt', 'agent-task', 'transform', 'human-in-the-loop', 'custom', 'input', 'output', 'default', 'group')
 - \`label\`: Display label for the node
-- \`position\`: Object with \`x\` and \`y\` coordinates
+- \`position\`: (Optional) Object with \`x\` and \`y\` coordinates (optional, as positioning is automatic if not specified and preferred)
+- \`style\`: (Optional) Styling object
 - \`status\`: (Optional) Current status ("pending", "running", "success", "error")
 - \`data\`: (Optional) Additional data like \`templateName\`, \`modelName\`, etc.
 
@@ -61,7 +63,6 @@ Simple process flow:
       "id": "start",
       "type": "input",
       "label": "New Order",
-      "position": { "x": 0, "y": 100 },
       "status": "success",
       "style": {
         "backgroundColor": "#dcfce7",
@@ -73,7 +74,6 @@ Simple process flow:
       "id": "validate",
       "type": "default",
       "label": "Validate Payment",
-      "position": { "x": 200, "y": 100 },
       "status": "running",
       "style": {
         "backgroundColor": "#dbeafe",
@@ -85,7 +85,6 @@ Simple process flow:
       "id": "fulfill",
       "type": "default",
       "label": "Ship Order",
-      "position": { "x": 400, "y": 100 },
       "status": "pending",
       "style": {
         "backgroundColor": "#fef3c7",
@@ -97,7 +96,6 @@ Simple process flow:
       "id": "complete",
       "type": "output",
       "label": "Order Complete",
-      "position": { "x": 600, "y": 100 },
       "status": "pending",
       "style": {
         "backgroundColor": "#f3e8ff",
@@ -171,7 +169,6 @@ Organizational flowchart:
       "id": "proposal",
       "type": "input",
       "label": "New Proposal",
-      "position": { "x": 200, "y": 0 },
       "style": {
         "backgroundColor": "#eff6ff",
         "borderColor": "#2563eb",
@@ -183,7 +180,6 @@ Organizational flowchart:
       "id": "review",
       "type": "default",
       "label": "Team Review",
-      "position": { "x": 200, "y": 150 },
       "style": {
         "backgroundColor": "#fef2f2",
         "borderColor": "#dc2626"
@@ -193,7 +189,6 @@ Organizational flowchart:
       "id": "approve",
       "type": "default",
       "label": "Manager Approval",
-      "position": { "x": 50, "y": 300 },
       "style": {
         "backgroundColor": "#f0fdf4",
         "borderColor": "#16a34a"
@@ -203,7 +198,6 @@ Organizational flowchart:
       "id": "reject",
       "type": "default",
       "label": "Needs Revision",
-      "position": { "x": 350, "y": 300 },
       "style": {
         "backgroundColor": "#fef2f2",
         "borderColor": "#dc2626"
@@ -213,7 +207,6 @@ Organizational flowchart:
       "id": "implement",
       "type": "output",
       "label": "Implementation",
-      "position": { "x": 50, "y": 450 },
       "style": {
         "backgroundColor": "#ecfdf5",
         "borderColor": "#059669"
@@ -223,7 +216,6 @@ Organizational flowchart:
       "id": "revise",
       "type": "default",
       "label": "Back to Team",
-      "position": { "x": 350, "y": 450 },
       "style": {
         "backgroundColor": "#fffbeb",
         "borderColor": "#d97706"
@@ -287,7 +279,7 @@ Organizational flowchart:
 }
 \`\`\`
 
-Use 'flow', 'workflow', or 'reactflow' language identifiers for interactive React Flow-based rendering with draggable nodes, edges, and controls. Ideal for workflow definitions, process diagrams, and system architecture visualizations.`;
+Use 'flow', 'workflow', or 'reactflow' language identifiers for interactive React Flow-based rendering with draggable nodes, edges, and controls. Ideal for workflow definitions, process diagrams, and system architecture visualizations. Positioning is handled automatically - do not specify x/y coordinates unless you absolutely need specific placement.`;
 
 export class FlowBlockRendererModule implements ControlModule {
   readonly id = "core-block-renderer-flow";

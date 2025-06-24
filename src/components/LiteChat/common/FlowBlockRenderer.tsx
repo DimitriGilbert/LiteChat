@@ -277,7 +277,7 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
       const reactFlowNodes: Node[] = layoutedNodes.map((node: FlowNode) => ({
         id: node.id,
         type: 'flowStep',
-        position: node.position,
+        position: node.position ?? { x: 0, y: 0 },
         data: {
           type: node.type,
           label: node.label,

@@ -53,7 +53,7 @@ export class JSONFlowParser implements FlowParser {
       // Validate nodes
       for (let i = 0; i < parsed.nodes.length; i++) {
         const node = parsed.nodes[i];
-        const nodeError = this.validateNode(node, i);
+        const nodeError = this.validateNode(node, i, parsed.nodes);
         if (nodeError) {
           return { success: false, error: nodeError };
         }
@@ -88,34 +88,43 @@ export class JSONFlowParser implements FlowParser {
     return JSON.stringify(flowData, null, 2);
   }
 
-  private validateNode(node: any, index: number): string | null {
+  private validateNode(node: any, index: number, allNodes: any[]): string | null {
     if (!node.id) {
       return `Node ${index}: Missing required field: id`;
     }
-
+    
     if (typeof node.id !== 'string') {
       return `Node ${index}: Field 'id' must be a string`;
     }
-
+    
     if (!node.type) {
       return `Node ${index}: Missing required field: type`;
-    }
-
-    const validTypes = ['trigger', 'prompt', 'agent-task', 'transform', 'human-in-the-loop', 'custom', 'input', 'output', 'default', 'group'];
-    if (!validTypes.includes(node.type)) {
-      return `Node ${index}: Invalid type '${node.type}'. Must be one of: ${validTypes.join(', ')}`;
     }
 
     if (!node.label) {
       return `Node ${index}: Missing required field: label`;
     }
 
-    if (!node.position || typeof node.position !== 'object') {
-      return `Node ${index}: Missing or invalid field: position (must be object)`;
+    // Position is optional - if not provided, auto-layout will handle it
+    if (node.position && typeof node.position === 'object') {
+      if (typeof node.position.x !== 'number' || typeof node.position.y !== 'number') {
+        return `Node ${index}: Invalid position - must have x and y as numbers`;
+      }
     }
 
-    if (typeof node.position.x !== 'number' || typeof node.position.y !== 'number') {
-      return `Node ${index}: Position must have numeric x and y coordinates`;
+    // Check for duplicate IDs
+    const idCount = allNodes.filter(n => n.id === node.id).length;
+    if (idCount > 1) {
+      return `Node ${index}: Duplicate ID '${node.id}' - IDs must be unique`;
+    }
+
+    // Check if type is valid
+    const validTypes = [
+      'trigger', 'prompt', 'agent-task', 'transform', 'human-in-the-loop', 'custom',
+      'input', 'output', 'default', 'group'
+    ];
+    if (!validTypes.includes(node.type) && !node.type.startsWith('custom-')) {
+      console.warn(`Node ${index}: Unrecognized type '${node.type}' - consider using standard types or prefixing with 'custom-'`);
     }
 
     if (node.status) {
@@ -253,19 +262,23 @@ export function autoLayoutNodes(nodes: FlowNode[]): FlowNode[] {
   const VERTICAL_SPACING = 150;
 
   return nodes.map((node, index) => {
-    if (node.position.x === 0 && node.position.y === 0 && index > 0) {
-      // Auto-position nodes that don't have explicit positions
+    // If position is missing, or x/y are not numbers, auto-layout
+    if (
+      !node.position ||
+      typeof node.position.x !== 'number' ||
+      typeof node.position.y !== 'number'
+    ) {
       const row = Math.floor(index / 3);
       const col = index % 3;
-      
       return {
         ...node,
         position: {
           x: col * HORIZONTAL_SPACING,
-          y: row * VERTICAL_SPACING
-        }
+          y: row * VERTICAL_SPACING,
+        },
       };
     }
+    // Otherwise, use the provided position
     return node;
   });
 }

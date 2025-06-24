@@ -48,7 +48,7 @@ export interface FlowNode {
   id: string;
   type: NodeType;
   label: string;
-  position: { x: number; y: number };
+  position?: { x: number; y: number };
   status?: StepStatus;
   data?: Record<string, any>;
   style?: NodeStyle;
