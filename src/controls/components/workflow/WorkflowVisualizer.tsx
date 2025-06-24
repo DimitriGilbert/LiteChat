@@ -39,7 +39,7 @@ interface WorkflowVisualizerProps {
   stepStatuses?: Record<string, StepStatus>;
 }
 
-const HORIZONTAL_SPACING = 400;
+// const HORIZONTAL_SPACING = 400;
 
 const WorkflowStepNode: React.FC<{ data: any }> = ({ data }) => {
   const getNodeColor = (type: string, status?: StepStatus) => {

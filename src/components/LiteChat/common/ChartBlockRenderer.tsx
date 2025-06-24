@@ -7,13 +7,13 @@ import React, {
   memo,
 } from "react";
 import {
-  Bar, BarChart, Line, LineChart, Area, AreaChart, Pie, PieChart, Radar, RadarChart,
-  CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, PolarAngleAxis, PolarGrid
+  Bar, BarChart, Line, LineChart, Area, AreaChart, Pie, PieChart, Radar, RadarChart, Scatter, ScatterChart, Cell,
+  CartesianGrid, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, PolarAngleAxis, PolarGrid
 } from "recharts";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
+import { ChartContainer, ChartTooltipContent, ChartLegend, type ChartConfig } from "@/components/ui/chart";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircleIcon, Loader2Icon, DownloadIcon, CodeIcon, ImageIcon, BarChart3Icon } from "lucide-react";
 import { JSONChartParser } from "@/lib/litechat/chart-parser";
@@ -112,25 +112,34 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
       return;
     }
     try {
-      const svg = containerRef.current.querySelector("svg");
-      if (!svg) {
-        toast.error("No chart SVG found to download.");
+      const { toPng } = await import('html-to-image');
+      
+      const rechartWrapper = containerRef.current.querySelector('.recharts-wrapper');
+      if (!rechartWrapper) {
+        toast.error("Chart wrapper not found");
         return;
       }
-      const svgData = new XMLSerializer().serializeToString(svg);
-      const blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${chartData?.title?.replace(/ /g, '_') || 'chart'}.svg`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Chart downloaded as SVG.");
-    } catch (err) {
-      toast.error("Failed to download chart.");
-      console.error(err);
+
+      const backgroundColor = window.getComputedStyle(containerRef.current).backgroundColor;
+
+      const dataUrl = await toPng(rechartWrapper as HTMLElement, {
+        backgroundColor,
+        filter: (node: Element) => {
+          return !node?.classList?.contains('recharts-tooltip-wrapper');
+        },
+      });
+
+      const link = document.createElement('a');
+      link.download = 'chart.png';
+      link.href = dataUrl;
+      link.click();
+      
+      toast.success("Chart downloaded successfully!");
+    } catch (error) {
+      console.error("Error downloading chart:", error);
+      toast.error("Failed to download chart");
     }
-  }, [chartData]);
+  }, []);
 
   const renderSlotForCodeBlock = useCallback(
     (
@@ -238,9 +247,7 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
               )}
               
               {chartData && !isLoading && (
-                <div ref={containerRef}>
-                  <ChartContent chartData={chartData} />
-                </div>
+                <ChartContent ref={containerRef} chartData={chartData} />
               )}
 
               {!chartData && !isLoading && !error && (
@@ -271,10 +278,13 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
   );
 };
 
-const supportedTypes = ['bar', 'line', 'area', 'pie', 'radar'] as const;
+const supportedTypes = ['bar', 'line', 'area', 'pie', 'radar', 'scatter'] as const;
 type SupportedChartType = typeof supportedTypes[number];
 
-const ChartContent: React.FC<{ chartData: ChartData }> = ({ chartData }) => {
+const ChartContent = React.forwardRef<
+  HTMLDivElement,
+  { chartData: ChartData }
+>(({ chartData }, ref) => {
   const [currentChartType, setCurrentChartType] = useState<SupportedChartType>(() => {
     const initialType = chartData.chartType;
     if (initialType && supportedTypes.includes(initialType as any)) {
@@ -312,8 +322,29 @@ const ChartContent: React.FC<{ chartData: ChartData }> = ({ chartData }) => {
   }, [chartData.chartData]);
 
   const renderChart = () => {
+    // Check if this is pie-style data (each row represents a category)
+    const isPieStyleData = chartData.chartData.length > 1 && 
+      chartData.chartData.every(item => item.color) &&
+      Object.keys(chartData.chartConfig).length === 1;
+
     switch (currentChartType) {
       case 'bar':
+        if (isPieStyleData) {
+          // For pie-style data, use individual colors for each bar
+          return (
+            <BarChart data={chartData.chartData}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <Tooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+              <Bar dataKey={pieDataKey} radius={4}>
+                {chartData.chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color || `var(--chart-${(index % 5) + 1})`} />
+                ))}
+              </Bar>
+            </BarChart>
+          );
+        }
         return (
           <BarChart data={chartData.chartData}>
             <CartesianGrid vertical={false} />
@@ -327,6 +358,18 @@ const ChartContent: React.FC<{ chartData: ChartData }> = ({ chartData }) => {
           </BarChart>
         );
       case 'line':
+        if (isPieStyleData) {
+          // For pie-style data, create a single line with individual point colors
+          return (
+            <LineChart data={chartData.chartData}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <Tooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+              <Line dataKey={pieDataKey} stroke="var(--chart-1)" strokeWidth={2} dot={{ r: 4 }} type="monotone" />
+            </LineChart>
+          );
+        }
         return (
           <LineChart data={chartData.chartData}>
             <CartesianGrid vertical={false} />
@@ -340,6 +383,18 @@ const ChartContent: React.FC<{ chartData: ChartData }> = ({ chartData }) => {
           </LineChart>
         );
       case 'area':
+        if (isPieStyleData) {
+          // For pie-style data, create a single area
+          return (
+            <AreaChart data={chartData.chartData}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <Tooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+              <Area dataKey={pieDataKey} type="monotone" fill="var(--chart-1)" fillOpacity={0.4} stroke="var(--chart-1)" />
+            </AreaChart>
+          );
+        }
         return (
           <AreaChart data={chartData.chartData}>
             <CartesianGrid vertical={false} />
@@ -353,18 +408,39 @@ const ChartContent: React.FC<{ chartData: ChartData }> = ({ chartData }) => {
           </AreaChart>
         );
       case 'pie':
-        const pieDataWithFill = chartData.chartData.map(entry => ({
-            ...entry,
-            fill: entry.color,
-        }));
         return (
             <PieChart>
                 <Tooltip cursor={false} content={<ChartTooltipContent />} />
-                <Pie data={pieDataWithFill} dataKey={pieDataKey} nameKey={axisKey} cx="50%" cy="50%" outerRadius={120} />
+                <Pie 
+                  data={chartData.chartData} 
+                  dataKey={pieDataKey} 
+                  nameKey={axisKey} 
+                  cx="50%" 
+                  cy="50%" 
+                  outerRadius={120}
+                >
+                  {chartData.chartData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.color || `var(--chart-${(index % 5) + 1})`} 
+                    />
+                  ))}
+                </Pie>
                 <ChartLegend />
             </PieChart>
         );
       case 'radar':
+        if (isPieStyleData) {
+          // For pie-style data, create a single radar series
+          return (
+            <RadarChart data={chartData.chartData}>
+              <PolarGrid />
+              <PolarAngleAxis dataKey={axisKey} />
+              <Tooltip cursor={false} content={<ChartTooltipContent />} />
+              <Radar dataKey={pieDataKey} fill="var(--chart-1)" fillOpacity={0.6} stroke="var(--chart-1)" />
+            </RadarChart>
+          );
+        }
         return (
           <RadarChart data={chartData.chartData}>
             <CartesianGrid />
@@ -377,13 +453,40 @@ const ChartContent: React.FC<{ chartData: ChartData }> = ({ chartData }) => {
             ))}
           </RadarChart>
         );
+      case 'scatter':
+        if (isPieStyleData) {
+          // For pie-style data, create a simple scatter
+          return (
+            <ScatterChart data={chartData.chartData}>
+              <CartesianGrid />
+              <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <ZAxis range={[60, 400]} />
+              <Tooltip cursor={false} content={<ChartTooltipContent />} />
+              <Scatter dataKey={pieDataKey} fill="var(--chart-1)" />
+            </ScatterChart>
+          );
+        }
+        return (
+          <ScatterChart data={chartData.chartData}>
+            <CartesianGrid />
+            <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+            <ZAxis range={[60, 400]} />
+            <Tooltip cursor={false} content={<ChartTooltipContent />} />
+            <ChartLegend />
+            {Object.keys(chartData.chartConfig).map(key => (
+              <Scatter key={key} dataKey={key} fill={`var(--color-${key})`} />
+            ))}
+          </ScatterChart>
+        );
       default:
         return <div className="text-center text-muted-foreground">Unsupported chart type: {currentChartType}</div>;
     }
   };
 
   return (
-    <Card>
+    <Card ref={ref}>
       <CardHeader className="flex flex-row items-start justify-between">
           <div className="flex-1">
               <CardTitle>{chartData.title || 'Chart'}</CardTitle>
@@ -399,6 +502,7 @@ const ChartContent: React.FC<{ chartData: ChartData }> = ({ chartData }) => {
                   <SelectItem value="area">Area</SelectItem>
                   <SelectItem value="pie">Pie</SelectItem>
                   <SelectItem value="radar">Radar</SelectItem>
+                  <SelectItem value="scatter">Scatter</SelectItem>
               </SelectContent>
           </Select>
       </CardHeader>
@@ -411,6 +515,7 @@ const ChartContent: React.FC<{ chartData: ChartData }> = ({ chartData }) => {
       </CardContent>
     </Card>
   );
-};
+});
+ChartContent.displayName = 'ChartContent';
 
 export const ChartBlockRenderer = memo(ChartBlockRendererComponent);

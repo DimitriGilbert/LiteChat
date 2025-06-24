@@ -17,18 +17,18 @@ import {
   MarkerType as XYMarkerType,
   Handle,
   Position,
+  ReactFlowProvider,
 } from '@xyflow/react';
 import { useSettingsStore } from "@/store/settings.store";
-import { useShallow } from "zustand/react/shallow";
-import type { CanvasControl } from "@/types/litechat/canvas/control";
+import { useShallow } from "zustand/shallow";
+import type { StepStatus } from "@/types/litechat/flow";
+import { JSONFlowParser } from "@/lib/litechat/flow-parser";
 import { useControlRegistryStore } from "@/store/control.store";
-import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control";
+import type { CanvasControl, CanvasControlRenderContext } from "@/types/litechat/canvas/control";
 import { AlertCircleIcon, Loader2Icon, DownloadIcon, CodeIcon, ImageIcon } from "lucide-react";
 import { CodeBlockRenderer } from "./CodeBlockRenderer";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import type { FlowData, FlowNode, StepStatus } from "@/types/litechat/flow";
-import { JSONFlowParser, autoLayoutNodes } from "@/lib/litechat/flow-parser";
 import { getTreeLayout } from '@/lib/litechat/tree-layout';
 
 import '@xyflow/react/dist/style.css';
@@ -38,8 +38,13 @@ interface FlowBlockRendererProps {
   isStreaming?: boolean;
 }
 
-// Custom Flow Node Component
+// Flow step node component
 const FlowStepNode: React.FC<{ data: any }> = ({ data }) => {
+  // Type-safe access to node data
+  const label = data.label || data.stepName || data.id || 'Unknown Step';
+  const type = data.type || 'default';
+  const status = data.status as StepStatus;
+
   const getNodeColor = (type: string, status?: StepStatus) => {
     if (status) {
       switch (status) {
@@ -55,78 +60,95 @@ const FlowStepNode: React.FC<{ data: any }> = ({ data }) => {
     }
     switch (type) {
       case 'trigger':
+      case 'input':
         return 'bg-[var(--card-foreground)] border-[var(--primary)] text-[var(--card)] shadow-sm';
       case 'prompt':
         return 'bg-[var(--card-foreground)] border-[var(--chart-1)] text-[var(--card)] shadow-sm';
       case 'agent-task':
         return 'bg-[var(--card-foreground)] border-[var(--chart-2)] text-[var(--card)] shadow-sm';
+      case 'transform':
+        return 'bg-[var(--card-foreground)] border-[var(--chart-3)] text-[var(--card)] shadow-sm';
       case 'human-in-the-loop':
         return 'bg-[var(--card-foreground)] border-[var(--chart-4)] text-[var(--card)] shadow-sm';
+      case 'output':
+        return 'bg-[var(--card-foreground)] border-[var(--chart-5)] text-[var(--card)] shadow-sm';
       default:
         return 'bg-[var(--card-foreground)] border-[var(--border)] text-[var(--card)] shadow-sm';
     }
   };
 
   const getTypeIcon = (type: string, status?: StepStatus) => {
-    // Status-based icons take priority
-    if (status) {
-      switch (status) {
-        case 'running':
-          return '⏳';
-        case 'success':
-          return '✅';
-        case 'error':
-          return '❌';
-        case 'pending':
-          return '⏸️';
-      }
-    }
-
-    // Default type-based icons
+    if (status === 'running') return '⚡';
+    if (status === 'error') return '❌';
+    if (status === 'success') return '✅';
+    
     switch (type) {
       case 'trigger':
-        return '🎯';
+      case 'input':
+        return '🚀';
       case 'prompt':
         return '💬';
       case 'agent-task':
         return '🤖';
+      case 'transform':
+        return '🔄';
       case 'human-in-the-loop':
         return '👤';
+      case 'output':
+        return '🎯';
       default:
-        return '⚙️';
+        return '📋';
     }
   };
 
+  const colorClasses = getNodeColor(type, status);
+  const icon = getTypeIcon(type, status);
+
   return (
-    <div className={cn(
-      'px-4 py-3 rounded-lg border-2 min-w-[200px] max-w-[280px]',
-      getNodeColor(data.type, data.status)
-    )}>
-      <Handle type="target" position={Position.Left} id="input" className="!bg-gray-700" />
+    <div
+      className={cn(
+        'px-4 py-2 rounded-lg border-2 min-w-[180px] max-w-[220px]',
+        colorClasses
+      )}
+    >
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="input"
+        className="w-3 h-3 !bg-gray-400 border-2 border-white"
+      />
       
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-lg">{getTypeIcon(data.type, data.status)}</span>
-        <span className="font-semibold text-sm">{data.label || data.name}</span>
-        {data.status && (
-          <span className="text-xs px-2 py-1 rounded-full bg-white/60 font-medium capitalize">
-            {data.status}
-          </span>
-        )}
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-lg">{icon}</span>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm leading-tight break-words">
+            {label}
+          </div>
+          {data.templateName && (
+            <div className="text-xs opacity-75 break-words">
+              {data.templateName}
+            </div>
+          )}
+          {data.modelName && (
+            <div className="text-xs opacity-60 break-words">
+              {data.modelName}
+            </div>
+          )}
+        </div>
       </div>
       
-      {data.templateName && (
-        <div className="text-sm font-medium mb-1 text-slate-700">
-          {data.templateName}
+      {data.description && (
+        <div className="text-xs opacity-70 mt-1 break-words">
+          {data.description}
         </div>
       )}
       
-      {data.modelName && (
-        <div className="text-xs opacity-75 font-mono bg-white/50 px-2 py-1 rounded">
-          {data.modelName}
-        </div>
-      )}
-      
-      <Handle type="source" position={Position.Right} id="output" className="!bg-gray-700" />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="output"
+        className="w-3 h-3 !bg-gray-400 border-2 border-white"
+      />
     </div>
   );
 };
@@ -149,24 +171,14 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
   const [isFolded, setIsFolded] = useState(
     isStreaming ? foldStreamingCodeBlocks : false
   );
-  const [, setFlowData] = useState<FlowData | null>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [showCode, setShowCode] = useState(false);
+  const [isReactFlowReady, setIsReactFlowReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const parserRef = useRef(new JSONFlowParser());
-
-  // Debug logging for streaming flow detection
-  // useEffect(() => {
-  //   console.log(`[FlowBlockRenderer] Props updated:`, {
-  //     codeLength: code?.length || 0,
-  //     isStreaming,
-  //     isFolded,
-  //     codePreview: code?.substring(0, 100) + (code?.length > 100 ? '...' : ''),
-  //   });
-  // }, [code, isStreaming, isFolded]);
 
   const canvasControls = useControlRegistryStore(
     useShallow((state) => Object.values(state.canvasControls))
@@ -210,8 +222,13 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
     [canvasControls]
   );
 
-  const parseFlow = useCallback(async () => {
+  // Unified flow parsing logic
+  const parseFlowData = useCallback(async () => {
     if (!code.trim() || isFolded) {
+      setNodes([]);
+      setEdges([]);
+      setError(null);
+      setIsReactFlowReady(false);
       return;
     }
 
@@ -223,8 +240,6 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
       if (!trimmedCode.startsWith('{') || !trimmedCode.endsWith('}')) {
         // Not complete JSON yet, don't show error
         setError(null);
-        setNodes([]);
-        setEdges([]);
         return;
       }
       
@@ -235,17 +250,13 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
       } catch (jsonError) {
         // JSON is not complete/valid yet during streaming
         setError(null);
-        setNodes([]);
-        setEdges([]);
         return;
       }
     }
 
     setIsLoading(true);
     setError(null);
-    setFlowData(null);
-    setNodes([]);
-    setEdges([]);
+    setIsReactFlowReady(false); // Reset ready state when parsing new data
 
     try {
       const parseResult = await parserRef.current.parse(code.trim());
@@ -253,95 +264,79 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
       if (!parseResult.success) {
         // Only show errors when not streaming or JSON appears complete
         if (!isStreaming) {
-          setError(parseResult.error || "Failed to parse flow data");
+          setError(parseResult.error || "Unknown parse error");
         }
-        return;
-      }
-
-      if (!parseResult.data) {
-        if (!isStreaming) {
-          setError("No flow data returned from parser");
-        }
+        setNodes([]);
+        setEdges([]);
+        setIsLoading(false);
         return;
       }
 
       const data = parseResult.data;
-      setFlowData(data);
-
-      // Apply auto-layout if needed
-      const layoutedNodes = autoLayoutNodes(data.nodes);
-
-      // Convert to React Flow format
-      let reactFlowNodes: Node[] = layoutedNodes.map((node: FlowNode) => ({
-        id: node.id,
-        type: 'flowStep',
-        position: node.position ?? { x: 0, y: 0 },
-        data: {
-          type: node.type,
-          label: node.label,
-          status: node.status,
-          templateName: node.data?.templateName,
-          modelName: node.data?.modelName,
-          ...node.data,
-        },
-      }));
-      // Map FlowEdge[] to Edge[] for getTreeLayout
-      const reactFlowEdges: Edge[] = data.edges.map((edge) => {
-        let markerEnd: Edge['markerEnd'] = undefined;
-        if (edge.markerEnd && typeof edge.markerEnd === 'object') {
-          // Only assign if type is a valid XYMarkerType
-          const validTypes = Object.values(XYMarkerType);
-          const type = (edge.markerEnd as any).type;
-          if (type && validTypes.includes(type)) {
-            markerEnd = {
-              ...edge.markerEnd,
-              type: type,
-            };
-          } else {
-            markerEnd = {
-              ...edge.markerEnd,
-              type: XYMarkerType.ArrowClosed,
-            };
-          }
+      if (!data) {
+        if (!isStreaming) {
+          setError("No data returned from parser");
         }
-        return {
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          type: edge.type as any,
-          animated: edge.animated,
-          style: edge.style,
-          markerEnd,
-        };
-      });
-      // Use d3-hierarchy to layout nodes
-      reactFlowNodes = getTreeLayout(reactFlowNodes, reactFlowEdges, [220, 120]);
+        setNodes([]);
+        setEdges([]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Convert flow nodes to ReactFlow nodes
+      let reactFlowNodes = data.nodes.map(node => ({
+        id: node.id,
+        position: node.position || { x: 0, y: 0 },
+        type: 'flowStep',
+        data: node as unknown as Record<string, unknown>
+      })) as Node[];
+      
+      // Convert flow edges to ReactFlow edges - preserve all original properties
+      let reactFlowEdges = data.edges.map(edge => ({
+        ...edge, // Preserve all original edge properties
+        markerEnd: edge.markerEnd || { type: XYMarkerType.ArrowClosed }
+      })) as Edge[];
+
+      // Only apply auto-layout if nodes don't have positions
+      const needsLayout = reactFlowNodes.every(node => 
+        !node.position || (node.position.x === 0 && node.position.y === 0)
+      );
+      
+      if (needsLayout) {
+        // Use the tree layout that respects the actual edge connections
+        reactFlowNodes = getTreeLayout(reactFlowNodes, reactFlowEdges, [220, 120]);
+      }
 
       setNodes(reactFlowNodes);
       setEdges(reactFlowEdges);
+
     } catch (err) {
-      console.error("[FlowBlockRenderer.parseFlow] Flow parsing error:", err);
-      setError(err instanceof Error ? err.message : "Failed to parse flow data");
+      console.error("[FlowBlockRenderer.parseFlowData] Flow parsing error:", err);
+      if (!isStreaming) {
+        setError(err instanceof Error ? err.message : "Failed to parse flow data");
+      }
+      setNodes([]);
+      setEdges([]);
     } finally {
       setIsLoading(false);
     }
-  }, [code, isFolded]);
+  }, [code, isFolded, isStreaming]);
 
   useEffect(() => {
     if (!isFolded && code.trim() && !showCode) {
       // For streaming: shorter debounce to check for complete JSON more frequently
       // For completed: immediate parsing
-      const delay = isStreaming ? 100 : 0; // Shorter delay for better responsiveness
-      const timeoutId = setTimeout(parseFlow, delay);
+      const delay = isStreaming ? 100 : 0;
+      const timeoutId = setTimeout(parseFlowData, delay);
       return () => clearTimeout(timeoutId);
     }
-  }, [code, isFolded, showCode, parseFlow, isStreaming]);
+  }, [code, isFolded, showCode, parseFlowData, isStreaming]);
 
   const toggleFold = () => {
     const unfolding = isFolded;
     setIsFolded((prev) => !prev);
     if (unfolding && !showCode) {
-      setTimeout(parseFlow, 0);
+      setTimeout(parseFlowData, 0);
     }
   };
 
@@ -351,29 +346,67 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
       return;
     }
 
+    // Additional check for ReactFlow readiness
+    if (!isReactFlowReady) {
+      toast.error("Flow is still loading, please wait...");
+      return;
+    }
+
     try {
-      const svgElement = containerRef.current.querySelector('svg');
-      if (!svgElement) {
-        toast.error("No SVG element found");
+      // Use html-to-image like ReactFlow documentation recommends
+      const { toPng } = await import('html-to-image');
+      
+      // Wait for the flow viewport to be ready with better retry logic
+      const waitForFlowViewport = async (maxAttempts = 15, delay = 200): Promise<Element | null> => {
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          const flowViewport = containerRef.current?.querySelector('.react-flow__viewport');
+          if (flowViewport) {
+            // Check if viewport has actual content
+            const hasNodes = flowViewport.querySelector('[data-id]');
+            if (hasNodes) {
+              return flowViewport;
+            }
+          }
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        return null;
+      };
+
+      const flowViewport = await waitForFlowViewport();
+      if (!flowViewport) {
+        toast.error("Flow viewport not ready. Please try again in a moment.");
         return;
       }
 
-      const svgData = new XMLSerializer().serializeToString(svgElement);
-      const blob = new Blob([svgData], { type: "image/svg+xml" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "flow-diagram.svg";
-      document.body.appendChild(link);
+      // Get background from the flow container to respect themes
+      const flowContainer = containerRef.current.querySelector('.flow-container') as HTMLElement;
+      const backgroundColor = flowContainer 
+        ? window.getComputedStyle(flowContainer).backgroundColor 
+        : 'white';
+
+      // Use the simple approach that works reliably
+      const dataUrl = await toPng(flowViewport as HTMLElement, {
+        backgroundColor: backgroundColor,
+        filter: (node: Element) => {
+          return !(
+            node?.classList?.contains('react-flow__minimap') ||
+            node?.classList?.contains('react-flow__controls')
+          );
+        },
+      });
+
+      const link = document.createElement('a');
+      link.download = 'flow-diagram.png';
+      link.href = dataUrl;
       link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      toast.success("SVG downloaded successfully!");
-    } catch (err) {
-      console.error("Download error:", err);
-      toast.error("Failed to download SVG");
+      
+      toast.success("Flow diagram downloaded successfully!");
+      
+    } catch (error) {
+      console.error("Error downloading flow diagram:", error);
+      toast.error("Failed to download flow diagram");
     }
-  }, []);
+  }, [isReactFlowReady]);
 
   const toggleView = useCallback(() => {
     setShowCode((prev) => !prev);
@@ -396,7 +429,10 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
   );
 
   return (
-    <div className="code-block-container group/codeblock my-4 max-w-full">
+    <div 
+      ref={containerRef}
+      className="code-block-container group/codeblock my-4 max-w-full"
+    >
       <div className="code-block-header sticky top-0 z-10 flex items-center justify-between">
         <div className="flex items-center gap-1">
           <div className="text-sm font-medium">FLOW</div>
@@ -418,12 +454,12 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
             )}
           </button>
           
-          {/* Download SVG button - only show when diagram is rendered */}
-          {nodes.length > 0 && !showCode && !error && (
+          {/* Download PNG button - only show when ReactFlow is ready and diagram is rendered */}
+          {isReactFlowReady && !showCode && !error && (
             <button
               onClick={handleDownloadSvg}
-              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-              title="Download SVG"
+              className="px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors"
+              title="Download as PNG"
             >
               <DownloadIcon className="h-4 w-4" />
             </button>
@@ -463,55 +499,13 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
                 )}
                 
                 {nodes.length > 0 && !isLoading && !error && (
-                  <div 
-                    ref={containerRef}
-                    className="flow-container h-96 bg-background border rounded-md"
-                  >
-                    <ReactFlow
-                      nodes={nodes}
-                      edges={edges}
-                      nodeTypes={nodeTypes}
-                      fitView
-                      fitViewOptions={{
-                        padding: 50,
-                        maxZoom: 2.25,
-                        minZoom: 0.15,
-                      }}
-                      proOptions={{ hideAttribution: true }}
-                      nodesDraggable={false}
-                      nodesConnectable={false}
-                      elementsSelectable={true}
-                      zoomOnScroll={true}
-                      panOnScroll={false}
-                      zoomOnDoubleClick={true}
-                      panOnDrag={true}
-                      className="bg-background"
-                    >
-                      <MiniMap 
-                        nodeColor={(node) => {
-                          if (node.data?.status) {
-                            switch (node.data.status) {
-                              case 'running': return '#3b82f6';
-                              case 'success': return '#10b981';
-                              case 'error': return '#ef4444';
-                              case 'pending': return '#6b7280';
-                            }
-                          }
-                          switch (node.data?.type) {
-                            case 'trigger': return '#6366f1';
-                            case 'prompt': return '#10b981';
-                            case 'agent-task': return '#8b5cf6';
-                            case 'human-in-the-loop': return '#f59e0b';
-                            default: return '#6b7280';
-                          }
-                        }}
-                        position="bottom-right"
-                        style={{ width: 120, height: 80 }}
-                      />
-                      <Controls position="top-left" showInteractive={false} />
-                      <Background variant={BackgroundVariant.Dots} gap={20} size={2} />
-                    </ReactFlow>
-                  </div>
+                  <ReactFlowProvider>
+                    <FlowContent 
+                      nodes={nodes} 
+                      edges={edges} 
+                      onReady={() => setIsReactFlowReady(true)}
+                    />
+                  </ReactFlowProvider>
                 )}
                 
                 {!nodes.length && !isLoading && !error && (
@@ -548,6 +542,41 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
             </pre>
           </div>
         )}
+    </div>
+  );
+};
+
+// Flow content component that uses ReactFlow hooks
+const FlowContent: React.FC<{
+  nodes: Node[];
+  edges: Edge[];
+  onReady: () => void;
+}> = ({ nodes, edges, onReady }) => {
+
+  useEffect(() => {
+    // Set ready when ReactFlow has mounted and has nodes
+    if (nodes.length > 0) {
+      // Add a small delay to ensure ReactFlow has fully rendered
+      const timeout = setTimeout(() => {
+        onReady();
+      }, 100);
+      return () => clearTimeout(timeout);
+    }
+  }, [nodes.length, onReady]);
+
+  return (
+    <div className="flow-container h-96 bg-background border rounded-md">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        fitView
+        attributionPosition="bottom-left"
+      >
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+        <Controls />
+        <MiniMap />
+      </ReactFlow>
     </div>
   );
 };

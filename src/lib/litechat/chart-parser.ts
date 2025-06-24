@@ -93,11 +93,28 @@ export class JSONChartParser implements ChartParser {
       return { success: false, error: `Invalid chartType '${parsed.chartType}'. Must be one of: ${validTypes.join(', ')}` };
     }
     
-    if (Object.keys(parsed.chartConfig).length === 0 && parsed.chartData.length > 0) {
+    // If chartConfig doesn't match the data structure, regenerate it
+    const needsRegeneration = this.shouldRegenerateConfig(parsed.chartData, parsed.chartConfig);
+    if (needsRegeneration) {
         parsed.chartConfig = this.generateDefaultConfig(parsed.chartData);
     }
 
     return { success: true, data: parsed as ChartData };
+  }
+
+  private shouldRegenerateConfig(chartData: any[], chartConfig: any): boolean {
+    if (!chartData || chartData.length === 0) return false;
+    if (!chartConfig || Object.keys(chartConfig).length === 0) return true;
+    
+    // Check if the config keys match the numeric data keys
+    const firstItem = chartData[0];
+    const numericKeys = Object.keys(firstItem).filter(key => 
+      typeof firstItem[key] === 'number' && !['id', 'index'].includes(key.toLowerCase())
+    );
+    
+    // If no numeric keys match config keys, regenerate
+    const hasMatchingKeys = numericKeys.some(key => chartConfig[key]);
+    return !hasMatchingKeys;
   }
 
   private generateDefaultConfig(data: any[]): ChartConfig {
@@ -105,32 +122,20 @@ export class JSONChartParser implements ChartParser {
     
     const config: ChartConfig = {};
     const firstItem = data[0];
-    let colorIndex = 1;
+    let colorIndex = 1; // Start from 1 for --chart-1
     
     Object.keys(firstItem).forEach((key) => {
         if (typeof firstItem[key] === 'number' && !['id', 'index'].includes(key.toLowerCase())) {
             config[key] = {
                 label: key.charAt(0).toUpperCase() + key.slice(1),
-                color: `hsl(var(--chart-${colorIndex}))`,
+                color: `var(--chart-${colorIndex})`,
             };
-            colorIndex = (colorIndex % 5) + 1;
+            colorIndex++;
+            if (colorIndex > 5) {
+                colorIndex = 1; // Reset to 1 when we exceed 5 colors
+            }
         }
     });
-
-    // Pie charts often use 'value'
-    if (firstItem.hasOwnProperty('value') && typeof firstItem.value === 'number') {
-        config['value'] = {
-            label: 'Value',
-            color: 'hsl(var(--chart-1))',
-        };
-    }
-     // and pie charts can use proportion
-     if (firstItem.hasOwnProperty('proportion') && typeof firstItem.proportion === 'number') {
-      config['proportion'] = {
-          label: 'Proportion',
-          color: 'hsl(var(--chart-1))',
-      };
-    }
     
     return config;
   }
