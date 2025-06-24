@@ -9,6 +9,7 @@ import type { WorkflowControlModule } from '@/controls/modules/WorkflowControlMo
 import { PersistenceService } from '@/services/persistence.service';
 import { toast } from 'sonner';
 import { nanoid } from 'nanoid';
+import { WorkflowShortcutToggle } from './WorkflowShortcutToggle';
 
 interface WorkflowListProps {
     module: WorkflowControlModule;
@@ -191,6 +192,17 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
                                             Steps: {workflow.steps.map(s => s.name).join(', ')}
                                         </div>
                                     )}
+                                    
+                                    <div className="mt-2">
+                                        <WorkflowShortcutToggle 
+                                            workflow={workflow}
+                                            onToggle={() => {
+                                                // Refresh workflows to update UI
+                                                loadWorkflows();
+                                                onWorkflowsChanged?.();
+                                            }}
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="flex items-center gap-1 mt-4 pt-2 border-t">

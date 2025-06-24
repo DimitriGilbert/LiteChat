@@ -3,6 +3,7 @@ import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { workflowEvent } from "@/types/litechat/events/workflow.events";
 import { WorkflowBuilder } from "@/controls/components/workflow/WorkflowBuilder";
+
 import type { WorkflowTemplate } from "@/types/litechat/workflow";
 import { useInteractionStore } from "@/store/interaction.store";
 import { promptTemplateEvent } from "@/types/litechat/events/prompt-template.events";
@@ -13,6 +14,7 @@ import { providerEvent } from "@/types/litechat/events/provider.events";
 import { usePromptTemplateStore } from "@/store/prompt-template.store";
 import { PersistenceService } from "@/services/persistence.service";
 import { toast } from "sonner";
+import { emitter } from "@/lib/litechat/event-emitter";
 
 export class WorkflowControlModule implements ControlModule {
   readonly id = "core-workflow-control";
@@ -65,10 +67,19 @@ export class WorkflowControlModule implements ControlModule {
       }
     );
 
+    // Subscribe to workflow update events
+    const unsubWorkflowUpdateRequest = modApi.on(
+      workflowEvent.updateWorkflowRequest,
+      async (payload) => {
+        await this.updateWorkflow(payload.id, payload.updates);
+      }
+    );
+
     this.eventUnsubscribers.push(
       unsubGloballyEnabledModelsUpdated,
       unsubInitialDataLoaded,
-      unsubTemplatesChanged
+      unsubTemplatesChanged,
+      unsubWorkflowUpdateRequest
     );
 
     // Request templates on initialization
@@ -356,5 +367,47 @@ export class WorkflowControlModule implements ControlModule {
       status: () => "ready",
       triggerRenderer: () => React.createElement(WorkflowBuilder, { module: this }),
     });
+  }
+
+  // Add updateWorkflow method for event-driven updates
+  async updateWorkflow(id: string, updates: Partial<WorkflowTemplate>): Promise<void> {
+    try {
+      // Find the workflow to update
+      const workflowIndex = this.workflows.findIndex(w => w.id === id);
+      if (workflowIndex === -1) {
+        console.error(`[WorkflowControlModule] Workflow with id ${id} not found`);
+        return;
+      }
+
+      // Update the workflow
+      const updatedWorkflow = {
+        ...this.workflows[workflowIndex],
+        ...updates,
+        updatedAt: new Date().toISOString()
+      };
+
+      // Save to persistence
+      await PersistenceService.saveWorkflow(updatedWorkflow);
+      
+      // Update local state
+      this.workflows[workflowIndex] = updatedWorkflow;
+      this.notifyComponentUpdate?.();
+
+      // Emit update event
+      emitter.emit(workflowEvent.workflowUpdated, { id, updates });
+    } catch (error) {
+      console.error('[WorkflowControlModule] Failed to update workflow:', error);
+      toast.error('Failed to update workflow');
+    }
+  }
+
+  // Get shortcut workflows for hover display
+  getShortcutWorkflows(): WorkflowTemplate[] {
+    return this.workflows.filter(workflow => workflow.isShortcut === true);
+  }
+
+  // Check if any interactions are currently streaming
+  getIsStreaming(): boolean {
+    return useInteractionStore.getState().streamingInteractionIds.length > 0;
   }
 } 

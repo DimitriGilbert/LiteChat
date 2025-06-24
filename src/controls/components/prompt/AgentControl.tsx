@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Bot, ArrowLeft, Settings } from "lucide-react";
+import { Bot, ArrowLeft, Settings, Edit } from "lucide-react";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -45,6 +50,7 @@ interface AgentControlModule {
   // Module methods for data access
   getAgents: () => PromptTemplate[];
   getTasksForAgent: (agentId: string) => PromptTemplate[];
+  getShortcutAgents: () => PromptTemplate[];
   loadPromptTemplates: () => void;
   getIsLoadingTemplates: () => boolean;
 }
@@ -624,17 +630,125 @@ export const AgentControl: React.FC<AgentControlProps> = ({ module }) => {
     return "Select an AI agent to work with. Each agent has specialized capabilities and tasks.";
   };
 
+  const shortcutAgents = module.getShortcutAgents();
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  // Filter agents based on search term
+  const filteredAgents = shortcutAgents.filter(agent =>
+    agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    agent.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleRunShortcutAgent = (agent: PromptTemplate) => {
+    // Check if agent needs configuration (has variables)
+    if (agent.variables && agent.variables.length > 0) {
+      // Open agent configuration
+      handleUseAgent(agent);
+      setIsModalOpen(true);
+    } else {
+      // Apply agent directly
+      module.applyAgent(agent.id, {}).then(() => {
+        toast.success(`Agent "${agent.name}" applied!`);
+      }).catch((error) => {
+        console.error("Failed to apply agent:", error);
+        toast.error("Failed to apply agent!");
+      });
+    }
+  };
+
   return (
     <>
-      <Button
-        variant={hasActiveAgent ? "secondary" : "ghost"}
-        size="sm"
-        onClick={() => setIsModalOpen(true)}
-        className="h-8 w-8 p-0"
-        title={hasActiveAgent ? `Active Agent: ${currentAgent?.name || 'Unknown'}` : "Select Agent"}
-      >
-        <LiteChatIcon className="h-4 w-4" />
-      </Button>
+      {shortcutAgents.length > 0 ? (
+        <HoverCard>
+          <HoverCardTrigger asChild>
+            <Button
+              variant={hasActiveAgent ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setIsModalOpen(true)}
+              className="h-8 w-8 p-0"
+              title={hasActiveAgent ? `Active Agent: ${currentAgent?.name || 'Unknown'}` : "Select Agent"}
+            >
+              <LiteChatIcon className="h-4 w-4" />
+            </Button>
+          </HoverCardTrigger>
+          <HoverCardContent className="w-80 p-0" align="start">
+            <div className="p-3 border-b">
+              <h4 className="font-semibold text-sm mb-2">Quick Agents</h4>
+              <Input
+                placeholder="Search agents..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-8"
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              <div className="p-2 space-y-1">
+                {filteredAgents.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-4 text-sm">
+                    {searchTerm ? "No agents match your search" : "No shortcut agents available"}
+                  </div>
+                ) : (
+                  filteredAgents.map((agent) => {
+                    const needsConfig = agent.variables && agent.variables.length > 0;
+                    
+                    return (
+                      <div
+                        key={agent.id}
+                        className="flex items-center gap-2 p-2 rounded hover:bg-accent transition-colors group"
+                      >
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0 opacity-50 group-hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUseAgent(agent);
+                            setIsModalOpen(true);
+                          }}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        
+                        <div 
+                          className="flex-1 min-w-0 cursor-pointer"
+                          onClick={() => handleRunShortcutAgent(agent)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm truncate">{agent.name}</span>
+                            <Badge variant="outline" className="text-xs px-1 py-0">
+                              {module.getTasksForAgent(agent.id).length}
+                            </Badge>
+                            {needsConfig && (
+                              <Badge variant="secondary" className="text-xs px-1 py-0">
+                                Setup
+                              </Badge>
+                            )}
+                          </div>
+                          {agent.description && (
+                            <div className="text-xs text-muted-foreground truncate mt-0.5">
+                              {agent.description}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </HoverCardContent>
+        </HoverCard>
+      ) : (
+        <Button
+          variant={hasActiveAgent ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => setIsModalOpen(true)}
+          className="h-8 w-8 p-0"
+          title={hasActiveAgent ? `Active Agent: ${currentAgent?.name || 'Unknown'}` : "Select Agent"}
+        >
+          <LiteChatIcon className="h-4 w-4" />
+        </Button>
+      )}
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="!w-[80vw] !h-[85vh] !max-w-none flex flex-col">

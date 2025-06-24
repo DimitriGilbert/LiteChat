@@ -52,6 +52,8 @@ export class RulesControlModule implements ControlModule {
           tagId: l.tagId,
           ruleId: l.ruleId,
         }));
+        // Auto-populate always-on rules
+        this.populateAlwaysOnRules();
       }
       this.updateHasRulesOrTags();
       this.isLoadingRules = false;
@@ -60,6 +62,20 @@ export class RulesControlModule implements ControlModule {
     });
 
     this.eventUnsubscribers.push(unsubStatus, unsubRulesLoaded);
+  }
+
+  private populateAlwaysOnRules() {
+    // Auto-activate always-on rules
+    const alwaysOnRuleIds = this.allRules
+      .filter(rule => rule.alwaysOn)
+      .map(rule => rule.id);
+    
+    if (alwaysOnRuleIds.length > 0) {
+      this.transientActiveRuleIds = new Set([
+        ...this.transientActiveRuleIds,
+        ...alwaysOnRuleIds
+      ]);
+    }
   }
 
   private updateHasRulesOrTags() {
@@ -208,14 +224,34 @@ export class RulesControlModule implements ControlModule {
         },
         clearOnSubmit: () => {
           let changed = false;
+          
+          // Clear regular rules but preserve always-on rules
+          const alwaysOnRuleIds = new Set(
+            this.allRules
+              .filter(rule => rule.alwaysOn)
+              .map(rule => rule.id)
+          );
+          
           if (this.transientActiveTagIds.size > 0) {
             this.transientActiveTagIds = new Set<string>();
             changed = true;
           }
-          if (this.transientActiveRuleIds.size > 0) {
-            this.transientActiveRuleIds = new Set<string>();
+          
+          // Only remove rules that are not always-on
+          const newActiveRuleIds = new Set<string>();
+          this.transientActiveRuleIds.forEach(ruleId => {
+            if (alwaysOnRuleIds.has(ruleId)) {
+              newActiveRuleIds.add(ruleId);
+            } else {
+              changed = true;
+            }
+          });
+          
+          if (newActiveRuleIds.size !== this.transientActiveRuleIds.size) {
+            this.transientActiveRuleIds = newActiveRuleIds;
             changed = true;
           }
+          
           if (changed) this.notifyComponentUpdate?.();
         },
       });

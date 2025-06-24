@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Save } from "lucide-react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
@@ -26,6 +27,7 @@ export interface BaseTemplateFormData {
   tools: string[];
   rules: string[];
   followUps?: string[];
+  isShortcut?: boolean;
 }
 
 interface TemplateFormBaseProps {
@@ -59,6 +61,7 @@ const createValidationSchema = () => {
     tools: z.array(z.string()),
     rules: z.array(z.string()),
     followUps: z.array(z.string()),
+    isShortcut: z.boolean().optional(),
   });
   
   return async ({ value }: { value: BaseTemplateFormData }) => {
@@ -114,6 +117,7 @@ export const TemplateFormBase: React.FC<TemplateFormBaseProps> = ({
       tools: template?.tools || [],
       rules: template?.rules || [],
       followUps: template?.followUps || [],
+      isShortcut: template?.isShortcut || false,
     },
     validators: {
       onChangeAsync: createValidationSchema(),
@@ -205,6 +209,25 @@ export const TemplateFormBase: React.FC<TemplateFormBaseProps> = ({
                   placeholder={`Describe what this ${type} does`}
                   rows={3}
                 />
+              </div>
+            )}
+          />
+
+          <form.Field
+            name="isShortcut"
+            children={(field) => (
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id={field.name}
+                  checked={field.state.value || false}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                />
+                <Label htmlFor={field.name} className="text-sm font-medium">
+                  Show as shortcut
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  When enabled, this {type} will appear in the quick access hover menu
+                </p>
               </div>
             )}
           />

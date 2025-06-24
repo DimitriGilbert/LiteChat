@@ -19,12 +19,14 @@ export class AutoTitleControlModule implements ControlModule {
   private isStreaming = false;
   private isFirstInteraction = false;
   private globalAutoTitleEnabled = true;
+  private autoTitleAlwaysOn = false;
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.turnAutoTitleEnabled = false;
     this.isStreaming = useInteractionStore.getState().status === "streaming";
     this.globalAutoTitleEnabled = useSettingsStore.getState().autoTitleEnabled;
+    this.autoTitleAlwaysOn = useSettingsStore.getState().autoTitleAlwaysOn;
     this.checkFirstInteraction();
     this.notifyComponentUpdate?.();
 
@@ -61,12 +63,24 @@ export class AutoTitleControlModule implements ControlModule {
         }
       }
     );
+    const unsubAlwaysOnSettings = modApi.on(
+      settingsEvent.autoTitleAlwaysOnChanged,
+      (payload) => {
+        if (typeof payload === "object" && payload && "enabled" in payload) {
+          if (this.autoTitleAlwaysOn !== payload.enabled) {
+            this.autoTitleAlwaysOn = payload.enabled;
+            this.notifyComponentUpdate?.();
+          }
+        }
+      }
+    );
 
     this.eventUnsubscribers.push(
       unsubStatus,
       unsubContext,
       unsubComplete,
-      unsubSettings
+      unsubSettings,
+      unsubAlwaysOnSettings
     );
     // console.log(`[${this.id}] Initialized.`);
   }
@@ -92,6 +106,7 @@ export class AutoTitleControlModule implements ControlModule {
   public getIsStreaming = (): boolean => this.isStreaming;
   public getIsFirstInteraction = (): boolean => this.isFirstInteraction;
   public getGlobalAutoTitleEnabled = (): boolean => this.globalAutoTitleEnabled;
+  public getAutoTitleAlwaysOn = (): boolean => this.autoTitleAlwaysOn;
 
   public setTurnEnabled = (enabled: boolean) => {
     if (this.turnAutoTitleEnabled !== enabled) {
@@ -119,12 +134,16 @@ export class AutoTitleControlModule implements ControlModule {
       status: () => "ready",
       triggerRenderer: triggerRenderer,
       getMetadata: () => {
-        return this.turnAutoTitleEnabled
+        // When always-on is enabled, always return metadata regardless of turn setting
+        // When not always-on, respect the turn setting
+        const shouldIncludeMetadata = this.autoTitleAlwaysOn || this.turnAutoTitleEnabled;
+        return shouldIncludeMetadata
           ? { autoTitleEnabledForTurn: true }
           : undefined;
       },
       clearOnSubmit: () => {
-        if (this.turnAutoTitleEnabled) {
+        // Only clear if not always-on
+        if (!this.autoTitleAlwaysOn && this.turnAutoTitleEnabled) {
           this.turnAutoTitleEnabled = false;
           this.notifyComponentUpdate?.();
         }

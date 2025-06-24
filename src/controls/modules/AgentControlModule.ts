@@ -31,10 +31,11 @@ export class AgentControlModule implements ControlModule {
     // Load templates on initialization
     modApi.emit(promptTemplateEvent.loadPromptTemplatesRequest, {});
 
-    // Listen for template changes
+    // Listen for template changes - BUT ONLY FOR AGENTS AND TASKS
     const unsubTemplatesChanged = modApi.on(promptTemplateEvent.promptTemplatesChanged, (payload) => {
       if (payload?.promptTemplates) {
-        this.allTemplates = payload.promptTemplates;
+        // Always create a new array to avoid read-only issues
+        this.allTemplates = [...payload.promptTemplates];
         this.isLoadingTemplates = false;
         this.notifyComponentUpdate?.();
       }
@@ -42,25 +43,42 @@ export class AgentControlModule implements ControlModule {
 
     const unsubTemplateAdded = modApi.on(promptTemplateEvent.promptTemplateAdded, (payload) => {
       if (payload?.promptTemplate) {
-        this.allTemplates = [...this.allTemplates, payload.promptTemplate];
-        this.notifyComponentUpdate?.();
+        const template = payload.promptTemplate;
+        // Only react to agent and task templates
+        if (template.type === "agent" || template.type === "task") {
+          // Always create a completely new array to avoid read-only issues
+          this.allTemplates = [...this.allTemplates, template];
+          this.notifyComponentUpdate?.();
+        }
       }
     });
 
     const unsubTemplateUpdated = modApi.on(promptTemplateEvent.promptTemplateUpdated, (payload) => {
       if (payload?.promptTemplate) {
-        const index = this.allTemplates.findIndex(t => t.id === payload.promptTemplate.id);
-        if (index !== -1) {
-          this.allTemplates[index] = payload.promptTemplate;
-          this.notifyComponentUpdate?.();
+        const template = payload.promptTemplate;
+        // Only react to agent and task templates  
+        if (template.type === "agent" || template.type === "task") {
+          const index = this.allTemplates.findIndex(t => t.id === template.id);
+          if (index !== -1) {
+            // Create a completely new array to avoid read-only errors
+            const newTemplates = [...this.allTemplates];
+            newTemplates[index] = { ...template }; // Also clone the template object
+            this.allTemplates = newTemplates;
+            this.notifyComponentUpdate?.();
+          }
         }
       }
     });
 
     const unsubTemplateDeleted = modApi.on(promptTemplateEvent.promptTemplateDeleted, (payload) => {
       if (payload?.id) {
-        this.allTemplates = this.allTemplates.filter(t => t.id !== payload.id);
-        this.notifyComponentUpdate?.();
+        // Find the template to see if it was an agent or task
+        const templateToDelete = this.allTemplates.find(t => t.id === payload.id);
+        if (templateToDelete && (templateToDelete.type === "agent" || templateToDelete.type === "task")) {
+          // Create a new array to avoid read-only issues
+          this.allTemplates = this.allTemplates.filter(t => t.id !== payload.id);
+          this.notifyComponentUpdate?.();
+        }
       }
     });
 
@@ -83,6 +101,10 @@ export class AgentControlModule implements ControlModule {
     return this.allTemplates.filter(template => 
       (template.type || "prompt") === "task" && template.parentId === agentId
     );
+  };
+
+  public getShortcutAgents = (): PromptTemplate[] => {
+    return this.getAgents().filter(agent => agent.isShortcut === true);
   };
 
   public getIsLoadingTemplates = (): boolean => this.isLoadingTemplates;

@@ -34,6 +34,13 @@ export class PromptLibraryControlModule implements ControlModule {
 
   public getIsStreaming = (): boolean => this.isStreaming;
 
+  public getShortcutTemplates = () => {
+    const { promptTemplates } = usePromptTemplateStore.getState();
+    return promptTemplates.filter((template: any) => 
+      (template.type === "prompt" || !template.type) && template.isShortcut === true
+    );
+  };
+
   public setNotifyCallback = (cb: (() => void) | null) => {
     this.notifyComponentUpdate = cb;
   };
