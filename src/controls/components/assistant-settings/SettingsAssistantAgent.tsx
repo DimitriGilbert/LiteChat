@@ -48,12 +48,16 @@ export const SettingsAssistantAgent: React.FC = () => {
       ...data,
       type: "agent",
       isPublic: false,
+      isShortcut: data.isShortcut || false,
     });
   };
 
   const handleUpdateAgent = async (data: BaseTemplateFormData) => {
     if (!editingAgent) return;
-    await updatePromptTemplate(editingAgent.id, data);
+    await updatePromptTemplate(editingAgent.id, {
+      ...data,
+      isShortcut: data.isShortcut || false,
+    });
   };
 
   const handleDeleteAgent = async (id: string) => {
@@ -75,6 +79,7 @@ export const SettingsAssistantAgent: React.FC = () => {
       type: "task",
       parentId: managingAgent.id,
       isPublic: false,
+      isShortcut: data.isShortcut || false,
     });
   };
 
@@ -83,6 +88,7 @@ export const SettingsAssistantAgent: React.FC = () => {
     await updatePromptTemplate(editingTask.id, {
       ...data,
       parentId: managingAgent.id,
+      isShortcut: data.isShortcut || false,
     });
   };
 

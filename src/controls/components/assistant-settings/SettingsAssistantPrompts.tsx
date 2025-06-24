@@ -49,12 +49,16 @@ export const SettingsAssistantPrompts: React.FC = () => {
       ...data,
       type: "prompt", // Always prompt type for this interface
       isPublic: false, // Always private for now
+      isShortcut: data.isShortcut || false,
     });
   };
 
   const handleUpdateTemplate = async (data: BaseTemplateFormData) => {
     if (!editingTemplate) return;
-    await updatePromptTemplate(editingTemplate.id, data);
+    await updatePromptTemplate(editingTemplate.id, {
+      ...data,
+      isShortcut: data.isShortcut || false,
+    });
   };
 
   const handleDeleteTemplate = async (id: string) => {
