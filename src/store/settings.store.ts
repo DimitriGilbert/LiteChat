@@ -494,16 +494,11 @@ export const useSettingsStore = create(
       });
     },
     setControlRuleAlwaysOn: (ruleId, alwaysOn) => {
-      set((state) => ({
-        controlRuleAlwaysOn: {
-          ...state.controlRuleAlwaysOn,
-          [ruleId]: alwaysOn,
-        },
-      }));
-      PersistenceService.saveSetting("controlRuleAlwaysOn", get().controlRuleAlwaysOn);
-      
-      // Emit event so components can react to control rule preference changes
-      emitter.emit(settingsEvent.loaded, { settings: get() });
+      const current = get().controlRuleAlwaysOn ?? {};
+      const updated = { ...current, [ruleId]: alwaysOn };
+      set({ controlRuleAlwaysOn: updated });
+      PersistenceService.saveSetting("controlRuleAlwaysOn", updated);
+      emitter.emit(settingsEvent.controlRuleAlwaysOnChanged, { ruleId, alwaysOn });
     },
     setAutoRuleSelectionEnabled: (enabled) => {
       set({ autoRuleSelectionEnabled: enabled });
@@ -1155,6 +1150,12 @@ export const useSettingsStore = create(
           handler: (
             p: SettingsEventPayloads[typeof settingsEvent.setRunnableBlocksSecurityPromptRequest]
           ) => actions.setRunnableBlocksSecurityPrompt(p.prompt),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setControlRuleAlwaysOnRequest,
+          handler: (payload) =>
+            actions.setControlRuleAlwaysOn(payload.ruleId, payload.alwaysOn),
           storeId,
         },
         {

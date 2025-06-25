@@ -21,9 +21,13 @@ export class RunnableBlocksSettingsModule implements ControlModule {
         if (typeof payload === "object" && payload && "enabled" in payload) {
           if (this.isVisible !== payload.enabled) {
             this.isVisible = payload.enabled;
-            // Re-register when visibility changes
-            this.destroy();
-            this.register(modApi);
+            // Update registration without destroying event subscriptions
+            if (this.isVisible && !this.unregisterCallback) {
+              this.register(modApi);
+            } else if (!this.isVisible && this.unregisterCallback) {
+              this.unregisterCallback();
+              this.unregisterCallback = null;
+            }
           }
         }
       }

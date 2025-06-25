@@ -104,6 +104,9 @@ export const settingsEvent = {
   setRunnableBlocksSecurityModelIdRequest: "settings.set.runnable.blocks.security.model.id.request",
   setRunnableBlocksSecurityPromptRequest: "settings.set.runnable.blocks.security.prompt.request",
   
+  // Control Rule event
+  setControlRuleAlwaysOnRequest: "settings.set.control.rule.always.on.request",
+
   loadSettingsRequest: "settings.load.settings.request",
   resetGeneralSettingsRequest: "settings.reset.general.settings.request",
   resetAssistantSettingsRequest: "settings.reset.assistant.settings.request",
@@ -116,6 +119,10 @@ export const settingsEvent = {
   runnableBlocksSecurityCheckEnabledChanged: "settings.runnable.blocks.security.check.enabled.changed",
   runnableBlocksSecurityModelIdChanged: "settings.runnable.blocks.security.model.id.changed",
   runnableBlocksSecurityPromptChanged: "settings.runnable.blocks.security.prompt.changed",
+  
+  // Control Rule changed event
+  controlRuleAlwaysOnChanged: "settings.control.rule.always.on.changed",
+
   setRunnableBlocksEnabledRequest: "settings.set.runnable.blocks.enabled.request",
   runnableBlocksEnabledChanged: "settings.runnable.blocks.enabled.changed",
 } as const;
@@ -314,6 +321,8 @@ export interface SettingsEventPayloads {
   [settingsEvent.runnableBlocksSecurityCheckEnabledChanged]: { enabled: boolean };
   [settingsEvent.runnableBlocksSecurityModelIdChanged]: { modelId: string | null };
   [settingsEvent.runnableBlocksSecurityPromptChanged]: { prompt: string | null };
+  [settingsEvent.setControlRuleAlwaysOnRequest]: { ruleId: string, alwaysOn: boolean };
+  [settingsEvent.controlRuleAlwaysOnChanged]: { ruleId: string, alwaysOn: boolean };
   [settingsEvent.loadSettingsRequest]: undefined;
   [settingsEvent.resetGeneralSettingsRequest]: undefined;
   [settingsEvent.resetAssistantSettingsRequest]: undefined;

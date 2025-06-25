@@ -4,9 +4,56 @@ import type { LiteChatModApi } from "@/types/litechat/modding";
 
 import { PythonRunnableBlockRenderer } from "@/components/LiteChat/common/PythonRunnableBlockRenderer";
 
+const PYTHON_RUNNABLE_BLOCK_CONTROL_PROMPT = `LiteChat supports interactive runnable Python code blocks using the \`runnable-python\` language identifier, powered by Pyodide. This allows you to execute Python code directly in the browser, complete with a \`litechat\` object for application integration.
+
+**Functionality:**
+- The \`runnable-python\` block executes Python code in a Pyodide environment.
+- It provides a global \`litechat\` object (accessible via \`from js import litechat\`) to interact with the LiteChat application.
+- Supports popular Python packages like \`numpy\`, \`pandas\`, and \`matplotlib\`.
+
+**\`litechat\` Object API:**
+- \`litechat.context\`: A snapshot of the current application context.
+- \`litechat.utils.log(level, *args)\`: Log messages to the console.
+- \`litechat.utils.toast(type, message)\`: Display a toast notification.
+- \`litechat.vfs.getInstance(vfsKey)\`: Get a VFS instance for file operations.
+- \`litechat.preview.createTarget()\`: Create a target for rendering HTML or plots.
+
+**Usage:**
+To create a runnable Python block, use the \`runnable-python\` language identifier.
+
+**Example: Using pandas and matplotlib**
+
+\`\`\`runnable-python
+import pandas as pd
+import matplotlib.pyplot as plt
+from js import litechat
+
+# Create a simple DataFrame
+data = {'City': ['London', 'Paris', 'New York', 'Tokyo'],
+        'Population': [8900000, 2141000, 8399000, 13929000]}
+df = pd.DataFrame(data)
+
+# Create a plot
+fig, ax = plt.subplots()
+df.plot(kind='bar', x='City', y='Population', ax=ax, legend=False)
+ax.set_title('City Populations')
+ax.set_ylabel('Population (Millions)')
+ax.set_xlabel('City')
+plt.tight_layout()
+
+# Display the plot in LiteChat
+# Pyodide's plt.show() will automatically render in the output.
+plt.show()
+
+litechat.utils.toast('success', 'Chart has been generated!')
+\`\`\`
+
+Use \`runnable-python\` for data analysis, visualization, and scientific computing tasks directly within the chat.`;
+
 export class PythonRunnableBlockModule implements ControlModule {
   readonly id = "core-python-runnable-block-renderer";
   private modApiRef: LiteChatModApi | null = null;
+  private unregisterCallbacks: (() => void)[] = [];
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApiRef = modApi;
@@ -106,7 +153,7 @@ export class PythonRunnableBlockModule implements ControlModule {
   }
 
   register(modApi: LiteChatModApi): void {
-    modApi.registerBlockRenderer({
+    const rendererUnregister = modApi.registerBlockRenderer({
       id: this.id,
       supportedLanguages: ["py", "python", "runnable-python"],
       priority: 5, // Higher than default code renderer but lower than specialized renderers
@@ -121,9 +168,22 @@ export class PythonRunnableBlockModule implements ControlModule {
         });
       },
     });
+    this.unregisterCallbacks.push(rendererUnregister);
+
+    const ruleUnregister = modApi.registerRule({
+      id: `${this.id}-control-rule`,
+      name: "Runnable Python Control",
+      content: PYTHON_RUNNABLE_BLOCK_CONTROL_PROMPT,
+      type: "control",
+      alwaysOn: false, // Disabled by default, user must opt-in via settings
+      moduleId: this.id,
+    });
+    this.unregisterCallbacks.push(ruleUnregister);
   }
 
   destroy(_modApi: LiteChatModApi): void {
+    this.unregisterCallbacks.forEach(cb => cb());
+    this.unregisterCallbacks = [];
     this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
