@@ -37,15 +37,13 @@ You can use the following methods on \`litechat\`:
 
 ### Basic DOM Operations
 \`\`\`runpy
-# Clear the target
 from js import document
-while target.firstChild:
-    target.removeChild(target.firstChild)
+target.replaceChildren()
 
 # Create and append elements
 heading = document.createElement('h3')
 heading.textContent = 'Hello from DOM!'
-heading.style.color = 'blue'
+heading.className = 'text-blue-500'
 target.appendChild(heading)
 
 # Create interactive elements
@@ -57,17 +55,15 @@ def on_click(event):
 button.addEventListener('click', on_click)
 target.appendChild(button)
 
-litechat.utils.log('info', 'DOM elements created and appended)
-
+litechat.utils.log('info', 'DOM elements created and appended')
 \`\`\`
 ### Complex DOM Structures
 \`\`\`runpy
 from js import document
-while target.firstChild:
-    target.removeChild(target.firstChild)
+target.replaceChildren()
 
 container = document.createElement('div')
-container.style.cssText = 'padding: 20px; background: #f0f0f0; border-radius: 8px; margin: 10px 0;'
+container.className = 'p-5 bg-gray-100 rounded-lg m-2'
 
 title = document.createElement('h3')
 title.textContent = 'Interactive Demo'
@@ -76,16 +72,16 @@ container.appendChild(title)
 input = document.createElement('input')
 input.type = 'text'
 input.placeholder = 'Type something...'
-input.style.cssText = 'padding: 8px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px;'
+input.className = 'p-2 m-2 border border-gray-300 rounded'
 container.appendChild(input)
 
 button = document.createElement('button')
 button.textContent = 'Process Input'
-button.style.cssText = 'padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;'
+button.className = 'p-2 bg-blue-500 text-white border-none rounded cursor-pointer'
 def on_click(event):
     output = document.createElement('div')
     output.textContent = f'You typed: {input.value}'
-    output.style.cssText = 'margin-top: 10px; padding: 10px; background: #e9ecef; border-radius: 4px;'
+    output.className = 'mt-2 p-2 bg-gray-200 rounded'
     container.appendChild(output)
 button.addEventListener('click', on_click)
 container.appendChild(button)
@@ -97,13 +93,12 @@ litechat.utils.log('info', 'Complex DOM structure created')
 ### Canvas/WebGL Example
 \`\`\`runpy
 from js import document
-while target.firstChild:
-    target.removeChild(target.firstChild)
+target.replaceChildren()
 
 canvas = document.createElement('canvas')
 canvas.width = 400
 canvas.height = 300
-canvas.style.border = '1px solid #ccc'
+canvas.className = 'border border-gray-300'
 target.appendChild(canvas)
 
 ctx = canvas.getContext('2d')
@@ -119,22 +114,21 @@ litechat.utils.log('info', 'Canvas with shapes created')
 ### Data Visualization Example
 \`\`\`runpy
 from js import document
-while target.firstChild:
-    target.removeChild(target.firstChild)
+target.replaceChildren()
 
 data = [10, 25, 15, 40, 30]
 max_val = max(data)
 
 chart = document.createElement('div')
-chart.style.cssText = 'display: flex; align-items: end; gap: 5px; height: 200px; padding: 20px;'
+chart.className = 'flex items-end gap-1 h-52 p-5'
 
 for value in data:
     bar = document.createElement('div')
     height = (value / max_val) * 150
-    bar.style.cssText = f'width: 40px; height: {height}px; background: linear-gradient(to top, #667eea, #764ba2); border-radius: 4px 4px 0 0; position: relative; transition: all 0.3s ease;'
+    bar.className = f'w-10 h-[{height}px] bg-gradient-to-t from-indigo-400 to-purple-800 rounded-t relative transition-all duration-300 ease-in-out'
     label = document.createElement('span')
     label.textContent = str(value)
-    label.style.cssText = 'position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: bold;'
+    label.className = 'absolute top-[-25px] left-1/2 -translate-x-1/2 text-xs font-bold'
     bar.appendChild(label)
     chart.appendChild(bar)
 target.appendChild(chart)
@@ -143,27 +137,31 @@ litechat.utils.log('info', 'Interactive bar chart created')
 
 ### Reading Files and DOM Display
 \`\`\`runpy
-vfs = await litechat.getVfsInstance('project-123')
-content = await vfs.promises.readFile('/data.txt', 'utf8')
-
+import asyncio
 from js import document
-while target.firstChild:
-    target.removeChild(target.firstChild)
 
-pre = document.createElement('pre')
-pre.style.cssText = 'background: #f8f9fa; padding: 15px; border-radius: 8px; overflow: auto; font-family: monospace;'
-pre.textContent = content
-target.appendChild(pre)
-litechat.utils.log('info', 'File content displayed in DOM')
+target.replaceChildren()
+
+async def main():
+    vfs = await litechat.getVfsInstance('project-123')
+    content = await vfs.promises.readFile('/data.txt', 'utf8')
+
+    pre = document.createElement('pre')
+    pre.className = 'bg-gray-50 p-3 rounded-lg overflow-auto font-mono'
+    pre.textContent = content
+    target.appendChild(pre)
+    litechat.utils.log('info', 'File content displayed in DOM')
+
+asyncio.run(main())
 \`\`\`
 
 ## IMPORTANT PRINCIPLES:
-1. **ALWAYS use \`target.appendChild()\`, \`target.removeChild()\`, etc.**
+1. **ALWAYS use \`target.appendChild()\`, \`target.replaceChildren()\`, etc.**
 2. **Create elements with \`document.createElement()\`**
 3. **Use \`element.style.cssText\` for efficient styling**
 4. **Add event listeners directly: \`element.addEventListener()\`**
 5. **Avoid innerHTML/outerHTML - use DOM methods for performance**
-6. **Use \`while target.firstChild: target.removeChild(target.firstChild)\` to clear content before adding new content**
+6. **Use \`target.replaceChildren()\` to clear content before adding new content**
 
 You are encouraged to use the full scientific Python stack, the LiteChat API for chat interactions, and DOM interop for visualizations. Focus on workflows that leverage these capabilities.`;
 
