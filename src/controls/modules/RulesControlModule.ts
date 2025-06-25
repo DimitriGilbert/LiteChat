@@ -15,12 +15,19 @@ import type { ModControlRule } from "@/types/litechat/modding";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useSettingsStore } from "../../store/settings.store";
 import { emitter } from "@/lib/litechat/event-emitter";
-import { useInputStore } from "@/store/input.store";
 import { toast } from "sonner";
-import { usePromptStateStore } from "@/store/prompt.store";
-import { InteractionService } from "@/services/interaction.service";
+import { AIService } from "@/services/ai.service";
+import {
+  splitModelId,
+  instantiateModelInstance,
+} from "@/lib/litechat/provider-helpers";
+import { useProviderStore } from "@/store/provider.store";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
+import { useInteractionStore } from "@/store/interaction.store";
+import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
-import type { CoreMessage } from "ai";
+import type { Interaction } from "@/types/litechat/interaction";
+import type { PromptTurnObject } from "@/types/litechat/prompt";
 
 export class RulesControlModule implements ControlModule {
   readonly id = "core-rules-tags";
@@ -40,6 +47,7 @@ export class RulesControlModule implements ControlModule {
   public isLoadingRules = true;
   private notifyComponentUpdate: (() => void) | null = null;
   private notifySettingsComponentUpdate: (() => void) | null = null;
+  private latestUserPrompt: string = "";
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApiRef = modApi;
@@ -83,6 +91,13 @@ export class RulesControlModule implements ControlModule {
         this.notifyComponentUpdate?.();
       }
     });
+
+    // Listen for prompt input changes
+    const promptListener = (payload: { value: string }) => {
+      this.latestUserPrompt = payload.value;
+    };
+    emitter.on(promptEvent.inputChanged, promptListener);
+    this.eventUnsubscribers.push(() => emitter.off(promptEvent.inputChanged, promptListener));
 
     this.eventUnsubscribers.push(unsubStatus, unsubRulesLoaded, unsubControlRules);
   }
@@ -457,93 +472,186 @@ export class RulesControlModule implements ControlModule {
     return controlRules.hasOwnProperty(ruleId);
   };
 
-  public async autoSelectRules() {
+  public autoSelectRules = async () => {
     const settings = useSettingsStore.getState();
     if (!settings.autoRuleSelectionEnabled) {
       toast.info("Auto-rule selection is disabled in settings.");
       return;
     }
-    // Get the current user prompt from the input area (same as auto-title gets turnData.content)
-    let userPrompt = "";
-    try {
-      const inputEl = document.querySelector("textarea[aria-label='Chat input']") as HTMLTextAreaElement | null;
-      userPrompt = inputEl?.value || "";
-    } catch {}
+    const userPrompt = this.latestUserPrompt;
     if (!userPrompt) {
-      toast.error("No user prompt found.");
+      toast.error("No user prompt found to base selection on.");
       return;
     }
-    const rules = this.getAllRules ? this.getAllRules() : [];
+    const rules = this.getAllRules();
     if (!rules.length) {
       toast.error("No rules available for selection.");
       return;
     }
-    // Format rules for the prompt
-    const rulesString = rules.map(r => `- ${r.name} (id: ${r.id})${r.content ? `: ${r.content}` : ""}`).join("\n");
-    let promptTemplate = settings.autoRuleSelectionPrompt || "";
-    const filledPrompt = promptTemplate.replace("{{prompt}}", userPrompt).replace("{{rules}}", rulesString);
+    const modelId = settings.autoRuleSelectionModelId;
+    if (!modelId) {
+      toast.error("No model selected for auto-rule selection in settings.");
+      return;
+    }
 
-    // Build PromptObject (like auto-title)
-    const promptObject = {
-      system: "Given the user prompt and the list of available rules, select the most relevant rules for this conversation. Return ONLY a JSON array of rule IDs.",
-      messages: [
-        { role: "user", content: filledPrompt } as CoreMessage
-      ],
-      parameters: {
-        temperature: 0.2,
-        max_tokens: 256,
-      },
-      metadata: {
-        modelId: settings.autoRuleSelectionModelId || undefined,
-        isRuleSelection: true,
-      },
-      tools: undefined,
-      toolChoice: 'none' as const,
-    };
-    const turnData = {
-      id: nanoid(),
-      content: `[Auto-select rules for: ${userPrompt.substring(0, 50)}...]`,
-      parameters: promptObject.parameters,
-      metadata: {
-        ...promptObject.metadata,
-        originalPrompt: userPrompt,
-      },
-    };
-    // Use a fake conversationId (null) since this is not tied to a conversation, or use a real one if available
-    let conversationId = null;
+    toast.loading("AI is selecting relevant rules...");
+
+    const conversationId =
+      useInteractionStore.getState().currentConversationId || "unassigned";
+    const interactionId = nanoid();
+    let interaction: Interaction | null = null;
+
     try {
-      // Try to get the current conversationId if possible
-      const interactionStore = require("@/store/interaction.store");
-      conversationId = interactionStore.useInteractionStore.getState().currentConversationId || null;
-    } catch {}
-    try {
-      const result = await InteractionService.startInteraction(
-        promptObject,
-        conversationId,
-        turnData,
-        'rules.auto_selection'
-      );
-      if (!result || !result.response) {
-        toast.error("No response from AI for rule selection.");
-        return;
+      const { providerId, modelId: specificModelId } = splitModelId(modelId);
+      
+      if (!providerId) {
+        throw new Error(`Could not determine provider from model ID: ${modelId}`);
       }
+
+      const providerConfig = useProviderStore
+        .getState()
+        .dbProviderConfigs.find((p) => p.id === providerId);
+      const apiKey = useProviderStore.getState().getApiKeyForProvider(providerId);
+
+      if (!providerConfig || !specificModelId) {
+        throw new Error(
+          `Invalid model ID or provider not found for ${modelId}`,
+        );
+      }
+
+      const modelInstance = instantiateModelInstance(
+        providerConfig,
+        specificModelId,
+        apiKey === null ? undefined : apiKey,
+      );
+
+      if (!modelInstance) {
+        throw new Error(`Failed to instantiate model: ${modelId}`);
+      }
+
+      const rulesString = rules
+        .map(
+          (r) =>
+            `- ${r.name} (id: ${r.id})${
+              r.content ? `: ${r.content.substring(0, 200)}...` : ""
+            }`,
+        )
+        .join("\n");
+
+      const systemPrompt =
+        "You are a helpful assistant that selects contextual rules based on a user's prompt. You only respond with a valid JSON array of strings.";
+      const promptTemplate =
+        settings.autoRuleSelectionPrompt ||
+        'Analyze the following user prompt and the list of available rules. Your task is to select the most relevant rules that should be applied. The user\'s goal is to get a better response from the AI. Respond with ONLY a JSON string array of the selected rule IDs, for example: ["rule-id-1", "rule-id-2"]. Do not include any other text, explanation, or markdown formatting.\n\nUSER PROMPT:\n{{prompt}}\n\nAVAILABLE RULES:\n{{rules}}';
+
+      const filledPrompt = promptTemplate
+        .replace("{{prompt}}", userPrompt)
+        .replace("{{rules}}", rulesString);
+
+      const turnData: PromptTurnObject = {
+        id: nanoid(),
+        content: `[Auto-select rules for: ${userPrompt.substring(0, 50)}...]`,
+        parameters: { temperature: 0.1, maxTokens: 512 },
+        metadata: {
+          modelId: modelId,
+          isRuleSelection: true,
+          originalPrompt: userPrompt,
+          systemPrompt: systemPrompt,
+        },
+      };
+
+      interaction = {
+        id: interactionId,
+        conversationId: conversationId,
+        startedAt: new Date(),
+        endedAt: null,
+        type: "rules.auto_selection",
+        status: "STREAMING", // Indicates in-progress
+        prompt: turnData,
+        response: null,
+        index: -1,
+        parentId: null,
+        metadata: { ...turnData.metadata },
+      };
+
+      await PersistenceService.saveInteraction(interaction);
+
+      const result = await AIService.generateCompletion({
+        model: modelInstance,
+        system: systemPrompt,
+        messages: [{ role: "user", content: filledPrompt }],
+        temperature: 0.1,
+        maxTokens: 512,
+      });
+
+      if (!result) {
+        throw new Error("AI returned an empty response.");
+      }
+
       let ruleIds: string[] = [];
       try {
-        ruleIds = JSON.parse(result.response.trim());
-        if (!Array.isArray(ruleIds)) throw new Error("Not an array");
+        const jsonMatch = result.match(/\[.*?\]/);
+        if (!jsonMatch) {
+          throw new Error("No JSON array found in the AI response.");
+        }
+        ruleIds = JSON.parse(jsonMatch[0]);
+        if (
+          !Array.isArray(ruleIds) ||
+          !ruleIds.every((id) => typeof id === "string")
+        ) {
+          throw new Error(
+            "AI response was not a valid JSON array of rule IDs.",
+          );
+        }
       } catch (err) {
-        toast.error("AI response was not a valid JSON array of rule IDs.");
-        return;
+        console.error(
+          "Failed to parse AI response for rule selection:",
+          err,
+          "Raw response:",
+          result,
+        );
+        throw new Error(
+          `AI response was not valid JSON. ${
+            err instanceof Error ? err.message : ""
+          }`,
+        );
       }
-      if (this.setActiveRuleIds) {
-        this.setActiveRuleIds(() => new Set(ruleIds));
-        toast.success("Auto-selected rules applied.");
-      } else {
-        toast.error("setActiveRuleIds method not available.");
-      }
+      
+      const finalInteraction: Interaction = {
+        ...interaction,
+        status: "COMPLETED",
+        endedAt: new Date(),
+        response: result,
+        metadata: {
+          ...interaction.metadata,
+          selectedRuleIds: ruleIds,
+        },
+      };
+      await PersistenceService.saveInteraction(finalInteraction);
+
+      this.setActiveRuleIds(() => new Set(ruleIds));
+      toast.success(`AI selected ${ruleIds.length} rules.`);
+      
     } catch (error) {
-      toast.error("Failed to auto-select rules.");
+      toast.dismiss();
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to auto-select rules: ${errorMessage}`);
       console.error("Auto-select rules error:", error);
+
+      if (interaction) {
+        const finalInteraction: Interaction = {
+          ...interaction,
+          status: "ERROR",
+          endedAt: new Date(),
+          response: null,
+          metadata: {
+            ...interaction.metadata,
+            error: errorMessage,
+          },
+        };
+        await PersistenceService.saveInteraction(finalInteraction);
+      }
     }
-  }
+  };
 }

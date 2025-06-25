@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/tooltip";
 import { RulesControlDialogContent } from "./RulesControlDialogContent";
 import type { RulesControlModule } from "@/controls/modules/RulesControlModule";
-import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
@@ -87,16 +86,16 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
     [module]
   );
 
-  const handleAutoSelectRules = useCallback(async () => {
-    // TODO: Implement AI-powered rule selection
-    // This would analyze the current prompt and suggest relevant rules
-    console.log('Auto-selecting rules based on prompt context...');
-    // Use toast instead of alert for better UX
-    toast.info('Auto-select rules feature coming soon!', {
-      description: 'This feature will be implemented in Issue #40 to automatically suggest relevant rules based on your prompt context.',
-      duration: 4000,
-    });
-  }, []);
+  // const handleAutoSelectRules = useCallback(async () => {
+  //   // TODO: Implement AI-powered rule selection
+  //   // This would analyze the current prompt and suggest relevant rules
+  //   console.log('Auto-selecting rules based on prompt context...');
+  //   // Use toast instead of alert for better UX
+  //   toast.info('Auto-select rules feature coming soon!', {
+  //     description: 'This feature will be implemented in Issue #40 to automatically suggest relevant rules based on your prompt context.',
+  //     duration: 4000,
+  //   });
+  // }, []);
 
   const handleTriggerClick = () => {
     if (!hasRulesOrTags) {

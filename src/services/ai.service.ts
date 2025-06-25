@@ -1,7 +1,7 @@
 // src/services/ai.service.ts
 // FULL FILE
 
-import { streamText, StreamTextResult, LanguageModelV1 } from "ai";
+import { streamText, generateText, StreamTextResult, LanguageModelV1 } from "ai";
 import type {
   CoreMessage,
   Tool,
@@ -189,6 +189,28 @@ export class AIService {
     } finally {
       console.log(
         `[AIService] Stream processing finished for ${interactionId}.`,
+      );
+    }
+  }
+
+  // Generates a non-streaming text completion.
+  static async generateCompletion(options: {
+    model: LanguageModelV1;
+    messages: CoreMessage[];
+    system?: string;
+    temperature?: number;
+    maxTokens?: number;
+  }): Promise<string> {
+    try {
+      const { text } = await generateText(options);
+      return text;
+    } catch (error: unknown) {
+      console.error(`[AIService] Error during generateText call:`, error);
+      // Re-throw a standardized error
+      throw new Error(
+        `AI completion failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
     }
   }
