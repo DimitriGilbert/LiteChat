@@ -162,7 +162,7 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
             allRules={allRules}
             allTags={allTags}
             getRulesForTag={getRulesForTag}
-            onAutoSelectRules={handleAutoSelectRules}
+            onAutoSelectRules={module.autoSelectRules}
           />
         </PopoverContent>
       )}

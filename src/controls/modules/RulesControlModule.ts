@@ -15,6 +15,12 @@ import type { ModControlRule } from "@/types/litechat/modding";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useSettingsStore } from "../../store/settings.store";
 import { emitter } from "@/lib/litechat/event-emitter";
+import { useInputStore } from "@/store/input.store";
+import { toast } from "sonner";
+import { usePromptStateStore } from "@/store/prompt.store";
+import { InteractionService } from "@/services/interaction.service";
+import { nanoid } from "nanoid";
+import type { CoreMessage } from "ai";
 
 export class RulesControlModule implements ControlModule {
   readonly id = "core-rules-tags";
@@ -450,4 +456,94 @@ export class RulesControlModule implements ControlModule {
     const controlRules = this.getControlRulesFromStore();
     return controlRules.hasOwnProperty(ruleId);
   };
+
+  public async autoSelectRules() {
+    const settings = useSettingsStore.getState();
+    if (!settings.autoRuleSelectionEnabled) {
+      toast.info("Auto-rule selection is disabled in settings.");
+      return;
+    }
+    // Get the current user prompt from the input area (same as auto-title gets turnData.content)
+    let userPrompt = "";
+    try {
+      const inputEl = document.querySelector("textarea[aria-label='Chat input']") as HTMLTextAreaElement | null;
+      userPrompt = inputEl?.value || "";
+    } catch {}
+    if (!userPrompt) {
+      toast.error("No user prompt found.");
+      return;
+    }
+    const rules = this.getAllRules ? this.getAllRules() : [];
+    if (!rules.length) {
+      toast.error("No rules available for selection.");
+      return;
+    }
+    // Format rules for the prompt
+    const rulesString = rules.map(r => `- ${r.name} (id: ${r.id})${r.content ? `: ${r.content}` : ""}`).join("\n");
+    let promptTemplate = settings.autoRuleSelectionPrompt || "";
+    const filledPrompt = promptTemplate.replace("{{prompt}}", userPrompt).replace("{{rules}}", rulesString);
+
+    // Build PromptObject (like auto-title)
+    const promptObject = {
+      system: "Given the user prompt and the list of available rules, select the most relevant rules for this conversation. Return ONLY a JSON array of rule IDs.",
+      messages: [
+        { role: "user", content: filledPrompt } as CoreMessage
+      ],
+      parameters: {
+        temperature: 0.2,
+        max_tokens: 256,
+      },
+      metadata: {
+        modelId: settings.autoRuleSelectionModelId || undefined,
+        isRuleSelection: true,
+      },
+      tools: undefined,
+      toolChoice: 'none' as const,
+    };
+    const turnData = {
+      id: nanoid(),
+      content: `[Auto-select rules for: ${userPrompt.substring(0, 50)}...]`,
+      parameters: promptObject.parameters,
+      metadata: {
+        ...promptObject.metadata,
+        originalPrompt: userPrompt,
+      },
+    };
+    // Use a fake conversationId (null) since this is not tied to a conversation, or use a real one if available
+    let conversationId = null;
+    try {
+      // Try to get the current conversationId if possible
+      const interactionStore = require("@/store/interaction.store");
+      conversationId = interactionStore.useInteractionStore.getState().currentConversationId || null;
+    } catch {}
+    try {
+      const result = await InteractionService.startInteraction(
+        promptObject,
+        conversationId,
+        turnData,
+        'rules.auto_selection'
+      );
+      if (!result || !result.response) {
+        toast.error("No response from AI for rule selection.");
+        return;
+      }
+      let ruleIds: string[] = [];
+      try {
+        ruleIds = JSON.parse(result.response.trim());
+        if (!Array.isArray(ruleIds)) throw new Error("Not an array");
+      } catch (err) {
+        toast.error("AI response was not a valid JSON array of rule IDs.");
+        return;
+      }
+      if (this.setActiveRuleIds) {
+        this.setActiveRuleIds(() => new Set(ruleIds));
+        toast.success("Auto-selected rules applied.");
+      } else {
+        toast.error("setActiveRuleIds method not available.");
+      }
+    } catch (error) {
+      toast.error("Failed to auto-select rules.");
+      console.error("Auto-select rules error:", error);
+    }
+  }
 }

@@ -86,6 +86,9 @@ export interface SettingsState {
   autoSyncOnStreamComplete: boolean;
   autoInitializeReposOnStartup: boolean;
   controlRuleAlwaysOn: Record<string, boolean>;
+  autoRuleSelectionEnabled: boolean;
+  autoRuleSelectionModelId: string | null;
+  autoRuleSelectionPrompt: string | null;
 }
 
 interface SettingsActions {
@@ -129,6 +132,9 @@ interface SettingsActions {
   setAutoSyncOnStreamComplete: (enabled: boolean) => void;
   setAutoInitializeReposOnStartup: (enabled: boolean) => void;
   setControlRuleAlwaysOn: (ruleId: string, alwaysOn: boolean) => void;
+  setAutoRuleSelectionEnabled: (enabled: boolean) => void;
+  setAutoRuleSelectionModelId: (modelId: string | null) => void;
+  setAutoRuleSelectionPrompt: (prompt: string | null) => void;
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>;
   resetAssistantSettings: () => Promise<void>;
@@ -173,6 +179,10 @@ const DEFAULT_ENABLE_AUTO_SCROLL_ON_STREAM = true;
 const DEFAULT_AUTO_SYNC_ON_STREAM_COMPLETE = false;
 const DEFAULT_AUTO_INITIALIZE_REPOS_ON_STARTUP = false;
 const DEFAULT_CONTROL_RULE_ALWAYS_ON = {};
+const DEFAULT_AUTO_RULE_SELECTION_ENABLED = false;
+const DEFAULT_AUTO_RULE_SELECTION_MODEL_ID = null;
+const DEFAULT_AUTO_RULE_SELECTION_PROMPT =
+  "Given the following user prompt and the list of available rules, select the most relevant rules for this conversation. Return a JSON array of rule IDs.\n\nUser Prompt: {{prompt}}\n\nAvailable Rules:\n{{rules}}\n\nReturn only a JSON array of rule IDs.";
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set, get) => ({
@@ -213,6 +223,9 @@ export const useSettingsStore = create(
     autoSyncOnStreamComplete: DEFAULT_AUTO_SYNC_ON_STREAM_COMPLETE,
     autoInitializeReposOnStartup: DEFAULT_AUTO_INITIALIZE_REPOS_ON_STARTUP,
     controlRuleAlwaysOn: DEFAULT_CONTROL_RULE_ALWAYS_ON,
+    autoRuleSelectionEnabled: DEFAULT_AUTO_RULE_SELECTION_ENABLED,
+    autoRuleSelectionModelId: DEFAULT_AUTO_RULE_SELECTION_MODEL_ID,
+    autoRuleSelectionPrompt: DEFAULT_AUTO_RULE_SELECTION_PROMPT,
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -475,6 +488,18 @@ export const useSettingsStore = create(
       // Emit event so components can react to control rule preference changes
       emitter.emit(settingsEvent.loaded, { settings: get() });
     },
+    setAutoRuleSelectionEnabled: (enabled) => {
+      set({ autoRuleSelectionEnabled: enabled });
+      PersistenceService.saveSetting("autoRuleSelectionEnabled", enabled);
+    },
+    setAutoRuleSelectionModelId: (modelId) => {
+      set({ autoRuleSelectionModelId: modelId });
+      PersistenceService.saveSetting("autoRuleSelectionModelId", modelId);
+    },
+    setAutoRuleSelectionPrompt: (prompt) => {
+      set({ autoRuleSelectionPrompt: prompt });
+      PersistenceService.saveSetting("autoRuleSelectionPrompt", prompt);
+    },
 
     loadSettings: async () => {
       try {
@@ -515,6 +540,9 @@ export const useSettingsStore = create(
           autoSyncOnStreamComplete,
           autoInitializeReposOnStartup,
           controlRuleAlwaysOn,
+          autoRuleSelectionEnabled,
+          autoRuleSelectionModelId,
+          autoRuleSelectionPrompt,
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -654,6 +682,18 @@ export const useSettingsStore = create(
             "controlRuleAlwaysOn",
             DEFAULT_CONTROL_RULE_ALWAYS_ON
           ),
+          PersistenceService.loadSetting<boolean>(
+            "autoRuleSelectionEnabled",
+            DEFAULT_AUTO_RULE_SELECTION_ENABLED
+          ),
+          PersistenceService.loadSetting<string | null>(
+            "autoRuleSelectionModelId",
+            DEFAULT_AUTO_RULE_SELECTION_MODEL_ID
+          ),
+          PersistenceService.loadSetting<string | null>(
+            "autoRuleSelectionPrompt",
+            DEFAULT_AUTO_RULE_SELECTION_PROMPT
+          ),
         ]);
 
         const loadedSettings = {
@@ -693,6 +733,9 @@ export const useSettingsStore = create(
           autoSyncOnStreamComplete,
           autoInitializeReposOnStartup,
           controlRuleAlwaysOn,
+          autoRuleSelectionEnabled,
+          autoRuleSelectionModelId,
+          autoRuleSelectionPrompt,
         };
         set(loadedSettings);
         emitter.emit(settingsEvent.loaded, { settings: loadedSettings });
@@ -999,6 +1042,27 @@ export const useSettingsStore = create(
           handler: (
             p: SettingsEventPayloads[typeof settingsEvent.setAutoInitializeReposOnStartupRequest]
           ) => actions.setAutoInitializeReposOnStartup(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoRuleSelectionEnabledRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setAutoRuleSelectionEnabledRequest]
+          ) => actions.setAutoRuleSelectionEnabled(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoRuleSelectionModelIdRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setAutoRuleSelectionModelIdRequest]
+          ) => actions.setAutoRuleSelectionModelId(p.modelId),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoRuleSelectionPromptRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setAutoRuleSelectionPromptRequest]
+          ) => actions.setAutoRuleSelectionPrompt(p.prompt),
           storeId,
         },
         {

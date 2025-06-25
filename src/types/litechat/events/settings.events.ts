@@ -95,6 +95,9 @@ export const settingsEvent = {
     "settings.set.auto.sync.on.stream.complete.request",
   setAutoInitializeReposOnStartupRequest:
     "settings.set.auto.initialize.repos.on.startup.request",
+  setAutoRuleSelectionEnabledRequest: "settings.set.auto.rule.selection.enabled.request",
+  setAutoRuleSelectionModelIdRequest: "settings.set.auto.rule.selection.model.id.request",
+  setAutoRuleSelectionPromptRequest: "settings.set.auto.rule.selection.prompt.request",
   loadSettingsRequest: "settings.load.settings.request",
   resetGeneralSettingsRequest: "settings.reset.general.settings.request",
   resetAssistantSettingsRequest: "settings.reset.assistant.settings.request",
@@ -286,6 +289,9 @@ export interface SettingsEventPayloads {
   [settingsEvent.setAutoInitializeReposOnStartupRequest]: {
     enabled: SettingsState["autoInitializeReposOnStartup"];
   };
+  [settingsEvent.setAutoRuleSelectionEnabledRequest]: { enabled: boolean };
+  [settingsEvent.setAutoRuleSelectionModelIdRequest]: { modelId: string | null };
+  [settingsEvent.setAutoRuleSelectionPromptRequest]: { prompt: string | null };
   [settingsEvent.loadSettingsRequest]: undefined;
   [settingsEvent.resetGeneralSettingsRequest]: undefined;
   [settingsEvent.resetAssistantSettingsRequest]: undefined;

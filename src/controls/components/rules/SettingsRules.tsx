@@ -10,6 +10,7 @@ import type { RulesControlModule } from "@/controls/modules/RulesControlModule";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
 import { rulesEvent } from "@/types/litechat/events/rules.events";
+import { SettingsAutoRules } from "./SettingsAutoRules";
 
 interface SettingsRulesProps {
   module: RulesControlModule;
@@ -144,6 +145,7 @@ export const SettingsRules: React.FC<SettingsRulesProps> = ({ module }) => {
 
   return (
     <div className="space-y-6">
+      <SettingsAutoRules />
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">Rules</h3>
         <Button onClick={handleAddNew} size="sm">
