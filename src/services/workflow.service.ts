@@ -22,9 +22,10 @@ import { useProviderStore } from "@/store/provider.store";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useConversationStore } from "@/store/conversation.store";
 import type { CoreMessage } from "ai";
-import { buildHistoryMessages } from "@/lib/litechat/ai-helpers";
+import { buildHistoryMessages, getContextSnapshot } from "@/lib/litechat/ai-helpers";
 import { WorkflowFlowGenerator } from "@/lib/litechat/workflow-flow-generator";
 import type { StepStatus } from "@/types/litechat/flow";
+import { CodeExecutionService } from "./code-execution.service";
 
 // Flow content manipulation types for better type safety
 interface FlowContentUpdate {
@@ -527,12 +528,19 @@ export const WorkflowService = {
       }
     }
 
-    // console.log(
-    //   `[WorkflowService] Compiling template "${template.name}" for step "${step.name}" with data:`,
-    //   formData
-    // );
-
     try {
+      if (step.type === "custom-prompt") {
+        const inMemoryTemplate = {
+          id: `workflow-custom-prompt-${step.id}`,
+          name: `Custom: ${step.name}`,
+          prompt: step.promptContent || '',
+          variables: step.promptVariables || [],
+          tools: [],
+          rules: [],
+        };
+        // @ts-ignore
+        return await compilePromptTemplate(inMemoryTemplate, formData);
+      }
       return await compilePromptTemplate(template, formData);
     } catch (error) {
       throw WorkflowError.fromError(error, "TEMPLATE_COMPILATION_FAILED", {
@@ -767,7 +775,7 @@ export const WorkflowService = {
         conversationId,
         mainInteractionId,
         template,
-        status: "RUNNING",
+        status: "running",
         currentStepIndex: -1, // Start at -1, trigger step is 0
         stepOutputs: {},
         startedAt: new Date().toISOString(),
@@ -1209,6 +1217,56 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
         }
       }
 
+      if (step.type === "tool-call") {
+        const previousStep = run.template.steps[stepIndex - 1];
+        if (!previousStep) {
+          throw new WorkflowError(
+            "Tool call step must have a preceding step.",
+            "STEP_CREATION_FAILED",
+            { runId: run.runId, stepId: step.id, stepIndex }
+          );
+        }
+        const input = run.stepOutputs[previousStep.id];
+        if (!step.toolName) {
+          throw new WorkflowError("Tool call step is missing 'toolName'.", "TOOL_NOT_FOUND", { runId: run.runId, stepId: step.id });
+        }
+        const tool = useControlRegistryStore.getState().tools[step.toolName];
+        if (!tool) {
+          throw new WorkflowError('Tool "' + step.toolName + '" not found in registry.', "TOOL_NOT_FOUND", { runId: run.runId, toolName: step.toolName });
+        }
+        if (!tool.implementation) {
+          throw new WorkflowError('Tool "' + step.toolName + '" has no implementation.', "TOOL_NO_IMPLEMENTATION", { runId: run.runId, toolName: step.toolName });
+        }
+        try {
+          const result = await tool.implementation(input, getContextSnapshot());
+          emitter.emit(workflowEvent.stepCompleted, { runId: run.runId, stepId: step.id, output: result, metadata: createWorkflowEventMetadata(run.runId, "normal", stepIndex + 30) });
+        } catch (error) {
+          throw WorkflowError.fromError(error, "TOOL_EXECUTION_FAILED", { runId: run.runId, toolName: step.toolName, input });
+        }
+        return;
+      }
+
+      if (step.type === "function") {
+        const context = await WorkflowService._buildTransformContext(run, stepIndex);
+        if (!step.functionCode || !step.functionLanguage) {
+          throw new WorkflowError("Function step is missing code or language.", "STEP_CREATION_FAILED", { runId: run.runId, stepId: step.id });
+        }
+        try {
+          let result;
+          if (step.functionLanguage === "js") {
+            result = await CodeExecutionService.executeJs(step.functionCode, context);
+          } else if (step.functionLanguage === "py") {
+            result = await CodeExecutionService.executePy(step.functionCode, context);
+          } else {
+            throw new WorkflowError(`Unsupported function language: ${step.functionLanguage}`, "STEP_CREATION_FAILED", { runId: run.runId, stepId: step.id });
+          }
+          emitter.emit(workflowEvent.stepCompleted, { runId: run.runId, stepId: step.id, output: result, metadata: createWorkflowEventMetadata(run.runId, "normal", stepIndex + 40) });
+        } catch (error) {
+          throw WorkflowError.fromError(error, "STEP_CREATION_FAILED", { runId: run.runId, stepId: step.id, message: "Function execution failed" });
+        }
+        return;
+      }
+
       // Validate model availability if specified
       if (step.modelId) {
         const providerState = useProviderStore.getState();
@@ -1640,7 +1698,7 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
       if (
         !activeRun ||
         activeRun.runId !== runId ||
-        activeRun.status !== "RUNNING"
+        activeRun.status !== "running"
       ) {
         console.log(
           `[WorkflowService] Step completion ignored - no active run or status changed`

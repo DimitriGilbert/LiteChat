@@ -6,12 +6,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { PromptTemplate } from '@/types/litechat/prompt-template';
 import type { ModelListItem } from '@/types/litechat/provider';
 import { ModelSelector } from '@/controls/components/global-model-selector/ModelSelector';
-import { ChevronDown, ChevronRight, Trash2, GripVertical, ArrowUp, ArrowDown, ChevronsUp } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, GripVertical, ArrowUp, ArrowDown, ChevronsUp, Code, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ActionTooltipButton } from '@/components/LiteChat/common/ActionTooltipButton';
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
+import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { CodeEditor } from '@/components/LiteChat/common/CodeEditor';
 
 interface WorkflowStepCardProps {
     step: WorkflowStep;
@@ -23,6 +26,7 @@ interface WorkflowStepCardProps {
     promptTemplates: PromptTemplate[];
     agentTasks: (PromptTemplate & { prefixedName: string })[];
     models: ModelListItem[];
+    tools?: Array<{ name: string; description?: string }>; // Available tools for tool-call steps
     module?: any; // Add module for validation
     workflow?: any; // Add workflow context for validation
     stepIndex?: number; // Add step index for validation
@@ -41,6 +45,7 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
     promptTemplates, 
     agentTasks,
     models,
+    tools = [],
     module,
     workflow,
     stepIndex,
@@ -130,6 +135,9 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
     const getStepTypeLabel = () => {
         switch (step.type) {
             case 'agent-task': return 'Agent Task';
+            case 'custom-prompt': return 'Custom Prompt';
+            case 'tool-call': return 'Tool Call';
+            case 'function': return 'Function';
             case 'human-in-the-loop': return 'Human Review';
             case 'transform': return 'Data Transform';
             default: return 'AI Prompt';
@@ -335,6 +343,9 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
                             <SelectContent>
                                 <SelectItem value="prompt">AI Prompt (from Template)</SelectItem>
                                 <SelectItem value="agent-task">Agent Task (from Template)</SelectItem>
+                                <SelectItem value="custom-prompt">Custom Prompt</SelectItem>
+                                <SelectItem value="tool-call">Tool Call</SelectItem>
+                                <SelectItem value="function">Function</SelectItem>
                                 <SelectItem value="transform">Data Transform</SelectItem>
                                 <SelectItem value="human-in-the-loop">Human in the Loop</SelectItem>
                             </SelectContent>
@@ -358,6 +369,110 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
                                     ))}
                                 </SelectContent>
                             </Select>
+                        </div>
+                    )}
+                    {step.type === 'custom-prompt' && (
+                        <div className="space-y-3">
+                            <div className="space-y-1">
+                                <Label htmlFor={`step-prompt-content-${step.id}`}>Prompt Content</Label>
+                                <Textarea
+                                    id={`step-prompt-content-${step.id}`}
+                                    value={step.promptContent || ''}
+                                    onChange={(e) => onChange({ ...step, promptContent: e.target.value })}
+                                    placeholder="Enter your custom prompt here..."
+                                    rows={4}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label>Input Variables</Label>
+                                <div className="text-xs text-muted-foreground mb-2">
+                                    Define variables that this step requires from previous steps
+                                </div>
+                                {/* Variable management UI could be added here */}
+                                <div className="text-sm text-muted-foreground p-2 bg-muted/30 rounded border">
+                                    Variables: {step.promptVariables?.map(v => v.name).join(', ') || 'None defined'}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {step.type === 'tool-call' && (
+                        <div className="space-y-3">
+                            <div className="space-y-1">
+                                <Label htmlFor={`step-tool-${step.id}`}>Tool</Label>
+                                <Select
+                                    value={step.toolName || ''}
+                                    onValueChange={(value) => onChange({ ...step, toolName: value })}
+                                >
+                                    <SelectTrigger id={`step-tool-${step.id}`}>
+                                        <SelectValue placeholder="Select a tool" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {tools.map(tool => (
+                                            <SelectItem key={tool.name} value={tool.name}>
+                                                {tool.name} {tool.description && `- ${tool.description}`}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            {step.toolName && (
+                                <div className="space-y-1">
+                                    <Label>Static Arguments</Label>
+                                    <div className="text-xs text-muted-foreground mb-2">
+                                        Define static arguments for the tool (dynamic data comes from previous steps)
+                                    </div>
+                                    <div className="text-sm text-muted-foreground p-2 bg-muted/30 rounded border">
+                                        Args: {Object.keys(step.toolArgs || {}).join(', ') || 'None defined'}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {step.type === 'function' && (
+                        <div className="space-y-3">
+                            <div className="space-y-1">
+                                <Label>Language</Label>
+                                <RadioGroup
+                                    value={step.functionLanguage || 'js'}
+                                    onValueChange={(value: 'js' | 'py') => onChange({ ...step, functionLanguage: value })}
+                                >
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="js" id={`lang-js-${step.id}`} />
+                                        <Label htmlFor={`lang-js-${step.id}`}>JavaScript</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="py" id={`lang-py-${step.id}`} />
+                                        <Label htmlFor={`lang-py-${step.id}`}>Python</Label>
+                                    </div>
+                                </RadioGroup>
+                            </div>
+                            <div className="space-y-1">
+                                <Label>Input Variables</Label>
+                                <div className="text-xs text-muted-foreground mb-2">
+                                    Define variables that this function expects from previous steps
+                                </div>
+                                <div className="text-sm text-muted-foreground p-2 bg-muted/30 rounded border">
+                                    Variables: {step.functionVariables?.map(v => v.name).join(', ') || 'None defined'}
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor={`step-function-code-${step.id}`}>Function Code</Label>
+                                <div className="text-xs text-muted-foreground mb-2">
+                                    Available context: workflow, initial_step, outputs[], and your defined variables. Use return statement to provide output.
+                                </div>
+                                <div className="border rounded-md">
+                                    <CodeEditor
+                                        value={step.functionCode || ''}
+                                        language={step.functionLanguage === 'py' ? 'python' : 'javascript'}
+                                        onChange={(value) => onChange({ ...step, functionCode: value })}
+                                        placeholder={step.functionLanguage === 'py' ? 
+                                            '# Example:\n# result = initial_step["data"] * 2\n# return {"processed": result}' :
+                                            '// Example:\n// const result = initial_step.data * 2;\n// return { processed: result };'
+                                        }
+                                        minHeight="200px"
+                                    />
+                                </div>
+                            </div>
                         </div>
                     )}
                     {step.type === 'human-in-the-loop' && (
