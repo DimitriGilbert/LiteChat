@@ -88,7 +88,10 @@ export class JsRunnableBlockModule implements ControlModule {
         log: (
           level: "log" | "warn" | "error" | "info" | "debug",
           ...args: any[]
-        ) => this.modApiRef!.log(level, ...args),
+        ) => {
+          if (!this.modApiRef) throw new Error("modApi not available");
+          return this.modApiRef.log(level, ...args);
+        },
         toast: (
           type: "success" | "info" | "warning" | "error",
           message: string

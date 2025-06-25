@@ -19,7 +19,18 @@ const runnableBlocksSchema = z.object({
   runnableBlocksSecurityCheckEnabled: z.boolean(),
   runnableBlocksSecurityModelId: z.string().nullable(),
   runnableBlocksSecurityPrompt: z.string(),
-});
+}).refine(
+  (data) => {
+    if (data.runnableBlocksSecurityCheckEnabled && data.runnableBlocksSecurityPrompt) {
+      return data.runnableBlocksSecurityPrompt.includes('{{code}}');
+    }
+    return true;
+  },
+  {
+    message: "Security prompt must include the {{code}} placeholder",
+    path: ["runnableBlocksSecurityPrompt"],
+  }
+);
 
 const SettingsRunnableBlocksComponent: React.FC = () => {
   const settings = useSettingsStore(
@@ -82,8 +93,9 @@ const SettingsRunnableBlocksComponent: React.FC = () => {
     },
   });
 
+  const formReset = form.reset;
   useEffect(() => {
-    form.reset({
+    formReset({
       jsEnabled: getSetting("core-js-runnable-block-renderer-control-rule", false),
       pythonEnabled: getSetting("core-python-runnable-block-renderer-control-rule", false),
       runnableBlocksSecurityCheckEnabled:
@@ -98,7 +110,7 @@ const SettingsRunnableBlocksComponent: React.FC = () => {
     settings.runnableBlocksSecurityCheckEnabled,
     settings.runnableBlocksSecurityModelId,
     settings.runnableBlocksSecurityPrompt,
-    form,
+    formReset,
   ]);
 
   return (

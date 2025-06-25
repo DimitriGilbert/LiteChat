@@ -426,6 +426,11 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
     toggleFold
   );
 
+  // Add useCallback for stable onReady reference
+  const handleFlowReady = useCallback(() => {
+    setIsReactFlowReady(true);
+  }, []);
+
   return (
     <div 
       ref={containerRef}
@@ -501,7 +506,7 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
                     <FlowContent 
                       nodes={nodes} 
                       edges={edges} 
-                      onReady={() => setIsReactFlowReady(true)}
+                      onReady={handleFlowReady}
                     />
                   </ReactFlowProvider>
                 )}
