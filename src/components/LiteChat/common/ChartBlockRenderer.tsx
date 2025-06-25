@@ -56,10 +56,18 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
     // In streaming, we only attempt to parse if the JSON looks mostly complete.
     if (isStreaming) {
       const trimmedCode = code.trim();
+      // Check for basic JSON structure
       const isLikelyJson = (trimmedCode.startsWith('{') && trimmedCode.endsWith('}'));
       const isLikelyArray = (trimmedCode.startsWith('[') && trimmedCode.endsWith(']'));
       if (!isLikelyJson && !isLikelyArray) {
-        return; 
+        return;
+      }
+
+      // Additional check: count braces/brackets to ensure they're balanced
+      const openBraces = (trimmedCode.match(/[{[]/g) || []).length;
+      const closeBraces = (trimmedCode.match(/[}\]]/g) || []).length;
+      if (openBraces !== closeBraces) {
+        return; // Still incomplete
       }
     }
     
@@ -129,8 +137,20 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
         },
       });
 
+      // Generate a descriptive filename
+      let baseName = 'chart';
+      if (chartData) {
+        if (chartData.title) {
+          // Sanitize title for filename
+          baseName = chartData.title.replace(/[^a-z0-9\-_]+/gi, '_').replace(/^_+|_+$/g, '');
+        } else if (chartData.chartType) {
+          baseName = chartData.chartType;
+        }
+      }
+      const filename = `${baseName || 'chart'}.png`;
+
       const link = document.createElement('a');
-      link.download = 'chart.png';
+      link.download = filename;
       link.href = dataUrl;
       link.click();
       
@@ -139,7 +159,7 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
       console.error("Error downloading chart:", error);
       toast.error("Failed to download chart");
     }
-  }, []);
+  }, [chartData]);
 
   const renderSlotForCodeBlock = useCallback(
     (
@@ -323,8 +343,8 @@ const ChartContent = React.forwardRef<
 
   const renderChart = () => {
     // Check if this is pie-style data (each row represents a category)
-    const isPieStyleData = chartData.chartData.length > 1 && 
-      chartData.chartData.every(item => item.color) &&
+    const isPieStyleData = chartData.chartData.length > 1 &&
+      chartData.chartData.some(item => item.color) &&
       Object.keys(chartData.chartConfig).length === 1;
 
     switch (currentChartType) {
