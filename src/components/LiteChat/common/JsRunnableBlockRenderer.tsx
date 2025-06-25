@@ -101,7 +101,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
         })
         .filter(Boolean);
     },
-    [canvasControls, editedCode, interactionId, setIsEditing]
+    [canvasControls, editedCode, interactionId, blockId, setIsEditing]
   );
 
   const highlightCode = useCallback(() => {
@@ -145,25 +145,30 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
     const originalWarn = console.warn;
     
     console.log = (...args) => {
-      capturedLogs.push(args.join(' '));
+      const formatted = args.map(arg => {
+        if (typeof arg === 'object') {
+          try {
+            return JSON.stringify(arg, null, 2);
+          } catch {
+            return String(arg);
+          }
+        }
+        return String(arg);
+      }).join(' ');
+      capturedLogs.push(formatted);
       originalLog(...args);
-    };
-    
-    console.error = (...args) => {
-      capturedLogs.push(`Error: ${args.join(' ')}`);
-      originalError(...args);
-    };
-    
-    console.warn = (...args) => {
-      capturedLogs.push(`Warning: ${args.join(' ')}`);
-      originalWarn(...args);
     };
 
     try {
       // Execute the code in an isolated context
       const codeToRun = isEditing ? editedCode : code;
-      const func = new Function(codeToRun);
-      await func();
+      // Wrap in async function to handle both sync and async code
+      const asyncFunc = new Function(`return (async () => { ${codeToRun} })();`);
+      const result = asyncFunc();
+      // Only await if it's a promise
+      if (result && typeof result.then === 'function') {
+        await result;
+      }
       
       if (capturedLogs.length === 0) {
         capturedLogs.push("Code executed successfully (no output)");

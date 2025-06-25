@@ -18,8 +18,7 @@ import { InlineCodeEditor } from "@/controls/components/canvas/codeblock/EditCod
 import { Button } from "@/components/ui/button";
 import { PlayIcon, Loader2Icon, EyeIcon, CodeIcon, DownloadIcon } from "lucide-react";
 import { toast } from "sonner";
-
-const pyodideVersionUrl = "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js";
+import { PYODIDE_VERSION_URL } from "@/lib/litechat/constants";
 
 // Pyodide types declaration
 declare global {
@@ -84,7 +83,7 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
       setIsLoading(true);
       try {
         window.pyodide = await window.loadPyodide({
-          indexURL: pyodideVersionUrl,
+          indexURL: PYODIDE_VERSION_URL,
         });
         setPyodideReady(true);
         toast.success("Python environment ready");
@@ -98,11 +97,11 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
       // Load Pyodide script if not already loaded
       setIsLoading(true);
       const script = document.createElement('script');
-      script.src = pyodideVersionUrl;
+      script.src = PYODIDE_VERSION_URL;
       script.onload = async () => {
         try {
           window.pyodide = await window.loadPyodide({
-            indexURL: pyodideVersionUrl,
+            indexURL: PYODIDE_VERSION_URL,
           });
           setPyodideReady(true);
           toast.success("Python environment ready");
@@ -162,7 +161,7 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
         })
         .filter(Boolean);
     },
-    [canvasControls, editedCode, interactionId, setIsEditing]
+    [canvasControls, editedCode, interactionId, blockId, setIsEditing]
   );
 
   const highlightCode = useCallback(() => {
