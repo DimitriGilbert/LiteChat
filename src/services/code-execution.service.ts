@@ -23,7 +23,6 @@ export const CodeExecutionService = {
         throw new Error('Pyodide only available in browser environment');
       }
 
-      // @ts-ignore - Dynamic import from CDN
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js';
       document.head.appendChild(script);
@@ -127,20 +126,25 @@ def workflow_return(value):
     return value
       `);
       
-      // Wrap user code to capture return statements
-      const wrappedCode = `
+      // Instead of interpolating user code, use exec to safely execute user code in a controlled scope
+      // This prevents code injection via triple quotes or special syntax
+      const safeWrapper = `
+import sys
+import json
+
 try:
-    ${code}
+    exec(USER_CODE, globals())
     # If no explicit return, try to capture the last expression
     if '_workflow_result' not in globals() or _workflow_result is None:
         pass  # No return value
 except Exception as e:
     _workflow_result = {'error': str(e)}
     raise
-      `;
-      
-      // Execute the Python code
-      pyodide.runPython(wrappedCode);
+`;
+      // Replace USER_CODE with a unique placeholder, then use runPython with code argument
+      // Pyodide supports runPython(code, globals, locals) but not direct code injection, so we use set
+      pyodide.globals.set("USER_CODE", code);
+      pyodide.runPython(safeWrapper);
       
       // Get the return value
       const result = pyodide.globals.get('_workflow_result');

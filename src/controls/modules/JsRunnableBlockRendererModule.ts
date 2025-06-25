@@ -130,7 +130,7 @@ chart.className = 'flex items-end gap-1 h-52 p-5';
 data.forEach((value, index) => {
   const bar = document.createElement('div');
   const height = (value / maxVal) * 150;
-  bar.className = \`w-10 h-\${height} bg-gradient-to-t from-purple-400 to-purple-600 rounded-t-md relative transition-all duration-300 ease-in-out\`;
+  bar.className = \`w-10 h-[\${height}] bg-gradient-to-t from-purple-400 to-purple-600 rounded-t-md relative transition-all duration-300 ease-in-out\`;
   
   // Add value label
   const label = document.createElement('span');
@@ -169,7 +169,7 @@ litechat.utils.log('info', 'File content displayed in DOM');
 ## IMPORTANT PRINCIPLES:
 1. **ALWAYS use \`litechat.target.appendChild()\`, \`litechat.target.replaceChildren()\`, etc.**
 2. **Create elements with \`document.createElement()\`**
-3. **Use \`element.style.cssText\` for efficient styling**
+3. **Use Tailwind utility classes via \`className\` for styling**
 4. **Add event listeners directly: \`element.onclick = () => {...}\`**
 5. **Avoid innerHTML/outerHTML - use DOM methods for performance**
 6. **Use \`litechat.target.replaceChildren()\` to clear content before adding new content**

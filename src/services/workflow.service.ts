@@ -26,6 +26,7 @@ import { buildHistoryMessages, getContextSnapshot } from "@/lib/litechat/ai-help
 import { WorkflowFlowGenerator } from "@/lib/litechat/workflow-flow-generator";
 import type { StepStatus } from "@/types/litechat/flow";
 import { CodeExecutionService } from "./code-execution.service";
+import type { PromptTemplateType } from "@/types/litechat/prompt-template";
 
 // Flow content manipulation types for better type safety
 interface FlowContentUpdate {
@@ -530,15 +531,21 @@ export const WorkflowService = {
 
     try {
       if (step.type === "custom-prompt") {
+        const now = new Date();
         const inMemoryTemplate = {
           id: `workflow-custom-prompt-${step.id}`,
           name: `Custom: ${step.name}`,
-          prompt: step.promptContent || '',
+          description: "",
           variables: step.promptVariables || [],
+          prompt: step.promptContent || '',
+          tags: [],
           tools: [],
           rules: [],
+          type: "prompt" as PromptTemplateType,
+          isPublic: false,
+          createdAt: now,
+          updatedAt: now,
         };
-        // @ts-ignore
         return await compilePromptTemplate(inMemoryTemplate, formData);
       }
       return await compilePromptTemplate(template, formData);
@@ -1262,7 +1269,7 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
           }
           emitter.emit(workflowEvent.stepCompleted, { runId: run.runId, stepId: step.id, output: result, metadata: createWorkflowEventMetadata(run.runId, "normal", stepIndex + 40) });
         } catch (error) {
-          throw WorkflowError.fromError(error, "STEP_CREATION_FAILED", { runId: run.runId, stepId: step.id, message: "Function execution failed" });
+          throw WorkflowError.fromError(error, "STEP_CREATION_FAILED", { runId: run.runId, stepId: step.id, error: error instanceof Error ? error.message : String(error)});
         }
         return;
       }
