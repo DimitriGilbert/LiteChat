@@ -22,36 +22,50 @@ export class JsRunnableBlockModule implements ControlModule {
     return {
       // ModApi access for full LiteChat integration
       modApi: this.modApiRef,
-      
+
       // Context snapshot for current state
       context: this.modApiRef.getContextSnapshot(),
-      
+
       // VFS access for file operations
       vfs: {
-        getInstance: (vfsKey: string) => this.modApiRef!.getVfsInstance(vfsKey),
-        getCurrentVfsKey: () => {
-          const context = this.modApiRef!.getContextSnapshot();
-          // Use selected conversation's project if available, otherwise 'orphan'
-          return context.selectedConversationId ? 
-            `project-${context.selectedConversationId}` : 'orphan';
-        }
+        vfs: {
+          getInstance: (vfsKey: string) => {
+            if (!this.modApiRef) throw new Error("modApi not available");
+            return this.modApiRef.getVfsInstance(vfsKey);
+          },
+          getCurrentVfsKey: () => {
+            if (!this.modApiRef) throw new Error("modApi not available");
+            const context = this.modApiRef.getContextSnapshot();
+            // Use selected conversation's project if available, otherwise 'orphan'
+            return context.selectedConversationId
+              ? `project-${context.selectedConversationId}`
+              : "orphan";
+          },
+        },
       },
-      
+
       // Utilities for common operations
       utils: {
-        log: (level: "log" | "warn" | "error" | "info" | "debug", ...args: any[]) => 
-          this.modApiRef!.log(level, ...args),
-        toast: (type: "success" | "info" | "warning" | "error", message: string) => 
-          this.modApiRef!.showToast(type, message),
-        generateId: () => `js-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        
-                 // Event system access
-         emit: (eventName: string, payload: any) => 
-           this.modApiRef!.emit(eventName as any, payload),
-         on: (eventName: string, callback: (payload: any) => void) => 
-           this.modApiRef!.on(eventName as any, callback),
+        log: (
+          level: "log" | "warn" | "error" | "info" | "debug",
+          ...args: any[]
+        ) => this.modApiRef!.log(level, ...args),
+        toast: (
+          type: "success" | "info" | "warning" | "error",
+          message: string
+        ) => this.modApiRef!.showToast(type, message),
+        generateId: () =>
+          `js-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+
+        // Event system access
+        // I do not like the any 
+        // TODO fix at some point but not critical
+        emit: (eventName: string, payload: any) =>
+          this.modApiRef!.emit(eventName as any, payload),
+        on: (eventName: string, callback: (payload: any) => void) =>
+          this.modApiRef!.on(eventName as any, callback),
       },
-      
+
       // Preview management for graphical output
       preview: {
         createTarget: (id?: string) => {
@@ -60,21 +74,21 @@ export class JsRunnableBlockModule implements ControlModule {
             id: previewId,
             render: (content: string | React.ReactElement) => {
               // Emit event to create/update preview block
-              this.modApiRef!.emit('canvas.preview.update', {
+              this.modApiRef!.emit("canvas.preview.update", {
                 previewId,
                 content,
-                type: 'html'
+                type: "html",
               });
             },
             clear: () => {
-              this.modApiRef!.emit('canvas.preview.clear', { previewId });
+              this.modApiRef!.emit("canvas.preview.clear", { previewId });
             },
             remove: () => {
-              this.modApiRef!.emit('canvas.preview.remove', { previewId });
-            }
+              this.modApiRef!.emit("canvas.preview.remove", { previewId });
+            },
           };
-        }
-      }
+        },
+      },
     };
   }
 
@@ -100,4 +114,4 @@ export class JsRunnableBlockModule implements ControlModule {
     this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
-} 
+}

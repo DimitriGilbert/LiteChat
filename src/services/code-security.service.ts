@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { nanoid } from "nanoid";
 import type { Interaction } from "@/types/litechat/interaction";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
+import { interpolateColor } from "@/lib/utils";
 
 export interface CodeSecurityResult {
   score: number;
@@ -128,13 +129,15 @@ export class CodeSecurityService {
       try {
         // Extract numeric score from response
         const cleaned = result.trim();
-        const numericMatch = cleaned.match(/\b(\d{1,3})\b/);
+        // Match numbers 0-100 more precisely
+        const numericMatch = cleaned.match(/\b(100|[0-9]{1,2})\b/);
         if (!numericMatch) {
           throw new Error("No numeric score found in AI response.");
         }
         const parsedScore = parseInt(numericMatch[1], 10);
-        if (isNaN(parsedScore) || parsedScore < 0 || parsedScore > 100) {
-          throw new Error(`Invalid score: ${parsedScore}. Must be between 0-100.`);
+        // The regex already ensures 0-100, but double-check for safety
+        if (isNaN(parsedScore)) {
+          throw new Error(`Failed to parse score: ${numericMatch[1]}`);
         }
         score = parsedScore;
       } catch (err) {
@@ -158,27 +161,7 @@ export class CodeSecurityService {
       const riskLevel = score <= 30 ? 'safe' : score <= 60 ? 'moderate' : score <= 90 ? 'high' : 'extreme';
       const clicksRequired = score <= 30 ? 1 : score <= 60 ? 2 : score <= 90 ? 3 : 3;
       const requiresConfirmation = score > 30;
-      
-      // Calculate color (green to yellow to red)
-      let color: string;
-      if (score <= 30) {
-        // Green
-        color = '#22c55e';
-      } else if (score <= 60) {
-        // Interpolate from green to yellow
-        const ratio = (score - 30) / 30;
-        const r = Math.round(34 + (234 - 34) * ratio);
-        const g = Math.round(197 + (179 - 197) * ratio);
-        const b = Math.round(94 + (8 - 94) * ratio);
-        color = `rgb(${r}, ${g}, ${b})`;
-      } else {
-        // Interpolate from yellow to red
-        const ratio = (score - 60) / 40;
-        const r = Math.round(234 + (239 - 234) * ratio);
-        const g = Math.round(179 + (68 - 179) * ratio);
-        const b = Math.round(8 + (68 - 8) * ratio);
-        color = `rgb(${r}, ${g}, ${b})`;
-      }
+      const color = interpolateColor(score);
 
       return {
         score,

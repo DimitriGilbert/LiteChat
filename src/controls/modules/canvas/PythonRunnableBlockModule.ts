@@ -28,13 +28,20 @@ export class PythonRunnableBlockModule implements ControlModule {
       
       // VFS access for file operations
       vfs: {
-        getInstance: (vfsKey: string) => this.modApiRef!.getVfsInstance(vfsKey),
+      vfs: {
+        getInstance: (vfsKey: string) => {
+          if (!this.modApiRef) throw new Error("modApi not available");
+          return this.modApiRef.getVfsInstance(vfsKey);
+        },
         getCurrentVfsKey: () => {
-          const context = this.modApiRef!.getContextSnapshot();
+          if (!this.modApiRef) throw new Error("modApi not available");
+          const context = this.modApiRef.getContextSnapshot();
           // Use selected conversation's project if available, otherwise 'orphan'
-          return context.selectedConversationId ? 
-            `project-${context.selectedConversationId}` : 'orphan';
+          return context.selectedConversationId
+            ? `project-${context.selectedConversationId}`
+            : 'orphan';
         }
+      },
       },
       
       // Utilities for common operations
