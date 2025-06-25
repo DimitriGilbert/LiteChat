@@ -200,6 +200,53 @@ const DEFAULT_RUNNABLE_BLOCKS_SECURITY_MODEL_ID = null;
 const DEFAULT_RUNNABLE_BLOCKS_SECURITY_PROMPT =
   "Analyze the following code for potential security risks or malicious behavior. Respond with ONLY a number from 0 to 100 where:\n- 0-30: Safe code (reading data, basic calculations, simple DOM manipulation)\n- 31-60: Moderate risk (file operations, network requests, eval usage)\n- 61-90: High risk (system commands, dangerous APIs, potential privacy violations)\n- 91-100: Extremely dangerous (malware, destructive operations, clear security threats)\n\nCode to analyze:\n{{code}}\n\nReturn only the numeric risk score (0-100).";
 
+// Add a static array of all SettingsState keys for robust, type-safe enumeration
+export const SETTINGS_KEYS: (keyof SettingsState)[] = [
+  "theme",
+  "globalSystemPrompt",
+  "temperature",
+  "maxTokens",
+  "topP",
+  "topK",
+  "presencePenalty",
+  "frequencyPenalty",
+  "enableAdvancedSettings",
+  "enableStreamingMarkdown",
+  "enableStreamingCodeBlockParsing",
+  "foldStreamingCodeBlocks",
+  "foldUserMessagesOnCompletion",
+  "streamingRenderFPS",
+  "gitUserName",
+  "gitUserEmail",
+  "gitGlobalPat",
+  "toolMaxSteps",
+  "prismThemeUrl",
+  "autoTitleEnabled",
+  "autoTitleAlwaysOn",
+  "autoTitleModelId",
+  "autoTitlePromptMaxLength",
+  "autoTitleIncludeFiles",
+  "autoTitleIncludeRules",
+  "forkCompactPrompt",
+  "forkCompactModelId",
+  "customFontFamily",
+  "customFontSize",
+  "chatMaxWidth",
+  "customThemeColors",
+  "autoScrollInterval",
+  "enableAutoScrollOnStream",
+  "autoSyncOnStreamComplete",
+  "autoInitializeReposOnStartup",
+  "controlRuleAlwaysOn",
+  "autoRuleSelectionEnabled",
+  "autoRuleSelectionModelId",
+  "autoRuleSelectionPrompt",
+  "runnableBlocksEnabled",
+  "runnableBlocksSecurityCheckEnabled",
+  "runnableBlocksSecurityModelId",
+  "runnableBlocksSecurityPrompt",
+];
+
 const persistSetting = async <K extends keyof SettingsState>(
   key: K,
   value: SettingsState[K]
@@ -493,19 +540,17 @@ export const useSettingsStore = create(
     loadSettings: async () => {
       try {
         const initialState = get();
-        const settingKeys = Object.keys(initialState).filter(key => typeof initialState[key as keyof SettingsState] !== 'function') as (keyof SettingsState)[];
+        // Use the static SETTINGS_KEYS array for robust, type-safe key enumeration
+        const settingKeys = SETTINGS_KEYS;
 
         const loadedSettings: Partial<SettingsState> = {};
         for (const key of settingKeys) {
           const loadedValue = await PersistenceService.loadSetting(key, initialState[key]);
-          if (loadedValue !== null && loadedValue !== undefined) {
-            (loadedSettings as any)[key] = loadedValue;
-          }
+          // Apply all loaded values, including nulls (do not filter out null)
+          (loadedSettings as any)[key] = loadedValue;
         }
-        
         set(loadedSettings);
         emitter.emit(settingsEvent.loaded, { settings: get() });
-
       } catch (error) {
         toast.error("Failed to load settings from the database.", {
           description:
