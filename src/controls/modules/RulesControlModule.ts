@@ -22,7 +22,6 @@ import {
   instantiateModelInstance,
 } from "@/lib/litechat/provider-helpers";
 import { useProviderStore } from "@/store/provider.store";
-import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { useInteractionStore } from "@/store/interaction.store";
 import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
